@@ -8,6 +8,10 @@ the currency store's `fetchRates()` on mount. In happy-dom, a pending real fetch
 is aborted during teardown and prints `DOMException [AbortError]` after the test
 suite passes.
 
+This is easiest to miss in full-suite runs because individual files can pass
+cleanly while concurrent happy-dom environments still abort a late fetch during
+global teardown.
+
 ## Fix
 
 Tests that render money-formatting hooks must own the exchange-rate dependency:
@@ -62,7 +66,15 @@ When a test renders a page or component that imports `useFormatMoney` or
 
 Do not leave native happy-dom fetches running in page tests.
 
+As of 2026-06-13, `useFormatMoney()` and `useDisplayMoney()` also skip their
+automatic mount-time `fetchRates()` call when `import.meta.env.MODE === 'test'`.
+Keep direct currency-store tests explicit: call `fetchRates()` yourself and stub
+`fetch` in that test. Do not remove the guard unless every component/page test
+that renders money formatting owns `/api/v1/exchange-rates`.
+
 ## Files affected
 
 - `apps/web/src/pages/TerritoriesPage.test.tsx`
 - `apps/web/src/pages/OpportunitiesPage.test.tsx`
+- `apps/web/src/hooks/useFormatMoney.ts`
+- `apps/web/src/hooks/useDisplayMoney.ts`

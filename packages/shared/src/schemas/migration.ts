@@ -87,35 +87,68 @@ export const DedupStrategyEnum = z.enum([
 ]);
 export type DedupStrategy = z.infer<typeof DedupStrategyEnum>;
 
+const RAW_SECRET_META_KEY_RE =
+  /(^|[_-])(api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|private[_-]?key|client[_-]?secret|secret)$/i;
+const SECRET_REFERENCE_META_KEY_RE =
+  /(secretRefs?|secretReferences?|credentialRefs?|credentialReferences?|credentialId|integrationConfigId)$/i;
+
+function rawSecretMetaPaths(value: unknown, path: string[] = []): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const paths: string[] = [];
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    const nextPath = [...path, key];
+    if (RAW_SECRET_META_KEY_RE.test(key) && !SECRET_REFERENCE_META_KEY_RE.test(key)) {
+      paths.push(nextPath.join('.'));
+      continue;
+    }
+    paths.push(...rawSecretMetaPaths(nested, nextPath));
+  }
+  return paths;
+}
+
 // ─── Job payload stored in BullMQ ───────────────────────────────────────────
 
 // One BullMQ job is a chunk of rows, not the entire import, so large imports
 // fan out into multiple jobs and the worker never times out.
-export const MigrationJobPayload = z.object({
-  migrationJobId: z.string().uuid(),
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
-  source: MigrationSourceEnum,
-  // Entity being imported: "Account", "Contact", "Lead", "Opportunity", "Activity"
-  entityType: z.string().min(1),
-  // Row offset for this chunk (0-indexed). Used for progress tracking.
-  chunkOffset: z.number().int().nonnegative(),
-  // Chunk size (default 100).
-  chunkSize: z.number().int().positive().default(100),
-  // Total rows in the full import (set on first chunk so worker can report progress).
-  totalRows: z.number().int().nonnegative(),
-  // For CSV imports: path in Redis where the parsed rows are stored.
-  // For HubSpot OAuth: not used (rows are fetched directly from API).
-  redisKey: z.string().min(1).optional(),
-  // For HubSpot OAuth: pagination cursor for this chunk.
-  hubspotAfter: z.string().optional(),
-  mappings: MappingsRecord,
-  dedupStrategy: DedupStrategyEnum.default('update'),
-  // Which column name (if any) holds the source system's record ID for dedup.
-  externalIdColumn: z.string().optional(),
-  // Additional provider-specific state (like tokens) to pass to the worker.
-  meta: z.record(z.unknown()).optional(),
-});
+export const MigrationJobPayload = z
+  .object({
+    migrationJobId: z.string().uuid(),
+    orgId: z.string().uuid(),
+    userId: z.string().uuid(),
+    source: MigrationSourceEnum,
+    // Entity being imported: "Account", "Contact", "Lead", "Opportunity", "Activity"
+    entityType: z.string().min(1),
+    // Row offset for this chunk (0-indexed). Used for progress tracking.
+    chunkOffset: z.number().int().nonnegative(),
+    // Chunk size (default 100).
+    chunkSize: z.number().int().positive().default(100),
+    // Total rows in the full import (set on first chunk so worker can report progress).
+    totalRows: z.number().int().nonnegative(),
+    // For CSV imports: path in Redis where the parsed rows are stored.
+    // For HubSpot OAuth: not used (rows are fetched directly from API).
+    redisKey: z.string().min(1).optional(),
+    // For HubSpot OAuth: pagination cursor for this chunk.
+    hubspotAfter: z.string().optional(),
+    mappings: MappingsRecord,
+    dedupStrategy: DedupStrategyEnum.default('update'),
+    // Which column name (if any) holds the source system's record ID for dedup.
+    externalIdColumn: z.string().optional(),
+    // Non-secret provider-specific state. Queue payloads may carry stable
+    // references such as IntegrationConfig ids; raw provider tokens stay in the
+    // encrypted credential store and are resolved by workers just in time.
+    meta: z.record(z.unknown()).optional(),
+  })
+  .superRefine((payload, ctx) => {
+    const secretPaths = rawSecretMetaPaths(payload.meta);
+    for (const path of secretPaths) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['meta', ...path.split('.')],
+        message:
+          'Migration job payload meta cannot contain raw secret material; store a credential reference instead.',
+      });
+    }
+  });
 export type MigrationJobPayload = z.infer<typeof MigrationJobPayload>;
 
 // ─── HubSpot discovery (entity counts pre-import) ───────────────────────────

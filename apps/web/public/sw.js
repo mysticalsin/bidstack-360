@@ -1,13 +1,28 @@
-/* global self, caches, URL, fetch, Response */
+/* global self, caches, URL, fetch */
 
-const CACHE_NAME = 'bidstack-v1';
+const CACHE_NAME = 'bidstack-v4-network-owned-routes';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 const STATIC_CACHE_MATCH_OPTIONS = { ignoreVary: true };
 const CRITICAL_MANIFEST_KEYS = ['index.html', 'src/pages/DashboardPage.tsx'];
-const SENSITIVE_DATA_PATHS = ['/api/', '/trpc/'];
+const NETWORK_ONLY_PATH_PREFIXES = [
+  '/api/',
+  '/auth/',
+  '/oauth/',
+  '/trpc/',
+  '/webhooks/dust',
+];
+const NETWORK_ONLY_PATH_SEGMENTS = ['/download', '/export'];
 
-function isSensitiveDataUrl(url) {
-  return SENSITIVE_DATA_PATHS.some((path) => url.pathname.startsWith(path));
+function isNetworkOwnedUrl(url) {
+  const pathname = url.pathname.toLowerCase();
+  return (
+    NETWORK_ONLY_PATH_PREFIXES.some((path) => pathname.startsWith(path)) ||
+    NETWORK_ONLY_PATH_SEGMENTS.some((segment) => pathname.includes(segment))
+  );
+}
+
+function isSameOriginUrl(url) {
+  return url.origin === self.location.origin;
 }
 
 function fetchAndCache(request, cache) {
@@ -35,7 +50,7 @@ async function purgeSensitiveCacheEntries() {
       await Promise.all(
         requests.map((request) => {
           const url = new URL(request.url);
-          return isSensitiveDataUrl(url) ? cache.delete(request) : Promise.resolve(false);
+          return isNetworkOwnedUrl(url) ? cache.delete(request) : Promise.resolve(false);
         }),
       );
     }),
@@ -155,6 +170,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Authenticated/data requests must stay outside the app-shell worker. The
+  // browser owns auth, CORS, streaming downloads, and network errors here.
+  if (isNetworkOwnedUrl(url) || !isSameOriginUrl(url)) {
+    return;
+  }
+
   // SPA navigation: network-first, cached app shell fallback.
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -167,24 +188,6 @@ self.addEventListener('fetch', (event) => {
               .then((cached) => cached || cache.match('/index.html', STATIC_CACHE_MATCH_OPTIONS)),
           ),
         ),
-    );
-    return;
-  }
-
-  // Authenticated data must never be stored or replayed from Cache Storage:
-  // stale CRM JSON can cross org/user boundaries after logout or account switch.
-  if (isSensitiveDataUrl(url)) {
-    event.respondWith(
-      fetch(request).catch(
-        () =>
-          new Response(JSON.stringify({ error: 'Offline', message: 'Network unavailable' }), {
-            status: 503,
-            headers: {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-store',
-            },
-          }),
-      ),
     );
     return;
   }
@@ -210,3 +213,12 @@ self.addEventListener('fetch', (event) => {
     ),
   );
 });
+
+if (self.__BIDSTACK_SW_TEST__ === true) {
+  self.__bidstackServiceWorkerPolicy = {
+    CACHE_NAME,
+    NETWORK_ONLY_PATH_PREFIXES,
+    NETWORK_ONLY_PATH_SEGMENTS,
+    isNetworkOwnedUrl,
+  };
+}

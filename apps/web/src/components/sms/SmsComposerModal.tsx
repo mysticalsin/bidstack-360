@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -96,13 +97,10 @@ export function SmsComposerModal({
     if (!isValidE164(phoneNumber)) return;
     setSendState('checking-consent');
     try {
-      const res = await fetch(`/api/v1/sms/consent/${encodeURIComponent(phoneNumber)}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { optedOut: boolean };
-        setConsent({ optedOut: data.optedOut, checked: true });
-      }
+      const data = await api<{ optedOut: boolean }>(
+        `/api/sms/consent/${encodeURIComponent(phoneNumber)}`,
+      );
+      setConsent({ optedOut: data.optedOut, checked: true });
     } catch {
       // Consent check failure is non-fatal — the API will enforce it on send
       setConsent({ optedOut: false, checked: false });
@@ -160,22 +158,15 @@ export function SmsComposerModal({
     setErrorMessage('');
 
     try {
-      const res = await fetch('/api/v1/sms/send', {
+      await api('/api/sms/send', {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           toNumber: phone,
           body: body.trim(),
           ...(entityType && { entityType }),
           ...(entityId && { entityId }),
-        }),
+        },
       });
-
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
 
       setSendState('success');
       // Auto-close after success

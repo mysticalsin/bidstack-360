@@ -154,6 +154,12 @@ function ConditionRow({
         <FieldPicker
           entity={entity}
           value={condition.field}
+          // WHY onResolve: hydrates fieldDef from the saved field on the edit
+          // path so opsForType / ValueInput render the correct operators and
+          // input. `setFieldDef` is a stable setter, so the resolve effect in
+          // FieldPicker won't loop. No-op when the user picks a field (onChange
+          // sets it first).
+          onResolve={setFieldDef}
           onChange={(key, def) => {
             setFieldDef(def);
             onChange({ ...condition, field: key, operator: 'eq', value: undefined });

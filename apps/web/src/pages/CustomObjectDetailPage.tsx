@@ -7,7 +7,7 @@
  *
  * WCAG 2.2 AA. Dark mode. Keyboard navigable.
  */
-import { useState } from 'react';
+import { type KeyboardEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -15,12 +15,36 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import {
   useCustomObjectDefs,
+  useCustomObjectFields,
   useCustomObjectRecord,
   useDeleteCustomObjectRecord,
   useUpdateCustomObjectRecord,
 } from '@/hooks/useCustomObjects';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
+
+/**
+ * Coerce the string-backed inline edit value into the JS type the API
+ * validator (custom-field-validation.ts) expects for `fieldType`. Sending a
+ * raw string for a number/boolean field 400s; text-like types stay strings.
+ */
+function coerceEditValue(fieldType: string | undefined, raw: string): unknown {
+  const trimmed = raw.trim();
+  switch (fieldType) {
+    case 'number':
+    case 'currency':
+      // Empty clears the value; otherwise hand a real number to the API.
+      return trimmed === '' ? null : Number(trimmed);
+    case 'boolean':
+      return raw === 'true';
+    case 'date':
+    case 'select':
+      return trimmed === '' ? null : trimmed;
+    default:
+      // text / phone / email / url / unknown — stored as-is.
+      return raw;
+  }
+}
 
 export function CustomObjectDetailPage() {
   const { t } = useTranslation('crm');
@@ -30,8 +54,12 @@ export function CustomObjectDetailPage() {
   const def = defsData?.items.find((d) => d.key === objectKey);
 
   const recordQuery = useCustomObjectRecord(def?.id ?? '', recordId);
+  const fieldsQuery = useCustomObjectFields(def?.id ?? '');
   const updateRecord = useUpdateCustomObjectRecord(def?.id ?? '', recordId);
   const deleteRecord = useDeleteCustomObjectRecord(def?.id ?? '');
+
+  // Field metadata keyed by fieldKey — drives type-aware inputs + payload coercion.
+  const fieldsByKey = new Map(fieldsQuery.data?.items.map((f) => [f.fieldKey, f]) ?? []);
 
   const [editField, setEditField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -42,15 +70,21 @@ export function CustomObjectDetailPage() {
 
   function startEdit(fieldKey: string) {
     setEditField(fieldKey);
-    setEditValue(String(values[fieldKey] ?? ''));
+    const raw = String(values[fieldKey] ?? '');
+    // A native date input needs YYYY-MM-DD; trim any stored ISO datetime tail.
+    const isDate = fieldsByKey.get(fieldKey)?.fieldType === 'date';
+    setEditValue(isDate ? raw.slice(0, 10) : raw);
     setEditError(null);
   }
 
   async function saveEdit() {
     if (!editField) return;
     setEditError(null);
+    const fieldType = fieldsByKey.get(editField)?.fieldType;
     try {
-      await updateRecord.mutateAsync({ values: { [editField]: editValue } });
+      await updateRecord.mutateAsync({
+        values: { [editField]: coerceEditValue(fieldType, editValue) },
+      });
       setEditField(null);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : t('customObjectDetail.saveFailed', 'Save failed'));
@@ -182,20 +216,61 @@ export function CustomObjectDetailPage() {
               <dd className="col-span-2">
                 {editField === key ? (
                   <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="input flex-1 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void saveEdit();
-                        if (e.key === 'Escape') setEditField(null);
-                      }}
-                      aria-label={t('customObjectDetail.editFieldAriaLabel', 'Edit {{field}}', {
-                        field: key.replace(/_/g, ' '),
-                      })}
-                    />
+                    {(() => {
+                      const fieldType = fieldsByKey.get(key)?.fieldType;
+                      const sharedProps = {
+                        value: editValue,
+                        autoFocus: true,
+                        className: 'input flex-1 text-sm',
+                        // Enter saves, Escape cancels — same UX across every control type.
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === 'Enter') void saveEdit();
+                          if (e.key === 'Escape') setEditField(null);
+                        },
+                        'aria-label': t('customObjectDetail.editFieldAriaLabel', 'Edit {{field}}', {
+                          field: key.replace(/_/g, ' '),
+                        }),
+                      } as const;
+
+                      if (fieldType === 'boolean') {
+                        return (
+                          <select {...sharedProps} onChange={(e) => setEditValue(e.target.value)}>
+                            <option value="false">
+                              {t('customObjectDetail.booleanFalse', 'No')}
+                            </option>
+                            <option value="true">
+                              {t('customObjectDetail.booleanTrue', 'Yes')}
+                            </option>
+                          </select>
+                        );
+                      }
+                      if (fieldType === 'select') {
+                        const options = fieldsByKey.get(key)?.options ?? [];
+                        return (
+                          <select {...sharedProps} onChange={(e) => setEditValue(e.target.value)}>
+                            <option value="">{t('customObjectDetail.selectNone', '—')}</option>
+                            {options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      }
+                      const inputType =
+                        fieldType === 'number' || fieldType === 'currency'
+                          ? 'number'
+                          : fieldType === 'date'
+                            ? 'date'
+                            : 'text';
+                      return (
+                        <input
+                          {...sharedProps}
+                          type={inputType}
+                          onChange={(e) => setEditValue(e.target.value)}
+                        />
+                      );
+                    })()}
                     <button
                       type="button"
                       onClick={() => {

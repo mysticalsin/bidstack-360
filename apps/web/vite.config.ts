@@ -26,7 +26,13 @@ export default defineConfig(({ command, mode }) => {
       );
     }
   }
-  const apiUrl = env.VITE_API_URL ?? process.env.VITE_API_URL ?? 'http://localhost:4000';
+  // Server-only proxy override for local verification against a non-default API
+  // port without forcing browser fetches cross-origin.
+  const apiUrl =
+    process.env.BIDSTACK_DEV_API_URL ??
+    process.env.VITE_API_URL ??
+    env.VITE_API_URL ??
+    'http://localhost:4000';
   const assetBase = env.VITE_ASSET_BASE ?? process.env.ASSET_CDN_URL ?? '/';
   // Bundle analyzer fires only in `--mode analyze`; keeps prod builds clean.
   const analyze = mode === 'analyze';
@@ -56,7 +62,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     server: {
-      port: 5173,
+      port: 38081,
       strictPort: true,
       host: true,
       proxy: {
@@ -64,6 +70,13 @@ export default defineConfig(({ command, mode }) => {
         '/webhooks/dust': { target: apiUrl, changeOrigin: true },
         '/livez': { target: apiUrl, changeOrigin: true },
         '/readyz': { target: apiUrl, changeOrigin: true },
+      },
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        // Dev dependency optimization does not inherit build.target. Keep
+        // modern route-only deps on native syntax during local prebundling.
+        target: 'esnext',
       },
     },
     preview: {

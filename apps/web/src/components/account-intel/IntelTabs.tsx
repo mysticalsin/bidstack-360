@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { Icon } from '@/components/ui/Icon';
+import { SourceBadge, type CockpitSourceState } from '@/components/cockpit/SourceBadge';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import type { AccountIntelFieldProvenance } from '@bidstack/shared';
 
 // ─── Shared helper (module-private) ────────────────────────────────────────
 
@@ -15,6 +17,117 @@ function sourceLabel(
   if (!docId) return null;
   const f = files.find((x) => x.id === docId);
   return f ? f.name : null;
+}
+
+function confidencePct(confidenceBps: number): number {
+  return Math.max(0, Math.min(100, Math.round(confidenceBps / 100)));
+}
+
+function confidenceState(confidenceBps: number): CockpitSourceState {
+  if (confidenceBps >= 7000) return 'verified';
+  if (confidenceBps >= 5000) return 'crm';
+  return 'missing';
+}
+
+function sourceState(docId: string | null, confidenceBps: number): CockpitSourceState {
+  if (!docId) return 'crm';
+  return confidenceState(confidenceBps);
+}
+
+function fieldSourceState(source: AccountIntelFieldProvenance | undefined): CockpitSourceState | null {
+  if (!source) return null;
+  if (source.source === 'manual') return 'crm';
+  if (source.source === 'derived:dust') {
+    return (source.confidence ?? 0) >= 0.7 ? 'verified' : 'crm';
+  }
+  if (source.source === 'derived:deterministic') {
+    return (source.confidence ?? 0) >= 0.5 ? 'crm' : 'missing';
+  }
+  return 'crm';
+}
+
+function IntelFieldProofRail({
+  fieldSources,
+  fields,
+  testIdBase,
+}: {
+  fieldSources?: Record<string, AccountIntelFieldProvenance>;
+  fields: Array<{ key: string; label: string }>;
+  testIdBase: string;
+}) {
+  const { t } = useTranslation('crm');
+  const visibleSources = fields
+    .map((field) => ({ field, source: fieldSources?.[field.key] }))
+    .filter((entry): entry is { field: { key: string; label: string }; source: AccountIntelFieldProvenance } =>
+      Boolean(entry.source),
+    );
+
+  if (visibleSources.length === 0) return null;
+
+  return (
+    <div
+      className="mt-1.5 flex flex-wrap items-center gap-1.5"
+      aria-label={t('intelTabs.fieldProofAria', 'Field source proof')}
+    >
+      {visibleSources.map(({ field, source }) => (
+        <SourceBadge
+          key={field.key}
+          label={field.label}
+          state={fieldSourceState(source) ?? 'crm'}
+          hint={t('intelTabs.fieldSourceHint', '{{field}} source: {{hint}}', {
+            field: field.label,
+            hint: source.hint,
+          })}
+          data-testid={`${testIdBase}-field-source-${field.key}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function IntelSourceBadges({
+  confidenceBps,
+  documentId,
+  fieldSource,
+  files,
+  testIdBase,
+}: {
+  confidenceBps: number;
+  documentId: string | null;
+  fieldSource?: AccountIntelFieldProvenance;
+  files: Array<{ id: string; name: string }>;
+  testIdBase: string;
+}) {
+  const { t } = useTranslation('crm');
+  const source = sourceLabel(documentId, files);
+  const pct = confidencePct(
+    fieldSource?.confidence == null ? confidenceBps : fieldSource.confidence * 10_000,
+  );
+  const sourceHint = fieldSource?.hint ?? (source
+    ? t('intelTabs.sourceDocumentHint', 'Extracted from {{source}} with {{pct}}% confidence.', {
+        source,
+        pct,
+      })
+    : t('intelTabs.sourceManualHint', 'Stored account intelligence record with {{pct}}% confidence.', {
+        pct,
+      }));
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <SourceBadge
+        label={fieldSource?.label ?? source ?? t('intelTabs.sourceManualBadge', 'Manual')}
+        state={fieldSourceState(fieldSource) ?? sourceState(documentId, confidenceBps)}
+        hint={sourceHint}
+        data-testid={`${testIdBase}-source`}
+      />
+      <SourceBadge
+        label={t('intelTabs.confidenceBadge', '{{pct}}% confidence', { pct })}
+        state={confidenceState(confidenceBps)}
+        hint={t('intelTabs.confidenceHint', 'Extraction confidence: {{pct}}%.', { pct })}
+        data-testid={`${testIdBase}-confidence`}
+      />
+    </div>
+  );
 }
 
 // ─── StatusBadge (module-private — only used by ExtractionsTab) ────────────
@@ -51,6 +164,7 @@ export function SolutionsTab({
     status: string;
     confidenceBps: number;
     extractedFromDocumentId: string | null;
+    fieldSources?: Record<string, AccountIntelFieldProvenance>;
   }>;
   files: Array<{ id: string; name: string }>;
   onDelete: (id: string) => void;
@@ -70,47 +184,50 @@ export function SolutionsTab({
   }
   return (
     <div className="space-y-2">
-      {solutions.map((s) => {
-        const src = sourceLabel(s.extractedFromDocumentId, files);
-        return (
-          <Card key={s.id} className="p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-[var(--fg-primary)]">{s.name}</span>
-                  <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-wider">
-                    {s.category}
-                  </span>
-                  {s.confidenceBps > 7000 && (
-                    <span className="rounded-full bg-[var(--success-tint)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
-                      {t('intelTabs.highConfidenceBadge', 'High confidence')}
-                    </span>
-                  )}
-                </div>
-                {s.description ? (
-                  <p className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-2">
-                    {s.description}
-                  </p>
-                ) : null}
-                {src ? (
-                  <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
-                    {t('intelTabs.sourceLabel', 'From: {{source}}', { source: src })}
-                  </p>
-                ) : null}
+      {solutions.map((s) => (
+        <Card key={s.id} className="p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-[var(--fg-primary)]">{s.name}</span>
+                <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-wider">
+                  {s.category}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => onDelete(s.id)}
-                disabled={isDeleting}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                aria-label={t('intelTabs.deleteAriaLabel', 'Delete {{name}}', { name: s.name })}
-              >
-                <Icon name="trash" size={14} />
-              </button>
+              {s.description ? (
+                <p className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-2">
+                  {s.description}
+                </p>
+              ) : null}
+              <IntelSourceBadges
+                confidenceBps={s.confidenceBps}
+                documentId={s.extractedFromDocumentId}
+                fieldSource={s.fieldSources?.name}
+                files={files}
+                testIdBase={`solution-${s.id}`}
+              />
+              <IntelFieldProofRail
+                fieldSources={s.fieldSources}
+                fields={[
+                  { key: 'description', label: t('intelTabs.solutionDescriptionField', 'Description') },
+                  { key: 'category', label: t('intelTabs.solutionCategoryField', 'Category') },
+                  { key: 'status', label: t('intelTabs.solutionStatusField', 'Status') },
+                ]}
+                testIdBase={`solution-${s.id}`}
+              />
             </div>
-          </Card>
-        );
-      })}
+            <button
+              type="button"
+              onClick={() => onDelete(s.id)}
+              disabled={isDeleting}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              aria-label={t('intelTabs.deleteAriaLabel', 'Delete {{name}}', { name: s.name })}
+            >
+              <Icon name="trash" size={14} />
+            </button>
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -131,6 +248,7 @@ export function ProductsTab({
     status: string;
     confidenceBps: number;
     extractedFromDocumentId: string | null;
+    fieldSources?: Record<string, AccountIntelFieldProvenance>;
   }>;
   files: Array<{ id: string; name: string }>;
   onDelete: (id: string) => void;
@@ -152,47 +270,57 @@ export function ProductsTab({
   }
   return (
     <div className="space-y-2">
-      {products.map((p) => {
-        const src = sourceLabel(p.extractedFromDocumentId, files);
-        return (
-          <Card key={p.id} className="p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-[var(--fg-primary)]">{p.name}</span>
-                  <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-wider">
-                    {p.category}
+      {products.map((p) => (
+        <Card key={p.id} className="p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-[var(--fg-primary)]">{p.name}</span>
+                <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-wider">
+                  {p.category}
+                </span>
+                {p.priceRangeMicros ? (
+                  <span className="rounded-full bg-tag-blue-bg px-2 py-0.5 text-[10px] font-medium text-tag-blue-fg">
+                    {formatMoneyMicros(p.priceRangeMicros, p.currency)}
                   </span>
-                  {p.priceRangeMicros ? (
-                    <span className="rounded-full bg-tag-blue-bg px-2 py-0.5 text-[10px] font-medium text-tag-blue-fg">
-                      {formatMoneyMicros(p.priceRangeMicros, p.currency)}
-                    </span>
-                  ) : null}
-                </div>
-                {p.description ? (
-                  <p className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-2">
-                    {p.description}
-                  </p>
-                ) : null}
-                {src ? (
-                  <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
-                    {t('intelTabs.sourceLabel', 'From: {{source}}', { source: src })}
-                  </p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => onDelete(p.id)}
-                disabled={isDeleting}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                aria-label={t('intelTabs.deleteAriaLabel', 'Delete {{name}}', { name: p.name })}
-              >
-                <Icon name="trash" size={14} />
-              </button>
+              {p.description ? (
+                <p className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-2">
+                  {p.description}
+                </p>
+              ) : null}
+              <IntelSourceBadges
+                confidenceBps={p.confidenceBps}
+                documentId={p.extractedFromDocumentId}
+                fieldSource={p.fieldSources?.name}
+                files={files}
+                testIdBase={`product-${p.id}`}
+              />
+              <IntelFieldProofRail
+                fieldSources={p.fieldSources}
+                fields={[
+                  { key: 'description', label: t('intelTabs.productDescriptionField', 'Description') },
+                  { key: 'category', label: t('intelTabs.productCategoryField', 'Category') },
+                  { key: 'priceRangeMicros', label: t('intelTabs.productPriceField', 'Price') },
+                  { key: 'currency', label: t('intelTabs.productCurrencyField', 'Currency') },
+                  { key: 'status', label: t('intelTabs.productStatusField', 'Status') },
+                ]}
+                testIdBase={`product-${p.id}`}
+              />
             </div>
-          </Card>
-        );
-      })}
+            <button
+              type="button"
+              onClick={() => onDelete(p.id)}
+              disabled={isDeleting}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              aria-label={t('intelTabs.deleteAriaLabel', 'Delete {{name}}', { name: p.name })}
+            >
+              <Icon name="trash" size={14} />
+            </button>
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -292,6 +420,9 @@ export function ExtractionsTab({
                     )}
                   </div>
                 ) : null}
+                {extraction?.status === 'done' ? (
+                  <WinLossInsight data={extraction.extractedData} />
+                ) : null}
                 {extraction?.error ? (
                   <p className="mt-2 text-xs text-[var(--danger)]">{extraction.error}</p>
                 ) : null}
@@ -300,6 +431,69 @@ export function ExtractionsTab({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function humanizeReason(tag: string): string {
+  return tag.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// "Why we won / lost" — the learned win/loss pattern extracted from a document,
+// read defensively from the extraction's JSON (no DTO coupling). Renders nothing
+// unless the document actually carried a win/loss signal.
+function WinLossInsight({ data }: { data: Record<string, unknown> | undefined }) {
+  const { t } = useTranslation('crm');
+  const wl = data?.winLoss as
+    | { outcome?: string; reasons?: unknown; competitors?: unknown; summary?: unknown }
+    | null
+    | undefined;
+  if (!wl) return null;
+  const reasons = Array.isArray(wl.reasons) ? wl.reasons.map(String) : [];
+  const competitors = Array.isArray(wl.competitors) ? wl.competitors.map(String) : [];
+  if (wl.outcome !== 'won' && wl.outcome !== 'lost' && reasons.length === 0) return null;
+
+  const headline =
+    wl.outcome === 'won'
+      ? t('intelTabs.winLossWon', 'Why we won')
+      : wl.outcome === 'lost'
+        ? t('intelTabs.winLossLost', 'Why we lost')
+        : t('intelTabs.winLossSignal', 'Win/loss signal');
+  const tone =
+    wl.outcome === 'won'
+      ? 'border-[var(--success)] text-[var(--success)]'
+      : wl.outcome === 'lost'
+        ? 'border-[var(--danger)] text-[var(--danger)]'
+        : 'border-[var(--border-default)] text-[var(--fg-secondary)]';
+
+  return (
+    <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-sunken)] p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}
+        >
+          <Icon name="sparkle" size={12} ariaHidden />
+          {headline}
+        </span>
+        {reasons.map((r) => (
+          <span
+            key={r}
+            className="rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-xs text-[var(--fg-secondary)]"
+          >
+            {t(`intelTabs.winLossReason.${r}`, humanizeReason(r))}
+          </span>
+        ))}
+      </div>
+      {competitors.length > 0 ? (
+        <p className="mt-1.5 text-xs text-[var(--fg-tertiary)]">
+          {t('intelTabs.winLossCompetitors', 'Competitors: {{names}}', {
+            names: competitors.join(', '),
+          })}
+        </p>
+      ) : null}
+      {typeof wl.summary === 'string' && wl.summary ? (
+        <p className="mt-1.5 text-xs leading-5 text-[var(--fg-secondary)]">{wl.summary}</p>
+      ) : null}
     </div>
   );
 }

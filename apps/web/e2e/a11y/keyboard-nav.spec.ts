@@ -24,7 +24,16 @@ async function tabForward(page: Page, steps: number): Promise<string[]> {
     const el = await page.evaluate(() => {
       const el = document.activeElement;
       if (!el || el === document.body) return '';
-      return el.tagName + (el.getAttribute('data-testid') ?? '') + (el.getAttribute('aria-label') ?? '') + el.id;
+      const htmlEl = el as HTMLElement;
+      const parts = [
+        el.tagName,
+        el.id ? `#${el.id}` : '',
+        el.getAttribute('data-testid') ? `[testid="${el.getAttribute('data-testid')}"]` : '',
+        el.getAttribute('aria-label') ? `[label="${el.getAttribute('aria-label')}"]` : '',
+        el.getAttribute('href') ? `[href="${el.getAttribute('href')}"]` : '',
+        htmlEl.innerText?.trim() ? `[text="${htmlEl.innerText.trim().replace(/\s+/g, ' ').slice(0, 80)}"]` : '',
+      ];
+      return parts.filter(Boolean).join('');
     });
     focused.push(el);
   }

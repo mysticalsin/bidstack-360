@@ -5,8 +5,20 @@ import dotenvFlow from 'dotenv-flow';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
 
-import { prisma } from '@bidstack/db';
-import { buildMcpServer } from './server.js';
+import { assertMcpProductionEnv } from './production-env.js';
+
+try {
+  assertMcpProductionEnv(process.env);
+} catch (err) {
+  const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  process.stderr.write(`${message}\n`);
+  process.exit(1);
+}
+
+const [{ prisma }, { buildMcpServer }] = await Promise.all([
+  import('@bidstack/db'),
+  import('./server.js'),
+]);
 
 const port = Number(process.env.PORT_MCP ?? 4001);
 const host = process.env.HOST ?? '0.0.0.0';

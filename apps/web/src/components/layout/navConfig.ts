@@ -15,6 +15,9 @@ import type { IconName } from '@/components/ui/Icon';
 
 export type NavBadgeKey = 'openBids' | 'overdueTasks';
 
+/** Admin-toggled module a nav item belongs to (hidden until enabled in Settings). */
+export type NavFeatureKey = 'agentStudio' | 'appflowy' | 'serum';
+
 export interface NavItem {
   to: string;
   /** English label; also the i18n fallback when a translation is missing. */
@@ -23,6 +26,8 @@ export interface NavItem {
   labelKey: string;
   icon: IconName;
   badgeKey?: NavBadgeKey;
+  /** When set, the item is hidden unless its module is enabled (OrgSettings). */
+  featureKey?: NavFeatureKey;
   /** Exact-match active state. Use for section overviews whose sub-routes are
    *  themselves separate nav items (e.g. `/sales` vs `/sales/orders`), so the
    *  overview doesn't stay highlighted while a sibling route is active. */
@@ -67,6 +72,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'building',
     items: [
       { to: '/accounts', label: 'Accounts', labelKey: 'nav.accounts', icon: 'building' },
+      { to: '/kam', label: 'Key Account Mgmt', labelKey: 'nav.kam', icon: 'target' },
       { to: '/key-accounts', label: 'Key Accounts', labelKey: 'nav.keyAccounts', icon: 'star' },
       { to: '/top-accounts', label: 'Top Accounts', labelKey: 'nav.topAccounts', icon: 'trophy' },
       { to: '/companies', label: 'Companies', labelKey: 'nav.companies', icon: 'list' },
@@ -100,7 +106,8 @@ export const NAV_SECTIONS: NavSection[] = [
       // RFP Response Hub (a read-only roll-up) folded into Proposals — the
       // actual work surface. /rfp-response now redirects there.
       { to: '/proposals', label: 'Proposals', labelKey: 'nav.proposals', icon: 'receipt' },
-      { to: '/agent-studio', label: 'Agent Studio', labelKey: 'nav.agentStudio', icon: 'sparkle' },
+      { to: '/serum', label: 'SERUM Mission Control', labelKey: 'nav.serumMissionControl', icon: 'sparkle', featureKey: 'serum' },
+      { to: '/agent-studio', label: 'Agent Studio', labelKey: 'nav.agentStudio', icon: 'sparkle', featureKey: 'agentStudio' },
     ],
   },
   {
@@ -121,9 +128,30 @@ export const NAV_SECTIONS: NavSection[] = [
       // page hosts the dashboard switcher, "Manage dashboards", and links to
       // saved Reports + the report builder. No separate Reports rail door.
       { to: '/analytics', label: 'Analytics & Reports', labelKey: 'nav.analyticsReports', icon: 'dashboard' },
+      // Collaborative workspace (AppFlowy embed) — hidden until an admin enables
+      // it + sets the URL in Settings → Modules.
+      { to: '/workspace', label: 'Collaborate', labelKey: 'nav.collaborate', icon: 'note', featureKey: 'appflowy' },
     ],
   },
 ];
+
+/** Module-toggle shape (subset of AppModules) the nav reads to gate items. */
+export interface NavModuleFlags {
+  agentStudioEnabled?: boolean;
+  appflowyEnabled?: boolean;
+  serumEnabled?: boolean;
+}
+
+/** A nav item is visible if it has no featureKey, or its module is enabled.
+ *  While flags are loading (undefined), gated items stay hidden. */
+export function isNavItemVisible(item: NavItem, flags: NavModuleFlags | undefined): boolean {
+  if (!item.featureKey) return true;
+  if (!flags) return false;
+  if (item.featureKey === 'agentStudio') return Boolean(flags.agentStudioEnabled);
+  if (item.featureKey === 'appflowy') return Boolean(flags.appflowyEnabled);
+  if (item.featureKey === 'serum') return Boolean(flags.serumEnabled);
+  return true;
+}
 
 // RFP Analytics, Integrations, Webhooks and Audit log are now TABS inside the
 // Settings page (see SettingsLayout GROUPS — RFP Analytics/Webhooks/Audit log are

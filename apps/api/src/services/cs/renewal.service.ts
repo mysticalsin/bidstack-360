@@ -28,11 +28,25 @@ export async function processRenewalOpportunities(
   log: PinoLogger,
 ): Promise<number> {
   // Find subscriptions renewing within 91 days that are still ACTIVE.
+  // Cursor-paginate: an enterprise org can have >1000 subscriptions in the
+  // window; a single bounded findMany would silently drop the overflow (and a
+  // takeless findMany trips the unbounded-query guard).
   const horizon = new Date(Date.now() + 91 * 24 * 60 * 60 * 1000);
-  const subs = await prisma.subscription.findMany({
-    where: { orgId, status: 'ACTIVE', renewalDate: { lte: horizon } },
-    select: { id: true, renewalDate: true, ownerId: true },
-  });
+  const subs: Array<{ id: string; renewalDate: Date; ownerId: string | null }> = [];
+  const PAGE_SIZE = 500;
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await prisma.subscription.findMany({
+      where: { orgId, status: 'ACTIVE', renewalDate: { lte: horizon } },
+      select: { id: true, renewalDate: true, ownerId: true },
+      orderBy: { id: 'asc' },
+      take: PAGE_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    subs.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    cursor = page[page.length - 1]!.id;
+  }
 
   let created = 0;
 
@@ -43,25 +57,35 @@ export async function processRenewalOpportunities(
       if (daysOut > threshold) continue; // not yet within window
       if (daysOut < threshold - 5) continue; // already past by >5 days — next threshold
 
-      // Idempotency: check if we already created this trigger row.
-      const existing = await prisma.renewalOpportunity.findFirst({
-        where: {
-          subscriptionId: sub.id,
-          daysOutTrigger: threshold,
-          deletedAt: null,
-        },
-      });
-      if (existing) continue;
+      // Idempotency under concurrency: the find-then-create is a TOCTOU race
+      // (no unique on subscriptionId+daysOutTrigger), so two overlapping runs
+      // could both insert. Serialize per (subscription, threshold) with a pg
+      // advisory xact lock, then re-check inside the same tx before creating
+      // ($executeRaw per MISTAKES.md 2026-06-07 — the lock result is unused).
+      const didCreate = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`renewal:${sub.id}:${threshold}`}))`;
+        const existing = await tx.renewalOpportunity.findFirst({
+          where: {
+            subscriptionId: sub.id,
+            daysOutTrigger: threshold,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (existing) return false;
 
-      await prisma.renewalOpportunity.create({
-        data: {
-          orgId,
-          subscriptionId: sub.id,
-          status: 'UPCOMING',
-          daysOutTrigger: threshold,
-          ownerId: sub.ownerId,
-        },
+        await tx.renewalOpportunity.create({
+          data: {
+            orgId,
+            subscriptionId: sub.id,
+            status: 'UPCOMING',
+            daysOutTrigger: threshold,
+            ownerId: sub.ownerId,
+          },
+        });
+        return true;
       });
+      if (!didCreate) continue;
       created++;
       log.info({ orgId, subscriptionId: sub.id, threshold }, 'cs: renewal opportunity created');
     }
@@ -78,6 +102,8 @@ export async function listRenewalOpportunities(
   const subs = await prisma.subscription.findMany({
     where: { orgId, accountId, deletedAt: null },
     select: { id: true },
+    orderBy: { id: 'asc' },
+    take: 1000,
   });
   const subIds = subs.map((s) => s.id);
 
@@ -85,5 +111,6 @@ export async function listRenewalOpportunities(
     where: { orgId, subscriptionId: { in: subIds }, deletedAt: null },
     include: { subscription: { select: { planTier: true, arrAmountMicros: true, renewalDate: true } } },
     orderBy: { createdAt: 'desc' },
+    take: 500,
   });
 }

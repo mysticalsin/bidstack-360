@@ -4,6 +4,132 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-06-23 — Modules toggle + AppFlowy embed + KAM premium account UX
+
+Three follow-on features on `feat/prod-hardening-mantu`.
+
+- **Agent Studio → admin toggle (hidden by default)** + **AppFlowy "Collaborate" embed** (`c8d3310a`): per-org `OrgSettings.appModules` (migration applied to dev DB) + `GET/PUT /org-settings/app-modules` (admin) + Settings → **Modules** tab. Nav items gate on the flags (`isNavItemVisible`); agent-studio is now hidden until enabled. `/workspace` iframes a configured AppFlowy URL (sandboxed) or shows a setup state.
+- **KAM premium designate + switch UX** (`a2929116`): swarm-designed (PM + UI/UX + senior dev). Replaced the dropdown with a search-first switcher, a designate dialog (typeahead → owner-model pre-filled by country → designate), an account hero, and a bespoke zero-state. "Key account" = `kamStatus != 'identified'`; write-once `keyAccountSince`; access-scope + FK-graft + IDOR guards + audit. Backend 5/5 live; full flow browser-verified.
+
+**AppFlowy is an embed scaffold, not data-integrated** (push-back recorded). Operator must deploy AppFlowy + set `frame-ancestors` + the URL; Clerk↔GoTrue SSO is separate; AGPL-3.0 + data-governance need legal/PO sign-off. See `docs/solutions/appflowy-workspace.md`.
+
+**Fully tested:** full-repo `pnpm -r typecheck/lint/build` green; `pnpm -r test` green — api 786/2-skip, web 407, worker 326, shared 136, mcp 54, db 35, +others (~1,775 tests). Browser-verified all three live (designate→hero; agent-studio hidden→toggle-on→appears; Settings Modules save). Dev DB reverted to defaults after testing.
+
+---
+
+## 2026-06-23 — KAM (Key Account Management) front layer — full build
+
+**Branch:** `feat/prod-hardening-mantu` · **Mode:** `/goal /loop` autonomous, multi-model (Claude build + 5-lens red-team; Codex cross-model deferred — credit-limited).
+
+**What:** built the structured layer between an account workshop and a qualified opportunity — Initiative→Lead→Opportunity→Dropped state machine feeding (not rebuilding) the existing Opportunity pipeline, transcript→note+todo human-gated staging, Dust MCP, KPI roll-ups, and the ABC-OM handoff. Plus a separate nav fix.
+
+**Process:** recon (7-agent reality map → corrected "Supabase" to Prisma/Postgres, found the mature pipeline to NOT rebuild) → technical brief (`docs/KAM-PLAN.md`) → 5-lens adversarial red-team (`docs/KAM-PLAN-REVIEW-LOG.md`, 8 blockers + 9 majors, all adopted) → 9 green-gated slices.
+
+**Shipped (9 commits, all live-verified on the dev DB):**
+- **S0** schema (6 models: KamConsultant/Session/Initiative/SessionDraft/Handoff/Prospection + 6 enums; Company + Task alters), idempotent migration, RBAC 3-source lockstep + drift test, shared `normalizeAccountName`, KAM PII map.
+- **S1** Initiative + locked state machine + atomic OM mint+handoff; extracted shared `mintOpportunityTx` (leads route migrated onto it, parity preserved).
+- **S2** Initiative-scoped tasks + per-account to-do roll-up + `lastActivityAt` blind-bump; shared FK-graft + access-scope guards (`kam-access.ts`).
+- **S3** sessions + transcript→note+todo human-gate (approve = only commit path; api-role forbidden; atomic + idempotent).
+- **S4** Handoff export to ABC's OM section (structured payload; confirm records the OM id).
+- **S5** Dust MCP tools on a dedicated `kam` scope (staging-write only — cannot reach canonical-write tools).
+- **S6** prospection read-mirror + KPI roll-ups (account/owner/country-VP) + staleness.
+- **Frontend** KAM cockpit (`/kam`): KPI strip, Initiative board, per-account to-do, human-gate draft review.
+- **Nav** accordion fix (Tony-approved before/after) — collapses inactive sections, kills the internal scroll; one KAM entry under Accounts.
+
+**Red-team blockers fixed (B1-B8):** inline-convert extracted; single-tx optimistic-guard mint (no double-mint); cross-tenant FK-graft + in-tenant access-scope on every endpoint/tool; account-identity keyed on Company.id; PII mechanism; never-auto-commit closed within KAM; RBAC/SERUM/regen chain wired.
+
+**Verified (DoD = run it, not write it):** api KAM suite 72/72 · db 35/35 · mcp 24/24 · leads parity 10/10 · `pnpm -r typecheck`/`lint` + web build green · **live browser walk** of the full lifecycle (transcript→pending draft→human approve→commit→board/to-do/KPI; Initiative→Lead→Opportunity mints Opportunity+Handoff) with UI↔Postgres cross-check, zero console errors, nav accordion + no-scroll confirmed. Full report: `docs/KAM-QA-REPORT.md`.
+
+**Operator-gated (before prod):** `db:migrate`/`db:generate`/`db:seed` on prod; publish SERUM `kam_*` allowlist + live Dust smoke; re-run Codex cross-model plan pass (~Jun 28). **Deferred:** pre-existing non-KAM auto-commit hardening (AiInsight enum, import-meeting, dust-poll); staleness notification cron; live SharePoint/ABC connectors (built as interfaces).
+
+---
+
+## 2026-06-22 — Production-Hardening Waves 1–2 (audit-driven, multi-agent)
+
+**Branch:** `feat/prod-hardening-mantu` · **Mode:** `/goal /audit /plan /loop` autopilot, enterprise-grade for 100k users.
+
+**Audit:** 14-lens verification-first audit (29 agents, adversarial verify) → 92 findings, 42 confirmed high-severity after re-read. Honest score **88/100** (Functional 21 / Code 22 / Design 23 / Infra 22). Prior waves (BS-1..43, walteur R/M/A) confirmed genuinely closed.
+
+**Wave 1 — confirmed blockers (each ships with a regression test):**
+- **PII bulk-encrypt fail-open** — `createMany` array defeated single-object orgId extraction → plaintext on the highest-volume ingest path. Array-aware encrypt + fail-loud throw. (`d818474d`)
+- **SMS double-send on retry** — Twilio called before the DB commit, attempts:3, no idempotency. Per-job Redis claim. (`4d762c31`)
+- **Renewals endpoint DOA** — takeless findMany tripped the query-guard → HTTP 400. Bounded `take` + cursor-paginated worker scan. (`34a89cb7`)
+- **Workflow automation engine never fired** — triggers toggled Active but nothing dispatched; 2 actions were no-ops. Wired a pure engine (`@bidstack/shared`) + per-app injected effects; record_created/stage_changed dispatch + 15-min schedule cron + all 5 actions. Dual cross-model review (Codex + Claude) caught a cross-tenant IDOR (`create_task` oppId) + 8 more, all fixed before commit. (`71f74e04`)
+
+**Wave 2 — confirmed majors (4 commits):**
+- RBAC gates on EmailTemplate + lead-rot (Read-Only could mutate); global search extended (proposals/requirements/references); tautological rbac-matrix test rewritten to fail on a permission regression. (`54fa762a`)
+- Worker idempotency/retry-safety: stable webhook event id across all 5 retries; webhook-processor `$transaction`; migration resume-past-committed; call-deal suggestion idempotency. New webhook + signatures tests. (`352478e9`)
+- API correctness: predictive-score scale unified to basis points; Twilio recording fetch timeout + size cap; PDF render fallback observability. (`6ab20736`)
+- Fail-loud config: API + worker refuse prod boot when the job signing secret is missing. (`d34cdd0c`)
+
+**Verified:** full `pnpm -r typecheck` exit 0 at each wave; ~50 new tests; lint-staged eslint clean on every commit; rbac (40) + search (live-DB, 7) integration tests green.
+
+**In flight:** Wave 3 — WCAG a11y (4 fixes), CSV formula-injection, intake/bulk-void UX, onboarding activation, api perf (4-agent fan-out).
+
+**Surfaced / NOT agent-reachable (the gate to a verified 99/100):**
+- **Operator:** prod `migrate:deploy` for the new `@@unique` constraints (Activity / PredictiveScore / ContractAgreement — schema groundwork pending, blocked on the Windows prisma-generate DLL lock); EXPLAIN-verify + `CONCURRENTLY` trigram + leads composite indexes; Chromium in the worker image for PDF; set `BIDSTACK_JOB_SIGNING_SECRET` in prod; CI branch-protection; live end-to-end smoke.
+- **Product decisions (need Tony):** User identity model (single vs org-scoped email); in-app team invites vs Clerk-owned; multi-stage approval chains; collaborative bid/no-bid voting; e2e seed strategy; marketing copy (Dust co-pilots vs de-scoped RFP-Agent).
+
+---
+
+## 2026-06-19 - Production-Hardening for Real Mantu Tenants
+
+**Branch:** `feat/prod-hardening-mantu` (off `demo` @ c038c5d9)
+
+**Goal:** `/goal` — finish the CRM toward real production for Mantu bid teams.
+
+**Done — verify-before-fix sweep (the audit was stale):**
+
+- Re-checked all 26 `walteur-kit/enterprise-assessment.json` findings against
+  current source via a 26-agent verification fan-out. **17 of 26 were already
+  remediated in the working tree** (incl. the heavy ones: F2 cockpit win/loss +
+  revenue truncation now uses `fetchAccountPerformance` Postgres aggregates;
+  F3 `@@index([orgId, companyId])` on Opportunity; F4 key-accounts cursor
+  pagination; F25 governance mutations now audited). Security #5–#17 confirmed
+  already closed (only migration `20260613160000` deploy pending).
+- Confirmed auth is production-safe: stub/demo modes refuse to boot in prod and
+  are loopback-only; Clerk path enforces `org_id`, SSO-domain allowlist,
+  cross-org attack prevention, JIT user provisioning + audit.
+
+**Done — fixed the 9 genuinely-open findings (surgical, parallel implementers):**
+
+- **F9** (security) webhook delivery now routes through `createResearchFetch`
+  (DNS-rebind-safe, resolves + rejects internal IPs per hop) instead of raw fetch.
+- **F11** (security) access-scope cache now invalidates cross-replica via Redis
+  pub/sub (was 60s-stale per-process on `replicas:2`).
+- **F6** (correctness) sector-view `totalAccounts` + `dataQualityWarning` now
+  org-exact `count()`s, not a take:1000 newest-companies sample.
+- **F19** (resilience) demo-org provisioning now atomic (`$transaction`, no orphan)
+  + idempotent on P2002 email race; `seedOrgData` widened to `TransactionClient`.
+- **F14/F15/F16** (perf) mutation onSend drops in-process cache tiers; lean
+  1-query release-score path; cockpit field-override folded into the parallel batch.
+- **F21** (a11y) cross-sell status advance now announces via aria-live toast.
+- **F26** (audit) mutation-audit safety-net now covers serum + credential admin
+  prefixes (+ regression test). **F28** scratch_img excluded from Docker context.
+
+**Done — production runbook:** new `DEPLOY.production.md` (real Clerk/Mantu deploy
+vs the demo-only `DEPLOY.md`): prod env, explicit `migrate:deploy` release step,
+per-tenant Clerk-org→Org registration, RBAC seed, verification, known gaps.
+
+**Verified:** `pnpm -r typecheck` PASS · `pnpm -r lint` PASS · `pnpm test` PASS
+(api 703/2-skip, web 374, mcp 48, db 12, memos 8, shared/dust/odoo/worker green).
+
+**Committed:** runbook (ba1e2b3d) + the in-progress demo wave consolidated in 6
+gate-green chunked commits (Windows lint-staged arg-limit forced chunking; each
+chunk lint-verified). The wave is mostly prior-session work, verified green here.
+
+**Surfaced / operator-only (cannot be done from the agent shell):**
+
+- Run `migrate:deploy` (incl. pending `20260613160000`) on the prod DB.
+- Set prod secrets (Clerk, signing, integration key, S3); register each Mantu
+  Clerk org as an `Org` row (JIT provisions users, not orgs).
+- Add Chromium to the `api` image for PDF export; WS proxy for realtime.
+- Did NOT touch the live Railway DB or the orphaned `Quote` tables (Rule 13).
+- Live end-to-end browser smoke against a running prod instance still pending
+  (needs prod DB env handoff).
+
+---
+
 ## 2026-06-07 - Agent Studio Bid Workspace Evidence Handoff
 
 **Done:**

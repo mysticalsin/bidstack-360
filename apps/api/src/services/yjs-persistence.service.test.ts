@@ -260,10 +260,11 @@ describe('AES-256-GCM encryption round-trip', () => {
     // Manually replicate encrypt/decrypt logic (same as service) with test key.
     const { createCipheriv, createDecipheriv, randomBytes } = await import('node:crypto');
     const key = Buffer.from('0'.repeat(64), 'hex'); // 32-byte zero key for test
+    const authTagLength = 16;
 
     function encrypt(buf: Buffer): Buffer {
       const iv = randomBytes(12);
-      const cipher = createCipheriv('aes-256-gcm', key, iv);
+      const cipher = createCipheriv('aes-256-gcm', key, iv, { authTagLength });
       const ct = Buffer.concat([cipher.update(buf), cipher.final()]);
       const tag = cipher.getAuthTag();
       return Buffer.concat([iv, tag, ct]);
@@ -273,7 +274,7 @@ describe('AES-256-GCM encryption round-trip', () => {
       const iv = buf.subarray(0, 12);
       const tag = buf.subarray(12, 28);
       const ct = buf.subarray(28);
-      const decipher = createDecipheriv('aes-256-gcm', key, iv);
+      const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength });
       decipher.setAuthTag(tag);
       return Buffer.concat([decipher.update(ct), decipher.final()]);
     }
@@ -290,9 +291,10 @@ describe('AES-256-GCM encryption round-trip', () => {
   it('tampered ciphertext throws on decrypt (authenticated encryption)', async () => {
     const { createCipheriv, createDecipheriv, randomBytes } = await import('node:crypto');
     const key = Buffer.from('0'.repeat(64), 'hex');
+    const authTagLength = 16;
 
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const cipher = createCipheriv('aes-256-gcm', key, iv, { authTagLength });
     const ct = Buffer.concat([cipher.update(Buffer.from('secret')), cipher.final()]);
     const tag = cipher.getAuthTag();
     const packed = Buffer.concat([iv, tag, ct]);
@@ -302,7 +304,9 @@ describe('AES-256-GCM encryption round-trip', () => {
     tampered[28] = (tampered[28] ?? 0) ^ 0xff;
 
     expect(() => {
-      const decipher = createDecipheriv('aes-256-gcm', key, tampered.subarray(0, 12));
+      const decipher = createDecipheriv('aes-256-gcm', key, tampered.subarray(0, 12), {
+        authTagLength,
+      });
       decipher.setAuthTag(tampered.subarray(12, 28));
       decipher.update(tampered.subarray(28));
       decipher.final();

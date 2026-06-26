@@ -9,7 +9,8 @@
  *   SALESFORCE_CSV / CSV — rows pre-parsed client-side, stored in Redis under
  *     payload.redisKey (1h TTL); this worker slices [chunkOffset, +chunkSize).
  *   HUBSPOT_OAUTH       — rows fetched live from the HubSpot CRM v3 API using
- *     the access token forwarded in payload.meta. Pagination: each chunk
+ *     an encrypted IntegrationConfig credential reference. Raw OAuth tokens are
+ *     never stored in BullMQ payloads. Pagination: each chunk
  *     enqueues the next one while HubSpot returns paging.next.after.
  *     KNOWN GAP: no token refresh — imports started with <30min-old OAuth
  *     tokens (the normal flow) complete fine; an expired token fails the job
@@ -28,6 +29,9 @@ import type pino from 'pino';
 
 import { prisma, Prisma } from '@bidstack/db';
 import { MIGRATION, MigrationJobPayload, type MigrationJobError } from '@bidstack/shared';
+import { decryptSecret } from '@bidstack/shared/server-crypto';
+
+import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
 
 // ─── Entity normalization ──────────────────────────────────────────────────
 
@@ -348,13 +352,75 @@ interface HubSpotPage {
   nextAfter: string | null;
 }
 
-async function fetchHubSpotPage(
+const HUBSPOT_INTEGRATION_TYPE = 'hubspot' as const;
+const HUBSPOT_MIGRATION_CONFIG_NAME = 'hubspot-migration';
+
+interface StoredHubSpotTokens {
+  accessToken?: unknown;
+  refreshToken?: unknown;
+  expiresAt?: unknown;
+}
+
+export async function resolveHubSpotAccessToken(
+  payload: MigrationJobPayload,
+): Promise<string> {
+  const meta = payload.meta as Record<string, unknown> | undefined;
+  const configId =
+    typeof meta?.hubspotIntegrationConfigId === 'string'
+      ? meta.hubspotIntegrationConfigId
+      : undefined;
+
+  const config = await prisma.integrationConfig.findFirst({
+    where: {
+      ...(configId ? { id: configId } : {}),
+      orgId: payload.orgId,
+      type: HUBSPOT_INTEGRATION_TYPE,
+      name: HUBSPOT_MIGRATION_CONFIG_NAME,
+      isActive: true,
+      deletedAt: null,
+    },
+    select: { credentials: true },
+  });
+
+  if (!config) {
+    throw new Error('HubSpot not connected — complete OAuth flow first');
+  }
+
+  const encrypted = (config.credentials as Record<string, unknown>).encrypted;
+  if (typeof encrypted !== 'string' || !encrypted) {
+    throw new Error('HubSpot credential reference is missing encrypted tokens');
+  }
+
+  let tokens: StoredHubSpotTokens;
+  try {
+    tokens = JSON.parse(decryptSecret(encrypted)) as StoredHubSpotTokens;
+  } catch {
+    throw new Error('Failed to decrypt HubSpot tokens');
+  }
+
+  if (typeof tokens.accessToken !== 'string' || !tokens.accessToken) {
+    throw new Error('HubSpot credential reference is missing an access token');
+  }
+
+  return tokens.accessToken;
+}
+
+export async function fetchHubSpotPage(
+  orgId: string,
   entityType: string,
   accessToken: string,
   properties: string[],
   limit: number,
   after?: string,
 ): Promise<HubSpotPage> {
+  const denial = await serumConnectorDenialMessage({
+    orgId,
+    connectorId: 'hubspot',
+    operation: `hubspot.import.${entityType}`,
+    writeRequested: false,
+  });
+  if (denial) throw new Error(denial);
+
   const params = new URLSearchParams({ limit: String(limit) });
   if (after) params.set('after', after);
   if (properties.length > 0) params.set('properties', properties.join(','));
@@ -402,6 +468,37 @@ async function recordChunkOutcome(
       END
       WHERE id = ${migrationJobId}::uuid`;
   }
+}
+
+/**
+ * Returns how many rows of this chunk a prior (retried) run already committed, so
+ * the import loop resumes PAST them instead of restarting. WHY audit-log based:
+ * the chunk audit row is the only durable per-chunk record, and it is written in
+ * the same worker pass — its `rowsConsumed` is an exact cursor (processed +
+ * errored). Returns 0 when this chunk has never run (the common, first-attempt
+ * path). Org-scoped; never reads another tenant's chunk progress.
+ */
+async function resolveChunkResumeCursor(
+  orgId: string,
+  migrationJobId: string,
+  chunkOffset: number,
+): Promise<number> {
+  const prior = await prisma.auditLog.findFirst({
+    where: {
+      orgId,
+      action: 'migration.chunk.imported',
+      targetType: 'MigrationJob',
+      targetId: migrationJobId,
+      // JSONB path filter — only the audit row for THIS chunk.
+      diff: { path: ['chunkOffset'], equals: chunkOffset },
+    },
+    orderBy: { at: 'desc' },
+    select: { diff: true },
+  });
+  if (!prior) return 0;
+  const diff = prior.diff as { rowsConsumed?: unknown } | null;
+  const consumed = typeof diff?.rowsConsumed === 'number' ? diff.rowsConsumed : 0;
+  return consumed >= 0 ? consumed : 0;
 }
 
 async function maybeComplete(migrationJobId: string, forceTotal?: number): Promise<void> {
@@ -490,11 +587,9 @@ export async function startMigrationWorker(
       let rows: Record<string, unknown>[];
       let nextAfter: string | null = null;
       if (payload.source === 'HUBSPOT_OAUTH') {
-        const accessToken = (payload.meta as Record<string, unknown> | undefined)?.accessToken;
-        if (typeof accessToken !== 'string' || !accessToken) {
-          throw new Error('HubSpot chunk missing accessToken in payload.meta');
-        }
+        const accessToken = await resolveHubSpotAccessToken(payload);
         const page = await fetchHubSpotPage(
+          payload.orgId,
           payload.entityType,
           accessToken,
           Object.keys(payload.mappings),
@@ -521,11 +616,24 @@ export async function startMigrationWorker(
         sourceTag: `migration:${payload.migrationJobId}`,
         dedupStrategy: payload.dedupStrategy,
       };
+
+      // Retry idempotency: a BullMQ retry re-runs the WHOLE chunk from the start.
+      // For the 'skip'/'update' strategies the per-row dedup check makes that safe,
+      // but 'duplicate' re-inserts every row unconditionally — so a retry after a
+      // partial commit would double-insert. We persist a resume cursor (rows
+      // consumed = processed + errored) in the prior chunk audit row and skip PAST
+      // already-committed rows so a retry resumes instead of restarting.
+      const resumeFrom = await resolveChunkResumeCursor(
+        payload.orgId,
+        payload.migrationJobId,
+        payload.chunkOffset,
+      );
+
       const createdIds: string[] = [];
       const errors: MigrationJobError[] = [];
       let processed = 0;
 
-      for (let i = 0; i < rows.length; i++) {
+      for (let i = resumeFrom; i < rows.length; i++) {
         const absoluteRow = payload.chunkOffset + i;
         try {
           const mapped = applyMappings(rows[i]!, payload.mappings);
@@ -542,8 +650,10 @@ export async function startMigrationWorker(
       }
 
       // ── Undo trail: contacts/opportunities have no `source` column, so the
-      // undo route reads these audit rows to find what this job created. ──
-      if (createdIds.length > 0) {
+      // undo route reads these audit rows to find what this job created. The
+      // `rowsConsumed` field doubles as the resume cursor for retry idempotency. ──
+      if (createdIds.length > 0 || processed > 0 || errors.length > 0) {
+        const rowsConsumed = resumeFrom + processed + errors.length;
         await prisma.auditLog.create({
           data: {
             orgId: payload.orgId,
@@ -551,7 +661,7 @@ export async function startMigrationWorker(
             action: 'migration.chunk.imported',
             targetType: 'MigrationJob',
             targetId: payload.migrationJobId,
-            diff: { entity, createdIds, chunkOffset: payload.chunkOffset },
+            diff: { entity, createdIds, chunkOffset: payload.chunkOffset, rowsConsumed },
           },
         });
       }

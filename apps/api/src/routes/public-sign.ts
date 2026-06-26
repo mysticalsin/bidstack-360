@@ -19,7 +19,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { InternalSignSubmit } from '@bidstack/shared';
+import { InternalSignSubmit, PublicSignatureRequest } from '@bidstack/shared';
 import { handleInternalSign } from '../services/documents/signature.service.js';
 
 export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -31,12 +31,10 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         response: {
-          200: z.object({
-            documentName: z.string(),
-            recipientName: z.string(),
-            orgName: z.string(),
-            status: z.string(),
-          }),
+          // Must match the shared PublicSignatureRequest contract the page reads
+          // — the previous ad-hoc shape (documentName/orgName) left the page
+          // rendering "undefined" for templateName/senderName/etc.
+          200: PublicSignatureRequest,
           404: z.object({ message: z.string() }),
           410: z.object({ message: z.string() }),
         },
@@ -59,14 +57,19 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
         return reply.status(410).send({ message: 'This signing request has been voided.' });
       }
 
-      const recipients = request.recipients as Array<{ name: string }>;
-      const recipientName = recipients[0]?.name ?? 'Recipient';
+      const recipients = request.recipients as Array<{ name?: string; email?: string }>;
+      const recipient = recipients[0];
 
       return reply.send({
-        documentName: request.document.name,
-        recipientName,
-        orgName: request.org.name,
+        id: request.id,
         status: request.status,
+        templateName: request.document.name,
+        senderName: request.org.name,
+        message: null,
+        documentPreviewUrl: null,
+        recipientName: recipient?.name ?? 'Recipient',
+        recipientEmail: recipient?.email ?? 'unknown@unknown.invalid',
+        expiresAt: null,
       });
     },
   );

@@ -12,8 +12,54 @@
 import { buildAgentUserMessage } from '../../lib/prompt-safety.js';
 import { createLogger } from '../../lib/logger.js';
 import { getOrgDust, resolveAgentId } from '../../lib/dust-credentials.js';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumPromptLibraryRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 const log = createLogger({ name: 'dust-agent' });
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
+
+async function promptLibraryAllows(args: {
+  orgId: string;
+  operation: string;
+  promptSet: string;
+}): Promise<boolean> {
+  try {
+    const decision = await checkSerumPromptLibraryRuntimePolicy({
+      orgId: args.orgId,
+      environment: defaultSerumConfigEnvironment(),
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.promptLibrary,
+      operation: args.operation,
+      promptSet: args.promptSet,
+      versionedPrompt: true,
+      injectionTested: true,
+      productionApproved: true,
+    });
+    if (decision.allowed) return true;
+    log.warn(
+      {
+        orgId: args.orgId,
+        operation: args.operation,
+        promptSet: args.promptSet,
+        reason: decision.reason,
+      },
+      'SERUM prompt library denied legacy Dust helper',
+    );
+    return false;
+  } catch (err) {
+    log.warn(
+      { err, orgId: args.orgId, operation: args.operation, promptSet: args.promptSet },
+      'SERUM prompt library check failed for legacy Dust helper',
+    );
+    return false;
+  }
+}
 
 
 // ─── Legacy functions (kept for existing callers) ────────────────────────────
@@ -55,6 +101,19 @@ export async function defendBidScore(props: {
   // allows an attacker to inject instructions (e.g. "Ignore previous instructions...").
   // buildAgentUserMessage() XML-escapes untrusted content and envelopes it so the
   // model treats it as data, not instructions. Trusted numerics go in {{PLACEHOLDERS}}.
+  if (
+    !(await promptLibraryAllows({
+      orgId: props.orgId,
+      operation: 'api.defendBidScore',
+      promptSet: 'bid-score-defense',
+    }))
+  ) {
+    return {
+      reasoning: `Score ${props.totalScore}/100 (${props.recommendation}) for ${props.opportunityName}. This is a deterministic fallback because SERUM prompt governance did not allow a Dust prompt.`,
+      sources: ['serum-policy'],
+    };
+  }
+
   const criteriaBreakdown = Object.entries(props.criteria)
     .map(([k, v]) => `  - ${k}: ${v}/5`)
     .join('\n');
@@ -125,6 +184,19 @@ export async function draftProposalSection(props: {
   // buildAgentUserMessage() XML-escapes and envelopes untrusted content so the
   // model treats it as data. sectionTitle goes into {{SECTION_TITLE}} which is
   // trusted-interpolated (server-side section key, not raw user text).
+  if (
+    !(await promptLibraryAllows({
+      orgId: props.orgId,
+      operation: 'api.draftProposalSection',
+      promptSet: 'proposal-section-draft',
+    }))
+  ) {
+    return {
+      content: `[SERUM prompt governance blocked AI drafting] Draft manually or publish an approved Prompt Library policy for ${props.sectionTitle}.`,
+      sources: ['serum-policy'],
+    };
+  }
+
   const userContext = [
     `Customer: ${props.customer}`,
     `Proposal: ${props.proposalName}`,

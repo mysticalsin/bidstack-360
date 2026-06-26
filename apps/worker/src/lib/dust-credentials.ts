@@ -4,14 +4,121 @@
 
 import type pino from 'pino';
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
+import { DustClient, type DustAgent, type DustAgentRun, type DustDocument, type DustDocumentDetail } from '@bidstack/dust-client';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumDustMcpGatewayRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 import {
   dustCredentialsFromConfigRow,
   dustCredentialsFromEnv,
   type DustCredentials,
 } from '@bidstack/shared/server';
+import type { SerumConfigEnvironment } from '@bidstack/shared';
 
 export { resolveAgentId, maskApiKey, type DustCredentials } from '@bidstack/shared/server';
+
+type DustRuntimeOptions = {
+  environment?: SerumConfigEnvironment;
+  writeApprovalConfirmed?: boolean;
+  toolAuditPresent?: boolean;
+};
+
+function defaultSerumConfigEnvironment(): SerumConfigEnvironment {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
+
+function serumGatewayGuardEnabled(): boolean {
+  return process.env.SERUM_ENABLED === 'true';
+}
+
+class SerumGuardedDustClient extends DustClient {
+  private readonly orgId: string;
+  private readonly environment: SerumConfigEnvironment;
+  private readonly writeApprovalConfirmed: boolean;
+  private readonly toolAuditPresent: boolean;
+  private readonly gatewayLog: pino.Logger;
+
+  constructor(
+    opts: ConstructorParameters<typeof DustClient>[0] & {
+      orgId: string;
+      environment: SerumConfigEnvironment;
+      writeApprovalConfirmed: boolean;
+      toolAuditPresent: boolean;
+      logger: pino.Logger;
+    },
+  ) {
+    super(opts);
+    this.orgId = opts.orgId;
+    this.environment = opts.environment;
+    this.writeApprovalConfirmed = opts.writeApprovalConfirmed;
+    this.toolAuditPresent = opts.toolAuditPresent;
+    this.gatewayLog = opts.logger;
+  }
+
+  private async guard(operation: string, writeRequested: boolean): Promise<void> {
+    if (!serumGatewayGuardEnabled()) {
+      return;
+    }
+
+    const decision = await checkSerumDustMcpGatewayRuntimePolicy({
+      orgId: this.orgId,
+      environment: this.environment,
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.dustMcpGateway,
+      operation,
+      writeRequested,
+      approvalConfirmed: this.writeApprovalConfirmed,
+      toolAuditPresent: this.toolAuditPresent,
+    });
+    if (!decision.allowed) {
+      this.gatewayLog.warn({ operation, reason: decision.reason }, 'dust: SERUM gateway denied operation');
+      throw new Error(`SERUM Dust/MCP Gateway denied ${operation}: ${decision.reason}`);
+    }
+  }
+
+  override async listDocuments(dataSourceId: string): Promise<DustDocument[]> {
+    await this.guard('dust.listDocuments', false);
+    return super.listDocuments(dataSourceId);
+  }
+
+  override async getDocument(dataSourceId: string, documentId: string): Promise<DustDocumentDetail> {
+    await this.guard('dust.getDocument', false);
+    return super.getDocument(dataSourceId, documentId);
+  }
+
+  override async listAgents(
+    view: 'all' | 'list' | 'published' | 'global' | 'favorites' = 'list',
+  ): Promise<DustAgent[]> {
+    await this.guard('dust.listAgents', false);
+    return super.listAgents(view);
+  }
+
+  override async upsertDocument(
+    dataSourceId: string,
+    documentId: string,
+    text: string,
+    metadata: Record<string, unknown> = {},
+  ): Promise<DustDocument> {
+    await this.guard('dust.upsertDocument', true);
+    return super.upsertDocument(dataSourceId, documentId, text, metadata);
+  }
+
+  override async runAgent(
+    agentId: string,
+    message: string,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<DustAgentRun> {
+    await this.guard('dust.runAgent', false);
+    return super.runAgent(agentId, message, opts);
+  }
+
+  override async getConversation(conversationId: string): Promise<Record<string, unknown>> {
+    await this.guard('dust.getConversation', false);
+    return super.getConversation(conversationId);
+  }
+}
 
 /**
  * Resolve an org's Dust credentials: the per-org IntegrationConfig
@@ -41,15 +148,20 @@ export async function resolveOrgDustCredentials(orgId: string): Promise<DustCred
 export async function getOrgDust(
   orgId: string,
   log: pino.Logger,
+  runtime: DustRuntimeOptions = {},
 ): Promise<{ client: DustClient | null; creds: DustCredentials | null }> {
   const creds = await resolveOrgDustCredentials(orgId);
   if (!creds) return { client: null, creds: null };
   return {
-    client: new DustClient({
+    client: new SerumGuardedDustClient({
       apiKey: creds.apiKey,
       workspaceId: creds.workspaceId,
       baseUrl: creds.baseUrl,
       logger: log,
+      orgId,
+      environment: runtime.environment ?? defaultSerumConfigEnvironment(),
+      writeApprovalConfirmed: runtime.writeApprovalConfirmed ?? false,
+      toolAuditPresent: runtime.toolAuditPresent ?? true,
     }),
     creds,
   };

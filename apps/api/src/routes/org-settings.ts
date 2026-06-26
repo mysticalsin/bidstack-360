@@ -4,7 +4,18 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { prisma } from '@bidstack/db';
-import { OpportunityFilterRules, OpportunityFilterRulesUpdate } from '@bidstack/shared';
+import {
+  AppModules,
+  AppModulesUpdate,
+  APP_MODULES_DEFAULT,
+  OpportunityFilterRules,
+  OpportunityFilterRulesUpdate,
+} from '@bidstack/shared';
+
+function parseAppModules(value: unknown): AppModules {
+  const parsed = AppModules.safeParse(value ?? {});
+  return parsed.success ? parsed.data : APP_MODULES_DEFAULT;
+}
 
 function parseRules(value: unknown): OpportunityFilterRules {
   const parsed = OpportunityFilterRules.safeParse(value ?? {});
@@ -65,6 +76,53 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       return rules;
+    },
+  );
+
+  // ── App modules (agent-studio visibility, AppFlowy Workspace) ────────────
+  server.get(
+    '/org-settings/app-modules',
+    {
+      preHandler: [server.requirePermission('settings:read')],
+      schema: { response: { 200: AppModules } },
+    },
+    async (req) => {
+      const row = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { appModules: true },
+      });
+      return parseAppModules(row?.appModules);
+    },
+  );
+
+  server.put(
+    '/org-settings/app-modules',
+    {
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
+      schema: { body: AppModulesUpdate, response: { 200: AppModules } },
+    },
+    async (req) => {
+      const existing = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { appModules: true },
+      });
+      const merged = AppModules.parse({ ...parseAppModules(existing?.appModules), ...req.body });
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: { orgId: req.auth.orgId, appModules: merged },
+        update: { appModules: merged },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.app_modules.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: req.body as object,
+        },
+      });
+      return merged;
     },
   );
 };

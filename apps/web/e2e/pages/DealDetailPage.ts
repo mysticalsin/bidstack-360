@@ -58,7 +58,9 @@ export class DealDetailPage {
   async markWon(): Promise<void> {
     await this.markWonButton.click();
     // Confirm dialog if present
-    const confirmBtn = this.page.getByRole('button', { name: /confirm|yes|mark won/i });
+    const confirmBtn = this.page
+      .getByRole('dialog')
+      .getByRole('button', { name: /confirm|yes|mark won/i });
     if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await confirmBtn.click();
     }
@@ -66,7 +68,9 @@ export class DealDetailPage {
 
   async markLost(): Promise<void> {
     await this.markLostButton.click();
-    const confirmBtn = this.page.getByRole('button', { name: /confirm|yes|mark lost/i });
+    const confirmBtn = this.page
+      .getByRole('dialog')
+      .getByRole('button', { name: /confirm|yes|mark lost/i });
     if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await confirmBtn.click();
     }

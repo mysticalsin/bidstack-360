@@ -25,7 +25,11 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import { logAiInvocation } from '../lib/ai-audit.js';
-import { enqueueRfpOrchestrate, type RfpOrchestrateJob } from '../queues/rfp-orchestrator.js';
+import {
+  RfpOrchestrateLoopPolicyError,
+  enqueueRfpOrchestrate,
+  type RfpOrchestrateJob,
+} from '../queues/rfp-orchestrator.js';
 import { enqueueRfpComplianceFill } from '../queues/rfp-compliance-fill.js';
 import { enqueueRfpSectionDraft } from '../queues/rfp-section-draft.js';
 import { createLogger } from '../lib/logger.js';
@@ -132,50 +136,52 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       const rfpRequestId =
         typeof data.rfpRequestId === 'string' ? data.rfpRequestId : req.params.opportunityId; // use opportunityId as synthetic rfpRequestId if absent
 
-      // WHY two-step: DocumentVersion requires a BidDocument parent (non-nullable FK).
-      // Create the BidDocument first, then version — consistent with bid-workspace.ts pattern.
-      const bidDocument = await prisma.bidDocument.create({
-        data: {
-          orgId,
-          opportunityId: opportunity.id,
-          title: file.name,
-          documentType: 'rfp',
-          status: 'intake',
-          source: 'upload',
-        },
-        select: { id: true },
-      });
+      // Create the relational upload records atomically. The RfpOrchestration
+      // unique key is the guard against duplicate submissions; if it rejects,
+      // the document parent/version must roll back with it.
+      const { bidDocument, docVersion, orchestration } = await prisma.$transaction(async (tx) => {
+        // WHY two-step: DocumentVersion requires a BidDocument parent (non-nullable FK).
+        // Create the BidDocument first, then version — consistent with bid-workspace.ts pattern.
+        const bidDocument = await tx.bidDocument.create({
+          data: {
+            orgId,
+            opportunityId: opportunity.id,
+            title: file.name,
+            documentType: 'rfp',
+            status: 'intake',
+            source: 'upload',
+          },
+          select: { id: true },
+        });
 
-      const docVersion = await prisma.documentVersion.create({
-        data: {
-          orgId,
-          bidDocumentId: bidDocument.id,
-          versionNo: 1,
-          fileAttachmentId: file.id,
-          storageKey: file.storageKey,
-          contentType: file.contentType,
-          bytes: file.bytes,
-          extractionStatus: 'queued',
-          ocrStatus: 'queued',
-        },
-        select: { id: true },
-      });
+        const docVersion = await tx.documentVersion.create({
+          data: {
+            orgId,
+            bidDocumentId: bidDocument.id,
+            versionNo: 1,
+            fileAttachmentId: file.id,
+            storageKey: file.storageKey,
+            contentType: file.contentType,
+            bytes: file.bytes,
+            extractionStatus: 'queued',
+            ocrStatus: 'queued',
+          },
+          select: { id: true },
+        });
 
-      // Create the RfpOrchestration row, then enqueue the pipeline. If the
-      // enqueue fails we delete the row below, so there is never an orphaned
-      // orchestration without a BullMQ job behind it. Not a DB transaction: the
-      // enqueue is a Redis op outside Postgres, so the rollback is an explicit
-      // delete in the catch.
-      const orchestration = await prisma.rfpOrchestration.create({
-        data: {
-          orgId,
-          rfpRequestId,
-          opportunityId: opportunity.id,
-          documentVersionId: docVersion.id,
-          state: 'queued',
-          startedByUserId: userId,
-        },
-        select: { id: true, state: true },
+        const orchestration = await tx.rfpOrchestration.create({
+          data: {
+            orgId,
+            rfpRequestId,
+            opportunityId: opportunity.id,
+            documentVersionId: docVersion.id,
+            state: 'queued',
+            startedByUserId: userId,
+          },
+          select: { id: true, state: true },
+        });
+
+        return { bidDocument, docVersion, orchestration };
       });
 
       const job: RfpOrchestrateJob = {
@@ -193,13 +199,25 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       try {
         jobId = await enqueueRfpOrchestrate(job);
       } catch (err) {
-        await prisma.rfpOrchestration
-          .delete({ where: { id: orchestration.id } })
+        await prisma
+          .$transaction([
+            prisma.rfpOrchestration.deleteMany({ where: { id: orchestration.id } }),
+            prisma.bidDocument.deleteMany({ where: { id: bidDocument.id } }),
+          ])
           .catch(() => undefined);
         log.error(
-          { err, orchestrationId: orchestration.id, orgId, opportunityId: opportunity.id },
+          {
+            err,
+            orchestrationId: orchestration.id,
+            bidDocumentId: bidDocument.id,
+            orgId,
+            opportunityId: opportunity.id,
+          },
           'RFP enqueue failed — rolled back orchestration',
         );
+        if (err instanceof RfpOrchestrateLoopPolicyError) {
+          throw server.httpErrors.conflict(err.message);
+        }
         throw server.httpErrors.serviceUnavailable(
           'RFP pipeline could not be started (queue unavailable). Please retry.',
         );

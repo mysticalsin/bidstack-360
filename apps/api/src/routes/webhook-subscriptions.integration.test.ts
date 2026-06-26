@@ -1,15 +1,23 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import { _resetIntegrationTokenKey } from '@bidstack/shared/server-crypto';
 
 import { buildServer } from '../server.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let previousTokenKey: string | undefined;
 const createdSubscriptionIds: string[] = [];
+// Deterministic 64-hex test key so the webhook signing-secret encryption path
+// (encryptSecret on create) runs — prod supplies a real INTEGRATION_TOKEN_KEY.
+const TEST_TOKEN_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 beforeAll(async () => {
+  previousTokenKey = process.env.INTEGRATION_TOKEN_KEY;
+  process.env.INTEGRATION_TOKEN_KEY = TEST_TOKEN_KEY;
+  _resetIntegrationTokenKey();
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -31,6 +39,9 @@ afterAll(async () => {
   }
   if (server) await server.close();
   if (dbReachable) await prisma.$disconnect();
+  if (previousTokenKey === undefined) delete process.env.INTEGRATION_TOKEN_KEY;
+  else process.env.INTEGRATION_TOKEN_KEY = previousTokenKey;
+  _resetIntegrationTokenKey();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>

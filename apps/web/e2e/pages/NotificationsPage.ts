@@ -33,7 +33,7 @@ export class NotificationsPage {
 
   async openTray(): Promise<void> {
     await this.bell.click();
-    await expect(this.tray.or(this.emptyState)).toBeVisible({ timeout: 5_000 });
+    await expect(this.tray.first()).toBeVisible({ timeout: 5_000 });
   }
 
   async assertBadgeCount(expectedMin: number): Promise<void> {
@@ -46,7 +46,7 @@ export class NotificationsPage {
 
   async markAllRead(): Promise<void> {
     await this.markAllReadButton.click();
-    await expect(this.emptyState.or(this.page.getByText(/no new notifications/i))).toBeVisible({
+    await expect(this.emptyState.or(this.page.getByText(/no new notifications/i)).first()).toBeVisible({
       timeout: 5_000,
     });
   }

@@ -19,7 +19,7 @@ type DashboardSnapshot = {
 };
 
 async function fetchDashboardSnapshot(request: APIRequestContext): Promise<DashboardSnapshot> {
-  const response = await request.get(`${API_URL}/api/crm/dashboard`);
+  const response = await request.get(`${API_URL}/api/v1/crm/dashboard`);
   expect(response.ok(), 'dashboard endpoint must respond').toBeTruthy();
   return (await response.json()) as DashboardSnapshot;
 }
@@ -33,7 +33,7 @@ async function fetchAccountSnapshot(request: APIRequestContext): Promise<{
     ?? baseline.companies[0]
     ?? baseline.cockpit.company;
   const response = await request.get(
-    `${API_URL}/api/crm/dashboard?account=${encodeURIComponent(target.id)}`,
+    `${API_URL}/api/v1/crm/dashboard?account=${encodeURIComponent(target.id)}`,
   );
   expect(response.ok(), 'target account dashboard endpoint must respond').toBeTruthy();
   const snapshot = (await response.json()) as DashboardSnapshot;

@@ -9,9 +9,57 @@ import {
   fetchCompanyNewsCrossCheck,
   mapApolloOrganization,
   normalizeName,
+  resolveApolloEnrichmentTransport,
   sanitizeApolloPayload,
   verifyApolloEnrichJobSignature,
 } from './company-enrich-apollo.js';
+
+describe('resolveApolloEnrichmentTransport', () => {
+  it('uses Apollo MCP only when URL and bearer token are both configured', () => {
+    expect(
+      resolveApolloEnrichmentTransport({
+        hasDomain: false,
+        env: {
+          APOLLO_MCP_URL: 'https://mcp.apollo.test/mcp',
+          APOLLO_MCP_BEARER_TOKEN: 'token',
+        },
+      }),
+    ).toEqual({
+      kind: 'mcp',
+      url: 'https://mcp.apollo.test/mcp',
+      bearerToken: 'token',
+    });
+
+    expect(
+      resolveApolloEnrichmentTransport({
+        hasDomain: true,
+        env: { APOLLO_MCP_URL: 'https://mcp.apollo.test/mcp' },
+      }),
+    ).toMatchObject({
+      kind: 'none',
+      reason: expect.stringContaining('partially configured'),
+    });
+  });
+
+  it('falls back to Apollo REST only with an API key and company domain', () => {
+    expect(
+      resolveApolloEnrichmentTransport({
+        hasDomain: true,
+        env: { APOLLO_API_KEY: 'apollo-key' },
+      }),
+    ).toEqual({ kind: 'api', apiKey: 'apollo-key' });
+
+    expect(
+      resolveApolloEnrichmentTransport({
+        hasDomain: false,
+        env: { APOLLO_API_KEY: 'apollo-key' },
+      }),
+    ).toMatchObject({
+      kind: 'none',
+      reason: expect.stringContaining('domain'),
+    });
+  });
+});
 
 describe('mapApolloOrganization', () => {
   it('maps a fully populated Apollo response to enrichment fields', () => {

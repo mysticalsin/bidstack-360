@@ -6,6 +6,7 @@ import { prisma } from '@bidstack/db';
 
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
+import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Microsoft push ────────────────────────────────────────────────────────
 
@@ -15,6 +16,13 @@ export async function handleMicrosoftPush({
   accessToken,
   log,
 }: PushParams): Promise<void> {
+  await assertSerumConnectorAllowed({
+    orgId: event.orgId,
+    connectorId: 'microsoft_graph',
+    operation: `calendar.${operation}`,
+    writeRequested: true,
+  });
+
   const baseUrl = 'https://graph.microsoft.com/v1.0/me/events';
   const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -95,6 +103,13 @@ export async function pullMicrosoftIncremental(
   deltaState: Record<string, unknown>,
   log: pino.Logger,
 ): Promise<void> {
+  await assertSerumConnectorAllowed({
+    orgId,
+    connectorId: 'microsoft_graph',
+    operation: 'calendar.pullIncremental',
+    writeRequested: false,
+  });
+
   const deltaLink = deltaState['calendarDeltaLink'] as string | undefined;
   const url =
     deltaLink ??

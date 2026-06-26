@@ -11,6 +11,10 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+const { checkSerumLoopRuntimePolicyMock } = vi.hoisted(() => ({
+  checkSerumLoopRuntimePolicyMock: vi.fn(),
+}));
+
 // ─── Module-level mocks ──────────────────────────────────────────────────────
 
 vi.mock('@bidstack/db', () => ({
@@ -18,6 +22,11 @@ vi.mock('@bidstack/db', () => ({
     $queryRaw: vi.fn(),
     $executeRaw: vi.fn(),
   },
+}));
+
+vi.mock('@bidstack/db/serum-runtime-policy', () => ({
+  SERUM_RUNTIME_CONFIG_KEYS: { loops: 'orchestration' },
+  checkSerumLoopRuntimePolicy: checkSerumLoopRuntimePolicyMock,
 }));
 
 vi.mock('bullmq', () => ({
@@ -38,6 +47,8 @@ vi.mock('@bidstack/shared', () => ({
     defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
   },
 }));
+
+import { serumLoopDenialForRfpOrchestrator } from '../rfp-orchestrator.js';
 
 const ORG_A = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const ORG_B = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -114,6 +125,60 @@ describe('rfp-orchestrator: org-mismatch guard', () => {
     const result = await runOrchestratorOrgGuard(ORG_A, ORG_B);
     // Verify the flag is specifically set — not just that it threw
     expect(result.doNotRetry).toBe(true);
+  });
+});
+
+describe('rfp-orchestrator: SERUM loop runtime guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns no denial when the active loop policy allows orchestration', async () => {
+    checkSerumLoopRuntimePolicyMock.mockResolvedValue({
+      allowed: true,
+      reason: 'Loop execution is allowed by the active SERUM policy.',
+    });
+
+    const result = await serumLoopDenialForRfpOrchestrator(
+      {
+        orgId: ORG_A,
+        rfpRequestId: 'req-001',
+        documentVersionId: DOC_VER_ID,
+      },
+      1,
+    );
+
+    expect(result).toBeNull();
+    expect(checkSerumLoopRuntimePolicyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: ORG_A,
+        configKey: 'orchestration',
+        loopId: 'req-001',
+        operation: 'rfp.orchestrate',
+        retryCount: 1,
+        hasDurableEvent: true,
+        approvalGateReached: false,
+      }),
+    );
+  });
+
+  it('returns a fail-closed denial when the loop policy rejects orchestration', async () => {
+    checkSerumLoopRuntimePolicyMock.mockResolvedValue({
+      allowed: false,
+      reason: 'Loop retry count exceeds the active SERUM retry cap.',
+    });
+
+    const result = await serumLoopDenialForRfpOrchestrator(
+      {
+        orgId: ORG_A,
+        rfpRequestId: 'req-001',
+        documentVersionId: DOC_VER_ID,
+      },
+      2,
+    );
+
+    expect(result).toContain('SERUM runtime denied loop "req-001"');
+    expect(result).toContain('retry cap');
   });
 });
 

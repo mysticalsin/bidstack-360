@@ -2,7 +2,7 @@
 // extracted from uploaded documents via Dust agents.
 
 import { motion, useReducedMotion } from 'framer-motion';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -26,7 +26,26 @@ interface Props {
 type IntelTabKey = 'solutions' | 'products' | 'extractions';
 
 export function AccountIntelPanel({ accountId }: Props) {
-  const intel = useAccountIntel(accountId);
+  // Live status: poll only while a document extraction is in flight, so an
+  // auto-extracted upload progresses to "done" without a manual refresh. Bounded
+  // to avoid hammering the heavy intel snapshot query forever: fast for the first
+  // ~30s, then back off, and give up after ~3 min so a permanently-stuck row
+  // can't drive an endless poll loop.
+  const pollTicks = useRef(0);
+  const intel = useAccountIntel(accountId, {
+    refetchInterval: (query) => {
+      const pending = (query.state.data?.extractions ?? []).some(
+        (e) => e.status === 'pending' || e.status === 'running',
+      );
+      if (!pending) {
+        pollTicks.current = 0;
+        return false;
+      }
+      pollTicks.current += 1;
+      if (pollTicks.current > 45) return false; // ~3 min cap on a stuck extraction
+      return pollTicks.current <= 8 ? 4000 : 12000; // 4s for ~30s, then 12s
+    },
+  });
   const files = useFiles(accountId);
   const extract = useExtractDocument(accountId);
   const deleteSolution = useDeleteSolution(accountId);

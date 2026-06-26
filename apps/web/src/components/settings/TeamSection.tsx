@@ -1,7 +1,9 @@
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useUsers, useUpdateUserRole, useOrgPresence } from '@/hooks/useUsers';
+import { useUsersPage, useUpdateUserRole, useOrgPresence } from '@/hooks/useUsers';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { Badge } from '@/components/ui/Badge';
@@ -13,7 +15,10 @@ import { UserRolesManager } from './UserRolesManager';
 export function TeamSection() {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
-  const users = useUsers();
+  // Cursor-paginated so a 100k-employee tenant can page through every member;
+  // the prior flat useUsers() capped the Team list at the first 100.
+  const pager = useCursorPagination('team');
+  const users = useUsersPage({ limit: 50, ...(pager.cursor ? { cursor: pager.cursor } : {}) });
   const updateRole = useUpdateUserRole();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   // 6 columns when admin (status, name, email, role, joined, actions).
@@ -32,7 +37,7 @@ export function TeamSection() {
       <div className="p-5">
         {users.isLoading ? (
           <LoadingSkeleton rows={3} />
-        ) : !users.data || users.data.length === 0 ? (
+        ) : !users.data || users.data.items.length === 0 ? (
           <p className="text-sm text-[var(--fg-secondary)]">
             {t('team.empty', 'No team members found.')}
           </p>
@@ -67,7 +72,7 @@ export function TeamSection() {
                 </tr>
               </thead>
               <tbody>
-                {users.data.map((u) => {
+                {users.data.items.map((u) => {
                   const isOnline = presence.data?.has(u.id) ?? false;
                   const expanded = isAdmin && expandedUserId === u.id;
                   return (
@@ -143,6 +148,16 @@ export function TeamSection() {
                   })}
               </tbody>
             </table>
+            <CursorPager
+              currentPage={pager.page}
+              hasNext={Boolean(users.data.nextCursor)}
+              hasPrevious={pager.hasPrevious}
+              isLoading={users.isLoading}
+              itemCount={users.data.items.length}
+              label={t('team.pager.label', 'members')}
+              onNext={() => pager.goNext(users.data?.nextCursor)}
+              onPrevious={pager.goPrevious}
+            />
           </div>
         )}
       </div>

@@ -1,7 +1,8 @@
 // QuickStart page — /quick-start
-// Single-page onboarding checklist with 8 items. Each item is actionable:
-// either launches the tour from a specific step or navigates to the action.
-// Progress bar reflects completedChecklist from the onboarding store.
+// Single-page onboarding checklist with 8 items. Each item deep-links to the
+// screen where the user actually does the work — a settings tab (?tab=) or a
+// product route — so no step is a dead end. Progress bar reflects
+// completedChecklist (plus live workspace signals) from the onboarding store.
 
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +12,6 @@ import { cn } from '@/lib/cn';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useUsers } from '@/hooks/useUsers';
-import { TOUR_STEPS } from '@/data/tour-steps';
 
 interface ChecklistItemDef {
   key: ChecklistItem;
@@ -23,7 +23,7 @@ interface ChecklistItemDef {
 export function QuickStartPage() {
   const navigate = useNavigate();
   const { t } = useTranslation('onboarding');
-  const { completedChecklist, markChecklistItem, skipToStep, startTour, tourActive, openTemplatePicker } =
+  const { completedChecklist, markChecklistItem, startTour, tourActive, openTemplatePicker } =
     useOnboardingStore();
 
   // Steps backed by real workspace state reflect reality instead of a click, so
@@ -38,12 +38,6 @@ export function QuickStartPage() {
   };
   const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
 
-  function launchTourAt(stepIndex: number) {
-    // Use skipToStep which sets tourActive + currentStepIndex
-    skipToStep(stepIndex);
-  }
-
-   
   const ITEMS: ChecklistItemDef[] = [
     {
       key: 'profile',
@@ -52,7 +46,7 @@ export function QuickStartPage() {
         'quickStart.items.profile.description',
         'Add your name, photo, and timezone so teammates can find you.',
       ),
-      action: () => navigate('/settings'),
+      action: () => navigate('/settings?tab=security'),
     },
     {
       key: 'template',
@@ -70,7 +64,7 @@ export function QuickStartPage() {
         'quickStart.items.firstLead.description',
         'Capture inbound interest and let BidStack score it automatically.',
       ),
-      action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'add-lead')),
+      action: () => navigate('/leads/new'),
     },
     {
       key: 'first_activity',
@@ -79,7 +73,7 @@ export function QuickStartPage() {
         'quickStart.items.firstActivity.description',
         'Record a call, email, or note against any contact.',
       ),
-      action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'activity-timeline')),
+      action: () => navigate('/contacts'),
     },
     {
       // key is a stable legacy id; the step now frames the actual product job.
@@ -107,7 +101,7 @@ export function QuickStartPage() {
         'quickStart.items.firstDeal.description',
         'Convert a lead or add a deal directly to the pipeline.',
       ),
-      action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'pipeline-kanban')),
+      action: () => navigate('/pipeline'),
     },
     {
       key: 'invite_team',
@@ -116,7 +110,7 @@ export function QuickStartPage() {
         'quickStart.items.inviteTeam.description',
         'Collaboration works best with the whole team in one place.',
       ),
-      action: () => navigate('/settings'),
+      action: () => navigate('/settings?tab=groups'),
     },
   ];
 
@@ -187,7 +181,7 @@ export function QuickStartPage() {
                   'group flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all',
                   'min-h-[44px]', // WCAG touch target
                   done
-                    ? 'border-[var(--border-subtle)] bg-[var(--surface-sunken)] opacity-70'
+                    ? 'border-[var(--border-subtle)] bg-[var(--surface-sunken)]'
                     : 'border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--brand)] hover:shadow-sm',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]',
                 )}
@@ -212,7 +206,7 @@ export function QuickStartPage() {
                     className={cn(
                       'text-sm font-medium',
                       done
-                        ? 'text-[var(--fg-tertiary)] line-through'
+                        ? 'text-[var(--fg-secondary)] line-through'
                         : 'text-[var(--fg-primary)]',
                     )}
                   >

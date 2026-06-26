@@ -28,6 +28,26 @@ export const RateCardLine = z.object({
 });
 export type RateCardLine = z.infer<typeof RateCardLine>;
 
+export const ContractFieldProvenanceSource = z.enum([
+  'manual',
+  'document',
+  'derived:llm',
+  'derived:deterministic',
+]);
+export type ContractFieldProvenanceSource = z.infer<typeof ContractFieldProvenanceSource>;
+
+export const ContractFieldProvenance = z.object({
+  source: ContractFieldProvenanceSource,
+  label: z.string().min(1),
+  hint: z.string().min(1),
+  confidence: z.number().min(0).max(1).nullable(),
+  sourceFileId: z.string().uuid().nullable(),
+  sourceFileName: z.string().nullable(),
+  sourceExtractionId: z.string().uuid().nullable(),
+  updatedAt: z.string().datetime(),
+});
+export type ContractFieldProvenance = z.infer<typeof ContractFieldProvenance>;
+
 export const ContractAgreement = z.object({
   id: z.string().uuid(),
   accountKey: z.string().min(1),
@@ -47,6 +67,7 @@ export const ContractAgreement = z.object({
   sourceFileId: z.string().uuid().nullable(),
   sourceFileName: z.string().nullable(),
   sourceExtractionId: z.string().uuid().nullable(),
+  fieldSources: z.record(ContractFieldProvenance).default({}),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -126,11 +147,29 @@ export type ContractExtractionDraft = z.infer<typeof ContractExtractionDraft>;
 export const ContractExtractionStatus = z.enum(['pending', 'running', 'done', 'error']);
 export type ContractExtractionStatus = z.infer<typeof ContractExtractionStatus>;
 
+export const ContractExtractionReviewStatus = z.enum(['needs_review', 'approved']);
+export type ContractExtractionReviewStatus = z.infer<typeof ContractExtractionReviewStatus>;
+
 export const ContractExtractionResult = z.object({
   id: z.string().uuid(),
   fileId: z.string().uuid(),
+  sourceFileId: z.string().uuid(),
+  sourceFileName: z.string().nullable(),
+  accountKey: z.string().min(1).nullable(),
   status: ContractExtractionStatus,
+  reviewStatus: ContractExtractionReviewStatus,
+  approvedAgreementId: z.string().uuid().nullable(),
   draft: ContractExtractionDraft.nullable(),
+  confidenceBps: z.number().int().min(0).max(10_000).nullable(),
+  warnings: z.array(z.string()).max(50),
+  source: z.enum(['deterministic', 'llm', 'unknown']),
+  extractedAt: z.string().datetime().nullable(),
   error: z.string().nullable(),
 });
 export type ContractExtractionResult = z.infer<typeof ContractExtractionResult>;
+
+export const ContractExtractionApproval = ContractAgreementCreate.omit({
+  sourceFileId: true,
+  sourceExtractionId: true,
+});
+export type ContractExtractionApproval = z.infer<typeof ContractExtractionApproval>;

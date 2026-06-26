@@ -11,9 +11,16 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: stage transitions and brief generation mutate opportunity state —
+  // require opportunities:write (every route here is a POST).
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('opportunities:write')(req);
+  });
+
   // POST /api/opportunities/:id/stage  (kanban move)
   server.post(
     '/opportunities/:id/stage',
@@ -88,24 +95,27 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       const nextStage = (toStage?.key ?? requestedStage) as PrismaStage | undefined;
       if (!nextStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
 
-      const [updated] = await prisma.$transaction([
-        prisma.opportunity.update({
-          where: { id: opp.id },
-          data: { pipelineStageId: toStage?.id ?? null, stage: nextStage },
-          include: {
-            pipelineStage: {
-              select: {
-                id: true,
-                name: true,
-                probability: true,
-                color: true,
-                isWon: true,
-                isLost: true,
-              },
-            },
+      // Re-assert the precondition in the WRITE: the opp was read with findFirst
+      // above (no lock), so a concurrent move could change its stage between
+      // read and write. updateMany guards on the stage/pipelineStageId we saw;
+      // count === 0 means someone else moved it first → 409 (lost update).
+      const updated = await prisma.$transaction(async (tx) => {
+        const { count } = await tx.opportunity.updateMany({
+          where: {
+            id: opp.id,
+            orgId: req.auth.orgId,
+            deletedAt: null,
+            stage: opp.stage,
+            pipelineStageId: opp.pipelineStageId,
           },
-        }),
-        prisma.auditLog.create({
+          data: { pipelineStageId: toStage?.id ?? null, stage: nextStage },
+        });
+        if (count === 0) {
+          throw server.httpErrors.conflict(
+            'Opportunity stage changed concurrently; reload and retry.',
+          );
+        }
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
@@ -119,8 +129,23 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
               toStage: nextStage,
             },
           },
-        }),
-      ]);
+        });
+        return tx.opportunity.findFirstOrThrow({
+          where: { id: opp.id, orgId: req.auth.orgId },
+          include: {
+            pipelineStage: {
+              select: {
+                id: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+              },
+            },
+          },
+        });
+      });
 
       void pushOpportunityToDust(updated.id, req.auth.orgId);
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {
@@ -128,6 +153,16 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
         pipelineStageId: updated.pipelineStageId,
         stage: nextStage,
         stageName: toStage?.name ?? nextStage,
+      });
+      // Dispatch stage_changed workflows for this opportunity (fail-open). The
+      // `stage` key drives the optional target-stage condition match; `ownerId`
+      // lets "notify the owner" actions resolve the recipient (engine falls back
+      // to input.ownerId when create_notification has no explicit userId).
+      void dispatchWorkflowEvent(req.auth.orgId, 'stage_changed', 'opportunity', updated.id, {
+        stage: nextStage,
+        pipelineStageId: updated.pipelineStageId,
+        stageName: toStage?.name ?? nextStage,
+        ownerId: updated.ownerId,
       });
 
       return {

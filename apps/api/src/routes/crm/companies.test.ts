@@ -39,7 +39,19 @@ afterAll(async () => {
     });
     await prisma.companyFieldOverride.deleteMany({ where: { orgId } });
     await prisma.auditLog.deleteMany({
-      where: { orgId, action: { in: ['company.field_override', 'company.field_override_revert'] } },
+      where: {
+        orgId,
+        action: {
+          in: [
+            'company.field_override',
+            'company.field_override_revert',
+            'company.technical_stack_override',
+            'company.technical_stack_suggestion_accept',
+            'company.technical_stack_suggestion_dismiss',
+            'crm.company.technical_stack_refresh',
+          ],
+        },
+      },
     });
   }
   if (server) await server.close();
@@ -253,5 +265,144 @@ describe('crm companies routes', () => {
     );
     expect(industryAfter?.overridden).toBeUndefined();
     expect(industryAfter?.block).toBe('external');
+  });
+
+  skipIfNoDb('manual technical stack persists into the account cockpit', async () => {
+    const put = await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/technical-stack',
+      payload: {
+        stack: [
+          {
+            label: 'Data',
+            items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }],
+          },
+        ],
+      },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().effectiveStack).toEqual([
+      {
+        label: 'Data',
+        items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }],
+      },
+    ]);
+
+    const state = await server.inject({
+      method: 'GET',
+      url: '/api/crm/companies/Mantu/technical-stack',
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json().manualStack[0].items[0].name).toBe('Snowflake');
+
+    const cockpit = await server.inject({ method: 'GET', url: '/api/crm/companies/mantu' });
+    expect(cockpit.statusCode).toBe(200);
+    expect(cockpit.json().technicalStack).toEqual([
+      {
+        label: 'Data',
+        items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }],
+      },
+    ]);
+  });
+
+  skipIfNoDb('POST /api/crm/companies/:id/technical-stack/refresh returns source statuses', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/crm/companies/Mantu/technical-stack/refresh',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.state.companyKey).toBe('mantu');
+    expect(body.providers.map((provider: { id: string }) => provider.id)).toEqual([
+      'apollo',
+      'seamless',
+      'tech_intel',
+      'open_data',
+    ]);
+    expect(body.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'apollo', label: 'Apollo' }),
+        expect.objectContaining({ id: 'seamless', label: 'Seamless.AI' }),
+        expect.objectContaining({ id: 'tech_intel', label: 'Tech Intel MCP' }),
+        expect.objectContaining({ id: 'open_data', label: 'Open data' }),
+      ]),
+    );
+  });
+
+  skipIfNoDb('technical stack refresh names configured Tech Intel MCP sources', async () => {
+    const previousSourceIds = process.env.TECH_STACK_MCP_SOURCE_IDS;
+    const previousBuiltWithUrl = process.env.TECH_STACK_MCP_BUILTWITH_URL;
+    const previousBuiltWithLabel = process.env.TECH_STACK_MCP_BUILTWITH_LABEL;
+    const previousWappalyzerUrl = process.env.TECH_STACK_MCP_WAPPALYZER_URL;
+    const previousWappalyzerLabel = process.env.TECH_STACK_MCP_WAPPALYZER_LABEL;
+
+    process.env.TECH_STACK_MCP_SOURCE_IDS = 'builtwith,wappalyzer';
+    process.env.TECH_STACK_MCP_BUILTWITH_URL = 'https://builtwith.example/mcp';
+    process.env.TECH_STACK_MCP_BUILTWITH_LABEL = 'BuiltWith MCP';
+    process.env.TECH_STACK_MCP_WAPPALYZER_URL = 'https://wappalyzer.example/mcp';
+    process.env.TECH_STACK_MCP_WAPPALYZER_LABEL = 'Wappalyzer MCP';
+
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/crm/companies/Mantu/technical-stack/refresh',
+      });
+
+      expect(res.statusCode).toBe(200);
+      const techIntel = res
+        .json()
+        .providers.find((provider: { id: string }) => provider.id === 'tech_intel');
+      expect(techIntel).toMatchObject({
+        id: 'tech_intel',
+        label: 'BuiltWith MCP + Wappalyzer MCP',
+        transport: 'mcp',
+      });
+    } finally {
+      if (previousSourceIds === undefined) delete process.env.TECH_STACK_MCP_SOURCE_IDS;
+      else process.env.TECH_STACK_MCP_SOURCE_IDS = previousSourceIds;
+      if (previousBuiltWithUrl === undefined) delete process.env.TECH_STACK_MCP_BUILTWITH_URL;
+      else process.env.TECH_STACK_MCP_BUILTWITH_URL = previousBuiltWithUrl;
+      if (previousBuiltWithLabel === undefined) delete process.env.TECH_STACK_MCP_BUILTWITH_LABEL;
+      else process.env.TECH_STACK_MCP_BUILTWITH_LABEL = previousBuiltWithLabel;
+      if (previousWappalyzerUrl === undefined) delete process.env.TECH_STACK_MCP_WAPPALYZER_URL;
+      else process.env.TECH_STACK_MCP_WAPPALYZER_URL = previousWappalyzerUrl;
+      if (previousWappalyzerLabel === undefined) delete process.env.TECH_STACK_MCP_WAPPALYZER_LABEL;
+      else process.env.TECH_STACK_MCP_WAPPALYZER_LABEL = previousWappalyzerLabel;
+    }
+  });
+
+  skipIfNoDb('technical stack refresh flags partial Apollo MCP configuration', async () => {
+    const previousApolloApiKey = process.env.APOLLO_API_KEY;
+    const previousApolloMcpUrl = process.env.APOLLO_MCP_URL;
+    const previousApolloMcpBearerToken = process.env.APOLLO_MCP_BEARER_TOKEN;
+    delete process.env.APOLLO_API_KEY;
+    process.env.APOLLO_MCP_URL = 'https://mcp.apollo.test/mcp';
+    delete process.env.APOLLO_MCP_BEARER_TOKEN;
+
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/crm/companies/Mantu/technical-stack/refresh',
+      });
+
+      expect(res.statusCode).toBe(200);
+      const apollo = res
+        .json()
+        .providers.find((provider: { id: string }) => provider.id === 'apollo');
+      expect(apollo).toMatchObject({
+        id: 'apollo',
+        status: 'unavailable',
+        transport: null,
+        message: expect.stringContaining('partially configured'),
+      });
+    } finally {
+      if (previousApolloApiKey === undefined) delete process.env.APOLLO_API_KEY;
+      else process.env.APOLLO_API_KEY = previousApolloApiKey;
+      if (previousApolloMcpUrl === undefined) delete process.env.APOLLO_MCP_URL;
+      else process.env.APOLLO_MCP_URL = previousApolloMcpUrl;
+      if (previousApolloMcpBearerToken === undefined) delete process.env.APOLLO_MCP_BEARER_TOKEN;
+      else process.env.APOLLO_MCP_BEARER_TOKEN = previousApolloMcpBearerToken;
+    }
   });
 });

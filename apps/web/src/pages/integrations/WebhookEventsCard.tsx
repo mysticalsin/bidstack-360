@@ -6,6 +6,8 @@
  * WebhookEvent (a type) and webhookStatusTone (a pure helper). Extracting it
  * keeps the overview tab clean and makes the table independently reusable.
  */
+import { useTranslation } from 'react-i18next';
+
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -22,16 +24,24 @@ export function WebhookEventsCard({
   events: WebhookEvent[];
   isLoading: boolean;
 }) {
+  const { t } = useTranslation('integrations');
   const errorCount = events.filter((event) => event.status === 'error').length;
 
   return (
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
-        title="Recent webhook events"
-        caption="A live evidence stream for Dust callbacks, CRM event subscribers and external automations."
+        title={t('webhookEvents.title', 'Recent webhook events')}
+        caption={t(
+          'webhookEvents.caption',
+          'A live evidence stream for Dust callbacks, CRM event subscribers and external automations.',
+        )}
         action={
           <Badge tone={errorCount > 0 ? 'tomato' : events.length > 0 ? 'jade' : 'gray'}>
-            {errorCount > 0 ? `${errorCount} errors` : events.length > 0 ? 'processing' : 'quiet'}
+            {errorCount > 0
+              ? t('webhookEvents.statusErrors', '{{count}} errors', { count: errorCount })
+              : events.length > 0
+                ? t('webhookEvents.statusProcessing', 'processing')
+                : t('webhookEvents.statusQuiet', 'quiet')}
           </Badge>
         }
       />
@@ -46,31 +56,40 @@ export function WebhookEventsCard({
               <Icon name="bell" className="size-5" />
             </span>
             <h3 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">
-              No webhook events yet
+              {t('webhookEvents.emptyTitle', 'No webhook events yet')}
             </h3>
             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              Once Dust or another system calls back, events appear here with status, source and
-              timing.
+              {t(
+                'webhookEvents.emptyBody',
+                'Once Dust or another system calls back, events appear here with status, source and timing.',
+              )}
             </p>
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto" role="region" aria-label="Recent webhook events table">
+        <div
+          className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+          role="region"
+          aria-label={t('webhookEvents.tableLabel', 'Recent webhook events table')}
+          tabIndex={0}
+        >
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-            <caption className="sr-only">Recent webhook events, newest first</caption>
+            <caption className="sr-only">
+              {t('webhookEvents.tableCaption', 'Recent webhook events, newest first')}
+            </caption>
             <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
               <tr>
                 <th scope="col" className="px-5 py-3 font-semibold">
-                  Event
+                  {t('webhookEvents.colEvent', 'Event')}
                 </th>
                 <th scope="col" className="px-5 py-3 font-semibold">
-                  Source
+                  {t('webhookEvents.colSource', 'Source')}
                 </th>
                 <th scope="col" className="px-5 py-3 font-semibold">
-                  Received
+                  {t('webhookEvents.colReceived', 'Received')}
                 </th>
                 <th scope="col" className="px-5 py-3 text-right font-semibold">
-                  Status
+                  {t('webhookEvents.colStatus', 'Status')}
                 </th>
               </tr>
             </thead>
@@ -88,7 +107,7 @@ export function WebhookEventsCard({
                       <p className="mt-1 text-xs text-[var(--danger)]">{event.error}</p>
                     ) : (
                       <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        Event accepted by the integration receiver.
+                        {t('webhookEvents.accepted', 'Event accepted by the integration receiver.')}
                       </p>
                     )}
                   </td>

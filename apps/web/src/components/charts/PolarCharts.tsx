@@ -199,6 +199,10 @@ export function GaugeChart({ value, label, 'aria-label': ariaLabel, height = 200
             endAngle={0}
             data={data}
           >
+            {/* Fixed 0-100 domain so the arc fills value/100. Without an explicit
+                angle axis Recharts derives the domain from the single datum and
+                the bar always renders full regardless of value. */}
+            <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
             <RadialBar
               dataKey="value"
               cornerRadius={6}

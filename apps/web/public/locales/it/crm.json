@@ -294,12 +294,15 @@
     "subtitle": "{{count}} persone nell'unità decisionale.",
     "actions": {
       "importCsv": {
+        "label": "Importa CSV",
         "aria": "Importa contatti da CSV"
       },
       "exportCsv": {
+        "label": "Esporta CSV",
         "aria": "Esporta tutti i contatti visibili in CSV"
       },
       "newContact": {
+        "label": "Nuovo contatto",
         "aria": "Crea un nuovo contatto"
       },
       "delete": "Elimina",

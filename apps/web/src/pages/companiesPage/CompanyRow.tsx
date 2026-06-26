@@ -51,7 +51,7 @@ export const CompanyRow = memo(function CompanyRow({
       </td>
       <td>
         <div className="flex min-w-[220px] items-center gap-3">
-          <CompanyLogo name={company.name} domain={company.domain} size={36} />
+          <CompanyLogo name={company.name} companyId={company.id} domain={company.domain} size={36} />
           <div className="min-w-0">
             <Link
               to={`/companies/${company.id}`}

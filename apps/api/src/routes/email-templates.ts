@@ -19,6 +19,34 @@ import { renderEmailTemplate } from '../lib/email-template-render.js';
 const IdParam = z.object({ id: z.string().uuid() });
 
 export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: email templates were previously ungated — any authenticated user
+  // (including Read-Only) could create, edit, or delete org outbound-mail
+  // templates (privilege escalation within a tenant). Gate template AUTHORING
+  // (create / patch / delete) behind settings:write, and reads behind
+  // settings:read. Mirrors the method-aware hook in workflows.ts / tags.ts.
+  //
+  // Two POSTs are deliberately read-level, not write:
+  //   • /render        — a pure preview (renderEmailTemplate only reads), so a
+  //                      sender previewing a template needs no settings:write.
+  //   • /:id/track-use — increments useCount + stamps lastUsedAt. This is send
+  //                      telemetry on the template, not template authoring, and
+  //                      runs in the compose/send flow where the caller (e.g. an
+  //                      Account Executive) holds no settings:write. Gating it as
+  //                      a read keeps the fix surgical to the actual finding
+  //                      (authoring) without breaking the send path.
+  server.addHook('preHandler', async (req) => {
+    const isMutation =
+      req.method === 'POST' ||
+      req.method === 'PUT' ||
+      req.method === 'PATCH' ||
+      req.method === 'DELETE';
+    const isReadLevelPost =
+      req.method === 'POST' &&
+      (req.url.includes('/email-templates/render') || req.url.endsWith('/track-use'));
+    const isAuthoring = isMutation && !isReadLevelPost;
+    await server.requirePermission(isAuthoring ? 'settings:write' : 'settings:read')(req);
+  });
+
   // ─── GET /api/v1/email-templates ──────────────────────────────────────
   server.get(
     '/email-templates',

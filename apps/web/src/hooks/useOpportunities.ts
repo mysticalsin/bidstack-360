@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { toast } from '@/components/ui/Toast';
@@ -12,7 +13,8 @@ import type {
 } from '@bidstack/shared';
 
 export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
-  return useQuery({
+  const mountedRefresh = useRef(false);
+  const query = useQuery({
     queryKey: ['opportunities', filter],
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();
@@ -23,7 +25,22 @@ export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
       }
       return api<OpportunityPage>(`/api/opportunities?${params.toString()}`, { signal });
     },
+    // Core revenue data must refresh whenever the user returns to list/kanban.
+    // The API has a short tenant-scoped cache; keeping this browser cache fresh
+    // prevents long-lived tabs from showing old pipeline state until logout.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
+
+  const { dataUpdatedAt, isFetching, refetch } = query;
+  const shouldRefreshCachedData = useRef(dataUpdatedAt > 0);
+  useEffect(() => {
+    if (!shouldRefreshCachedData.current || mountedRefresh.current || isFetching) return;
+    mountedRefresh.current = true;
+    void refetch({ cancelRefetch: false });
+  }, [isFetching, refetch]);
+
+  return query;
 }
 
 /** Lightweight count for badges / KPIs — avoids fetching 200 rows just for a number. */

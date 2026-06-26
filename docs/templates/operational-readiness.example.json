@@ -1,0 +1,37 @@
+{
+  "operationalReadiness": {
+    "environment": "staging",
+    "platform": "azure",
+    "releaseId": "release-YYYY-MM-DD-<git-sha>",
+    "reviewer": "release-ops@example.com",
+    "approval": {
+      "approver": "platform-owner@example.com",
+      "ticket": "MANTU-OPS-<real-ticket-id>",
+      "approvedAt": "2026-06-18T10:00:00.000Z"
+    },
+    "infrastructure": {
+      "bicepBuildPassed": true,
+      "whatIfPassed": true,
+      "privateNetworkingApproved": true,
+      "storageValidated": true
+    },
+    "database": {
+      "migrationJobValidated": true,
+      "migrationDeployValidated": true,
+      "backupConfigured": true,
+      "backupRetentionDays": 35,
+      "geoRedundantBackup": true,
+      "restoreDrillAt": "2026-06-18T11:00:00.000Z",
+      "restoreRtoMinutes": 120,
+      "restoreRpoMinutes": 15
+    },
+    "rollback": {
+      "runbookReviewed": true,
+      "rollbackDrillAt": "2026-06-18T12:00:00.000Z"
+    },
+    "monitoring": {
+      "alertsValidated": true,
+      "onCallValidated": true
+    }
+  }
+}

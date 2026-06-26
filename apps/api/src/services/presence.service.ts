@@ -25,7 +25,7 @@ const presenceRedis = new Redis(redisUrl, {
   enableOfflineQueue: true,
   maxRetriesPerRequest: null,
   retryStrategy: (times) => Math.min(times * 200, 5_000),
-  lazyConnect: false,
+  lazyConnect: true,
 });
 
 presenceRedis.on('error', () => {

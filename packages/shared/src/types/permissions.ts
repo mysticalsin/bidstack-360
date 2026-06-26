@@ -27,6 +27,8 @@ export const PERMISSION_KEYS = [
   'integrations:write',
   'invoices:read',
   'invoices:write',
+  'kam:read',
+  'kam:write',
   'leads:read',
   'leads:write',
   'mcp:read',

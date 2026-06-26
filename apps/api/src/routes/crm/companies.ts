@@ -2,7 +2,16 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { AccountCockpitSnapshot, CompanyAutopopulateResponse, CrmCompany } from '@bidstack/shared';
+import {
+  AccountCockpitSnapshot,
+  CompanyAutopopulateResponse,
+  CrmCompany,
+  TechnicalStackCategory,
+  TechnicalStackRefreshResponse,
+  TechnicalStackState,
+  type TechnicalStackCategory as TechnicalStackCategoryType,
+  type TechnicalStackRefreshProvider as TechnicalStackRefreshProviderType,
+} from '@bidstack/shared';
 
 import {
   buildCompanyCockpit,
@@ -11,13 +20,25 @@ import {
   domainFor,
   getCompaniesOnly,
 } from '../../services/crm/dashboard.service.js';
+import { resolveCockpitCompany } from '../../services/crm/dashboard.queries.js';
 import { normalizeName } from '../../services/crm/dashboard.utils.js';
 import { invalidateDashboardSnapshotCache } from './dashboard.js';
+import { getAccessScope } from '../../lib/access-scope.js';
+import { canReadAccount } from '../../lib/account-access.js';
+import { resolveDataProviderApiKey } from '../../lib/data-provider-credentials.js';
 import {
   queueApolloEnrichment,
   upsertVerifiedCompanyEnrichment,
 } from '../../services/crm/enrichment.service.js';
+import { techStackMcpSourceConfigsFromEnv } from '../../providers/company-tech-stack-mcp.js';
 import { autopopulateCompanies } from '../../services/crm/company.service.js';
+import {
+  TECHNICAL_STACK_FIELD_KEY,
+  acceptTechnicalStackSuggestion,
+  buildTechnicalStackState,
+  parseTechnicalStackOverride,
+  technicalStackOverrideValue,
+} from '../../services/crm/technical-stack.service.js';
 
 const CompanySearchQuery = z.object({
   q: z.string().trim().optional(),
@@ -59,6 +80,106 @@ const AutopopulateSalesCompaniesBody = z
   .default({});
 
 export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
+  const TechnicalStackBody = z.object({
+    stack: z.array(TechnicalStackCategory).max(16),
+  });
+  const TechnicalStackRefreshBody = z.object({}).nullish().default({});
+  const TechnicalStackParams = z.object({ companyKey: z.string().min(1).max(255) });
+  const TechnicalStackSuggestionParams = TechnicalStackParams.extend({
+    suggestionId: z.string().min(1).max(180),
+  });
+
+  async function loadTechnicalStackContext(orgId: string, userId: string, rawCompanyKey: string) {
+    const scope = await getAccessScope(orgId, userId);
+    const rawKey = normalizeName(rawCompanyKey);
+    const company = await resolveCockpitCompany(orgId, rawKey, prisma);
+    if (!company) throw server.httpErrors.notFound('Company not found');
+    const access = await canReadAccount({
+      orgId,
+      userId,
+      accountId: rawCompanyKey,
+      accountName: company.name,
+      scope,
+      prismaClient: prisma,
+    });
+    if (!access.allowed) throw server.httpErrors.notFound('Company not found');
+    const companyKey = normalizeName(company.name);
+    const override = await prisma.companyFieldOverride.findUnique({
+      where: {
+        orgId_companyKey_fieldKey: {
+          orgId,
+          companyKey,
+          fieldKey: TECHNICAL_STACK_FIELD_KEY,
+        },
+      },
+      select: { value: true, updatedAt: true },
+    });
+    const state = buildTechnicalStackState({
+      companyKey,
+      providerStack: company.technicalStack ?? [],
+      overrideValue: override?.value,
+      overrideUpdatedAt: override?.updatedAt ?? null,
+      providerUpdatedAt: company.updatedAt,
+    });
+    return {
+      company,
+      companyKey,
+      state,
+      overrideValue: override?.value,
+      overrideUpdatedAt: override?.updatedAt ?? null,
+    };
+  }
+
+  async function saveTechnicalStackOverride({
+    orgId,
+    userId,
+    companyKey,
+    stack,
+    dismissedSuggestionIds,
+    action,
+  }: {
+    orgId: string;
+    userId: string;
+    companyKey: string;
+    stack: TechnicalStackCategoryType[];
+    dismissedSuggestionIds: string[];
+    action: string;
+  }) {
+    const value = technicalStackOverrideValue(stack, dismissedSuggestionIds);
+    const saved = await prisma.$transaction(async (tx) => {
+      const row = await tx.companyFieldOverride.upsert({
+        where: {
+          orgId_companyKey_fieldKey: {
+            orgId,
+            companyKey,
+            fieldKey: TECHNICAL_STACK_FIELD_KEY,
+          },
+        },
+        create: {
+          orgId,
+          companyKey,
+          fieldKey: TECHNICAL_STACK_FIELD_KEY,
+          value,
+          overriddenById: userId,
+        },
+        update: { value, overriddenById: userId },
+      });
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          userId,
+          action,
+          targetType: 'company',
+          targetId: companyKey,
+          diff: value,
+        },
+      });
+      return row;
+    });
+    invalidateDashboardSnapshotCache(orgId);
+    return saved;
+  }
+
   server.get(
     '/crm/companies/search',
     {
@@ -68,7 +189,8 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const companies = await getCompaniesOnly(req.auth.orgId, prisma);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const companies = await getCompaniesOnly(req.auth.orgId, prisma, scope);
       const q = req.query.q?.toLowerCase();
       const items = companies
         .filter((company) => {
@@ -90,6 +212,186 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   server.get(
+    '/crm/companies/:companyKey/technical-stack',
+    {
+      schema: {
+        params: TechnicalStackParams,
+        response: { 200: TechnicalStackState },
+      },
+    },
+    async (req) => {
+      const { state } = await loadTechnicalStackContext(
+        req.auth.orgId,
+        req.auth.userId,
+        req.params.companyKey,
+      );
+      return state;
+    },
+  );
+
+  server.post(
+    '/crm/companies/:companyKey/technical-stack/refresh',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+      preHandler: server.requirePermission('companies:write'),
+      schema: {
+        params: TechnicalStackParams,
+        body: TechnicalStackRefreshBody,
+        response: { 200: TechnicalStackRefreshResponse },
+      },
+    },
+    async (req) => {
+      const { company, companyKey, state, overrideValue, overrideUpdatedAt } =
+        await loadTechnicalStackContext(req.auth.orgId, req.auth.userId, req.params.companyKey);
+      const refreshed = await upsertVerifiedCompanyEnrichment({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        name: company.name,
+        domain: company.domain,
+        website: company.website,
+        requestedBy: 'technical_stack_refresh',
+        auditAction: 'crm.company.technical_stack_refresh',
+        log: req.log,
+        prisma,
+      });
+      const apolloJobId = await queueApolloEnrichment({
+        orgId: req.auth.orgId,
+        companyName: company.name,
+        ...(refreshed.domain ?? company.domain
+          ? { domain: refreshed.domain ?? company.domain ?? undefined }
+          : {}),
+        log: req.log,
+      });
+      const refreshedState = buildTechnicalStackState({
+        companyKey,
+        providerStack: refreshed.company.technicalStack ?? state.providerStack,
+        overrideValue,
+        overrideUpdatedAt,
+        providerUpdatedAt: refreshed.company.updatedAt,
+      });
+      const nowIso = new Date().toISOString();
+      return {
+        state: refreshedState,
+        providers: await buildTechnicalStackRefreshProviders({
+          orgId: req.auth.orgId,
+          apolloJobId,
+          refreshedStack: refreshed.company.technicalStack ?? [],
+          refreshedSources: refreshed.company.sourceAttribution,
+          nowIso,
+        }),
+      };
+    },
+  );
+
+  server.put(
+    '/crm/companies/:companyKey/technical-stack',
+    {
+      preHandler: server.requirePermission('companies:write'),
+      schema: {
+        params: TechnicalStackParams,
+        body: TechnicalStackBody,
+        response: { 200: TechnicalStackState },
+      },
+    },
+    async (req) => {
+      const { companyKey, state, overrideValue } = await loadTechnicalStackContext(
+        req.auth.orgId,
+        req.auth.userId,
+        req.params.companyKey,
+      );
+      const dismissedSuggestionIds =
+        parseTechnicalStackOverride(overrideValue)?.dismissedSuggestionIds ?? [];
+      const saved = await saveTechnicalStackOverride({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        companyKey,
+        stack: req.body.stack,
+        dismissedSuggestionIds,
+        action: 'company.technical_stack_override',
+      });
+      return buildTechnicalStackState({
+        companyKey,
+        providerStack: state.providerStack,
+        overrideValue: saved.value,
+        overrideUpdatedAt: saved.updatedAt,
+      });
+    },
+  );
+
+  server.post(
+    '/crm/companies/:companyKey/technical-stack/suggestions/:suggestionId/accept',
+    {
+      preHandler: server.requirePermission('companies:write'),
+      schema: {
+        params: TechnicalStackSuggestionParams,
+        response: { 200: TechnicalStackState },
+      },
+    },
+    async (req) => {
+      const { companyKey, state, overrideValue } = await loadTechnicalStackContext(
+        req.auth.orgId,
+        req.auth.userId,
+        req.params.companyKey,
+      );
+      const nextStack = acceptTechnicalStackSuggestion(state, req.params.suggestionId);
+      if (!nextStack) throw server.httpErrors.notFound('Provider suggestion not found');
+      const dismissedSuggestionIds = (
+        parseTechnicalStackOverride(overrideValue)?.dismissedSuggestionIds ?? []
+      ).filter((id) => id !== req.params.suggestionId);
+      const saved = await saveTechnicalStackOverride({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        companyKey,
+        stack: nextStack,
+        dismissedSuggestionIds,
+        action: 'company.technical_stack_suggestion_accept',
+      });
+      return buildTechnicalStackState({
+        companyKey,
+        providerStack: state.providerStack,
+        overrideValue: saved.value,
+        overrideUpdatedAt: saved.updatedAt,
+      });
+    },
+  );
+
+  server.post(
+    '/crm/companies/:companyKey/technical-stack/suggestions/:suggestionId/dismiss',
+    {
+      preHandler: server.requirePermission('companies:write'),
+      schema: {
+        params: TechnicalStackSuggestionParams,
+        response: { 200: TechnicalStackState },
+      },
+    },
+    async (req) => {
+      const { companyKey, state, overrideValue } = await loadTechnicalStackContext(
+        req.auth.orgId,
+        req.auth.userId,
+        req.params.companyKey,
+      );
+      const existing = parseTechnicalStackOverride(overrideValue);
+      const saved = await saveTechnicalStackOverride({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        companyKey,
+        stack: existing?.stack ?? state.manualStack,
+        dismissedSuggestionIds: [
+          ...(existing?.dismissedSuggestionIds ?? []),
+          req.params.suggestionId,
+        ],
+        action: 'company.technical_stack_suggestion_dismiss',
+      });
+      return buildTechnicalStackState({
+        companyKey,
+        providerStack: state.providerStack,
+        overrideValue: saved.value,
+        overrideUpdatedAt: saved.updatedAt,
+      });
+    },
+  );
+
+  server.get(
     '/crm/companies/lookup',
     {
       schema: {
@@ -98,7 +400,8 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const companies = await getCompaniesOnly(req.auth.orgId, prisma);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const companies = await getCompaniesOnly(req.auth.orgId, prisma, scope);
       const domain = normalizeDomain(req.query.domain);
       const registryNeedles = [
         req.query.vat,
@@ -164,7 +467,8 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       // WHY: buildCompanyCockpit runs 7 targeted queries vs buildDashboardSnapshot's 12
       // full-table scans. Widgets, bid opportunities, insights, providers, queues, and
       // release score are irrelevant to a single-company cockpit view.
-      const cockpit = await buildCompanyCockpit(req.auth.orgId, req.params.id, prisma);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const cockpit = await buildCompanyCockpit(req.auth.orgId, req.params.id, prisma, scope);
       if (!cockpit) throw server.httpErrors.notFound('Company not found');
       return cockpit;
     },
@@ -260,6 +564,15 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const companyKey = normalizeName(req.params.companyKey);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const access = await canReadAccount({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.params.companyKey,
+        scope,
+        prismaClient: prisma,
+      });
+      if (!access.allowed) throw server.httpErrors.notFound('Company not found');
       // Override + its audit row must land together or not at all.
       const saved = await prisma.$transaction(async (tx) => {
         const row = await tx.companyFieldOverride.upsert({
@@ -315,6 +628,15 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const companyKey = normalizeName(req.params.companyKey);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const access = await canReadAccount({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.params.companyKey,
+        scope,
+        prismaClient: prisma,
+      });
+      if (!access.allowed) throw server.httpErrors.notFound('Company not found');
       await prisma.companyFieldOverride.deleteMany({
         where: { orgId: req.auth.orgId, companyKey, fieldKey: req.params.fieldKey },
       });
@@ -333,3 +655,118 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 };
+
+async function buildTechnicalStackRefreshProviders({
+  orgId,
+  apolloJobId,
+  refreshedStack,
+  refreshedSources,
+  nowIso,
+}: {
+  orgId: string;
+  apolloJobId: string | null;
+  refreshedStack: TechnicalStackCategoryType[];
+  refreshedSources: Array<{ source: string }>;
+  nowIso: string;
+}): Promise<TechnicalStackRefreshProviderType[]> {
+  const apolloMcpConfigured = Boolean(
+    process.env.APOLLO_MCP_URL && process.env.APOLLO_MCP_BEARER_TOKEN,
+  );
+  const apolloMcpPartial = Boolean(
+    (process.env.APOLLO_MCP_URL || process.env.APOLLO_MCP_BEARER_TOKEN) && !apolloMcpConfigured,
+  );
+  const apolloApiConfigured = Boolean(process.env.APOLLO_API_KEY);
+  const apolloConfigured = apolloMcpConfigured || apolloApiConfigured;
+  const apolloTransport = apolloMcpConfigured ? 'mcp' : 'api';
+  const seamlessMcpConfigured = Boolean(process.env.SEAMLESS_MCP_URL);
+  const seamlessApiConfigured = Boolean(
+    (await resolveDataProviderApiKey(orgId, 'seamless').catch(() => null)) ??
+      process.env.SEAMLESS_API_KEY,
+  );
+  const seamlessConfigured = seamlessMcpConfigured || seamlessApiConfigured;
+  const seamlessTransport = seamlessMcpConfigured ? 'mcp' : 'api';
+  const seamlessSynced =
+    refreshedSources.some((source) => source.source === 'seamless') ||
+    refreshedStack.some((category) =>
+      category.items.some((item) => item.source.toLowerCase().includes('seamless')),
+    );
+  const techIntelSources = techStackMcpSourceConfigsFromEnv();
+  const techIntelConfigured = techIntelSources.length > 0;
+  const techIntelSynced =
+    refreshedSources.some((source) => source.source === 'tech_stack_mcp') ||
+    refreshedStack.some((category) =>
+      category.items.some((item) => item.source.toLowerCase().includes('tech_stack_mcp')),
+    );
+  const techIntelLabel = techIntelProviderLabel(techIntelSources);
+  const openDataDisabled = process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1';
+
+  return [
+    {
+      id: 'apollo',
+      label: 'Apollo',
+      status: apolloConfigured
+        ? apolloJobId
+          ? 'queued'
+          : 'unavailable'
+        : apolloMcpPartial
+          ? 'unavailable'
+          : 'disabled',
+      transport: apolloConfigured ? apolloTransport : null,
+      message: apolloConfigured
+        ? apolloJobId
+          ? apolloMcpConfigured
+            ? 'Apollo company intelligence queued through the configured MCP lane.'
+            : 'Apollo company intelligence queued through the REST API lane.'
+          : 'Apollo is configured but the enrichment queue did not accept the job.'
+        : apolloMcpPartial
+          ? 'Apollo MCP is partially configured; set both APOLLO_MCP_URL and APOLLO_MCP_BEARER_TOKEN, or set APOLLO_API_KEY.'
+        : 'Apollo MCP/API credentials are not configured.',
+      lastCheckedAt: nowIso,
+    },
+    {
+      id: 'seamless',
+      label: 'Seamless.AI',
+      status: seamlessConfigured ? (seamlessSynced ? 'synced' : 'unavailable') : 'disabled',
+      transport: seamlessConfigured ? seamlessTransport : null,
+      message: seamlessConfigured
+        ? seamlessSynced
+          ? `Seamless.AI ${seamlessMcpConfigured ? 'MCP' : 'API'} returned company technology signals.`
+          : `Seamless.AI ${seamlessMcpConfigured ? 'MCP' : 'API'} was checked but returned no technology signals for this account.`
+        : 'Seamless.AI MCP/API credentials are not configured.',
+      lastCheckedAt: nowIso,
+    },
+    {
+      id: 'tech_intel',
+      label: techIntelLabel,
+      status: techIntelConfigured ? (techIntelSynced ? 'synced' : 'unavailable') : 'disabled',
+      transport: techIntelConfigured ? 'mcp' : null,
+      message: techIntelConfigured
+        ? techIntelSynced
+          ? `${techIntelLabel} returned company technology signals.`
+          : `${techIntelLabel} was checked but returned no technology signals for this account.`
+        : 'Technology intelligence MCP is not configured.',
+      lastCheckedAt: nowIso,
+    },
+    {
+      id: 'open_data',
+      label: 'Open data',
+      status: openDataDisabled ? 'disabled' : 'synced',
+      transport: openDataDisabled ? null : 'open_data',
+      message: openDataDisabled
+        ? 'Open company verification is disabled for this environment.'
+        : 'Open company verification checked domain, logo, and public profile sources.',
+      lastCheckedAt: nowIso,
+    },
+  ];
+}
+
+function techIntelProviderLabel(
+  sources: Array<{ label: string }>,
+): string {
+  const labels = [
+    ...new Set(sources.map((source) => source.label.trim()).filter(Boolean)),
+  ];
+  if (labels.length === 0) return process.env.TECH_STACK_MCP_LABEL ?? 'Tech Intel MCP';
+  if (labels.length <= 2) return labels.join(' + ');
+  return `${labels.slice(0, 2).join(' + ')} + ${labels.length - 2} more`;
+}

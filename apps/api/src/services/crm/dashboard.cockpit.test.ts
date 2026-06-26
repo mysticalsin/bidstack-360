@@ -127,6 +127,49 @@ describe('applyFieldOverrides', () => {
   });
 });
 
+describe('buildCockpit technical stack overrides', () => {
+  it('uses the saved manual tech stack instead of provider/default rows', () => {
+    const cockpit = buildCockpit({
+      company: company({
+        name: 'Acme',
+        technicalStack: [
+          {
+            label: 'Cloud',
+            items: [{ name: 'Azure', source: 'enrichment:apollo', confidence: 0.91 }],
+          },
+        ],
+      }),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [
+        {
+          fieldKey: 'technicalStack',
+          value: {
+            stack: [
+              {
+                label: 'Data',
+                items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }],
+              },
+            ],
+            dismissedSuggestionIds: [],
+          },
+        },
+      ],
+    });
+
+    expect(cockpit.technicalStack).toEqual([
+      {
+        label: 'Data',
+        items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }],
+      },
+    ]);
+  });
+});
+
 describe('buildCockpit win/loss + revenue derivation', () => {
   const baseArgs = (opps: unknown[]) => ({
     company: company({ name: 'Acme' }),

@@ -19,7 +19,15 @@ export function initTelemetry(): void {
 
   sdk = new NodeSDK({
     traceExporter,
-    instrumentations: [getNodeAutoInstrumentations()],
+    // Disable fs instrumentation: it emits a span for every filesystem call
+    // (module loads, template reads, static assets), which floods the trace
+    // backend and adds measurable per-request overhead for no diagnostic value
+    // in this HTTP/DB-bound service.
+    instrumentations: [
+      getNodeAutoInstrumentations({
+        '@opentelemetry/instrumentation-fs': { enabled: false },
+      }),
+    ],
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'bidstack-api',
       [ATTR_SERVICE_VERSION]: process.env.OTEL_SERVICE_VERSION || '0.1.0',

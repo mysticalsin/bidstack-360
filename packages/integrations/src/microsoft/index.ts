@@ -5,6 +5,16 @@ import type {
   SyncResult,
   } from '../types/plugin.js';
 
+/** Default fetch timeout for Microsoft Graph API calls (15 seconds). */
+const FETCH_TIMEOUT_MS = 15_000;
+
+function fetchWithTimeout(url: string, opts: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = FETCH_TIMEOUT_MS, ...rest } = opts;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...rest, signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 /**
  * Microsoft 365 Integration Plugin
  *
@@ -46,7 +56,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
       throw new Error('Microsoft OAuth credentials not configured');
     }
 
-    const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    const res = await fetchWithTimeout(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -59,8 +69,8 @@ export class MicrosoftPlugin implements IntegrationPlugin {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Microsoft token exchange failed: ${text}`);
+      // Do NOT propagate response body — it may contain sensitive token data.
+      throw new Error(`Microsoft token exchange failed (HTTP ${res.status})`);
     }
 
     const data = (await res.json()) as {
@@ -84,7 +94,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
     if (!accessToken) return { valid: false, message: 'Missing access token' };
 
     try {
-      const res = await fetch('https://graph.microsoft.com/v1.0/me', {
+      const res = await fetchWithTimeout('https://graph.microsoft.com/v1.0/me', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       return { valid: res.ok, message: res.ok ? undefined : `HTTP ${res.status}` };
@@ -103,7 +113,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
       throw new Error('Cannot refresh: missing credentials');
     }
 
-    const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    const res = await fetchWithTimeout(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -115,7 +125,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
       }),
     });
 
-    if (!res.ok) throw new Error('Microsoft refresh failed');
+    if (!res.ok) throw new Error(`Microsoft refresh failed (HTTP ${res.status})`);
     const data = (await res.json()) as { access_token: string; refresh_token?: string };
 
     return {
@@ -153,7 +163,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
           const start = args.startDate as string;
           const end = args.endDate as string;
           const url = `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${encodeURIComponent(start)}&endDateTime=${encodeURIComponent(end)}`;
-          const res = await fetch(url, {
+          const res = await fetchWithTimeout(url, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (!res.ok) throw new Error(`Microsoft Graph error: ${res.status}`);
@@ -171,7 +181,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
         execute: async (args, context) => {
           const accessToken = context.config.credentials?.accessToken as string | undefined;
           if (!accessToken) throw new Error('Microsoft not connected');
-          const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+          const res = await fetchWithTimeout('https://graph.microsoft.com/v1.0/me/sendMail', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${accessToken}`,

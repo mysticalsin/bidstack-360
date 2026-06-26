@@ -11,7 +11,21 @@ import {
 } from 'fastify-type-provider-zod';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { checkSerumConnectorRuntimePolicy } from '@bidstack/db/serum-runtime-policy';
+
 import { __resetErpClient, erpRoutes } from './erp-integration.js';
+
+vi.mock('@bidstack/db/serum-runtime-policy', () => ({
+  SERUM_RUNTIME_CONFIG_KEYS: {
+    connectors: 'registry',
+  },
+  checkSerumConnectorRuntimePolicy: vi.fn(),
+  recordSerumConnectorConnectionTest: vi.fn(),
+}));
+
+const checkConnector = vi.mocked(checkSerumConnectorRuntimePolicy);
+const TEST_ORG_ID = '00000000-0000-4000-8000-000000000001';
+const TEST_USER_ID = '00000000-0000-4000-8000-000000000002';
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -24,6 +38,12 @@ async function buildApp() {
   const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  app.addHook('preHandler', async (req) => {
+    (req as typeof req & { auth: { orgId: string; userId: string } }).auth = {
+      orgId: TEST_ORG_ID,
+      userId: TEST_USER_ID,
+    };
+  });
   await app.register(sensible);
   await app.register(erpRoutes, { prefix: '/api/integrations' });
   return app;
@@ -31,6 +51,16 @@ async function buildApp() {
 
 describe('erp-integration route', () => {
   beforeEach(() => {
+    checkConnector.mockResolvedValue({
+      configType: 'connectors',
+      configKey: 'registry',
+      environment: 'dev',
+      subject: 'erp.test:odoo',
+      allowed: true,
+      status: 'allowed',
+      reason: 'Connector operation is allowed by the active SERUM policy.',
+      activeConfigVersionId: '00000000-0000-4000-8000-000000000099',
+    });
     __resetErpClient();
     process.env.ERP_MCP_URL = 'http://erp.test/mcp';
     process.env.ERP_DB = 'mantu-prod';
@@ -43,6 +73,7 @@ describe('erp-integration route', () => {
     delete process.env.ODOO_DB;
     delete process.env.ODOO_MCP_BEARER_TOKEN;
     vi.unstubAllGlobals();
+    checkConnector.mockReset();
     __resetErpClient();
   });
 
@@ -248,6 +279,36 @@ describe('erp-integration route', () => {
         { id: 2, name: 'Amaris' },
       ],
     });
+  });
+
+  it('blocks ERP proxy calls before network egress when SERUM connector policy denies', async () => {
+    checkConnector.mockResolvedValueOnce({
+      configType: 'connectors',
+      configKey: 'registry',
+      environment: 'dev',
+      subject: 'erp.search:odoo',
+      allowed: false,
+      status: 'not_configured',
+      reason: 'No active SERUM Connectors policy is published.',
+      activeConfigVersionId: null,
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/integrations/erp/search',
+      payload: {
+        model: 'res.partner',
+        fields: ['name'],
+        limit: 5,
+      },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toContain('SERUM connector policy denied');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('returns 502 Bad Gateway when an allowed-model query fails upstream', async () => {

@@ -40,21 +40,45 @@ export function IntakePage() {
     refetchInterval: hasPendingExtractions ? 2000 : false,
   });
 
-  // Auto-advance to review once all extractions finish
+  // Auto-advance to review once the extractions WE triggered this session
+  // settle. Scope to extractingDocIds so historical extractions on the account
+  // can't trigger (or block) advancement.
   useEffect(() => {
     if (!hasPendingExtractions || !intel.data) return;
-    const pendingOrRunning = intel.data.extractions.filter(
-      (e) => e.status === 'pending' || e.status === 'running',
-    );
-    if (pendingOrRunning.length === 0 && intel.data.extractions.length > 0) {
-      // Defer to next tick to avoid cascading renders
-      setTimeout(() => {
-        setExtractingDocIds(new Set());
-        setStep('review');
+    const mine = intel.data.extractions.filter((e) => extractingDocIds.has(e.documentId));
+    // Nothing matched yet (snapshot hasn't caught up) — keep polling.
+    if (mine.length === 0) return;
+    const stillWorking = mine.some((e) => e.status === 'pending' || e.status === 'running');
+    if (stillWorking) return;
+
+    // All settled. Only advance if at least one extraction actually succeeded;
+    // a fully-failed batch must surface the error and stay on the extract step
+    // so the user can retry rather than land on an empty review.
+    const doneCount = mine.filter((e) => e.status === 'done').length;
+    const errorCount = mine.filter((e) => e.status === 'error').length;
+    // Defer to next tick to avoid cascading renders.
+    setTimeout(() => {
+      setExtractingDocIds(new Set());
+      if (doneCount === 0) {
+        toast.error(t('intake.toastExtractionAllFailed', 'Extraction failed — no documents extracted'));
+        return;
+      }
+      if (errorCount > 0) {
+        toast.warning(
+          t('intake.toastExtractionPartial', 'Some documents failed to extract'),
+          {
+            description: t('intake.toastExtractionPartialDetail', '{{done}} succeeded, {{failed}} failed', {
+              done: doneCount,
+              failed: errorCount,
+            }),
+          },
+        );
+      } else {
         toast.success(t('intake.toastExtractionComplete', 'Extraction complete'));
-      }, 0);
-    }
-  }, [intel.data, hasPendingExtractions, t]);
+      }
+      setStep('review');
+    }, 0);
+  }, [intel.data, hasPendingExtractions, extractingDocIds, t]);
 
   const toggleDoc = (id: string) => {
     setSelectedDocs((prev) => {

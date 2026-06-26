@@ -201,13 +201,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         completedChecklist: persisted.completedChecklist ?? [],
       });
     }
-    // Auto-start tour for new users (tourSeen === false and not dismissed)
-    const s = get();
-    if (!s.tourSeen && !s.dismissed) {
-      // Slight delay so the app shell has time to paint before overlay appears
-      setTimeout(() => {
-        set({ tourActive: true, currentStepIndex: 0 });
-      }, 1200);
-    }
+    // Tours are opt-in from Quick Start/topbar. Auto-starting on route load
+    // blocks primary CRM actions behind a full-screen backdrop.
   },
 }));

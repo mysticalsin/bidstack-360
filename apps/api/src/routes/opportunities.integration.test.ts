@@ -4,11 +4,14 @@
 // in-process. Skipped automatically when DATABASE_URL is unreachable so
 // the suite stays useful in offline CI.
 
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import { mintNextCode } from './opportunities.helpers.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -100,6 +103,43 @@ describe('opportunities routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.items.some((o: { customer: string }) => o.customer === 'MAHLE')).toBe(true);
+  });
+
+  skipIfNoDb('mintNextCode sorts OP suffixes numerically beyond four digits', async () => {
+    const org = await prisma.org.create({
+      data: {
+        clerkOrg: `org_code_alloc_${randomUUID()}`,
+        name: 'Opportunity Code Allocation Test',
+      },
+    });
+
+    try {
+      await prisma.opportunity.createMany({
+        data: [
+          {
+            orgId: org.id,
+            code: 'OP-9999',
+            customer: 'Allocator',
+            name: 'Four digit ceiling',
+            stage: 's1_lead',
+            probability: 0,
+          },
+          {
+            orgId: org.id,
+            code: 'OP-10000',
+            customer: 'Allocator',
+            name: 'Five digit successor',
+            stage: 's1_lead',
+            probability: 0,
+          },
+        ],
+      });
+
+      const code = await prisma.$transaction((tx) => mintNextCode(tx, org.id));
+      expect(code).toBe('OP-10001');
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 
   skipIfNoDb('GET /api/opportunities/:id returns the full intel payload', async () => {

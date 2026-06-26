@@ -4,6 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { csvCell } from '@/lib/csv';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -258,12 +259,13 @@ export function useExportReport() {
       if (rows.length === 0) return { blob: new Blob(['']), filename: `report-${runId}.csv` };
       const headers = Object.keys(rows[0]!);
       const lines = [
-        headers.join(','),
+        headers.map((h) => csvCell(h)).join(','),
         ...rows.map((row) =>
           headers
             .map((h) => {
-              const v = String(row[h] ?? '');
-              // Escape commas and quotes per RFC 4180
+              // csvCell neutralizes formula-injection (=,+,-,@,TAB,CR) first;
+              // then escape commas/quotes/newlines per RFC 4180.
+              const v = csvCell(String(row[h] ?? ''));
               return v.includes(',') || v.includes('"') || v.includes('\n')
                 ? `"${v.replace(/"/g, '""')}"`
                 : v;

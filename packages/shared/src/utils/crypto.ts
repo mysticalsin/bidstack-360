@@ -9,10 +9,9 @@
 // three columns per secret.
 //
 // The master key (`INTEGRATION_TOKEN_KEY`) must be a 32-byte value supplied
-// out of band — typically generated once with
-// `node -e "console.log(crypto.randomBytes(32).toString('base64'))"` and
-// stored in a secret manager. The runtime accepts either base64 (44 chars,
-// optional padding) or 64-char hex. A non-conforming value throws at boot.
+// out of band as a 64-character hex string, typically generated once with
+// `openssl rand -hex 32` and stored in a secret manager. A non-conforming
+// value throws before any secret is encrypted or decrypted.
 
 import {
   createCipheriv,
@@ -28,19 +27,12 @@ const TAG_LENGTH_BYTES = 16;
 const VERSION = 0x01; // bump if we ever change algorithm/layout
 
 function decodeMasterKey(raw: string): Buffer {
-  // Accept hex (64 chars) or base64/base64url (≥ 43 chars after padding).
   const trimmed = raw.trim();
   if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
     return Buffer.from(trimmed, 'hex');
   }
-  try {
-    const buf = Buffer.from(trimmed, 'base64');
-    if (buf.length === KEY_LENGTH_BYTES) return buf;
-  } catch {
-    // fall through to error
-  }
   throw new Error(
-    `INTEGRATION_TOKEN_KEY must be 32 raw bytes encoded as hex (64 chars) or base64 (44 chars). Got length ${trimmed.length}.`,
+    `INTEGRATION_TOKEN_KEY must be a 64-character hex string (${KEY_LENGTH_BYTES} bytes). Got length ${trimmed.length}.`,
   );
 }
 
@@ -73,7 +65,9 @@ export function encryptSecret(plaintext: string, key?: Buffer): string {
   }
   const masterKey = key ?? getIntegrationTokenKey();
   const iv = randomBytes(IV_LENGTH_BYTES);
-  const cipher = createCipheriv(ALGORITHM, masterKey, iv);
+  const cipher = createCipheriv(ALGORITHM, masterKey, iv, {
+    authTagLength: TAG_LENGTH_BYTES,
+  });
   const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   const packed = Buffer.concat([Buffer.from([VERSION]), iv, tag, ciphertext]);
@@ -101,9 +95,26 @@ export function decryptSecret(blob: string, key?: Buffer): string {
   const iv = packed.subarray(1, 1 + IV_LENGTH_BYTES);
   const tag = packed.subarray(1 + IV_LENGTH_BYTES, 1 + IV_LENGTH_BYTES + TAG_LENGTH_BYTES);
   const ciphertext = packed.subarray(1 + IV_LENGTH_BYTES + TAG_LENGTH_BYTES);
-  const decipher = createDecipheriv(ALGORITHM, masterKey, iv);
+  const decipher = createDecipheriv(ALGORITHM, masterKey, iv, {
+    authTagLength: TAG_LENGTH_BYTES,
+  });
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+}
+
+/**
+ * Decrypt a blob, but fall back to returning the input unchanged if it is not a
+ * valid encrypted blob. Used for in-place at-rest migration of columns that may
+ * still hold legacy PLAINTEXT secrets (written before encryption was added) —
+ * new writes are encrypted, old plaintext is read as-is until backfilled. Only
+ * use where the column is transitioning; never as a general "decrypt maybe".
+ */
+export function decryptSecretOrPlaintext(value: string, key?: Buffer): string {
+  try {
+    return decryptSecret(value, key);
+  } catch {
+    return value;
+  }
 }
 
 /** Constant-time compare for string secrets (CSRF state, signing keys, etc.). */

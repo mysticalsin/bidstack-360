@@ -317,7 +317,9 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       // companies collapses that to 2 DB calls total (root + all nodes) and
       // keeps memory flat: only the ~50-byte {id, name, parentId} tuples are
       // loaded, not full company rows.
-      const ORG_COMPANY_CAP = 2_000;
+      // Bounded at the query-guard ceiling (take > 1000 is rejected as
+      // unbounded). Org hierarchies above this are vanishingly rare.
+      const ORG_COMPANY_CAP = 1_000;
       const allNodes = await prisma.company.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         select: { id: true, name: true, parentId: true },

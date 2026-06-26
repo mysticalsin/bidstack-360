@@ -19,6 +19,7 @@ import { leadsUpdate } from './leads-update.js';
 import { leadsConvert } from './leads-convert.js';
 import { notesList } from './notes-list.js';
 import { notesCreate } from './notes-create.js';
+import { salesToolkitsList } from './sales-toolkits-list.js';
 import {
   crmSearchCompanies,
   crmCreateDeal,
@@ -28,6 +29,16 @@ import {
   crmCreateActivity,
   crmGenerateInsights,
 } from './crm-tools.js';
+import {
+  kamListAccounts,
+  kamListInitiatives,
+  kamIngestTranscript,
+  kamProposeSessionDraft,
+  kamUpdateTaskStatus,
+  kamGetKpis,
+  kamReadProspections,
+  kamLogProspection,
+} from './kam-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
   description: string;
@@ -63,6 +74,7 @@ export const tools = {
   'leads.convert': leadsConvert,
   'notes.list': notesList,
   'notes.create': notesCreate,
+  sales_toolkits_list: salesToolkitsList,
   // Canonical CRM surface consumed by Dust (DustCrmToolName enum)
   crm_search_companies: crmSearchCompanies,
   crm_create_deal: crmCreateDeal,
@@ -71,11 +83,24 @@ export const tools = {
   crm_list_activities: crmListActivities,
   crm_create_activity: crmCreateActivity,
   crm_generate_insights: crmGenerateInsights,
+  // KAM front layer. Write tools use the dedicated `kam` scope (see ToolScope)
+  // so a KAM agent key cannot reach the canonical-write tools above.
+  kam_list_accounts: kamListAccounts,
+  kam_list_initiatives: kamListInitiatives,
+  kam_ingest_transcript: kamIngestTranscript,
+  kam_propose_session_draft: kamProposeSessionDraft,
+  kam_update_task_status: kamUpdateTaskStatus,
+  kam_get_kpis: kamGetKpis,
+  kam_read_prospections: kamReadProspections,
+  kam_log_prospection: kamLogProspection,
 } as const;
 
 export type ToolName = keyof typeof tools;
 
-export type ToolScope = 'read' | 'write';
+// `kam` is a dedicated staging scope: it grants KAM ingest/propose/status-update
+// WITHOUT granting `write` (which canonical-mutating tools require). A Dust KAM
+// agent key holds ['read','kam'] and therefore cannot call leads.create etc.
+export type ToolScope = 'read' | 'write' | 'kam';
 
 export const toolScopes = {
   'opportunities.list': 'read',
@@ -96,6 +121,7 @@ export const toolScopes = {
   'leads.convert': 'write',
   'notes.list': 'read',
   'notes.create': 'write',
+  sales_toolkits_list: 'read',
   crm_search_companies: 'read',
   crm_create_deal: 'write',
   crm_update_deal: 'write',
@@ -103,6 +129,14 @@ export const toolScopes = {
   crm_list_activities: 'read',
   crm_create_activity: 'write',
   crm_generate_insights: 'read',
+  kam_list_accounts: 'read',
+  kam_list_initiatives: 'read',
+  kam_ingest_transcript: 'kam',
+  kam_propose_session_draft: 'kam',
+  kam_update_task_status: 'kam',
+  kam_get_kpis: 'read',
+  kam_read_prospections: 'read',
+  kam_log_prospection: 'kam',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {

@@ -34,6 +34,7 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import {
   SLACK_AUTH_URL,
   SLACK_TOKEN_URL,
@@ -43,6 +44,7 @@ import {
   redirectUri,
   verifySlackSignature,
   syncChannels,
+  slackGet,
   buildUserMappings,
   handleChannelCreated,
   handleMemberJoinedChannel,
@@ -217,6 +219,33 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       const accessToken = tokens.access_token;
+
+      try {
+        const authTest = await slackGet<{
+          ok: boolean;
+          team?: string;
+          team_id?: string;
+          user_id?: string;
+          bot_id?: string;
+          error?: string;
+        }>('auth.test', accessToken);
+        if (authTest.ok) {
+          await recordSerumConnectorTestSuccess({
+            orgId,
+            connectorId: 'slack',
+            operation: 'slack.oauth.callback',
+            testedByUserId: userId,
+            evidence: {
+              team: authTest.team,
+              teamId: authTest.team_id,
+              userId: authTest.user_id,
+              botId: authTest.bot_id,
+            },
+          });
+        }
+      } catch (err) {
+        server.log.warn({ err }, 'Slack auth.test failed; connection evidence not recorded');
+      }
 
       // Sync channel list (non-fatal on error)
       try {

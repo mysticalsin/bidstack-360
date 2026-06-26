@@ -33,7 +33,6 @@ export const COCKPIT_CARDS: { id: string; label: string; group: 'main' | 'side' 
   { id: 'infoSearchLeads', label: 'InfoSearch leads', group: 'side' },
   { id: 'kpiSidebar', label: 'KPI sidebar', group: 'side' },
   { id: 'dataTrust', label: 'Data trust', group: 'side' },
-  { id: 'liveDataMesh', label: 'Live data mesh', group: 'side' },
   { id: 'keyContacts', label: 'Key contacts', group: 'side' },
   { id: 'notes', label: 'Notes', group: 'side' },
   { id: 'files', label: 'Files', group: 'side' },

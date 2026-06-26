@@ -28,6 +28,13 @@ function mockFetch(body: unknown, ok = true): typeof fetch {
   return vi.fn(async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
 }
 
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status: init.status ?? 200,
+    headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
+  });
+}
+
 describe('fetchSeamlessCompany', () => {
   it('maps a Seamless company into an OpenCompanyProfile, source-tagged Seamless', async () => {
     const p = await fetchSeamlessCompany({
@@ -50,6 +57,46 @@ describe('fetchSeamlessCompany', () => {
     const meta = p!.providerMetadata.seamless as Record<string, unknown>;
     expect(meta.annualRevenue).toBe(43000000000);
     expect(meta.technologies).toEqual(['SAP', 'Salesforce']);
+  });
+
+  it('prefers a Seamless MCP company search before REST API fallback', async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string };
+      if (body.method === 'initialize') return jsonResponse({ result: {} });
+      if (body.method === 'notifications/initialized') return jsonResponse({}, { status: 202 });
+      return jsonResponse({
+        result: {
+          structuredContent: {
+            data: [
+              {
+                searchResultId: 'mcp_1',
+                name: 'Sanofi',
+                domain: 'sanofi.com',
+                technologies: ['SAP', 'Salesforce'],
+              },
+            ],
+          },
+        },
+      });
+    }) as unknown as typeof fetch;
+
+    const p = await fetchSeamlessCompany({
+      name: 'Sanofi',
+      domain: 'sanofi.com',
+      apiKey: undefined,
+      mcpUrl: 'https://seamless.example/mcp',
+      mcpBearerToken: 'mcp-token',
+      fetchImpl,
+    });
+
+    expect(p).not.toBeNull();
+    expect(p!.domain).toBe('sanofi.com');
+    expect(p!.sourceAttribution[0].label).toBe('Seamless.AI MCP company intelligence');
+    expect(p!.sourceAttribution[0].providerMetadata.transport).toBe('mcp_streamable_http');
+    expect((p!.providerMetadata.seamless as Record<string, unknown>).transport).toBe(
+      'mcp_streamable_http',
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it('returns null with no API key (without fetching)', async () => {

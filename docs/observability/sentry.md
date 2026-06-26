@@ -1,144 +1,158 @@
-# Sentry Integration — BidStack 360°
+# Sentry Integration - BidStack 360
 
 ## Overview
 
-BidStack uses Sentry for error tracking across all three runtime surfaces:
-- **API** (`apps/api`) — Fastify request errors, 5xx exceptions
-- **Worker** (`apps/worker`) — BullMQ job failures
-- **Web** (`apps/web`) — React unhandled exceptions, performance tracing, optional session replay
+BidStack uses Sentry for error tracking across runtime surfaces:
+
+- **API** (`apps/api`) - Fastify request errors and 5xx exceptions.
+- **Worker** (`apps/worker`) - BullMQ job failures.
+- **Web** (`apps/web`) - React unhandled exceptions, performance tracing, and optional session replay.
 
 ## Setup
 
-### 1. Create a Sentry Organization + Projects
+### 1. Create Sentry Projects
 
-1. Sign in at [sentry.io](https://sentry.io) → New Organization.
-2. Create **three projects**:
-   - `bidstack-api` (Platform: Node.js → Fastify)
-   - `bidstack-worker` (Platform: Node.js)
-   - `bidstack-web` (Platform: JavaScript → React)
-3. Copy the DSN for each project.
+Create three projects in Sentry:
+
+- `bidstack-api` - Platform: Node.js / Fastify
+- `bidstack-worker` - Platform: Node.js
+- `bidstack-web` - Platform: JavaScript / React
 
 ### 2. Set Environment Variables
 
-Add to your `.env` (copy from `.env.example`):
-
 ```bash
-# Backend (API + Worker share the same DSN if you want unified backend project)
+# Backend
 SENTRY_DSN=https://xxxxxxx@oXXX.ingest.sentry.io/YYYYYYY
-SENTRY_ENVIRONMENT=production       # development | staging | production
-SENTRY_RELEASE=git-sha-or-semver   # set in CI (e.g. $(git rev-parse HEAD))
+SENTRY_ENVIRONMENT=production
+SENTRY_RELEASE=git-sha-or-semver
+SENTRY_TRACES_SAMPLE_RATE=0.1
 
 # Frontend
 VITE_SENTRY_DSN=https://xxxxxxx@oXXX.ingest.sentry.io/ZZZZZZZ
 VITE_SENTRY_ENVIRONMENT=production
 VITE_SENTRY_RELEASE=git-sha-or-semver
-VITE_SENTRY_REPLAY=false            # set true to enable session replay (legal review required)
+VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
+VITE_SENTRY_REPLAY=false
 ```
 
-### 3. Wire Up in Code
+### 3. API Wiring
 
-**API entry point** (`apps/api/src/index.ts`):
+`apps/api/src/main.ts` initializes Sentry before the server is built:
+
 ```ts
-// MUST be called BEFORE buildServer()
-import { initSentry } from './plugins/sentry.js';
+import { initSentry } from './instrument.js';
+
 initSentry();
 const server = await buildServer();
 ```
 
-**API server** (`apps/api/src/server.ts`) — in `buildServer()`, register Sentry FIRST:
+`apps/api/src/server.ts` registers the request-scope plugin immediately after
+auth so `req.auth` is available:
+
 ```ts
-import { sentryPlugin } from './plugins/sentry.js';
-// ... register sentryPlugin before other plugins ...
-await server.register(sentryPlugin);           // ← first
-await server.register(datadogPlugin);          // ← second
-await server.register(errorHandlerPlugin);     // ← third
+await server.register(errorHandlerPlugin);
+await server.register(authPlugin);
+await server.register(sentryPlugin);
 ```
 
-**Worker** (`apps/worker/src/main.ts`):
+Handled 5xx errors are captured from the central error handler through
+`captureSentryServerError()` so normalized application errors still reach
+operator alerts.
+
+### 4. Worker Wiring
+
 ```ts
-import { initWorkerSentry, attachSentryToWorker } from './plugins/sentry.js';
+import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
+
 initWorkerSentry(log);
-// After each startXxxWorker() call, attach Sentry to each Worker instance
+attachSentryToWorker(worker, 'queue-name', log);
 ```
 
-**Web** (`apps/web/src/main.tsx`):
+### 5. Web Wiring
+
 ```tsx
 import { initSentry } from './lib/sentry.js';
-initSentry();  // before createRoot()
+
+initSentry();
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-**Web Error Boundary** (in `App.tsx`):
-```tsx
-import { Sentry } from './lib/sentry.js';
-<Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-  <RouterProvider router={router} />
-</Sentry.ErrorBoundary>
-```
-
-## Sourcemap Upload (Production)
-
-Sourcemaps let Sentry show original TypeScript line numbers in stack traces.
-
-### Vite Plugin (recommended)
-```bash
-pnpm add -D @sentry/vite-plugin
-```
-
-In `apps/web/vite.config.ts`:
-```ts
-import { sentryVitePlugin } from '@sentry/vite-plugin';
-export default defineConfig({
-  plugins: [
-    react(),
-    sentryVitePlugin({
-      org: 'your-sentry-org',
-      project: 'bidstack-web',
-      authToken: process.env.SENTRY_AUTH_TOKEN,
-    }),
-  ],
-  build: { sourcemap: true },
-});
-```
-
-Set `SENTRY_AUTH_TOKEN` in CI secrets (GitHub Actions → Settings → Secrets).
-
-### sentry-cli (alternative for API)
-```bash
-sentry-cli releases new $SENTRY_RELEASE
-sentry-cli releases files $SENTRY_RELEASE upload-sourcemaps ./dist --url-prefix '~/'
-sentry-cli releases finalize $SENTRY_RELEASE
-```
+Session replay is privacy-sensitive. Keep `VITE_SENTRY_REPLAY=false` until
+legal/product approval exists.
 
 ## PII Protection
 
-All three surfaces implement `beforeSend` hooks that scrub PII before any data
-leaves the process. Fields redacted: `email`, `phone`, `name`, `firstName`,
-`lastName`, `password`, `secret`, `token`, `apiKey`, and variants (snake_case,
-camelCase). See `apps/api/src/plugins/sentry.ts` for the canonical list.
+All API Sentry events pass through `apps/api/src/lib/sentry-privacy.ts` before
+transmission. It redacts email, phone/name variants, postal identifiers,
+token/API-key variants, and worker phone-number fields from request and extra
+payloads.
 
-**Verify**: The unit tests in `apps/api/src/plugins/sentry.test.ts` assert PII
-scrubbing across nested objects and arrays. Run them with:
+Sentry user context is pseudonymous: `{ id: userId }` only. Org id is a tag.
+Email, name, and phone must not be added to Sentry scope.
+
+Verify with:
+
 ```bash
-pnpm test --reporter=verbose apps/api/src/plugins/sentry.test.ts
+pnpm --filter @bidstack/api exec vitest run src/plugins/sentry.test.ts src/plugins/sentry-context.test.ts
 ```
+
+## Sourcemap Upload
+
+Set `SENTRY_RELEASE` during CI and upload sourcemaps for deploys that need
+original TypeScript line numbers.
+
+For API artifacts:
+
+```bash
+sentry-cli releases new "$SENTRY_RELEASE"
+sentry-cli releases files "$SENTRY_RELEASE" upload-sourcemaps ./dist --url-prefix "~/"
+sentry-cli releases finalize "$SENTRY_RELEASE"
+```
+
+For web artifacts, use `@sentry/vite-plugin` or an equivalent CI step with
+`SENTRY_AUTH_TOKEN` stored as a CI secret.
 
 ## Alert Recommendations
 
-Configure in Sentry → Alerts → Create Alert Rule:
+| Alert                  | Condition                      | Action                |
+| ---------------------- | ------------------------------ | --------------------- |
+| Error rate spike       | Error rate > 0.1% in 5 minutes | Email + Slack on-call |
+| New fatal issue        | First seen, severity fatal     | Email                 |
+| Performance regression | p95 latency > 2 seconds        | Email                 |
+| Worker job failure     | `queue` tag present, any error | Slack on-call         |
 
-| Alert | Condition | Action |
-|-------|-----------|--------|
-| Error rate spike | Error rate > 0.1% in 5m window | Email + Slack #on-call |
-| New issue | First seen, severity: fatal | Email |
-| Performance regression | p95 latency > 2s | Email |
-| Worker job failure | `queue` tag present, any error | Slack #on-call |
+## Launch Gate
 
-## Session Replay
+Production deploys require:
 
-Opt-in: set `VITE_SENTRY_REPLAY=true`. Captures a video replay of sessions
-where errors occur. **Legal sign-off required** — session replay captures user
-interactions which may constitute personal data processing under GDPR.
+- `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, and `SENTRY_RELEASE` set.
+- `SENTRY_SMOKE_ENABLED=true` and a release-only `SENTRY_SMOKE_TOKEN` set only
+  while generating evidence.
+- A passing Sentry privacy test run.
+- A staged 5xx smoke event observed in the `bidstack-api` project.
+- Worker failure capture verified on at least one non-production queue.
+- Session replay disabled unless legal sign-off exists.
 
-Configuration: `maskAllInputs=true` (default) — all input fields are masked.
-Review `apps/web/src/lib/sentry.ts` for the full configuration.
+Trigger controlled smoke events from the release target and generate deploy
+evidence:
+
+```powershell
+$env:API_BASE_URL='https://<staging-or-production-api>'
+$env:SENTRY_SMOKE_TOKEN='<release-smoke-token>'
+$env:SENTRY_RELEASE='bidstack@0.1.0+abc123'
+$env:SENTRY_ENVIRONMENT='staging'
+$env:BIDSTACK_SENTRY_ORG='<sentry-org-slug>'
+$env:BIDSTACK_SENTRY_API_PROJECT='bidstack-api'
+$env:BIDSTACK_SENTRY_WORKER_PROJECT='bidstack-worker'
+$env:BIDSTACK_SENTRY_DSN_CONFIGURED='true'
+pnpm deploy:evidence:sentry:trigger -- --observe-delay-ms 30000
+```
+
+The trigger-capable evidence writer sends the controlled API 500 and worker
+failure, waits for ingestion, queries Sentry through the CLI for release-scoped
+API and worker smoke markers, then writes
+`deploy-evidence/sentry-smoke-latest.json` for the strict deploy gate. The smoke
+token is sent only as `x-bidstack-sentry-smoke-token`; it is never written to
+the artifact. The artifact does record the non-local API trigger target; strict
+deploy verification rejects missing, local, or placeholder-looking trigger
+targets.

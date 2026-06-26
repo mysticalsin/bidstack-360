@@ -6,6 +6,7 @@ import { useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
   | 'overview'
+  | 'serum'
   | 'profile'
   | 'appearance'
   | 'notifications'
@@ -18,6 +19,7 @@ export type SettingsSection =
   | 'groups'
   | 'opportunity-filters'
   | 'rfp-analytics'
+  | 'modules'
   | 'integrations'
   | 'webhooks'
   | 'audit-log'
@@ -31,7 +33,10 @@ interface Group {
 const GROUPS: Group[] = [
   {
     label: 'Command center',
-    items: [{ id: 'overview', label: 'Overview', icon: 'dashboard' }],
+    items: [
+      { id: 'overview', label: 'Overview', icon: 'dashboard' },
+      { id: 'serum', label: 'SERUM Control Plane', icon: 'sparkle', admin: true },
+    ],
   },
   {
     // Profile folds into Security; Language folds into Appearance — fewer,
@@ -53,6 +58,7 @@ const GROUPS: Group[] = [
       { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
       { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
+      { id: 'modules', label: 'Modules', icon: 'package', admin: true },
     ],
   },
   {
@@ -98,6 +104,8 @@ export function SettingsLayout({ active, onChange, children }: Props) {
     switch (id) {
       case 'overview':
         return t('settingsLayout.itemOverview', 'Overview');
+      case 'serum':
+        return t('settingsLayout.itemSerum', 'SERUM Control Plane');
       case 'appearance':
         return t('settingsLayout.itemAppearance', 'Appearance & Language');
       case 'notifications':

@@ -18,7 +18,7 @@
  * Dark mode via CSS variables.
  */
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
@@ -94,39 +94,91 @@ interface DetailPanelProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const DETAIL_TABS: DetailTab[] = ['summary', 'transcript'];
+
 function DetailPanel({ callSessionId, open, onOpenChange }: DetailPanelProps) {
   const [tab, setTab] = useState<DetailTab>('summary');
   const audioRef = useRef<HTMLAudioElement>(null);
+  const tabRefs = useRef<Record<DetailTab, HTMLButtonElement | null>>({
+    summary: null,
+    transcript: null,
+  });
   const { data: call } = useCall(callSessionId);
   const { t } = useTranslation('crm');
+
+  const tabLabel = (id: DetailTab) =>
+    id === 'summary'
+      ? t('calls.detail.tab.summary', 'Summary')
+      : t('calls.detail.tab.transcript', 'Transcript');
+
+  // Roving-tabindex arrow-key navigation per WAI-ARIA tabs pattern: only the
+  // active tab is in the Tab order; arrows move selection + focus between tabs.
+  const onTabKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const idx = DETAIL_TABS.indexOf(tab);
+    let next: DetailTab | null = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      next = DETAIL_TABS[(idx + 1) % DETAIL_TABS.length] ?? null;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      next = DETAIL_TABS[(idx - 1 + DETAIL_TABS.length) % DETAIL_TABS.length] ?? null;
+    } else if (e.key === 'Home') {
+      next = DETAIL_TABS[0] ?? null;
+    } else if (e.key === 'End') {
+      next = DETAIL_TABS[DETAIL_TABS.length - 1] ?? null;
+    }
+    if (next) {
+      e.preventDefault();
+      setTab(next);
+      tabRefs.current[next]?.focus();
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={t('calls.detail.title', 'Call detail')} className="w-[min(720px,96vw)] max-h-[90vh]">
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-[var(--border-subtle)] px-5 pb-0 pt-3">
-          {(['summary', 'transcript'] as DetailTab[]).map((t) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={tab === t}
-              onClick={() => setTab(t)}
-              className={cn(
-                '-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring-color)]',
-                'min-h-[44px]',
-                tab === t
-                  ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
-                  : 'border-transparent text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
-              )}
-            >
-              {t}
-            </button>
-          ))}
+        <div
+          role="tablist"
+          aria-label={t('calls.detail.tablistAria', 'Call detail views')}
+          className="flex gap-1 border-b border-[var(--border-subtle)] px-5 pb-0 pt-3"
+        >
+          {DETAIL_TABS.map((id) => {
+            const selected = tab === id;
+            return (
+              <button
+                key={id}
+                ref={(el) => {
+                  tabRefs.current[id] = el;
+                }}
+                id={`call-detail-tab-${id}`}
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`call-detail-panel-${id}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setTab(id)}
+                onKeyDown={onTabKeyDown}
+                className={cn(
+                  '-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring-color)]',
+                  'min-h-[44px]',
+                  selected
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    : 'border-transparent text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
+                )}
+              >
+                {tabLabel(id)}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab content */}
-        <div className="overflow-y-auto p-5">
+        <div
+          role="tabpanel"
+          id={`call-detail-panel-${tab}`}
+          aria-labelledby={`call-detail-tab-${tab}`}
+          tabIndex={0}
+          className="overflow-y-auto p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring-color)]"
+        >
           {/* Audio player (shared across tabs — visible on summary tab) */}
           {tab === 'summary' && call?.signedRecordingUrl && (
             <div className="mb-5">

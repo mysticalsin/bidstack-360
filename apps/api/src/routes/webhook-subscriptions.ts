@@ -5,6 +5,11 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
+import { decryptSecretOrPlaintext, encryptSecret } from '@bidstack/shared/server-crypto';
+import {
+  assertSerumConnectorAllowed,
+  recordSerumConnectorTestSuccess,
+} from '../lib/serum-connector-policy.js';
 
 const WebhookSub = z.object({
   id: z.string().uuid(),
@@ -107,7 +112,9 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         data: {
           orgId: req.auth.orgId,
           url: req.body.url,
-          secret,
+          // Store the HMAC signing secret encrypted at rest; the plaintext is
+          // returned to the caller once below (signingSecret) and never again.
+          secret: encryptSecret(secret),
           events: req.body.events,
           active: req.body.active,
         },
@@ -301,8 +308,18 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         data: { message: 'This is a test ping from BidStack webhooks.' },
       });
 
+      await assertSerumConnectorAllowed({
+        orgId: sub.orgId,
+        connectorId: 'webhook_delivery',
+        operation: 'webhook.testPing',
+        writeRequested: true,
+        connectionTestProbe: true,
+      });
+
       const t = Math.floor(Date.now() / 1000);
-      const sig = createHmac('sha256', sub.secret).update(`${t}.${pingBody}`).digest('hex');
+      const sig = createHmac('sha256', decryptSecretOrPlaintext(sub.secret))
+        .update(`${t}.${pingBody}`)
+        .digest('hex');
       const signature = `t=${t},v1=${sig}`;
       const start = Date.now();
 
@@ -326,6 +343,11 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             },
             body: pingBody,
             signal: controller.signal,
+            // SSRF: refuse to follow redirects — a 30x to an internal host would
+            // bypass the static assertSafeWebhookUrl check on the original URL.
+            // (Full DNS-rebind parity with the worker's safe-research-fetch is
+            // follow-up once that helper moves to a shared package.)
+            redirect: 'error',
           });
         } finally {
           clearTimeout(timeoutId);
@@ -361,6 +383,16 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         where: { id: sub.id },
         data: result.success ? { lastDeliveryAt: new Date() } : { lastFailureAt: new Date() },
       });
+
+      if (result.success) {
+        await recordSerumConnectorTestSuccess({
+          orgId: sub.orgId,
+          connectorId: 'webhook_delivery',
+          operation: 'webhook.testPing',
+          testedByUserId: req.auth.userId,
+          evidence: { subscriptionId: sub.id, statusCode: result.statusCode },
+        });
+      }
 
       return result;
     },

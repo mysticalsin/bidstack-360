@@ -35,6 +35,7 @@ NC='\033[0m'
 ENV_FILE=".env.production"
 BACKUP_FILE=".env.production.backup.$(date +%Y%m%d_%H%M%S)"
 ROTATION_LOG="docs/operations/secret-rotation.log"
+TOKEN_ROTATION_SCRIPT="scripts/rotate-integration-tokens.ts"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC}  $1"; }
 log_ok()      { echo -e "${GREEN}[OK]${NC}    $1"; }
@@ -96,30 +97,38 @@ log_section "Step 1: INTEGRATION_TOKEN_KEY rotation"
 log_info "This key encrypts stored OAuth access/refresh tokens in the database."
 log_warn "Rotating this key requires a migration script to re-encrypt existing tokens."
 log_warn "DO NOT rotate unless you have the re-encryption migration ready to run."
+log_warn "This script blocks key replacement unless $TOKEN_ROTATION_SCRIPT exists."
 echo ""
 
 if confirm "Rotate INTEGRATION_TOKEN_KEY?"; then
-  OLD_KEY="${INTEGRATION_TOKEN_KEY:-}"
-  NEW_KEY=$(openssl rand -base64 32)
-
-  log_info "New INTEGRATION_TOKEN_KEY generated (64-char base64)"
-  log_warn "Old key (keep for re-encryption migration, then discard):"
-  echo "  OLD: ${OLD_KEY:0:8}...[truncated for safety]"
-
-  # Update in env file
-  if grep -q "^INTEGRATION_TOKEN_KEY=" "$ENV_FILE"; then
-    # Preserve old key temporarily as _PREV
-    sed -i.bak "s|^INTEGRATION_TOKEN_KEY=.*|INTEGRATION_TOKEN_KEY=\"${NEW_KEY}\"\nINTEGRATION_TOKEN_KEY_PREV=\"${OLD_KEY}\"|" "$ENV_FILE"
+  if [[ ! -f "$TOKEN_ROTATION_SCRIPT" ]]; then
+    log_error "INTEGRATION_TOKEN_KEY rotation blocked: $TOKEN_ROTATION_SCRIPT is missing."
+    log_warn "Create and test the re-encryption tool before generating a replacement key."
+    log_warn "Required contract: decrypt every stored IntegrationToken with OLD_INTEGRATION_TOKEN_KEY and re-encrypt with NEW_INTEGRATION_TOKEN_KEY."
+    append_log "INTEGRATION_TOKEN_KEY rotation blocked - missing re-encryption tool"
   else
-    echo "INTEGRATION_TOKEN_KEY=\"${NEW_KEY}\"" >> "$ENV_FILE"
-  fi
+    OLD_KEY="${INTEGRATION_TOKEN_KEY:-}"
+    NEW_KEY=$(openssl rand -hex 32)
 
-  log_ok "INTEGRATION_TOKEN_KEY updated in $ENV_FILE"
-  log_warn "ACTION REQUIRED:"
-  log_warn "  1. Run the token re-encryption migration: pnpm db:migrate (includes re-encryption script)"
-  log_warn "  2. After successful migration: remove INTEGRATION_TOKEN_KEY_PREV from $ENV_FILE"
-  log_warn "  3. Restart API and worker services"
-  append_log "INTEGRATION_TOKEN_KEY rotated"
+    log_info "New INTEGRATION_TOKEN_KEY generated (64-character hex)"
+    log_warn "Old key preserved only as INTEGRATION_TOKEN_KEY_PREV for the re-encryption window."
+
+    # Update in env file
+    if grep -q "^INTEGRATION_TOKEN_KEY=" "$ENV_FILE"; then
+      # Preserve old key temporarily as _PREV
+      sed -i.bak "s|^INTEGRATION_TOKEN_KEY=.*|INTEGRATION_TOKEN_KEY=\"${NEW_KEY}\"\nINTEGRATION_TOKEN_KEY_PREV=\"${OLD_KEY}\"|" "$ENV_FILE"
+    else
+      echo "INTEGRATION_TOKEN_KEY=\"${NEW_KEY}\"" >> "$ENV_FILE"
+    fi
+
+    log_ok "INTEGRATION_TOKEN_KEY updated in $ENV_FILE"
+    log_warn "ACTION REQUIRED:"
+    log_warn "  1. Run token re-encryption with $TOKEN_ROTATION_SCRIPT using OLD_INTEGRATION_TOKEN_KEY and NEW_INTEGRATION_TOKEN_KEY from the secret store."
+    log_warn "  2. Verify all stored IntegrationToken rows decrypt with the new key."
+    log_warn "  3. After successful token re-encryption: remove INTEGRATION_TOKEN_KEY_PREV from $ENV_FILE"
+    log_warn "  4. Restart API and worker services"
+    append_log "INTEGRATION_TOKEN_KEY rotated"
+  fi
 else
   log_info "INTEGRATION_TOKEN_KEY rotation skipped"
 fi
@@ -279,7 +288,8 @@ echo "  [ ] Restart Worker service"
 echo "  [ ] Verify: curl https://app.bidstack.com/api/health"
 echo "  [ ] Verify: send a test Stripe webhook → confirm 200 in Stripe dashboard"
 echo "  [ ] Log in via SSO → confirm JWT still valid"
-echo "  [ ] After 1 hour: remove JWT_SIGNING_*_PREV and INTEGRATION_TOKEN_KEY_PREV from $ENV_FILE"
+echo "  [ ] After 1 hour: remove JWT_SIGNING_*_PREV from $ENV_FILE"
+echo "  [ ] If INTEGRATION_TOKEN_KEY was rotated: remove INTEGRATION_TOKEN_KEY_PREV only after token re-encryption succeeds"
 echo "  [ ] Delete old Stripe webhook endpoint from dashboard"
 echo "  [ ] Update rotation log in $ROTATION_LOG"
 echo "  [ ] Destroy backup: rm $BACKUP_FILE (after confirming everything works)"

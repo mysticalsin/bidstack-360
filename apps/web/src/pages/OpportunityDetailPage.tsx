@@ -5,6 +5,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { toast } from '@/components/ui/Toast';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
@@ -25,6 +26,7 @@ import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { useCommandContext } from '@/hooks/useCommandContext';
+import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
 
@@ -55,6 +57,7 @@ export function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useOpportunity(id);
   const patch = usePatchOpportunity();
+  const stageMove = useStageMutation();
   const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
@@ -117,6 +120,19 @@ export function OpportunityDetailPage() {
       kind: t.kind,
       text: t.text,
     })) ?? [];
+  const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
+  const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
+  const isOutcomeLocked = isWon || isLost;
+  const moveToOutcome = (stage: 'closed_won' | 'closed_lost') => {
+    stageMove.mutate(
+      { id: data.id, pipelineStageId: stage },
+      {
+        onError: () => {
+          toast.error(t('opportunityDetail.outcomeUpdateFailed', 'Could not update outcome.'));
+        },
+      },
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -231,6 +247,49 @@ export function OpportunityDetailPage() {
                 >
                   {t('opportunityDetail.askDustButton', 'Ask Dust')}
                 </MagneticButton>
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-2"
+                aria-label={t('opportunityDetail.outcomeActionsLabel', 'Opportunity outcome actions')}
+              >
+                {isWon ? (
+                  <Button variant="success" size="sm" disabled className="rounded-full">
+                    <Icon name="trophy" size={13} />
+                    {t('opportunityDetail.wonStatusButton', 'Won')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="success"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={stageMove.isPending || isOutcomeLocked}
+                    onClick={() => moveToOutcome('closed_won')}
+                  >
+                    <Icon name="trophy" size={13} />
+                    {stageMove.isPending
+                      ? t('opportunityDetail.markWonPendingButton', 'Closing...')
+                      : t('opportunityDetail.markWonButton', 'Mark Won')}
+                  </Button>
+                )}
+                {isLost ? (
+                  <Button variant="destructive" size="sm" disabled className="rounded-full">
+                    <Icon name="close" size={13} />
+                    {t('opportunityDetail.lostStatusButton', 'Lost')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={stageMove.isPending || isOutcomeLocked}
+                    onClick={() => moveToOutcome('closed_lost')}
+                  >
+                    <Icon name="close" size={13} />
+                    {stageMove.isPending
+                      ? t('opportunityDetail.markLostPendingButton', 'Closing...')
+                      : t('opportunityDetail.markLostButton', 'Mark Lost')}
+                  </Button>
+                )}
               </div>
               <InlineEditSelect<OpportunityStage>
                 value={data.stage as OpportunityStage}

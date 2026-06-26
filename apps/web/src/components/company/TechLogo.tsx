@@ -1,94 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 
-// Technical stack logos resolve from official domains through a resilient
-// favicon service. That keeps enterprise brand chips visual without noisy 404s
-// when a brand is absent from an icon CDN. Unknown brands fall back to initials.
-const DOMAIN_MAP: Record<string, string> = {
-  'active directory': 'microsoft.com',
-  android: 'android.com',
-  ansible: 'ansible.com',
-  asana: 'asana.com',
-  auth0: 'auth0.com',
-  aws: 'aws.amazon.com',
-  azure: 'azure.microsoft.com',
-  bitbucket: 'bitbucket.org',
-  cisco: 'cisco.com',
-  'cisco meraki': 'meraki.cisco.com',
-  cloudflare: 'cloudflare.com',
-  confluence: 'atlassian.com',
-  crowdstrike: 'crowdstrike.com',
-  databricks: 'databricks.com',
-  datadog: 'datadoghq.com',
-  digitalocean: 'digitalocean.com',
-  docker: 'docker.com',
-  duo: 'duo.com',
-  elastic: 'elastic.co',
-  elasticsearch: 'elastic.co',
-  figma: 'figma.com',
-  gcp: 'cloud.google.com',
-  github: 'github.com',
-  gitlab: 'gitlab.com',
-  'google cloud': 'cloud.google.com',
-  'google cloud platform': 'cloud.google.com',
-  grafana: 'grafana.com',
-  hubspot: 'hubspot.com',
-  ibm: 'ibm.com',
-  intercom: 'intercom.com',
-  ios: 'apple.com',
-  jamf: 'jamf.com',
-  'jamf pro': 'jamf.com',
-  jira: 'atlassian.com',
-  kafka: 'kafka.apache.org',
-  kubernetes: 'kubernetes.io',
-  linear: 'linear.app',
-  linode: 'linode.com',
-  macos: 'apple.com',
-  mailchimp: 'mailchimp.com',
-  microsoft: 'microsoft.com',
-  'microsoft 365': 'microsoft.com',
-  'microsoft azure': 'azure.microsoft.com',
-  'microsoft defender': 'microsoft.com',
-  'microsoft entra id': 'microsoft.com',
-  'microsoft intune': 'microsoft.com',
-  mongodb: 'mongodb.com',
-  mysql: 'mysql.com',
-  netlify: 'netlify.com',
-  newrelic: 'newrelic.com',
-  notion: 'notion.so',
-  office: 'microsoft.com',
-  'office 365': 'microsoft.com',
-  okta: 'okta.com',
-  oracle: 'oracle.com',
-  'palo alto networks': 'paloaltonetworks.com',
-  postgres: 'postgresql.org',
-  postgresql: 'postgresql.org',
-  prometheus: 'prometheus.io',
-  proofpoint: 'proofpoint.com',
-  redhat: 'redhat.com',
-  'red hat': 'redhat.com',
-  redis: 'redis.io',
-  salesforce: 'salesforce.com',
-  sendgrid: 'sendgrid.com',
-  sentinelone: 'sentinelone.com',
-  servicenow: 'servicenow.com',
-  shopify: 'shopify.com',
-  slack: 'slack.com',
-  snowflake: 'snowflake.com',
-  splunk: 'splunk.com',
-  stripe: 'stripe.com',
-  terraform: 'terraform.io',
-  twilio: 'twilio.com',
-  ubuntu: 'ubuntu.com',
-  vercel: 'vercel.com',
-  vmware: 'vmware.com',
-  windows: 'microsoft.com',
-  'windows 10': 'microsoft.com',
-  'windows 11': 'microsoft.com',
-  workday: 'workday.com',
-  zscaler: 'zscaler.com',
-  zendesk: 'zendesk.com',
-  zoom: 'zoom.us',
-};
+import { techLogoUrl } from './techIconSlug';
 
 interface TechLogoProps {
   name: string;
@@ -98,11 +10,17 @@ interface TechLogoProps {
   style?: CSSProperties;
 }
 
-export function TechLogo({ name, size = 14, className, style }: TechLogoProps) {
-  const domain = domainFor(name);
+/**
+ * Tech-stack glyph: the REAL brand logo via the same-origin proxy
+ * (Simple Icons), with a deterministic colored monogram as the offline-safe
+ * fallback (proxy 404 / unknown brand / load error). Never a broken image.
+ */
+export function TechLogo({ name, size = 16, className, style }: TechLogoProps) {
+  const url = techLogoUrl(name);
   const [failed, setFailed] = useState(false);
+  const tone = toneForName(name);
 
-  if (!domain || failed) {
+  if (url && !failed) {
     return (
       <span
         className={className}
@@ -113,36 +31,63 @@ export function TechLogo({ name, size = 14, className, style }: TechLogoProps) {
           justifyContent: 'center',
           width: size,
           height: size,
-          borderRadius: 4,
-          background: 'var(--surface-sunken)',
-          color: 'var(--fg-tertiary)',
-          fontSize: Math.max(8, Math.round(size * 0.6)),
-          fontWeight: 700,
+          borderRadius: Math.max(4, Math.round(size * 0.22)),
+          overflow: 'hidden',
           flexShrink: 0,
+          background: 'var(--surface-raised)',
+          border: '1px solid var(--border-subtle)',
           ...style,
         }}
       >
-        {name.charAt(0).toUpperCase()}
+        <img
+          src={url}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          style={{ width: '72%', height: '72%', objectFit: 'contain' }}
+        />
       </span>
     );
   }
 
   return (
-    <img
-      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=${Math.max(16, size * 2)}`}
-      alt=""
-      width={size}
-      height={size}
-      loading="lazy"
-      decoding="async"
-      onError={() => setFailed(true)}
+    <span
       className={className}
-      style={{ flexShrink: 0, ...style }}
-    />
+      aria-hidden
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: size,
+        height: size,
+        borderRadius: Math.max(4, Math.round(size * 0.22)),
+        background: `linear-gradient(135deg, color-mix(in srgb, ${tone} 18%, var(--surface-raised)), var(--surface-sunken))`,
+        color: tone,
+        border: '1px solid color-mix(in srgb, currentColor 28%, var(--border-default))',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+        fontSize: Math.max(8, Math.round(size * 0.58)),
+        fontWeight: 800,
+        lineHeight: 1,
+        flexShrink: 0,
+        ...style,
+      }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
   );
 }
 
-function domainFor(name: string): string | null {
-  const key = name.trim().toLowerCase();
-  return DOMAIN_MAP[key] ?? null;
+function toneForName(name: string): string {
+  const tones = [
+    'var(--tag-blue-fg)',
+    'var(--tag-jade-fg)',
+    'var(--tag-amber-fg)',
+    'var(--tag-purple-fg)',
+    'var(--tag-teal-fg)',
+    'var(--tag-rose-fg)',
+  ];
+  const sum = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return tones[sum % tones.length] ?? 'var(--fg-tertiary)';
 }

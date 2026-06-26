@@ -14,10 +14,12 @@ import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
 import { api } from '@/lib/api';
+import { useAppModules } from '@/hooks/useAppModules';
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
   NAV_SECTIONS,
+  isNavItemVisible,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -33,6 +35,14 @@ export function Sidebar() {
   const toggle = useUiStore((s) => s.toggleSidebar);
   const isAdmin = useIsAdmin();
   const { t } = useTranslation('common');
+  const { data: appModules } = useAppModules();
+
+  // Hide module-gated items (agent-studio, Collaborate) unless enabled in
+  // Settings → Modules; drop a section that ends up empty after filtering.
+  const sections = NAV_SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.filter((it) => isNavItemVisible(it, appModules)),
+  })).filter((s) => s.items.length > 0);
 
   const dustQuery = useQuery({
     queryKey: ['dust:status'],
@@ -100,8 +110,8 @@ export function Sidebar() {
             pinned; only this list scrolls when every group is expanded, so the
             hamburger/collapse toggle never scrolls out of reach. min-h-0 lets a
             flex child actually overflow instead of growing the whole sidebar. */}
-        <div className="sb-scroll flex-1 min-h-0 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
+        <div className="sb-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+        {sections.map((section) => (
           <SidebarSection
             key={section.key}
             section={section}
@@ -181,10 +191,18 @@ function SidebarSection({
   badges: Badges;
   collapsed: boolean;
 }) {
-  const sectionCollapsed = useUiStore((s) => Boolean(s.collapsedSections[section.key]));
-  const toggleSection = useUiStore((s) => s.toggleSection);
+  const location = useLocation();
+  const override = useUiStore((s) => s.collapsedSections[section.key]);
+  const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
   const { t } = useTranslation('common');
   const sectionTitle = t(section.titleKey, section.title);
+  // Accordion: a section is collapsed by default unless it holds the active
+  // route — so only one section's items show at once and the rail never needs
+  // an internal scroll. An explicit user toggle (override) wins and persists.
+  const isActiveSection = section.items.some(
+    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
+  );
+  const sectionCollapsed = override === undefined ? !isActiveSection : override;
 
   if (collapsed) {
     if (section.key === 'home') {
@@ -209,6 +227,10 @@ function SidebarSection({
           className="sb-item sb-parent-trigger"
           aria-label={sectionTitle}
           title={sectionTitle}
+          onClick={() => {
+            const toggleSidebar = useUiStore.getState().toggleSidebar;
+            toggleSidebar();
+          }}
         >
           <Icon name={section.icon} size={16} />
           {totalBadge > 0 && <span className="sb-badge-dot" />}
@@ -249,7 +271,7 @@ function SidebarSection({
       <button
         type="button"
         className="sb-group-title sb-group-toggle"
-        onClick={() => toggleSection(section.key)}
+        onClick={() => setSectionCollapsed(section.key, !sectionCollapsed)}
         aria-expanded={!sectionCollapsed}
         aria-controls={bodyId}
       >

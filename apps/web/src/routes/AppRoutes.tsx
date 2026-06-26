@@ -34,6 +34,8 @@ import {
   SalesToolkitsPage,
   SectorViewPage,
   CrossSellPage,
+  KamAccountPage,
+  WorkspacePage,
   KeyAccountsPage,
   LeadDetailPage,
   LeadsPage,
@@ -47,6 +49,7 @@ import {
   ReportsPage,
   ReportBuilderPage,
   SearchPage,
+  SerumMissionControlPage,
   ServiceCaseDetailPage,
   ServiceDeskPage,
   SsoCallbackPage,
@@ -110,6 +113,14 @@ export function AppRoutes() {
           />
           {/* Agent Studio — open to members (run + view); authoring is admin-gated
               inside the page via useIsAdmin(). */}
+          <Route
+            path="/serum"
+            element={
+              <RequireAuth>
+                <SerumMissionControlPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/agent-studio"
             element={
@@ -181,6 +192,22 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <KeyAccountsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/kam"
+            element={
+              <RequireAuth>
+                <KamAccountPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/workspace"
+            element={
+              <RequireAuth>
+                <WorkspacePage />
               </RequireAuth>
             }
           />

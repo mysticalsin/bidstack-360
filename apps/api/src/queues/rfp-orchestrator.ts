@@ -6,6 +6,10 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { createLogger } from '../lib/logger.js';
 import { RFP_ORCHESTRATE } from '@bidstack/shared';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumLoopRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 const log = createLogger({ name: 'queue:rfp-orchestrate' });
 
@@ -20,8 +24,39 @@ export interface RfpOrchestrateJob {
   startedByUserId?: string;
 }
 
+export class RfpOrchestrateLoopPolicyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RfpOrchestrateLoopPolicyError';
+  }
+}
+
 let queueSingleton: Queue | null = null;
 let connectionSingleton: IORedis | null = null;
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
+
+async function assertRfpOrchestrateLoopAllowed(job: RfpOrchestrateJob): Promise<void> {
+  const decision = await checkSerumLoopRuntimePolicy({
+    orgId: job.orgId,
+    environment: defaultSerumConfigEnvironment(),
+    configKey: SERUM_RUNTIME_CONFIG_KEYS.loops,
+    loopId: job.rfpRequestId,
+    operation: 'rfp.orchestrate',
+    retryCount: 0,
+    hasDurableEvent: true,
+    approvalGateReached: false,
+  });
+  if (!decision.allowed) {
+    throw new RfpOrchestrateLoopPolicyError(
+      `SERUM loop policy denied RFP orchestration: ${decision.reason}`,
+    );
+  }
+}
 
 function getQueue(): Queue {
   if (queueSingleton) return queueSingleton;
@@ -60,6 +95,7 @@ export async function enqueueRfpOrchestrate(job: RfpOrchestrateJob): Promise<str
     );
     return null;
   }
+  await assertRfpOrchestrateLoopAllowed(job);
   try {
     const queued = await getQueue().add('rfp.orchestrate', job, {
       // WHY: dedup key per org+rfpRequest so duplicate uploads don't double-launch

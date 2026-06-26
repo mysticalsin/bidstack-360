@@ -65,6 +65,17 @@ export const DUST_WEBHOOK_PROCESSOR: QueueConfig = {
 };
 
 /** Document intelligence extraction — reads file, calls LLM, writes solutions/products. */
+/** Controlled release smoke queue for proving worker Sentry failure capture. */
+export const SENTRY_SMOKE: QueueConfig = {
+  name: 'sentry.smoke',
+  defaultJobOptions: {
+    attempts: 1,
+    backoff: { type: 'fixed', delay: 1_000 },
+    removeOnComplete: { age: 86_400, count: 50 },
+    removeOnFail: { age: 86_400 * 7, count: 500 },
+  },
+};
+
 export const DOCUMENT_EXTRACT: QueueConfig = {
   name: 'document-extract',
   defaultJobOptions: {
@@ -145,5 +156,41 @@ export const CREW_RUN: QueueConfig = {
     backoff: { type: 'exponential', delay: 10_000 },
     removeOnComplete: { age: 86_400, count: 200 },
     removeOnFail: { age: 604_800, count: 5000 },
+  },
+};
+
+/**
+ * Tenant export (GDPR Art. 20 data portability) — streams every org-scoped
+ * business/personal-data entity into a single gzipped NDJSON archive and
+ * uploads it to durable storage. Few attempts: the job is idempotent (it
+ * re-checks TenantExport.status before doing work), but a retry that re-runs a
+ * full-tenant scan is expensive, so we back off long and cap attempts low. Jobs
+ * are kept 7 days on success / 30 days on failure for compliance audit.
+ */
+export const TENANT_EXPORT: QueueConfig = {
+  name: 'tenant-export',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 5000 },
+  },
+};
+
+/**
+ * AI audit retention purge — deletes ai_invocations rows past the retention
+ * window (EU AI Act Art. 50 / GDPR Art. 22 audit log; default 90 days). Runs
+ * daily as a repeatable cron registered by the worker. Few attempts: the purge
+ * is idempotent (it only deletes rows older than a cutoff, which never grows),
+ * so a missed run is harmless — the next day's run covers it. Job records are
+ * kept 7d on success / 30d on failure for compliance audit.
+ */
+export const AI_AUDIT_RETENTION: QueueConfig = {
+  name: 'ai-audit-retention',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 30 },
+    removeOnFail: { age: 86_400 * 30, count: 100 },
   },
 };

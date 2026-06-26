@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTasks } from '@/hooks/useTasks';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
 import { daysUntil, formatDate } from '@/lib/format';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
@@ -47,12 +49,23 @@ function parseFilter(raw: string | null): StatusFilter {
 
 export function TasksPage() {
   const { t } = useTranslation('crm');
-  const { data, isLoading, isError, error } = useTasks();
   // Filter rides on the query string so the view is shareable + back/forward
   // navigable. Linking to "/tasks?filter=overdue" lands a coworker on the
   // exact same slice we were looking at.
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = parseFilter(searchParams.get('filter'));
+  // The four concrete statuses are filtered server-side so the result spans the
+  // whole tenant, not just the loaded page. 'overdue'/'today' are date filters
+  // the route doesn't model, so those stay client-side (see filteredItems) and
+  // therefore only reflect the pages currently loaded.
+  const serverStatus =
+    filter === 'all' || filter === 'overdue' || filter === 'today' ? undefined : filter;
+  const pager = useCursorPagination(filter);
+  const { data, isLoading, isError, error } = useTasks({
+    ...(serverStatus ? { status: serverStatus } : {}),
+    limit: 50,
+    ...(pager.cursor ? { cursor: pager.cursor } : {}),
+  });
   // useTransition keeps the filter-chip click snappy: the chip flips
   // immediately, the list re-filters as a non-urgent update so a slow
   // render won't block the press feedback.
@@ -71,6 +84,8 @@ export function TasksPage() {
         const d = daysUntil(t.dueDate);
         return d !== null && d < 0 && t.status !== 'done';
       }
+      // Concrete statuses are already narrowed server-side; this is a no-op
+      // guard for the loaded page.
       return t.status === filter;
     });
   }, [data?.items, filter]);
@@ -362,6 +377,22 @@ export function TasksPage() {
             {/* Inline quick-add — sits at the bottom of the list so power users
               don't need to open the dialog for a one-shot follow-up. */}
             <InlineTaskAdd />
+            {/* Cursor pager — only meaningful on the list view. For the
+              client-side 'overdue'/'today' filters it pages the underlying
+              status-unfiltered set, so a page may render fewer rows than the
+              page size; that's expected until the route grows a date filter. */}
+            {!isLoading && !isError && (items.length > 0 || pager.hasPrevious) ? (
+              <CursorPager
+                currentPage={pager.page}
+                hasNext={Boolean(data?.nextCursor)}
+                hasPrevious={pager.hasPrevious}
+                isLoading={isLoading}
+                itemCount={items.length}
+                label={t('tasks.pager.label', 'tasks')}
+                onNext={() => pager.goNext(data?.nextCursor)}
+                onPrevious={pager.goPrevious}
+              />
+            ) : null}
           </Card>
         </>
       )}

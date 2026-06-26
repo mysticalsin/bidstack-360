@@ -6,6 +6,9 @@ import { api } from '@/lib/api';
 import { useStageMutation } from './useStageMutation';
 import type { Opportunity, OpportunityPage, PipelineStage } from '@bidstack/shared';
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
+
 vi.mock('@/lib/api', () => ({
   api: vi.fn(),
 }));
@@ -157,5 +160,36 @@ describe('useStageMutation', () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
+  it('rolls back list and detail caches when the server rejects a stage move', async () => {
+    const { queryClient, wrapper } = createHarness();
+    const listKey = ['opportunities', { limit: 50 }] as const;
+    const detailKey = ['opportunity', opportunity.id] as const;
+    const countKey = ['opportunities', 'count', { excludeClosed: true }] as const;
+
+    queryClient.setQueryData<OpportunityPage>(listKey, {
+      items: [opportunity],
+      nextCursor: null,
+    });
+    queryClient.setQueryData<Opportunity>(detailKey, opportunity);
+    queryClient.setQueryData(countKey, { count: 1 });
+    vi.mocked(api).mockRejectedValueOnce(new Error('Stage is locked'));
+
+    const { result } = renderHook(() => useStageMutation(), { wrapper });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({
+          id: opportunity.id,
+          pipelineStageId: targetStage.id,
+          pipelineStage: targetStage,
+        });
+      }),
+    ).rejects.toThrow('Stage is locked');
+
+    expect(queryClient.getQueryData<OpportunityPage>(listKey)?.items[0]).toEqual(opportunity);
+    expect(queryClient.getQueryData<Opportunity>(detailKey)).toEqual(opportunity);
+    expect(queryClient.getQueryData(countKey)).toEqual({ count: 1 });
   });
 });

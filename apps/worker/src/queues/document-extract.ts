@@ -31,9 +31,9 @@ import { resolveOrgLlm } from '../lib/org-llm.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import type { ContractExtractionDraft } from '@bidstack/shared';
 
-import { deterministicExtract } from './document-extract-analysis.js';
+import { deterministicExtract, normalizeWinLoss } from './document-extract-analysis.js';
 import { writeBidWorkspaceArtifacts } from './document-extract-db.js';
-import type { ExtractionResult } from './document-extract-types.js';
+import type { ExtractionResult, WinLossSignal } from './document-extract-types.js';
 
 const QUEUE_NAME = DOCUMENT_EXTRACT.name;
 
@@ -42,6 +42,7 @@ const QUEUE_NAME = DOCUMENT_EXTRACT.name;
 const EXTRACTION_PROMPT = `You are a CRM intelligence extractor. Given the following company document, extract:
 1. SOLUTIONS — services, offerings, consulting engagements, or strategic capabilities this company provides.
 2. PRODUCTS — software, platforms, hardware, or tangible items this company sells.
+3. WINLOSS — if the document is a bid debrief, outcome note, or email that reveals whether a deal was WON or LOST and why.
 
 Respond ONLY in valid JSON with this exact shape (no markdown, no explanation):
 {
@@ -50,10 +51,16 @@ Respond ONLY in valid JSON with this exact shape (no markdown, no explanation):
   ],
   "products": [
     { "name": "...", "description": "...", "category": "...", "priceRange": "optional string like 50000-150000" }
-  ]
+  ],
+  "winLoss": {
+    "outcome": "won | lost | unknown",
+    "reasons": ["one or more of: price, product_fit, relationship, timing, support, competitor"],
+    "competitors": ["named competitor companies, if any"],
+    "summary": "one short sentence on why we won or lost, or null"
+  }
 }
 
-If no solutions or products are found, return empty arrays. Categories should be one of: infrastructure, security, data, ai, software, network, general.
+If no solutions or products are found, return empty arrays. Categories should be one of: infrastructure, security, data, ai, software, network, general. If the document shows no win/loss signal, set "winLoss" to null.
 
 --- DOCUMENT ---
 `;
@@ -77,6 +84,7 @@ const JobData = z.object({
   extractionKind: z.enum(['intel', 'contract']).optional(),
 });
 type JobData = z.infer<typeof JobData>;
+export type DocumentExtractJobData = JobData;
 
 // ─── Dust extraction ───────────────────────────────────────────────────────
 
@@ -109,6 +117,12 @@ async function runDustExtraction(
       category?: string;
       priceRange?: string;
     }>;
+    winLoss?: {
+      outcome?: string;
+      reasons?: unknown;
+      competitors?: unknown;
+      summary?: string | null;
+    } | null;
   };
 
   const result: ExtractionResult = {
@@ -127,6 +141,7 @@ async function runDustExtraction(
         category: String(p.category ?? 'general'),
         priceRange: p.priceRange,
       })),
+    winLoss: normalizeWinLoss(parsed.winLoss),
   };
 
   log.info(
@@ -160,9 +175,29 @@ function mergeContractDrafts(
   };
 }
 
+function accountIntelExtractionMetadata(input: {
+  extractionId: string;
+  documentId: string;
+  dustRunId: string | null;
+}): Prisma.InputJsonValue {
+  return {
+    source: {
+      type: 'document_extraction',
+      extractionId: input.extractionId,
+      documentId: input.documentId,
+      extractor: input.dustRunId ? 'dust' : 'deterministic',
+      dustRunId: input.dustRunId,
+    },
+  };
+}
+
 // ─── Worker processor ──────────────────────────────────────────────────────
 
-async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
+async function processJobData(
+  rawData: unknown,
+  log: pino.Logger,
+  jobId: string | number | undefined,
+): Promise<void> {
   const {
     orgId,
     accountId,
@@ -176,7 +211,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     documentVersionId,
     prompt,
     extractionKind,
-  } = JobData.parse(job.data);
+  } = JobData.parse(rawData);
 
   // Mark as running
   const runningUpdate = await prisma.documentExtraction.updateMany({
@@ -224,7 +259,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
         draft = mergeContractDrafts(llmDraft, deterministic);
         source = 'llm';
       } else {
-        log.warn({ jobId: job.id, provider: llm.kind }, 'contract LLM pass failed; using deterministic');
+        log.warn({ jobId, provider: llm.kind }, 'contract LLM pass failed; using deterministic');
       }
     }
 
@@ -239,7 +274,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       throw new Error('Contract extraction does not match an active tenant-scoped extraction');
     }
     log.info(
-      { jobId: job.id, documentId, source, provider: llm?.kind ?? null },
+      { jobId, documentId, source, provider: llm?.kind ?? null },
       'contract extraction completed',
     );
     return;
@@ -265,6 +300,11 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     log.info('No Dust agent configured, using deterministic extraction');
     result = deterministicExtract(text);
   }
+  const extractionMetadata = accountIntelExtractionMetadata({
+    extractionId,
+    documentId,
+    dustRunId,
+  });
 
   // Persist solutions
   for (const s of result.solutions) {
@@ -278,12 +318,14 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
         category: s.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
       update: {
         description: s.description || null,
         category: s.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
     });
   }
@@ -300,21 +342,26 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
         category: p.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
       update: {
         description: p.description || null,
         category: p.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
     });
   }
 
-  // Mark extraction done
+  // Mark extraction done. winLoss is stored on the extraction's JSON so the
+  // account intel panel can surface "why we won/lost" with document provenance
+  // (no schema change); a later phase rolls it up into WinLossRecord.
   const extractedData: {
     solutions: Array<{ name: string; description: string; category: string }>;
     products: Array<{ name: string; description: string; category: string; priceRange?: string }>;
-  } = { solutions: result.solutions, products: result.products };
+    winLoss?: WinLossSignal | null;
+  } = { solutions: result.solutions, products: result.products, winLoss: result.winLoss ?? null };
 
   const doneUpdate = await prisma.documentExtraction.updateMany({
     where: { id: extractionId, orgId, documentId, deletedAt: null },
@@ -342,6 +389,17 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   }
 }
 
+async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
+  await processJobData(job.data, log, job.id);
+}
+
+export async function processDocumentExtractJobForTest(
+  data: DocumentExtractJobData,
+  log: pino.Logger,
+): Promise<void> {
+  await processJobData(data, log, 'test-direct');
+}
+
 // ─── BullMQ bootstrap ──────────────────────────────────────────────────────
 
 export async function startDocumentExtract(
@@ -350,13 +408,21 @@ export async function startDocumentExtract(
   workers: Worker[],
   _queues: Queue[],
 ): Promise<void> {
+  // Env-tunable so prod can scale extraction throughput without a code change
+  // (defaults preserve prior behaviour). NB: this is a global cap — true per-org
+  // fairness (a bulk import by one tenant must not starve others) needs a
+  // groupKey/per-org lane and is tracked as follow-up; auto-extract jobs are
+  // enqueued at lower priority (see api enqueueDocumentExtract) so user-initiated
+  // extracts still jump the queue.
+  const concurrency = Math.max(1, parseInt(process.env.DOCUMENT_EXTRACT_CONCURRENCY ?? '2', 10) || 2);
+  const limiterMax = Math.max(1, parseInt(process.env.DOCUMENT_EXTRACT_RATE_MAX ?? '10', 10) || 10);
   const queue = new BullWorker<JobData>(
     QUEUE_NAME,
     async (job) => processJob(job, log.child({ jobId: job.id })),
     {
       connection,
-      concurrency: 2,
-      limiter: { max: 10, duration: 60_000 },
+      concurrency,
+      limiter: { max: limiterMax, duration: 60_000 },
     },
   );
 

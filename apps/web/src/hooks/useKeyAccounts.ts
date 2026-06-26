@@ -17,16 +17,34 @@ export interface KeyAccount {
   opportunityCount: number;
 }
 
-export function useKeyAccounts(filters?: { search?: string; industry?: string; ownerId?: string }) {
-  return useQuery<{ items: KeyAccount[] }>({
+interface KeyAccountFilters {
+  search?: string;
+  industry?: string;
+  ownerId?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface KeyAccountsResponse {
+  items: KeyAccount[];
+  nextCursor: string | null;
+}
+
+export function useKeyAccounts(filters?: KeyAccountFilters) {
+  return useQuery<KeyAccountsResponse>({
     queryKey: ['key-accounts', filters],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       if (filters?.search) params.set('search', filters.search);
       if (filters?.industry) params.set('industry', filters.industry);
       if (filters?.ownerId) params.set('ownerId', filters.ownerId);
-      return api(`/api/accounts/key?${params.toString()}`);
+      if (filters?.limit) params.set('limit', String(filters.limit));
+      if (filters?.cursor) params.set('cursor', filters.cursor);
+      return api(`/api/accounts/key?${params.toString()}`, { signal });
     },
+    // Live: a just-designated key account must appear, not the 2-min cache.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -34,5 +52,7 @@ export function useAccountIndustries() {
   return useQuery<{ items: string[] }>({
     queryKey: ['account-industries'],
     queryFn: async () => api('/api/accounts/industries'),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }

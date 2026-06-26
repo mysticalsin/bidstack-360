@@ -6,7 +6,20 @@ import { SearchResponse } from '@bidstack/shared';
 
 import { scoreMatch, tokenize } from '../lib/search-score.js';
 
-const VALID_TYPES = ['opportunity', 'lead', 'contact', 'company', 'task', 'note'] as const;
+const VALID_TYPES = [
+  'opportunity',
+  'lead',
+  'contact',
+  'company',
+  'task',
+  'note',
+  // Bid-piloting entities — each maps to a real soft-deletable table:
+  // proposals (Proposal.name), requirements (Requirement.text/externalRef),
+  // references (Reference.title/description).
+  'proposal',
+  'rfp_requirement',
+  'reference',
+] as const;
 
 type ValidType = (typeof VALID_TYPES)[number];
 
@@ -35,7 +48,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/search',
     {
-      // Per-user cap: search fans out concurrent ILIKE queries across 6 entities,
+      // Per-user cap: search fans out concurrent ILIKE queries across 9 entities,
       // so protect it from runaway autocomplete/abuse at scale. Generous enough
       // for fast debounced typing (2/sec sustained).
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
@@ -292,6 +305,111 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   ]),
                 },
                 recency: recencyMs(n.updatedAt, n.createdAt),
+              })),
+            );
+          })(),
+        );
+      }
+
+      if (requestedTypes.includes('proposal')) {
+        queries.push(
+          (async () => {
+            const proposals = await prisma.proposal.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, ['name']) as Prisma.ProposalWhereInput['AND'],
+              },
+              orderBy: { updatedAt: 'desc' },
+              take: perTypeLimit,
+            });
+            addResults(
+              proposals.map((p) => ({
+                item: {
+                  type: 'proposal' as const,
+                  id: p.id,
+                  title: p.name,
+                  subtitle: p.status,
+                  url: `/proposals/${p.id}`,
+                  score: scoreMatch(q, [{ text: p.name, weight: 3 }]),
+                },
+                recency: recencyMs(p.updatedAt, p.createdAt),
+              })),
+            );
+          })(),
+        );
+      }
+
+      if (requestedTypes.includes('rfp_requirement')) {
+        queries.push(
+          (async () => {
+            const requirements = await prisma.requirement.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, [
+                  'text',
+                  'externalRef',
+                ]) as Prisma.RequirementWhereInput['AND'],
+              },
+              orderBy: { updatedAt: 'desc' },
+              take: perTypeLimit,
+            });
+            addResults(
+              requirements.map((r) => ({
+                item: {
+                  type: 'rfp_requirement' as const,
+                  id: r.id,
+                  // Requirement text is free-form and can be long; clamp the
+                  // title so the result row stays one line.
+                  title: r.text.length > 80 ? `${r.text.slice(0, 80)}…` : r.text,
+                  subtitle: [r.externalRef, r.requirementType].filter(Boolean).join(' · '),
+                  url: r.opportunityId
+                    ? `/opportunities/${r.opportunityId}`
+                    : `/proposals?search=${encodeURIComponent(r.externalRef ?? r.text.slice(0, 40))}`,
+                  score: scoreMatch(q, [
+                    { text: r.text, weight: 3 },
+                    { text: r.externalRef ?? '', weight: 2 },
+                  ]),
+                },
+                recency: recencyMs(r.updatedAt, r.createdAt),
+              })),
+            );
+          })(),
+        );
+      }
+
+      if (requestedTypes.includes('reference')) {
+        queries.push(
+          (async () => {
+            const references = await prisma.reference.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, [
+                  'title',
+                  'description',
+                  'industry',
+                ]) as Prisma.ReferenceWhereInput['AND'],
+              },
+              orderBy: { createdAt: 'desc' },
+              take: perTypeLimit,
+            });
+            addResults(
+              references.map((r) => ({
+                item: {
+                  type: 'reference' as const,
+                  id: r.id,
+                  title: r.title,
+                  subtitle: [r.industry, r.description].filter(Boolean).join(' · '),
+                  url: `/references?search=${encodeURIComponent(r.title)}`,
+                  score: scoreMatch(q, [
+                    { text: r.title, weight: 3 },
+                    { text: r.industry ?? '', weight: 2 },
+                    { text: r.description ?? '', weight: 1 },
+                  ]),
+                },
+                recency: recencyMs(r.createdAt),
               })),
             );
           })(),

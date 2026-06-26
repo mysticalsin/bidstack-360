@@ -3,7 +3,6 @@
 // in stores/theme.ts; this one covers everything else).
 
 import { create } from 'zustand';
-import { startTransition } from 'react';
 
 const STORAGE_KEY = 'bidstack-ui.v1';
 
@@ -51,32 +50,53 @@ function writeLater(state: PersistedState): void {
   globalThis.setTimeout(persist, 0);
 }
 
+function applySidebarDomState(collapsed: boolean): void {
+  if (typeof document === 'undefined') return;
+  if (collapsed) {
+    document.documentElement.dataset.sidebarCollapsed = 'true';
+    return;
+  }
+  delete document.documentElement.dataset.sidebarCollapsed;
+}
+
 interface UiStore extends PersistedState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
   toggleSection: (key: string) => void;
+  /** Explicit set (accordion override) — true = collapsed, false = expanded. */
+  setSectionCollapsed: (key: string, collapsed: boolean) => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (v: boolean) => void;
   toggleMobileNav: () => void;
 }
 
+const initialState = read();
+applySidebarDomState(initialState.sidebarCollapsed);
+
 export const useUiStore = create<UiStore>((set, get) => ({
-  ...read(),
+  ...initialState,
   mobileNavOpen: false,
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
+    applySidebarDomState(next);
     writeLater({ sidebarCollapsed: next, collapsedSections: get().collapsedSections });
-    startTransition(() => set({ sidebarCollapsed: next }));
+    set({ sidebarCollapsed: next });
   },
   setSidebarCollapsed: (v) => {
+    applySidebarDomState(v);
     writeLater({ sidebarCollapsed: v, collapsedSections: get().collapsedSections });
-    startTransition(() => set({ sidebarCollapsed: v }));
+    set({ sidebarCollapsed: v });
   },
   toggleSection: (key) => {
     const current = get().collapsedSections;
     const next = { ...current, [key]: !current[key] };
     writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
-    startTransition(() => set({ collapsedSections: next }));
+    set({ collapsedSections: next });
+  },
+  setSectionCollapsed: (key, collapsed) => {
+    const next = { ...get().collapsedSections, [key]: collapsed };
+    writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
+    set({ collapsedSections: next });
   },
   setMobileNavOpen: (v) => set({ mobileNavOpen: v }),
   toggleMobileNav: () => set({ mobileNavOpen: !get().mobileNavOpen }),

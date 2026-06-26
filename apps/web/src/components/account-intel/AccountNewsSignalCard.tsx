@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAccountNews } from '@/hooks/useAccountNews';
+import { SourceBadge } from '@/components/cockpit/SourceBadge';
+import type { SourceAttribution } from '@bidstack/shared';
 
 function when(iso: string | null): string {
   if (!iso) return '';
@@ -16,10 +18,37 @@ function when(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString();
 }
 
+function attributionFor(
+  attribution: SourceAttribution | undefined,
+  fetchedAt: string | undefined,
+): SourceAttribution {
+  return (
+    attribution ?? {
+      source: 'google_news_open_web',
+      label: 'Google News',
+      sourceUrl: 'https://news.google.com/',
+      fetchedAt: fetchedAt ?? new Date(0).toISOString(),
+      confidence: 0.55,
+      providerMetadata: { signalType: 'public_news' },
+    }
+  );
+}
+
 export function AccountNewsSignalCard({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const news = useAccountNews(accountId);
   const items = news.data?.items ?? [];
+  const source = attributionFor(news.data?.sourceAttribution, news.data?.fetchedAt);
+  const sourceConfidence = Math.round(source.confidence * 100);
+  const sourceHint = t(
+    'accountNewsSignal.sourceHint',
+    '{{label}} open-web feed checked at {{fetchedAt}} with {{confidence}}% source confidence. Verify before treating it as a Mantu fact.',
+    {
+      label: source.label,
+      fetchedAt: when(source.fetchedAt) || source.fetchedAt,
+      confidence: sourceConfidence,
+    },
+  );
 
   return (
     <Card>
@@ -57,9 +86,28 @@ export function AccountNewsSignalCard({ accountId }: { accountId: string }) {
           />
         ) : (
           <>
-            <div className="mb-3 flex items-center gap-2 text-xs text-[var(--fg-secondary)]">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--fg-secondary)]">
               <Badge tone="gray">{t('accountNewsSignal.badgeExternal', 'External')}</Badge>
-              <span>{t('accountNewsSignal.sourceNote', 'Source: Google News · verify before treating as a Mantu fact.')}</span>
+              <SourceBadge
+                label={source.label}
+                state="crm"
+                hint={sourceHint}
+                data-testid="account-news-source"
+              />
+              <SourceBadge
+                label={t('accountNewsSignal.confidenceBadge', '{{confidence}}% source confidence', {
+                  confidence: sourceConfidence,
+                })}
+                state={source.confidence >= 0.7 ? 'verified' : 'apollo_stale'}
+                hint={sourceHint}
+                data-testid="account-news-source-confidence"
+              />
+              <span>
+                {t(
+                  'accountNewsSignal.sourceNote',
+                  'Open-web signal; verify before treating as a Mantu fact.',
+                )}
+              </span>
             </div>
             <ul className="space-y-2">
               {items.map((item) => (

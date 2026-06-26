@@ -18,6 +18,7 @@ import {
   NoteList,
   NotePatch,
 } from '@bidstack/shared';
+import { canReadAccount } from '../lib/account-access.js';
 import {
   attribution,
   extractMeetingNotes,
@@ -47,6 +48,7 @@ function serializeNote(n: NoteWithAuthor): z.infer<typeof Note> {
   return {
     id: n.id,
     accountId: n.accountId,
+    companyId: n.companyId ?? undefined,
     title: n.title,
     bodyMd: n.bodyMd,
     pinned: n.pinned,
@@ -58,6 +60,22 @@ function serializeNote(n: NoteWithAuthor): z.infer<typeof Note> {
 }
 
 export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
+  async function ensureAccountVisible(input: {
+    orgId: string;
+    userId: string;
+    accountId: string;
+    companyId?: string | null;
+  }) {
+    const access = await canReadAccount({
+      orgId: input.orgId,
+      userId: input.userId,
+      accountId: input.accountId,
+      companyId: input.companyId,
+      prismaClient: prisma,
+    });
+    if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+  }
+
   // GET /api/notes?accountId=<id>
   // accountId is required because returning every note across every account
   // would be unbounded and surface cross-account context the cockpit panel
@@ -75,14 +93,21 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.query.accountId,
+        companyId: req.query.companyId,
+      });
+      const accountId = normalizeAccountId(req.query.accountId);
       const where: Prisma.NoteWhereInput = {
         orgId: req.auth.orgId,
         deletedAt: null,
       };
       if (req.query.companyId) {
-        where.companyId = req.query.companyId;
+        where.OR = [{ companyId: req.query.companyId }, { accountId }];
       } else {
-        where.accountId = normalizeAccountId(req.query.accountId);
+        where.accountId = accountId;
       }
       const items = await prisma.note.findMany({
         where,
@@ -108,6 +133,12 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.body.accountId,
+        companyId: req.body.companyId,
+      });
       const created = await prisma.note.create({
         data: {
           orgId: req.auth.orgId,
@@ -140,6 +171,12 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const accountId = normalizeAccountId(req.body.accountId);
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.body.accountId,
+        companyId: req.body.companyId,
+      });
       const companyName = req.body.companyName.trim();
       const importedAt = new Date();
       const source = attribution({
@@ -169,6 +206,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
           data: {
             orgId: req.auth.orgId,
             accountId,
+            companyId: req.body.companyId ?? null,
             authorUserId: req.auth.userId,
             title,
             bodyMd: req.body.bodyMd,
@@ -254,9 +292,22 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       // gate is what enforces the tenant boundary.
       const existing = await prisma.note.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, title: true, bodyMd: true, pinned: true },
+        select: {
+          id: true,
+          accountId: true,
+          companyId: true,
+          title: true,
+          bodyMd: true,
+          pinned: true,
+        },
       });
       if (!existing) throw server.httpErrors.notFound('Note not found');
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: existing.accountId,
+        companyId: existing.companyId,
+      });
 
       const updated = await prisma.$transaction(async (tx) => {
         const updateResult = await tx.note.updateMany({
@@ -313,9 +364,15 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       const existing = await prisma.note.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, title: true, bodyMd: true },
+        select: { id: true, accountId: true, companyId: true, title: true, bodyMd: true },
       });
       if (!existing) throw server.httpErrors.notFound('Note not found');
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: existing.accountId,
+        companyId: existing.companyId,
+      });
 
       await prisma.$transaction(async (tx) => {
         const updateResult = await tx.note.updateMany({

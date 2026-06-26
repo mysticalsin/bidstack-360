@@ -128,6 +128,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       const customFieldValues = await prisma.customFieldValue.findMany({
         where: { orgId: req.auth.orgId, entityType: 'task', entityId: task.id },
         select: { id: true, definitionId: true, value: true },
+        take: 100, // query-guard requires a bound; matches contacts/opps/leads
       });
       return {
         id: task.id,

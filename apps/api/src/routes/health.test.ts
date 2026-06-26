@@ -22,8 +22,13 @@ describe('health route contract', () => {
     await app.close();
   });
 
-  it('treats local storage as not production-ready', () => {
+  it('treats local storage as not production-ready (non-demo)', () => {
     expect(storageConfigReady({ NODE_ENV: 'production', STORAGE_DRIVER: 'local' })).toBe(false);
+  });
+
+  it('allows local storage in production DEMO deployments', () => {
+    // matches env.ts: STORAGE_DRIVER=local is permitted in prod when DEMO_MODE=true
+    expect(storageConfigReady({ NODE_ENV: 'production', STORAGE_DRIVER: 'local', DEMO_MODE: 'true' })).toBe(true);
   });
 
   it('requires an S3 bucket when S3 storage is selected', () => {

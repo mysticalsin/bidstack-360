@@ -44,7 +44,10 @@ export interface McpAuthCtx {
   scopes: string[];
 }
 
-export function requireMcpScope(ctx: McpAuthCtx, scope: 'read' | 'write'): void {
+// `kam` is the dedicated KAM staging scope — distinct from `write` so a KAM
+// agent key cannot reach canonical-write tools. Exact-match (no hierarchy):
+// a `write` key does NOT satisfy `kam` and vice-versa.
+export function requireMcpScope(ctx: McpAuthCtx, scope: 'read' | 'write' | 'kam'): void {
   if (!ctx.scopes.includes(scope)) {
     throw new Error(`API key lacks \`${scope}\` scope`);
   }

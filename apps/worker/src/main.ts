@@ -28,6 +28,12 @@ import { startCallWorkers } from './queues/calls.js';
 // Wave 8 — Predictive ML scoring retrain worker
 import { startPredictiveRetrainWorker } from './queues/predictive-retrain.js';
 import { startCompetitorResearch } from './queues/competitor-research.js';
+// Workflow automation — trigger dispatch (record_created / stage_changed) + schedule cron
+import { startWorkflowDispatchWorker } from './queues/workflow-dispatch.js';
+import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
+// Bid-deadline alerts (7/3/1 days) + scheduled analytics reports — repeatable scans
+import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
+import { startScheduledReports } from './queues/scheduled-reports.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -42,6 +48,19 @@ import { startRfpQaReview } from './queues/rfp-qa-review.js';
 import { startCrewRun, startCrewRunReaper } from './queues/crew-run.js';
 import { startSignatureWorkers } from './queues/signatures.js';
 import { startMigrationWorker } from './queues/migration.js';
+import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
+// GDPR Art. 20 — tenant data-portability export
+import { startTenantExport } from './queues/tenant-export.js';
+// EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
+import { startAiAuditRetention } from './queues/ai-audit-retention.js';
+import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
+import { assertWorkerProductionEnv } from './lib/production-env.js';
+import {
+  attachMetricsToWorker,
+  metricsAccessAllowed,
+  renderMetrics,
+  startQueueDepthCollector,
+} from './lib/metrics.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -53,16 +72,13 @@ const log = pino({
 });
 
 // Fail fast on bad production config instead of booting "healthy" and failing
-// every job. Postgres + Redis are the worker's universal hard dependencies; the
-// API enforces its own env via getEnv(), but the worker can't import that
-// app-specific schema, so it checks its must-haves here. (DATABASE_URL is read
-// by the Prisma client; REDIS_URL by every BullMQ queue below.)
-if (process.env.NODE_ENV === 'production') {
-  const missing = (['DATABASE_URL', 'REDIS_URL'] as const).filter((k) => !process.env[k]?.trim());
-  if (missing.length > 0) {
-    log.fatal({ missing }, 'worker: missing required production env — refusing to boot');
-    process.exit(1);
-  }
+// jobs later when a queue first hits Postgres, Redis, encrypted provider tokens,
+// or durable object storage.
+try {
+  assertWorkerProductionEnv(process.env);
+} catch (err) {
+  log.fatal({ err }, 'worker: invalid production env - refusing to boot');
+  process.exit(1);
 }
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
@@ -84,10 +100,16 @@ connection.on('connect', () => log.info({ redisEndpoint }, 'redis connected'));
 
 const workers: Worker[] = [];
 const queues: Queue[] = [];
+initWorkerSentry(log);
 
 // WHY separate: startCallWorkers has a different signature — returns Worker[]
 // synchronously (no queue/workers arrays) and does not need to be awaited.
 workers.push(...startCallWorkers(connection, log, queues));
+
+// Start the webhook-delivery worker FIRST and capture its producer queue: the
+// workflow engine's `call_webhook` effect reuses this single queue instead of
+// opening (and leaking) a new one per dispatch job / schedule scan.
+const webhookDeliveryQueue = await startWebhookDeliveryWorker(connection, log, workers, queues);
 
 await Promise.all([
   startDustPoller(connection, log, workers, queues),
@@ -97,11 +119,16 @@ await Promise.all([
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
-  startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
   startPredictiveRetrainWorker(connection, log, workers, queues),
   startCompetitorResearch(connection, log, workers, queues),
+  // Workflow automation engine — reuses the webhook-delivery producer queue.
+  startWorkflowDispatchWorker(connection, log, workers, queues, webhookDeliveryQueue),
+  startWorkflowScheduleWorker(connection, log, workers, queues, webhookDeliveryQueue),
+  // Bid-deadline alerts + scheduled analytics reports (repeatable, org-scoped scans)
+  startBidDeadlineAlerts(connection, log, workers, queues),
+  startScheduledReports(connection, log, workers, queues),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),
   startRfpOrchestrationReaper(connection, log, workers, queues),
@@ -122,7 +149,20 @@ await Promise.all([
   startCrewRunReaper(connection, log, workers, queues),
   // Migration connector (CSV / Salesforce CSV / HubSpot) import consumer
   startMigrationWorker(connection, log, workers, queues),
+  startSentrySmokeWorker(connection, log, workers, queues),
+  // GDPR Art. 20 — tenant data-portability export
+  startTenantExport(connection, log, workers, queues),
+  // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
+  startAiAuditRetention(connection, log, workers, queues),
 ]);
+
+for (const worker of workers) {
+  attachSentryToWorker(worker, worker.name, log);
+  attachMetricsToWorker(worker, worker.name);
+}
+
+// Periodic queue-depth gauges (waiting/active per queue) for backpressure alerts.
+const queueDepthCollector = startQueueDepthCollector(queues, log);
 
 log.info(
   'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
@@ -130,7 +170,32 @@ log.info(
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
 
-const healthServer = http.createServer((_req, res) => {
+const healthServer = http.createServer((req, res) => {
+  // Prometheus scrape endpoint. Outside health auth, but production requires an
+  // explicit bearer token (mirrors the API's /metrics guard).
+  const pathname = (req.url ?? '/').split('?')[0];
+  if (pathname === '/metrics') {
+    void (async () => {
+      if (!metricsAccessAllowed(req.headers.authorization)) {
+        res.writeHead(process.env.METRICS_BEARER_TOKEN ? 401 : 404, {
+          'Content-Type': 'text/plain',
+        });
+        res.end('Not found');
+        return;
+      }
+      try {
+        const body = await renderMetrics();
+        res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+        res.end(body);
+      } catch (err) {
+        log.error({ err }, 'failed to render metrics');
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('metrics error');
+      }
+    })();
+    return;
+  }
+
   // Probe BOTH dependencies: nearly every queue handler hits Postgres, so a
   // worker with a dead DB must not report healthy (it would keep receiving jobs
   // it can only fail).
@@ -191,6 +256,7 @@ const shutdown = async (signal: string) => {
     // Release the health port FIRST so a hot-reload's replacement can bind it
     // without a long EADDRINUSE retry window — BullMQ worker.close() below can
     // take seconds while it drains the active job.
+    queueDepthCollector.stop();
     healthServer.close();
     await Promise.all(workers.map((w) => w.close()));
     await Promise.all(queues.map((q) => q.close()));

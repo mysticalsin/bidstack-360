@@ -16,6 +16,7 @@ import { ImportOpportunitiesDialog } from '@/components/opportunity/ImportOpport
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 import { Button } from '@/components/ui/Button';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
@@ -24,19 +25,64 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
-export function OppKpiBar({ opps }: { opps: Opportunity[] }) {
+/**
+ * Headline KPIs. Tenant-wide counts/pipeline come from the server aggregate
+ * (`/api/crm/summary`) so they reflect the whole org, not just the current 50-row
+ * cursor page — at 100k-company scale a page-derived total under-reports the
+ * pipeline by orders of magnitude. Weighted revenue has no server aggregate, so
+ * it stays page-derived and is explicitly labelled "(page)" to avoid
+ * misrepresenting it as a tenant total.
+ */
+export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
   const { t } = useTranslation('crm');
   const { formatMoney } = useFormatMoney();
-  const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
   const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
-  const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
-  const kpis = [
-    { label: t('oppToolbar.kpiOpportunities', 'Opportunities'), value: String(opps.length) },
-    { label: t('oppToolbar.kpiRevenue', 'Revenue'), value: formatMoney(totalValue, 'EUR') },
-    { label: t('oppToolbar.kpiWeightedRevenue', 'WR'), value: formatMoney(weighted, 'EUR') },
-    { label: t('oppToolbar.kpiOpen', 'Open'), value: formatMoney(openValue, 'EUR') },
-  ];
+  const kpis = summary
+    ? [
+        {
+          label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
+          value: summary.opportunities.toLocaleString(),
+        },
+        {
+          label: t('oppToolbar.kpiOpenCount', 'Open'),
+          value: summary.openOpportunities.toLocaleString(),
+        },
+        {
+          label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
+          value: formatMoney(summary.pipelineValue, 'EUR'),
+        },
+        {
+          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
+          value: formatMoney(weighted, 'EUR'),
+        },
+      ]
+    : [
+        // Fallback before the summary resolves: page-derived totals, all labelled
+        // "(page)" so they are never mistaken for tenant-wide figures.
+        {
+          label: t('oppToolbar.kpiOpportunitiesPage', 'Opportunities (page)'),
+          value: String(opps.length),
+        },
+        {
+          label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
+          value: formatMoney(
+            opps.reduce((acc, o) => acc + o.value, 0),
+            'EUR',
+          ),
+        },
+        {
+          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
+          value: formatMoney(weighted, 'EUR'),
+        },
+        {
+          label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
+          value: formatMoney(
+            openOpps.reduce((acc, o) => acc + o.value, 0),
+            'EUR',
+          ),
+        },
+      ];
   return (
     <div
       role="region"

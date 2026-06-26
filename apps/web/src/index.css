@@ -38,6 +38,19 @@
   --brand-primary-tint: #eaeefe;
   --brand-deep: #1b2c7a;
 
+  /* SERUM Glass system */
+  --serum-bg: #f7f9fc;
+  --serum-surface: rgba(255, 255, 255, 0.82);
+  --serum-surface-solid: #ffffff;
+  --serum-surface-soft: rgba(244, 248, 255, 0.74);
+  --serum-border: rgba(7, 26, 68, 0.11);
+  --serum-text: #071a44;
+  --serum-blue: #005fcc;
+  --serum-cyan: #52c7ff;
+  --serum-violet: #7a5af8;
+  --serum-shadow-sm: 0 8px 24px rgba(7, 26, 68, 0.08);
+  --serum-shadow-md: 0 20px 52px rgba(7, 26, 68, 0.12);
+
   /* Surface */
   --surface-page: #fafbfd;
   --surface-card: #ffffff;
@@ -53,7 +66,7 @@
   --fg-secondary: #5a6478;
   /* fg-tertiary darkened from #8a93a6 (3.09:1) → #6b7280 (4.6:1) to clear
      WCAG 1.4.3 normal text on white. */
-  --fg-tertiary: #6b7280;
+  --fg-tertiary: #5a6478;
   --fg-muted: #626c7d;
   --fg-inverted: #ffffff;
   --fg-on-brand: #ffffff;
@@ -73,6 +86,7 @@
   --danger-tint: #fbe5e8;
   --info: #6e59ff;
   --info-tint: #ece8ff;
+  --info-strong: #5e47ec; /* darker --info for text on tints; ≈5.2:1 on the brand tint, ≈5.9:1 on white (AA) */
 
   /* Semantic aliases — components use these instead of duplicating semantic names */
   --fg-error: #b82032; /* = --danger; 6.38:1 on white ✅ */
@@ -85,7 +99,7 @@
   --warning-fg: #8a5a00; /* = --warning */
   --success-surface: #e4f4ec; /* = --success-tint */
   --error-surface: #fbe5e8; /* = --danger-tint */
-  --sidebar-fg: #6b7280; /* = --fg-tertiary */
+  --sidebar-fg: #5a6478; /* = --fg-tertiary */
   --sidebar-fg-active: #1a1f36; /* = --fg-primary */
   --sidebar-hover: rgba(0, 0, 0, 0.04);
   --sidebar-active: rgba(44, 75, 255, 0.08);
@@ -187,6 +201,19 @@
   --brand-gradient-end: #7882e7;
   --brand-gradient: linear-gradient(135deg, #5e6ad2 0%, #7882e7 100%);
 
+  /* SERUM Glass system */
+  --serum-bg: #05070d;
+  --serum-surface: rgba(14, 18, 29, 0.78);
+  --serum-surface-solid: #0e121d;
+  --serum-surface-soft: rgba(20, 26, 42, 0.72);
+  --serum-border: rgba(122, 154, 255, 0.2);
+  --serum-text: #f8fbff;
+  --serum-blue: #63a8ff;
+  --serum-cyan: #69d6ff;
+  --serum-violet: #9b86ff;
+  --serum-shadow-sm: 0 12px 34px rgba(0, 0, 0, 0.32);
+  --serum-shadow-md: 0 28px 64px rgba(0, 0, 0, 0.42);
+
   /* Surface — deep void black */
   --surface-page: #010102;
   --surface-card: #0c0c0e;
@@ -201,7 +228,7 @@
   /* Foreground — crisp cool whites */
   --fg-primary: #f8fafc;
   --fg-secondary: #a1a1aa;
-  --fg-tertiary: #84848e; /* 5.28:1 on surface-card ✅ (was #71717a: 4.04:1 ❌) */
+  --fg-tertiary: #92929d; /* 5.04:1 on border-subtle surfaces */
   --fg-muted: #8b8b94;
   --fg-inverted: #010102;
   --fg-on-brand: #ffffff;
@@ -394,9 +421,13 @@
   --font-mono:
     ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, 'Cascadia Code', monospace;
 
-  /* Login page fonts — scoped, do not override global font-sans/font-display */
-  --font-heading: "'Instrument Serif'", serif;
-  --font-body: "'Barlow'", sans-serif;
+  /* Login page fonts — scoped, self-contained, do not override global font-sans/font-display */
+  --font-heading:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI Variable Display', system-ui,
+    sans-serif;
+  --font-body:
+    system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable', 'Segoe UI',
+    Helvetica, Arial, sans-serif;
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -848,8 +879,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Spring-style padding transition so internal collapse feels Apple-grade. */
-  transition: padding 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: none;
 }
 /* Collapsed mode: icons-only rail. Labels + badges fade out; tooltips
    take over labeling on hover/focus. The actual width comes from the
@@ -877,10 +907,7 @@ a {
 .sb-brand > div:not(.sb-mark) {
   opacity: 1;
   max-width: 150px;
-  transition:
-    opacity 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    max-width 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    visibility 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 120ms ease;
   visibility: visible;
   overflow: hidden;
   white-space: nowrap;
@@ -900,11 +927,7 @@ a {
   padding: 4px 12px 6px;
   opacity: 1;
   max-width: 200px;
-  transition:
-    opacity 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    max-width 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    padding 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    visibility 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 120ms ease;
   visibility: visible;
   overflow: hidden;
   white-space: nowrap;
@@ -968,10 +991,7 @@ a {
   display: inline-block;
   opacity: 1;
   max-width: 150px;
-  transition:
-    opacity 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    max-width 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    visibility 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 120ms ease;
   visibility: visible;
   overflow: hidden;
   white-space: nowrap;
@@ -994,12 +1014,7 @@ a {
   min-height: 0;
   opacity: 1;
   max-width: 50px;
-  transition:
-    opacity 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    max-width 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    padding 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    margin 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    visibility 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 120ms ease;
   visibility: visible;
   overflow: hidden;
   white-space: nowrap;
@@ -1017,11 +1032,7 @@ a {
   padding: 6px 10px 0;
   opacity: 1;
   max-height: 50px;
-  transition:
-    opacity 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    max-height 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    padding 180ms cubic-bezier(0.32, 0.72, 0, 1),
-    visibility 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 120ms ease;
   visibility: visible;
   overflow: hidden;
 }
@@ -1093,9 +1104,7 @@ a {
   align-items: center;
   gap: 10px;
   padding: 6px 10px 14px;
-  transition:
-    padding 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    gap 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: none;
 }
 /* Expanded: the toggle sits absolutely at right:8px (32px wide) — reserve
    that strip so the brand text can never run underneath it, and ellipsize
@@ -1166,11 +1175,9 @@ a {
   font-weight: 500;
   transition:
     background-color 0.18s ease,
-    color 0.18s ease,
-    padding 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    gap 260ms cubic-bezier(0.32, 0.72, 0, 1);
+    color 0.18s ease;
   text-decoration: none;
-  min-height: 36px;
+  min-height: 44px;
   overflow: hidden;
 }
 /* Collapsed item: square 44x44 target, icon dead-centered. We use
@@ -1268,6 +1275,14 @@ a {
     visibility 0.12s ease;
   z-index: 50;
   padding: 6px;
+}
+.sb-flyout::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 8px;
 }
 .sb-parent-container:hover .sb-flyout {
   opacity: 1;
@@ -2479,13 +2494,12 @@ a {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
-  /* Spring the column reflow so collapse feels Apple-grade. The CSS
-     variable interpolates naturally with `transition` on the grid template
-     in modern engines; for older ones, the column snaps which is still
-     better than the prior 168px ghost gutter. */
-  transition: grid-template-columns 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* Do not animate the grid track: it reflows the full CRM dashboard during
+     sidebar toggles and pushes INP over the enterprise performance budget. */
+  transition: none;
 }
-.app-shell.has-collapsed-sidebar {
+.app-shell.has-collapsed-sidebar,
+[data-sidebar-collapsed='true'] .app-shell {
   --sidebar-w: 72px;
 }
 .app-shell .main {
@@ -2583,6 +2597,10 @@ a {
   z-index: 50;
   background: var(--surface-overlay);
   backdrop-filter: blur(4px);
+  animation: mobile-nav-fade-in 180ms ease-out;
+}
+.mobile-nav-backdrop[data-state='closed'] {
+  animation: mobile-nav-fade-out 140ms ease-in;
 }
 .mobile-nav-drawer {
   position: fixed;
@@ -2597,6 +2615,54 @@ a {
   z-index: 51;
   display: flex;
   flex-direction: column;
+  /* Clip at the drawer edge so only the inner <nav> scrolls (vertically) — no
+     drawer-level horizontal/vertical overflow or rubber-band. */
+  overflow: hidden;
+  overscroll-behavior: contain;
+  animation: mobile-nav-slide-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mobile-nav-drawer[data-state='closed'] {
+  animation: mobile-nav-slide-out 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes mobile-nav-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mobile-nav-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes mobile-nav-slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes mobile-nav-slide-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-nav-backdrop,
+  .mobile-nav-backdrop[data-state='closed'],
+  .mobile-nav-drawer,
+  .mobile-nav-drawer[data-state='closed'] {
+    animation-duration: 1ms;
+  }
 }
 
 /* ---------- Risk list / activity / contacts ---------- */
@@ -2709,20 +2775,35 @@ a {
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
 }
 .kvlist .kv:last-child {
   border-bottom: 0;
 }
 .kvlist dt {
   color: var(--fg-tertiary);
+  flex: 0 0 auto;
   font-size: 12.5px;
   margin: 0;
 }
 .kvlist dd {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
   margin: 0;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   text-align: right;
+}
+.kv-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kv-source {
+  flex: 0 0 auto;
 }
 .activity-kind-icon {
   color: var(--fg-secondary);
@@ -3581,6 +3662,97 @@ a {
   gap: 8px;
   justify-content: flex-end;
 }
+.account-experience-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: 18px;
+  align-items: stretch;
+  margin: 16px 0;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 8%, transparent), transparent 48%),
+    var(--surface-card);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+}
+.account-experience-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+.account-experience-copy p,
+.account-experience-copy span {
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.account-experience-copy h2 {
+  margin: 6px 0 8px;
+  color: var(--fg-primary);
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.16;
+}
+.account-experience-copy span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
+}
+.account-health-bars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.account-health-bar {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  padding: 12px;
+}
+.account-health-bar > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.account-health-bar strong {
+  color: var(--fg-primary);
+}
+.account-health-bar > span {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-card);
+  margin-top: 9px;
+}
+.account-health-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-primary);
+  transition: width 0.3s ease;
+}
+.account-health-strong i {
+  background: var(--success);
+}
+.account-health-good i {
+  background: var(--brand-primary);
+}
+.account-health-needs_attention i {
+  background: var(--warning);
+}
+.account-health-critical i {
+  background: var(--danger);
+}
 .integration-motion-rail {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3673,6 +3845,56 @@ a {
      the old 34px failed on coarse-pointer (touch) devices. */
   min-height: 44px;
 }
+.account-filter-body {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.account-segment-bar {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.account-segment-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  min-width: 132px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--surface-card);
+  padding: 0 12px;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    border-color 0.16s,
+    background 0.16s,
+    color 0.16s,
+    transform 0.16s;
+}
+.account-segment-bar button:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.account-segment-bar button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.account-segment-bar button.is-active {
+  border-color: color-mix(in srgb, var(--brand-primary) 56%, var(--border-default));
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--surface-card));
+  color: var(--fg-primary);
+}
+.account-segment-bar strong {
+  color: var(--brand-primary);
+  font-variant-numeric: tabular-nums;
+}
 .account-filter:hover {
   background: var(--surface-sunken);
 }
@@ -3733,6 +3955,7 @@ a {
 }
 .account-card:hover {
   border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 .account-card:focus-visible {
   outline: none;
@@ -3784,6 +4007,34 @@ a {
   font-weight: 500;
   letter-spacing: 0.01em;
 }
+.account-card-tech {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  overflow: hidden;
+  color: var(--brand-primary);
+}
+.account-card-tech span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0.5px solid color-mix(in srgb, var(--brand-primary) 24%, var(--border-subtle));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 8%, var(--surface-card));
+  padding: 3px 8px;
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.account-card-tech.is-empty {
+  color: var(--fg-tertiary);
+}
+.account-card-tech.is-empty span {
+  border-color: var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--fg-tertiary);
+}
 .account-card-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -3809,13 +4060,18 @@ a {
   color: var(--fg-primary);
   font-feature-settings: 'tnum';
 }
+.account-card-signal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  border-top: 0.5px solid var(--border-subtle);
+  padding-top: 12px;
+}
 .account-card-confidence {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-top: 0.5px solid var(--border-subtle);
-  padding-top: 12px;
   color: var(--fg-tertiary);
   font-size: 11px;
   font-weight: 600;
@@ -3826,6 +4082,119 @@ a {
   color: var(--fg-primary);
   font-size: 13px;
   letter-spacing: 0;
+}
+.account-card-coverage {
+  min-width: 0;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.account-card-coverage > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.account-card-coverage strong {
+  color: var(--fg-primary);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.account-card-coverage > span {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  margin-top: 7px;
+}
+.account-card-coverage i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-primary), var(--success));
+}
+.strategic-signal-insight {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 0.5px solid color-mix(in srgb, var(--warning) 26%, var(--border-subtle));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-card));
+  color: var(--fg-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.strategic-signal-insight svg {
+  margin-top: 1px;
+  color: var(--warning);
+}
+.strategic-signal-insight span,
+.strategic-signal-insight strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.strategic-signal-insight strong {
+  grid-column: 2;
+  color: var(--fg-primary);
+  font-size: 11.5px;
+}
+.strategic-signal-insight.is-complete {
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));
+  background: color-mix(in srgb, var(--success) 7%, var(--surface-card));
+}
+.strategic-signal-insight.is-complete svg {
+  color: var(--success);
+}
+.strategic-signal-insight.is-compact {
+  min-height: 40px;
+  padding: 8px 9px;
+}
+.account-card-insight {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 0.5px solid color-mix(in srgb, var(--warning) 26%, var(--border-subtle));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-card));
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.account-card-insight svg {
+  margin-top: 1px;
+  color: var(--warning);
+}
+.account-card-insight span,
+.account-card-insight strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-card-insight strong {
+  grid-column: 2;
+  color: var(--fg-primary);
+  font-size: 11.5px;
+}
+.account-card-insight.is-complete {
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));
+  background: color-mix(in srgb, var(--success) 7%, var(--surface-card));
+}
+.account-card-insight.is-complete svg {
+  color: var(--success);
 }
 .account-card-foot {
   display: inline-flex;
@@ -3841,6 +4210,383 @@ a {
   text-decoration: underline;
 }
 
+/* ---------- Sector view ---------- */
+.sector-quality-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--warning);
+  border-radius: 12px;
+  background: var(--warning-tint);
+  padding: 14px 16px;
+  color: var(--fg-primary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.sector-quality-banner strong {
+  font-weight: 700;
+}
+.sector-command-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.sector-metric {
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-card) 92%, transparent), transparent),
+    var(--surface-card);
+  box-shadow: var(--shadow-xs);
+  padding: 14px;
+}
+.sector-metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--surface-sunken));
+  color: var(--brand-primary);
+  margin-bottom: 10px;
+}
+.sector-metric > span:not(.sector-metric-icon),
+.sector-metric small {
+  display: block;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sector-metric strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 6px 0 4px;
+  color: var(--fg-primary);
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.12;
+}
+.sector-metric small {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
+}
+.sector-experience-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.4fr);
+  gap: 16px;
+  align-items: start;
+}
+.sector-radar-panel,
+.sector-detail-panel {
+  overflow: hidden;
+}
+.sector-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sector-panel-head p,
+.sector-detail-hero p {
+  margin: 0;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sector-panel-head h2,
+.sector-detail-hero h2 {
+  margin: 4px 0 0;
+  color: var(--fg-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+.sector-radar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.sector-radar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 0.55fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  padding: 11px 12px;
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    transform 0.18s;
+}
+.sector-radar-row:hover {
+  border-color: var(--border-default);
+  background: var(--surface-sunken);
+  transform: translateX(2px);
+}
+.sector-radar-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.sector-radar-row.is-active {
+  border-color: color-mix(in srgb, var(--brand-primary) 50%, var(--border-default));
+  background: color-mix(in srgb, var(--brand-primary) 8%, var(--surface-card));
+}
+.sector-radar-main {
+  min-width: 0;
+}
+.sector-radar-main span,
+.sector-radar-fte {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.sector-radar-main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.sector-radar-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+.sector-radar-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-primary), var(--success));
+  transition: width 0.3s ease;
+}
+.sector-radar-fte {
+  color: var(--fg-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.sector-detail-hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 9%, transparent), transparent 58%),
+    var(--surface-card);
+}
+.sector-detail-hero > div:first-child {
+  min-width: 0;
+}
+.sector-detail-hero span {
+  display: block;
+  margin-top: 7px;
+  color: var(--fg-secondary);
+  font-size: 13px;
+}
+.sector-detail-score {
+  display: flex;
+  min-width: 124px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  padding: 12px;
+}
+.sector-detail-score strong {
+  color: var(--fg-primary);
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+}
+.sector-detail-score span {
+  margin: 5px 0 0;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.sector-coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 16px;
+}
+.sector-coverage-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  padding: 11px;
+}
+.sector-coverage-item > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+.sector-coverage-item strong {
+  color: var(--fg-primary);
+}
+.sector-coverage-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-card);
+  margin-top: 9px;
+}
+.sector-coverage-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-primary);
+}
+.sector-detail-insight {
+  padding: 0 16px 14px;
+}
+.sector-country-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 16px;
+}
+.sector-country-strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-card);
+  padding: 0 12px;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sector-country-strip button:hover,
+.sector-country-strip button.is-active {
+  border-color: color-mix(in srgb, var(--brand-primary) 48%, var(--border-default));
+  color: var(--fg-primary);
+}
+.sector-country-strip span {
+  color: var(--brand-primary);
+  font-variant-numeric: tabular-nums;
+}
+.sector-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+.sector-account-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-card);
+  padding: 10px 12px;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.16s,
+    background 0.16s,
+    transform 0.16s;
+}
+.sector-account-row:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-sunken);
+  transform: translateY(-1px);
+}
+.sector-account-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.sector-account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--brand-primary) 12%, var(--surface-sunken));
+  color: var(--brand-primary);
+  font-weight: 800;
+}
+.sector-account-main,
+.sector-account-signal {
+  min-width: 0;
+}
+.sector-account-main strong,
+.sector-account-main small,
+.sector-account-signal small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sector-account-main strong {
+  color: var(--fg-primary);
+  font-size: 13px;
+}
+.sector-account-next {
+  display: block;
+  margin-top: 6px;
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.sector-account-next b {
+  color: var(--fg-primary);
+  font-weight: 700;
+}
+.sector-account-next.is-complete b {
+  color: var(--success);
+}
+.sector-account-main small,
+.sector-account-signal small {
+  margin-top: 3px;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 @media (max-width: 1180px) {
   .command-center {
     grid-template-columns: 1fr;
@@ -3848,6 +4594,13 @@ a {
 
   .account-dashboard-strip {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .account-experience-panel,
+  .sector-experience-grid {
+    grid-template-columns: 1fr;
+  }
+  .sector-command-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 720px) {
@@ -3899,6 +4652,26 @@ a {
   .account-dashboard-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .account-experience-panel,
+  .account-health-bars,
+  .sector-command-strip,
+  .sector-coverage-grid {
+    grid-template-columns: 1fr;
+  }
+  .account-card-signal-grid,
+  .sector-radar-row,
+  .sector-account-row {
+    grid-template-columns: 1fr;
+  }
+  .sector-detail-hero {
+    flex-direction: column;
+  }
+  .sector-account-signal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   .integration-motion-rail {
     grid-template-columns: 1fr;
   }
@@ -3910,6 +4683,25 @@ a {
   }
   .account-source-stat strong {
     font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-track::before,
+  .rail-node {
+    animation: none;
+  }
+  .account-segment-bar button,
+  .sector-radar-row,
+  .sector-account-row,
+  .account-health-bar i,
+  .sector-radar-bar span {
+    transition: none;
+  }
+  .account-segment-bar button:hover,
+  .sector-radar-row:hover,
+  .sector-account-row:hover {
+    transform: none;
   }
 }
 

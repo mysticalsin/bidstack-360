@@ -26,7 +26,7 @@ esac
 
 # Common secret patterns
 PATTERNS=(
-  'sk-[A-Za-z0-9]{20,}'                        # OpenAI / Anthropic
+  'sk-[A-Za-z0-9_-]{20,}'                      # OpenAI / Anthropic modern keys
   'sk_live_[A-Za-z0-9]{20,}'                   # Stripe live
   'sk_test_[A-Za-z0-9]{20,}'                   # Stripe test
   'pk_live_[A-Za-z0-9]{20,}'                   # Stripe live publishable
@@ -34,6 +34,10 @@ PATTERNS=(
   'AKIA[0-9A-Z]{16}'                           # AWS access key
   'ghp_[A-Za-z0-9]{30,}'                       # GitHub personal token
   'gho_[A-Za-z0-9]{30,}'                       # GitHub OAuth
+  'github_pat_[A-Za-z0-9_]{30,}'               # GitHub fine-grained PAT
+  'xox[baprs]-[A-Za-z0-9-]{20,}'               # Slack tokens
+  'AIza[0-9A-Za-z_-]{35}'                      # Google API keys
+  'AccountKey=[A-Za-z0-9+/=]{40,}'             # Azure Storage connection strings
   'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}'  # JWT
   'BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY'     # private keys
 )

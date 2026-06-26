@@ -6,6 +6,25 @@
 
 ---
 
+## ✅ RESOLUTION — 2026-06-24 (verification swarm)
+
+All 57 findings re-verified against current `HEAD`. **Status: fully resolved.**
+
+- **52 of 57** were already fixed across the hardening waves + KAM build (P0 #1–6,
+  P1 #7–25, P2/P3 #27–47). Several (#8, #16, #33, #41) fixed-by-removal when the
+  quote-to-cash / invoicing surface was deleted (`InvoicesPage`/`SalesOrdersPage`
+  gone).
+- **#26** (ZapierApp `apiKeyHash` had no index → sequential scan on the hot auth
+  path) — **fixed**: `@@index([apiKeyHash])` + migration
+  `20260624120000_zapier_app_api_key_hash_index`, applied to the demo DB. The
+  `deletedAt: null` half was already present.
+- **#43** (`packages/twenty-bidstack/` orphaned) — **by design, do not touch**
+  (preserved per `CLAUDE.md` / `PRESERVATION-NOTE.md`). Not a defect.
+
+No open findings remain in this backlog.
+
+---
+
 ## 🔴 P0 — Fix Immediately (Security / Crash / Data Leak)
 
 | #   | Issue                                                                                                                                                                                                                           | File(s)                                                                      | Effort | Source      |

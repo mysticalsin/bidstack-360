@@ -8,11 +8,28 @@ export interface SectorCountry {
   fteVolume: number | null;
 }
 
+export interface SectorAccount {
+  id: string;
+  name: string;
+  domain: string | null;
+  countryCode: string;
+  employeeCount: number | null;
+  source: string;
+  confidence: number;
+  updatedAt: string;
+}
+
 export interface SectorRow {
   sector: string;
   accountCount: number;
   fteVolume: number | null;
+  coverage: {
+    knownFteAccounts: number;
+    verifiedAccounts: number;
+    logoAccounts: number;
+  };
   countries: SectorCountry[];
+  accounts: SectorAccount[];
 }
 
 export interface SectorViewResponse {

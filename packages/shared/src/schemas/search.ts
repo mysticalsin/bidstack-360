@@ -7,6 +7,11 @@ export const SearchResultType = z.enum([
   'company',
   'task',
   'note',
+  // Bid-piloting entities surfaced by global search (proposals, extracted RFP
+  // requirements, and reusable references / case-study stories).
+  'proposal',
+  'rfp_requirement',
+  'reference',
   // 'sales_order' retained for tolerance of any persisted/cached value; the
   // module was removed and nothing emits it.
   'sales_order',

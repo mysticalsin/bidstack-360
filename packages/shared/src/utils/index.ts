@@ -24,6 +24,24 @@ export function normalizeName(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
+/**
+ * Canonical account-key normalizer for cross-surface KAM joins.
+ *
+ * Governance / contract / cross-sell / project-ref tables key accounts on a
+ * normalized name (free-text `accountKey`). KAM entities key on `Company.id`
+ * (exact), but when a KPI must bridge to those legacy surfaces it derives the
+ * key via THIS function — the single source of truth. Use it everywhere an
+ * account name becomes a stable key; do not re-implement. Strips REPEATED
+ * leading/trailing hyphens (strict variant) so names with leading/trailing
+ * punctuation key identically. See docs/KAM-PLAN.md §1.
+ */
+export function normalizeAccountName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export function normalizeCountry(country: string | null): string | null {
   if (!country) return null;
   const normalized = country.trim().toUpperCase();

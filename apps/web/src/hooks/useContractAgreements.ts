@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import type {
   ContractAgreement,
   ContractAgreementCreate,
+  ContractExtractionApproval,
   ContractAgreementPage,
   ContractAgreementPatch,
   ContractExtractionResult,
@@ -36,6 +37,18 @@ export function usePatchContractAgreement() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ContractAgreementPatch }) =>
       api<ContractAgreement>(`/api/contract-agreements/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['contract-agreements'] }),
+  });
+}
+
+export function useApproveContractExtraction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ContractExtractionApproval }) =>
+      api<ContractAgreement>(`/api/contract-agreements/extractions/${id}/approve`, {
+        method: 'POST',
+        body,
+      }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['contract-agreements'] }),
   });
 }

@@ -54,12 +54,16 @@ jobs:
           set -euo pipefail
           ACR="${{ vars.ACR_LOGIN_SERVER }}"
           TAG="${IMAGE_TAG}"
-          # web needs the Clerk publishable key baked in at build time
           for target in api web worker mcp-server migrate; do
+            extra_args=()
+            # web needs the Clerk publishable value baked into the static Vite bundle
+            if [ "$target" = "web" ]; then
+              extra_args+=(--build-arg BIDSTACK_WEB_BUILD_MODE=clerk)
+              extra_args+=(--build-arg PUBLIC_CLERK_PUBLISHABLE="${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}")
+            fi
             docker build \
               --target "$target" \
-              --build-arg VITE_CLERK_PUBLISHABLE_KEY="${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}" \
-              --build-arg BIDSTACK_BUILD_AUTH_MODE=clerk \
+              "${extra_args[@]}" \
               -t "$ACR/bidstack-$target:$TAG" \
               -f Dockerfile .
             docker push "$ACR/bidstack-$target:$TAG"

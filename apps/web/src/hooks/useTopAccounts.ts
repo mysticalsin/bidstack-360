@@ -35,6 +35,8 @@ export function useTopAccounts(filters?: { search?: string; industry?: string; l
       if (filters?.limit) params.set('limit', String(filters.limit));
       return api(`/api/accounts/top?${params.toString()}`);
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -47,6 +49,9 @@ export function useUpdateTopAccountList() {
         method: 'PUT',
         body: { companyIds },
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['top-accounts'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['top-accounts'] });
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+    },
   });
 }

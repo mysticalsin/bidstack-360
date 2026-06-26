@@ -3,7 +3,6 @@
 // and closes on link selection, backdrop tap, or Escape.
 
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,12 +16,12 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, type NavItem } from './navConfig';
+import { useAppModules } from '@/hooks/useAppModules';
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
   const setOpen = useUiStore((s) => s.setMobileNavOpen);
-  const reduced = useReducedMotion();
 
   // Lock body scroll while open.
   useEffect(() => {
@@ -30,44 +29,27 @@ export function MobileNav() {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      document.body.style.pointerEvents = 'auto';
     }
     return () => {
       document.body.style.overflow = '';
+      document.body.style.pointerEvents = 'auto';
     };
   }, [open]);
 
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
-      <AnimatePresence>
-        {open && (
-          <RadixDialog.Portal forceMount>
-            <RadixDialog.Overlay asChild forceMount>
-              <motion.div
-                className="mobile-nav-backdrop"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={reduced ? { duration: 0 } : { duration: 0.2 }}
-              />
-            </RadixDialog.Overlay>
-            <RadixDialog.Content asChild forceMount aria-describedby={undefined}>
-              <motion.div
-                id="mobile-nav-drawer"
-                className="mobile-nav-drawer"
-                initial={reduced ? { x: 0 } : { x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={reduced ? { x: 0 } : { x: '-100%' }}
-                transition={
-                  reduced ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 30 }
-                }
-              >
-                <RadixDialog.Title className="sr-only">Primary navigation</RadixDialog.Title>
-                <MobileNavContent onClose={() => setOpen(false)} />
-              </motion.div>
-            </RadixDialog.Content>
-          </RadixDialog.Portal>
-        )}
-      </AnimatePresence>
+      <RadixDialog.Portal>
+        <RadixDialog.Overlay className="mobile-nav-backdrop" />
+        <RadixDialog.Content
+          aria-describedby={undefined}
+          id="mobile-nav-drawer"
+          className="mobile-nav-drawer"
+        >
+          <RadixDialog.Title className="sr-only">Primary navigation</RadixDialog.Title>
+          <MobileNavContent onClose={() => setOpen(false)} />
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
     </RadixDialog.Root>
   );
 }
@@ -84,6 +66,11 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
   const overdueTasks = taskSummary.data?.overdue ?? 0;
 
   const badges = { openBids, overdueTasks };
+  const { data: appModules } = useAppModules();
+  const sections = NAV_SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.filter((it) => isNavItemVisible(it, appModules)),
+  })).filter((s) => s.items.length > 0);
 
   return (
     <div className="flex h-full flex-col">
@@ -108,13 +95,12 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Scrollable nav */}
-      <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2 py-2">
-        {NAV_SECTIONS.map((section) => (
-          <NavGroup key={section.key} title={t(section.titleKey, section.title)}>
-            {section.items.map((item) => (
-              <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
-            ))}
-          </NavGroup>
+      <nav
+        aria-label="Primary navigation"
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2 py-2"
+      >
+        {sections.map((section) => (
+          <MobileNavSection key={section.key} section={section} badges={badges} onNavigate={onClose} />
         ))}
 
         {favorites.length > 0 && (
@@ -150,6 +136,45 @@ function NavGroup({ title, children }: { title: string; children: React.ReactNod
         {title}
       </div>
       {children}
+    </div>
+  );
+}
+
+// Collapsible primary section (accordion, mirrors the desktop sidebar):
+// collapsed by default unless it holds the active route; the user's tap is
+// persisted. Keeps the mobile drawer tidy and reachable without long scrolls.
+function MobileNavSection({
+  section,
+  badges,
+  onNavigate,
+}: {
+  section: NavSection;
+  badges: { openBids: number; overdueTasks: number };
+  onNavigate: () => void;
+}) {
+  const location = useLocation();
+  const { t } = useTranslation('common');
+  const override = useUiStore((s) => s.collapsedSections[section.key]);
+  const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
+  const isActive = section.items.some(
+    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
+  );
+  const collapsed = override === undefined ? !isActive : override;
+  return (
+    <div className="py-1">
+      <button
+        type="button"
+        onClick={() => setSectionCollapsed(section.key, !collapsed)}
+        aria-expanded={!collapsed}
+        className="flex min-h-9 w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
+      >
+        <span>{t(section.titleKey, section.title)}</span>
+        <Icon name="chevron-down" size={12} className={cn('transition-transform', collapsed && '-rotate-90')} ariaHidden />
+      </button>
+      {!collapsed &&
+        section.items.map((item) => (
+          <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onNavigate} />
+        ))}
     </div>
   );
 }

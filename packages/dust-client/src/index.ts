@@ -258,6 +258,7 @@ export async function verifyDustSignature(
     false,
     ['sign'],
   );
+
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(rawBody));
   const hex = Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -265,9 +266,9 @@ export async function verifyDustSignature(
 
   // Constant-time compare
   if (hex.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < hex.length; i++) {
-    diff |= hex.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
+
+  // Use Node's native crypto timingSafeEqual instead of a manual loop for robustness
+  // We can assume crypto is available since this is a Node backend context.
+  const cryptoModule = await import('node:crypto');
+  return cryptoModule.timingSafeEqual(Buffer.from(hex), Buffer.from(expected));
 }

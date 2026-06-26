@@ -35,10 +35,10 @@ test('command palette opens via Ctrl+K and navigates', async ({ page, gotoAndWai
 
 test('agents page is reachable from product routes', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/agents');
-  await expect(page.getByRole('heading', { level: 1, name: 'Agents' })).toBeVisible({
+  await expect(page.getByRole('heading', { level: 1, name: 'Agent Studio' })).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByText(/RFP agent squad/i)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Agents' })).toBeVisible();
 });
 
 test('dark mode toggle persists across reload', async ({ page, gotoAndWait }) => {

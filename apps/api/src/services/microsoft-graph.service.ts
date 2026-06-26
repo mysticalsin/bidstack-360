@@ -16,6 +16,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma, EmailProvider } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
 import { getAccessToken, GRAPH_BASE, type ServiceLogger } from './microsoft-graph-auth.service.js';
+import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Email send ────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,13 @@ export async function sendEmail(
   if (!token || token.orgId !== params.orgId || token.status !== 'active') {
     throw new Error('Integration token not found or not active');
   }
+
+  await assertSerumConnectorAllowed({
+    orgId: params.orgId,
+    connectorId: 'microsoft_graph',
+    operation: 'mail.send',
+    writeRequested: true,
+  });
 
   const accessToken = await getAccessToken(token, log);
   const pixelToken = randomBytes(24).toString('base64url');
@@ -211,6 +219,13 @@ export async function pullIncrementalSync(
     log.warn({ integrationTokenId }, 'Skipping Graph pull: token inactive');
     return { persisted: 0 };
   }
+
+  await assertSerumConnectorAllowed({
+    orgId,
+    connectorId: 'microsoft_graph',
+    operation: 'mail.pullIncremental',
+    writeRequested: false,
+  });
 
   const accessToken = await getAccessToken(token, log);
   const deltaState = (token.deltaState ?? {}) as Record<string, unknown>;

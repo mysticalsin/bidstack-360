@@ -7,10 +7,8 @@
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SAMPLE_CSV = path.resolve(__dirname, '../fixtures/sample-sf-export.csv');
+const SAMPLE_CSV = path.resolve(process.cwd(), 'e2e/fixtures/sample-sf-export.csv');
 
 test.describe('Data migration / import wizard', () => {
   test('import page or settings section is accessible', async ({ page }) => {

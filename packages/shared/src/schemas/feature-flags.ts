@@ -13,5 +13,9 @@ export const FeatureFlags = z.object({
   infosearchEnabled: z.boolean(),
   /** 360Learning Sales Toolkits section. */
   lms360Enabled: z.boolean(),
+  /** SERUM control-plane surfaces. Defaults off until the backend is configured. */
+  serumEnabled: z.boolean(),
+  /** Explicit demo/safe-mode surfaces. Defaults off and must never mimic production activity. */
+  serumDemoModeEnabled: z.boolean(),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlags>;

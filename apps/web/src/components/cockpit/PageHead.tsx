@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import { Icon } from '@/components/ui/Icon';
@@ -86,6 +87,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
       >
         <CompanyLogo
           name={cockpit.company.name}
+          companyId={cockpit.company.id}
           logo={cockpit.company.logo}
           domain={cockpit.company.domain}
           size={52}
@@ -238,6 +240,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
 function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   const { t } = useTranslation('crm');
   const c = cockpit.company;
+  const imageUrl = displayableLogoUrl(c.imageUrl);
   const rows: Array<[string, string]> = [];
   if (c.industry) rows.push([t('pageHead.briefIndustry', 'Industry'), c.industry]);
   if (c.employeeCount)
@@ -249,9 +252,9 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
     rows.push([t('pageHead.briefFounded', 'Founded'), c.incorporationDate.slice(0, 4)]);
   return (
     <div>
-      {c.imageUrl ? (
+      {imageUrl ? (
         <img
-          src={c.imageUrl}
+          src={imageUrl}
           alt=""
           loading="lazy"
           decoding="async"

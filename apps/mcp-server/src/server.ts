@@ -19,6 +19,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { mcpAuth, requireMcpScope, type McpAuthCtx } from './auth.js';
 import { hourlyRateLimitPlugin, mcpRateLimitFailsClosed } from './plugins/hourly-rate-limit.js';
 import { pingRedis, redis } from './redis.js';
+import { assertSerumAllowsMcpToolCall } from './serum-policy.js';
 import { requiredScopeForTool, tools, type ToolName } from './tools/index.js';
 
 type LooseTool = {
@@ -63,6 +64,7 @@ function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
       async (args: unknown) => {
         try {
           requireMcpScope(ctx, requiredScope);
+          await assertSerumAllowsMcpToolCall(ctx, name);
           const out = await (tool as LooseTool).handler(args, ctx);
           return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
         } catch (err) {

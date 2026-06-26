@@ -12,6 +12,19 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { WorkflowActionKind, WorkflowTriggerKind, type WorkflowCreate } from '@bidstack/shared';
 
+// Only triggers/actions the engine actually fires are selectable — creating a
+// workflow with an unwired kind would produce a dead automation. UNWIRED and
+// hidden until implemented: triggers record_updated, webhook_received; actions
+// send_email, send_slack, run_dust_agent.
+const WIRED_TRIGGERS = ['record_created', 'stage_changed', 'schedule', 'manual'] as const;
+const WIRED_ACTIONS = [
+  'create_task',
+  'create_notification',
+  'call_webhook',
+  'assign_owner',
+  'update_field',
+] as const;
+
 const triggerLabel = (t: TFunction, kind: string): string => {
   const labels: Record<string, string> = {
     record_created: t('newWorkflow.triggerRecordCreated', 'When a record is created'),
@@ -113,11 +126,13 @@ export function NewWorkflowDialog({ onClose, onCreate, isPending }: Props) {
               onChange={(e) => setTriggerKind(e.target.value as WorkflowTriggerKind)}
               disabled={isPending}
             >
-              {WorkflowTriggerKind.options.map((kind) => (
-                <option key={kind} value={kind}>
-                  {triggerLabel(t, kind)}
-                </option>
-              ))}
+              {WorkflowTriggerKind.options
+                .filter((kind) => (WIRED_TRIGGERS as readonly string[]).includes(kind))
+                .map((kind) => (
+                  <option key={kind} value={kind}>
+                    {triggerLabel(t, kind)}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -142,11 +157,13 @@ export function NewWorkflowDialog({ onClose, onCreate, isPending }: Props) {
                   onChange={(e) => setAction(i, e.target.value as WorkflowActionKind)}
                   disabled={isPending}
                 >
-                  {WorkflowActionKind.options.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {actionLabel(t, kind)}
-                    </option>
-                  ))}
+                  {WorkflowActionKind.options
+                    .filter((kind) => (WIRED_ACTIONS as readonly string[]).includes(kind))
+                    .map((kind) => (
+                      <option key={kind} value={kind}>
+                        {actionLabel(t, kind)}
+                      </option>
+                    ))}
                 </select>
                 <button
                   type="button"

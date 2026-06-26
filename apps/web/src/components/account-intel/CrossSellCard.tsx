@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { SourceBadge } from '@/components/cockpit/SourceBadge';
 import { useIsAdmin } from '@/lib/auth';
 import { useUsers } from '@/hooks/useUsers';
 import {
@@ -34,6 +35,42 @@ const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
   in_progress: 'done',
   done: 'open',
 };
+
+function dateOnly(value: string | null): string | null {
+  return value ? value.slice(0, 10) : null;
+}
+
+function ActionAuditBadges({ action }: { action: CrossSellAction }) {
+  const { t } = useTranslation('crm');
+  const createdAt = dateOnly(action.createdAt);
+  const updatedAt = dateOnly(action.updatedAt);
+  const unknownDate = t('crossSell.audit.unknownDate', 'unknown date');
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <SourceBadge
+        label={t('crossSell.audit.manualBadge', 'Manual action')}
+        state="crm"
+        hint={t(
+          'crossSell.audit.manualHint',
+          'Manually logged cross-sell action created {{createdAt}}.',
+          { createdAt: createdAt ?? unknownDate },
+        )}
+        data-testid={`cross-sell-${action.id}-manual-source`}
+      />
+      <SourceBadge
+        label={t('crossSell.audit.auditBadge', 'Audit logged')}
+        state="verified"
+        hint={t(
+          'crossSell.audit.auditHint',
+          'Server mutation audit covers create/update/delete events. Last updated {{updatedAt}}.',
+          { updatedAt: updatedAt ?? unknownDate },
+        )}
+        data-testid={`cross-sell-${action.id}-audit-source`}
+      />
+    </div>
+  );
+}
 
 export function CrossSellCard({ accountKey }: { accountKey: string }) {
   const actions = useCrossSellActions({ accountKey });
@@ -85,18 +122,36 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                       {action.assigneeName ? ` · ${action.assigneeName}` : ''}
                       {action.dueDate ? ` · due ${action.dueDate.slice(0, 10)}` : ''}
                     </p>
+                    <ActionAuditBadges action={action} />
                   </div>
                   <button
                     type="button"
                     disabled={!canWrite || patch.isPending}
-                    onClick={() =>
-                      patch.mutate({ id: action.id, body: { status: NEXT_STATUS[action.status] } })
-                    }
-                    className="min-h-[28px] shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
+                    onClick={() => {
+                      const next = NEXT_STATUS[action.status];
+                      patch.mutate(
+                        { id: action.id, body: { status: next } },
+                        {
+                          onSuccess: () =>
+                            toast.success(
+                              t('crossSell.toast.statusAdvanced', 'Status: {{status}}', {
+                                status: statusLabel(next),
+                              }),
+                            ),
+                          onError: (err: Error) =>
+                            toast.error(
+                              t('crossSell.toast.statusError', 'Could not update status'),
+                              { description: err.message },
+                            ),
+                        },
+                      );
+                    }}
+                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
                     aria-label={t('crossSell.advanceStatusLabel', 'Advance status of {{description}}', {
                       description: action.description,
                     })}
                     title={canWrite ? t('crossSell.advanceStatusHint', 'Click to advance status') : undefined}
+                    data-testid={`cross-sell-${action.id}-status`}
                   >
                     <Badge tone={STATUS_TONE[action.status]}>{statusLabel(action.status)}</Badge>
                   </button>
@@ -112,7 +167,9 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
 
 function CreateAction({ accountKey }: { accountKey: string }) {
   const [open, setOpen] = useState(false);
-  const users = useUsers();
+  // Assignee picker: no server-side user search exists, so request the route
+  // maximum (200) instead of the default 100 to avoid dropping assignees.
+  const users = useUsers({ limit: 200 });
   const create = useCreateCrossSellAction();
   const { t } = useTranslation('crm');
   const [form, setForm] = useState({

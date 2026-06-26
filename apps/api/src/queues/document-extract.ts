@@ -28,6 +28,12 @@ export interface DocumentExtractJob {
   prompt?: string;
   /** 'contract' routes to the MSA/rate-card extractor + parks a review draft. */
   extractionKind?: 'intel' | 'contract';
+  /**
+   * BullMQ priority (lower = sooner; omit for top priority). Auto-extract on
+   * upload passes a low priority so a tenant's bulk import can't starve another
+   * tenant's user-initiated "Extract" clicks of queue throughput.
+   */
+  priority?: number;
 }
 
 let queueSingleton: Queue | null = null;
@@ -100,6 +106,7 @@ export async function enqueueDocumentExtract(job: DocumentExtractJob): Promise<s
   try {
     const queued = await getQueue().add('document.extract', job, {
       jobId: [job.orgId, job.documentId, job.bidDocumentId ?? job.extractionId].join('--'),
+      ...(job.priority !== undefined ? { priority: job.priority } : {}),
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, documentId: job.documentId },
@@ -112,5 +119,17 @@ export async function enqueueDocumentExtract(job: DocumentExtractJob): Promise<s
       'Failed to enqueue document extract job',
     );
     return null;
+  }
+}
+
+export async function closeDocumentExtractQueueForTest(): Promise<void> {
+  const queue = queueSingleton;
+  const connection = connectionSingleton;
+  queueSingleton = null;
+  connectionSingleton = null;
+
+  await queue?.close().catch(() => undefined);
+  if (connection) {
+    await connection.quit().catch(() => connection.disconnect());
   }
 }

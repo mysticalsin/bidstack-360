@@ -201,4 +201,58 @@ describe('POST /api/v1/opportunities/:opportunityId/rfp/upload', () => {
       // We assert the orchestration row exists with correct tenant scoping.
     },
   );
+
+  skipIfNoDb('409 duplicate rfpRequestId rolls back document records', async () => {
+    const opp = await createOpportunity('upload-duplicate-rfp');
+    const firstFile = await createFile();
+    const secondFile = await createFile();
+    const rfpRequestId = randomUUID();
+
+    const firstRes = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+      payload: { fileAttachmentId: firstFile.id, rfpRequestId },
+    });
+
+    expect(firstRes.statusCode).toBe(202);
+    const firstBody = firstRes.json<{ orchestrationId: string }>();
+    ctx.cleanup.rfpOrchestrations.push(firstBody.orchestrationId);
+
+    const firstBidDoc = await prisma.bidDocument.findFirst({
+      where: { orgId: ctx.orgId!, opportunityId: opp.id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    expect(firstBidDoc).not.toBeNull();
+    ctx.cleanup.bidDocuments.push(firstBidDoc!.id);
+
+    const firstDocVersion = await prisma.documentVersion.findFirst({
+      where: { orgId: ctx.orgId!, bidDocumentId: firstBidDoc!.id },
+      select: { id: true },
+    });
+    expect(firstDocVersion).not.toBeNull();
+    ctx.cleanup.documentVersions.push(firstDocVersion!.id);
+
+    const docsBeforeDuplicate = await prisma.bidDocument.count({
+      where: { orgId: ctx.orgId!, opportunityId: opp.id },
+    });
+
+    const duplicateRes = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+      payload: { fileAttachmentId: secondFile.id, rfpRequestId },
+    });
+
+    expect(duplicateRes.statusCode).toBe(409);
+
+    const docsAfterDuplicate = await prisma.bidDocument.count({
+      where: { orgId: ctx.orgId!, opportunityId: opp.id },
+    });
+    expect(docsAfterDuplicate).toBe(docsBeforeDuplicate);
+
+    const leakedDocVersion = await prisma.documentVersion.findFirst({
+      where: { orgId: ctx.orgId!, fileAttachmentId: secondFile.id },
+    });
+    expect(leakedDocVersion).toBeNull();
+  });
 });

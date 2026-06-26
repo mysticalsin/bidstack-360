@@ -2,18 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type pino from 'pino';
 
 vi.mock('../lib/dust-credentials.js', () => ({
-  resolveOrgDustCredentials: vi.fn(),
+  getOrgDust: vi.fn(),
   resolveAgentId: vi.fn((_creds, _purpose, fallback) => fallback ?? null),
 }));
 vi.mock('../lib/llm-provider.js', () => ({ resolveLlmFromEnv: vi.fn() }));
 vi.mock('../lib/rfp-llm.js', () => ({ runRfpCompletion: vi.fn() }));
 
 import { createDustExecutor } from './dust-executor.js';
-import { resolveOrgDustCredentials } from '../lib/dust-credentials.js';
+import { getOrgDust } from '../lib/dust-credentials.js';
 import { resolveLlmFromEnv } from '../lib/llm-provider.js';
 import { runRfpCompletion } from '../lib/rfp-llm.js';
 
-const mockCredentials = vi.mocked(resolveOrgDustCredentials);
+const mockGetOrgDust = vi.mocked(getOrgDust);
 const mockResolveLlm = vi.mocked(resolveLlmFromEnv);
 const mockRunRfpCompletion = vi.mocked(runRfpCompletion);
 const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
@@ -38,7 +38,7 @@ const taskInput = {
 describe('createDustExecutor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCredentials.mockResolvedValue(null);
+    mockGetOrgDust.mockResolvedValue({ client: null, creds: null });
     mockResolveLlm.mockReturnValue(null);
   });
 

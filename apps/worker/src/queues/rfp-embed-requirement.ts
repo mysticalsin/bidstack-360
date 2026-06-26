@@ -15,6 +15,10 @@ import type pino from 'pino';
 import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumRetrievalRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 import { createHash } from 'node:crypto';
 
 import { RFP_EMBED_REQUIREMENT } from '@bidstack/shared';
@@ -39,10 +43,33 @@ interface CohereEmbedResponse {
   embeddings: number[][];
 }
 
-async function cohereEmbed(text: string, log: pino.Logger): Promise<number[] | null> {
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
+
+async function cohereEmbed(orgId: string, text: string, log: pino.Logger): Promise<number[] | null> {
   const apiKey = process.env.COHERE_API_KEY;
   if (!apiKey) {
     log.warn('COHERE_API_KEY not set — requirement embedding skipped');
+    return null;
+  }
+
+  const decision = await checkSerumRetrievalRuntimePolicy({
+    orgId,
+    environment: defaultSerumConfigEnvironment(),
+    configKey: SERUM_RUNTIME_CONFIG_KEYS.retrieval,
+    operation: 'retrieval.embedRequirement',
+    requestedChunks: 1,
+    sourceBacked: true,
+    expectedConfidence: 1,
+  });
+  if (!decision.allowed) {
+    log.warn(
+      { orgId, status: decision.status, reason: decision.reason },
+      'SERUM retrieval policy denied requirement embedding',
+    );
     return null;
   }
 
@@ -115,7 +142,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     return;
   }
 
-  const vector = await cohereEmbed(contentText, log);
+  const vector = await cohereEmbed(orgId, contentText, log);
   if (!vector) {
     log.warn({ requirementId }, 'rfp-embed-requirement: no vector returned, skipping upsert');
     return;

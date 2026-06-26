@@ -8,9 +8,21 @@
 // PostgreSQL and is double-quoted throughout.
 
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumRetrievalRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 const COHERE_MODEL = 'embed-multilingual-v3.0';
 const EMBED_DIM = 1024;
+
+// Upper bound on chunks we request from the SERUM retrieval policy for a
+// semantic search. Matches the policy's own default maxChunks (8) so a caller
+// asking for a larger `limit` (the tool allows up to 25) still runs in semantic
+// mode — clamped to this cap — instead of tripping the policy's chunk-count
+// guard and silently degrading to keyword search. When the requested limit
+// exceeds this cap, the result is flagged via `cappedToPolicyMax`.
+const SEMANTIC_RETRIEVAL_CHUNK_CAP = 8;
 
 export interface RankedReference {
   id: string;
@@ -27,6 +39,11 @@ export interface RankedReference {
 export interface ReferenceSearchResult {
   mode: 'semantic' | 'keyword';
   references: RankedReference[];
+  // True when the caller's `limit` exceeded the semantic retrieval chunk cap, so
+  // the semantic search still ran but was capped at SEMANTIC_RETRIEVAL_CHUNK_CAP
+  // chunks. Distinguishes a deliberate cap (still semantic) from a keyword
+  // fallback (mode === 'keyword'). Absent/false when no capping occurred.
+  cappedToPolicyMax?: boolean;
 }
 
 export interface ReferenceSearchOpts {
@@ -36,13 +53,34 @@ export interface ReferenceSearchOpts {
 }
 
 /**
- * Embed a query with Cohere. Returns null when COHERE_API_KEY is unset (caller
- * falls back to keyword search) or on any transport/shape error.
+ * Embed a query with Cohere. Returns null — and the caller falls back to keyword
+ * search — in three cases:
+ *  1. COHERE_API_KEY is unset (no embedding provider configured);
+ *  2. the SERUM retrieval policy denies the operation (governed, intentional —
+ *     e.g. policy disabled, ungrounded, or below the confidence threshold). Note
+ *     the caller clamps `requestedChunks` to SEMANTIC_RETRIEVAL_CHUNK_CAP first,
+ *     so a chunk-count over-request is capped rather than denied here;
+ *  3. any Cohere transport error or unexpected response shape.
  */
-export async function embedQuery(text: string): Promise<number[] | null> {
+export async function embedQuery(
+  orgId: string,
+  text: string,
+  requestedChunks: number,
+): Promise<number[] | null> {
   const apiKey = process.env.COHERE_API_KEY;
   if (!apiKey) return null;
   try {
+    const decision = await checkSerumRetrievalRuntimePolicy({
+      orgId,
+      environment: defaultSerumConfigEnvironment(),
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.retrieval,
+      operation: 'retrieval.referenceSearch',
+      requestedChunks,
+      sourceBacked: true,
+      expectedConfidence: 1,
+    });
+    if (!decision.allowed) return null;
+
     const res = await fetch('https://api.cohere.ai/v1/embed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -59,6 +97,12 @@ export async function embedQuery(text: string): Promise<number[] | null> {
   } catch {
     return null;
   }
+}
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
 }
 
 interface RefRow {
@@ -84,12 +128,23 @@ export async function searchReferences(
   opts: ReferenceSearchOpts = {},
 ): Promise<ReferenceSearchResult> {
   const limit = Math.min(Math.max(opts.limit ?? 8, 1), 25);
-  const vector = await embedQuery(query);
+  // Clamp the chunk count we ask the SERUM policy for: requesting more than the
+  // policy cap is denied outright, which would silently drop us to keyword
+  // search. Clamping keeps semantic mode alive (returning up to the cap) and we
+  // surface the cap on the result so callers can tell this apart from a denial.
+  const requestedChunks = Math.min(limit, SEMANTIC_RETRIEVAL_CHUNK_CAP);
+  const cappedToPolicyMax = limit > SEMANTIC_RETRIEVAL_CHUNK_CAP;
+  const vector = await embedQuery(orgId, query, requestedChunks);
+
+  // In semantic mode the policy only permits `requestedChunks` grounded chunks,
+  // so honour that as the result count too; keyword search is not chunk-governed
+  // and uses the full requested `limit`.
+  const effectiveLimit = vector ? requestedChunks : limit;
 
   let rows: RefRow[];
   if (vector) {
     const pgVec = `[${vector.join(',')}]`;
-    const candidateLimit = Math.min(limit * 4, 50);
+    const candidateLimit = Math.min(effectiveLimit * 4, 50);
     rows = await prisma.$queryRaw<RefRow[]>`
       SELECT
         r.id::text,
@@ -139,10 +194,13 @@ export async function searchReferences(
     const want = new Set(opts.tags.map((t) => t.toLowerCase()));
     results = results.filter((r) => r.tags.some((t) => want.has(t.toLowerCase())));
   }
-  results = results.slice(0, limit);
+  results = results.slice(0, effectiveLimit);
 
   return {
     mode: vector ? 'semantic' : 'keyword',
+    // Only meaningful when semantic mode actually ran; a keyword fallback was
+    // not capped, it was denied/unconfigured.
+    ...(vector && cappedToPolicyMax ? { cappedToPolicyMax: true } : {}),
     references: results.map((r) => ({
       id: r.id,
       title: r.title,

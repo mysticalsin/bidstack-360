@@ -20,6 +20,11 @@ import type { AiInsight, CrmDashboardSnapshot } from '@bidstack/shared';
 
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
+  accountOpportunityScopePredicate,
+  applyOpportunityScope,
+  type AccessScope,
+} from '../../lib/access-scope.js';
+import {
   buildCompanies,
   fallbackCompany,
   findSelectedCompany,
@@ -61,7 +66,16 @@ export async function buildDashboardSnapshot(
   accountId: string | undefined,
   prisma: PrismaClient,
   _logger: LoggerLike,
+  scope?: AccessScope,
 ): Promise<z.infer<typeof CrmDashboardSnapshot>> {
+  const opportunityWhere = scope
+    ? applyOpportunityScope({ orgId, deletedAt: null }, scope)
+    : { orgId, deletedAt: null };
+  const taskOpportunityPredicate = scope ? accountOpportunityScopePredicate(scope) : null;
+  const taskWhere = taskOpportunityPredicate
+    ? { orgId, deletedAt: null, opportunity: taskOpportunityPredicate }
+    : { orgId, deletedAt: null };
+
   const [
     opportunities,
     contacts,
@@ -75,9 +89,10 @@ export async function buildDashboardSnapshot(
     providerRows,
     queueRows,
     releaseScoreRow,
+    companyRows,
   ] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { orgId, deletedAt: null },
+      where: opportunityWhere,
       select: {
         id: true,
         code: true,
@@ -124,7 +139,7 @@ export async function buildDashboardSnapshot(
       take: 200,
     }),
     prisma.task.findMany({
-      where: { orgId, deletedAt: null },
+      where: taskWhere,
       select: {
         id: true,
         title: true,
@@ -278,13 +293,37 @@ export async function buildDashboardSnapshot(
       },
       orderBy: { scoredAt: 'desc' },
     }),
+    // Authoritative Company rows — domain/logo/id override the opp/enrichment-
+    // derived companies so manual edits win and the cockpit resolves by real id.
+    prisma.company.findMany({
+      where: { orgId, deletedAt: null },
+      select: { id: true, name: true, domain: true, logoUrl: true },
+      take: 500,
+    }),
   ]);
 
-  const companies = buildCompanies(opportunities, enrichments);
+  const visibleCompanyKeys =
+    scope && !scope.unrestricted
+      ? new Set(opportunities.map((opportunity) => normalizeName(opportunity.customer)))
+      : null;
+  const visibleOpportunityIds =
+    scope && !scope.unrestricted
+      ? new Set(opportunities.map((opportunity) => opportunity.id))
+      : null;
+  const companies = buildCompanies(opportunities, enrichments, companyRows).filter(
+    (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
+  );
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
-  const insights = persistedInsights.length
-    ? persistedInsights.map((insight) => ({
+  const visibleInsights = visibleCompanyKeys
+    ? persistedInsights.filter(
+        (insight) =>
+          (insight.companyName && visibleCompanyKeys.has(normalizeName(insight.companyName))) ||
+          (insight.opportunityId && visibleOpportunityIds?.has(insight.opportunityId)),
+      )
+    : persistedInsights;
+  const insights = visibleInsights.length
+    ? visibleInsights.map((insight) => ({
         id: insight.id,
         kind: insight.kind as z.infer<typeof AiInsight>['kind'],
         title: insight.title,
@@ -312,7 +351,7 @@ export async function buildDashboardSnapshot(
     }),
     // Account-scoped aggregate — the org-wide `opportunities` array above is
     // a 100-row sample and must NOT back the selected account's win/loss.
-    fetchAccountPerformance(orgId, selectedCompany.name, prisma),
+    fetchAccountPerformance(orgId, selectedCompany.name, prisma, scope),
   ]);
 
   return {

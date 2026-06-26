@@ -6,10 +6,32 @@
  * targets on this device affect a significant portion of mobile users.
  * Screenshots captured here form the visual-regression baseline.
  */
-import { test, expect, devices } from '@playwright/test';
-import { cleanupMeetingImportContacts } from '../fixtures/test-data-cleanup.js';
+import { test, expect, devices, type Page } from '@playwright/test';
+import { cleanupVisualRegressionArtifacts } from '../fixtures/test-data-cleanup.js';
 
 const IPHONE_SE = devices['iPhone SE'];
+
+const STABLE_DYNAMIC_TEXT_CSS = `
+  [data-testid="opportunity-updated-at"] {
+    color: transparent !important;
+    display: inline-block !important;
+    font-size: 0 !important;
+    line-height: 1rem !important;
+    overflow: hidden !important;
+    vertical-align: baseline !important;
+    width: 4.75rem !important;
+  }
+
+  [data-testid="opportunity-updated-at"]::after {
+    color: var(--fg-tertiary) !important;
+    content: "recently";
+    font-size: 0.75rem !important;
+  }
+`;
+
+async function stabilizeDynamicScreenshotText(page: Page) {
+  await page.addStyleTag({ content: STABLE_DYNAMIC_TEXT_CSS });
+}
 
 const KEY_ROUTES = [
   { name: 'dashboard', path: '/dashboard' },
@@ -48,11 +70,15 @@ for (const route of KEY_ROUTES) {
   });
 
   test(`${route.name}: screenshot baseline (iPhone SE)`, async ({ page, request }) => {
+    // WHY: Scope cleanup to the contacts route only. cleanupVisualRegressionArtifacts
+    // deletes opportunities matching the broad 'E2E Pipeline QA' prefix, which would
+    // race flows/pipeline.spec.ts live fixtures if run on every route.
     if (route.name === 'contacts') {
-      await cleanupMeetingImportContacts(request);
+      await cleanupVisualRegressionArtifacts(request);
     }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+    await stabilizeDynamicScreenshotText(page);
     await page.waitForTimeout(500); // Let animations settle
 
     // Capture baseline; compare on subsequent runs with --update-snapshots to refresh.

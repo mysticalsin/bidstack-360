@@ -1,18 +1,23 @@
 // FilesPanel — drag-drop upload zone + attachment list for a customer account.
 // Used inside the cockpit aside on the dashboard.
 
-import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { downloadFileUrl, useDeleteFile, useFiles, useUploadFile } from '@/hooks/useFiles';
+import { useDeleteFile, useFiles, useUploadFile } from '@/hooks/useFiles';
+import { downloadFromApi } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
 import {
+  classifyDocument,
+  DOCUMENT_CATEGORIES,
+  DOCUMENT_CATEGORY_LABELS,
   FILE_INPUT_ACCEPT,
   inferAllowedFileContentType,
+  type DocumentCategory,
   type FileAttachment,
 } from '@bidstack/shared';
 
@@ -29,6 +34,23 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
   const [dragActive, setDragActive] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<FileAttachment | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Organize the flat file list into library categories (MSA, rate card,
+  // win/loss, …) computed from the filename — no schema column needed.
+  const grouped = useMemo(() => {
+    const items = list.data?.items ?? [];
+    const byCategory = new Map<DocumentCategory, FileAttachment[]>();
+    for (const file of items) {
+      const category = classifyDocument(file.name, file.contentType);
+      const bucket = byCategory.get(category) ?? [];
+      bucket.push(file);
+      byCategory.set(category, bucket);
+    }
+    return DOCUMENT_CATEGORIES.filter((c) => byCategory.has(c)).map((category) => ({
+      category,
+      files: byCategory.get(category) ?? [],
+    }));
+  }, [list.data]);
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -73,10 +95,10 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
         title={t('files.heading', 'Files')}
         caption={
           list.data
-            ? t('files.attachmentCount', '{{count}} attachment(s)', {
+            ? t('files.attachmentCountScoped', '{{count}} attachment(s) - access follows account groups', {
                 count: list.data.items.length,
               })
-            : undefined
+            : t('files.accessScoped', 'Access follows account groups')
         }
         action={
           <Button
@@ -88,6 +110,16 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
             {upload.isPending ? t('files.uploading', 'Uploading…') : t('files.upload', 'Upload')}
           </Button>
         }
+      />
+
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={FILE_INPUT_ACCEPT}
+        onChange={onChange}
+        className="sr-only"
+        aria-label={t('files.inputLabel', 'Choose files to upload')}
       />
 
       <div
@@ -117,14 +149,6 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
         <p className="mt-0.5 text-[11px] text-[var(--fg-tertiary)]">
           {t('files.acceptedFormats', 'PDF, DOCX, XLSX, images — up to 50 MB')}
         </p>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={FILE_INPUT_ACCEPT}
-          onChange={onChange}
-          className="sr-only"
-        />
       </div>
 
       {uploadError ? (
@@ -149,11 +173,23 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
           message={t('files.emptyMessage', 'Upload to attach documents to this account.')}
         />
       ) : (
-        <ul className="divide-y divide-[var(--border-subtle)]">
-          {list.data?.items.map((file) => (
-            <FileRow key={file.id} file={file} onDelete={() => setPendingDelete(file)} />
+        <div className="divide-y divide-[var(--border-subtle)]">
+          {grouped.map(({ category, files }) => (
+            <section key={category}>
+              <div className="flex items-center justify-between px-5 pb-1 pt-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
+                  {t(`documentCategory.${category}`, DOCUMENT_CATEGORY_LABELS[category])}
+                </h3>
+                <span className="text-[11px] text-[var(--fg-tertiary)]">{files.length}</span>
+              </div>
+              <ul>
+                {files.map((file) => (
+                  <FileRow key={file.id} file={file} onDelete={() => setPendingDelete(file)} />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
       <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
@@ -194,9 +230,15 @@ function FileRow({ file, onDelete }: { file: FileAttachment; onDelete: () => voi
   return (
     <li className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-sunken)] transition-colors">
       <FileGlyph contentType={file.contentType} />
-      <a
-        href={downloadFileUrl(file.id)}
-        className="min-w-0 flex-1 group"
+      <button
+        type="button"
+        // Authed blob download: a native <a href> can't send the Bearer token, so
+        // it 401'd under production (Clerk) auth. downloadFromApi fetches with the
+        // token then saves the blob.
+        onClick={() => {
+          void downloadFromApi(`/api/files/${file.id}/download`, file.name);
+        }}
+        className="min-w-0 flex-1 group text-left"
         title={t('files.downloadTitle', 'Download {{name}}', { name: file.name })}
       >
         <div className="truncate text-sm font-medium text-[var(--fg-primary)] group-hover:underline">
@@ -206,7 +248,7 @@ function FileRow({ file, onDelete }: { file: FileAttachment; onDelete: () => voi
           {humanizeBytes(file.bytes)} · {file.uploadedByEmail ?? t('files.unknownUploader', 'unknown')} ·{' '}
           {relativeTime(file.createdAt)}
         </div>
-      </a>
+      </button>
       <button
         type="button"
         aria-label={t('files.deleteAria', 'Delete {{name}}', { name: file.name })}

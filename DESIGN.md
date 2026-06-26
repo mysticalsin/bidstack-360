@@ -160,6 +160,24 @@ Source of truth: `apps/web/src/index.css`. All UI must use CSS variables. No hex
 
 **Reduced Motion:** All transitions collapse to `0.01ms` when `prefers-reduced-motion: reduce` is active. No exceptions.
 
+### 1.7 SERUM Glass
+
+SERUM screens use the existing BidStack system with a restrained control-plane layer, not a separate theme.
+
+| Token                      | Usage                                        |
+| -------------------------- | -------------------------------------------- |
+| `--serum-glass-bg`         | Translucent control-plane panels             |
+| `--serum-glass-border`     | Quiet glass panel border                     |
+| `--serum-glow`             | Rare elevated status glow                    |
+| `--serum-accent-cyan`      | Live/system signals                          |
+| `--serum-accent-violet`    | Model/router signals                         |
+| `--serum-accent-blue`      | Primary SERUM action and focus accents       |
+| `--serum-success-soft`     | Source-backed ready/success state background |
+| `--serum-warning-soft`     | Attention state background                   |
+| `--serum-danger-soft`      | Disabled/error state background              |
+
+SERUM motion is calm: short fades, small y/scale movement, no decorative blobs, no fake live pulses unless a real source timestamp exists. Disabled and not-configured states are first-class states, not empty polish gaps.
+
 ---
 
 ## 2. Components

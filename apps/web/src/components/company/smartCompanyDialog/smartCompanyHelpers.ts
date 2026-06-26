@@ -1,7 +1,7 @@
 /**
  * smartCompanyDialog/smartCompanyHelpers.ts — pure helpers for SmartCompanyDialog.
  *
- * WHY separate: 7 stateless functions account for 60 lines in the dialog file.
+ * WHY separate: stateless helpers account for 60+ lines in the dialog file.
  * Moving them here keeps the component under the 400-line cap and makes each
  * function independently testable without a React context.
  */
@@ -52,10 +52,6 @@ export function slugFor(name: string): string {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'company'
   );
-}
-
-export function faviconUrl(domain: string, size: number): string {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
 }
 
 export function logoSourceLabel(source: NonNullable<CrmCompany['logo']>['source']): string {

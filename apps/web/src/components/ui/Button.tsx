@@ -75,6 +75,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={disabled}
         onClick={handleClick}
+        data-ui-sound-handled="true"
         // Spring on tap mirrors UIButton's tactile feel on iOS. Disable when
         // the user has reduced-motion on or the button is disabled.
         whileTap={reduced || disabled ? undefined : { scale: PRESS_SCALE[size] }}

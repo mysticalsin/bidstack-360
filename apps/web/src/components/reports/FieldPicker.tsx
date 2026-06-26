@@ -2,7 +2,7 @@
 // Field metadata is fetched from /api/entities/:type/fields.
 // Falls back to a hard-coded schema when the endpoint is unavailable.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Search } from 'lucide-react';
@@ -68,11 +68,17 @@ interface Props {
   entity: ReportEntityType;
   value: string;
   onChange: (field: string, fieldDef: FieldDef) => void;
+  // WHY onResolve: on the edit path a saved condition arrives with `value` set
+  // but the parent has no FieldDef yet, so it can't render the correct
+  // operators/value-input. This fires once the field metadata resolves for the
+  // current `value`, letting the parent hydrate the field TYPE without the user
+  // re-selecting the field.
+  onResolve?: (fieldDef: FieldDef) => void;
   placeholder?: string;
   className?: string;
 }
 
-export function FieldPicker({ entity, value, onChange, placeholder, className }: Props) {
+export function FieldPicker({ entity, value, onChange, onResolve, placeholder, className }: Props) {
   const { t } = useTranslation('reports');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -102,6 +108,12 @@ export function FieldPicker({ entity, value, onChange, placeholder, className }:
   );
 
   const selectedField = fields.find((f) => f.key === value);
+
+  // Notify the parent of the resolved FieldDef for the current `value` so the
+  // edit path can hydrate the field type before the user interacts (see Props).
+  useEffect(() => {
+    if (selectedField) onResolve?.(selectedField);
+  }, [selectedField, onResolve]);
 
   return (
     <div className={cn('relative', className)}>

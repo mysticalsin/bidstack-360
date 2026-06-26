@@ -22,12 +22,19 @@ export const QuickStartPage = lazy(() =>
 export const SearchPage = lazy(() =>
   import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage })),
 );
+export const SerumMissionControlPage = lazy(() =>
+  import('@/pages/SerumMissionControlPage').then((m) => ({ default: m.SerumMissionControlPage })),
+);
 
 // ─── CRM ──────────────────────────────────────────────────────────────────────
 
 export const AccountsPage = lazy(() =>
   import('@/pages/AccountsPage').then((m) => ({ default: m.AccountsPage })),
 );
+// KAM cockpit (default export)
+export const KamAccountPage = lazy(() => import('@/pages/kam/KamAccountPage'));
+// Collaborate (AppFlowy embed, default export)
+export const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'));
 export const CompaniesPage = lazy(() =>
   import('@/pages/CompaniesPage').then((m) => ({ default: m.CompaniesPage })),
 );

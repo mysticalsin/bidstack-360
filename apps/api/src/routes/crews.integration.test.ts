@@ -1,21 +1,34 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 
-const { enqueueCrewRunMock, cancelQueuedCrewRunMock } = vi.hoisted(() => ({
+const {
+  enqueueCrewRunMock,
+  cancelQueuedCrewRunMock,
+  checkSerumAgentRuntimePolicyMock,
+  checkSerumLoopRuntimePolicyMock,
+} = vi.hoisted(() => ({
   enqueueCrewRunMock: vi.fn(
     async (job: { runId: string }): Promise<string | null> => `crew-run-${job.runId}`,
   ),
   cancelQueuedCrewRunMock: vi.fn(async (): Promise<boolean> => true),
+  checkSerumAgentRuntimePolicyMock: vi.fn(),
+  checkSerumLoopRuntimePolicyMock: vi.fn(),
 }));
 
 vi.mock('../queues/crew-run.js', () => ({
   enqueueCrewRun: enqueueCrewRunMock,
   cancelQueuedCrewRun: cancelQueuedCrewRunMock,
+}));
+
+vi.mock('@bidstack/db/serum-runtime-policy', () => ({
+  SERUM_RUNTIME_CONFIG_KEYS: { agents: 'registry', loops: 'orchestration' },
+  checkSerumAgentRuntimePolicy: checkSerumAgentRuntimePolicyMock,
+  checkSerumLoopRuntimePolicy: checkSerumLoopRuntimePolicyMock,
 }));
 
 let server: Awaited<ReturnType<typeof buildServer>>;
@@ -26,6 +39,24 @@ let userId: string | null = null;
 const createdCrewIds: string[] = [];
 const createdRunIds: string[] = [];
 const createdOrgIds: string[] = [];
+const createdAgentKeys: string[] = [];
+
+beforeEach(() => {
+  checkSerumAgentRuntimePolicyMock.mockReset();
+  checkSerumAgentRuntimePolicyMock.mockResolvedValue({
+    allowed: true,
+    status: 'allowed',
+    reason: 'allowed by test policy',
+    activeConfigVersionId: randomUUID(),
+  });
+  checkSerumLoopRuntimePolicyMock.mockReset();
+  checkSerumLoopRuntimePolicyMock.mockResolvedValue({
+    allowed: true,
+    status: 'allowed',
+    reason: 'loop allowed by test policy',
+    activeConfigVersionId: randomUUID(),
+  });
+});
 
 beforeAll(async () => {
   try {
@@ -68,6 +99,11 @@ afterAll(async () => {
         DELETE FROM crews WHERE id = ANY(${createdCrewIds}::uuid[])
       `;
     }
+    if (createdAgentKeys.length > 0 && orgId) {
+      await prisma.crewAgent.deleteMany({
+        where: { orgId, agentKey: { in: createdAgentKeys } },
+      });
+    }
     if (createdOrgIds.length > 0) {
       await prisma.org.deleteMany({ where: { id: { in: createdOrgIds } } });
     }
@@ -98,6 +134,35 @@ async function createCrew(targetOrgId = orgId!, targetUserId: string | null = us
   return id;
 }
 
+async function createCrewWithAgent(agentKey = `agent-${randomUUID()}`) {
+  createdAgentKeys.push(agentKey);
+  await prisma.crewAgent.create({
+    data: {
+      orgId: orgId!,
+      agentKey,
+      role: 'Route Test Agent',
+      goal: 'Prove SERUM runtime policy gates crew execution',
+      backstory: 'Created by crew route regression tests.',
+      tools: [],
+      createdByUserId: userId!,
+    },
+  });
+  const crewId = await createCrew();
+  await prisma.crewTask.create({
+    data: {
+      orgId: orgId!,
+      crewId,
+      taskKey: `task-${randomUUID()}`,
+      description: 'Review the supplied RFP.',
+      expectedOutput: 'A short review.',
+      agentKey,
+      contextKeys: [],
+      sortOrder: 0,
+    },
+  });
+  return { crewId, agentKey };
+}
+
 async function createRun(
   crewId: string,
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'partial',
@@ -122,6 +187,108 @@ async function createRun(
 }
 
 describe('crew run controls', () => {
+  skipIfNoDb('blocks starting a crew run when SERUM denies the loop policy', async () => {
+    enqueueCrewRunMock.mockClear();
+    checkSerumLoopRuntimePolicyMock.mockResolvedValueOnce({
+      allowed: false,
+      status: 'disabled',
+      reason: 'SERUM Loops policy is published but disabled.',
+      activeConfigVersionId: randomUUID(),
+    });
+    const { crewId } = await createCrewWithAgent();
+
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/v1/crews/${crewId}/run`,
+      payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ message: string }>().message).toContain('SERUM runtime denied loop');
+    expect(enqueueCrewRunMock).not.toHaveBeenCalled();
+    expect(checkSerumAgentRuntimePolicyMock).not.toHaveBeenCalled();
+    expect(checkSerumLoopRuntimePolicyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId,
+        configKey: 'orchestration',
+        loopId: crewId,
+        operation: 'crew.run',
+        hasDurableEvent: true,
+        approvalGateReached: false,
+      }),
+    );
+  });
+
+  skipIfNoDb('blocks starting a crew run when SERUM denies a referenced agent', async () => {
+    enqueueCrewRunMock.mockClear();
+    checkSerumAgentRuntimePolicyMock.mockResolvedValueOnce({
+      allowed: false,
+      status: 'not_configured',
+      reason: 'No active SERUM Agents policy is published.',
+      activeConfigVersionId: null,
+    });
+    const { crewId, agentKey } = await createCrewWithAgent();
+
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/v1/crews/${crewId}/run`,
+      payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ message: string }>().message).toContain(`SERUM runtime denied agent "${agentKey}"`);
+    expect(enqueueCrewRunMock).not.toHaveBeenCalled();
+    expect(checkSerumAgentRuntimePolicyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId,
+        configKey: 'registry',
+        agentId: agentKey,
+        approvalConfirmed: true,
+      }),
+    );
+  });
+
+  skipIfNoDb('requires explicit approval before queueing a SERUM-governed crew run', async () => {
+    enqueueCrewRunMock.mockClear();
+    const { crewId, agentKey } = await createCrewWithAgent();
+    checkSerumAgentRuntimePolicyMock.mockImplementation(async (args: { approvalConfirmed: boolean }) => ({
+      allowed: args.approvalConfirmed,
+      status: args.approvalConfirmed ? 'allowed' : 'denied',
+      reason: args.approvalConfirmed
+        ? 'Agent run is allowed by the active SERUM policy.'
+        : 'Human approval confirmation is required before an agent run can start.',
+      activeConfigVersionId: randomUUID(),
+    }));
+
+    const blocked = await server.inject({
+      method: 'POST',
+      url: `/api/v1/crews/${crewId}/run`,
+      payload: { inputs: { rfp: 'RFP text' } },
+    });
+    expect(blocked.statusCode).toBe(409);
+    expect(enqueueCrewRunMock).not.toHaveBeenCalled();
+
+    const allowed = await server.inject({
+      method: 'POST',
+      url: `/api/v1/crews/${crewId}/run`,
+      payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
+    });
+    expect(allowed.statusCode).toBe(202);
+    const body = allowed.json<{ runId: string }>();
+    createdRunIds.push(body.runId);
+    expect(enqueueCrewRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        crewId,
+        runId: body.runId,
+        inputs: { rfp: 'RFP text' },
+        approvalConfirmed: true,
+      }),
+    );
+    expect(checkSerumAgentRuntimePolicyMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ agentId: agentKey, approvalConfirmed: true }),
+    );
+  });
+
   skipIfNoDb('cancels a queued crew run and removes the queued job', async () => {
     const crewId = await createCrew();
     const runId = await createRun(crewId, 'queued');

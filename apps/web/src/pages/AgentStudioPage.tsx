@@ -422,13 +422,14 @@ function CrewsSection({
 function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
   const { t } = useTranslation('crm');
   const [rfp, setRfp] = useState('');
+  const [approvalConfirmed, setApprovalConfirmed] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
 
   const start = useMutation({
     mutationFn: () =>
       api<{ runId: string }>(`/api/v1/crews/${crewId}/run`, {
         method: 'POST',
-        body: { inputs: { rfp } },
+        body: { inputs: { rfp }, approvalConfirmed },
       }),
     onSuccess: (data) => setRunId(data.runId),
     onError: () => toast.error(t('agentStudio.toastRunStartError', 'Could not start the run')),
@@ -439,6 +440,12 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
     queryFn: ({ signal }) => api(`/api/v1/crew-runs/${runId}`, { signal }),
     enabled: Boolean(runId),
     refetchInterval: (q) => (RUNNING.has(q.state.data?.status ?? '') ? 1500 : false),
+  });
+
+  const cancel = useMutation({
+    mutationFn: () => api(`/api/v1/crew-runs/${runId}/cancel`, { method: 'POST' }),
+    onSuccess: () => void run.refetch(),
+    onError: () => toast.error(t('agentStudio.toastCancelError', 'Could not cancel the run')),
   });
 
   const roleByKey = new Map(agents.map((a) => [a.agentKey, a.role]));
@@ -454,11 +461,26 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
         disabled={start.isPending || Boolean(runId)}
       />
       {!runId && (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex min-h-11 items-start gap-3 text-xs text-[var(--fg-secondary)]">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-[var(--border-strong)] accent-[var(--accent)]"
+              checked={approvalConfirmed}
+              onChange={(e) => setApprovalConfirmed(e.target.checked)}
+              disabled={start.isPending}
+            />
+            <span>
+              {t(
+                'agentStudio.approvalConfirmed',
+                'I reviewed this run and approve the listed agents to process this input.',
+              )}
+            </span>
+          </label>
           <Button
             size="sm"
             onClick={() => start.mutate()}
-            disabled={!rfp.trim() || start.isPending}
+            disabled={!rfp.trim() || !approvalConfirmed || start.isPending}
           >
             {start.isPending
               ? t('agentStudio.starting', 'Starting…')
@@ -488,6 +510,18 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
               {t('agentStudio.statusLabel', 'Status:')}{' '}
               <span className="font-medium">{run.data?.status ?? 'queued'}</span>
             </div>
+            {run.data && RUNNING.has(run.data.status) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => cancel.mutate()}
+                disabled={cancel.isPending}
+              >
+                {cancel.isPending
+                  ? t('agentStudio.cancelling', 'Cancelling…')
+                  : t('agentStudio.cancelRun', 'Cancel run')}
+              </Button>
+            )}
             {(run.isError || (run.data && !RUNNING.has(run.data.status))) && (
               <Button
                 variant="secondary"

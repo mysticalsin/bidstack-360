@@ -16,6 +16,7 @@ import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
@@ -29,10 +30,19 @@ export function CompaniesPage() {
   const [showNew, setShowNew] = useState(false);
 
   const searchParam = params.get('search') ?? undefined;
-  const pager = useCursorPagination(searchParam ?? '');
+  // Debounce the value that feeds the query key so a server fetch fires once the
+  // user pauses typing — not on every keystroke (a per-keystroke request storm at
+  // 100k-company scale). The raw URL param still drives the input for responsive
+  // typing. Same pattern Round 1 used for KeyAccountsPage.
+  const debouncedSearch = useDebouncedValue(searchParam, 250);
+  const pager = useCursorPagination(debouncedSearch ?? '');
   const filter = useMemo(
-    () => ({ search: searchParam, limit: 50, ...(pager.cursor ? { cursor: pager.cursor } : {}) }),
-    [searchParam, pager.cursor],
+    () => ({
+      search: debouncedSearch,
+      limit: 50,
+      ...(pager.cursor ? { cursor: pager.cursor } : {}),
+    }),
+    [debouncedSearch, pager.cursor],
   );
 
   const companies = useCompanies(filter);
@@ -72,6 +82,9 @@ export function CompaniesPage() {
   // ReadonlyArray -> mutable for the bulk-selection/consumers; identity stable.
   const items = sorted as CompanyItem[];
   const bulk = useBulkSelection(items);
+  // Input reads the raw URL param so typing is responsive; result/empty-state copy
+  // reflects the debounced term that actually drove the fetch.
+  const inputValue = searchParam ?? '';
   const searchTerm = filter.search ?? '';
 
   const stats = useMemo(() => {
@@ -224,7 +237,7 @@ export function CompaniesPage() {
               type="search"
               placeholder={t('companies.searchPlaceholder', 'Search by name or domain…')}
               aria-label={t('companies.searchAriaLabel', 'Search companies')}
-              value={searchTerm}
+              value={inputValue}
               onChange={(e) => {
                 const next = new URLSearchParams(params);
                 if (e.target.value) next.set('search', e.target.value);

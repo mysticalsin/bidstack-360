@@ -16,6 +16,10 @@ import { createHash } from 'node:crypto';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+import {
+  SerumConnectorPolicyError,
+  assertSerumConnectorAllowed,
+} from '../lib/serum-connector-policy.js';
 
 type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
@@ -118,6 +122,13 @@ async function slackPost(
   return data;
 }
 
+function slackPolicyErrorResult(err: unknown): SlackResult | null {
+  if (err instanceof SerumConnectorPolicyError) {
+    return { ok: false, error: err.message };
+  }
+  return null;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────
 
 /**
@@ -129,6 +140,19 @@ export async function postMessage(
   log?: ServiceLogger,
 ): Promise<SlackResult> {
   const { orgId, channelId, blocks, text } = params;
+
+  try {
+    await assertSerumConnectorAllowed({
+      orgId,
+      connectorId: 'slack',
+      operation: 'slack.postMessage',
+      writeRequested: true,
+    });
+  } catch (err) {
+    const policyResult = slackPolicyErrorResult(err);
+    if (policyResult) return policyResult;
+    throw err;
+  }
 
   let botToken: string;
   try {
@@ -158,6 +182,19 @@ export async function postReply(
 ): Promise<SlackResult> {
   const { orgId, channelId, threadTs, blocks, text } = params;
 
+  try {
+    await assertSerumConnectorAllowed({
+      orgId,
+      connectorId: 'slack',
+      operation: 'slack.postReply',
+      writeRequested: true,
+    });
+  } catch (err) {
+    const policyResult = slackPolicyErrorResult(err);
+    if (policyResult) return policyResult;
+    throw err;
+  }
+
   let botToken: string;
   try {
     botToken = await getBotToken(orgId);
@@ -182,6 +219,19 @@ export async function postReply(
  */
 export async function dmUser(params: DmUserParams, log?: ServiceLogger): Promise<SlackResult> {
   const { orgId, userId, blocks, text } = params;
+
+  try {
+    await assertSerumConnectorAllowed({
+      orgId,
+      connectorId: 'slack',
+      operation: 'slack.dmUser',
+      writeRequested: true,
+    });
+  } catch (err) {
+    const policyResult = slackPolicyErrorResult(err);
+    if (policyResult) return policyResult;
+    throw err;
+  }
 
   // Resolve BidStack user → Slack user id
   const mapping = await prisma.slackUserMapping.findUnique({

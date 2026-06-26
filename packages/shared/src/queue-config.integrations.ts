@@ -263,3 +263,39 @@ export const COMPETITOR_RESEARCH: QueueConfig = {
     removeOnFail: { age: 86_400 * 30, count: 500 },
   },
 };
+
+/**
+ * workflow.dispatch — fires when a domain event (record_created /
+ * stage_changed) matches an active workflow's trigger. One job per event; the
+ * consumer loads matching workflows and runs each through the shared engine,
+ * writing a WorkflowRun row per workflow.
+ *
+ * WHY 3 attempts: assign_owner / update_field are naturally idempotent
+ * (set-to-value), so an at-least-once retry re-applies the same mutation
+ * safely. create_task / create_notification can duplicate on retry, accepted
+ * as the at-least-once tradeoff (events are rare and operator-visible).
+ */
+export const WORKFLOW_DISPATCH: QueueConfig = {
+  name: 'workflow.dispatch',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 500 },
+    removeOnFail: { age: 86_400 * 30, count: 5000 },
+  },
+};
+
+/**
+ * workflow.schedule — repeatable scan (every 15 min) for active
+ * `triggerKind: 'schedule'` workflows that are due, running each through the
+ * shared engine. Single low-volume job; the worker registers the repeatable.
+ */
+export const WORKFLOW_SCHEDULE: QueueConfig = {
+  name: 'workflow.schedule',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 50 },
+    removeOnFail: { age: 86_400 * 7, count: 500 },
+  },
+};

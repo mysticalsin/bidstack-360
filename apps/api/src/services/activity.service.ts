@@ -41,38 +41,40 @@ export async function logActivity(input: LogActivityInput) {
     ? { idempotencyKey: input.idempotencyKey }
     : undefined;
 
+  const data = {
+    orgId: input.orgId,
+    type: input.type,
+    subject: input.subject ?? null,
+    description: input.description ?? null,
+    startTime: input.startTime ?? null,
+    endTime: input.endTime ?? null,
+    status: input.status ?? 'completed',
+    entityType: input.entityType,
+    entityId: input.entityId,
+    ownerId: input.actorType === 'user' ? input.actorId ?? null : null,
+    actorId: input.actorId ?? null,
+    actorType: input.actorType ?? 'user',
+    body: (input.body ?? {}) as Prisma.InputJsonObject,
+    metadata: (input.metadata ?? metadata) as Prisma.InputJsonObject | undefined,
+    occurredAt: input.occurredAt ?? new Date(),
+    idempotencyKey: input.idempotencyKey,
+  };
+
+  // Idempotency under concurrency: find-then-create raced (two callers replaying
+  // the same key could both insert). Upsert on the unique idempotencyKey is a
+  // single atomic statement — a concurrent duplicate hits the where branch and
+  // returns the existing row unchanged (empty update = no-op).
   if (input.idempotencyKey) {
-    const existing = await prisma.activity.findFirst({
-      where: {
-        orgId: input.orgId,
-        entityType: input.entityType,
-        entityId: input.entityId,
-        idempotencyKey: input.idempotencyKey,
-      },
+    return prisma.activity.upsert({
+      where: { idempotencyKey: input.idempotencyKey },
+      create: data,
+      update: {},
       select: { id: true },
     });
-    if (existing) return existing;
   }
 
   return prisma.activity.create({
-    data: {
-      orgId: input.orgId,
-      type: input.type,
-      subject: input.subject ?? null,
-      description: input.description ?? null,
-      startTime: input.startTime ?? null,
-      endTime: input.endTime ?? null,
-      status: input.status ?? 'completed',
-      entityType: input.entityType,
-      entityId: input.entityId,
-      ownerId: input.actorType === 'user' ? input.actorId ?? null : null,
-      actorId: input.actorId ?? null,
-      actorType: input.actorType ?? 'user',
-      body: (input.body ?? {}) as Prisma.InputJsonObject,
-      metadata: (input.metadata ?? metadata) as Prisma.InputJsonObject | undefined,
-      occurredAt: input.occurredAt ?? new Date(),
-      idempotencyKey: input.idempotencyKey,
-    },
+    data,
     select: { id: true },
   });
 }

@@ -156,6 +156,12 @@ export const jobFailedTotal = new Counter(
   ['queue'],
 );
 
+export const pdfRenderFallbackTotal = new Counter(
+  'pdf_render_fallback_total',
+  'PDF renders that fell back from Puppeteer to the pdf-lib basic renderer (Chromium unavailable or launch failed)',
+  [],
+);
+
 // ── Collectors array (add new metrics here) ─────────────────────────────────
 
 const ALL_METRICS = [
@@ -164,6 +170,7 @@ const ALL_METRICS = [
   dbQueryDuration,
   jobProcessedTotal,
   jobFailedTotal,
+  pdfRenderFallbackTotal,
 ];
 
 function exposeAllMetrics(): string {
@@ -217,7 +224,9 @@ export function storageConfigReady(env: NodeJS.ProcessEnv = process.env): boolea
   if (driver === 's3') {
     return Boolean(env.S3_BUCKET && env.S3_BUCKET.trim());
   }
-  return env.NODE_ENV !== 'production';
+  // Local storage is ready in non-prod, and in prod DEMO deployments — matches
+  // env.ts which permits STORAGE_DRIVER=local in production only when DEMO_MODE.
+  return env.NODE_ENV !== 'production' || env.DEMO_MODE === 'true';
 }
 
 // ── Route plugin ────────────────────────────────────────────────────────────

@@ -13,8 +13,8 @@ import { springSnap, springSoft } from '@/lib/motion';
 
 import type { CompanyLookupResponse, CrmCompany } from '@bidstack/shared';
 
+import { displayableLogoUrl } from './logoUrlSafety';
 import {
-  faviconUrl,
   initialsFor,
   logoSourceLabel,
   normalizeDomain,
@@ -71,7 +71,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
   const previewDomain = company?.domain ?? normalizedDomain;
   const previewWebsite =
     company?.website ?? (website || (previewDomain ? `https://${previewDomain}/` : null));
-  const logoUrl = company?.logo?.url ?? (previewDomain ? faviconUrl(previewDomain, 128) : null);
+  const logoUrl = displayableLogoUrl(company?.logo?.url);
   const sourceItems =
     company?.sourceAttribution.slice(0, 3).map((source) => source.label) ??
     (previewDomain
@@ -110,7 +110,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
         : logoUrl
           ? t('smartCompany.autofill.value.preview', 'preview')
           : t('smartCompany.autofill.value.fallback', 'fallback'),
-      progress: company?.logo?.url ? 100 : logoUrl ? 72 : 34,
+      progress: logoUrl ? 100 : company?.logo?.url ? 72 : 34,
     },
     {
       label: t('smartCompany.autofill.sourceReceipts', 'Source receipts'),

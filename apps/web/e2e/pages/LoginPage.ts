@@ -36,8 +36,15 @@ export class LoginPage {
   /** True if we land on the app shell rather than a login form. */
   async isInStubAuthMode(): Promise<boolean> {
     await this.page.goto('/', { waitUntil: 'load' });
-    // Stub mode redirects / → /dashboard immediately without a login screen.
-    return this.page.url().includes('/dashboard') || this.page.url().includes('/pipeline');
+    await expect(this.page.getByRole('main')).toBeVisible({ timeout: 10_000 });
+
+    const loginFormVisible = await this.emailInput.isVisible({ timeout: 500 }).catch(() => false);
+    if (loginFormVisible) return false;
+
+    return this.page
+      .getByRole('navigation', { name: /primary navigation/i })
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
   }
 
   async assertLoginError(): Promise<void> {

@@ -2,40 +2,13 @@
  * Unit tests for the Sentry PII scrubbing logic.
  *
  * WHY these tests:
- * The beforeSend hook is the last line of defense before PII reaches Sentry's
- * servers. A regression here would cause a GDPR/CCPA violation. Tests must
- * verify that EVERY PII field is scrubbed, including nested objects.
- *
- * Strategy: isolate the scrubPii function via module internals test. We can't
- * call Sentry.init in tests (no DSN), so we extract and test scrubPii directly.
+ * The beforeSend hook is the last line of defense before telemetry leaves the
+ * process. A regression here would cause a GDPR/CCPA privacy incident.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-// ─── Inline the scrubPii function from sentry.ts ─────────────────────────
-// WHY inline: importing the module would trigger Sentry.init side effects.
-// If scrubPii logic changes, update both files.
-
-const PII_FIELDS = new Set([
-  'email', 'phone', 'phoneNumber', 'phone_number',
-  'name', 'firstName', 'lastName', 'first_name', 'last_name',
-  'fullName', 'full_name', 'displayName', 'display_name',
-  'address', 'street', 'city', 'zipCode', 'zip_code', 'postalCode', 'postal_code',
-  'ssn', 'taxId', 'tax_id', 'nationalId', 'national_id',
-  'password', 'secret', 'token', 'apiKey', 'api_key',
-]);
-
-function scrubPii(obj: unknown, depth = 0): unknown {
-  if (depth > 10 || obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map((item) => scrubPii(item, depth + 1));
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-    result[key] = PII_FIELDS.has(key) ? '[REDACTED]' : scrubPii(value, depth + 1);
-  }
-  return result;
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────
+import { scrubPii, scrubSentryEvent } from '../lib/sentry-privacy.js';
 
 describe('scrubPii', () => {
   it('redacts top-level PII fields', () => {
@@ -48,7 +21,6 @@ describe('scrubPii', () => {
     const output = scrubPii(input) as Record<string, unknown>;
     expect(output.email).toBe('[REDACTED]');
     expect(output.phone).toBe('[REDACTED]');
-    // Non-PII fields pass through
     expect(output.orgId).toBe('org-123');
     expect(output.status).toBe('active');
   });
@@ -65,13 +37,13 @@ describe('scrubPii', () => {
       },
     };
     const output = scrubPii(input) as Record<string, unknown>;
-    const opportunity = (output as { opportunity?: { contact?: Record<string, unknown> } }).opportunity;
+    const opportunity = output.opportunity as { contact?: Record<string, unknown> } | undefined;
     const contact = opportunity?.contact;
     expect(contact).toBeDefined();
     if (!contact) throw new Error('Expected nested contact to survive scrubbing');
     expect(contact.name).toBe('[REDACTED]');
     expect(contact.email).toBe('[REDACTED]');
-    expect(contact.company).toBe('Acme'); // not a PII field
+    expect(contact.company).toBe('Acme');
   });
 
   it('redacts PII in arrays', () => {
@@ -93,16 +65,14 @@ describe('scrubPii', () => {
   });
 
   it('handles deeply nested objects without stack overflow', () => {
-    // depth limit is 10 — build an 11-level deep object
     let deep: Record<string, unknown> = { email: 'deep@example.com' };
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 12; i += 1) {
       deep = { nested: deep };
     }
-    // Should not throw
     expect(() => scrubPii(deep)).not.toThrow();
   });
 
-  it('redacts camelCase and snake_case PII variants', () => {
+  it('redacts camelCase, snake_case, and worker phone-token variants', () => {
     const input = {
       phoneNumber: '555-0100',
       phone_number: '555-0101',
@@ -110,11 +80,16 @@ describe('scrubPii', () => {
       first_name: 'Bob',
       apiKey: 'sk-xxx',
       api_key: 'sk-yyy',
+      toNumber: '+15550100',
+      from_number: '+15550101',
+      authToken: 'secret-token',
+      queue: 'sms.send',
     };
     const output = scrubPii(input) as Record<string, unknown>;
-    for (const key of Object.keys(input)) {
+    for (const key of Object.keys(input).filter((key) => key !== 'queue')) {
       expect(output[key]).toBe('[REDACTED]');
     }
+    expect(output.queue).toBe('sms.send');
   });
 
   it('does not redact non-PII fields that contain PII-like values', () => {
@@ -123,8 +98,32 @@ describe('scrubPii', () => {
       description: 'Phone: +1234567890',
     };
     const output = scrubPii(input) as Record<string, unknown>;
-    // The field NAMES are not PII fields — values pass through unchanged
     expect(output.message).toBe('Contact alice@example.com for details');
     expect(output.description).toBe('Phone: +1234567890');
+  });
+
+  it('scrubs request and extra payloads before Sentry sends an event', () => {
+    const event = scrubSentryEvent({
+      request: {
+        data: {
+          email: 'person@example.com',
+          safe: 'kept',
+        },
+      },
+      extra: {
+        nested: {
+          phone: '+15550102',
+          orgId: 'org-123',
+        },
+      },
+    });
+
+    expect(event.request.data).toEqual({ email: '[REDACTED]', safe: 'kept' });
+    expect(event.extra).toEqual({
+      nested: {
+        phone: '[REDACTED]',
+        orgId: 'org-123',
+      },
+    });
   });
 });

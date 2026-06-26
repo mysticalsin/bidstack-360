@@ -24,6 +24,8 @@ import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
+import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
+import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import { getAccessToken } from '../../services/microsoft-graph-auth.service.js';
 import {
   createSubscription,
@@ -176,6 +178,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       // Get user's email from Graph /me endpoint
       let externalEmail: string | undefined;
+      let graphMeEvidence: { mail?: string; userPrincipalName?: string } | null = null;
       try {
         const meRes = await fetch(
           'https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName',
@@ -184,8 +187,8 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
           },
         );
         if (meRes.ok) {
-          const me = (await meRes.json()) as { mail?: string; userPrincipalName?: string };
-          externalEmail = me.mail ?? me.userPrincipalName;
+          graphMeEvidence = (await meRes.json()) as { mail?: string; userPrincipalName?: string };
+          externalEmail = graphMeEvidence.mail ?? graphMeEvidence.userPrincipalName;
         }
       } catch (err) {
         server.log.warn({ err }, 'Could not fetch MS Graph /me');
@@ -213,6 +216,19 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         },
       });
 
+      if (graphMeEvidence) {
+        await recordSerumConnectorTestSuccess({
+          orgId,
+          connectorId: 'microsoft_graph',
+          operation: 'microsoft.mail.oauth.callback',
+          testedByUserId: userId,
+          evidence: {
+            mail: graphMeEvidence.mail,
+            userPrincipalName: graphMeEvidence.userPrincipalName,
+          },
+        });
+      }
+
       // Fetch the saved token record to get its id for queue/subscription
       const savedToken = await prisma.integrationToken.findUnique({
         where: {
@@ -233,7 +249,10 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(err => server.log.warn({ err }, 'Failed to create subscription in background'));
       }
 
-      server.log.info({ orgId, userId, email: externalEmail }, 'Outlook Mail connected');
+      server.log.info(
+        { orgId, userId, externalAccountDomain: emailDomainForTelemetry(externalEmail) },
+        'Outlook Mail connected',
+      );
 
       return reply.redirect(
         `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?connected=outlook`,

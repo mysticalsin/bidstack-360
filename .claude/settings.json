@@ -49,7 +49,7 @@
       "command": "npx",
       "args": ["-y", "@21st-dev/magic@latest"],
       "env": {
-        "API_KEY": "420f55095bec1db3947a0692aeafef5caad1541edc7f30c39d230241fc6ac3ac"
+        "API_KEY": "set-in-local-claude-settings"
       }
     }
   },

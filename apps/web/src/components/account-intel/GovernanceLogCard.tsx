@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { SourceBadge } from '@/components/cockpit/SourceBadge';
 import { useIsAdmin } from '@/lib/auth';
 import {
   useCreateGovernanceMeeting,
@@ -35,6 +36,74 @@ const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
   in_progress: 'done',
   done: 'open',
 };
+
+function dateOnly(value: string | null): string | null {
+  return value ? value.slice(0, 10) : null;
+}
+
+function MeetingAuditBadges({ meeting }: { meeting: GovernanceMeeting }) {
+  const { t } = useTranslation('crm');
+  const createdAt = dateOnly(meeting.createdAt);
+  const updatedAt = dateOnly(meeting.updatedAt);
+  const unknownDate = t('governanceLog.audit.unknownDate', 'unknown date');
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <SourceBadge
+        label={t('governanceLog.audit.meetingBadge', 'Manual meeting')}
+        state="crm"
+        hint={t(
+          'governanceLog.audit.meetingHint',
+          'Manually logged governance meeting created {{createdAt}}.',
+          { createdAt: createdAt ?? unknownDate },
+        )}
+        data-testid={`governance-meeting-${meeting.id}-manual-source`}
+      />
+      <SourceBadge
+        label={t('governanceLog.audit.auditBadge', 'Audit logged')}
+        state="verified"
+        hint={t(
+          'governanceLog.audit.auditHint',
+          'Server mutation audit covers governance meeting and action mutations. Last updated {{updatedAt}}.',
+          { updatedAt: updatedAt ?? unknownDate },
+        )}
+        data-testid={`governance-meeting-${meeting.id}-audit-source`}
+      />
+    </div>
+  );
+}
+
+function GovernanceActionAuditBadges({
+  action,
+}: {
+  action: GovernanceMeeting['actions'][number];
+}) {
+  const { t } = useTranslation('crm');
+  const createdAt = dateOnly(action.createdAt);
+  const unknownDate = t('governanceLog.audit.unknownDate', 'unknown date');
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <SourceBadge
+        label={t('governanceLog.audit.actionBadge', 'Manual action')}
+        state="crm"
+        hint={t('governanceLog.audit.actionHint', 'Governance action created {{createdAt}}.', {
+          createdAt: createdAt ?? unknownDate,
+        })}
+        data-testid={`governance-action-${action.id}-manual-source`}
+      />
+      <SourceBadge
+        label={t('governanceLog.audit.auditBadge', 'Audit logged')}
+        state="verified"
+        hint={t(
+          'governanceLog.audit.actionAuditHint',
+          'Server mutation audit covers action status and ownership updates.',
+        )}
+        data-testid={`governance-action-${action.id}-audit-source`}
+      />
+    </div>
+  );
+}
 
 export function GovernanceLogCard({ accountKey }: { accountKey: string }) {
   const meetings = useGovernanceMeetings(accountKey);
@@ -89,15 +158,19 @@ function MeetingRow({ meeting, canWrite }: { meeting: GovernanceMeeting; canWrit
       {meeting.outcomes ? (
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">{meeting.outcomes}</p>
       ) : null}
+      <MeetingAuditBadges meeting={meeting} />
       {meeting.actions.length > 0 ? (
         <ul className="mt-2 space-y-1">
           {meeting.actions.map((action) => (
-            <li key={action.id} className="flex items-center justify-between gap-2 text-xs">
-              <span className="min-w-0 truncate text-[var(--fg-primary)]">
+            <li key={action.id} className="flex items-start justify-between gap-2 text-xs">
+              <div className="min-w-0">
+                <span className="block text-[var(--fg-primary)]">
                 {action.description}
                 {action.ownerName ? ` · ${action.ownerName}` : ''}
                 {action.dueDate ? ` · ${action.dueDate.slice(0, 10)}` : ''}
-              </span>
+                </span>
+                <GovernanceActionAuditBadges action={action} />
+              </div>
               <button
                 type="button"
                 disabled={!canWrite || patchAction.isPending}
@@ -108,10 +181,11 @@ function MeetingRow({ meeting, canWrite }: { meeting: GovernanceMeeting; canWrit
                     body: { status: NEXT_STATUS[action.status] },
                   })
                 }
-                className="min-h-[28px] shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
                 aria-label={t('governanceLog.advanceStatusLabel', 'Advance status of {{description}}', {
                   description: action.description,
                 })}
+                data-testid={`governance-action-${action.id}-status`}
               >
                 <Badge tone={STATUS_TONE[action.status]}>{action.status.replace('_', ' ')}</Badge>
               </button>

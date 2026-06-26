@@ -7,7 +7,11 @@ interface ApiOptions {
   signal?: AbortSignal;
 }
 
-type ApiTokenProvider = () => string | null | Promise<string | null>;
+interface ApiTokenOptions {
+  forceRefresh?: boolean;
+}
+
+type ApiTokenProvider = (options?: ApiTokenOptions) => string | null | Promise<string | null>;
 
 let apiTokenProvider: ApiTokenProvider | null = null;
 
@@ -15,7 +19,9 @@ let apiTokenProvider: ApiTokenProvider | null = null;
 // different origin. VITE_API_URL is inlined at build time and prefixed onto
 // every request. Empty in local dev (Vite proxies /api) and in single-origin
 // deploys, so behavior there is unchanged.
-const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL ?? '');
+const STUB_ROLE_KEY = 'bidstack:stub-role';
+const E2E_ROLE_HEADER_ENABLED = import.meta.env.VITE_ENABLE_E2E_ROLE_HEADER === 'true';
 
 export class ApiError extends Error {
   constructor(
@@ -32,7 +38,46 @@ export function setApiTokenProvider(provider: ApiTokenProvider | null): void {
   apiTokenProvider = provider;
 }
 
-function normalizeApiPath(path: string): string {
+function shouldRefreshAuth(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+async function getApiToken(options?: ApiTokenOptions): Promise<string | null> {
+  return apiTokenProvider ? await apiTokenProvider(options) : null;
+}
+
+function getE2eRoleHeader(): Record<string, string> {
+  if (!E2E_ROLE_HEADER_ENABLED || typeof window === 'undefined') return {};
+  const role = window.localStorage.getItem(STUB_ROLE_KEY);
+  return role ? { 'x-bidstack-e2e-role': role } : {};
+}
+
+function buildHeaders(token: string | null, hasJsonBody: boolean): Record<string, string> | undefined {
+  const headers: Record<string, string> = {
+    ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...getE2eRoleHeader(),
+  };
+
+  return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+async function parseJsonResponse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    throw new ApiError('Invalid JSON response from server', res.status, text);
+  }
+}
+
+export function normalizeApiBase(rawBase: string): string {
+  const trimmed = rawBase.trim().replace(/\/+$/, '');
+  if (trimmed === '/api' || trimmed === '/api/v1') return '';
+  return trimmed.replace(/\/api(?:\/v1)?$/, '');
+}
+
+export function normalizeApiPath(path: string): string {
   // Ensure all API calls use /api/v1/ prefix. The backend rewriteUrl
   // handles /api/ → /api/v1/, but normalizing here keeps the frontend
   // consistent and removes the fragile dependency on that rewrite.
@@ -44,6 +89,18 @@ function normalizeApiPath(path: string): string {
     return path.replace('/api/', '/api/v1/');
   }
   return path;
+}
+
+export function buildApiUrl(path: string, base = API_BASE): string {
+  return `${normalizeApiBase(base)}${normalizeApiPath(path)}`;
+}
+
+function getErrorMessage(data: unknown): string | null {
+  if (data === null || typeof data !== 'object') return null;
+  const record = data as { message?: unknown; error?: unknown };
+  if (typeof record.message === 'string') return record.message;
+  if (typeof record.error === 'string') return record.error;
+  return null;
 }
 
 /**
@@ -60,11 +117,6 @@ export async function downloadFromApi(
   opts: { querystring?: Record<string, string | undefined> } = {},
 ): Promise<void> {
   const resolvedPath = normalizeApiPath(path);
-  const token = apiTokenProvider ? await apiTokenProvider() : null;
-  const headers: Record<string, string> = {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-
   const qs = opts.querystring
     ? Object.entries(opts.querystring)
         .filter(([, v]) => v !== undefined)
@@ -73,11 +125,20 @@ export async function downloadFromApi(
     : '';
   const url = qs ? `${resolvedPath}?${qs}` : resolvedPath;
 
-  const res = await fetch(`${API_BASE}${url}`, {
-    method: 'GET',
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
-    credentials: 'include',
-  });
+  const requestExport = async (forceRefresh = false) => {
+    const token = await getApiToken(forceRefresh ? { forceRefresh: true } : undefined);
+    return fetch(buildApiUrl(url), {
+      method: 'GET',
+      headers: buildHeaders(token, false),
+      credentials: 'include',
+      cache: 'no-store',
+    });
+  };
+
+  let res = await requestExport();
+  if (!res.ok && apiTokenProvider && shouldRefreshAuth(res.status)) {
+    res = await requestExport(true);
+  }
 
   if (!res.ok) {
     throw new ApiError(`Export failed (${res.status})`, res.status, null);
@@ -98,36 +159,28 @@ export async function downloadFromApi(
 
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const resolvedPath = normalizeApiPath(path);
-  const token = apiTokenProvider ? await apiTokenProvider() : null;
-  const headers: Record<string, string> = {
-    ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const body = opts.body ? JSON.stringify(opts.body) : undefined;
+  const requestJson = async (forceRefresh = false) => {
+    const token = await getApiToken(forceRefresh ? { forceRefresh: true } : undefined);
+    return fetch(buildApiUrl(resolvedPath), {
+      method: opts.method ?? 'GET',
+      headers: buildHeaders(token, Boolean(body)),
+      body,
+      signal: opts.signal,
+      credentials: 'include',
+      cache: 'no-store',
+    });
   };
 
-  const res = await fetch(`${API_BASE}${resolvedPath}`, {
-    method: opts.method ?? 'GET',
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-    signal: opts.signal,
-    credentials: 'include',
-  });
-
-  const text = await res.text();
-  let data: unknown;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    throw new ApiError('Invalid JSON response from server', res.status, text);
+  let res = await requestJson();
+  if (!res.ok && apiTokenProvider && shouldRefreshAuth(res.status)) {
+    res = await requestJson(true);
   }
 
+  const data = await parseJsonResponse(res);
+
   if (!res.ok) {
-    const message =
-      data !== null &&
-      typeof data === 'object' &&
-      'message' in data &&
-      typeof (data as { message: unknown }).message === 'string'
-        ? (data as { message: string }).message
-        : `Request failed (${res.status})`;
+    const message = getErrorMessage(data) ?? `Request failed (${res.status})`;
     throw new ApiError(message, res.status, data);
   }
   return data as T;

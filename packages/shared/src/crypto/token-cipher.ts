@@ -14,12 +14,12 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_BYTES = 12;  // GCM recommended IV length
+const IV_BYTES = 12; // GCM recommended IV length
 const TAG_BYTES = 16;
 
 function getKey(): Buffer {
   const hex = process.env.INTEGRATION_TOKEN_KEY;
-  if (!hex || hex.length !== 64) {
+  if (!hex || !/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error(
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string (32 bytes). ' +
         'Generate with: openssl rand -hex 32',
@@ -43,7 +43,9 @@ function getKey(): Buffer {
 export function encryptToken(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv(ALGORITHM, key, iv);
+  const cipher = createCipheriv(ALGORITHM, key, iv, {
+    authTagLength: TAG_BYTES,
+  });
 
   const encrypted = Buffer.concat([
     cipher.update(plaintext, 'utf8'),
@@ -80,7 +82,9 @@ export function decryptToken(ciphertext: string): string {
   const tag = packed.subarray(IV_BYTES, IV_BYTES + TAG_BYTES);
   const data = packed.subarray(IV_BYTES + TAG_BYTES);
 
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  const decipher = createDecipheriv(ALGORITHM, key, iv, {
+    authTagLength: TAG_BYTES,
+  });
   decipher.setAuthTag(tag);
 
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');

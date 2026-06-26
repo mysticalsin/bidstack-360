@@ -46,6 +46,7 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
     <Card>
       <SectionHeader
         title={t('notes.panelTitle', 'Notes')}
+        caption={t('notes.accessScoped', 'Access follows account groups')}
         action={
           accountId && !composing ? (
             <div className="flex flex-wrap items-center justify-end gap-2">

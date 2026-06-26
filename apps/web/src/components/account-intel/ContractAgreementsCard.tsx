@@ -3,28 +3,36 @@
  * the countries each covers, global rebate terms, and the rate re-evaluation
  * schedule. Pre-sales-owned, internal data. Demo feedback (Marc + Marie-Benoît).
  */
-import { useState, type FormEvent } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useState, type DragEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SourceBadge, type CockpitSourceState } from '@/components/cockpit/SourceBadge';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useIsAdmin } from '@/lib/auth';
+import { staggerChild } from '@/lib/motion';
 import {
   useContractAgreements,
   useCreateContractAgreement,
+  useApproveContractExtraction,
   useExtractContract,
   useContractExtraction,
 } from '@/hooks/useContractAgreements';
 import { useUploadFile, downloadFileUrl } from '@/hooks/useFiles';
-import type {
-  ContractAgreement,
-  ContractKind,
-  ContractStatus,
-  RateCardLine,
-  RateCardUnit,
+import {
+  FILE_INPUT_ACCEPT,
+  type ContractAgreement,
+  type ContractFieldProvenance,
+  type ContractExtractionApproval,
+  type ContractKind,
+  type ContractStatus,
+  type RateCardLine,
+  type RateCardUnit,
 } from '@bidstack/shared';
 
 const STATUS_TONE: Record<ContractStatus, 'jade' | 'amber' | 'gray' | 'tomato'> = {
@@ -63,13 +71,156 @@ function formatRate(rateMicros: number, currency: string, unit: RateCardUnit): s
   return `${amount}${UNIT_LABEL[unit]}`;
 }
 
+function formatRebate(bps: number | null): string {
+  return bps == null ? '0.00%' : `${(bps / 100).toFixed(2)}%`;
+}
+
+function confidenceTone(bps: number | null): 'jade' | 'amber' | 'gray' {
+  if (bps == null) return 'gray';
+  return bps >= 8000 ? 'jade' : 'amber';
+}
+
 const inputCls =
   'rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm';
+
+type ContractFieldKey =
+  | 'reference'
+  | 'countries'
+  | 'globalRebateBps'
+  | 'rateReviewSchedule'
+  | 'nextRateReviewAt'
+  | 'expiryDate'
+  | 'status'
+  | 'rateCard';
+
+function sourceState(source: ContractFieldProvenance['source']): CockpitSourceState {
+  if (source === 'manual' || source === 'derived:llm') return 'verified';
+  if (source === 'document' || source === 'derived:deterministic') return 'crm';
+  return 'missing';
+}
+
+function fieldSource(
+  agreement: ContractAgreement,
+  field: ContractFieldKey,
+): ContractFieldProvenance {
+  const source = agreement.fieldSources?.[field] ?? agreement.fieldSources?.reference;
+  return (
+    source ?? {
+      source: 'manual',
+      label: 'Manual',
+      hint: `Manually maintained in BidStack CRM. Saved ${agreement.updatedAt.slice(0, 10)}.`,
+      confidence: 1,
+      sourceFileId: null,
+      sourceFileName: null,
+      sourceExtractionId: null,
+      updatedAt: agreement.updatedAt,
+    }
+  );
+}
+
+function ContractSourceBadge({
+  agreement,
+  field,
+  testId,
+}: {
+  agreement: ContractAgreement;
+  field: ContractFieldKey;
+  testId: string;
+}) {
+  const source = fieldSource(agreement, field);
+  return (
+    <SourceBadge
+      label={source.label}
+      state={sourceState(source.source)}
+      hint={source.hint}
+      className="shrink-0"
+      data-testid={testId}
+    />
+  );
+}
+
+function summarizeFieldSources(
+  agreements: ContractAgreement[],
+  fields: ContractFieldKey[],
+  label: string,
+): { label: string; state: CockpitSourceState; hint: string } {
+  const sources = agreements
+    .flatMap((agreement) => fields.map((field) => fieldSource(agreement, field)))
+    .filter(Boolean);
+  const agreementCount = agreements.length;
+  const humanReviewed = sources.filter((source) => source.source.startsWith('derived:')).length;
+  const documentLinked = sources.filter((source) => source.source === 'document').length;
+  const manual = sources.filter((source) => source.source === 'manual').length;
+  const latest = sources
+    .map((source) => source.updatedAt)
+    .sort()
+    .at(-1);
+
+  if (humanReviewed > 0) {
+    return {
+      label: 'Reviewed extraction',
+      state: 'verified',
+      hint: `${label} is derived from ${agreementCount} agreement record(s); ${humanReviewed} source field(s) were human-reviewed extraction output. Latest update ${latest?.slice(0, 10) ?? 'unknown'}.`,
+    };
+  }
+  if (documentLinked > 0) {
+    return {
+      label: 'Linked documents',
+      state: 'crm',
+      hint: `${label} is derived from ${agreementCount} agreement record(s); ${documentLinked} source field(s) are linked to uploaded contract documents. Latest update ${latest?.slice(0, 10) ?? 'unknown'}.`,
+    };
+  }
+  return {
+    label: 'Manual CRM',
+    state: manual > 0 ? 'crm' : 'missing',
+    hint: `${label} is derived from ${agreementCount} manually maintained agreement record(s). Latest update ${latest?.slice(0, 10) ?? 'unknown'}.`,
+  };
+}
+
+function ContractMetricTile({
+  label,
+  value,
+  source,
+  testId,
+}: {
+  label: string;
+  value: string | number;
+  source: { label: string; state: CockpitSourceState; hint: string };
+  testId: string;
+}) {
+  return (
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2">
+      <p className="text-[10px] font-medium uppercase text-[var(--fg-tertiary)]">{label}</p>
+      <p className="mt-1 truncate text-lg font-semibold text-[var(--fg-primary)]">{value}</p>
+      <SourceBadge
+        label={source.label}
+        state={source.state}
+        hint={source.hint}
+        className="mt-1 max-w-full"
+        data-testid={testId}
+      />
+    </div>
+  );
+}
 
 export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
   const { t } = useTranslation('crm');
   const agreements = useContractAgreements(accountKey);
   const canWrite = useIsAdmin();
+  const items = agreements.data ?? [];
+  const activeCount = items.filter((item) => item.status === 'active').length;
+  const coveredCountries = new Set(items.flatMap((item) => item.countries)).size;
+  const nextReview = items
+    .map((item) => item.nextRateReviewAt ?? item.expiryDate)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0];
+  const activeSource = summarizeFieldSources(items, ['status'], 'Active agreement count');
+  const coverageSource = summarizeFieldSources(items, ['countries'], 'Country coverage');
+  const nextSource = summarizeFieldSources(
+    items,
+    ['nextRateReviewAt', 'expiryDate'],
+    'Next legal review date',
+  );
 
   return (
     <Card role="region" aria-label={t('contractAgreements.regionLabel', 'Contractual agreements')}>
@@ -82,6 +233,28 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
         action={canWrite ? <CreateAgreement accountKey={accountKey} /> : undefined}
       />
       <div className="px-5 pb-5">
+        {!agreements.isLoading && !agreements.isError && items.length > 0 && (
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <ContractMetricTile
+              label={t('contractAgreements.metricActive', 'Active')}
+              value={activeCount}
+              source={activeSource}
+              testId="contract-summary-source-active"
+            />
+            <ContractMetricTile
+              label={t('contractAgreements.metricCoverage', 'Coverage')}
+              value={coveredCountries}
+              source={coverageSource}
+              testId="contract-summary-source-coverage"
+            />
+            <ContractMetricTile
+              label={t('contractAgreements.metricNext', 'Next')}
+              value={nextReview ? nextReview.slice(0, 10) : t('contractAgreements.none', 'None')}
+              source={nextSource}
+              testId="contract-summary-source-next"
+            />
+          </div>
+        )}
         {agreements.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : agreements.isError ? (
@@ -89,7 +262,7 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
             title={t('contractAgreements.loadErrorTitle', 'Could not load contractual agreements')}
             message={agreements.error?.message ?? t('contractAgreements.tryAgainShortly', 'Try again shortly.')}
           />
-        ) : (agreements.data?.length ?? 0) === 0 ? (
+        ) : items.length === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
             {t(
               'contractAgreements.empty',
@@ -98,13 +271,18 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
           </p>
         ) : (
           <ul className="divide-y divide-[var(--border)]">
-            {agreements.data!.map((a) => (
-              <li key={a.id} className="py-3">
+            {items.map((a) => (
+              <li key={a.id} className="rounded-lg px-2 py-3 transition-colors hover:bg-[var(--surface-sunken)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-sm text-[var(--fg-primary)]">
+                    <p className="flex flex-wrap items-center gap-2 text-sm text-[var(--fg-primary)]">
                       <Badge tone="teal">{KIND_LABEL[a.kind]}</Badge>
-                      <span className="font-medium">{a.reference}</span>
+                      <span className="min-w-0 truncate font-medium">{a.reference}</span>
+                      <ContractSourceBadge
+                        agreement={a}
+                        field="reference"
+                        testId={`contract-source-${a.id}-reference`}
+                      />
                     </p>
                     <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
                       {a.countries.length > 0
@@ -112,7 +290,7 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
                         : t('contractAgreements.noCountriesSet', 'No countries set')}
                       {a.globalRebateBps != null
                         ? t('contractAgreements.rebateSuffix', ' · rebate {{pct}}%', {
-                            pct: (a.globalRebateBps / 100).toFixed(2),
+                            pct: formatRebate(a.globalRebateBps).replace('%', ''),
                           })
                         : ''}
                       {t('contractAgreements.rateReviewSuffix', ' · rate review {{schedule}}', {
@@ -129,6 +307,37 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
                           })
                         : ''}
                     </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <ContractSourceBadge
+                        agreement={a}
+                        field="countries"
+                        testId={`contract-source-${a.id}-countries`}
+                      />
+                      <ContractSourceBadge
+                        agreement={a}
+                        field="globalRebateBps"
+                        testId={`contract-source-${a.id}-rebate`}
+                      />
+                      <ContractSourceBadge
+                        agreement={a}
+                        field="rateReviewSchedule"
+                        testId={`contract-source-${a.id}-rate-review`}
+                      />
+                      {a.nextRateReviewAt && (
+                        <ContractSourceBadge
+                          agreement={a}
+                          field="nextRateReviewAt"
+                          testId={`contract-source-${a.id}-next-review`}
+                        />
+                      )}
+                      {a.expiryDate && (
+                        <ContractSourceBadge
+                          agreement={a}
+                          field="expiryDate"
+                          testId={`contract-source-${a.id}-expiry`}
+                        />
+                      )}
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <Badge tone={STATUS_TONE[a.status]}>{a.status}</Badge>
@@ -146,6 +355,18 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
                 </div>
                 {a.rateCard.length > 0 && (
                   <table className="mt-2 w-full text-xs">
+                    <caption className="pb-1 text-left">
+                      <span className="inline-flex w-full items-center justify-between gap-2">
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+                          {t('contractAgreements.rateCard', 'Rate card')}
+                        </span>
+                        <ContractSourceBadge
+                          agreement={a}
+                          field="rateCard"
+                          testId={`contract-source-${a.id}-rate-card`}
+                        />
+                      </span>
+                    </caption>
                     <thead>
                       <tr className="text-left text-[var(--fg-tertiary)]">
                         <th scope="col" className="py-1 font-medium">
@@ -181,12 +402,21 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
   const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const create = useCreateContractAgreement();
+  const approve = useApproveContractExtraction();
   const upload = useUploadFile(accountKey);
   const extract = useExtractContract();
+  const reducedMotion = useReducedMotion();
+  const [dragActive, setDragActive] = useState(false);
   // The hosted source document (uploaded MSA/rate-card PDF) linked to this agreement.
   const [sourceFile, setSourceFile] = useState<{ id: string; name: string } | null>(null);
   const [extractionId, setExtractionId] = useState<string | null>(null);
   const extraction = useContractExtraction(extractionId);
+  const extractionDraft = extraction.data?.draft ?? null;
+  const extractionBusy =
+    extractionId !== null &&
+    extraction.data?.status !== 'done' &&
+    extraction.data?.status !== 'error';
+  const saveBusy = create.isPending || approve.isPending;
 
   // OCR/extraction is best-effort — the user explicitly APPLIES the draft into
   // the editable form, then reviews/edits before saving (never auto-committed).
@@ -235,6 +465,44 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
     setRateLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setRateLines((ls) => ls.filter((_, idx) => idx !== i));
 
+  const resetForm = () => {
+    setOpen(false);
+    setForm({
+      kind: 'msa',
+      reference: '',
+      countries: '',
+      globalRebatePct: '',
+      currency: 'EUR',
+      expiryDate: '',
+      rateReviewSchedule: 'annual',
+    });
+    setRateLines([]);
+    setSourceFile(null);
+    setExtractionId(null);
+    setDragActive(false);
+  };
+
+  const uploadSelectedFile = (file: File) => {
+    upload.mutate(file, {
+      onSuccess: (att) => {
+        setSourceFile({ id: att.id, name: att.name });
+        setExtractionId(null);
+        toast.success(t('contractAgreements.toastDocumentAttached', 'Document attached'));
+      },
+      onError: (err: Error) =>
+        toast.error(t('contractAgreements.toastUploadFailed', 'Upload failed'), {
+          description: err.message,
+        }),
+    });
+  };
+
+  const onDropDocument = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files[0];
+    if (file) uploadSelectedFile(file);
+  };
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!form.reference.trim()) {
@@ -258,55 +526,63 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
         rateMicros: Math.round(Number(l.rate) * 1_000_000),
         unit: l.unit,
       }));
-    create.mutate(
-      {
-        accountKey,
-        kind: form.kind,
-        reference: form.reference.trim(),
-        countries,
-        globalRebateBps: pct ? Math.round(Number(pct) * 100) : null,
-        currency: form.currency.trim().toUpperCase() || 'EUR',
-        rateCard,
-        sourceFileId: sourceFile?.id ?? null,
-        expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
-        rateReviewSchedule: form.rateReviewSchedule,
-        status: 'active',
+    if (extractionBusy) {
+      toast.error(t('contractAgreements.toastExtractionStillRunning', 'Extraction still running'), {
+        description: t(
+          'contractAgreements.toastExtractionStillRunningDesc',
+          'Wait for the review draft, or remove the extraction and save manually.',
+        ),
+      });
+      return;
+    }
+
+    const payload: ContractExtractionApproval = {
+      accountKey,
+      kind: form.kind,
+      reference: form.reference.trim(),
+      countries,
+      globalRebateBps: pct ? Math.round(Number(pct) * 100) : null,
+      currency: form.currency.trim().toUpperCase() || 'EUR',
+      rateCard,
+      expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
+      rateReviewSchedule: form.rateReviewSchedule,
+      status: 'active',
+    };
+    const mutationOptions = {
+      onSuccess: () => {
+        toast.success(t('contractAgreements.toastAgreementRecorded', 'Agreement recorded'));
+        resetForm();
       },
-      {
-        onSuccess: () => {
-          toast.success(t('contractAgreements.toastAgreementRecorded', 'Agreement recorded'));
-          setOpen(false);
-          setForm({
-            kind: 'msa',
-            reference: '',
-            countries: '',
-            globalRebatePct: '',
-            currency: 'EUR',
-            expiryDate: '',
-            rateReviewSchedule: 'annual',
-          });
-          setRateLines([]);
-          setSourceFile(null);
-          setExtractionId(null);
-        },
-        onError: (err: Error) =>
-          toast.error(t('contractAgreements.toastCouldNotSave', 'Could not save'), {
-            description: err.message,
-          }),
-      },
-    );
+      onError: (err: Error) =>
+        toast.error(t('contractAgreements.toastCouldNotSave', 'Could not save'), {
+          description: err.message,
+        }),
+    };
+
+    if (extractionId && extraction.data?.status === 'done' && extractionDraft) {
+      approve.mutate({ id: extractionId, body: payload }, mutationOptions);
+    } else {
+      create.mutate({ ...payload, sourceFileId: sourceFile?.id ?? null }, mutationOptions);
+    }
   };
 
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
+        <Icon name="plus" size={14} />
         {t('contractAgreements.addAgreement', 'Add agreement')}
       </Button>
     );
   }
   return (
-    <form onSubmit={onSubmit} className="w-full space-y-2">
-      <div className="grid grid-cols-2 gap-2">
+    <motion.form
+      onSubmit={onSubmit}
+      className="w-full space-y-3"
+      variants={reducedMotion ? undefined : staggerChild}
+      initial={reducedMotion ? false : 'initial'}
+      animate="animate"
+    >
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <select
           value={form.kind}
           onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as ContractKind }))}
@@ -377,32 +653,38 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
         />
       </div>
 
-      {/* Hosted source document — upload + store the MSA/rate-card PDF */}
-      <div className="space-y-1 border-t border-[var(--border)] pt-2">
+      {/* Hosted source document: upload + store the MSA/rate-card PDF. */}
+      <div className="space-y-2 border-t border-[var(--border)] pt-3">
         <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
           {t('contractAgreements.sourceDocument', 'Source document')}
         </p>
         {sourceFile ? (
-          <div className="space-y-1">
-            <p className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
-              <span className="truncate">{sourceFile.name}</span>
-              <button
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="flex min-w-0 items-center gap-2 text-sm text-[var(--fg-secondary)]">
+                <Icon name="file" size={16} className="shrink-0 text-[var(--brand-primary)]" />
+                <span className="truncate">{sourceFile.name}</span>
+              </p>
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setSourceFile(null);
                   setExtractionId(null);
                 }}
-                className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
                 aria-label={t('contractAgreements.removeAttachedDocument', 'Remove attached document')}
               >
-                {t('contractAgreements.remove', 'remove')}
-              </button>
-            </p>
+                <Icon name="x" size={14} />
+              </Button>
+            </div>
             {/* OCR + extraction → reviewable prefill */}
             {!extractionId ? (
-              <button
+              <Button
                 type="button"
-                className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] hover:underline disabled:opacity-50"
+                variant="secondary"
+                size="sm"
+                className="mt-3"
                 disabled={extract.isPending}
                 onClick={() =>
                   extract.mutate(sourceFile.id, {
@@ -415,30 +697,47 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
                   })
                 }
               >
+                <Icon name={extract.isPending ? 'loader' : 'wand'} size={14} />
                 {extract.isPending
                   ? t('contractAgreements.starting', 'Starting…')
                   : t('contractAgreements.extractFields', 'Extract fields from document')}
-              </button>
-            ) : extraction.data?.status === 'done' && extraction.data.draft ? (
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  className="min-h-[44px] rounded px-2 text-xs font-medium text-[var(--brand-primary)] hover:underline"
-                  onClick={applyDraft}
-                >
+              </Button>
+            ) : extraction.data?.status === 'done' && extractionDraft ? (
+              <div className="mt-3 space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={confidenceTone(extraction.data.confidenceBps)}>
+                    {t('contractAgreements.extractionConfidence', '{{pct}}% confidence', {
+                      pct: ((extraction.data.confidenceBps ?? 0) / 100).toFixed(0),
+                    })}
+                  </Badge>
+                  <Badge tone={extraction.data.source === 'llm' ? 'purple' : 'gray'}>
+                    {extraction.data.source === 'llm'
+                      ? t('contractAgreements.aiAssisted', 'AI assisted')
+                      : t('contractAgreements.rulesBased', 'Rules based')}
+                  </Badge>
+                  <Badge tone={extraction.data.reviewStatus === 'approved' ? 'jade' : 'amber'}>
+                    {extraction.data.reviewStatus === 'approved'
+                      ? t('contractAgreements.reviewApproved', 'Approved')
+                      : t('contractAgreements.needsReview', 'Needs review')}
+                  </Badge>
+                </div>
+                <Button type="button" variant="success" size="sm" onClick={applyDraft}>
+                  <Icon name="checkCircle" size={14} />
                   {t(
                     'contractAgreements.applyExtractedFields',
                     'Apply extracted fields (review before saving)',
                   )}
-                </button>
-                {extraction.data.draft.warnings.slice(0, 2).map((w, i) => (
-                  <p key={i} className="text-[11px] text-[var(--fg-tertiary)]">
-                    {w}
+                </Button>
+                {extractionDraft.warnings.slice(0, 2).map((w, i) => (
+                  <p key={i} className="flex gap-1 text-[11px] text-[var(--fg-tertiary)]">
+                    <Icon name="warning" size={12} className="mt-0.5 shrink-0" />
+                    <span>{w}</span>
                   </p>
                 ))}
               </div>
             ) : extraction.data?.status === 'error' ? (
-              <p className="text-xs text-[var(--danger)]">
+              <p className="mt-3 flex gap-2 text-xs text-[var(--danger)]">
+                <Icon name="warning" size={14} className="shrink-0" />
                 {extraction.data.error
                   ? t(
                       'contractAgreements.extractionFailedWithReason',
@@ -451,35 +750,52 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
                     )}
               </p>
             ) : (
-              <p className="text-xs text-[var(--fg-tertiary)]">
+              <p className="mt-3 flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
+                <Icon name="loader" size={14} />
                 {t('contractAgreements.extracting', 'Extracting… (OCR + parsing)')}
               </p>
             )}
           </div>
         ) : (
-          <label className="flex min-h-[44px] cursor-pointer items-center text-sm text-[var(--brand-primary)] hover:underline">
-            {upload.isPending
-              ? t('contractAgreements.uploading', 'Uploading…')
-              : t(
-                  'contractAgreements.attachDocument',
-                  'Attach MSA / rate-card document (PDF, image)',
-                )}
+          <label
+            data-testid="contract-source-dropzone"
+            className={`flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-3 text-center text-sm transition-colors ${
+              dragActive
+                ? 'border-[var(--brand-primary)] bg-[var(--btn-brand-tint-hover)] text-[var(--brand-primary)]'
+                : 'border-[var(--border-default)] bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]'
+            }`}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDragActive(true);
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={onDropDocument}
+          >
+            <Icon name="upload" size={20} />
+            <span>
+              {upload.isPending
+                ? t('contractAgreements.uploading', 'Uploading…')
+                : t(
+                    'contractAgreements.attachDocument',
+                    'Attach MSA / rate-card document (PDF, Office, text, image)',
+                  )}
+            </span>
             <input
               type="file"
-              accept=".pdf,image/png,image/jpeg,image/tiff,image/webp,.doc,.docx"
+              accept={FILE_INPUT_ACCEPT}
               className="sr-only"
+              aria-label={t(
+                'contractAgreements.uploadSourceDocument',
+                'Upload source contract document',
+              )}
+              data-testid="contract-source-file-input"
               disabled={upload.isPending}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = '';
                 if (!file) return;
-                upload.mutate(file, {
-                  onSuccess: (att) => setSourceFile({ id: att.id, name: att.name }),
-                  onError: (err: Error) =>
-                    toast.error(t('contractAgreements.toastUploadFailed', 'Upload failed'), {
-                      description: err.message,
-                    }),
-                });
+                uploadSelectedFile(file);
               }}
             />
           </label>
@@ -522,35 +838,43 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
               <option value="year">/yr</option>
               <option value="fixed">fixed</option>
             </select>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => removeLine(i)}
-              className="min-h-[44px] min-w-[44px] rounded text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
+              className="min-w-[44px] text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
               aria-label={t('contractAgreements.removeRateLine', 'Remove rate line {{n}}', { n: i + 1 })}
             >
-              ×
-            </button>
+              <Icon name="x" size={14} />
+            </Button>
           </div>
         ))}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={addLine}
-          className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] hover:underline"
+          className="text-[var(--brand-primary)]"
         >
-          {t('contractAgreements.addRateLine', '+ Add rate line')}
-        </button>
+          <Icon name="plus" size={14} />
+          {t('contractAgreements.addRateLine', 'Add rate line')}
+        </Button>
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={create.isPending}>
-          {create.isPending
+        <Button type="submit" disabled={saveBusy || extractionBusy}>
+          <Icon name={saveBusy ? 'loader' : 'checkCircle'} size={14} />
+          {saveBusy
             ? t('contractAgreements.saving', 'Saving…')
-            : t('contractAgreements.save', 'Save')}
+            : extractionId && extraction.data?.status === 'done' && extractionDraft
+              ? t('contractAgreements.approveAndSave', 'Approve and save')
+              : t('contractAgreements.save', 'Save')}
         </Button>
-        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+        <Button type="button" variant="ghost" onClick={resetForm}>
           {t('contractAgreements.cancel', 'Cancel')}
         </Button>
       </div>
-    </form>
+    </motion.form>
   );
 }

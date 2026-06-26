@@ -17,10 +17,13 @@ let dbReachable = false;
 let orgId: string | null = null;
 let memberId: string | null = null;
 let roleId: string | null = null;
+let previousStubRoleHeader: string | undefined;
 const ROLE_NAME = `NOTIF-RBAC-TEST role ${Date.now()}`;
 const PERM_KEY = 'tasks:read';
 
 beforeAll(async () => {
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -60,6 +63,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orgId) {
+    await prisma.userRole.deleteMany({
+      where: { user: { email: { endsWith: '@bidstack.local' } } },
+    });
+    await prisma.user.deleteMany({
+      where: { email: { endsWith: '@bidstack.local' } },
+    });
     if (memberId) {
       await prisma.userRole.deleteMany({ where: { userId: memberId } });
       await prisma.user.deleteMany({ where: { id: memberId } });
@@ -74,6 +83,11 @@ afterAll(async () => {
   }
   if (server) await server.close();
   if (dbReachable) await prisma.$disconnect();
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
+  }
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
@@ -92,6 +106,58 @@ describe('capability manifest + user-role assignment', () => {
     // The seed/stub identity is an admin and therefore holds many permission keys.
     expect(body.isAdmin).toBe(true);
     expect(body.permissions.length).toBeGreaterThan(0);
+  });
+
+  t('GET /me/capabilities can resolve a real Read-Only E2E browser identity', async () => {
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/me/capabilities',
+      headers: { 'x-bidstack-e2e-role': 'read-only' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { isAdmin: boolean; roles: string[]; permissions: string[] };
+    expect(body.isAdmin).toBe(false);
+    expect(body.roles).toContain('Read-Only');
+    expect(body.permissions).toContain('accounts:read');
+    expect(body.permissions).not.toContain('audit-log:read');
+    expect(body.permissions.filter((permission) => permission.endsWith(':write'))).toEqual([]);
+  });
+
+  t('GET /me/capabilities maps the E2E Viewer identity onto read-only permissions', async () => {
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/me/capabilities',
+      headers: { 'x-bidstack-e2e-role': 'viewer' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      isAdmin: boolean;
+      legacyRole: string;
+      roles: string[];
+      permissions: string[];
+    };
+    expect(body.isAdmin).toBe(false);
+    expect(body.legacyRole).toBe('member');
+    expect(body.roles).toContain('Read-Only');
+    expect(body.permissions).toContain('accounts:read');
+    expect(body.permissions).not.toContain('audit-log:read');
+    expect(body.permissions.filter((permission) => permission.endsWith(':write'))).toEqual([]);
+  });
+
+  t('GET /me/capabilities can resolve a real Sales Manager E2E browser identity', async () => {
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/me/capabilities',
+      headers: { 'x-bidstack-e2e-role': 'manager' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { isAdmin: boolean; roles: string[]; permissions: string[] };
+    expect(body.isAdmin).toBe(false);
+    expect(body.roles).toContain('Sales Manager');
+    expect(body.permissions).toContain('opportunities:write');
+    expect(body.permissions).toContain('territories:write');
+    expect(body.permissions).not.toContain('settings:write');
+    expect(body.permissions).not.toContain('users:write');
   });
 
   t('assign → list → revoke a custom role, idempotently', async () => {

@@ -43,6 +43,11 @@ const SAFETY_NET_PREFIXES = [
   '/api/v1/email-templates',
   '/api/v1/entities',
   '/api/v1/forecasts',
+  // Admin/governance/credential surfaces — high-value 403 denials must be audited.
+  '/api/v1/serum',
+  '/api/v1/integrations/agent-providers',
+  '/api/v1/integrations/data-providers',
+  '/api/v1/integrations/api-keys',
   '/api/v1/integrations/dust',
   '/api/v1/integrations/email',
   '/api/v1/integrations/integrations/gmail',

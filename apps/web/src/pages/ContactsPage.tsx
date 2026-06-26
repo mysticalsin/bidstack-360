@@ -319,7 +319,7 @@ export function ContactsPage() {
                 variant="secondary"
                 aria-label={t('contacts.actions.importCsv.aria', 'Import contacts from CSV')}
               >
-                {t('contacts.actions.importCsv', 'Import CSV')}
+                {t('contacts.actions.importCsv.label', 'Import CSV')}
               </Button>
             }
           />
@@ -331,7 +331,7 @@ export function ContactsPage() {
             aria-label={t('contacts.actions.exportCsv.aria', 'Export all visible contacts as CSV')}
           >
             <Icon name="download" size={14} />
-            {t('contacts.actions.exportCsv', 'Export CSV')}
+            {t('contacts.actions.exportCsv.label', 'Export CSV')}
           </LiquidGlassButton>
           <ContactDialog
             trigger={
@@ -341,7 +341,7 @@ export function ContactsPage() {
                 aria-label={t('contacts.actions.newContact.aria', 'Create a new contact')}
               >
                 <Icon name="plus" size={14} />
-                {t('contacts.actions.newContact', 'New contact')}
+                {t('contacts.actions.newContact.label', 'New contact')}
               </Button>
             }
           />

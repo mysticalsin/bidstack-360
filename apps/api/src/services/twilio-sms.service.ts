@@ -18,6 +18,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@bidstack/db';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+import {
+  assertSerumConnectorAllowed,
+  recordSerumConnectorTestSuccess,
+} from '../lib/serum-connector-policy.js';
 type SmsEntityType = 'CONTACT' | 'LEAD';
 type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
@@ -124,6 +128,13 @@ export async function sendSms(params: SendSmsParams, log: ServiceLogger): Promis
     throw new Error(`Cannot send SMS to ${toNumber}: number has opted out (TCPA).`);
   }
 
+  await assertSerumConnectorAllowed({
+    orgId,
+    connectorId: 'twilio_sms',
+    operation: 'sms.send',
+    writeRequested: true,
+  });
+
   // Step 1: Load credentials
   const { accountSid, authToken, tokenId, fromNumber } = await loadCredentials(orgId);
 
@@ -194,6 +205,48 @@ export async function sendSms(params: SendSmsParams, log: ServiceLogger): Promis
 
   log.info({ messageId: msg.id, twilioSid: twilioMsg.sid, toNumber }, 'SMS queued via Twilio');
   return { messageId: msg.id };
+}
+
+export async function testTwilioConnection(
+  orgId: string,
+  userId: string,
+  log: ServiceLogger,
+): Promise<{ ok: true; accountSidSuffix: string; fromNumber: string }> {
+  await assertSerumConnectorAllowed({
+    orgId,
+    connectorId: 'twilio_sms',
+    operation: 'sms.testConnection',
+    writeRequested: false,
+    connectionTestProbe: true,
+  });
+
+  const { accountSid, authToken, fromNumber } = await loadCredentials(orgId);
+  const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+  const response = await fetch(`${TWILIO_API_BASE}/Accounts/${accountSid}.json`, {
+    headers: { Authorization: `Basic ${basicAuth}` },
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    log.warn({ status: response.status, err }, 'Twilio connection test failed');
+    throw new Error(`Twilio connection test failed ${response.status}: ${err}`);
+  }
+
+  const account = (await response.json()) as { status?: string; friendly_name?: string };
+  await recordSerumConnectorTestSuccess({
+    orgId,
+    connectorId: 'twilio_sms',
+    operation: 'sms.testConnection',
+    testedByUserId: userId,
+    evidence: {
+      accountSidSuffix: accountSid.slice(-6),
+      accountStatus: account.status ?? null,
+      friendlyNamePresent: Boolean(account.friendly_name),
+      fromNumber,
+    },
+  });
+
+  return { ok: true, accountSidSuffix: accountSid.slice(-6), fromNumber };
 }
 
 // ─── Status webhook ────────────────────────────────────────────────────────

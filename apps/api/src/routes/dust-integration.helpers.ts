@@ -5,9 +5,8 @@
 import { type z } from 'zod';
 
 import { prisma, type Opportunity } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 
-import { resolveOrgDustCredentials, type DustCredentials } from '../lib/dust-credentials.js';
+import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.js';
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
@@ -36,17 +35,12 @@ interface DustAgentStatus {
 }
 
 async function listDustAgents(
-  creds: DustCredentials | null,
+  orgId: string,
   log: { warn: (a: object, msg?: string) => void },
 ): Promise<DustAgentStatus> {
-  if (!creds) return { agents: [], error: null };
   try {
-    const dust = new DustClient({
-      apiKey: creds.apiKey,
-      workspaceId: creds.workspaceId,
-      baseUrl: creds.baseUrl,
-      timeoutMs: 5_000,
-    });
+    const { client: dust } = await getOrgDust(orgId, log as unknown as Parameters<typeof getOrgDust>[1]);
+    if (!dust) return { agents: [], error: null };
     return { agents: await dust.listAgents(), error: null };
   } catch (err) {
     log.warn({ err }, 'dust agents fetch error');
@@ -122,7 +116,7 @@ async function buildDustStatus(
       where: { orgId, source: 'dust.poll', status: 'processed' },
       orderBy: { receivedAt: 'desc' },
     }),
-    listDustAgents(creds, log),
+    listDustAgents(orgId, log),
   ]);
 
   const configured = Boolean(creds);

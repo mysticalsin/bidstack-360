@@ -20,8 +20,9 @@ import {
   OpportunityImportResult,
 } from '@bidstack/shared';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { serializeOpportunity } from '../serializers/opportunity.js';
-import { isUniqueViolation, mintNextCode } from './opportunities.helpers.js';
+import { isUniqueViolation, mintNextCode, mintNextCodes } from './opportunities.helpers.js';
 
 export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) => {
 
@@ -185,6 +186,13 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         pipelineStageId: created.pipelineStage?.id ?? null,
         stageName: created.pipelineStage?.name ?? null,
       });
+      // Dispatch record_created workflows for this opportunity (fail-open).
+      // `ownerId` lets "notify the owner" actions resolve the recipient (the
+      // engine falls back to input.ownerId when no explicit userId is set).
+      void dispatchWorkflowEvent(req.auth.orgId, 'record_created', 'opportunity', created.id, {
+        stage: created.stage,
+        ownerId: created.ownerId,
+      });
       return reply.code(201).send(serializeOpportunity(created));
     },
   );
@@ -325,16 +333,8 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
               if (needsMinting.length > 0) {
                 // No deletedAt filter — soft-deleted rows still own their code under
                 // the (orgId, code) unique key; see mintNextCode. (Review finding.)
-                const last = await tx.opportunity.findFirst({
-                  where: { orgId: req.auth.orgId, code: { startsWith: 'OP-' } },
-                  orderBy: { code: 'desc' },
-                  select: { code: true },
-                });
-                let n = last ? Number(last.code.slice(3)) + 1 : 2001;
-                for (const vr of needsMinting) {
-                  mintedCodes.set(vr.index, `OP-${n.toString().padStart(4, '0')}`);
-                  n += 1;
-                }
+                const codes = await mintNextCodes(tx, req.auth.orgId, needsMinting.length);
+                needsMinting.forEach((vr, index) => mintedCodes.set(vr.index, codes[index]!));
               }
 
               await tx.opportunity.createMany({

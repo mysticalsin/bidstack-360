@@ -12,6 +12,8 @@ import { useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
+let lastInputWasKeyboard = false;
+
 function routeTitles(t: TFunction): Record<string, string> {
   return {
     '/dashboard': t('routeAnnouncer.routeDashboard', 'Dashboard'),
@@ -94,6 +96,25 @@ export function RouteAnnouncer() {
   const isFirstMount = useRef(true);
 
   useEffect(() => {
+    const markKeyboard = () => {
+      lastInputWasKeyboard = true;
+    };
+    const markPointer = () => {
+      lastInputWasKeyboard = false;
+    };
+    window.addEventListener('keydown', markKeyboard, { capture: true });
+    window.addEventListener('pointerdown', markPointer, { capture: true });
+    window.addEventListener('mousedown', markPointer, { capture: true });
+    window.addEventListener('touchstart', markPointer, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', markKeyboard, { capture: true });
+      window.removeEventListener('pointerdown', markPointer, { capture: true });
+      window.removeEventListener('mousedown', markPointer, { capture: true });
+      window.removeEventListener('touchstart', markPointer, { capture: true });
+    };
+  }, []);
+
+  useEffect(() => {
     // Skip the initial mount so we don't announce on first paint — only
     // navigations should speak.
     if (isFirstMount.current) {
@@ -112,7 +133,7 @@ export function RouteAnnouncer() {
     // top of the new page instead of staying on the sidebar link.
     const focusHandle = window.setTimeout(() => {
       const main = document.getElementById('main');
-      if (main) {
+      if (main && lastInputWasKeyboard) {
         main.focus({ preventScroll: true });
       }
     }, 60);

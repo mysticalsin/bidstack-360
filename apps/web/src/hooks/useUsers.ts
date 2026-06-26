@@ -21,16 +21,50 @@ interface PresenceEntry {
   lastSeenAt: number;
 }
 
-export function useUsers() {
-  // GET /api/users is cursor-paginated and returns { items, nextCursor }.
-  // Unwrap to the OrgUser[] array via `select` so every consumer (which all
-  // use `users.data` as a flat list) keeps working — passing the raw object
-  // to a `.map()` crashed the Forecasts page.
+interface UsersPage {
+  items: OrgUser[];
+  nextCursor: string | null;
+}
+
+interface UsersPageParams {
+  cursor?: string;
+  /** Route caps at 200; default 100 matches the API default. */
+  limit?: number;
+}
+
+function usersPath(params: UsersPageParams): string {
+  const qs = new URLSearchParams();
+  if (params.cursor) qs.set('cursor', params.cursor);
+  if (params.limit) qs.set('limit', String(params.limit));
+  return `/api/users${qs.toString() ? `?${qs.toString()}` : ''}`;
+}
+
+// useUsers — the flat-list view every picker/count consumer relies on.
+// GET /api/users is cursor-paginated and returns { items, nextCursor }; we
+// unwrap to OrgUser[] via `select` so callers keep using `users.data` as an
+// array (passing the raw object to `.map()` crashed the Forecasts page).
+//
+// LIMITATION: the /api/users route exposes no `search` param, so the owner /
+// assignee pickers that consume this hook cannot do a server-side typeahead and
+// still load a single bounded page. We raise their limit to the route maximum
+// (200) so they no longer silently cap at the first 100, but a true 100k-tenant
+// fix needs a backend `?search=` endpoint. See useUsersPage for the paginated
+// Team list view.
+export function useUsers(params: UsersPageParams = {}) {
   return useQuery({
-    queryKey: ['users'],
-    queryFn: ({ signal }) =>
-      api<{ items: OrgUser[]; nextCursor: string | null }>('/api/users', { signal }),
+    queryKey: ['users', params],
+    queryFn: ({ signal }) => api<UsersPage>(usersPath(params), { signal }),
     select: (data) => data.items,
+  });
+}
+
+// useUsersPage — the cursor-paginated view for the admin Team list, which must
+// page through every member at a large tenant instead of capping at 100.
+// Returns the raw { items, nextCursor } so the page can drive a CursorPager.
+export function useUsersPage(params: UsersPageParams = {}) {
+  return useQuery<UsersPage>({
+    queryKey: ['users', 'page', params],
+    queryFn: ({ signal }) => api<UsersPage>(usersPath(params), { signal }),
   });
 }
 

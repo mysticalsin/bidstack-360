@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@bidstack/db', () => ({ prisma: {} }));
+vi.mock('@bidstack/db/serum-runtime-policy', () => ({
+  SERUM_RUNTIME_CONFIG_KEYS: { promptLibrary: 'governance' },
+  checkSerumPromptLibraryRuntimePolicy: vi.fn(),
+}));
 vi.mock('@bidstack/shared', () => ({
   RFP_STORY_MATCH: { name: 'rfp.story_match' },
   rolePreambleForKey: () => 'requirements analyst',

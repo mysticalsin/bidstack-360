@@ -29,6 +29,7 @@ export const TabsTrigger = forwardRef<HTMLButtonElement, ComponentProps<typeof R
       <RadixTabs.Trigger
         ref={ref}
         onClick={handleClick}
+        data-ui-sound-handled="true"
         className={cn(
           // Apple HIG segmented-control-ish look. State styles per design-standards.md:
           // default / hover / focus-visible (2px ring, WCAG 2.2) / active (data-state) / disabled.

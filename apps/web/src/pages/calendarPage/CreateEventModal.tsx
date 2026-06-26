@@ -13,6 +13,21 @@ interface CreateEventModalProps {
   error?: string | null;
 }
 
+// Convert a local date ("YYYY-MM-DD") + time ("HH:MM") into an offset-correct
+// ISO instant. `new Date(y, mo, d, h, m)` interprets the parts as LOCAL time, so
+// toISOString() yields the right UTC instant for the user's chosen wall-clock —
+// matching how the week grid buckets events back into local hour rows. A literal
+// "Z" suffix instead mislabels local wall-clock as UTC, dropping events into the
+// wrong hour/day for any non-UTC offset.
+function localWallClockToIso(date: string, time: string): string {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  const hour = Number(time.slice(0, 2));
+  const minute = Number(time.slice(3, 5));
+  return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString();
+}
+
 export function CreateEventModal({
   initialDate,
   onClose,
@@ -36,8 +51,11 @@ export function CreateEventModal({
     e.preventDefault();
     onSave({
       subject,
-      startAt: `${date}T${startTime}:00Z`,
-      endAt: `${date}T${endTime}:00Z`,
+      // Local wall-clock → instant: the week grid buckets by local hour via
+      // `new Date(startAt).getHours()`, so emit an offset-correct ISO (not a "Z"
+      // string that mislabels local time as UTC) to keep rows consistent.
+      startAt: localWallClockToIso(date, startTime),
+      endAt: localWallClockToIso(date, endTime),
       location: location || undefined,
       provider,
     });

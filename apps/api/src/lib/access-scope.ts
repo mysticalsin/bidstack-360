@@ -26,6 +26,11 @@
 
 import { prisma, type Prisma } from '@bidstack/db';
 
+import { createLogger } from './logger.js';
+import { publish, subscribe } from '../services/realtime.service.js';
+
+const log = createLogger({ name: 'access-scope' });
+
 export interface AccessScope {
   unrestricted: boolean;
   /** ISO-2 country codes visible to the user (union of their groups). */
@@ -44,6 +49,17 @@ const MAX_GROUPS = 100;
 const MAX_CACHE_ENTRIES = 5_000;
 
 const scopeCache = new Map<string, { scope: AccessScope; expiresAt: number }>();
+
+// Redis Pub/Sub channel for cross-replica cache invalidation. Each API replica
+// holds its own in-process scopeCache; a group mutation on one replica must
+// drop the matching entries on all the others or restricted users would keep
+// seeing stale scope until the 60s TTL lapses.
+const INVALIDATION_CHANNEL = 'access-scope:invalidate';
+
+interface InvalidationMessage {
+  orgId: string;
+  userId?: string;
+}
 
 /** Resolve the caller's visibility scope (60s in-process cache). */
 export async function getAccessScope(orgId: string, userId: string): Promise<AccessScope> {
@@ -78,10 +94,12 @@ export async function getAccessScope(orgId: string, userId: string): Promise<Acc
 }
 
 /**
- * Drop cached scopes after a group mutation. Without a userId the whole
- * org is invalidated (group-level edits affect every member).
+ * Drop the matching entries from THIS replica's in-process cache. Without a
+ * userId the whole org is invalidated (group-level edits affect every member).
+ * Local-only — never re-broadcasts, so it is safe to call from the pub/sub
+ * subscriber without forming an invalidation loop.
  */
-export function invalidateAccessScope(orgId: string, userId?: string): void {
+function applyInvalidation(orgId: string, userId?: string): void {
   if (userId) {
     scopeCache.delete(`${orgId}:${userId}`);
     return;
@@ -89,6 +107,35 @@ export function invalidateAccessScope(orgId: string, userId?: string): void {
   for (const key of scopeCache.keys()) {
     if (key.startsWith(`${orgId}:`)) scopeCache.delete(key);
   }
+}
+
+/**
+ * Drop cached scopes after a group mutation, on this replica AND all the others.
+ * Invalidates locally first (synchronous, guaranteed) then fire-and-forgets a
+ * Pub/Sub broadcast. A Redis hiccup must never break the write path that called
+ * this, so the publish error is swallowed/logged — at worst other replicas keep
+ * stale scope for up to the 60s TTL, which is the pre-broadcast behaviour.
+ */
+export function invalidateAccessScope(orgId: string, userId?: string): void {
+  applyInvalidation(orgId, userId);
+
+  const message: InvalidationMessage = { orgId, ...(userId ? { userId } : {}) };
+  void publish(INVALIDATION_CHANNEL, 'access-scope.invalidate', message).catch((err) => {
+    log.warn({ err, orgId, userId }, 'failed to broadcast access-scope invalidation');
+  });
+}
+
+// Subscribe each replica to remote invalidations. The subscriber calls
+// applyInvalidation (NOT invalidateAccessScope) so a received message clears the
+// local cache without re-broadcasting. Guarded out of the test env — unit tests
+// import this module without a Redis subscriber, matching the NODE_ENV==='test'
+// gate used by the queue bootstraps.
+if (process.env.NODE_ENV !== 'test') {
+  subscribe(INVALIDATION_CHANNEL, (payload) => {
+    const data = payload.data as InvalidationMessage | undefined;
+    if (!data || typeof data.orgId !== 'string') return;
+    applyInvalidation(data.orgId, data.userId);
+  });
 }
 
 /**
@@ -125,6 +172,46 @@ export function applyOpportunityScope(
  * unrestricted user's full page) would be served to the wrong caller.
  * Unrestricted callers keep sharing one entry (today's behavior).
  */
+export function countryVariantsForScope(scope: AccessScope): string[] {
+  return [...new Set(scope.countries.flatMap((c) => [c.toUpperCase(), c.toLowerCase()]))];
+}
+
+export function accountOpportunityScopePredicate(
+  scope: AccessScope,
+): Prisma.OpportunityWhereInput | null {
+  if (scope.unrestricted) return null;
+  const variants = countryVariantsForScope(scope);
+  const clauses: Prisma.OpportunityWhereInput[] = [{ ownerId: scope.userId }];
+  if (variants.length > 0) {
+    clauses.unshift({ territory: { countryCodes: { hasSome: variants } } });
+    clauses.unshift({ country: { in: variants } });
+  }
+  return { OR: clauses };
+}
+
+export function companyScopePredicate(scope: AccessScope): Prisma.CompanyWhereInput | null {
+  if (scope.unrestricted) return null;
+  const variants = countryVariantsForScope(scope);
+  const opportunityPredicate = accountOpportunityScopePredicate(scope);
+  const clauses: Prisma.CompanyWhereInput[] = [
+    { keyAccountOwnerId: scope.userId },
+    ...(opportunityPredicate
+      ? [{ opportunities: { some: { deletedAt: null, ...opportunityPredicate } } }]
+      : []),
+  ];
+  if (variants.length > 0) clauses.unshift({ countryCode: { in: variants } });
+  return { OR: clauses };
+}
+
+export function applyCompanyScope(
+  where: Prisma.CompanyWhereInput,
+  scope: AccessScope,
+): Prisma.CompanyWhereInput {
+  const predicate = companyScopePredicate(scope);
+  if (!predicate) return where;
+  return { AND: [where, predicate] };
+}
+
 export function scopeCacheTag(scope: AccessScope): string {
   return scope.unrestricted ? 'scope-all' : `scope-${scope.userId}`;
 }

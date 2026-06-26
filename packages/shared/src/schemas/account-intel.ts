@@ -1,5 +1,27 @@
 import { z } from 'zod';
 
+export const AccountIntelFieldProvenanceSource = z.enum([
+  'manual',
+  'document',
+  'derived:dust',
+  'derived:deterministic',
+]);
+export type AccountIntelFieldProvenanceSource = z.infer<
+  typeof AccountIntelFieldProvenanceSource
+>;
+
+export const AccountIntelFieldProvenance = z.object({
+  source: AccountIntelFieldProvenanceSource,
+  label: z.string().min(1),
+  hint: z.string().min(1),
+  confidence: z.number().min(0).max(1).nullable(),
+  sourceFileId: z.string().uuid().nullable(),
+  sourceFileName: z.string().nullable(),
+  sourceExtractionId: z.string().uuid().nullable(),
+  updatedAt: z.string().datetime(),
+});
+export type AccountIntelFieldProvenance = z.infer<typeof AccountIntelFieldProvenance>;
+
 export const AccountSolution = z.object({
   id: z.string().uuid(),
   accountId: z.string().min(1).max(255),
@@ -9,6 +31,7 @@ export const AccountSolution = z.object({
   status: z.string(),
   extractedFromDocumentId: z.string().uuid().nullable(),
   metadata: z.record(z.unknown()),
+  fieldSources: z.record(AccountIntelFieldProvenance).default({}),
   confidenceBps: z.number().int(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -26,6 +49,7 @@ export const AccountProduct = z.object({
   status: z.string(),
   extractedFromDocumentId: z.string().uuid().nullable(),
   metadata: z.record(z.unknown()),
+  fieldSources: z.record(AccountIntelFieldProvenance).default({}),
   confidenceBps: z.number().int(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

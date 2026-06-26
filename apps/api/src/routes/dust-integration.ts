@@ -8,9 +8,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import type { Logger as PinoLogger } from 'pino';
-import { DustClient } from '@bidstack/dust-client';
 
-import { resolveOrgDustCredentials } from '../lib/dust-credentials.js';
+import { getOrgDust } from '../lib/dust-credentials.js';
 import { enqueueDustResync } from '../queues/dust-poll.js';
 import {
   DustStatus,
@@ -93,21 +92,16 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
-      const creds = await resolveOrgDustCredentials(req.auth.orgId);
-      if (!creds?.dataSourceId) {
+      const { client: dust, creds } = await getOrgDust(
+        req.auth.orgId,
+        req.log.child({ kind: 'dust' }) as unknown as PinoLogger,
+      );
+      if (!dust || !creds?.dataSourceId) {
         throw server.httpErrors.serviceUnavailable('Dust integration not configured');
       }
 
       const text = serializeOpportunityToMarkdown(opp);
       const documentId = `bidstack-deal-${opp.code}`;
-
-      const dust = new DustClient({
-        apiKey: creds.apiKey,
-        workspaceId: creds.workspaceId,
-        baseUrl: creds.baseUrl,
-        timeoutMs: 10_000,
-        logger: req.log.child({ kind: 'dust' }) as unknown as PinoLogger,
-      });
 
       const doc = await dust.upsertDocument(creds.dataSourceId, documentId, text, {
         opportunity_code: opp.code,

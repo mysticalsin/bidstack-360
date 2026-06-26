@@ -49,6 +49,13 @@ function serializeReference(ref: {
 }
 
 export const referencesRoutes: FastifyPluginAsync = async (server) => {
+  // RBAC: reference CRUD writes were ungated. Gate every mutation with
+  // accounts:write (closest registered key; no references:* exists), mirroring
+  // sibling CRM routes. Reads pass through.
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('accounts:write')(req);
+  });
+
   const app = server.withTypeProvider<ZodTypeProvider>();
 
   // GET /api/v1/references — list references with filters

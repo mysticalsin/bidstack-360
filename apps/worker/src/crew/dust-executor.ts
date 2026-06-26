@@ -7,9 +7,7 @@
 
 import type pino from 'pino';
 
-import { DustClient } from '@bidstack/dust-client';
-
-import { resolveOrgDustCredentials, resolveAgentId } from '../lib/dust-credentials.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import { resolveLlmFromEnv } from '../lib/llm-provider.js';
 import { runRfpCompletion } from '../lib/rfp-llm.js';
 import type { AgentExecutor } from './types.js';
@@ -24,15 +22,7 @@ const DEFAULT_CREW_AGENT_ID = 'rfp-crew-agent';
  * Dust workspace.
  */
 export async function createDustExecutor(log: pino.Logger, orgId: string): Promise<AgentExecutor> {
-  const creds = await resolveOrgDustCredentials(orgId);
-  const dust = creds
-    ? new DustClient({
-        apiKey: creds.apiKey,
-        workspaceId: creds.workspaceId,
-        baseUrl: creds.baseUrl,
-        logger: log,
-      })
-    : null;
+  const { client: dust, creds } = await getOrgDust(orgId, log);
   const crewAgentId =
     resolveAgentId(creds, 'crew', process.env.DUST_CREW_AGENT_ID) ?? DEFAULT_CREW_AGENT_ID;
   if (!dust) {

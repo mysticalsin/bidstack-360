@@ -19,7 +19,9 @@ import { mutationAuditPlugin } from './plugins/mutation-audit.js';
 import { openapiPlugin } from './plugins/openapi.js';
 import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
+import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
+import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
 // Wave 8 — Y.js CRDT collaborative text editing
@@ -27,7 +29,7 @@ import { yjsCollabPlugin } from './plugins/yjs-collab.js';
 import { config } from './env.js';
 import { rbacPlugin } from './plugins/rbac.js';
 import { redis } from './redis.js';
-import { healthRoute } from './routes/health.js';
+import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
 
 const CONNECT_SRC = [
@@ -52,6 +54,11 @@ const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     bodyLimit: 10485760, // 10 MiB to allow large Dust AI webhooks
+    // Bound per-request and idle-socket lifetimes so a slow query or hung
+    // downstream cannot pin a Node worker (+ its DB connection) indefinitely.
+    // Defaults are 0 (unbounded) — dangerous at 100k scale. See env.ts.
+    requestTimeout: config.REQUEST_TIMEOUT_MS,
+    keepAliveTimeout: config.KEEPALIVE_TIMEOUT_MS,
     rewriteUrl: (req) => {
       const url = req.url ?? '';
       if (url.startsWith('/api/') && !url.startsWith('/api/v')) {
@@ -75,6 +82,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         paths: [
           'req.headers.authorization',
           'req.headers.cookie',
+          'req.headers["x-bidstack-sentry-smoke-token"]',
           'req.headers["x-api-key"]',
           'req.headers["x-clerk-session"]',
           'res.headers["set-cookie"]',
@@ -101,6 +109,22 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
+
+  // Record Prometheus HTTP metrics on every completed response. Use the route
+  // TEMPLATE (req.routeOptions.url, e.g. /api/v1/accounts/:id) as the label —
+  // never the raw path — so path params like ids don't blow up label
+  // cardinality. Unmatched requests (404s with no route) fall back to 'unknown'.
+  // reply.elapsedTime is the wall-clock request duration in ms; convert to s.
+  server.addHook('onResponse', async (req, reply) => {
+    const route = req.routeOptions?.url ?? 'unknown';
+    const labels = {
+      method: req.method,
+      route,
+      status_code: String(reply.statusCode),
+    };
+    httpRequestsTotal.inc(labels);
+    httpRequestDuration.observe({ method: req.method, route }, reply.elapsedTime / 1000);
+  });
 
   server.addHook('onSend', async (_req, reply) => {
     reply.header('X-Request-Id', _req.id);
@@ -146,13 +170,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = [config.PUBLIC_BASE_URL].filter(Boolean);
-      if (config.NODE_ENV === 'development') {
-        allowed.push('http://localhost:5173', 'http://localhost:4173');
-      }
-      // Production safety: never allow localhost origins.
-      if (config.NODE_ENV === 'production' && origin.includes('localhost')) {
-        return cb(new Error('localhost origin rejected in production'), false);
+      const allowed = buildAllowedCorsOrigins(config.PUBLIC_BASE_URL, config.NODE_ENV);
+      // Production safety: never allow loopback origins.
+      if (config.NODE_ENV === 'production' && isLoopbackOrigin(origin)) {
+        return cb(new Error('loopback origin rejected in production'), false);
       }
       cb(null, allowed.includes(origin));
     },
@@ -186,6 +207,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(apiVersioningPlugin);
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
+  await server.register(sentryPlugin);
   await server.register(rbacPlugin);
   await server.register(securityHeadersPlugin);
   await server.register(idempotencyPlugin);
@@ -199,20 +221,73 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(yjsCollabPlugin);
   await server.register(healthRoute);
 
+  // ── Rate-limit store selection (Redis vs in-memory) ──────────────────────
+  // The store is chosen ONCE here. In production the limit must hold across
+  // replicas, so we require the shared Redis store; otherwise each Node process
+  // keeps its own counter and the effective global limit is multiplied by the
+  // replica count. Fail loud at boot rather than silently degrading.
+  const redisReady = redis.status === 'ready' || redis.status === 'connect';
+  const rateLimitRedis = config.NODE_ENV !== 'test' && redisReady ? redis : undefined;
+  if (
+    config.NODE_ENV === 'production' &&
+    config.RATE_LIMIT_REDIS_REQUIRED === 'true' &&
+    !rateLimitRedis
+  ) {
+    throw new Error(
+      'Rate-limit Redis store is required in production (RATE_LIMIT_REDIS_REQUIRED=true) ' +
+        `but Redis is not connected (status=${redis.status}). Set RATE_LIMIT_REDIS_REQUIRED=false ` +
+        'only for single-process deploys.',
+    );
+  }
+
+  const isLowEnv = config.NODE_ENV === 'development' || config.NODE_ENV === 'test';
+
   await server.register(rateLimit, {
-    max: (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') ? 10_000 : config.API_RATE_LIMIT_MAX,
+    max: isLowEnv ? 10_000 : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
-    redis:
-      config.NODE_ENV !== 'test' && (redis.status === 'ready' || redis.status === 'connect')
-        ? redis
-        : undefined,
+    redis: rateLimitRedis,
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
-      // Public routes (health, webhooks) intentionally fall back to IP.
-      const auth = (req as unknown as { auth?: { userId?: string } }).auth;
-      return auth?.userId ?? req.ip;
+      // Fold in orgId so the per-user bucket is partitioned per tenant and keys
+      // can never collide across tenants. Public routes (health, webhooks) have
+      // no auth context and intentionally fall back to IP.
+      const auth = (req as unknown as { auth?: { userId?: string; orgId?: string } }).auth;
+      if (auth?.userId) return `u:${auth.orgId ?? 'no-org'}:${auth.userId}`;
+      return `ip:${req.ip}`;
     },
   });
+
+  // Per-tenant (org) aggregate cap — OPT-IN (0 = disabled, the default). Enforced
+  // alongside the per-user/IP limit so, in a MULTI-TENANT deployment, one tenant's
+  // users cannot exhaust shared capacity and starve other tenants. Intentionally
+  // OFF by default: a single large (100k-employee) tenant's legitimate aggregate
+  // traffic would trip a low org cap. Operators running shared SaaS set
+  // API_RATE_LIMIT_PER_ORG_MAX > 0. Uses the same store (Redis in prod).
+  if (config.API_RATE_LIMIT_PER_ORG_MAX > 0) {
+    const orgRateLimit = server.createRateLimit({
+      max: config.API_RATE_LIMIT_PER_ORG_MAX,
+      timeWindow: '1 minute',
+      keyGenerator: (req) => {
+        const auth = (req as unknown as { auth?: { orgId?: string } }).auth;
+        return auth?.orgId ? `org:${auth.orgId}` : `ip:${req.ip}`;
+      },
+    });
+    server.addHook('onRequest', async (req, reply) => {
+      // Only authenticated requests carry an org; unauthenticated/public routes
+      // are already covered by the per-IP bucket above.
+      const auth = (req as unknown as { auth?: { orgId?: string } }).auth;
+      if (!auth?.orgId) return;
+      const result = await orgRateLimit(req);
+      if (!result.isAllowed) {
+        reply.header('retry-after', String(result.ttlInSeconds));
+        return reply.code(429).send({
+          statusCode: 429,
+          error: 'Too Many Requests',
+          message: 'Tenant rate limit exceeded. Please retry later.',
+        });
+      }
+    });
+  }
 
   await registerRoutes(server);
 

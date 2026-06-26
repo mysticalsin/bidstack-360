@@ -10,6 +10,45 @@ interface MoveArgs {
   pipelineStage?: PipelineStage;
 }
 
+type StageMoveResponse = {
+  id: string;
+  pipelineStageId: string | null;
+  stage: string;
+  pipelineStage?: PipelineStage | null;
+};
+
+function applyStageMove<T extends Opportunity>(
+  opportunity: T,
+  move: {
+    pipelineStageId: string | null;
+    stage?: string | null;
+    pipelineStage?: PipelineStage | null;
+  },
+): T {
+  if (move.pipelineStageId && isPipelineStageIdUuid(move.pipelineStageId)) {
+    const nextPipelineStage =
+      move.pipelineStage !== undefined
+        ? move.pipelineStage
+        : opportunity.pipelineStage?.id === move.pipelineStageId
+          ? opportunity.pipelineStage
+          : null;
+
+    return {
+      ...opportunity,
+      pipelineStageId: move.pipelineStageId,
+      pipelineStage: nextPipelineStage,
+      stage: move.stage ?? nextPipelineStage?.name ?? move.pipelineStageId,
+    };
+  }
+
+  return {
+    ...opportunity,
+    pipelineStageId: null,
+    pipelineStage: null,
+    stage: move.stage ?? move.pipelineStageId ?? opportunity.stage,
+  };
+}
+
 // Wraps POST /api/opportunities/:id/stage with optimistic UI:
 // flips the card immediately; rolls back if the server rejects.
 export function useStageMutation() {
@@ -17,7 +56,7 @@ export function useStageMutation() {
 
   return useMutation({
     mutationFn: ({ id, pipelineStageId }: MoveArgs) =>
-      api<{ id: string; pipelineStageId: string | null; stage: string }>(`/api/opportunities/${id}/stage`, {
+      api<StageMoveResponse>(`/api/opportunities/${id}/stage`, {
         method: 'POST',
         body: isPipelineStageIdUuid(pipelineStageId)
           ? { pipelineStageId }
@@ -35,9 +74,11 @@ export function useStageMutation() {
             ...value,
             items: value.items.map((o) =>
               o.id === id
-                ? isPipelineStageIdUuid(pipelineStageId)
-                  ? { ...o, pipelineStageId, pipelineStage: pipelineStage ?? o.pipelineStage, stage: pipelineStage?.name ?? o.stage }
-                  : { ...o, stage: pipelineStageId, pipelineStageId: null, pipelineStage: null }
+                ? applyStageMove(o, {
+                    pipelineStageId,
+                    stage: pipelineStage?.name ?? pipelineStageId,
+                    pipelineStage,
+                  })
                 : o,
             ),
           });
@@ -49,9 +90,11 @@ export function useStageMutation() {
       if (detailSnap) {
         qc.setQueryData<Opportunity>(
           detailKey,
-          isPipelineStageIdUuid(pipelineStageId)
-            ? { ...detailSnap, pipelineStageId, pipelineStage: pipelineStage ?? detailSnap.pipelineStage, stage: pipelineStage?.name ?? detailSnap.stage }
-            : { ...detailSnap, stage: pipelineStageId, pipelineStageId: null, pipelineStage: null },
+          applyStageMove(detailSnap, {
+            pipelineStageId,
+            stage: pipelineStage?.name ?? pipelineStageId,
+            pipelineStage,
+          }),
         );
       }
       return { snapshots, detailSnap };
@@ -65,13 +108,13 @@ export function useStageMutation() {
         if (!cur || !Array.isArray(cur.items)) return cur;
         return {
           ...cur,
-          items: cur.items.map((o) => (o.id === id ? { ...o, ...data } : o)),
+          items: cur.items.map((o) => (o.id === id ? applyStageMove(o, data) : o)),
         };
       });
       const detailKey = ['opportunity', id] as const;
       const detailSnap = qc.getQueryData<Opportunity>(detailKey);
       if (detailSnap) {
-        qc.setQueryData<Opportunity>(detailKey, { ...detailSnap, ...data });
+        qc.setQueryData<Opportunity>(detailKey, applyStageMove(detailSnap, data));
       }
     },
     onSettled: () => {

@@ -26,6 +26,15 @@ import { dataProviderCredentialsRoutes } from './routes/data-provider-credential
 import { exchangeRatesRoutes } from './routes/exchange-rates.js';
 import { filesRoutes } from './routes/files.js';
 import { leadRoutes } from './routes/leads.js';
+import { kamInitiativeRoutes } from './routes/kam-initiatives.js';
+import { kamTaskRoutes } from './routes/kam-tasks.js';
+import { kamSessionRoutes } from './routes/kam-sessions.js';
+import { kamDraftRoutes } from './routes/kam-drafts.js';
+import { kamHandoffRoutes } from './routes/kam-handoffs.js';
+import { kamProspectionRoutes } from './routes/kam-prospections.js';
+import { kamReportRoutes } from './routes/kam-reports.js';
+import { kamAccountRoutes } from './routes/kam-accounts.js';
+import { companyLogoRoutes } from './routes/company-logo.js';
 import { notesRoutes } from './routes/notes.js';
 import { opportunityContactsRoutes } from './routes/opportunity-contacts.js';
 import { erpRoutes } from './routes/erp-integration.js';
@@ -40,6 +49,7 @@ import { reportsRoutes } from './routes/reports.js';
 import { analyticsReportsRoutes } from './routes/analytics-reports.js';
 import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
 import { configFeaturesRoutes } from './routes/config-features.js';
+import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
 import { sectorViewRoutes } from './routes/sector-view.js';
 import { infosearchRoutes } from './routes/infosearch.js';
@@ -58,6 +68,7 @@ import { workflowRoutes } from './routes/workflows.js';
 import { tagRoutes } from './routes/tags.js';
 import { emailTemplateRoutes } from './routes/email-templates.js';
 import { leadRotRoutes } from './routes/lead-rot.js';
+import { savedViewsRoutes } from './routes/saved-views.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
@@ -117,12 +128,17 @@ import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
 import { competitorRoutes } from './routes/competitors.js';
 // Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
 import { monitoringRoutes } from './routes/monitoring.js';
+import { opsSentrySmokeRoutes } from './routes/ops-sentry-smoke.js';
 // Data migration: CSV import, cancel/undo destructive operations
 import { migrationRoutes } from './routes/migrations.js';
 // Data migration: HubSpot OAuth + import
 import { hubspotMigrationRoutes } from './routes/migrations-hubspot.routes.js';
 // Public demo door (only self-registers when DEMO_MODE is armed)
 import { demoRoutes } from './routes/demo.js';
+// GDPR Art. 20 — tenant data-portability export
+import { tenantExportRoutes } from './routes/tenant-export.js';
+// GDPR Art. 17 — per-data-subject erasure (anonymization)
+import { erasureRoutes } from './routes/erasure.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -134,6 +150,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
   await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
+  await server.register(serumRoutes, { prefix: '/api/v1' });
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
   await server.register(sectorViewRoutes, { prefix: '/api/v1' });
   await server.register(infosearchRoutes, { prefix: '/api/v1' });
@@ -142,6 +159,15 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });
   await server.register(projectReferencesRoutes, { prefix: '/api/v1' });
+  await server.register(kamInitiativeRoutes, { prefix: '/api/v1' });
+  await server.register(kamTaskRoutes, { prefix: '/api/v1' });
+  await server.register(kamSessionRoutes, { prefix: '/api/v1' });
+  await server.register(kamDraftRoutes, { prefix: '/api/v1' });
+  await server.register(kamHandoffRoutes, { prefix: '/api/v1' });
+  await server.register(kamProspectionRoutes, { prefix: '/api/v1' });
+  await server.register(kamReportRoutes, { prefix: '/api/v1' });
+  await server.register(kamAccountRoutes, { prefix: '/api/v1' });
+  await server.register(companyLogoRoutes, { prefix: '/api/v1' });
   await server.register(orgSettingsRoutes, { prefix: '/api/v1' });
   await server.register(searchRoutes, { prefix: '/api/v1' });
   await server.register(auditLogsRoutes, { prefix: '/api/v1' });
@@ -185,6 +211,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(tagRoutes, { prefix: '/api/v1' });
   await server.register(emailTemplateRoutes, { prefix: '/api/v1' });
   await server.register(leadRotRoutes, { prefix: '/api/v1' });
+  await server.register(savedViewsRoutes, { prefix: '/api/v1' });
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
@@ -270,11 +297,18 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
   await server.register(monitoringRoutes, { prefix: '/api/v1' });
+  await server.register(opsSentrySmokeRoutes, { prefix: '/api/v1' });
 
   // Data migration: CSV import, cancel/undo destructive operations
   await server.register(migrationRoutes, { prefix: '/api/v1' });
   // Data migration: HubSpot OAuth + import
   await server.register(hubspotMigrationRoutes, { prefix: '/api/v1' });
+
+  // GDPR Art. 20 — tenant data-portability export (admin-gated, org-scoped)
+  await server.register(tenantExportRoutes, { prefix: '/api/v1' });
+
+  // GDPR Art. 17 — per-data-subject erasure / anonymization (admin-gated, org-scoped)
+  await server.register(erasureRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.

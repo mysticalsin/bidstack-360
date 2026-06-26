@@ -274,11 +274,19 @@ function buildNpsEmailText(greeting: string, publicUrl: string, exp: Date): stri
 
 // ─── Quarterly batch ───────────────────────────────────────────────────────
 
+// Hard ceiling on accounts processed per quarterly run. Any org with more than
+// this many eligible accounts is paged across consecutive runs (the next run
+// re-selects the still-unsurveyed accounts, since this one stamped sentAt on the
+// ones it dispatched). Bounds the scan + the per-account write fan-out below.
+const MAX_ACCOUNTS_PER_RUN = 1_000;
+
 /** Send NPS surveys to all contacts for qualifying accounts (quarterly trigger). */
 export async function sendQuarterlyNpsSurveys(orgId: string, log: PinoLogger): Promise<number> {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
-  // Active accounts that haven't had a survey in 90 days.
+  // Active accounts that haven't had a survey in 90 days. Bounded scan: contacts
+  // are fetched inline (take:1) so there is no per-account follow-up query, and
+  // the account set itself is capped at MAX_ACCOUNTS_PER_RUN.
   const accounts = await prisma.subscription.findMany({
     where: {
       orgId,
@@ -294,6 +302,8 @@ export async function sendQuarterlyNpsSurveys(orgId: string, log: PinoLogger): P
       account: { select: { contacts: { select: { id: true }, take: 1 } } },
     },
     distinct: ['accountId'],
+    orderBy: { accountId: 'asc' },
+    take: MAX_ACCOUNTS_PER_RUN,
   });
 
   let dispatched = 0;

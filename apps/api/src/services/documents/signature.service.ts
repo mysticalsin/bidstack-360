@@ -294,15 +294,39 @@ export async function handleDocuSignWebhook(
 
   const newStatus = docuSignStatusToModel(eventType);
 
+  // IDEMPOTENCY GATE: DocuSign Connect delivers at-least-once — a "completed"
+  // event is redelivered on every retry until we return 200. Without a guard,
+  // each redelivery re-runs the status write AND appends a duplicate
+  // SignatureEvent, polluting the non-repudiable audit trail. We mirror the
+  // internal-sign TOCTOU pattern: claim the transition atomically with an
+  // updateMany whose WHERE excludes the target status and all terminal states.
+  // count===0 means this event was already processed (or the request is already
+  // terminal) — we return WITHOUT recording a duplicate event. The route still
+  // sends 200 (we don't throw), so DocuSign stops retrying.
+  //
+  // `status: { not: newStatus }` dedupes same-status redeliveries (e.g. a second
+  // "completed"). `notIn TERMINAL_STATUSES` ensures a terminal request (already
+  // SIGNED/VOIDED/DECLINED/EXPIRED) is never reopened by a late or out-of-order
+  // event. Both conditions live on the WHERE, so the gate is decided in the DB,
+  // not in app code that two concurrent deliveries could both pass.
   await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: request.id },
+    const claim = await tx.signatureRequest.updateMany({
+      where: {
+        id: request.id,
+        status: { not: newStatus, notIn: DOCUSIGN_TERMINAL_STATUSES },
+      },
       data: {
         status: newStatus,
         ...(newStatus === 'SIGNED' ? { completedAt: new Date() } : {}),
         ...(newStatus === 'VOIDED' ? { voidedAt: new Date() } : {}),
       },
     });
+    if (claim.count === 0) {
+      // Already processed / already terminal — duplicate or stale delivery.
+      // No event written; the transaction commits as a no-op and the caller
+      // returns 200 so DocuSign stops retrying.
+      return;
+    }
 
     await tx.signatureEvent.create({
       data: {
@@ -317,6 +341,15 @@ export async function handleDocuSignWebhook(
     });
   });
 }
+
+// Terminal signature states. Once a request reaches any of these, a redelivered
+// or out-of-order DocuSign webhook must NOT mutate it or append another event.
+const DOCUSIGN_TERMINAL_STATUSES: SignatureStatus[] = [
+  'SIGNED',
+  'VOIDED',
+  'DECLINED',
+  'EXPIRED',
+];
 
 // ─── voidSignatureRequest ─────────────────────────────────────────────────────
 
@@ -400,8 +433,31 @@ export async function handleInternalSign(params: {
   });
 
   if (!request) notFound('Signing link not found or expired');
-  if (request.status === 'SIGNED') badRequest('Document has already been signed');
   if (request.status === 'VOIDED') badRequest('This signing request has been voided');
+  if (request.status === 'SIGNED') badRequest('Document has already been signed');
+
+  // The signed-PDF key is deterministic (orgId + requestId), so winning the
+  // transition lets us record it up front and the loser never overwrites it.
+  const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
+
+  // TOCTOU GATE: claim the SIGNED transition atomically BEFORE the expensive
+  // PDF render + S3 PUT. `notIn: ['SIGNED','VOIDED']` means only one of two
+  // concurrent submits matches; the loser's count===0 aborts here — so we never
+  // render twice, never overwrite the signed PDF, and never record duplicate
+  // SIGNED events on the non-repudiable audit trail.
+  const claim = await prisma.signatureRequest.updateMany({
+    where: { id: request.id, status: { notIn: ['SIGNED', 'VOIDED'] } },
+    data: {
+      status: 'SIGNED',
+      completedAt: new Date(),
+      completedDocumentS3Key: s3Key,
+      recipients: updateRecipientSignedAt(request.recipients as object[], typedName),
+    },
+  });
+  if (claim.count === 0) {
+    // Another request won the race (or it was voided between read and claim).
+    badRequest('Document has already been signed');
+  }
 
   // Build a minimal signed document HTML
   const signedHtml = buildSignedDocumentHtml({
@@ -416,12 +472,13 @@ export async function handleInternalSign(params: {
   // Upload to storage
   const { getStorage } = await import('../../storage/index.js');
   const store = await getStorage();
-  const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
   // Persist the signed PDF. Local: direct disk write. S3: PUT the bytes via a
-  // presigned URL (driver-agnostic — no direct SDK dependency here). FAIL CLOSED:
-  // never mark the request SIGNED with a key that points at bytes we did not
-  // actually write. The previous S3 branch was a no-op TODO that silently
-  // discarded every signed PDF in production while reporting success. (Review.)
+  // presigned URL (driver-agnostic — no direct SDK dependency here). The status
+  // is already SIGNED (claimed above for TOCTOU dedup); if this PUT throws, the
+  // request stays SIGNED with no SIGNED event recorded (the event write below is
+  // skipped) — the gap is detectable and the deterministic key is re-PUTtable on
+  // retry. The previous S3 branch was a no-op TODO that silently discarded every
+  // signed PDF in production while reporting success. (Review.)
   if (store.writeLocal) {
     await store.writeLocal(s3Key, pdfBuf);
   } else {
@@ -441,27 +498,19 @@ export async function handleInternalSign(params: {
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: request.id },
-      data: {
-        status: 'SIGNED',
-        completedAt: new Date(),
-        completedDocumentS3Key: s3Key,
-        recipients: updateRecipientSignedAt(request.recipients as object[], typedName),
-      },
-    });
-    await tx.signatureEvent.create({
-      data: {
-        signatureRequestId: request.id,
-        type: 'SIGNED',
-        recipientEmail: extractFirstEmail(request.recipients as object[]),
-        occurredAt: new Date(),
-        ipAddress,
-        userAgent,
-        payload: { typedName, s3Key } as object,
-      },
-    });
+  // The SIGNED status, completedAt, s3Key, and recipient signedAt were committed
+  // by the winning claim above. Only the immutable audit event remains — record
+  // it exactly once (one SIGNED event per winning submit, as before).
+  await prisma.signatureEvent.create({
+    data: {
+      signatureRequestId: request.id,
+      type: 'SIGNED',
+      recipientEmail: extractFirstEmail(request.recipients as object[]),
+      occurredAt: new Date(),
+      ipAddress,
+      userAgent,
+      payload: { typedName, s3Key } as object,
+    },
   });
 
   return { requestId: request.id };
@@ -533,22 +582,44 @@ function timingSafeEqual(a: Buffer, b: Buffer): boolean {
   return diff === 0;
 }
 
+// Escape user-controlled text before interpolating into the signed-doc HTML that
+// htmlToPdf() renders — typedName/documentName are attacker-controllable, so raw
+// interpolation was an HTML/script injection into the rendered PDF.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// The signature image must be a base64 data:image URL — reject anything else
+// (javascript:, external URLs, onerror-bearing payloads) before it reaches src.
+function safeSignatureSrc(value: string): string {
+  return /^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(value) ? value : '';
+}
+
 function buildSignedDocumentHtml(params: {
   typedName: string;
   signatureDataUrl: string;
   signedAt: string;
   documentName: string;
 }): string {
+  const documentName = escapeHtml(params.documentName);
+  const typedName = escapeHtml(params.typedName);
+  const signedAt = escapeHtml(params.signedAt);
+  const signatureSrc = safeSignatureSrc(params.signatureDataUrl);
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Signed: ${params.documentName}</title></head>
+<head><meta charset="utf-8"><title>Signed: ${documentName}</title></head>
 <body style="font-family:sans-serif;margin:40px;color:#111">
-<h1 style="font-size:1.5rem">${params.documentName}</h1>
+<h1 style="font-size:1.5rem">${documentName}</h1>
 <hr style="margin:24px 0">
-<p>Signed by: <strong>${params.typedName}</strong></p>
-<p>Signed at: ${params.signedAt}</p>
+<p>Signed by: <strong>${typedName}</strong></p>
+<p>Signed at: ${signedAt}</p>
 <div style="margin-top:16px;border:1px solid #ccc;padding:16px;display:inline-block">
-  <img src="${params.signatureDataUrl}" alt="Signature" style="max-height:80px">
+  <img src="${signatureSrc}" alt="Signature" style="max-height:80px">
 </div>
 <p style="margin-top:24px;font-size:0.75rem;color:#666">
   This document was signed via BidStack 360° INTERNAL provider. This is an

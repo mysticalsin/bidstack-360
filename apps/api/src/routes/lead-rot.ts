@@ -81,6 +81,12 @@ export const leadRotRoutes: FastifyPluginAsyncZod = async (server) => {
   server.put(
     '/lead-rot/config',
     {
+      // RBAC: this rewrites org-wide rot thresholds (a Settings mutation) and
+      // was previously ungated — a Read-Only user could change every rep's
+      // staleness signals. Gate behind settings:write, matching how other
+      // Settings PUTs are protected. GET stays open to any authenticated user;
+      // recovery-suggest is a lead-operational read, so neither is gated here.
+      preHandler: server.requirePermission('settings:write'),
       schema: {
         body: LeadStageRotConfigUpsert,
         response: { 200: LeadStageRotConfig },

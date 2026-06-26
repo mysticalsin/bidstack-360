@@ -24,7 +24,17 @@ This runbook covers day-to-day operational procedures. For architecture details 
 
 ### Standard deploy (Docker / container)
 
+`docker-compose.prod.yml` requires `INTEGRATION_TOKEN_KEY` for both API and
+worker because both services decrypt tenant/provider secrets. It also publishes
+the web UI on `WEB_HTTP_PORT` (default `8080`) to the web container's
+unprivileged nginx port `8080`. Run the compose policy before building so env
+or ingress drift fails before an image is shipped.
+
 ```bash
+# 0. Validate production compose / env wiring
+pnpm deploy:evidence:compose:policy
+docker compose -f docker-compose.prod.yml config --quiet
+
 # 1. Build and tag the API image
 docker build -t bidstack-api:$GIT_SHA -f Dockerfile .
 
@@ -142,23 +152,34 @@ kubectl scale deployment/bidstack-worker --replicas=2
 ## Rotate INTEGRATION_TOKEN_KEY
 
 `INTEGRATION_TOKEN_KEY` encrypts OAuth tokens in `IntegrationToken` table (AES-256-GCM, `token-cipher.ts`).
+`scripts/ops/rotate-secrets.sh` intentionally blocks this rotation unless `scripts/rotate-integration-tokens.ts` exists.
+The rotation tool is resumable: rows already encrypted with the new key are skipped.
 
 ```bash
-# 1. Generate new key
-openssl rand -hex 32
+# 1. Prove the operator contract and local crypto behavior.
+pnpm deploy:evidence:secret-rotation:policy
+pnpm deploy:evidence:secret-rotation:tool:selftest
 
-# 2. Write a migration script (similar to scripts/encrypt-existing-pii.ts)
-#    that decrypts tokens with OLD key, re-encrypts with NEW key.
-#    Pattern: use decryptToken(row.accessToken, oldKey) → encryptToken(plain, newKey).
+# 2. Generate but do not deploy the new key yet.
+NEW_KEY=$(openssl rand -hex 32)
 
-# 3. Run migration with both keys in env
+# 3. Dry-run database re-encryption with both keys.
 OLD_INTEGRATION_TOKEN_KEY=<old> \
-NEW_INTEGRATION_TOKEN_KEY=<new> \
-tsx scripts/rotate-integration-tokens.ts   # (create this script when needed)
+NEW_INTEGRATION_TOKEN_KEY="$NEW_KEY" \
+pnpm exec tsx scripts/rotate-integration-tokens.ts --dry-run
 
-# 4. Update INTEGRATION_TOKEN_KEY env and redeploy
-# 5. Remove OLD_INTEGRATION_TOKEN_KEY from env
+# 4. Apply re-encryption. If interrupted, rerun the same command; already-new rows are skipped.
+OLD_INTEGRATION_TOKEN_KEY=<old> \
+NEW_INTEGRATION_TOKEN_KEY="$NEW_KEY" \
+pnpm exec tsx scripts/rotate-integration-tokens.ts --apply
+
+# 5. Update INTEGRATION_TOKEN_KEY env to "$NEW_KEY" and redeploy.
+# 6. Keep INTEGRATION_TOKEN_KEY_PREV / old key until app/API smoke tests pass.
+# 7. Remove INTEGRATION_TOKEN_KEY_PREV only after token re-encryption and smoke tests succeed.
 ```
+
+If any row cannot decrypt with the old or new key, stop and investigate before
+changing the active environment secret.
 
 ---
 

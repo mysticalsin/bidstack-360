@@ -39,6 +39,7 @@ const ALL_QUEUE_NAMES = [
   'company.enrich-apollo',
   'dust.poll',
   'document.extract',
+  'sentry.smoke',
   'webhook.delivery',
   // Email / calendar
   'email.outlook.pull-incremental',

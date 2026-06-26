@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
+const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
+
 /**
  * Convert and format a money amount for the user's selected display currency.
  * Uses live exchange rates fetched from open.er-api.com.
@@ -10,6 +12,7 @@ import { formatMoney, formatMoneyMicros } from '@/lib/format';
 export function useDisplayMoney(value: number, sourceCurrency = 'EUR'): string {
   const { currency, convert, fetchRates } = useCurrencyStore();
   useEffect(() => {
+    if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
   const converted = convert(value, sourceCurrency);
@@ -25,6 +28,7 @@ export function useDisplayMoneyMicros(
 ): string {
   const { currency, convert, fetchRates } = useCurrencyStore();
   useEffect(() => {
+    if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
   // Convert micros to unit value

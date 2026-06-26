@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { useCall, useExtractInsights, type CallSummaryEntry } from '@/hooks/useCalls';
+import { callActionItemText, useCall, useExtractInsights, type CallSummaryEntry } from '@/hooks/useCalls';
 import type { BadgeTone } from '@/components/ui/Badge';
 
 // ─── MEDDIC dimension display names ───────────────────────────────────────────
@@ -244,7 +244,7 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
             {actionItems.map((item, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-[var(--fg-primary)]">
                 <span aria-hidden className="flex-shrink-0 text-[var(--fg-tertiary)] mt-0.5">•</span>
-                {item}
+                {callActionItemText(item)}
               </li>
             ))}
           </ul>

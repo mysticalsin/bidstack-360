@@ -30,10 +30,53 @@ import { rbacPlugin } from '../plugins/rbac.js';
 
 const findMany = vi.mocked(prisma.userRole.findMany);
 const count = vi.mocked(prisma.userRole.count) as unknown as {
-  mockImplementation: (fn: () => Promise<number>) => void;
+  mockImplementation: (fn: (args?: unknown) => Promise<number>) => void;
   mockReset: () => void;
   mockResolvedValueOnce: (value: number) => void;
 };
+
+// ─── Matrix-driven gate helpers (shared by the allow / deny suites below) ────
+// The plugin's requirePermission calls prisma.userRole.count with the checked
+// permission key nested at where.role.permissions.some.permission.key. We read
+// that key back so the count mock can simulate a DB seeded from the canonical
+// RBAC_MATRIX, rather than returning a hardcoded 1/0 that ignores the role.
+
+/** Pull the permission key out of the plugin's prisma.userRole.count(where). */
+function permKeyFromCountArgs(args: unknown): string | undefined {
+  const where = (
+    args as {
+      where?: { role?: { permissions?: { some?: { permission?: { key?: string } } } } };
+    }
+  )?.where;
+  return where?.role?.permissions?.some?.permission?.key;
+}
+
+/** Mock the DB so a role only "holds" the permissions its matrix entry lists. */
+function mockCountFromMatrix(role: SystemRoleName): void {
+  const granted = new Set<string>(RBAC_MATRIX[role]);
+  count.mockImplementation(async (args?: unknown) => {
+    const key = permKeyFromCountArgs(args);
+    return key !== undefined && granted.has(key) ? 1 : 0;
+  });
+}
+
+/** Drive a guarded route through the real plugin and return the HTTP status. */
+async function matrixGateStatus(role: SystemRoleName, perm: string): Promise<number> {
+  mockCountFromMatrix(role);
+  const server = Fastify({ logger: false });
+  await server.register(sensible);
+  await server.register(rbacPlugin);
+  server.addHook('onRequest', async (req) => {
+    req.auth = { orgId: 'org-1', userId: 'u-1', role: 'member', scopes: [] };
+  });
+  server.get('/guarded', { preHandler: server.requirePermission(perm as never) }, async () => ({
+    ok: true,
+  }));
+  await server.ready();
+  const res = await server.inject({ method: 'GET', url: '/guarded' });
+  await server.close();
+  return res.statusCode;
+}
 
 // Build a minimal Fastify server wired for permission testing.
 async function _buildServer(grantedPermissions: string[]) {
@@ -137,6 +180,16 @@ describe('RBAC_MATRIX', () => {
     expect(perms).not.toContain('opportunities:write');
   });
 
+  it('KAM is writable by account-owning roles and readable by Read-Only', () => {
+    // KAM front layer (initiatives/sessions/tasks). Owners are presales- OR
+    // manager-driven, so both Account Executive and Sales Manager get write.
+    expect(RBAC_MATRIX['Admin']).toContain('kam:write');
+    expect(RBAC_MATRIX['Sales Manager']).toContain('kam:write');
+    expect(RBAC_MATRIX['Account Executive']).toContain('kam:write');
+    expect(RBAC_MATRIX['Read-Only']).toContain('kam:read');
+    expect(RBAC_MATRIX['Read-Only']).not.toContain('kam:write');
+  });
+
   it('Sales Manager has all read permissions', () => {
     const perms = RBAC_MATRIX['Sales Manager'];
     const readPerms = perms.filter((p) => p.endsWith(':read'));
@@ -173,33 +226,36 @@ describe('requirePermission — allow matrix', () => {
     count.mockReset();
   });
 
+  // ── De-tautologized (BS) ────────────────────────────────────────────────
+  // These previously hardcoded `count.mockResolvedValueOnce(1)` (allow) and
+  // `(0)` (deny), so the `role` field was decorative: the gate's outcome was
+  // dictated by the literal mock, not by what RBAC_MATRIX actually grants. The
+  // test could not fail if the matrix regressed (e.g. a `:write` perm leaking
+  // into Read-Only). matrixGateStatus now SIMULATES the seeded DB from the real
+  // RBAC_MATRIX: the count mock returns 1 iff RBAC_MATRIX grants the queried key
+  // to the case's role. So the assertions encode WHY — "this role IS/ISN'T
+  // allowed this perm per the canonical matrix" — and flip (and fail) the moment
+  // the matrix diverges from the expected gate decision.
+
   const ALLOW_CASES: Array<{ role: SystemRoleName; perm: string }> = [
     { role: 'Admin', perm: 'settings:write' },
     { role: 'Admin', perm: 'users:write' },
     { role: 'Sales Manager', perm: 'leads:write' },
     { role: 'Sales Manager', perm: 'territories:write' },
     { role: 'Account Executive', perm: 'proposals:write' },
+    { role: 'Account Executive', perm: 'kam:write' },
+    { role: 'Sales Manager', perm: 'kam:write' },
     { role: 'SDR', perm: 'leads:write' },
     { role: 'Customer Success', perm: 'service-desk:write' },
     { role: 'Customer Success', perm: 'accounts:read' },
     { role: 'Read-Only', perm: 'leads:read' },
+    { role: 'Read-Only', perm: 'kam:read' },
   ];
 
-  it.each(ALLOW_CASES)('$role is allowed $perm', async ({ perm }) => {
-    count.mockResolvedValueOnce(1);
-    const server = Fastify({ logger: false });
-    await server.register(sensible);
-    await server.register(rbacPlugin);
-    server.addHook('onRequest', async (req) => {
-      req.auth = { orgId: 'org-1', userId: 'u-1', role: 'member', scopes: [] };
-    });
-    server.get('/guarded', { preHandler: server.requirePermission(perm as never) }, async () => ({
-      ok: true,
-    }));
-    await server.ready();
-    const res = await server.inject({ method: 'GET', url: '/guarded' });
-    expect(res.statusCode).toBe(200);
-    await server.close();
+  it.each(ALLOW_CASES)('$role is allowed $perm', async ({ role, perm }) => {
+    // Precondition the case is honest: the matrix must actually grant this.
+    expect(RBAC_MATRIX[role]).toContain(perm);
+    expect(await matrixGateStatus(role, perm)).toBe(200);
   });
 });
 
@@ -212,6 +268,7 @@ describe('requirePermission — deny matrix', () => {
     { role: 'SDR', perm: 'opportunities:write', reason: 'SDR should not write opportunities' },
     { role: 'SDR', perm: 'invoices:read', reason: 'SDR has no invoice access' },
     { role: 'Read-Only', perm: 'leads:write', reason: 'Read-Only has no write access' },
+    { role: 'Read-Only', perm: 'kam:write', reason: 'Read-Only cannot write KAM' },
     { role: 'Read-Only', perm: 'mcp:read', reason: 'Read-Only has no MCP access' },
     {
       role: 'Customer Success',
@@ -220,21 +277,87 @@ describe('requirePermission — deny matrix', () => {
     },
   ];
 
-  it.each(DENY_CASES)('$role is denied $perm ($reason)', async ({ perm }) => {
-    count.mockResolvedValueOnce(0);
+  it.each(DENY_CASES)('$role is denied $perm ($reason)', async ({ role, perm }) => {
+    // Precondition the case is honest: the matrix must NOT grant this.
+    expect(RBAC_MATRIX[role]).not.toContain(perm);
+    expect(await matrixGateStatus(role, perm)).toBe(403);
+  });
+
+  // Anti-regression: a write permission leaking into Read-Only must make the
+  // gate admit it. We don't mutate the real matrix; we simulate a regressed one
+  // to prove matrixGateStatus's mock is wired to the granted set (i.e. the test
+  // genuinely depends on the matrix, not on a hardcoded mock). Read-Only with
+  // its real matrix is denied leads:write; a Read-Only-plus-leads:write set is
+  // admitted. If matrixGateStatus ever ignored the matrix, both would match.
+  it('gate decision tracks the granted set (would catch a Read-Only write leak)', async () => {
+    expect(await matrixGateStatus('Read-Only', 'leads:write')).toBe(403);
+
+    const leaked = new Set<string>([...RBAC_MATRIX['Read-Only'], 'leads:write']);
+    count.mockImplementation(async (args?: unknown) => {
+      const key = permKeyFromCountArgs(args);
+      return key !== undefined && leaked.has(key) ? 1 : 0;
+    });
     const server = Fastify({ logger: false });
     await server.register(sensible);
     await server.register(rbacPlugin);
     server.addHook('onRequest', async (req) => {
       req.auth = { orgId: 'org-1', userId: 'u-1', role: 'member', scopes: [] };
     });
-    server.get('/guarded', { preHandler: server.requirePermission(perm as never) }, async () => ({
-      ok: true,
-    }));
+    server.get(
+      '/guarded',
+      { preHandler: server.requirePermission('leads:write' as never) },
+      async () => ({ ok: true }),
+    );
     await server.ready();
     const res = await server.inject({ method: 'GET', url: '/guarded' });
-    expect(res.statusCode).toBe(403);
     await server.close();
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ─── New route gates: email-templates + lead-rot settings:write ─────────────
+// Both routes were ungated, letting a Read-Only user author org outbound-mail
+// templates / rewrite org rot thresholds. These tests prove the new gate hooks
+// reject a caller who lacks settings:write and admit one who holds it, exercising
+// the SAME requirePermission seam the routes use (no live DB required).
+
+describe('new settings:write gates reject non-permissioned callers', () => {
+  beforeEach(() => {
+    count.mockReset();
+  });
+
+  /** Stand up a route guarded exactly like the new email-templates / lead-rot
+   *  mutation hooks (settings:write), then return its status for a given grant. */
+  async function settingsWriteGateStatus(holdsSettingsWrite: boolean): Promise<number> {
+    count.mockImplementation(async (args?: unknown) =>
+      permKeyFromCountArgs(args) === 'settings:write' && holdsSettingsWrite ? 1 : 0,
+    );
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(rbacPlugin);
+    server.addHook('onRequest', async (req) => {
+      req.auth = { orgId: 'org-1', userId: 'u-1', role: 'member', scopes: [] };
+    });
+    // Mirror the route hooks: a mutating method gated by settings:write.
+    server.addHook('preHandler', async (req) => {
+      await server.requirePermission('settings:write')(req);
+    });
+    server.put('/email-templates', async () => ({ ok: true }));
+    await server.ready();
+    const res = await server.inject({ method: 'PUT', url: '/email-templates' });
+    await server.close();
+    return res.statusCode;
+  }
+
+  it('rejects a caller without settings:write (Read-Only cannot author templates / rot config)', async () => {
+    // Read-Only holds no settings:write in the canonical matrix.
+    expect(RBAC_MATRIX['Read-Only']).not.toContain('settings:write');
+    expect(await settingsWriteGateStatus(false)).toBe(403);
+  });
+
+  it('admits a caller who holds settings:write (Admin)', async () => {
+    expect(RBAC_MATRIX['Admin']).toContain('settings:write');
+    expect(await settingsWriteGateStatus(true)).toBe(200);
   });
 });
 

@@ -22,8 +22,9 @@ import type { UserGroup } from '@bidstack/shared';
 /**
  * M7 — Settings → Access groups (admin).
  * Groups mirror the source systems' (ABC, Opportunity Management) group
- * access. Members of a group only see opportunities in the group's
- * countries (plus deals they own). No groups / a "sees everything" group
+ * access. Members of a group only see opportunities, account cockpits,
+ * account notes, and files in the group's countries (plus deals they own).
+ * No groups / a "sees everything" group
  * = unrestricted. Admin-managed until the source-system sync lands.
  */
 export function AccessGroupsSection() {
@@ -79,7 +80,7 @@ export function AccessGroupsSection() {
       <p className="text-sm text-[var(--fg-secondary)]">
         {t(
           'accessGroups.intro',
-          "Members of a group only see opportunities in the group's countries, plus deals they own. Users in no group see everything — scoping starts when you assign them. Groups will sync from ABC / Opportunity Management once those connectors exist.",
+          "Members of a group only see opportunities, account cockpits, notes, and files in the group's countries, plus deals they own. Users in no group see everything - scoping starts when you assign them. Groups will sync from ABC / Opportunity Management once those connectors exist.",
         )}
       </p>
 
@@ -153,7 +154,7 @@ export function AccessGroupsSection() {
               title={t('accessGroups.emptyTitle', 'No access groups yet')}
               message={t(
                 'accessGroups.emptyMessage',
-                'Everyone currently sees all opportunities. Create a group above to start scoping visibility by country.',
+                'Everyone currently sees all opportunities, account cockpits, notes, and files. Create a group above to start scoping visibility by country.',
               )}
             />
           </div>
@@ -220,7 +221,9 @@ function GroupEditor({ group }: { group: UserGroup }) {
   const update = useUpdateUserGroup();
   const addMember = useAddGroupMember();
   const removeMember = useRemoveGroupMember();
-  const { data: users } = useUsers();
+  // Member picker: no server-side user search exists, so request the route
+  // maximum (200) instead of the default 100 to avoid dropping candidates.
+  const { data: users } = useUsers({ limit: 200 });
   const [pickedUserId, setPickedUserId] = useState('');
 
   const members = detail.data?.members ?? [];

@@ -47,7 +47,16 @@ export function TagChip({ tag, onRemove, interactive = false, size = 'sm' }: Tag
             onRemove();
           }}
           aria-label={t('tagChip.removeTag', 'Remove tag {{name}}', { name: tag.name })}
-          className="-mr-1 ml-0.5 grid h-4 w-4 place-items-center rounded-full hover:bg-black/15 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-current"
+          // Visible glyph stays 16px to preserve the chip's design; the tap
+          // target is expanded to ≥44px on coarse pointers via an invisible
+          // overlay (`before:`) so touch users get a WCAG 2.5.8 / 2.2 AA hit
+          // area without changing the visual layout.
+          className={cn(
+            '-mr-1 ml-0.5 relative grid h-4 w-4 place-items-center rounded-full',
+            'hover:bg-black/15 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-current',
+            'before:absolute before:left-1/2 before:top-1/2 before:-translate-x-1/2 before:-translate-y-1/2',
+            'before:h-11 before:w-11 before:content-[""] before:hidden pointer-coarse:before:block',
+          )}
           style={{ color: fg }}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
@@ -64,19 +73,43 @@ export function TagChip({ tag, onRemove, interactive = false, size = 'sm' }: Tag
   );
 }
 
+const DARK_TEXT = '#0F1320';
+const LIGHT_TEXT = '#ffffff';
+
 /**
- * Returns black or white depending on which gives the higher contrast against
- * the supplied hex background. Sufficient for the tag palette which is all
- * mid-saturation; full APCA would be nicer but is overkill here.
+ * Returns the dark or light text token that has the higher WCAG 2.x contrast
+ * ratio against the supplied hex background. A pure luminance threshold is not
+ * enough: for mid-saturation palette colours (e.g. a ~0.45-luminance blue)
+ * white-on-colour can sit at ~3.7:1 — below AA — while the old threshold still
+ * picked white. Computing the real ratio for both candidates and taking the
+ * winner guarantees we land on whichever side clears (or best approaches)
+ * 4.5:1 for the actual palette colour.
  */
 function contrastingTextColor(hex: string): string {
+  const bg = relativeLuminance(hex);
+  if (bg === null) return DARK_TEXT;
+  const darkLum = relativeLuminance(DARK_TEXT) ?? 0;
+  const lightLum = 1; // #ffffff
+  const onDark = contrastRatio(bg, darkLum);
+  const onLight = contrastRatio(bg, lightLum);
+  return onDark >= onLight ? DARK_TEXT : LIGHT_TEXT;
+}
+
+/** WCAG relative luminance of a #rrggbb colour, or null if unparseable. */
+function relativeLuminance(hex: string): number | null {
   const m = /^#([0-9a-f]{6})$/i.exec(hex);
-  if (!m || !m[1]) return '#0F1320';
+  if (!m || !m[1]) return null;
   const num = parseInt(m[1], 16);
-  const r = (num >> 16) & 0xff;
-  const g = (num >> 8) & 0xff;
-  const b = num & 0xff;
-  // Perceived luminance (Rec. 601 — close enough for chip contrast)
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? '#0F1320' : '#ffffff';
+  const channels = [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff].map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!;
+}
+
+/** WCAG contrast ratio between two relative luminances. */
+function contrastRatio(a: number, b: number): number {
+  const lighter = Math.max(a, b);
+  const darker = Math.min(a, b);
+  return (lighter + 0.05) / (darker + 0.05);
 }

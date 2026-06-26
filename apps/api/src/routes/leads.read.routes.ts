@@ -41,7 +41,13 @@ export const leadRoutesRead: FastifyPluginAsyncZod = async (server) => {
             : {}),
         },
         include: { owner: { select: { name: true } } },
-        orderBy: [{ score: 'desc' }, { createdAt: 'desc' }],
+        // id tiebreaker makes cursor pagination stable when (score, createdAt)
+        // tie — without it equal-keyed rows can reorder between pages and a
+        // cursor row can be skipped or repeated. The cursor is keyed on id, so
+        // the final sort column must be id. NOTE: a composite index on
+        // (orgId, score DESC, createdAt DESC, id ASC) is an operator migration
+        // (not added here) to keep this ordering index-backed at scale.
+        orderBy: [{ score: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });

@@ -19,7 +19,13 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { useCall, useExtractInsights, type CallSession } from '@/hooks/useCalls';
+import {
+  callActionItemText,
+  useCall,
+  useExtractInsights,
+  type CallActionItem,
+  type CallSession,
+} from '@/hooks/useCalls';
 import { formatDate } from '@/lib/format';
 import type { BadgeTone } from '@/components/ui/Badge';
 
@@ -87,7 +93,7 @@ function formatDuration(sec: number | null): string {
 
 // ─── Action items list ────────────────────────────────────────────────────────
 
-function ActionItemsList({ items }: { items: string[] }) {
+function ActionItemsList({ items }: { items: Array<CallActionItem | string> }) {
   const { t } = useTranslation('crm');
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const toggle = (i: number) =>
@@ -118,7 +124,9 @@ function ActionItemsList({ items }: { items: string[] }) {
               'min-h-[44px] min-w-[44px]',
               checked.has(i) && 'border-[var(--brand-primary)] bg-[var(--brand-primary)]',
             )}
-            aria-label={t('callTimeline.markItemComplete', 'Mark "{{item}}" as complete', { item })}
+            aria-label={t('callTimeline.markItemComplete', 'Mark "{{item}}" as complete', {
+              item: callActionItemText(item),
+            })}
           />
           <span
             className={cn(
@@ -126,7 +134,7 @@ function ActionItemsList({ items }: { items: string[] }) {
               checked.has(i) && 'text-[var(--fg-tertiary)] line-through',
             )}
           >
-            {item}
+            {callActionItemText(item)}
           </span>
         </li>
       ))}

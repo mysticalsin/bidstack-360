@@ -6,11 +6,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let seedCompanyName: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdContactIds: string[] = [];
 
 beforeAll(async () => {
@@ -21,9 +27,11 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  // Per-file throwaway org so leftover contacts can never collide on a shared
+  // seed org (the old org_seed_mantu pattern made this test flake on re-runs).
+  const iso = await createIsolatedOrg('contacts');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
 
   const company = await prisma.company.findFirst({
     where: { orgId },
@@ -41,7 +49,9 @@ afterAll(async () => {
     await prisma.auditLog.deleteMany({ where: { targetType: 'contact', targetId: id } });
     await prisma.contact.deleteMany({ where: { id } });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 

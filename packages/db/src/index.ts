@@ -10,12 +10,25 @@
 // Runbook: docs/security/pii-field-encryption.md
 
 import { PrismaClient } from '../generated/client/index.js';
+import { makeAuditImmutabilityMiddleware } from './middleware/audit-immutability.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
 import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function buildPrismaClient(): PrismaClient {
+  // Connection-pool sizing is NOT configured here on purpose. Prisma's canonical
+  // knob is the connection string itself (`?connection_limit=N&pool_timeout=S`),
+  // so the pool is owned by per-service env (DATABASE_URL) + the infra pooler,
+  // not hardcoded in shared code. This matters at 100k scale: Prisma's DEFAULT
+  // pool is num_cpus*2+1 PER PROCESS, so without an explicit connection_limit,
+  // N api replicas + the worker silently multiply and blow past Postgres
+  // max_connections. The worker is the busiest client (~150 in-flight jobs vs a
+  // default ~17 connections → P2024 pool-timeout errors), so its connection_limit
+  // must match its job concurrency. Front Postgres with PgBouncer (transaction
+  // mode) and set per-service connection_limit such that
+  //   sum(replicas * connection_limit) + worker < Postgres max_connections.
+  // See DEPLOY.production.md §"Connection pool sizing" and .env.example.
   const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
@@ -35,6 +48,26 @@ function buildPrismaClient(): PrismaClient {
   // Soft delete middleware automatically filters out records where deletedAt is not null.
   // We apply this globally so developers don't have to constantly append `deletedAt: null`.
   client.$use(makeSoftDeleteMiddleware());
+
+  // Audit immutability: AuditLog is insert-only. Blocks update/delete/upsert via
+  // the Prisma client so audit history cannot be silently altered. If/when an
+  // AuditLog retention purge is added it must go through $executeRaw, which
+  // bypasses $use middleware — the single allowed delete path. (NOTE: today only
+  // ai_invocations has a retention purge; AuditLog itself is not yet pruned —
+  // tracked as follow-up. See audit-immutability.ts.)
+  //
+  // WHY the test-env skip: integration tests seed AuditLog fixtures and must purge
+  // them in teardown via the ordinary client. The guard's behaviour is proven by
+  // audit-immutability.test.ts (it calls the factory directly), and real
+  // tamper-resistance is enforced in prod/dev here AND, as the recommended
+  // backstop, by a DB-level trigger + REVOKE (see audit-immutability.ts). Leaving
+  // the app-layer guard unconditional in test would force every suite onto a raw
+  // SQL purge path for no added safety, so we skip registration only under Vitest.
+  const isTestRuntime =
+    process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+  if (!isTestRuntime) {
+    client.$use(makeAuditImmutabilityMiddleware());
+  }
 
   return client;
 }
@@ -89,6 +122,15 @@ export type {
   QueueHealth,
   ReleaseScore,
   Lead,
+  TenantExport,
+  SavedView,
+  SavedViewEntity,
+  KamConsultant,
+  KamSession,
+  KamInitiative,
+  KamSessionDraft,
+  KamHandoff,
+  KamProspection,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -109,6 +151,12 @@ export {
   LeadPriority,
   IntegrationProvider,
   EmailProvider,
+  InitiativeStage,
+  KamAccountStatus,
+  KamOwnerModel,
+  KamSessionSource,
+  KamDraftStatus,
+  KamHandoffStatus,
 } from '../generated/client/index.js';
 
 // Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the

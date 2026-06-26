@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
@@ -17,6 +18,7 @@ import {
   healthLabel,
   healthTone,
   sourcePillsFor,
+  techStackPillsFor,
   titleCase,
   type AccountRow,
 } from './accountUtils';
@@ -32,6 +34,8 @@ export const AccountCard = memo(function AccountCard({
   const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
+  const techPills = techStackPillsFor(company);
+  const imageUrl = displayableLogoUrl(company.imageUrl);
   return (
     <motion.div
       layout
@@ -42,7 +46,8 @@ export const AccountCard = memo(function AccountCard({
         transition: { ...springLayout, delay: Math.min(index, 16) * 0.028 },
       }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
-      /* hover/tap animations removed per UX request */
+      whileHover={{ y: -3 }}
+      whileTap={{ y: -1, scale: 0.998 }}
     >
       <div className="account-card-shell">
         <Link
@@ -52,9 +57,9 @@ export const AccountCard = memo(function AccountCard({
             name: company.name,
           })}
         >
-          {company.imageUrl ? (
+          {imageUrl ? (
             <img
-              src={company.imageUrl}
+              src={imageUrl}
               alt=""
               loading="lazy"
               decoding="async"
@@ -64,6 +69,7 @@ export const AccountCard = memo(function AccountCard({
           <div className="account-card-head">
             <CompanyLogo
               name={company.name}
+              companyId={company.id}
               logo={company.logo}
               domain={company.domain}
               size={52}
@@ -96,6 +102,15 @@ export const AccountCard = memo(function AccountCard({
             ))}
           </div>
 
+          <div className={`account-card-tech${techPills.length === 0 ? ' is-empty' : ''}`}>
+            <Icon name="zap" size={13} ariaHidden />
+            {techPills.length > 0 ? (
+              techPills.map((tech) => <span key={tech}>{tech}</span>)
+            ) : (
+              <span>{t('account.techStackPending', 'Tech stack pending')}</span>
+            )}
+          </div>
+
           <dl className="account-card-stats">
             <div>
               <dt>{t('account.openDeals', 'Open deals')}</dt>
@@ -121,11 +136,50 @@ export const AccountCard = memo(function AccountCard({
             </div>
           </dl>
 
-          <div className="account-card-confidence">
-            <span>{t('account.confidence', 'Confidence')}</span>
-            <strong>
-              <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
-            </strong>
+          <div className="account-card-signal-grid">
+            <div className="account-card-confidence">
+              <span>{t('account.confidence', 'Confidence')}</span>
+              <strong>
+                <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
+              </strong>
+            </div>
+            <div className="account-card-coverage">
+              <div>
+                <span>{t('account.coverage', 'Coverage')}</span>
+                <strong>
+                  <AnimatedMetric value={`${row.coverage.score}%`} />
+                </strong>
+              </div>
+              <span aria-hidden>
+                <i style={{ width: `${row.coverage.score}%` }} />
+              </span>
+            </div>
+            <div
+              className={`account-card-insight${row.coverage.missing.length === 0 ? ' is-complete' : ''}`}
+              aria-label={t(
+                'account.coverageInsightAria',
+                '{{name}} coverage insight: {{reason}} {{nextAction}}',
+                {
+                  name: company.name,
+                  reason: row.coverage.reason,
+                  nextAction: t('account.coverageNextAction', 'Next: {{nextAction}}', {
+                    nextAction: row.coverage.nextAction,
+                  }),
+                },
+              )}
+            >
+              <Icon
+                name={row.coverage.missing.length === 0 ? 'checkCircle' : 'info'}
+                size={14}
+                ariaHidden
+              />
+              <span>{`${row.coverage.reason} `}</span>
+              <strong>
+                {t('account.coverageNextAction', 'Next: {{nextAction}}', {
+                  nextAction: row.coverage.nextAction,
+                })}
+              </strong>
+            </div>
           </div>
 
           <div className="account-card-foot">

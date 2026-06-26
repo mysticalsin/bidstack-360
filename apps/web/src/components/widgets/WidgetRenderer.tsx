@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
+import { csvCell } from '@/lib/csv';
 import { ChartContainer } from '@/components/charts/ChartContainer';
 import {
   AreaChart,
@@ -233,11 +234,12 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
     if (rows.length === 0) return;
     const headers = Object.keys(rows[0]!);
     const lines = [
-      headers.join(','),
+      headers.map((h) => csvCell(h)).join(','),
       ...rows.map((r) =>
         headers
           .map((h) => {
-            const v = String(r[h] ?? '');
+            // csvCell neutralizes formula-injection (=,+,-,@,TAB,CR) before quoting.
+            const v = csvCell(String(r[h] ?? ''));
             return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
           })
           .join(','),

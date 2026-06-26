@@ -9,6 +9,11 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumAgentRuntimePolicy,
+  checkSerumLoopRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 import { cancelQueuedCrewRun, enqueueCrewRun } from '../queues/crew-run.js';
 import { seedStandardCrew } from '../lib/crew-standard.js';
@@ -119,6 +124,15 @@ const RunInputs = z
       });
     }
   });
+
+const CrewRunStartBody = z.object({
+  inputs: RunInputs,
+  approvalConfirmed: z.boolean().default(false),
+});
+
+const CrewRunRetryBody = z.object({
+  approvalConfirmed: z.boolean().default(false),
+});
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 
@@ -312,6 +326,60 @@ async function missingAgentKeys(orgId: string, body: z.infer<typeof CrewBody>): 
   return [...needed].filter((k) => !have.has(k));
 }
 
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
+
+function crewRuntimeAgentIds(crew: NonNullable<Awaited<ReturnType<typeof loadCrew>>>): string[] {
+  const ids = new Set<string>();
+  for (const task of crew.tasks) ids.add(task.agentKey);
+  if (crew.process === 'hierarchical' && crew.managerAgentKey) ids.add(crew.managerAgentKey);
+  return [...ids].filter(Boolean);
+}
+
+async function assertSerumAllowsCrewRun(args: {
+  orgId: string;
+  crew: NonNullable<Awaited<ReturnType<typeof loadCrew>>>;
+  approvalConfirmed: boolean;
+  operation: 'crew.run' | 'crew.retry';
+  retryCount?: number;
+  replayRequested?: boolean;
+  excludedRunId?: string;
+}): Promise<string | null> {
+  const loopDecision = await checkSerumLoopRuntimePolicy({
+    orgId: args.orgId,
+    environment: defaultSerumConfigEnvironment(),
+    configKey: SERUM_RUNTIME_CONFIG_KEYS.loops,
+    loopId: args.crew.id,
+    operation: args.operation,
+    retryCount: args.retryCount ?? 0,
+    hasDurableEvent: true,
+    approvalGateReached: false,
+    replayRequested: args.replayRequested ?? false,
+    approvalConfirmed: args.approvalConfirmed,
+  });
+  if (!loopDecision.allowed) {
+    return `SERUM runtime denied loop "${args.crew.id}": ${loopDecision.reason}`;
+  }
+
+  for (const agentId of crewRuntimeAgentIds(args.crew)) {
+    const decision = await checkSerumAgentRuntimePolicy({
+      orgId: args.orgId,
+      environment: defaultSerumConfigEnvironment(),
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.agents,
+      agentId,
+      approvalConfirmed: args.approvalConfirmed,
+      excludedRunId: args.excludedRunId,
+    });
+    if (!decision.allowed) {
+      return `SERUM runtime denied agent "${agentId}": ${decision.reason}`;
+    }
+  }
+  return null;
+}
+
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 export const crewRoutes: FastifyPluginAsync = async (server) => {
@@ -470,7 +538,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: z.object({ inputs: RunInputs }),
+        body: CrewRunStartBody,
         response: { 202: z.object({ runId: z.string().uuid(), status: z.string() }) },
       },
     },
@@ -478,6 +546,13 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       const { orgId } = req.auth;
       const crew = await loadCrew(orgId, req.params.id);
       if (!crew) throw server.httpErrors.notFound('Crew not found');
+      const denial = await assertSerumAllowsCrewRun({
+        orgId,
+        crew,
+        approvalConfirmed: req.body.approvalConfirmed,
+        operation: 'crew.run',
+      });
+      if (denial) throw server.httpErrors.conflict(denial);
 
       const startedBy = uuidOrNull(req.auth.userId);
       const rows = await prisma.$queryRaw<{ id: string }[]>`
@@ -494,6 +569,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
         crewId: req.params.id,
         runId,
         inputs: req.body.inputs,
+        approvalConfirmed: req.body.approvalConfirmed,
       });
       if (!jobId) {
         // Redis unreachable — without a job the run would sit 'queued' forever.
@@ -563,6 +639,9 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     async (req, reply) => {
+      const parsedBody = CrewRunRetryBody.safeParse(req.body ?? {});
+      if (!parsedBody.success) throw server.httpErrors.badRequest('Invalid retry payload');
+      const approvalConfirmed = parsedBody.data.approvalConfirmed;
       const isAdmin = req.auth.role === 'admin';
       const run = await loadRunForAction(req.auth.orgId, req.auth.userId, isAdmin, req.params.id);
       if (!run) throw server.httpErrors.notFound('Run not found');
@@ -571,6 +650,14 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       }
       const crew = await loadCrew(req.auth.orgId, run.crew_id);
       if (!crew) throw server.httpErrors.notFound('Crew not found');
+      const denial = await assertSerumAllowsCrewRun({
+        orgId: req.auth.orgId,
+        crew,
+        approvalConfirmed,
+        operation: 'crew.retry',
+        replayRequested: true,
+      });
+      if (denial) throw server.httpErrors.conflict(denial);
 
       const inputs = asRunInputs(run.inputs);
       const startedBy = uuidOrNull(req.auth.userId);
@@ -588,6 +675,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
         crewId: run.crew_id,
         runId: newRunId,
         inputs,
+        approvalConfirmed,
       });
       if (!jobId) {
         await prisma.$executeRaw`

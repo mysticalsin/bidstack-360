@@ -92,19 +92,46 @@ export function useResendSignature(id: string) {
 
 // ─── Bulk void ────────────────────────────────────────────────────────────────
 
+export interface BulkVoidSummary {
+  /** ids that voided successfully */
+  succeeded: string[];
+  /** ids that failed, with their error message for surfacing to the user */
+  failed: Array<{ id: string; error: string }>;
+}
+
 export function useBulkVoidSignatures() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ ids, reason }: { ids: string[]; reason: string }) =>
-      Promise.all(
+  return useMutation<BulkVoidSummary, Error, { ids: string[]; reason: string }>({
+    // WHY allSettled (not all): a single failing void must not abort the rest.
+    // The previous Promise.all rejected on the first failure, leaving the
+    // remaining requests un-awaited and the outcome invisible — the user saw a
+    // generic error with no idea which records actually voided.
+    mutationFn: async ({ ids, reason }): Promise<BulkVoidSummary> => {
+      const results = await Promise.allSettled(
         ids.map((id) =>
           api<SignatureRequest>(`/api/signatures/${id}/void`, {
             method: 'POST',
             body: { reason },
           }),
         ),
-      ),
-    onSuccess: () => {
+      );
+      const summary: BulkVoidSummary = { succeeded: [], failed: [] };
+      results.forEach((result, i) => {
+        const id = ids[i]!;
+        if (result.status === 'fulfilled') {
+          summary.succeeded.push(id);
+        } else {
+          const error =
+            result.reason instanceof Error ? result.reason.message : String(result.reason);
+          summary.failed.push({ id, error });
+        }
+      });
+      return summary;
+    },
+    // Invalidate regardless of partial failure — the succeeded ids changed
+    // state on the server and the list must reflect them. onSettled (not
+    // onSuccess) so a mutationFn that itself throws still refreshes the cache.
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: [SIG_KEY] });
     },
   });
