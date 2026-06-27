@@ -20,6 +20,7 @@ import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
 
 export function ReferencesPage() {
@@ -28,6 +29,9 @@ export function ReferencesPage() {
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState('');
   const [tag, setTag] = useState('');
+  // References writes are gated server-side behind accounts:write — hide the
+  // write controls for users who lack it (they previously 403'd on click).
+  const canWrite = useHasPermission('accounts:write');
 
   const industries = useAccountIndustries();
   const references = useReferences({
@@ -35,6 +39,10 @@ export function ReferencesPage() {
     industry: industry || undefined,
     tag: tag || undefined,
   });
+  // Unfiltered source for the tag dropdown — deriving tag options from the
+  // tag/search-filtered `references` collapsed the list to the active selection,
+  // trapping the user. Mirrors the independent industry-filter source.
+  const allReferencesForTags = useReferences({});
   const useRef = useUseReference();
   const createRef = useCreateReference();
   const deleteRef = useDeleteReference();
@@ -70,8 +78,11 @@ export function ReferencesPage() {
     });
   };
 
-  // Collect all unique tags for the filter
-  const allTags = Array.from(new Set(items.flatMap((r) => r.tags))).sort();
+  // Collect all unique tags for the filter from the UNFILTERED source so the
+  // dropdown always offers every tag, regardless of the active tag/search.
+  const allTags = Array.from(
+    new Set((allReferencesForTags.data?.items ?? []).flatMap((r) => r.tags)),
+  ).sort();
 
   return (
     <motion.div
@@ -95,7 +106,11 @@ export function ReferencesPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>{t('references.newButton', 'New reference')}</Button>
+        {canWrite && (
+          <Button onClick={() => setShowCreate(true)}>
+            {t('references.newButton', 'New reference')}
+          </Button>
+        )}
       </motion.header>
 
       {/* Filters */}
@@ -249,6 +264,7 @@ export function ReferencesPage() {
                         </span>
                       )}
                     </div>
+                    {canWrite && (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -272,6 +288,7 @@ export function ReferencesPage() {
                           : t('references.useReference', 'Use reference')}
                       </Button>
                     </div>
+                    )}
                   </div>
                 </div>
               </Card>
