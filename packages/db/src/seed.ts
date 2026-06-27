@@ -608,6 +608,180 @@ async function main() {
   });
   console.log('  ✓ pre-sales governance: cross-sell, comitology, references');
 
+  // ─── KAM: designate one key account (F9) ───────────────────────────────────
+  // GET /api/v1/kam/accounts lists companies whose kamStatus != 'identified'.
+  // The company seed leaves every row on the default 'identified', so the KAM
+  // door opens empty. Promote the marquee account (CI Financial — already the
+  // anchor for the governance/cross-sell demo data) to an active, pre-sales-
+  // driven KAM. Idempotent: keyed on the stable company id.
+  const ciFinancialId = companyIdByNorm.get('ci-financial');
+  if (ciFinancialId) {
+    await prisma.company.updateMany({
+      where: { id: ciFinancialId, orgId: org.id, deletedAt: null },
+      data: { kamStatus: 'active', kamOwnerModel: 'presales_driven' },
+    });
+    console.log('  ✓ KAM: CI Financial designated key account');
+  }
+
+  // ─── References Library (F9) ───────────────────────────────────────────────
+  // The /references door (the reusable customer-reference library, distinct from
+  // projectReference) reads the `reference` table org-scoped, and is empty until
+  // seeded. Seed three case studies tied to seeded companies so it is alive on
+  // first open. Idempotent: upsert by stable id.
+  const fixtureReferences: Array<{
+    id: string;
+    companyNorm: string;
+    title: string;
+    description: string;
+    industry: string;
+    valueMicros: bigint;
+    contactName: string | null;
+    contactEmail: string | null;
+    tags: string[];
+    usageCount: number;
+    daysSinceUsed: number | null;
+  }> = [
+    {
+      id: '4ef00000-0000-4000-8000-000000000001',
+      companyNorm: 'ci-financial',
+      title: 'CI Financial — Core banking platform modernization',
+      description:
+        'Migrated a legacy core-banking monolith to a cloud-native microservices estate on AWS — release lead time fell from weeks to days with 99.95% uptime in year one.',
+      industry: 'financial_services',
+      valueMicros: BigInt(880_000) * 1_000_000n,
+      contactName: 'Michael Johnson',
+      contactEmail: 'mjohnson@ci.com',
+      tags: ['cloud-migration', 'aws', 'financial-services', 'modernization'],
+      usageCount: 3,
+      daysSinceUsed: 12,
+    },
+    {
+      id: '4ef00000-0000-4000-8000-000000000002',
+      companyNorm: 'rush-university-system-for-health',
+      title: 'Rush University — EHR cloud migration',
+      description:
+        'Moved electronic health records to a HIPAA-compliant cloud platform for 14,000 staff, cutting clinician access times by 40% with a zero-downtime cutover.',
+      industry: 'healthcare',
+      valueMicros: BigInt(2_100_000) * 1_000_000n,
+      contactName: 'Anil Rajan',
+      contactEmail: 'arajan@rush.edu',
+      tags: ['healthcare', 'ehr', 'cloud-migration', 'compliance'],
+      usageCount: 1,
+      daysSinceUsed: 30,
+    },
+    {
+      id: '4ef00000-0000-4000-8000-000000000003',
+      companyNorm: 'dnb-bank',
+      title: 'DNB Bank — Multi-region cloud landing zone',
+      description:
+        'Designed and rolled out a multi-region cloud landing zone with policy-as-code guardrails, enabling compliant workload onboarding across the Nordics.',
+      industry: 'financial_services',
+      valueMicros: BigInt(2_700_000) * 1_000_000n,
+      contactName: null,
+      contactEmail: null,
+      tags: ['cloud', 'landing-zone', 'governance', 'nordics'],
+      usageCount: 0,
+      daysSinceUsed: null,
+    },
+  ];
+  for (const r of fixtureReferences) {
+    const companyId = companyIdByNorm.get(r.companyNorm) ?? null;
+    const lastUsedAt =
+      r.daysSinceUsed !== null ? new Date(Date.now() - r.daysSinceUsed * 86_400_000) : null;
+    await prisma.reference.upsert({
+      where: { id: r.id },
+      create: {
+        id: r.id,
+        orgId: org.id,
+        companyId,
+        title: r.title,
+        description: r.description,
+        industry: r.industry,
+        valueMicros: r.valueMicros,
+        contactName: r.contactName,
+        contactEmail: r.contactEmail,
+        tags: r.tags,
+        usageCount: r.usageCount,
+        lastUsedAt,
+      },
+      update: {
+        companyId,
+        title: r.title,
+        description: r.description,
+        industry: r.industry,
+        valueMicros: r.valueMicros,
+        contactName: r.contactName,
+        contactEmail: r.contactEmail,
+        tags: r.tags,
+        usageCount: r.usageCount,
+        lastUsedAt,
+      },
+    });
+  }
+  console.log(`  ✓ references: ${fixtureReferences.length}`);
+
+  // ─── Analytics dashboard (F9) ──────────────────────────────────────────────
+  // GET /api/v1/dashboards is org-scoped and (for non-admins) filtered to shared
+  // or owned dashboards. No dashboard is seeded, so the /analytics door opens
+  // empty. Seed one shared dashboard with two widgets so it is alive on first
+  // open. Widget `type` values match the AnalyticsWidgetType enum the strict GET
+  // response schema validates. Idempotent: upsert by stable id.
+  const dashboardId = 'da5b0000-0000-4000-8000-000000000001';
+  await prisma.analyticsDashboard.upsert({
+    where: { id: dashboardId },
+    create: {
+      id: dashboardId,
+      orgId: org.id,
+      ownerId: seedUserId,
+      name: 'Pre-sales Command Center',
+      description: 'Pipeline health, win rate, and bid coverage at a glance.',
+      isShared: true,
+    },
+    update: {
+      name: 'Pre-sales Command Center',
+      description: 'Pipeline health, win rate, and bid coverage at a glance.',
+      isShared: true,
+    },
+  });
+  const dashboardWidgets: Array<{
+    id: string;
+    title: string;
+    type: string;
+    config: Prisma.InputJsonValue;
+    position: Prisma.InputJsonValue;
+  }> = [
+    {
+      id: 'da5b0000-0000-4000-8000-000000000011',
+      title: 'Weighted Pipeline',
+      type: 'kpi',
+      config: { format: 'currency', subtitle: 'Open opportunities, probability-weighted' },
+      position: { x: 0, y: 0, w: 3, h: 2 },
+    },
+    {
+      id: 'da5b0000-0000-4000-8000-000000000012',
+      title: 'Pipeline by Stage',
+      type: 'bar',
+      config: { subtitle: 'Open opportunity value grouped by sales stage' },
+      position: { x: 3, y: 0, w: 6, h: 4 },
+    },
+  ];
+  for (const w of dashboardWidgets) {
+    await prisma.analyticsDashboardWidget.upsert({
+      where: { id: w.id },
+      create: {
+        id: w.id,
+        orgId: org.id,
+        dashboardId,
+        title: w.title,
+        type: w.type,
+        config: w.config,
+        position: w.position,
+      },
+      update: { title: w.title, type: w.type, config: w.config, position: w.position },
+    });
+  }
+  console.log(`  ✓ analytics dashboard: 1 (+${dashboardWidgets.length} widgets)`);
+
   console.log('✅ Seed complete.');
 }
 
