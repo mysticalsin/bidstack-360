@@ -214,9 +214,17 @@ export async function probeIntegrationEndpoint(
   const startedAt = Date.now();
 
   try {
-    // Close the DNS-rebind gap: assertProbeUrlAllowed is a string-only host
-    // check; resolve the host and reject if it points at an internal address.
-    await assertUrlResolvesPublic(checkedUrl);
+    // Close the DNS-rebind gap for PUBLIC hosts: assertProbeUrlAllowed is a
+    // string-only check, so resolve the host and reject if it points at an
+    // internal address. SKIP it for the dev-only localhost carve-out that
+    // assertProbeUrlAllowed deliberately permits (probing a local MCP server) —
+    // assertUrlResolvesPublic would otherwise hard-reject localhost/127.x.
+    const probeHostname = new URL(checkedUrl).hostname;
+    const isLocalDevProbe =
+      isLocalDevelopmentHostname(probeHostname) && process.env.NODE_ENV !== 'production';
+    if (!isLocalDevProbe) {
+      await assertUrlResolvesPublic(checkedUrl);
+    }
     const res = await fetch(checkedUrl, {
       method: 'GET',
       redirect: 'manual',
