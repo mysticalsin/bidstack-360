@@ -300,8 +300,11 @@ export function TopAccountsPage() {
         />
       ) : items.length === 0 ? (
         <EmptyState
-          title={t('topAccounts.emptyTitle', 'No account data yet')}
-          message={t('topAccounts.emptyMessage', 'Add opportunities with values to see top accounts ranked by pipeline.')}
+          title={t('topAccounts.emptyTitle', 'No ranked accounts yet')}
+          message={t(
+            'topAccounts.emptyMessage',
+            'Top accounts rank companies by their linked opportunity pipeline. Add companies and link opportunities to them, or curate the Top 10 in Settings.',
+          )}
           action={
             <Link to="/companies" className="btn btn-primary">
               <Icon name="building" size={14} />
