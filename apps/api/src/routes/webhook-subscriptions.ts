@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
 import { decryptSecretOrPlaintext, encryptSecret } from '@bidstack/shared/server-crypto';
+import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 import {
   assertSerumConnectorAllowed,
   recordSerumConnectorTestSuccess,
@@ -330,6 +331,10 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         error?: string;
       };
       try {
+        // Close the DNS-rebind gap the comment below names: resolve sub.url and
+        // reject if it points at an internal/metadata address before connecting.
+        // The static assertSafeWebhookUrl (string) check ran at registration.
+        await assertUrlResolvesPublic(sub.url);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), TEST_PING_TIMEOUT_MS);
         let res: Response;

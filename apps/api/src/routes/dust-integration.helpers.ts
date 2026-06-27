@@ -10,6 +10,7 @@ import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.j
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
+import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 import {
   type DustStatusPayload,
   type DustStatusCacheEntry,
@@ -213,6 +214,9 @@ export async function probeIntegrationEndpoint(
   const startedAt = Date.now();
 
   try {
+    // Close the DNS-rebind gap: assertProbeUrlAllowed is a string-only host
+    // check; resolve the host and reject if it points at an internal address.
+    await assertUrlResolvesPublic(checkedUrl);
     const res = await fetch(checkedUrl, {
       method: 'GET',
       redirect: 'manual',
