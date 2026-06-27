@@ -4,7 +4,7 @@
 // Uses a CSS grid + drag-to-reorder via mouse events (no external dep beyond
 // what's already in the bundle: framer-motion handles smooth reordering).
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, Reorder } from 'framer-motion';
@@ -47,7 +47,18 @@ export function AnalyticsDashboardPage() {
 
   // Local widget order (for drag-reorder; persists on next re-fetch)
   const [localOrder, setLocalOrder] = useState<DashboardWidget[]>([]);
-  const widgets = localOrder.length > 0 ? localOrder : rawWidgets;
+  // Reconcile the manual drag-order with server truth DURING RENDER (no effect —
+  // avoids cascading setState): keep the user's order for survivors, append
+  // newly-added widgets, drop deleted ones. Without this, after a reorder a
+  // deleted widget kept showing and a new one never appeared (localOrder shadowed
+  // rawWidgets until a dashboard switch).
+  const widgets = useMemo(() => {
+    if (localOrder.length === 0) return rawWidgets;
+    const byId = new Map(rawWidgets.map((w) => [w.id, w]));
+    const kept = localOrder.filter((w) => byId.has(w.id)).map((w) => byId.get(w.id)!);
+    const added = rawWidgets.filter((w) => !localOrder.some((p) => p.id === w.id));
+    return [...kept, ...added];
+  }, [localOrder, rawWidgets]);
 
   const addWidgetMutation = useAddWidget(activeDash?.id ?? '');
   const deleteWidgetMutation = useDeleteWidget(activeDash?.id ?? '');
