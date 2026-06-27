@@ -26,6 +26,14 @@ import {
 
 const IdParam = z.object({ id: z.string().uuid() });
 
+// F6 hardening: bound how many views a user can hoard and how large a single
+// `filters` blob may be. The schema already caps per-field (string/array/key
+// count), but `filters` is persisted verbatim AND doubled into auditLog.diff on
+// PATCH, so a total serialized-size + per-user-count ceiling is the real guard
+// against authenticated storage amplification.
+const MAX_VIEWS_PER_USER = 100;
+const MAX_FILTERS_BYTES = 16_384; // 16 KiB serialized
+
 // The Json columns come back as Prisma.JsonValue; the Zod response schema
 // re-validates them, so we narrow with a small serializer rather than casting
 // the whole row. Keeping this explicit also documents the on-the-wire shape.
@@ -134,6 +142,15 @@ export const savedViewsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      assertFiltersSize(req.body.filters, server);
+      const existingCount = await prisma.savedView.count({
+        where: { orgId: req.auth.orgId, userId: req.auth.userId, deletedAt: null },
+      });
+      if (existingCount >= MAX_VIEWS_PER_USER) {
+        throw server.httpErrors.conflict(
+          `Saved view limit reached (${MAX_VIEWS_PER_USER}). Delete one to add another.`,
+        );
+      }
       const created = await prisma.$transaction(async (tx) => {
         const view = await tx.savedView.create({
           data: {
@@ -176,6 +193,7 @@ export const savedViewsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      assertFiltersSize(req.body.filters, server);
       const existing = await loadOwnedOrAdmin(req.auth, req.params.id, server);
 
       const updated = await prisma.$transaction(async (tx) => {
@@ -251,6 +269,20 @@ export const savedViewsRoutes: FastifyPluginAsyncZod = async (server) => {
  * cross-org id is indistinguishable from a missing one (404, no info leak).
  * Then enforce owner-or-admin: a non-owner, non-admin member gets 403.
  */
+/** Reject an oversized `filters` blob (F6). Undefined (omitted in a PATCH) passes. */
+function assertFiltersSize(
+  filters: unknown,
+  server: Parameters<FastifyPluginAsyncZod>[0],
+): void {
+  if (filters === undefined) return;
+  const bytes = JSON.stringify(filters ?? {}).length;
+  if (bytes > MAX_FILTERS_BYTES) {
+    throw server.httpErrors.badRequest(
+      `filters payload too large (${bytes} bytes > ${MAX_FILTERS_BYTES} limit)`,
+    );
+  }
+}
+
 async function loadOwnedOrAdmin(
   auth: { orgId: string; userId: string; role: string },
   id: string,

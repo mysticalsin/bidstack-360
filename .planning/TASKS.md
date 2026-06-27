@@ -6,7 +6,7 @@ are DEFERRED (need a subscription / prod env).
 
 - [x] T1 — Top-Accounts empty-state copy (don't claim "add opportunities" when they exist) · PM-01b
 - [x] T2 — Remove dead `useGoals` hook (`/api/goals` 404, orphaned) · F7
-- [ ] T3 — Saved-view per-user count cap + filters total-size cap · F6
+- [x] T3 — Saved-view per-user count cap + filters total-size cap · F6
 - [ ] T4 — Notification `(orgId,userId,url)` partial unique index for bid-deadline dedupe · I3
 - [ ] T5 — Seed: create Company rows for opp customers + link `companyId` + set `topAccountRank` so Top-Accounts/Sector/KAM populate (durable F2 fix) · then run seed
 
