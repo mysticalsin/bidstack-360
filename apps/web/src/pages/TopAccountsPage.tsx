@@ -299,19 +299,41 @@ export function TopAccountsPage() {
           }
         />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('topAccounts.emptyTitle', 'No ranked accounts yet')}
-          message={t(
-            'topAccounts.emptyMessage',
-            'Top accounts rank companies by their linked opportunity pipeline. Add companies and link opportunities to them, or curate the Top 10 in Settings.',
-          )}
-          action={
-            <Link to="/companies" className="btn btn-primary">
-              <Icon name="building" size={14} />
-              {t('topAccounts.emptyCta', 'Browse companies')}
-            </Link>
-          }
-        />
+        search || industry ? (
+          <EmptyState
+            title={t('topAccounts.emptyFilteredTitle', 'No accounts match your filters')}
+            message={t(
+              'topAccounts.emptyFilteredMessage',
+              'No top accounts match the current search/industry filter. Clear it to see the full ranking.',
+            )}
+            action={
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSearch('');
+                  setIndustry('');
+                }}
+              >
+                {t('topAccounts.clearFilters', 'Clear filters')}
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('topAccounts.emptyTitle', 'No ranked accounts yet')}
+            message={t(
+              'topAccounts.emptyMessage',
+              'Top accounts rank companies by their linked opportunity pipeline. Add companies and link opportunities to them, or curate the Top 10 in Settings.',
+            )}
+            action={
+              <Link to="/companies" className="btn btn-primary">
+                <Icon name="building" size={14} />
+                {t('topAccounts.emptyCta', 'Browse companies')}
+              </Link>
+            }
+          />
+        )
       ) : (
         <motion.div layout className="space-y-3">
           {items.map((account, index) => (
