@@ -10,8 +10,11 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
 import {
   ProposalStatusChip,
+  proposalStatusLabel,
+  PROPOSAL_STATUS_LABELS,
   type ProposalStatus,
 } from '@/components/rfp/shared/ProposalStatusChip';
+import { useHasPermission } from '@/hooks/useCapabilities';
 
 interface ProposalSection {
   id: string;
@@ -47,6 +50,7 @@ export function ProposalDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { t } = useTranslation('rfp');
+  const canWrite = useHasPermission('proposals:write');
   useDocumentTitle();
 
   const {
@@ -89,6 +93,19 @@ export function ProposalDetailPage() {
           body: { content },
         },
       );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
+  // Move the proposal through its lifecycle. The backend PATCH drives real
+  // side-effects (webhook fan-out on 'submitted', MemOS win/loss on won/lost),
+  // so this was the missing UI for an otherwise-complete flow.
+  const updateStatus = useMutation({
+    mutationFn: async (status: ProposalStatus) => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}`, { method: 'PATCH', body: { status } });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['proposal', id] });
@@ -167,6 +184,25 @@ export function ProposalDetailPage() {
     setEditingSection(null);
   };
 
+  const handleStatusChange = (next: ProposalStatus) => {
+    if (!proposal || next === proposal.status) return;
+    // Confirm terminal outcomes — they crystallize win/loss in MemOS + notify
+    // connected integrations via webhook fan-out, so they are not casual changes.
+    if (
+      (next === 'won' || next === 'lost') &&
+      !window.confirm(
+        t(
+          'proposalDetail.confirmTerminalStatus',
+          'Mark this proposal as "{{status}}"? This records the outcome and notifies connected integrations.',
+          { status: proposalStatusLabel(next) },
+        ),
+      )
+    ) {
+      return;
+    }
+    updateStatus.mutate(next);
+  };
+
   return (
     <>
       <div className="motion-page-head page-head">
@@ -180,7 +216,28 @@ export function ProposalDetailPage() {
               <Icon name="arrow" size={16} className="rotate-180" />
             </button>
             <h1 className="page-title">{proposal.name}</h1>
-            <ProposalStatusChip status={proposal.status} />
+            {canWrite ? (
+              <>
+                <label htmlFor="proposal-status" className="sr-only">
+                  {t('proposalDetail.statusLabel', 'Proposal status')}
+                </label>
+                <select
+                  id="proposal-status"
+                  value={proposal.status}
+                  disabled={updateStatus.isPending}
+                  onChange={(e) => handleStatusChange(e.target.value as ProposalStatus)}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-medium disabled:opacity-60"
+                >
+                  {(Object.keys(PROPOSAL_STATUS_LABELS) as ProposalStatus[]).map((s) => (
+                    <option key={s} value={s}>
+                      {proposalStatusLabel(s)}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <ProposalStatusChip status={proposal.status} />
+            )}
           </div>
           <p className="page-sub">
             {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}
@@ -190,6 +247,11 @@ export function ProposalDetailPage() {
                 })}`
               : ''}
           </p>
+          {updateStatus.isError && (
+            <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+              {t('proposalDetail.statusUpdateError', 'Could not update status. Please try again.')}
+            </p>
+          )}
         </div>
       </div>
 
