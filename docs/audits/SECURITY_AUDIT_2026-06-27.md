@@ -25,8 +25,10 @@ Each MAJOR authZ gap let a **Read-Only role member AND a read-scoped API key** p
 
 ## Remaining — tracked, not yet fixed
 
-### SSRF parity (MAJOR) — next implementation step
-Two **authenticated, rate-limited** API-side paths fetch a tenant-controlled URL after only a *string-level* host check (no DNS resolution), so a hostname that resolves to an internal/metadata IP (DNS-rebind) passes:
+### SSRF parity (MAJOR) — ✅ FIXED (commit 61e0d9dd)
+Promoted the worker's DNS-resolving guard into `@bidstack/shared/server` (`assertUrlResolvesPublic` / `createSafeFetch`) and call it before the fetch in both `webhook-subscriptions.ts` (test-ping) and `dust-integration.helpers.ts` (probe). Unit-tested with mocked DNS. The worker keeps its own copy (DRY-dedup is an optional follow-up). `signature.service.ts:200` storageUrl provenance still to confirm.
+
+~~Two **authenticated, rate-limited** API-side paths fetch a tenant-controlled URL after only a *string-level* host check (no DNS resolution), so a hostname that resolves to an internal/metadata IP (DNS-rebind) passes:~~
 - `routes/webhook-subscriptions.ts:337` — `POST /webhook-subscriptions/:id/test`
 - `routes/dust-integration.helpers.ts:216` — integration endpoint probe
 
