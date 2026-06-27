@@ -1,22 +1,18 @@
 # ============================================================================
 #  BidStack 360° — Azure deploy pipeline        ⚠️ UNVALIDATED DRAFT ⚠️
 # ============================================================================
-#  This is a DRAFT. It is intentionally named *.draft and lives in infra/azure/
-#  so it is NOT an active workflow. Per CLAUDE.md, .github/workflows/ is
-#  coordinate-before-edit — review this, then a maintainer moves it to
-#  .github/workflows/deploy.yml.
+#  DRAFT — intentionally *.draft in infra/azure/ so it is NOT an active
+#  workflow. Per CLAUDE.md, .github/workflows/ is coordinate-before-edit: review
+#  this, then a MAINTAINER moves it to .github/workflows/deploy.yml.
 #
-#  Contract it encodes (the whole point of "zero-touch, no hand-run prisma"):
-#    build all images → push to ACR → RUN THE MIGRATE JOB TO COMPLETION →
-#    only then roll the api/worker/mcp/web revisions. A failed migration stops
-#    the deploy before any app sees the new schema.
+#  Contract: validate IaC → require CI green → build+push images → RUN THE
+#  MIGRATE JOB TO COMPLETION → roll api/worker/mcp/web → POST-DEPLOY HEALTH GATE
+#  → automatic ROLLBACK on failure. A failed migration or failed health gate
+#  stops/reverts the deploy before bad code serves traffic.
 #
-#  Prerequisites (configure once, see README.md):
-#    - Azure OIDC login (federated credential) → secrets: AZURE_CLIENT_ID,
-#      AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
-#    - An ACR, a resource group, and the bicep already deployed once
-#      (infra/azure/main.bicep) so the apps + migrate job exist.
-#    - Repo vars: ACR_LOGIN_SERVER, AZURE_RG, NAME_PREFIX
+#  Prerequisites (see README.md): Azure OIDC (AZURE_CLIENT_ID/TENANT_ID/
+#  SUBSCRIPTION_ID), an ACR + RG + a first bicep deploy so apps/migrate exist,
+#  repo vars ACR_LOGIN_SERVER / AZURE_RG / NAME_PREFIX / FRONT_DOOR_HOST.
 # ============================================================================
 
 name: deploy (DRAFT)
@@ -24,31 +20,56 @@ name: deploy (DRAFT)
 on:
   workflow_dispatch: {}
   # push:
-  #   branches: [main]      # enable after review
+  #   branches: [demo]      # enable after maintainer review
 
 permissions:
   id-token: write # OIDC login to Azure
   contents: read
 
+concurrency:
+  group: azure-deploy
+  cancel-in-progress: false # never interleave two deploys onto one environment
+
 env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  build-and-push:
+  # ── Gate 0: IaC must compile, and CI must already be green for this SHA ──────
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: az bicep build (fails on any IaC error/warning)
+        run: az bicep build --file infra/azure/main.bicep
+      - name: Require CI success for this commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.sha;
+            const { data } = await github.rest.checks.listForRef({
+              owner: context.repo.owner, repo: context.repo.repo, ref,
+            });
+            const required = ['ci', 'gitleaks', 'semgrep']; // align with .github/workflows
+            const failing = data.check_runs.filter(
+              c => required.includes(c.name) && c.conclusion !== 'success',
+            );
+            if (failing.length) {
+              core.setFailed('Deploy blocked — CI not green: ' + failing.map(c => c.name).join(', '));
+            }
 
+  build-and-push:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
       - name: ACR login
         run: az acr login --name "${{ vars.ACR_LOGIN_SERVER }}"
-
       - name: Build + push all images (api, web, worker, mcp-server, migrate)
         run: |
           set -euo pipefail
@@ -56,16 +77,13 @@ jobs:
           TAG="${IMAGE_TAG}"
           for target in api web worker mcp-server migrate; do
             extra_args=()
-            # web needs the Clerk publishable value baked into the static Vite bundle
             if [ "$target" = "web" ]; then
               extra_args+=(--build-arg BIDSTACK_WEB_BUILD_MODE=clerk)
               extra_args+=(--build-arg PUBLIC_CLERK_PUBLISHABLE="${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}")
+              # SPA stays same-origin /api (Front Door path-routes /api/* to the api app).
             fi
-            docker build \
-              --target "$target" \
-              "${extra_args[@]}" \
-              -t "$ACR/bidstack-$target:$TAG" \
-              -f Dockerfile .
+            docker build --target "$target" "${extra_args[@]}" \
+              -t "$ACR/bidstack-$target:$TAG" -f Dockerfile .
             docker push "$ACR/bidstack-$target:$TAG"
           done
 
@@ -79,21 +97,16 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      # Point the migrate job at the new image, start it, and BLOCK until it
-      # finishes. A non-zero exit (failed migration) fails the deploy here, so
-      # the app-roll job below never runs.
+      # Point the migrate job at the new image, start it, BLOCK until terminal.
+      # A failed migration fails here, so roll-apps never runs.
       - name: Run migrations to completion
         run: |
           set -euo pipefail
-          RG="${{ vars.AZURE_RG }}"
-          ACR="${{ vars.ACR_LOGIN_SERVER }}"
+          RG="${{ vars.AZURE_RG }}"; ACR="${{ vars.ACR_LOGIN_SERVER }}"
           JOB="${{ vars.NAME_PREFIX }}-migrate"
-          az containerapp job update -g "$RG" -n "$JOB" \
-            --image "$ACR/bidstack-migrate:${IMAGE_TAG}"
+          az containerapp job update -g "$RG" -n "$JOB" --image "$ACR/bidstack-migrate:${IMAGE_TAG}"
           EXEC=$(az containerapp job start -g "$RG" -n "$JOB" --query name -o tsv)
           echo "Started migrate execution: $EXEC"
-          # Poll until terminal.
           for i in $(seq 1 60); do
             STATUS=$(az containerapp job execution show -g "$RG" -n "$JOB" \
               --job-execution-name "$EXEC" --query properties.status -o tsv)
@@ -112,6 +125,7 @@ jobs:
     strategy:
       matrix:
         svc: [api, worker, mcp, web]
+      fail-fast: false
     steps:
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -119,16 +133,65 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Update ${{ matrix.svc }} revision
+      - name: Record current image (for rollback) and update ${{ matrix.svc }}
         run: |
           set -euo pipefail
-          RG="${{ vars.AZURE_RG }}"
-          ACR="${{ vars.ACR_LOGIN_SERVER }}"
-          # web image is bidstack-web; others map app name -> image suffix
-          case "${{ matrix.svc }}" in
-            mcp) IMG="mcp-server" ;;
-            *)   IMG="${{ matrix.svc }}" ;;
-          esac
-          az containerapp update -g "$RG" -n "${{ vars.NAME_PREFIX }}-${{ matrix.svc }}" \
-            --image "$ACR/bidstack-$IMG:${IMAGE_TAG}"
+          RG="${{ vars.AZURE_RG }}"; ACR="${{ vars.ACR_LOGIN_SERVER }}"
+          APP="${{ vars.NAME_PREFIX }}-${{ matrix.svc }}"
+          case "${{ matrix.svc }}" in mcp) IMG="mcp-server" ;; *) IMG="${{ matrix.svc }}" ;; esac
+          PREV=$(az containerapp show -g "$RG" -n "$APP" \
+            --query "properties.template.containers[0].image" -o tsv)
+          echo "PREV_IMAGE=$PREV" >> "$GITHUB_OUTPUT" || true
+          echo "$PREV" > "prev-${{ matrix.svc }}.txt"
+          az containerapp update -g "$RG" -n "$APP" --image "$ACR/bidstack-$IMG:${IMAGE_TAG}"
+        id: roll
+      - uses: actions/upload-artifact@v4
+        with: { name: "prev-${{ matrix.svc }}", path: "prev-${{ matrix.svc }}.txt" }
+
+  # ── Gate 1: confirm the new revisions are actually serving via Front Door ────
+  health-gate:
+    needs: roll-apps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe Front Door endpoints
+        run: |
+          set -euo pipefail
+          BASE="https://${{ vars.FRONT_DOOR_HOST }}"
+          ok=0
+          for i in $(seq 1 30); do
+            api=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/readyz" || echo 000)
+            web=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/" || echo 000)
+            echo "readyz=$api web=$web (attempt $i)"
+            if [ "$api" = "200" ] && [ "$web" = "200" ]; then ok=1; break; fi
+            sleep 10
+          done
+          [ "$ok" = "1" ] || { echo "::error::post-deploy health gate failed"; exit 1; }
+
+  # ── Auto-rollback: revert each app to its previous image on any failure ─────
+  rollback:
+    needs: [roll-apps, health-gate]
+    if: failure()
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { svc: [api, worker, mcp, web] }
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: actions/download-artifact@v4
+        with: { name: "prev-${{ matrix.svc }}" }
+        continue-on-error: true
+      - name: Revert ${{ matrix.svc }} to previous image
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RG }}"; APP="${{ vars.NAME_PREFIX }}-${{ matrix.svc }}"
+          PREV=$(cat "prev-${{ matrix.svc }}.txt" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then
+            echo "Rolling $APP back to $PREV"
+            az containerapp update -g "$RG" -n "$APP" --image "$PREV"
+          else
+            echo "::warning::no previous image recorded for $APP — manual rollback may be needed"
+          fi

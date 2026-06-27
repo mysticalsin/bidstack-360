@@ -94,9 +94,49 @@ Then move `deploy.workflow.yml.draft` → `.github/workflows/deploy.yml` (mainta
   access-scoping layer (Settings → Access groups) must be configured and
   reviewed as part of that validation before any real-tenant rollout.
 
-## Known gaps (intentionally not modelled)
+## Enterprise hardening applied (2026-06-26, audit wfr7ow1ue)
 
-- Custom domains + managed certs (api/web ingress).
-- Autoscale rules beyond replica bounds (e.g. queue-length KEDA scaler for the worker).
-- Backups/restore runbook, alerting, dashboards.
-- VNet + private endpoints (strongly recommended for prod; the draft uses public + firewall for brevity).
+`main.bicep` was rewritten to the enterprise posture. Now modelled:
+
+- **VNet-injected** Container Apps env, `zoneRedundant: true`, workload profiles.
+- **Postgres**: PRIVATE (delegated subnet + private DNS, `publicNetworkAccess: Disabled`,
+  no firewall rule), built-in **PgBouncer** (:6432), **storage auto-grow**,
+  Entra admin = the app managed identity, geo-redundant backup, HA ZoneRedundant.
+- **Redis PREMIUM**: private endpoint, `maxmemory-policy=noeviction`, AOF
+  persistence, zone-redundant.
+- **Key Vault**: purge protection, RBAC, `publicNetworkAccess: Disabled`,
+  `networkAcls.defaultAction: Deny`, private endpoint.
+- **Front Door Premium + WAF** (DRS 2.1 + Bot rules) — single public origin,
+  path-routes `/api/*` + `/webhooks/*` to api, `/*` to web (SPA stays same-origin
+  /api; nginx never needs to reach `api:4000`).
+- **Per-service `DATABASE_URL`** secrets (PgBouncer + `connection_limit` per
+  service) + a direct `database-url-direct` for the migrate job (Prisma needs a
+  non-pooled connection for DDL).
+- **`BIDSTACK_JOB_SIGNING_SECRET`** wired (api + worker boot-required), **App
+  Insights** + **diagnostic settings** (PG/Redis/KV → Log Analytics) + **Azure
+  Monitor alerts** (PG storage, Redis memory) + action group, **KEDA** queue-depth
+  scaler on the worker, `minReplicas: 2`, `terminationGracePeriodSeconds: 150`,
+  `TRUSTED_PROXIES=2`.
+
+### Still to do before deploy (honest follow-ups)
+
+- [ ] **`az bicep build` + `what-if`** — this file is still UNVALIDATED here (no
+      Azure CLI in the authoring env). Resolve every `// VALIDATE:` marker,
+      especially: Container Apps KV secret-ref shape, the **KEDA redis scaler**
+      metadata/auth (host:port + TLS + password), `redisConfiguration` AOF
+      (needs a storage account), Front Door resource graph, `cidrSubnet()` ranges.
+- [ ] **True passwordless Postgres**: the bicep ENABLES Entra auth + sets the MI
+      as Entra admin, but the app still connects via `pgAdminLogin:password` in
+      `DATABASE_URL`. Full Entra requires an **app-side token provider** that
+      fetches an AAD access token and feeds it to Prisma as the rotating
+      password — an app-code change (follow-up). Password auth is retained as
+      break-glass meanwhile.
+- [ ] **Front Door custom domain** binding (`publicBaseUrl` host) + managed cert
+      + lock ACA ingress to the Front Door origin (Private Link origin, or
+      `X-Azure-FDID` check) so the app FQDNs aren't directly reachable.
+- [ ] **CD activation**: `deploy.workflow.yml.draft` now has bicep-validate +
+      CI-green gate + post-deploy health gate + auto-rollback, but a MAINTAINER
+      must move it to `.github/workflows/deploy.yml` (gated by CLAUDE.md).
+- [ ] Tested **restore / geo-restore** runbook; rewrite `docs/RUNBOOK.md` for
+      Container Apps (it still targets K8s/Docker).
+- [ ] Right-size SKUs (PG `D2ds_v5`, Redis `Premium P1`) for real load.
