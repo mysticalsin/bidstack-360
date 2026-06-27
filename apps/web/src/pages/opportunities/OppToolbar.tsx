@@ -111,6 +111,7 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
 export function OppPageHeader({
   search,
   stageFilter,
+  stageOptions,
   itemCount,
   hasData,
   isExporting = false,
@@ -120,6 +121,7 @@ export function OppPageHeader({
 }: {
   search: string | undefined;
   stageFilter: string | null;
+  stageOptions: PipelineStage[];
   itemCount: number;
   hasData: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
@@ -129,6 +131,11 @@ export function OppPageHeader({
   onExportCsv: () => void;
 }) {
   const { t } = useTranslation('crm');
+  // Resolve a configured stage id (UUID) to its name; fall back to formatStage
+  // for legacy enum ids so the subtitle never shows a raw UUID.
+  const stageFilterLabel = stageFilter
+    ? (stageOptions.find((s) => s.id === stageFilter)?.name ?? formatStage(stageFilter))
+    : '';
   const clearBtnClass =
     'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
 
@@ -154,7 +161,7 @@ export function OppPageHeader({
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
               {t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
-                stage: formatStage(stageFilter).toLowerCase(),
+                stage: stageFilterLabel.toLowerCase(),
               })}
               <button type="button" onClick={onClearStageFilter} className={clearBtnClass}>
                 {t('oppToolbar.clearFilter', 'clear filter')}

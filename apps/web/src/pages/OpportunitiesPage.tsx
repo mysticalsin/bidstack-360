@@ -361,6 +361,7 @@ export function OpportunitiesPage() {
       <OppPageHeader
         search={search}
         stageFilter={stageFilter}
+        stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
