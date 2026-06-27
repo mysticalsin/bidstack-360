@@ -14,7 +14,12 @@ export function NewLeadPage() {
   const create = useCreateLead();
   const firstNameRef = useRef<HTMLInputElement>(null);
   const lastNameRef = useRef<HTMLInputElement>(null);
-  const [errors, setErrors] = useState<{ firstName?: boolean; lastName?: boolean }>({});
+  const companyNameRef = useRef<HTMLInputElement>(null);
+  const [errors, setErrors] = useState<{
+    firstName?: boolean;
+    lastName?: boolean;
+    companyName?: boolean;
+  }>({});
   const [form, setForm] = useState<LeadCreate>({
     firstName: '',
     lastName: '',
@@ -29,13 +34,24 @@ export function NewLeadPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const next = { firstName: !form.firstName.trim(), lastName: !form.lastName.trim() };
-    if (next.firstName || next.lastName) {
+    const next = {
+      firstName: !form.firstName.trim(),
+      lastName: !form.lastName.trim(),
+      companyName: !form.companyName.trim(),
+    };
+    if (next.firstName || next.lastName || next.companyName) {
       setErrors(next);
       // Move focus to the first invalid field so a keyboard/SR user lands on
       // the problem, not just hears a transient toast.
-      (next.firstName ? firstNameRef : lastNameRef).current?.focus();
-      toast.error(t('newLead.toastNameRequired', 'First and last name are required'));
+      (next.firstName
+        ? firstNameRef
+        : next.lastName
+          ? lastNameRef
+          : companyNameRef
+      ).current?.focus();
+      toast.error(
+        t('newLead.toastRequiredFields', 'First name, last name, and company are required'),
+      );
       return;
     }
     setErrors({});
@@ -169,13 +185,20 @@ export function NewLeadPage() {
                 htmlFor="lead-company"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                {t('newLead.labelCompany', 'Company')}
+                {t('newLead.labelCompany', 'Company')}{' '}
+                <span className="text-[var(--danger)]">*</span>
               </label>
               <input
                 id="lead-company"
+                ref={companyNameRef}
+                required
+                aria-invalid={errors.companyName || undefined}
                 value={form.companyName}
-                onChange={field('companyName')}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                onChange={(e) => {
+                  field('companyName')(e);
+                  if (errors.companyName) setErrors((s) => ({ ...s, companyName: false }));
+                }}
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 aria-[invalid=true]:border-[var(--danger)] aria-[invalid=true]:ring-[var(--danger)]/20"
               />
             </div>
             <div>
