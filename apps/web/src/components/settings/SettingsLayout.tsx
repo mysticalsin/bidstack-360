@@ -176,6 +176,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
                       <li key={item.id}>
                         <button
                           type="button"
+                          aria-current={active === item.id ? 'page' : undefined}
                           onClick={() => {
                             onChange(item.id);
                             setMenuOpen(false);
