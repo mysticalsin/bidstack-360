@@ -43,6 +43,9 @@ export function NewForecastDialogContent({
 
   const canSubmit =
     period.trim().length > 0 &&
+    // Require an owner — the server rejects an empty ownerId (must be a UUID), so
+    // gating Save here turns a silent 400 into a clear "pick an owner first".
+    ownerId.trim().length > 0 &&
     !isPending &&
     Object.values(amounts).some((v) => v.trim().length > 0 && Number(v) > 0);
 
