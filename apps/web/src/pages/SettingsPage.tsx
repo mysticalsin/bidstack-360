@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SettingsLayout, type SettingsSection } from '@/components/settings/SettingsLayout';
@@ -20,6 +21,7 @@ import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
+import { useIsAdmin } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
 // The English default is passed to t() so the UI never shows a raw key.
@@ -45,10 +47,43 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   developer: ['sectionDeveloper', 'Developer access'],
 };
 
+const SETTINGS_SECTIONS = new Set<SettingsSection>(
+  Object.keys(SECTION_TITLES) as SettingsSection[],
+);
+
+const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
+  'serum',
+  'crm',
+  'data-import',
+  'top-accounts',
+  'groups',
+  'opportunity-filters',
+  'rfp-analytics',
+  'modules',
+  'webhooks',
+  'audit-log',
+  'developer',
+]);
+
+function resolveSettingsTab(tab: string | null, isAdmin: boolean): SettingsSection {
+  const candidate =
+    tab && SETTINGS_SECTIONS.has(tab as SettingsSection) ? (tab as SettingsSection) : 'overview';
+  if (!isAdmin && ADMIN_SETTINGS_SECTIONS.has(candidate)) return 'overview';
+  return candidate;
+}
+
 export function SettingsPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = (searchParams.get('tab') as SettingsSection) || 'overview';
+  const isAdmin = useIsAdmin();
+  const requestedTab = searchParams.get('tab');
+  const activeTab = resolveSettingsTab(requestedTab, isAdmin);
+
+  useEffect(() => {
+    if (requestedTab && requestedTab !== activeTab) {
+      setSearchParams({ tab: activeTab }, { replace: true });
+    }
+  }, [activeTab, requestedTab, setSearchParams]);
 
   const setActive = (tab: SettingsSection) => {
     setSearchParams({ tab });
@@ -57,7 +92,7 @@ export function SettingsPage() {
   const sections: Record<SettingsSection, React.ReactNode> = {
     overview: <SettingsOverviewSection onNavigate={setActive} />,
     serum: <SerumControlPlaneSection />,
-    // Profile + Language no longer have their own tabs — they fold into
+    // Profile + Language no longer have their own tabs; they fold into
     // Security and Appearance. The standalone keys stay so deep links still
     // resolve.
     profile: <ProfileSection />,

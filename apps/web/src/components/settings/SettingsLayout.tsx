@@ -39,7 +39,7 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    // Profile folds into Security; Language folds into Appearance — fewer,
+    // Profile folds into Security; Language folds into Appearance; fewer,
     // clearer personal tabs.
     label: 'Personal',
     items: [
