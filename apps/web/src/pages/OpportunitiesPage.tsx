@@ -282,9 +282,16 @@ export function OpportunitiesPage() {
     setIsExporting(true);
     try {
       await downloadFromApi('/api/opportunities/export', `bidstack-opportunities-${stamp}.csv`, {
-        querystring: {
-          pipelineStageId: stageFilter ?? undefined,
-        },
+        // Mirror the list query's stage branching: a configured stage is a UUID
+        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
+        // legacy enum as pipelineStageId 400s the export.
+        querystring: stageFilter
+          ? isPipelineStageIdUuid(stageFilter)
+            ? { pipelineStageId: stageFilter }
+            : isLegacyOpportunityStage(stageFilter)
+              ? { stage: stageFilter }
+              : {}
+          : {},
       });
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
