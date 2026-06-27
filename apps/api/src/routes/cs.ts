@@ -139,6 +139,8 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/accounts/:id/churn-signals/:signalId/acknowledge',
     {
+      // Mutates churn-signal workflow state — gate as an account write.
+      preHandler: [app.requirePermission('accounts:write')],
       schema: {
         params: SignalParams,
         response: { 200: MessageResponse, 404: MessageResponse },
@@ -165,6 +167,8 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/accounts/:id/churn-signals/:signalId/resolve',
     {
+      // Mutates churn-signal workflow state — gate as an account write.
+      preHandler: [app.requirePermission('accounts:write')],
       schema: {
         params: SignalParams,
         body: ResolveBody,

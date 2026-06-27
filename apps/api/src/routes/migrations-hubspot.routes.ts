@@ -261,6 +261,9 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/start-hubspot',
     {
+      // Bulk import (creates companies/contacts/deals/tasks). migrations.ts
+      // gates all non-GET on settings:write; this sibling file had no RBAC gate.
+      preHandler: [server.requirePermission('settings:write')],
       config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       schema: {
         body: z.object({

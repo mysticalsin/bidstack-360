@@ -80,6 +80,10 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/dust/push-deal/:id',
     {
+      // Pushes the deal to the external Dust data source + writes dustDocId —
+      // a write. Every sibling integration mutation gates on integrations:write;
+      // this one was missing it (read-only role / read-scoped key could push).
+      preHandler: [server.requirePermission('integrations:write')],
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),

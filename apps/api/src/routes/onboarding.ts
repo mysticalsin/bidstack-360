@@ -76,6 +76,8 @@ export const onboardingRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/onboarding/templates/:template/install',
     {
+      // Mass-creates pipelines/leads/deals/tasks — admin-grade setup write.
+      preHandler: [server.requirePermission('settings:write')],
       schema: {
         params: z.object({ template: TemplateKey }),
         response: {
@@ -103,6 +105,8 @@ export const onboardingRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/onboarding/sample-data',
     {
+      // Bulk-deletes sample data — a read-only role/key must not wipe it.
+      preHandler: [server.requirePermission('settings:write')],
       schema: {
         response: { 200: DeleteResult },
       },
