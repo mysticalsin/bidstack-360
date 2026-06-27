@@ -214,6 +214,17 @@ export function ReferencesPage() {
                     </p>
                   )}
 
+                  {ref.documentUrl && (
+                    <a
+                      href={ref.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center rounded text-xs font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                    >
+                      {t('references.viewDocument', 'View document')}
+                    </a>
+                  )}
+
                   {ref.tags.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {ref.tags.map((t) => (
