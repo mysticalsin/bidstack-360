@@ -28,7 +28,7 @@ import { Queue, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma, OpportunityStage } from '@bidstack/db';
+import { prisma, OpportunityStage, Prisma } from '@bidstack/db';
 
 import {
   DEADLINE_THRESHOLD_DAYS,
@@ -75,9 +75,11 @@ interface ScannedOpp {
 /**
  * Create the alert for one (opp, threshold) IF it does not already exist. The
  * copy uses the real `daysUntil` (not the bucket boundary), while `threshold` is
- * the per-boundary dedupe discriminator. The existence check on the
- * deterministic dedupe url is the idempotency guard. Returns true when a new
- * notification was written.
+ * the per-boundary dedupe discriminator. The existence check is the fast path;
+ * the DB-level guarantee is the partial unique index
+ * `notifications_deadline_dedupe_uq` on (org_id, user_id, url) for deadline urls,
+ * so a concurrent scan that wins the race surfaces P2002 (caught → false) rather
+ * than inserting a duplicate. Returns true when a new notification was written.
  */
 async function alertIfNew(
   opp: ScannedOpp,
@@ -92,23 +94,32 @@ async function alertIfNew(
   if (existing) return false;
 
   const label = dueInLabel(daysUntil);
-  await prisma.notification.create({
-    data: {
-      orgId: opp.orgId,
-      userId: opp.ownerId,
-      // 'system' is the only non-gated NotificationType the worker may emit
-      // without editing @bidstack/shared (the Zod enum gates the API response
-      // serializer). entityType/url distinguish deadline alerts from other
-      // system notifications.
-      type: 'system',
-      title: `Bid deadline ${label}: ${opp.name}`,
-      body: `${opp.customer} — proposal for "${opp.name}" is due ${label}.`,
-      entityType: 'opportunity',
-      entityId: opp.id,
-      url,
-    },
-  });
-  return true;
+  try {
+    await prisma.notification.create({
+      data: {
+        orgId: opp.orgId,
+        userId: opp.ownerId,
+        // 'system' is the only non-gated NotificationType the worker may emit
+        // without editing @bidstack/shared (the Zod enum gates the API response
+        // serializer). entityType/url distinguish deadline alerts from other
+        // system notifications.
+        type: 'system',
+        title: `Bid deadline ${label}: ${opp.name}`,
+        body: `${opp.customer} — proposal for "${opp.name}" is due ${label}.`,
+        entityType: 'opportunity',
+        entityId: opp.id,
+        url,
+      },
+    });
+    return true;
+  } catch (err) {
+    // A concurrent scan already wrote this exact (opp, threshold) alert and won
+    // the unique-index race — idempotent: treat as already-alerted, not an error.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return false;
+    }
+    throw err;
+  }
 }
 
 async function scanDeadlines(log: pino.Logger): Promise<void> {
