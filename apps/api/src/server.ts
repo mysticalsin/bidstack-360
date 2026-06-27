@@ -28,7 +28,7 @@ import { realtimePlugin } from './plugins/realtime.js';
 import { yjsCollabPlugin } from './plugins/yjs-collab.js';
 import { config } from './env.js';
 import { rbacPlugin } from './plugins/rbac.js';
-import { redis } from './redis.js';
+import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
 
@@ -50,6 +50,24 @@ const CONNECT_SRC = [
 ];
 
 const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges.cloudflare.com'];
+
+/**
+ * Parse TRUSTED_PROXIES into a Fastify trustProxy value. Behind Azure Front Door
+ * + Container Apps Envoy the client IP is N hops upstream, so a hop COUNT (e.g.
+ * "2") or "true" is the correct setting; a CIDR/IP allowlist is also supported.
+ * Empty disables proxy trust (direct-exposure default).
+ */
+function parseTrustProxy(value: string | undefined): boolean | number | string[] {
+  if (!value) return false;
+  const v = value.trim();
+  if (v === 'true') return true;
+  if (v === 'false' || v === '') return false;
+  if (/^\d+$/.test(v)) return Number(v);
+  return v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -102,9 +120,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
     },
-    trustProxy: config.TRUSTED_PROXIES
-      ? config.TRUSTED_PROXIES.split(',').map((s) => s.trim())
-      : false,
+    trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
 
   server.setValidatorCompiler(validatorCompiler);
@@ -226,8 +242,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   // replicas, so we require the shared Redis store; otherwise each Node process
   // keeps its own counter and the effective global limit is multiplied by the
   // replica count. Fail loud at boot rather than silently degrading.
-  const redisReady = redis.status === 'ready' || redis.status === 'connect';
-  const rateLimitRedis = config.NODE_ENV !== 'test' && redisReady ? redis : undefined;
+  // Await readiness (bounded) so a still-connecting Redis at boot does not
+  // falsely trip the production guard below — a status-only check was a boot race.
+  const redisReady = config.NODE_ENV !== 'test' && (await waitForRedisReady());
+  const rateLimitRedis = redisReady ? redis : undefined;
   if (
     config.NODE_ENV === 'production' &&
     config.RATE_LIMIT_REDIS_REQUIRED === 'true' &&

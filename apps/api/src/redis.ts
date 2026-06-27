@@ -17,6 +17,9 @@ export const redis = new Redis(redisUrl, {
   connectTimeout: 1_000,
   enableOfflineQueue: false,
   maxRetriesPerRequest: 1,
+  // TCP keepalive so Azure Cache for Redis' ~10-minute idle reaper doesn't
+  // silently drop this long-lived client between requests.
+  keepAlive: 30_000,
   retryStrategy: (times) =>
     times > MAX_RECONNECT_ATTEMPTS
       ? null
@@ -58,6 +61,39 @@ export async function pingRedis(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Resolve once Redis can run commands, or after `timeoutMs`. Unlike a bare
+ * status check, this AWAITS the in-flight eager connection (status 'connecting'),
+ * so a slow connect at boot is not mistaken for a hard failure. Used by the
+ * rate-limit store selection so it never falsely trips the production guard.
+ */
+export function waitForRedisReady(timeoutMs = 5_000): Promise<boolean> {
+  if (redisStatusCanRunCommand()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onUp = (): void => {
+      cleanup();
+      resolve(true);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(redisStatusCanRunCommand());
+    }, timeoutMs);
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      redis.off('ready', onUp);
+      redis.off('connect', onUp);
+    };
+    redis.once('ready', onUp);
+    redis.once('connect', onUp);
+    // If the client has already given up, kick a reconnect attempt.
+    if (redisStatusCanReconnect()) {
+      void ensureRedisReady().then((ok) => {
+        if (ok) onUp();
+      });
+    }
+  });
 }
 
 redis.on('error', () => {

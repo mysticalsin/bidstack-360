@@ -64,6 +64,29 @@ import {
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
+  // Prevent accidental PII/secret leakage into Log Analytics (mirrors the API
+  // logger's redaction set in apps/api/src/lib/logger.ts).
+  redact: {
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'req.headers["x-api-key"]',
+      '*.password',
+      '*.secret',
+      '*.token',
+      '*.apiKey',
+      '*.api_key',
+      '*.authToken',
+      '*.auth_token',
+      '*.accessToken',
+      '*.access_token',
+      '*.refreshToken',
+      '*.refresh_token',
+      'err.config.headers.Authorization',
+      'err.config.headers.authorization',
+    ],
+    remove: true,
+  },
   transport:
     process.env.NODE_ENV === 'development'
       ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
@@ -93,6 +116,9 @@ const redisEndpoint = (() => {
 
 const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
+  // TCP keepalive so Azure Cache for Redis' ~10-min idle reaper doesn't drop the
+  // BullMQ connection during quiet periods.
+  keepAlive: 30_000,
 });
 
 connection.on('error', (err) => log.error({ err }, 'redis error'));
@@ -196,6 +222,15 @@ const healthServer = http.createServer((req, res) => {
     return;
   }
 
+  // Shallow liveness: the process is up. NOT coupled to DB/Redis, so a transient
+  // dependency blip does not make Container Apps restart every worker replica at
+  // once, mid-job. The deep /health below is readiness (for dashboards/manual).
+  if (pathname === '/livez') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
   // Probe BOTH dependencies: nearly every queue handler hits Postgres, so a
   // worker with a dead DB must not report healthy (it would keep receiving jobs
   // it can only fail).
@@ -246,12 +281,18 @@ healthServer.listen(healthPort, () => {
   log.info({ healthPort }, 'health server listening');
 });
 
+// Force-exit budget for graceful shutdown. Must exceed the longest in-flight job
+// (OCR/AI runs can take minutes) so a revision swap / scale-in DRAINS active
+// BullMQ jobs instead of killing them — keep it below the platform's
+// terminationGracePeriodSeconds. Tunable per deployment.
+const SHUTDOWN_TIMEOUT_MS = Number(process.env.WORKER_SHUTDOWN_TIMEOUT_MS || 120_000);
+
 const shutdown = async (signal: string) => {
-  log.info({ signal }, 'shutting down worker');
+  log.info({ signal, timeoutMs: SHUTDOWN_TIMEOUT_MS }, 'shutting down worker');
   const timeout = setTimeout(() => {
     log.error('forced exit after timeout');
     process.exit(1);
-  }, 10_000);
+  }, SHUTDOWN_TIMEOUT_MS);
   try {
     // Release the health port FIRST so a hot-reload's replacement can bind it
     // without a long EADDRINUSE retry window — BullMQ worker.close() below can
