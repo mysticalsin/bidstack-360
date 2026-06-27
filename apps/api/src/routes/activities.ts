@@ -155,8 +155,11 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
 
       const serialized = items.map(serializeActivity);
+      // Only advertise a next page when THIS page is full; a partial page is the
+      // last page, so emitting a cursor there produced a phantom 'next' that
+      // fetched 0 rows.
       const nextCursor =
-        items.length > 0 ? items[items.length - 1]?.occurredAt.toISOString() ?? null : null;
+        items.length === limit ? items[items.length - 1]?.occurredAt.toISOString() ?? null : null;
 
       return { items: serialized, total, nextCursor };
     },
