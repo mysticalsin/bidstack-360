@@ -1,6 +1,6 @@
 // Integration tests for the GDPR Art. 20 tenant export routes.
 // Pattern: users.roles.integration.test.ts — buildServer + inject against the
-// seed org (org_seed_mantu); role switching via the x-bidstack-e2e-role header.
+// isolated org; role switching via the x-bidstack-e2e-role header.
 //
 // WHY these assertions matter:
 //   - an org-admin must be able to REQUEST an export (Art. 20 right);
@@ -14,10 +14,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 let previousStubRoleHeader: string | undefined;
 const createdExportIds: string[] = [];
 
@@ -31,9 +37,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('tenant-export');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   // Start from a clean slate so single-flight assertions are deterministic.
   await prisma.tenantExport.deleteMany({ where: { orgId } });
   server = await buildServer();
@@ -44,7 +50,9 @@ afterAll(async () => {
   if (orgId) {
     await prisma.tenantExport.deleteMany({ where: { orgId } });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
   if (previousStubRoleHeader === undefined) {
     delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
@@ -55,7 +63,7 @@ afterAll(async () => {
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
+    if (!dbReachable || !orgId) throw new Error(`[skip] ${name}: DB/isolated org unavailable`);
     await fn();
   });
 

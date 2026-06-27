@@ -1,15 +1,19 @@
 // Integration tests for the cross-sell action log (A2).
-// Pattern: tasks.integration.test.ts — buildServer + inject against the seed
-// org; every fixture cleaned up in afterAll.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const ACCOUNT = 'xsell-test-account';
 const createdIds: string[] = [];
 
@@ -21,9 +25,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('cross-sell');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   server = await buildServer();
   await server.ready();
 });
@@ -35,18 +39,20 @@ afterAll(async () => {
       where: { orgId, action: { startsWith: 'cross_sell_action.' } },
     });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
+    if (!dbReachable || !orgId) throw new Error(`[skip] ${name}: DB/isolated org unavailable`);
     await fn();
   });
 
 describe('cross-sell actions routes', () => {
-  t('create → list → patch status', async () => {
+  t('create -> list -> patch status', async () => {
     const create = await server.inject({
       method: 'POST',
       url: '/api/cross-sell-actions',
@@ -81,6 +87,11 @@ describe('cross-sell actions routes', () => {
       where: { orgId: orgId!, action: 'cross_sell_action.create', targetId: id },
     });
     expect(audit).not.toBeNull();
+
+    const updateAudit = await prisma.auditLog.findFirst({
+      where: { orgId: orgId!, action: 'cross_sell_action.update', targetId: id },
+    });
+    expect(updateAudit).not.toBeNull();
   });
 
   t('rejects an assignee from another org with 400', async () => {

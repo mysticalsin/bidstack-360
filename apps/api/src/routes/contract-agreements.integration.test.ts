@@ -1,6 +1,6 @@
 // Integration tests for contractual management (MSAs/framework agreements).
 // Pattern: cross-sell.integration.test.ts — buildServer + inject against the
-// seed org; fixtures cleaned up in afterAll.
+// isolated org; fixtures cleaned up in afterAll.
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,10 +10,16 @@ import { DOCUMENT_EXTRACT } from '@bidstack/shared';
 
 import { closeDocumentExtractQueueForTest } from '../queues/document-extract.js';
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const ACCOUNT = 'contract-test-account';
 
 beforeAll(async () => {
@@ -24,9 +30,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('contract-agreements');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   server = await buildServer();
   await server.ready();
 });
@@ -38,13 +44,15 @@ afterAll(async () => {
       where: { orgId, action: { startsWith: 'contract_agreement.' } },
     });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
+    if (!dbReachable || !orgId) throw new Error(`[skip] ${name}: DB/isolated org unavailable`);
     await fn();
   });
 

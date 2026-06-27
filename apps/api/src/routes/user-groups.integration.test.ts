@@ -1,4 +1,4 @@
-// M7 — access-scoping integration tests.
+// M7: access-scoping integration tests.
 //
 // WHY these tests matter: the access-scoping layer is the contract that a
 // group-restricted user cannot see opportunities outside their countries
@@ -6,8 +6,8 @@
 // groups keep exactly today's org-wide visibility. A regression here is a
 // data-exposure incident, not a cosmetic bug.
 //
-// The dev/test auth stub authenticates every request as the FIRST seed user
-// of org_seed_mantu, so we scope THAT user by group membership and watch the
+// The dev/test auth stub authenticates every request as the first user in this
+// file's isolated org, so we scope that user by group membership and watch the
 // list change. All fixtures are UUID-pinned (MISTAKES 2026-06-07: no small
 // random ranges in persistent fixtures) and cleaned up in afterAll.
 
@@ -19,13 +19,19 @@ import { prisma } from '@bidstack/db';
 
 import { invalidateAccessScope } from '../lib/access-scope.js';
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let stubUserId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 
-// Pinned fixture identity — improbable ISO-2 user-assigned codes ZZ/QQ never
+// Pinned fixture identity: improbable ISO-2 user-assigned codes ZZ/QQ never
 // appear in seeds; the marker makes ?search= return only our fixtures.
 const marker = `SCOPE-${randomUUID()}`.slice(0, 42);
 const oppIds: string[] = [];
@@ -53,9 +59,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('user-groups');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
 
   // Same resolution the auth stub uses (plugins/auth.ts resolveStubAuth).
   const stubUser = await prisma.user.findFirst({
@@ -229,14 +235,16 @@ afterAll(async () => {
     // Leave no stale scope behind for other suites sharing this process.
     if (stubUserId) invalidateAccessScope(orgId);
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId || !stubUserId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed data missing`);
+      throw new Error(`[skip] ${name}: DATABASE_URL not reachable or isolated data missing`);
     }
     await fn();
   });
@@ -289,10 +297,10 @@ describe('access scoping (user groups)', () => {
       expect(memberRes.statusCode).toBe(201);
 
       const visible = await listVisibleFixtureIds();
-      expect(visible.has(oppInScopeId)).toBe(true); // country ZZ ∈ scope
+      expect(visible.has(oppInScopeId)).toBe(true); // country ZZ is in scope
       expect(visible.has(oppTerritoryId)).toBe(true); // territory countryCodes overlap
       expect(visible.has(oppOwnedId)).toBe(true); // owned rows always visible
-      expect(visible.has(oppOutOfScopeId)).toBe(false); // QQ, not owned → hidden
+      expect(visible.has(oppOutOfScopeId)).toBe(false); // QQ, not owned, hidden
     },
   );
 

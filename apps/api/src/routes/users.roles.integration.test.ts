@@ -11,15 +11,22 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let memberId: string | null = null;
 let roleId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 let previousStubRoleHeader: string | undefined;
 const ROLE_NAME = `NOTIF-RBAC-TEST role ${Date.now()}`;
 const PERM_KEY = 'tasks:read';
+const ADMIN_HEADERS = { 'x-bidstack-e2e-role': 'admin' };
 
 beforeAll(async () => {
   previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
@@ -31,9 +38,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('users-roles');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
 
   // A throwaway member to assign roles to, and a throwaway custom role that
   // grants exactly one permission so we can prove the manifest reflects it.
@@ -64,10 +71,10 @@ beforeAll(async () => {
 afterAll(async () => {
   if (orgId) {
     await prisma.userRole.deleteMany({
-      where: { user: { email: { endsWith: '@bidstack.local' } } },
+      where: { orgId, user: { email: { endsWith: '@bidstack.local' } } },
     });
     await prisma.user.deleteMany({
-      where: { email: { endsWith: '@bidstack.local' } },
+      where: { orgId, email: { endsWith: '@bidstack.local' } },
     });
     if (memberId) {
       await prisma.userRole.deleteMany({ where: { userId: memberId } });
@@ -81,7 +88,9 @@ afterAll(async () => {
       where: { orgId, action: { startsWith: 'user_role.' }, targetId: memberId ?? undefined },
     });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
   if (previousStubRoleHeader === undefined) {
     delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
@@ -93,7 +102,7 @@ afterAll(async () => {
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
     if (!dbReachable || !orgId || !memberId || !roleId) {
-      throw new Error(`[skip] ${name} — DB/seed/fixtures unavailable`);
+      throw new Error(`[skip] ${name}: DB/isolated fixtures unavailable`);
     }
     await fn();
   });
@@ -103,7 +112,7 @@ describe('capability manifest + user-role assignment', () => {
     const res = await server.inject({ method: 'GET', url: '/api/me/capabilities' });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { isAdmin: boolean; permissions: string[]; userId: string };
-    // The seed/stub identity is an admin and therefore holds many permission keys.
+    // The isolated stub identity is an admin and therefore holds many permission keys.
     expect(body.isAdmin).toBe(true);
     expect(body.permissions.length).toBeGreaterThan(0);
   });
@@ -160,10 +169,11 @@ describe('capability manifest + user-role assignment', () => {
     expect(body.permissions).not.toContain('users:write');
   });
 
-  t('assign → list → revoke a custom role, idempotently', async () => {
+  t('assign -> list -> revoke a custom role, idempotently', async () => {
     const assign = await server.inject({
       method: 'POST',
       url: `/api/users/${memberId}/roles`,
+      headers: ADMIN_HEADERS,
       payload: { roleId },
     });
     expect(assign.statusCode).toBe(200);
@@ -174,21 +184,31 @@ describe('capability manifest + user-role assignment', () => {
     const again = await server.inject({
       method: 'POST',
       url: `/api/users/${memberId}/roles`,
+      headers: ADMIN_HEADERS,
       payload: { roleId },
     });
     expect(again.statusCode).toBe(200);
 
-    const list = await server.inject({ method: 'GET', url: `/api/users/${memberId}/roles` });
+    const list = await server.inject({
+      method: 'GET',
+      url: `/api/users/${memberId}/roles`,
+      headers: ADMIN_HEADERS,
+    });
     ids = (list.json() as { items: { roleId: string }[] }).items.map((r) => r.roleId);
     expect(ids).toContain(roleId);
 
     const revoke = await server.inject({
       method: 'DELETE',
       url: `/api/users/${memberId}/roles/${roleId}`,
+      headers: ADMIN_HEADERS,
     });
     expect(revoke.statusCode).toBe(204);
 
-    const after = await server.inject({ method: 'GET', url: `/api/users/${memberId}/roles` });
+    const after = await server.inject({
+      method: 'GET',
+      url: `/api/users/${memberId}/roles`,
+      headers: ADMIN_HEADERS,
+    });
     ids = (after.json() as { items: { roleId: string }[] }).items.map((r) => r.roleId);
     expect(ids).not.toContain(roleId);
 
@@ -196,6 +216,7 @@ describe('capability manifest + user-role assignment', () => {
     const regrant = await server.inject({
       method: 'POST',
       url: `/api/users/${memberId}/roles`,
+      headers: ADMIN_HEADERS,
       payload: { roleId },
     });
     expect(regrant.statusCode).toBe(200);
@@ -217,6 +238,7 @@ describe('capability manifest + user-role assignment', () => {
       const res = await server.inject({
         method: 'POST',
         url: `/api/users/${memberId}/roles`,
+        headers: ADMIN_HEADERS,
         payload: { roleId: foreignRole.id },
       });
       expect(res.statusCode).toBe(400);
