@@ -19,10 +19,12 @@ import { Territory, TerritoryCreate, TerritoryPatch } from '@bidstack/shared';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { territoriesRoutingRoutes } from './territories-routing.js';
 import { territoriesForecastRoutes } from './territories-forecast.js';
+import { forecastsProjectionRoutes } from './forecasts-projection.js';
 
 export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
   await server.register(territoriesRoutingRoutes);
   await server.register(territoriesForecastRoutes);
+  await server.register(forecastsProjectionRoutes);
 
   const validateTerritoryOwner = async (orgId: string, ownerId: string) => {
     if (!(await tenantEntityBelongsToOrg('user', ownerId, orgId))) {

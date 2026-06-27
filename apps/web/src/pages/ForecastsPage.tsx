@@ -20,6 +20,7 @@ import { staggerChild, staggerParent } from '@/lib/motion';
 import type { Forecast } from '@bidstack/shared';
 
 import { ForecastChart } from './forecasts/ForecastChart';
+import { ForecastProjection } from './forecasts/ForecastProjection';
 import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
 import {
@@ -179,6 +180,24 @@ export function ForecastsPage() {
           />
         </Dialog>
       </motion.header>
+
+      {/* ── Derived projection (primary, always-populated view) ── */}
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        <ForecastProjection />
+      </motion.div>
+
+      {/* ── Manual overrides (secondary) ── */}
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('forecasts.manualSectionTitle', 'Manual overrides')}
+        </h2>
+        <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
+          {t(
+            'forecasts.manualSectionCaption',
+            'Rep-entered pipeline / best-case / commit / closed figures. These take precedence over the derived baseline for their period.',
+          )}
+        </p>
+      </motion.div>
 
       {/* ── Period filter ── */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>

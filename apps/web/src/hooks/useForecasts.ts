@@ -1,7 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type { Forecast } from '@bidstack/shared';
+import type { Forecast, ForecastProjection } from '@bidstack/shared';
+
+/**
+ * Pipeline-weighted forecast projection derived from open opportunities.
+ * Non-empty whenever open pipeline exists — the page's primary view.
+ */
+export function useForecastProjection() {
+  return useQuery({
+    queryKey: ['forecast-projection'],
+    queryFn: ({ signal }) => api<ForecastProjection>('/api/forecasts/projection', { signal }),
+  });
+}
 
 export function useForecasts(period?: string) {
   return useQuery({
