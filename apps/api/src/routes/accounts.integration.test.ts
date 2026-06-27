@@ -89,12 +89,15 @@ describe('accounts routes', () => {
       console.warn('[skip] no seed org');
       return;
     }
+    // Pick a NON-key company so PATCH→key is a real standard→key transition;
+    // keyAccountSince is only stamped on that transition (accounts.ts), so
+    // promoting an already-key company would leave it null and falsely fail.
     const company = await prisma.company.findFirst({
-      where: { orgId, deletedAt: null },
+      where: { orgId, deletedAt: null, tier: { not: 'key' } },
       orderBy: { createdAt: 'asc' },
     });
     if (!company) {
-      console.warn('[skip] no companies to tier');
+      console.warn('[skip] no non-key companies to tier');
       return;
     }
 

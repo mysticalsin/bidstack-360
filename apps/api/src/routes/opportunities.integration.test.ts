@@ -90,7 +90,9 @@ describe('opportunities routes', () => {
     const seedItem = seedBody.items.find((item) => item.id === seed!.id);
     expect(seedItem).toMatchObject({
       id: seed!.id,
-      code: expect.stringMatching(/^OP-\d{4}$/),
+      // \d{4,}: codes zero-pad to 4 but grow past OP-9999 once an org exceeds
+      // 9,999 opportunities (real at 100k scale) — accept any 4+ digit suffix.
+      code: expect.stringMatching(/^OP-\d{4,}$/),
       probability: expect.any(Number),
     });
   });
