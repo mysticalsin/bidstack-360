@@ -33,8 +33,11 @@ export function AnalyticsDashboardPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [addingWidget, setAddingWidget] = useState(false);
 
-  // Resolve the active dashboard (default to first)
-  const activeDash = activeDashId ? dashboards.find((d) => d.id === activeDashId) : dashboards[0];
+  // Resolve the active dashboard (default to first). Fall back to the first
+  // dashboard when ?id points at a stale/foreign/deleted id, so a bad deep-link
+  // shows a real dashboard instead of the false "No dashboards" empty state.
+  const activeDash =
+    (activeDashId ? dashboards.find((d) => d.id === activeDashId) : undefined) ?? dashboards[0];
 
   const {
     data: rawWidgets = [],
