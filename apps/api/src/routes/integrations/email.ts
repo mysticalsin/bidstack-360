@@ -126,6 +126,16 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
 
       const tokens = await prisma.integrationToken.findMany({
         where: { orgId, userId, deletedAt: null },
+        // Defense-in-depth: never load the *Encrypted token columns into memory
+        // for a status read — select only the non-secret fields the view uses.
+        select: {
+          provider: true,
+          status: true,
+          externalAccountEmail: true,
+          lastSyncedAt: true,
+          errorMessage: true,
+          scope: true,
+        },
         take: 100,
       });
 

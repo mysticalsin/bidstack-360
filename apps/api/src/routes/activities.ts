@@ -231,7 +231,10 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       // Re-fetch the full row to satisfy the Activity schema (startTime, endTime, etc.)
-      const row = await prisma.activity.findUniqueOrThrow({ where: { id: item.id } });
+      // Scope by orgId too (convention) — the row was just created in this org.
+      const row = await prisma.activity.findFirstOrThrow({
+        where: { id: item.id, orgId: req.auth.orgId },
+      });
       reply.status(201);
       return serializeActivity(row as ActivityRow);
     },
