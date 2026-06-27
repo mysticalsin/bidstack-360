@@ -1,4 +1,4 @@
-// Cross-sell action log (A2) — structured cross-country/cross-team actions on
+// Cross-sell action log (A2): structured cross-country/cross-team actions on
 // shared accounts. Pre-sales owns it; assignable + status-tracked.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -106,30 +106,33 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
       } catch {
         throw server.httpErrors.badRequest('Assignee is not a member of this org');
       }
-      const created = await prisma.crossSellAction.create({
-        data: {
-          orgId: req.auth.orgId,
-          accountKey: normalizeName(req.body.accountKey),
-          description: req.body.description,
-          requestingUnit: req.body.requestingUnit,
-          assignedUnit: req.body.assignedUnit,
-          assigneeId: req.body.assigneeId ?? null,
-          dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
-          status: req.body.status,
-          notes: req.body.notes ?? null,
-          createdById: req.auth.userId,
-        },
-        select: ASSIGNEE_SELECT,
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'cross_sell_action.create',
-          targetType: 'cross_sell_action',
-          targetId: created.id,
-          diff: { accountKey: created.accountKey, assignedUnit: created.assignedUnit },
-        },
+      const created = await prisma.$transaction(async (tx) => {
+        const action = await tx.crossSellAction.create({
+          data: {
+            orgId: req.auth.orgId,
+            accountKey: normalizeName(req.body.accountKey),
+            description: req.body.description,
+            requestingUnit: req.body.requestingUnit,
+            assignedUnit: req.body.assignedUnit,
+            assigneeId: req.body.assigneeId ?? null,
+            dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+            status: req.body.status,
+            notes: req.body.notes ?? null,
+            createdById: req.auth.userId,
+          },
+          select: ASSIGNEE_SELECT,
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'cross_sell_action.create',
+            targetType: 'cross_sell_action',
+            targetId: action.id,
+            diff: { accountKey: action.accountKey, assignedUnit: action.assignedUnit },
+          },
+        });
+        return action;
       });
       // Tell the assignee they own a new cross-sell action (best-effort).
       if (created.assigneeId && created.assigneeId !== req.auth.userId) {
@@ -167,35 +170,38 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
           throw server.httpErrors.badRequest('Assignee is not a member of this org');
         }
       }
-      await prisma.crossSellAction.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
-        data: {
-          ...(req.body.description !== undefined ? { description: req.body.description } : {}),
-          ...(req.body.requestingUnit !== undefined
-            ? { requestingUnit: req.body.requestingUnit }
-            : {}),
-          ...(req.body.assignedUnit !== undefined ? { assignedUnit: req.body.assignedUnit } : {}),
-          ...(req.body.assigneeId !== undefined ? { assigneeId: req.body.assigneeId } : {}),
-          ...(req.body.dueDate !== undefined
-            ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
-            : {}),
-          ...(req.body.status !== undefined ? { status: req.body.status } : {}),
-          ...(req.body.notes !== undefined ? { notes: req.body.notes } : {}),
-        },
-      });
-      const updated = await prisma.crossSellAction.findFirstOrThrow({
-        where: { id: existing.id, orgId: req.auth.orgId },
-        select: ASSIGNEE_SELECT,
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'cross_sell_action.update',
-          targetType: 'cross_sell_action',
-          targetId: updated.id,
-          diff: req.body as object,
-        },
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.crossSellAction.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: {
+            ...(req.body.description !== undefined ? { description: req.body.description } : {}),
+            ...(req.body.requestingUnit !== undefined
+              ? { requestingUnit: req.body.requestingUnit }
+              : {}),
+            ...(req.body.assignedUnit !== undefined ? { assignedUnit: req.body.assignedUnit } : {}),
+            ...(req.body.assigneeId !== undefined ? { assigneeId: req.body.assigneeId } : {}),
+            ...(req.body.dueDate !== undefined
+              ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+              : {}),
+            ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+            ...(req.body.notes !== undefined ? { notes: req.body.notes } : {}),
+          },
+        });
+        const action = await tx.crossSellAction.findFirstOrThrow({
+          where: { id: existing.id, orgId: req.auth.orgId },
+          select: ASSIGNEE_SELECT,
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'cross_sell_action.update',
+            targetType: 'cross_sell_action',
+            targetId: action.id,
+            diff: req.body as object,
+          },
+        });
+        return action;
       });
       // Notify only on a real re-assignment to a different, non-actor user.
       if (

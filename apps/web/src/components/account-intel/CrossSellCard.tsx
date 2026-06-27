@@ -1,6 +1,6 @@
 /**
  * Cross-sell action log for the open account (A2). Structured, assignable
- * actions across countries/teams on a shared account — pre-sales owns it.
+ * actions across countries/teams on a shared account; pre-sales owns it.
  */
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { SourceBadge } from '@/components/cockpit/SourceBadge';
-import { useIsAdmin } from '@/lib/auth';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useUsers } from '@/hooks/useUsers';
 import {
   useCreateCrossSellAction,
@@ -33,7 +33,7 @@ const STATUS_LABEL: Record<GovernanceStatus, string> = {
 const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
   open: 'in_progress',
   in_progress: 'done',
-  done: 'open',
+  done: 'done',
 };
 
 function dateOnly(value: string | null): string | null {
@@ -75,7 +75,7 @@ function ActionAuditBadges({ action }: { action: CrossSellAction }) {
 export function CrossSellCard({ accountKey }: { accountKey: string }) {
   const actions = useCrossSellActions({ accountKey });
   const patch = usePatchCrossSellAction();
-  const canWrite = useIsAdmin();
+  const canWrite = useHasPermission('accounts:write');
   const { t } = useTranslation('crm');
 
   const statusLabel = (status: GovernanceStatus): string => {
@@ -118,16 +118,17 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                   <div className="min-w-0">
                     <p className="text-sm text-[var(--fg-primary)]">{action.description}</p>
                     <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-                      {action.requestingUnit} → {action.assignedUnit}
-                      {action.assigneeName ? ` · ${action.assigneeName}` : ''}
-                      {action.dueDate ? ` · due ${action.dueDate.slice(0, 10)}` : ''}
+                      {action.requestingUnit} -&gt; {action.assignedUnit}
+                      {action.assigneeName ? ` - ${action.assigneeName}` : ''}
+                      {action.dueDate ? ` - due ${action.dueDate.slice(0, 10)}` : ''}
                     </p>
                     <ActionAuditBadges action={action} />
                   </div>
                   <button
                     type="button"
-                    disabled={!canWrite || patch.isPending}
+                    disabled={!canWrite || action.status === 'done' || patch.isPending}
                     onClick={() => {
+                      if (action.status === 'done') return;
                       const next = NEXT_STATUS[action.status];
                       patch.mutate(
                         { id: action.id, body: { status: next } },
@@ -150,7 +151,13 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                     aria-label={t('crossSell.advanceStatusLabel', 'Advance status of {{description}}', {
                       description: action.description,
                     })}
-                    title={canWrite ? t('crossSell.advanceStatusHint', 'Click to advance status') : undefined}
+                    title={
+                      action.status === 'done'
+                        ? t('crossSell.doneStatusHint', 'Completed actions stay closed')
+                        : canWrite
+                          ? t('crossSell.advanceStatusHint', 'Click to advance status')
+                          : undefined
+                    }
                     data-testid={`cross-sell-${action.id}-status`}
                   >
                     <Badge tone={STATUS_TONE[action.status]}>{statusLabel(action.status)}</Badge>

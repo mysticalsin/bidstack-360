@@ -18,8 +18,8 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/lib/auth', () => ({
-  useIsAdmin: () => false,
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: () => false,
 }));
 
 vi.mock('@/hooks/useUsers', () => ({
