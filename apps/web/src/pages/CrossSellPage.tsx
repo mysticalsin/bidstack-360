@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
@@ -67,13 +68,19 @@ export default function CrossSellPage() {
   const { t } = useTranslation('crm');
   const [status, setStatus] = useState<GovernanceStatus | 'all'>('all');
   const actions = useCrossSellActions(status === 'all' ? {} : { status });
+  // KPI summary must reflect the whole org regardless of the table's status
+  // filter — computing it from the filtered slice showed misleading zeros (e.g.
+  // selecting "Done" made Active/Overdue/Unassigned all read 0). React Query
+  // dedupes this with `actions` when status === 'all'.
+  const allActions = useCrossSellActions({});
   const patch = usePatchCrossSellAction();
   const canWrite = useHasPermission('accounts:write');
   const today = new Date().toISOString().slice(0, 10);
 
   const items = useMemo(() => actions.data?.items ?? [], [actions.data?.items]);
+  const summaryItems = useMemo(() => allActions.data?.items ?? [], [allActions.data?.items]);
   const summary = useMemo(() => {
-    const active = items.filter((a) => a.status !== 'done');
+    const active = summaryItems.filter((a) => a.status !== 'done');
     const overdue = active.filter((a) => isOverdue(a, today));
     const unassigned = active.filter((a) => !a.assigneeId);
     const nextDue = [...active].sort(sortByDueDate).find((a) => a.dueDate);
@@ -83,7 +90,7 @@ export default function CrossSellPage() {
       unassignedCount: unassigned.length,
       nextDue,
     };
-  }, [items, today]);
+  }, [summaryItems, today]);
 
   const statusLabel = (value: GovernanceStatus): string => {
     switch (value) {
@@ -197,13 +204,30 @@ export default function CrossSellPage() {
           message={actions.error?.message ?? t('crossSell.errorMessage', 'Try again shortly.')}
         />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('crossSell.emptyTitle', 'No cross-sell actions')}
-          message={t(
-            'crossSell.emptyMessage',
-            "Log cross-team actions from any account's cockpit. They appear here for the whole org.",
-          )}
-        />
+        status !== 'all' ? (
+          <EmptyState
+            title={t('crossSell.emptyFilteredTitle', 'No {{status}} cross-sell actions', {
+              status: statusLabel(status).toLowerCase(),
+            })}
+            message={t(
+              'crossSell.emptyFilteredMessage',
+              'No actions match this filter. Clear it to see every cross-sell action.',
+            )}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => setStatus('all')}>
+                {t('crossSell.showAll', 'Show all')}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('crossSell.emptyTitle', 'No cross-sell actions')}
+            message={t(
+              'crossSell.emptyMessage',
+              "Log cross-team actions from any account's cockpit. They appear here for the whole org.",
+            )}
+          />
+        )
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
