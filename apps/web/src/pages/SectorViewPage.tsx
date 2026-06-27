@@ -40,6 +40,12 @@ export default function SectorViewPage() {
   const sectors = view.data?.sectors ?? [];
   const selectedSector =
     sectors.find((sector) => sector.sector === selectedSectorName) ?? sectors[0] ?? null;
+  // The "Largest sector" tile must reflect the sector with the most accounts —
+  // independent of which sector the user has selected in the radar list.
+  const largestSector = sectors.reduce<(typeof sectors)[number] | null>(
+    (max, sector) => (!max || sector.accountCount > max.accountCount ? sector : max),
+    null,
+  );
   const selectedSectorSignal = selectedSector ? sectorCoverageSignal(selectedSector) : null;
   const filteredAccounts = selectedSector
     ? country
@@ -182,11 +188,11 @@ export default function SectorViewPage() {
             <SectorMetric
               icon="contacts"
               label={t('sectorView.metricLeaders', 'Largest sector')}
-              value={selectedSector?.sector ?? '-'}
+              value={largestSector?.sector ?? '-'}
               detail={
-                selectedSector
+                largestSector
                   ? t('sectorView.metricLeaderDetail', '{{count}} accounts', {
-                      count: selectedSector.accountCount,
+                      count: largestSector.accountCount,
                     })
                   : '-'
               }
