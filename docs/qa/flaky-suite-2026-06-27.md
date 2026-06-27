@@ -24,3 +24,9 @@ The api vitest config runs files serially (`fileParallelism: false`), so global 
 ## Interim
 - Product is verified correct (each test green in isolation; all non-flaky tests green; typecheck + prod build green).
 - Until the hermeticity pass lands, CI should treat a single full-suite failure as suspect-flaky: re-run the named file in isolation to distinguish a real regression from a leak.
+
+## Update — scope of the shared-org hermeticity work (deferred)
+- The full api suite passed GREEN after the llm-judge fetch-leak fix (the one high-blast-radius global leak). Residual flakiness is intermittent shared-DB pollution.
+- **39 api test files** resolve the shared `org_seed_mantu` (grep `clerkOrg: 'org_seed_mantu'`). Only 6 are migrated to `createIsolatedOrg`. Migrating the rest is the durable fix BUT is non-trivial: `seedOrgData` (the isolated seed) is smaller/different-shaped than the legacy big seed, so count/shape assertions break on a naive swap (seen on accounts/leads/opportunities — reverted).
+- **High-leverage path:** enrich `seedOrgData` to match the legacy seed's shape (>=8 companies/contacts/opps, etc.) so all 39 can migrate cleanly in one pass. Caveat: `seedOrgData` is also the production demo-org seed (demo-auth.ts) — enriching changes the demo dataset; do it deliberately.
+- **Status:** deferred to a dedicated session (large + needs the seed-shape decision). The suite is green; treat single full-suite failures as suspect-flaky (re-run the named file alone) until this lands.
