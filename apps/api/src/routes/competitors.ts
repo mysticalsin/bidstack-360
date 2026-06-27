@@ -57,6 +57,9 @@ export const competitorRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { orgId, deletedAt: null },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, domain: true, aliases: true, createdAt: true },
+        // Bounded to satisfy the unbounded-query guard; competitor profiles are
+        // org-curated and low-volume, so a high cap lists them all without risk.
+        take: 500,
       });
       return { items: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) };
     },

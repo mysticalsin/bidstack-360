@@ -3622,7 +3622,7 @@
     "overdueTasks": "{{count}} tarefas atrasadas",
     "stalledOpps": "{{count}} oportunidades paradas",
     "newLeads": "{{count}} novos leads esta semana",
-    "pipelineValue": "{{value}} M€ de valor do pipeline"
+    "pipelineValue": "{{value}} de valor do pipeline"
   },
   "importOpportunities": {
     "trigger": "Importar",

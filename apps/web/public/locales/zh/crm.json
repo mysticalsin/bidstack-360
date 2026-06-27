@@ -3622,7 +3622,7 @@
     "overdueTasks": "{{count}} 项任务逾期",
     "stalledOpps": "{{count}} 个机会停滞",
     "newLeads": "本周 {{count}} 个新线索",
-    "pipelineValue": "管道价值 {{value}} 百万欧元"
+    "pipelineValue": "管道价值 {{value}}"
   },
   "importOpportunities": {
     "trigger": "导入",

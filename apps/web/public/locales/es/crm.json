@@ -3655,7 +3655,7 @@
     "overdueTasks": "{{count}} tareas vencidas",
     "stalledOpps": "{{count}} oportunidades estancadas",
     "newLeads": "{{count}} nuevos prospectos esta semana",
-    "pipelineValue": "{{value}} M€ de valor de cartera"
+    "pipelineValue": "{{value}} de valor de cartera"
   },
   "importOpportunities": {
     "trigger": "Importar",
