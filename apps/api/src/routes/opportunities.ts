@@ -23,6 +23,7 @@ import {
   scopeCacheTag,
 } from '../lib/access-scope.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
+import { resolveCompanyIdByName } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
@@ -324,6 +325,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         stageUpdate = req.body.stage as PrismaStage;
       }
 
+      // Re-link to a Company when the customer changes (link-only-if-exists;
+      // never auto-creates from free text). A customer with no matching Company
+      // clears the stale link so companyId always reflects the current customer.
+      let companyIdUpdate: string | null | undefined = undefined;
+      if (req.body.customer !== undefined) {
+        companyIdUpdate = await resolveCompanyIdByName(
+          prisma,
+          req.auth.orgId,
+          req.body.customer,
+        );
+      }
+
       // CF upserts included in the same transaction so a CF failure rolls back
       // the opportunity update — prevents partial-update / data corruption (P0 #5).
       const cfOps = (req.body.customFieldValues ?? []).map(({ definitionId, value }) =>
@@ -352,6 +365,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           where: { id: before.id },
           data: {
             ...(req.body.customer ? { customer: req.body.customer } : {}),
+            ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
             ...(req.body.name ? { name: req.body.name } : {}),
             ...(stageUpdate ? { stage: stageUpdate } : {}),
             ...(req.body.pipelineStageId !== undefined

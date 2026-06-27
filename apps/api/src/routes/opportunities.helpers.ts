@@ -5,6 +5,7 @@
  * and are used from create, import, and lead conversion handlers.
  */
 import { Prisma } from '@bidstack/db';
+import { normalizeName } from '@bidstack/shared';
 
 type MaxOpportunityCodeRow = {
   maxCode: number | bigint | null;
@@ -57,4 +58,48 @@ export async function mintNextCodes(
 
 export function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
+
+/**
+ * Builds a normalizedName → Company.id index for an org (one query).
+ *
+ * WHY in code, not SQL: Company has no `normalizedName` column, so the
+ * customer→Company join is computed via the shared `normalizeName` (the single
+ * source of truth used by the seed, worker, and CRM cockpit). Used by the
+ * import path to resolve all rows from a single fetch instead of N+1.
+ */
+export async function loadCompanyNameIndex(
+  db: Prisma.TransactionClient,
+  orgId: string,
+): Promise<Map<string, string>> {
+  const companies = await db.company.findMany({
+    where: { orgId, deletedAt: null },
+    select: { id: true, name: true },
+  });
+  const index = new Map<string, string>();
+  for (const c of companies) {
+    const key = normalizeName(c.name);
+    // First match wins so re-runs are stable when two names normalize alike.
+    if (key && !index.has(key)) index.set(key, c.id);
+  }
+  return index;
+}
+
+/**
+ * Resolves a free-text customer string to an EXISTING Company id within the org
+ * by normalized name. Link-only: returns null when no Company matches — it never
+ * creates a Company from free text (that would pollute the account rollups with
+ * duplicates). Keeps `opportunity.companyId` consistent with `customer` so the
+ * /accounts and cockpit rollups (which group by companyId) stay correct.
+ */
+export async function resolveCompanyIdByName(
+  db: Prisma.TransactionClient,
+  orgId: string,
+  customer: string | null | undefined,
+): Promise<string | null> {
+  if (!customer) return null;
+  const key = normalizeName(customer);
+  if (!key) return null;
+  const index = await loadCompanyNameIndex(db, orgId);
+  return index.get(key) ?? null;
 }

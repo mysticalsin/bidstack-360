@@ -252,6 +252,118 @@ export const fixtureCompanyEnrichments: FixtureCompanyEnrichment[] = [
   },
 ];
 
+// Curated Company spec (F2). One canonical Company per DISTINCT opportunity
+// customer — never auto-created per free-text string (that would pollute the
+// account rollups with duplicates). `name` MUST match the opportunity.customer
+// string verbatim so the normalizeName join links them. The three
+// enrichment-backed names (CI Financial, Rush, Mantu) additionally resolve the
+// CompanyEnrichment cache via the same normalizeName key; the rest show base
+// Company data only (no Apollo key locally). IDs are stable for idempotent
+// re-seeding.
+export interface FixtureCompany {
+  id: string;
+  name: string;
+  domain: string;
+  industry: string;
+  countryCode: string;
+  employeeCount: number;
+  tier: 'key' | 'standard';
+  keyAccountNotes: string | null;
+}
+
+export const fixtureCompanies: FixtureCompany[] = [
+  {
+    id: 'c0000000-0000-4000-8000-000000000001',
+    name: 'CI Financial',
+    domain: 'ci.com',
+    industry: 'financial_services',
+    countryCode: 'CA',
+    employeeCount: 2500,
+    tier: 'key',
+    keyAccountNotes: 'Strategic IT modernization + MSP account — exec sponsor engaged.',
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000002',
+    name: 'Logistec Corporation',
+    domain: 'logistec.com',
+    industry: 'transportation',
+    countryCode: 'CA',
+    employeeCount: 1200,
+    tier: 'standard',
+    keyAccountNotes: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000003',
+    name: 'Rush University System for Health',
+    domain: 'rush.edu',
+    industry: 'healthcare',
+    countryCode: 'US',
+    employeeCount: 14_000,
+    tier: 'key',
+    keyAccountNotes: 'EHR cloud migration — regulated, high-touch delivery.',
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000004',
+    name: 'MAPFRE',
+    domain: 'mapfre.com',
+    industry: 'insurance',
+    countryCode: 'ES',
+    employeeCount: 30_000,
+    tier: 'standard',
+    keyAccountNotes: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000005',
+    name: 'MAHLE',
+    domain: 'mahle.com',
+    industry: 'manufacturing',
+    countryCode: 'DE',
+    employeeCount: 72_000,
+    tier: 'standard',
+    keyAccountNotes: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000006',
+    name: 'Aritzia',
+    domain: 'aritzia.com',
+    industry: 'retail',
+    countryCode: 'CA',
+    employeeCount: 9000,
+    tier: 'standard',
+    keyAccountNotes: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000007',
+    name: 'NOS',
+    domain: 'nos.pt',
+    industry: 'telecom',
+    countryCode: 'PT',
+    employeeCount: 4000,
+    tier: 'standard',
+    keyAccountNotes: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000008',
+    name: 'DNB Bank',
+    domain: 'dnb.no',
+    industry: 'financial_services',
+    countryCode: 'NO',
+    employeeCount: 9000,
+    tier: 'key',
+    keyAccountNotes: 'Cloud landing zone — multi-region rollout.',
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000009',
+    name: 'Mantu',
+    domain: 'mantu.com',
+    industry: 'consulting',
+    countryCode: 'FR',
+    employeeCount: 12_000,
+    tier: 'standard',
+    keyAccountNotes: null,
+  },
+];
+
 export interface FixtureContact {
   id: string;
   customer: string;

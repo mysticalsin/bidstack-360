@@ -13,13 +13,21 @@
  */
 import { type Prisma } from '@bidstack/db';
 
-import { isUniqueViolation, mintNextCode } from '../../routes/opportunities.helpers.js';
+import {
+  isUniqueViolation,
+  mintNextCode,
+  resolveCompanyIdByName,
+} from '../../routes/opportunities.helpers.js';
 
 export interface MintOpportunityInput {
   orgId: string;
   customer: string;
   name: string;
-  /** Set for KAM (initiative.companyId). Leads leave it null (legacy behavior). */
+  /**
+   * Set for KAM (initiative.companyId). When omitted (e.g. lead-convert), the
+   * mint resolves an EXISTING Company by normalized `customer` name — link-only,
+   * never auto-created — so converted opps roll up into the account views (F2).
+   */
   companyId?: string | null;
   valueMicros?: bigint;
   ownerId?: string | null;
@@ -87,6 +95,9 @@ export async function mintOpportunityTx(
     pipelineStageId: input.pipelineStageId,
     stageKey: input.stageKey,
   });
+  // Honor an explicit companyId (KAM); otherwise link-only-if-exists by name.
+  const companyId =
+    input.companyId ?? (await resolveCompanyIdByName(tx, input.orgId, input.customer));
   return tx.opportunity.create({
     data: {
       orgId: input.orgId,
@@ -95,7 +106,7 @@ export async function mintOpportunityTx(
       name: input.name,
       stage: stageKey as 's1_lead',
       pipelineStageId,
-      companyId: input.companyId ?? null,
+      companyId,
       valueMicros: input.valueMicros ?? BigInt(0),
       probability: input.probability ?? 20,
       ownerId: input.ownerId ?? null,

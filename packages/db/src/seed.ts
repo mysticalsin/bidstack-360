@@ -13,6 +13,7 @@ import dotenvFlow from 'dotenv-flow';
 
 import { type Prisma, PrismaClient } from '../generated/client/index.js';
 import {
+  fixtureCompanies,
   fixtureCompanyEnrichments,
   fixtureContacts,
   fixtureLeads,
@@ -30,6 +31,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
 
 const prisma = new PrismaClient();
+
+/** Mirrors the app's company normalization (worker + crm routes + shared
+ *  normalizeName) so customer→Company and the cockpit enrichment join target
+ *  the same key. Kept inline to avoid a cross-package import in the seed. */
+function normalizeName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
 const SEED_ORG_CLERK = 'org_seed_mantu';
 const SEED_ORG_NAME = 'Mantu (seed)';
@@ -376,6 +388,111 @@ async function main() {
     });
   }
   console.log(`  ✓ historical closed deals: ${HISTORY.length}`);
+
+  // ─── Real Company rows + opp/contact linkage (F2) ──────────────────────────
+  // Account rollups (/accounts/top, /accounts/key, sector-view) read the Company
+  // table and LEFT JOIN opportunities on company_id. Without real Company rows —
+  // and without opportunity.companyId set — every account reads totalValue=0.
+  // Materialize one canonical Company per DISTINCT opportunity customer from the
+  // curated spec (never one-per-free-text-string), then link by normalized name.
+  const companyIdByNorm = new Map<string, string>();
+  for (const c of fixtureCompanies) {
+    const isKey = c.tier === 'key';
+    await prisma.company.upsert({
+      where: { id: c.id },
+      create: {
+        id: c.id,
+        orgId: org.id,
+        name: c.name,
+        legalName: c.name,
+        domain: c.domain,
+        industry: c.industry,
+        employeeCount: c.employeeCount,
+        countryCode: c.countryCode,
+        website: `https://${c.domain}/`,
+        // Logos resolve via the same-origin /api/v1/logo?domain= proxy.
+        logoUrl: null,
+        tier: isKey ? 'key' : 'standard',
+        keyAccountSince: isKey ? new Date() : null,
+        keyAccountOwnerId: isKey ? seedUserId : null,
+        keyAccountNotes: c.keyAccountNotes,
+        source: 'verified_data',
+        confidence: 0.72,
+        enrichedAt: new Date(),
+      },
+      update: {
+        name: c.name,
+        legalName: c.name,
+        domain: c.domain,
+        industry: c.industry,
+        employeeCount: c.employeeCount,
+        countryCode: c.countryCode,
+        website: `https://${c.domain}/`,
+        tier: isKey ? 'key' : 'standard',
+        keyAccountNotes: c.keyAccountNotes,
+        source: 'verified_data',
+        confidence: 0.72,
+        enrichedAt: new Date(),
+      },
+    });
+    companyIdByNorm.set(normalizeName(c.name), c.id);
+  }
+  console.log(`  ✓ companies: ${fixtureCompanies.length}`);
+
+  // Backfill: link every opportunity (fixtures, history, and any pre-existing)
+  // to its Company by normalized customer name. Idempotent — writes only when the
+  // link changes. Customers with no curated Company stay null (no dup pollution).
+  const allOpps = await prisma.opportunity.findMany({
+    where: { orgId: org.id },
+    select: { id: true, customer: true, companyId: true },
+  });
+  let linkedOpps = 0;
+  for (const o of allOpps) {
+    const target = companyIdByNorm.get(normalizeName(o.customer)) ?? null;
+    if (target && o.companyId !== target) {
+      await prisma.opportunity.update({ where: { id: o.id }, data: { companyId: target } });
+      linkedOpps += 1;
+    }
+  }
+  console.log(`  ✓ linked opportunities → companies: ${linkedOpps}`);
+
+  // Same linkage for contacts so the account cockpit's contactCount populates.
+  const allContacts = await prisma.contact.findMany({
+    where: { orgId: org.id },
+    select: { id: true, customer: true, companyId: true },
+  });
+  let linkedContacts = 0;
+  for (const ct of allContacts) {
+    const target = companyIdByNorm.get(normalizeName(ct.customer)) ?? null;
+    if (target && ct.companyId !== target) {
+      await prisma.contact.update({ where: { id: ct.id }, data: { companyId: target } });
+      linkedContacts += 1;
+    }
+  }
+  console.log(`  ✓ linked contacts → companies: ${linkedContacts}`);
+
+  // Rank the top 3 companies by total pipeline+won value so /accounts/top curated
+  // mode highlights the marquee accounts. Clear stale ranks first (idempotent).
+  const valueByCompany = await prisma.opportunity.groupBy({
+    by: ['companyId'],
+    where: { orgId: org.id, companyId: { not: null }, deletedAt: null },
+    _sum: { valueMicros: true },
+  });
+  const topThree = valueByCompany
+    .filter((r) => r.companyId)
+    .sort((a, b) => Number(b._sum.valueMicros ?? 0n) - Number(a._sum.valueMicros ?? 0n))
+    .slice(0, 3);
+  await prisma.company.updateMany({
+    where: { orgId: org.id, topAccountRank: { not: null } },
+    data: { topAccountRank: null },
+  });
+  for (let i = 0; i < topThree.length; i += 1) {
+    await prisma.company.update({
+      where: { id: topThree[i]!.companyId! },
+      data: { topAccountRank: i + 1 },
+    });
+  }
+  console.log(`  ✓ top-account ranks: ${topThree.length}`);
 
   // ─── Access group (M7) — demonstrate scoped visibility ─────────────────────
   const emeaGroup = await prisma.userGroup.upsert({

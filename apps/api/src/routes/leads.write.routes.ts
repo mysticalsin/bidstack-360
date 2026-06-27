@@ -294,8 +294,10 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
 
         // 2. Create Opportunity via the shared mint primitive (code mint +
-        //    stage resolution). companyId stays unset here, preserving the
-        //    legacy lead-convert behavior. See services/opportunities/mint.ts.
+        //    stage resolution). No explicit companyId, so the mint links to an
+        //    EXISTING Company by normalized customer name (link-only; never
+        //    auto-created) so converted opps roll up into the account views (F2).
+        //    See services/opportunities/mint.ts.
         const opp = await mintOpportunityTx(tx, {
           orgId: req.auth.orgId,
           customer: lead.companyName,

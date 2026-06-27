@@ -14,6 +14,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import {
+  normalizeName,
   Opportunity,
   OpportunityCreate,
   OpportunityImport,
@@ -22,7 +23,13 @@ import {
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { serializeOpportunity } from '../serializers/opportunity.js';
-import { isUniqueViolation, mintNextCode, mintNextCodes } from './opportunities.helpers.js';
+import {
+  isUniqueViolation,
+  loadCompanyNameIndex,
+  mintNextCode,
+  mintNextCodes,
+  resolveCompanyIdByName,
+} from './opportunities.helpers.js';
 
 export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) => {
 
@@ -103,6 +110,11 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         }
       }
 
+      // Link to an existing Company by normalized customer name (link-only-if-
+      // exists; never auto-creates a Company from free text — that would pollute
+      // the account rollups with duplicates). Resolved once before the retry loop.
+      const companyId = await resolveCompanyIdByName(prisma, req.auth.orgId, body.customer);
+
       // Mint code + create + audit atomically; retry on Q-NNNN unique
       // collision with bounded attempts (mirrors sales-orders pattern).
       let createdId: string | null = null;
@@ -115,6 +127,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                 orgId: req.auth.orgId,
                 code,
                 customer: body.customer,
+                ...(companyId ? { companyId } : {}),
                 name: body.name,
                 stage: stageKey,
                 pipelineStageId,
@@ -222,23 +235,27 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
             .filter((o): o is string => o !== undefined && o !== null),
         ),
       ];
-      const [importTerritories, importOwnerUsers, importPipelineStages] = await Promise.all([
-        prisma.territory.findMany({
-          where: { orgId: req.auth.orgId, active: true },
-          select: { id: true, countryCodes: true },
-        }),
-        uniqueOwnerEmails.length > 0
-          ? prisma.user.findMany({
-              where: { orgId: req.auth.orgId, email: { in: uniqueOwnerEmails } },
-              select: { id: true, email: true },
-            })
-          : Promise.resolve([]),
-        prisma.pipelineStage.findMany({
-          where: { orgId: req.auth.orgId, deletedAt: null },
-          orderBy: { orderIndex: 'asc' },
-          select: { id: true, key: true },
-        }),
-      ]);
+      const [importTerritories, importOwnerUsers, importPipelineStages, companyIndex] =
+        await Promise.all([
+          prisma.territory.findMany({
+            where: { orgId: req.auth.orgId, active: true },
+            select: { id: true, countryCodes: true },
+          }),
+          uniqueOwnerEmails.length > 0
+            ? prisma.user.findMany({
+                where: { orgId: req.auth.orgId, email: { in: uniqueOwnerEmails } },
+                select: { id: true, email: true },
+              })
+            : Promise.resolve([]),
+          prisma.pipelineStage.findMany({
+            where: { orgId: req.auth.orgId, deletedAt: null },
+            orderBy: { orderIndex: 'asc' },
+            select: { id: true, key: true },
+          }),
+          // Load the org's Company name index once so each row links by
+          // normalized customer name without an N+1 lookup (link-only-if-exists).
+          loadCompanyNameIndex(prisma, req.auth.orgId),
+        ]);
 
       // Build lookup maps once — O(1) access per row.
       const countryToTerritoryId = new Map<string, string>();
@@ -264,6 +281,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         id: string;
         ownerId: string | null | undefined;
         territoryId: string | null;
+        companyId: string | null;
         pipelineStageId: string | null | undefined;
         stageKey: PrismaStage;
         row: (typeof opportunities)[number];
@@ -307,11 +325,17 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
           stageKey = defaultImportStage.key as PrismaStage;
         }
 
+        // Link to an existing Company (in-memory map lookup — no DB query/row).
+        const companyId = row.customer
+          ? (companyIndex.get(normalizeName(row.customer)) ?? null)
+          : null;
+
         validRows.push({
           index: i,
           id: randomUUID(),
           ownerId,
           territoryId,
+          companyId,
           pipelineStageId,
           stageKey,
           row,
@@ -345,6 +369,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                     orgId: req.auth.orgId,
                     code,
                     customer: vr.row.customer,
+                    ...(vr.companyId ? { companyId: vr.companyId } : {}),
                     name: vr.row.name,
                     stage: vr.stageKey,
                     pipelineStageId: vr.pipelineStageId ?? undefined,
