@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import { enqueueRfpEmbedReference } from '../queues/rfp-embed-reference.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 
 // Build the text we embed for semantic retrieval: title + description +
 // industry + tags. Mirrors the worker's search_document embedding so Spotlight
@@ -116,6 +117,14 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
     handler: async (req, reply) => {
       const { orgId } = req.auth;
       const body = req.body;
+
+      // Multi-tenant guard: a reference may link a Company, but the FK comes
+      // straight from the request body. Without this check a caller could point
+      // companyId at ANOTHER org's company and leak its name/logo via the
+      // GET /references include. Mirror the proposals.ts opportunity check.
+      if (body.companyId && !(await tenantEntityBelongsToOrg('company', body.companyId, orgId))) {
+        return reply.notFound('Company not found');
+      }
 
       const ref = await prisma.reference.create({
         data: {
