@@ -124,6 +124,16 @@ export function ProposalDetailPage() {
     },
   });
 
+  const updateDueDate = useMutation({
+    mutationFn: async (dueDate: string | null) => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}`, { method: 'PATCH', body: { dueDate } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
@@ -262,6 +272,23 @@ export function ProposalDetailPage() {
               </>
             ) : (
               <ProposalStatusChip status={proposal.status} />
+            )}
+            {canWrite && (
+              <label className="flex items-center gap-1">
+                <span className="sr-only">{t('proposalDetail.dueDateLabel', 'Due date')}</span>
+                <input
+                  type="date"
+                  value={proposal.dueDate ? proposal.dueDate.slice(0, 10) : ''}
+                  disabled={updateDueDate.isPending}
+                  onChange={(e) =>
+                    updateDueDate.mutate(
+                      e.target.value ? new Date(e.target.value).toISOString() : null,
+                    )
+                  }
+                  aria-label={t('proposalDetail.dueDateLabel', 'Due date')}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs disabled:opacity-60"
+                />
+              </label>
             )}
             {canWrite && (
               <button
