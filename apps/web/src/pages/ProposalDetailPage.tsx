@@ -202,8 +202,13 @@ export function ProposalDetailPage() {
   };
 
   const saveEdit = (sectionId: string) => {
-    updateSection.mutate({ sectionId, content: editContent });
-    setEditingSection(null);
+    // Close the editor only on success — closing eagerly discarded the typed
+    // content when the save failed (silent data loss). The mutation's own
+    // onSuccess (cache invalidation) still runs alongside this callback.
+    updateSection.mutate(
+      { sectionId, content: editContent },
+      { onSuccess: () => setEditingSection(null) },
+    );
   };
 
   const handleStatusChange = (next: ProposalStatus) => {
@@ -394,6 +399,14 @@ export function ProposalDetailPage() {
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                 />
+                {updateSection.isError && (
+                  <p role="alert" className="text-xs text-[var(--danger)]">
+                    {t(
+                      'proposalDetail.sectionSaveError',
+                      'Could not save. Your changes are kept — try again.',
+                    )}
+                  </p>
+                )}
                 <div className="flex justify-end gap-2">
                   <Button variant="secondary" size="sm" onClick={() => setEditingSection(null)}>
                     {t('proposalDetail.cancel', 'Cancel')}
