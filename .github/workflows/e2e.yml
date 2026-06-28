@@ -8,9 +8,9 @@ name: E2E (full suite)
 
 on:
   push:
-    branches: [main, 'release/**']
+    branches: [main, demo, 'release/**']
   pull_request:
-    branches: [main]
+    branches: [main, demo]
   workflow_dispatch:
     inputs:
       update_snapshots:
