@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import {
   ProposalStatusChip,
   proposalStatusLabel,
@@ -112,6 +113,17 @@ export function ProposalDetailPage() {
     },
   });
 
+  const deleteProposal = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('No proposal ID');
+      return api(`/api/v1/proposals/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] });
+      navigate('/proposals');
+    },
+  });
+
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
@@ -203,6 +215,19 @@ export function ProposalDetailPage() {
     updateStatus.mutate(next);
   };
 
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: t('proposalDetail.confirmDelete.title', 'Delete this proposal?'),
+      description: t(
+        'proposalDetail.confirmDelete.description',
+        'This permanently removes the proposal and all its sections. This cannot be undone.',
+      ),
+      confirmLabel: t('proposalDetail.confirmDelete.confirm', 'Delete'),
+      destructive: true,
+    });
+    if (ok) deleteProposal.mutate();
+  };
+
   return (
     <>
       <div className="motion-page-head page-head">
@@ -238,6 +263,20 @@ export function ProposalDetailPage() {
             ) : (
               <ProposalStatusChip status={proposal.status} />
             )}
+            {canWrite && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteProposal.isPending}
+                aria-label={t('proposalDetail.deleteAriaLabel', 'Delete proposal')}
+                className="ml-auto inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 disabled:opacity-60"
+              >
+                <Icon name="trash" size={13} />
+                {deleteProposal.isPending
+                  ? t('proposalDetail.deleting', 'Deleting…')
+                  : t('proposalDetail.deleteButton', 'Delete')}
+              </button>
+            )}
           </div>
           <p className="page-sub">
             {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}
@@ -250,6 +289,11 @@ export function ProposalDetailPage() {
           {updateStatus.isError && (
             <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
               {t('proposalDetail.statusUpdateError', 'Could not update status. Please try again.')}
+            </p>
+          )}
+          {deleteProposal.isError && (
+            <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+              {t('proposalDetail.deleteError', 'Could not delete the proposal. Please try again.')}
             </p>
           )}
         </div>
