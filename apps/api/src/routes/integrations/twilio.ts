@@ -179,6 +179,10 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/integrations/twilio/test',
     {
+      // WHY integrations:read: returns the connected account SID suffix + from
+      // number (integration config) — gate it so non-integration roles can't
+      // enumerate the org's Twilio configuration.
+      preHandler: fastify.requirePermission('integrations:read'),
       schema: {
         description: 'Test the active Twilio connection without sending an SMS',
         tags: ['sms'],
@@ -205,6 +209,10 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/sms/send',
     {
+      // WHY integrations:write: sending SMS incurs real cost + carries abuse and
+      // impersonation risk — must be gated to write principals, not any
+      // authenticated user or a read-scoped API key.
+      preHandler: fastify.requirePermission('integrations:write'),
       schema: {
         description: 'Send an SMS message via Twilio',
         tags: ['sms'],

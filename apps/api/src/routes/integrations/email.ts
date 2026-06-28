@@ -15,7 +15,11 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
 
   // POST /email/send
+  // WHY integrations:write: sending mail from the org's connected mailbox is a
+  // privileged outbound action — a read-only role or a read-scoped API key must
+  // not be able to send (impersonation/abuse). Mirrors the SMS send gate.
   app.post('/email/send', {
+    preHandler: server.requirePermission('integrations:write'),
     schema: {
       body: SendEmailRequest,
       response: {
