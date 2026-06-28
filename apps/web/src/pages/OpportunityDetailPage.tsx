@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { api } from '@/lib/api';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
@@ -61,6 +64,32 @@ export function OpportunityDetailPage() {
   const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!id) return;
+    const ok = await confirm({
+      title: t('opportunityDetail.confirmDelete.title', 'Delete this opportunity?'),
+      description: t(
+        'opportunityDetail.confirmDelete.description',
+        'This cannot be undone from the UI — the audit log records the delete.',
+      ),
+      confirmLabel: t('opportunityDetail.confirmDelete.confirm', 'Delete'),
+      destructive: true,
+    });
+    if (!ok) return;
+    setIsDeleting(true);
+    try {
+      await api(`/api/opportunities/${id}`, { method: 'DELETE' });
+      void qc.invalidateQueries({ queryKey: ['opportunities'] });
+      toast.success(t('opportunityDetail.toast.deleted', 'Opportunity deleted'));
+      nav('/opportunities');
+    } catch {
+      toast.error(t('opportunityDetail.toast.deleteFailed', 'Failed to delete opportunity'));
+      setIsDeleting(false);
+    }
+  };
 
   // Register contextual commands for this page in the global Cmd+K palette.
   // WHY: Twenty's command menu surfaces page-specific actions; we adapt the
@@ -247,6 +276,18 @@ export function OpportunityDetailPage() {
                 >
                   {t('opportunityDetail.askDustButton', 'Ask Dust')}
                 </MagneticButton>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full text-[var(--danger)]"
+                  disabled={isDeleting}
+                  onClick={handleDelete}
+                >
+                  <Icon name="trash" size={13} className="mr-1" />
+                  {isDeleting
+                    ? t('opportunityDetail.deleting', 'Deleting…')
+                    : t('opportunityDetail.deleteButton', 'Delete')}
+                </Button>
               </div>
               <div
                 className="flex flex-wrap items-center gap-2"
