@@ -93,13 +93,7 @@
     "webhooks:encrypt-secrets": "tsx scripts/encrypt-webhook-secrets.ts --dry-run",
     "webhooks:encrypt-secrets:selftest": "tsx scripts/encrypt-webhook-secrets.ts --selftest",
     "clean": "pnpm -r exec rimraf dist build .turbo .vite",
-    "prepare": "husky || true",
-    "merge:status": "node scripts/merge/merge-status.mjs",
-    "merge:predict": "node scripts/merge/predict-conflicts.mjs",
-    "merge:next": "bash scripts/merge/merge-next.sh",
-    "merge:all": "bash scripts/merge/merge-all.sh",
-    "merge:rollback": "bash scripts/merge/rollback.sh",
-    "merge:cherry-pick": "bash scripts/merge/cherry-pick-leaked.sh"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@bidstack/db": "workspace:*",
