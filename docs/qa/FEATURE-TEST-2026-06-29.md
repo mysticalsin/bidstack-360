@@ -79,3 +79,27 @@ data for them yet.
 - **Environment caveat:** deployed demo, possibly behind the branch. Re-run against the branch (needs a local
   Postgres — Docker engine was hung this session) to confirm the custom-objects nav bug and the 401 still
   reproduce on current code.
+
+---
+
+## Branch re-test (2026-06-29, `feat/prod-hardening-mantu` running locally at :38081, stub auth)
+
+Ran the local branch build (Docker came up; Postgres on `:5433` seeded) and re-checked each finding:
+
+| Demo finding | On the branch | Action |
+| --- | --- | --- |
+| `/custom-objects` nav → 404 | **Reproduced** — `CustomObjectListPage` is keyed off `/o/:objectKey`; the bare path 404s | ✅ **FIXED** `87ed336e` — nav + command palette → `/settings/custom-objects`; bare path now redirects there (verified live) |
+| `/custom-objects/new` "Object not found" | Reproduced, but the admin's "New Object" is a **dialog** (not a link to that route) → orphan, not user-reachable | Left as-is (unreachable via UI) |
+| Repeated background `401` | **Not reproduced** — clean console on the branch build | Demo-only (stale-session artifact) |
+| Stale duplicate "RECENT" account | **Not reproduced** — local session has its own RECENT | Demo-only (localStorage across demo sessions) |
+| Missing `<h1>` on `/calendar` + `/workspace` | **Reproduced** (`/workspace` uses H2s) | Open — minor a11y |
+| New-lead create | Could **not** be re-confirmed locally — the throwaway **Redis (`:6380`) was not reachable** (`ECONNREFUSED`), so Redis-dependent endpoints (idempotency on create, `/opportunities/count`, dashboard) 500'd. This is a **local-env Docker/Redis instability, not a branch regression** — create works on the demo (which has Redis). | Re-confirm once Redis is stable |
+
+**Routes confirmed loading on the branch:** dashboard (h1 present; data panel slow on cold dev build),
+opportunities, analytics, serum, roles, kam, proposals, settings, settings/custom-objects, leads, calendar,
+workspace, custom-objects (now redirects). New-lead form on the branch additionally **requires Company**
+(`Company *`) — an intentional validation tightening vs the demo.
+
+**Net:** the one real branch bug (Custom Objects 404) is fixed + committed. Remaining open item from this pass
+is the minor `/calendar` + `/workspace` missing-`<h1>` a11y gap. The Docker/WSL backend on this machine was
+unstable (engine came up then dropped mid-session), so data-write re-confirmation needs a stable Redis.
