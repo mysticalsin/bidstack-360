@@ -97,6 +97,7 @@ See [Enable PII encryption — Rollback](#rollback-1) below.
 The API is stateless (auth via Clerk JWT, no server-side sessions). Add replicas freely.
 
 Redis is the shared state layer:
+
 - Rate limiting: `@fastify/rate-limit` with Redis backend
 - Idempotency: `idempotencyPlugin` uses Redis TTL store
 - BullMQ queues: processed by `apps/worker` (scale workers independently)
@@ -222,6 +223,8 @@ tsx scripts/encrypt-existing-pii.ts
 # Step 3: Verify (spot-check a row)
 psql $DATABASE_URL -c "SELECT email FROM contacts LIMIT 3;"
 # Expect: enc:v1:...
+psql $DATABASE_URL -c "SELECT email FROM leads WHERE email IS NOT NULL LIMIT 3;"
+psql $DATABASE_URL -c "SELECT email FROM kam_consultants WHERE email IS NOT NULL LIMIT 3;"
 
 # Step 4: Set env and redeploy
 PII_FIELD_ENCRYPTION=true

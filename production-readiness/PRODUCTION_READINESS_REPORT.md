@@ -1,58 +1,76 @@
 # BidStack 360° — Production Readiness Report
 
-**Date:** 2026-06-27 · **Branch:** feat/prod-hardening-mantu
-**Method:** Evidence-based review. Unverified = UNKNOWN/FAIL, never assumed PASS. Live infrastructure was not accessible to this review.
+**Date:** 2026-06-28 · **Branch:** feat/prod-hardening-mantu
+**Bar:** real production with customer PII · **Access this session:** local repo only.
+**Method:** evidence-based. Unverified = UNKNOWN/FAIL, never assumed PASS. Supersedes 2026-06-27.
 
 ---
 
 ## 1. Verdict: **NOT READY**
 
-Not because of application defects — the code-side security and correctness are genuinely strong — but because the **operational release gates cannot be PASSed without infrastructure access and authorized testing**, and per the gate rules an untested backup/restore, unverified live IAM/network, unmeasured load behavior, and an intermittently-flaky test suite are blockers.
-
-This is **READY-pending-operational-verification**: most remaining work is *proving* things in the live environment (backup restore drill, load test, IAM/TLS/bucket review, container + CI scans, monitoring/alert validation), plus 3 decisions only you can make.
+The application/code layer is **strong and improved this session**; the remaining gap is **PII/webhook production evidence plus operational verification that requires cloud/staging access** — not broad application defects.
 
 ## 2. Top risks (highest first)
-1. **No tested backups / restore (CRITICAL, Gate 12).** Backups may exist via infra but no restore drill has been run. For an app holding customer + PII data this is the #1 blocker.
-2. **Live infra/IAM/network unverified (HIGH, Gate 6).** No review of cloud IAM least-privilege, public-bucket/DB exposure, DNS/TLS, firewall rules. Code sets correct security headers; the live posture is unknown.
-3. **PII-at-rest encryption prod status unknown (HIGH, Gate 5/13).** `PII_FIELD_ENCRYPTION` defaults `false`; if not enabled in prod, Contact/Lead/User email+phone are plaintext at rest. (Also: the SMS-field encryption path shipped in *unverified swarm WIP*, now quarantined — see §6.)
-4. **Performance under load unmeasured (HIGH, Gate 10).** k6 scripts exist but no load/stress/soak run; SLOs not validated.
-5. **Supply-chain / CI gates unverified (HIGH, Gate 8).** SAST/SCA/secret-scan/container-scan scripts exist but weren't run/reviewed; branch protection unverified.
-6. **Test suite not reliably green (MED, Gate 9).** Intermittent cross-file flakiness; 39 integration tests share one DB org.
 
-## 3. What was fixed (this session — 17 verified commits)
-- **2 real production bugs:** lead-convert + CSV import 400 (unbounded query → query-guard reject) `7c34c770`; cross-tenant `references.companyId` leak `208efe0e`.
-- **Security hardening:** 6 missing authZ write-gates `20a72e6e`; DNS-rebind SSRF guard + dev carve-out `61e0d9dd`/`00bebc0b`; defense-in-depth (token select, join org-filter, activity scope) `0dd353d8`.
-- **Reliability:** test-suite global-leak fix `f08a9ed1`.
-- **Feature work landed green:** F8 forecasts, integration-test isolation, cross-sell atomic writes, settings RBAC.
-- **Quarantined** ~50 files of unverified, ultrareview-flagged swarm WIP (PII-enc + queue-fairness) into `stash@{0}` + patch — kept out of the verified branch.
+1. **PII/webhook at-rest certification remains open (CRITICAL, Gate 5/13).** The PII code trap is fixed for `Contact`, `Lead`, and `KamConsultant` by routing supported email equality filters through keyed `emailHash`, covering KAM backfill/rollback, and failing loud when decryption context is missing. Webhook delivery now uses strict `decryptWebhookSigningSecret`; inbound Dust webhook org resolution uses keyed `WebhookSubscription.secretHash` in production-like runtimes instead of plaintext secret equality. Legacy plaintext or missing/invalid secret hashes require `scripts/encrypt-webhook-secrets.ts` and cannot pass release evidence. `pnpm deploy:evidence:pii` and `pnpm deploy:evidence:webhooks` now write privacy-safe raw DB proof artifacts and are wired into the strict bundle/verifier. Production still needs operator dry-run/apply evidence, live release DB ciphertext/hash artifacts, storage-level encryption confirmation, and a decision/control for `User.email` (currently excluded from field encryption until a generated `User.emailHash` migration exists).
+2. **Live infra/IAM/network unverified (HIGH, Gate 6).** No cloud IAM least-privilege, bucket/DB exposure, DNS/TLS, firewall review.
+3. **Production backup/restore unverified (HIGH, Gate 12).** The restore _mechanism_ is now proven locally (dump→restore→row-count match), and staging/production migrations now fail closed without fresh encrypted pre-migrate backup proof. Actual prod backup existence/offsite/immutability + a prod restore drill + RTO/RPO remain unverified.
+4. **Performance under load unmeasured (HIGH, Gate 10).** k6 scripts exist; no run.
+5. **Supply-chain CI gates not enforced (HIGH, Gate 8).** SAST + SCA run clean this session, and strict container evidence now requires raw Trivy JSON plus CycloneDX SBOM JSON per image, but live container/IaC scans still are not required CI checks, there's no gated CD, and actions use mutable tags.
+6. **Runtime API/MCP proof still needs live targets (MEDIUM, Gate 4).** The code now has API/MCP connectivity evidence commands, including a privacy-safe read-only MCP `tools/call` smoke, but staging/production target+token runs have not been captured.
 
-## 4. What was tested / verified
-- typecheck (all packages) ✅ · production build ✅ · MCP server (54 tests) ✅ · full api suite green this run (with a documented flakiness caveat).
-- 4-dimension read-only security audit (multi-tenancy, authZ/IDOR, injection/SSRF, secret/PII) — see `docs/audits/SECURITY_AUDIT_2026-06-27.md`.
-- `/ultrareview` independent cloud review — 3 findings triaged (1 fixed, 2 were in quarantined swarm WIP).
+## 3. What was fixed this session (committed `06c33a59`)
 
-## 5. Evidence index
-- `production-readiness/RELEASE_GATE_MATRIX.md` — per-gate status + evidence.
-- `docs/audits/SECURITY_AUDIT_2026-06-27.md` — security findings + fixes.
-- `docs/qa/flaky-suite-2026-06-27.md` — test reliability gap + fix-plan.
-- `docs/security/THREAT-MODEL.md` — threat model (pre-existing, 33K).
-- Commits `7c34c770`,`208efe0e`,`20a72e6e`,`61e0d9dd`,`00bebc0b`,`0dd353d8`,`f08a9ed1` (+ feature commits).
-- `git stash@{0}` + `scratchpad/swarm-wip-batch2-2026-06-27.patch` — quarantined swarm WIP.
+Four authorization gaps (Gate 4), all reachable by read-only roles + read-scoped API keys:
 
-## 6. Remaining findings / open items
-- **Operational gates UNKNOWN/FAIL:** backups/restore, live IAM/network/TLS, container scan, CI/supply-chain, load/performance, observability runtime — all need infra access (§7).
-- **Test hermeticity:** 39 shared-org integration tests → isolated-org migration (needs a seed-shape decision). Documented.
-- **Apple-UX + accessibility:** Gate 3 unverified — needs a dev-stack/browser session.
-- **Swarm WIP decision:** keep+review-and-land (PII-at-rest encryption, per-org queue fairness) or drop. The ultrareview found real bugs in it (SMS `VarChar(32)` overflow; missing committed module).
+- `POST /email/send` → `integrations:write` (send from org mailbox)
+- `POST /sms/send` → `integrations:write` (SMS cost + abuse)
+- `POST /integrations/twilio/test` → `integrations:read` (leaked Twilio config)
+- `PATCH /crm/widgets` → `settings:write` (org-wide dashboard config)
 
-## 7. Required human approvals / access (to close the gates)
-1. **Cloud + CI access** (read at minimum) + an **authorized-testing scope** (domains, accounts, environments) — unblocks Gates 6, 7, 8, 10.
-2. **Run a backup restore drill** in staging (or confirm one) — unblocks Gate 12 (CRITICAL).
-3. **Confirm `PII_FIELD_ENCRYPTION=true` + master key in prod** (after `scripts/encrypt-existing-pii.ts`) — unblocks Gate 5/13.
-4. **Decision: keep or drop the stashed swarm features** (PII-at-rest, queue-fairness).
-5. **Legal/security sign-off** for any compliance claim (Gate 13 is an evidence package only).
+Verified: `pnpm --filter @bidstack/api typecheck` exit 0; full api suite 809 passed with the fixes in place.
 
-## 8. 30 / 60 / 90-day hardening plan
-**0–30 (blockers):** restore + rollback drills (RTO/RPO); run load test at expected traffic; live IAM/network/TLS/bucket review; container + SAST/SCA/secret CI scans; confirm PII-encryption prod posture; land the test-hermeticity pass (reliably green).
-**30–60 (HIGH/MED):** formalize role×object authZ matrix + contract tests; accessibility (WCAG 2.2 AA) + browser E2E; observability dashboards/alerts validated (trigger test alerts); RLS/Prisma-extension backstop ADR (fail-closed tenant scoping).
-**60–90 (hardening):** SBOM + artifact provenance; DR tabletop; vendor/subprocessor review; web unit-test coverage uplift; Apple-UX polish; soak tests + capacity plan.
+## 4. What was verified this session (fresh evidence — see `EVIDENCE_INDEX.md`)
+
+- typecheck (all packages) ✅ · prod build ✅ · mcp 54/54 ✅ · shared 149/149 ✅
+- SAST: semgrep OWASP/JS/TS, **0 findings / 1568 files** ✅
+- SCA: `pnpm audit` **0 high/critical** (1 moderate) ✅
+- Secrets: `.env` + `.vercel/.env.production.local` gitignored & untracked; **0 secrets in web bundle; 0 source maps** ✅
+- Backup/restore mechanism: dump→restore→**row-count match** ✅
+- Migration safety: staging/production `db:migrate:deploy` and Docker `migrate` target require fresh encrypted pre-migrate backup proof ✅
+- AuthZ matrix: prior AI-compute gaps now gated behind human sessions + route permissions ✅
+- REST API-key exact production scopes: focused auth tests pass ✅
+- AI compute API-key denial: focused auth tests pass ✅
+- Public booking + e-signature E2E: blank fixture env values now fall back to seeded defaults; missing booking/signing fixtures and missing send-for-signature UI are hard failures; focused Chromium gate passed 8/8 ✅
+- Signed-document PDF renderer runtime: API Docker image builds with Chromium, exposes `PUPPETEER_EXECUTABLE_PATH`, and runtime probe confirms executable Chromium ✅
+- Container evidence contract: scanner/verifier selftests prove strict release evidence requires immutable refs, raw Trivy JSON, CycloneDX SBOM JSON, zero blocking findings, and full deploy-image coverage ✅
+- KAM handoff UI: KAM cockpit now exposes draft/exported/confirmed OM handoffs, downloads the ABC OM JSON payload, previews the exported payload, and requires an ABC reference before confirmation ✅
+- Webhook secret lookup hash: new subscription writes store encrypted secret plus keyed `secretHash`; production-like inbound Dust rejects legacy plaintext subscription lookup; backfill/evidence/verifier selftests require valid hashes ✅
+- MCP connectivity gate: `deploy:evidence:mcp` now accepts the server's object-shaped discovery metadata, requires `tools/list`, runs a default no-match `crm_search_companies` `tools/call`, and stores only counts/privacy flags instead of raw tool output ✅
+- Telemetry privacy scrub: Fastify/Pino request URLs, query strings, generic log args, and Sentry
+  request/exception/breadcrumb payloads now redact emails, phone-shaped values, sensitive field names,
+  and token-shaped strings ✅
+- WIP-delta (48 files): **no security regression** — net guards + org-scoping equal-or-higher ✅
+- Merge safety: the 2 fused delete actions are gated + org-scoped + audited + soft-delete ✅
+- QA: 4 clean isolated api runs green; flakiness traced to self-inflicted contention ✅
+
+## 5. Remaining findings / open items
+
+- **CRITICAL:** PII + webhook operator dry-run/apply evidence, live `deploy:evidence:pii` and `deploy:evidence:webhooks` release DB ciphertext/hash artifacts, storage-level encryption confirmation, and `User.email` field-level decision.
+- **HIGH:** live container/SBOM + IaC scans enforced in CI, gated CD approval, action SHA pinning.
+- **MEDIUM:** silent decrypt-mask startup self-test; optional finer AI entitlement/quotas beyond the new human-session + permission gates.
+- **Gate 9:** full local API suite now passes after route-test isolation and the targeted public booking/e-signature browser gate is green; still needs CI repeat proof on isolated infra (for example 10x green) and broader lifecycle coverage.
+- **Gate 3:** a11y (WCAG 2.2 AA) + full cross-browser E2E + Apple-UX review remain open.
+
+## 6. Required human approvals / access (to close the gates)
+
+1. **Cloud + CI read access + authorized-testing scope** (domains, accounts, environments) — unblocks Gates 6, 7, 8, 10.
+2. **PII/webhook production evidence + decision:** run/apply `scripts/encrypt-existing-pii.ts` and `scripts/encrypt-webhook-secrets.ts`, run `pnpm deploy:evidence:pii` and `pnpm deploy:evidence:webhooks` against the release DB, confirm storage-level encryption, and decide whether `User.email` is storage-encryption-only or gets a generated `User.emailHash` migration.
+3. **Production backup + restore drill** in staging; generate a real pre-migrate backup proof artifact; ratify RTO/RPO.
+4. **Legal/security sign-off** for any compliance claim (Gate 13 is an evidence package only).
+
+## 7. 30 / 60 / 90-day hardening plan
+
+**0–30 (blockers):** run PII backfill + `deploy:evidence:pii`, run webhook secret backfill + `deploy:evidence:webhooks`, confirm storage encryption, decide `User.email`; generate real pre-migrate backup proof, run prod backup/restore + rollback drills (RTO/RPO); live IAM/network/TLS/bucket review; run strict container vuln/SBOM evidence on immutable release image digests, enforce container + IaC scans in CI + a gated CD; run k6 load at expected traffic.
+**30–60 (HIGH/MED):** rotate/migrate any legacy broad REST API keys to exact scopes; prove 10x green in CI; a11y (WCAG 2.2 AA) + browser E2E; runtime dashboards/alerts validated (trigger test alerts); RLS/Prisma-extension tenant backstop ADR; decide whether to add a dedicated AI entitlement beyond the current human-session + permission gates.
+**60–90 (hardening):** provenance attestations + action SHA-pinning + Dependabot; DR tabletop; vendor/subprocessor review; web unit-coverage uplift; soak tests + capacity plan.

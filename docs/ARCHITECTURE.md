@@ -172,12 +172,13 @@ Per `SPEC.md` §2.3:
 
 ### PII Field Encryption (Wave 5)
 
-- AES-256-GCM encryption for `Contact.email/phone/mobilePhone`, `Lead.email/phone`, `User.email`.
+- AES-256-GCM encryption for `Contact.email/phone`, `Lead.email/phone`, and `KamConsultant.email`.
 - Per-org key derivation: `HKDF-SHA256(masterKey, orgId)`.
 - Envelope: `enc:v1:<iv>:<tag>:<ciphertext>`.
-- Searchable hash: `emailHash` column (HMAC-SHA256, keyed).
-- Prisma `$use` middleware auto-encrypts on write / auto-decrypts on read.
+- Searchable hash: `emailHash` column (trim/lowercase email, HMAC-SHA256, keyed).
+- Prisma `$use` middleware auto-encrypts on write, rewrites supported email equality filters to `emailHash`, and auto-decrypts on read.
 - Opt-in: `PII_FIELD_ENCRYPTION=true`. Default off for backward compatibility.
+- `User.email` remains outside field encryption until a generated `User.emailHash` migration exists.
 - Runbook: `docs/security/pii-field-encryption.md`.
 
 ### Azure SSO / Microsoft Entra
