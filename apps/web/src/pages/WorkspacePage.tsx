@@ -30,6 +30,7 @@ export default function WorkspacePage() {
   if (isError || !data?.appflowyEnabled || !data?.appflowyUrl) {
     return (
       <div className="p-4 md:p-6">
+        <h1 className="sr-only">Collaborate</h1>
         <Card>
           <SectionHeader title="Collaborate" caption="Shared workspace for the team" />
           <EmptyState

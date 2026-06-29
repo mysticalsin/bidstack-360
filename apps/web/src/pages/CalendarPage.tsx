@@ -132,6 +132,8 @@ export function CalendarPage() {
 
   return (
     <div className="flex flex-col h-full bg-(--color-bg) text-(--color-text-primary)">
+      {/* Page landmark heading (the visible date label below is a styled span). */}
+      <h1 className="sr-only">{t('calendar.title', 'Calendar')}</h1>
       {/* Toolbar */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-(--color-border)">
         <button
