@@ -81,18 +81,22 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 ENV NODE_ENV=production
 RUN addgroup -S bidstack && adduser -S -G bidstack bidstack
 COPY --chown=bidstack:bidstack packages/db/prisma ./packages/db/prisma
+COPY --chown=bidstack:bidstack scripts/run-safe-migrate-deploy.mjs ./scripts/run-safe-migrate-deploy.mjs
+RUN mkdir -p /run/bidstack && chown bidstack:bidstack /run/bidstack
 RUN rm -rf /root/.cache/node /pnpm /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/pnpm /usr/local/bin/pnpx \
     /usr/local/bin/yarn /usr/local/bin/yarnpkg
 USER bidstack
-CMD ["./packages/db/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/db/prisma/schema.prisma"]
+CMD ["node", "scripts/run-safe-migrate-deploy.mjs", "--prisma-bin", "./packages/db/node_modules/.bin/prisma", "--schema", "packages/db/prisma/schema.prisma"]
 
 # ─── API ────────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS api
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN apk add --no-cache openssl
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+RUN apk add --no-cache ca-certificates chromium freetype harfbuzz nss openssl ttf-freefont
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 RUN addgroup -S bidstack && adduser -S -G bidstack bidstack

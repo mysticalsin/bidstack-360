@@ -4,7 +4,9 @@
  * WHY: If PII_FIELD_ENCRYPTION must be turned off (e.g. key management
  * incident, upgrade blocked, emergency access needed by legacy tooling),
  * this script reverses the encrypt-existing-pii.ts migration by decrypting
- * all enc:v1 envelopes back to plaintext.
+ * all current enc:v1 envelopes back to plaintext. It also decrypts legacy
+ * User.email envelopes from the pre-User.emailHash implementation so auth can
+ * recover if that older script was ever run.
  *
  * WARNING: Running this script stores PII as plaintext in PostgreSQL.
  * Use only under an approved incident/rollback plan.
@@ -21,10 +23,7 @@
  */
 
 import { PrismaClient } from '../packages/db/generated/client/index.js';
-import {
-  decryptPiiField,
-  isEncrypted,
-} from '../packages/shared/src/crypto/pii-field-cipher.js';
+import { decryptPiiField, isEncrypted } from '../packages/shared/src/crypto/pii-field-cipher.js';
 
 const CHUNK_SIZE = 1000;
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -47,7 +46,7 @@ async function rollbackContacts(): Promise<Stats> {
       take: CHUNK_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
-      select: { id: true, orgId: true, email: true, phone: true },
+      select: { id: true, orgId: true, email: true, emailHash: true, phone: true },
     });
     if (rows.length === 0) break;
     cursor = rows[rows.length - 1]!.id;
@@ -60,6 +59,9 @@ async function rollbackContacts(): Promise<Stats> {
       if (typeof row.email === 'string' && isEncrypted(row.email)) {
         updates.email = decryptPiiField(row.email, row.orgId, 'email');
         updates.emailHash = null; // clear the search hash
+        needsUpdate = true;
+      } else if (row.emailHash !== null) {
+        updates.emailHash = null;
         needsUpdate = true;
       }
       if (typeof row.phone === 'string' && isEncrypted(row.phone)) {
@@ -96,7 +98,7 @@ async function rollbackLeads(): Promise<Stats> {
       take: CHUNK_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
-      select: { id: true, orgId: true, email: true, phone: true },
+      select: { id: true, orgId: true, email: true, emailHash: true, phone: true },
     });
     if (rows.length === 0) break;
     cursor = rows[rows.length - 1]!.id;
@@ -108,6 +110,9 @@ async function rollbackLeads(): Promise<Stats> {
 
       if (typeof row.email === 'string' && isEncrypted(row.email)) {
         updates.email = decryptPiiField(row.email, row.orgId, 'email');
+        updates.emailHash = null;
+        needsUpdate = true;
+      } else if (row.emailHash !== null) {
         updates.emailHash = null;
         needsUpdate = true;
       }
@@ -126,8 +131,53 @@ async function rollbackLeads(): Promise<Stats> {
       }
     }
 
+    process.stdout.write(`\r  leads: ${stats.processed} processed, ${stats.decrypted} decrypted`);
+  }
+
+  process.stdout.write('\n');
+  return stats;
+}
+
+async function rollbackKamConsultants(): Promise<Stats> {
+  const stats: Stats = { processed: 0, decrypted: 0, skipped: 0 };
+  let cursor: string | undefined;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const rows = await prisma.kamConsultant.findMany({
+      take: CHUNK_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+      select: { id: true, orgId: true, email: true, emailHash: true },
+    });
+    if (rows.length === 0) break;
+    cursor = rows[rows.length - 1]!.id;
+
+    for (const row of rows) {
+      stats.processed++;
+
+      if (typeof row.email === 'string' && isEncrypted(row.email)) {
+        const plain = decryptPiiField(row.email, row.orgId, 'email');
+        const updates = { email: plain, emailHash: null };
+        stats.decrypted++;
+        if (!DRY_RUN) {
+          await prisma.kamConsultant.update({ where: { id: row.id }, data: updates });
+        }
+      } else if (row.emailHash !== null) {
+        stats.decrypted++;
+        if (!DRY_RUN) {
+          await prisma.kamConsultant.update({
+            where: { id: row.id },
+            data: { emailHash: null },
+          });
+        }
+      } else {
+        stats.skipped++;
+      }
+    }
+
     process.stdout.write(
-      `\r  leads: ${stats.processed} processed, ${stats.decrypted} decrypted`,
+      `\r  kam_consultants: ${stats.processed} processed, ${stats.decrypted} decrypted`,
     );
   }
 
@@ -135,7 +185,7 @@ async function rollbackLeads(): Promise<Stats> {
   return stats;
 }
 
-async function rollbackUsers(): Promise<Stats> {
+async function rollbackLegacyUsers(): Promise<Stats> {
   const stats: Stats = { processed: 0, decrypted: 0, skipped: 0 };
   let cursor: string | undefined;
 
@@ -165,7 +215,7 @@ async function rollbackUsers(): Promise<Stats> {
     }
 
     process.stdout.write(
-      `\r  users: ${stats.processed} processed, ${stats.decrypted} decrypted`,
+      `\r  legacy_users: ${stats.processed} processed, ${stats.decrypted} decrypted`,
     );
   }
 
@@ -180,7 +230,9 @@ async function main(): Promise<void> {
   }
 
   process.stdout.write('=== BidStack PII Decryption Rollback ===\n');
-  process.stdout.write(`Mode: ${DRY_RUN ? 'DRY RUN' : 'LIVE (DESTRUCTIVE — stores plaintext PII)'}\n\n`);
+  process.stdout.write(
+    `Mode: ${DRY_RUN ? 'DRY RUN' : 'LIVE (DESTRUCTIVE — stores plaintext PII)'}\n\n`,
+  );
 
   if (!DRY_RUN) {
     process.stdout.write(
@@ -192,12 +244,14 @@ async function main(): Promise<void> {
 
   const contactStats = await rollbackContacts();
   const leadStats = await rollbackLeads();
-  const userStats = await rollbackUsers();
+  const kamConsultantStats = await rollbackKamConsultants();
+  const legacyUserStats = await rollbackLegacyUsers();
 
   process.stdout.write('\n=== Summary ===\n');
   process.stdout.write(`Contact: ${contactStats.decrypted} decrypted\n`);
   process.stdout.write(`Lead:    ${leadStats.decrypted} decrypted\n`);
-  process.stdout.write(`User:    ${userStats.decrypted} decrypted\n`);
+  process.stdout.write(`KAM:     ${kamConsultantStats.decrypted} decrypted\n`);
+  process.stdout.write(`Legacy User: ${legacyUserStats.decrypted} decrypted\n`);
 }
 
 main()

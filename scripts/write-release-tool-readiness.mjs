@@ -98,7 +98,9 @@ function parseOptionalBoolean(value) {
 }
 
 function normalizeGitleaksMode(value) {
-  const mode = String(value || 'auto').trim().toLowerCase();
+  const mode = String(value || 'auto')
+    .trim()
+    .toLowerCase();
   if (['auto', 'native', 'docker'].includes(mode)) return mode;
   throw new Error(`Invalid gitleaks mode: ${value}`);
 }
@@ -170,7 +172,9 @@ function checkFromCommand(id, label, result, detail = {}) {
     exitCode: result.exitCode,
     version,
     detail: detail.detail,
-    error: result.passed ? undefined : result.error || oneLine(result.stderr) || oneLine(result.stdout),
+    error: result.passed
+      ? undefined
+      : result.error || oneLine(result.stderr) || oneLine(result.stdout),
   };
 }
 
@@ -230,19 +234,60 @@ function dockerImageProbe(root, id, label, image, args, executeImageProbes) {
 function collectChecks(options) {
   const checks = [];
 
-  checks.push(versionedCommandCheck(options.root, 'node.version', 'Node.js 24 runtime', 'node', ['--version'], 24));
-  checks.push(versionedResultCheck('pnpm.version', 'pnpm 10 package manager', runPnpm(options.root, ['--version']), 10));
-  checks.push(checkFromCommand('git.available', 'Git CLI available', runCommand(options.root, 'git', ['--version'])));
-  checks.push(checkFromCommand('bash.available', 'Bash available for repo shell gates', runCommand(options.root, 'bash', ['--version'])));
+  checks.push(
+    versionedCommandCheck(
+      options.root,
+      'node.version',
+      'Node.js 24 runtime',
+      'node',
+      ['--version'],
+      24,
+    ),
+  );
+  checks.push(
+    versionedResultCheck(
+      'pnpm.version',
+      'pnpm 10 package manager',
+      runPnpm(options.root, ['--version']),
+      10,
+    ),
+  );
+  checks.push(
+    checkFromCommand(
+      'git.available',
+      'Git CLI available',
+      runCommand(options.root, 'git', ['--version']),
+    ),
+  );
+  checks.push(
+    checkFromCommand(
+      'bash.available',
+      'Bash available for repo shell gates',
+      runCommand(options.root, 'bash', ['--version']),
+    ),
+  );
 
   const dockerCli = runCommand(options.root, 'docker', ['--version']);
   checks.push(checkFromCommand('docker.cli', 'Docker CLI available', dockerCli));
   const dockerDaemon = dockerCli.passed
     ? runCommand(options.root, 'docker', ['version', '--format', '{{.Server.Version}}'])
-    : { command: 'docker version --format {{.Server.Version}}', exitCode: null, passed: false, error: 'Docker CLI unavailable', stdout: '', stderr: '' };
+    : {
+        command: 'docker version --format {{.Server.Version}}',
+        exitCode: null,
+        passed: false,
+        error: 'Docker CLI unavailable',
+        stdout: '',
+        stderr: '',
+      };
   checks.push(checkFromCommand('docker.daemon', 'Docker daemon reachable', dockerDaemon));
 
-  checks.push(checkFromCommand('sentry.cli', 'Sentry CLI available for smoke evidence', runCommand(options.root, 'sentry', ['--version'])));
+  checks.push(
+    checkFromCommand(
+      'sentry.cli',
+      'Sentry CLI available for smoke evidence',
+      runCommand(options.root, 'sentry', ['--version']),
+    ),
+  );
   checks.push(
     checkFromCommand(
       'playwright.cli',
@@ -259,9 +304,14 @@ function collectChecks(options) {
     passed: localK6.passed || dockerDaemon.passed,
     command: localK6.command,
     exitCode: localK6.exitCode,
-    version: localK6.passed ? oneLine(localK6.stdout || localK6.stderr) : `docker fallback ${options.k6Image}`,
+    version: localK6.passed
+      ? oneLine(localK6.stdout || localK6.stderr)
+      : `docker fallback ${options.k6Image}`,
     detail: localK6.passed ? 'local k6' : 'Docker fallback is required',
-    error: localK6.passed || dockerDaemon.passed ? undefined : 'k6 is unavailable and Docker fallback is not reachable',
+    error:
+      localK6.passed || dockerDaemon.passed
+        ? undefined
+        : 'k6 is unavailable and Docker fallback is not reachable',
   });
 
   const nativeGitleaks = runCommand(options.root, options.gitleaksBin, ['version']);
@@ -278,8 +328,14 @@ function collectChecks(options) {
       (options.gitleaksMode === 'auto' && (nativeGitleaks.passed || dockerDaemon.passed)),
     command: nativeGitleaks.command,
     exitCode: nativeGitleaks.exitCode,
-    version: gitleaksUsesNative ? oneLine(nativeGitleaks.stdout || nativeGitleaks.stderr) : `docker fallback ${options.gitleaksImage}`,
-    detail: gitleaksUsesNative ? 'native' : gitleaksUsesDocker ? 'docker fallback' : options.gitleaksMode,
+    version: gitleaksUsesNative
+      ? oneLine(nativeGitleaks.stdout || nativeGitleaks.stderr)
+      : `docker fallback ${options.gitleaksImage}`,
+    detail: gitleaksUsesNative
+      ? 'native'
+      : gitleaksUsesDocker
+        ? 'docker fallback'
+        : options.gitleaksMode,
     error:
       nativeGitleaks.passed || dockerDaemon.passed
         ? undefined
@@ -309,10 +365,46 @@ function collectChecks(options) {
     error: dockerDaemon.passed ? undefined : 'Docker daemon is required for Trivy evidence',
   });
 
-  checks.push(dockerImageProbe(options.root, 'gitleaks.image', 'Gitleaks Docker image executes', options.gitleaksImage, ['version'], options.executeImageProbes));
-  checks.push(dockerImageProbe(options.root, 'semgrep.image', 'Semgrep Docker image executes', options.semgrepImage, ['semgrep', '--version'], options.executeImageProbes));
-  checks.push(dockerImageProbe(options.root, 'trivy.image', 'Trivy Docker image executes', options.trivyImage, ['--version'], options.executeImageProbes));
-  checks.push(dockerImageProbe(options.root, 'k6.image', 'k6 Docker image executes', options.k6Image, ['version'], options.executeImageProbes));
+  checks.push(
+    dockerImageProbe(
+      options.root,
+      'gitleaks.image',
+      'Gitleaks Docker image executes',
+      options.gitleaksImage,
+      ['version'],
+      options.executeImageProbes,
+    ),
+  );
+  checks.push(
+    dockerImageProbe(
+      options.root,
+      'semgrep.image',
+      'Semgrep Docker image executes',
+      options.semgrepImage,
+      ['semgrep', '--version'],
+      options.executeImageProbes,
+    ),
+  );
+  checks.push(
+    dockerImageProbe(
+      options.root,
+      'trivy.image',
+      'Trivy Docker image executes',
+      options.trivyImage,
+      ['--version'],
+      options.executeImageProbes,
+    ),
+  );
+  checks.push(
+    dockerImageProbe(
+      options.root,
+      'k6.image',
+      'k6 Docker image executes',
+      options.k6Image,
+      ['version'],
+      options.executeImageProbes,
+    ),
+  );
 
   for (const relativePath of [
     '.gitleaks.toml',
@@ -325,7 +417,12 @@ function collectChecks(options) {
     'scripts/write-operational-readiness-evidence.mjs',
     'scripts/verify-azure-infra-policy.mjs',
     'scripts/write-secret-scan-evidence.mjs',
+    'scripts/write-api-connectivity-evidence.mjs',
+    'scripts/write-pii-ciphertext-evidence.mjs',
+    'scripts/encrypt-webhook-secrets.ts',
+    'scripts/write-webhook-secret-ciphertext-evidence.mjs',
     'scripts/write-provider-quality-evidence.mjs',
+    'scripts/write-mcp-connectivity-evidence.mjs',
     'scripts/write-sentry-smoke-evidence.mjs',
     'scripts/write-browser-regression-evidence.mjs',
     'scripts/run-deploy-evidence-bundle.mjs',
@@ -369,7 +466,9 @@ function runWriter(options) {
   const artifact = buildArtifact(options, collectChecks(options));
   const absolutePath = writeArtifact(options.root, options.outputPath, artifact);
   process.stdout.write(`Release tool readiness: ${path.relative(options.root, absolutePath)}\n`);
-  process.stdout.write(`Required checks: ${artifact.checks.filter((check) => check.required).length}\n`);
+  process.stdout.write(
+    `Required checks: ${artifact.checks.filter((check) => check.required).length}\n`,
+  );
   process.stdout.write(`Blocking failures: ${artifact.blockingFailures.length}\n`);
 
   for (const check of artifact.checks) {
@@ -387,29 +486,59 @@ function runWriter(options) {
 
 function runSelftest() {
   const good = buildArtifact(
-    { executeImageProbes: false, gitleaksImage: DEFAULT_GITLEAKS_IMAGE, semgrepImage: DEFAULT_SEMGREP_IMAGE, trivyImage: DEFAULT_TRIVY_IMAGE, k6Image: DEFAULT_K6_IMAGE },
+    {
+      executeImageProbes: false,
+      gitleaksImage: DEFAULT_GITLEAKS_IMAGE,
+      semgrepImage: DEFAULT_SEMGREP_IMAGE,
+      trivyImage: DEFAULT_TRIVY_IMAGE,
+      k6Image: DEFAULT_K6_IMAGE,
+    },
     [
       { id: 'node.version', label: 'Node', required: true, passed: true },
       { id: 'docker.daemon', label: 'Docker', required: true, passed: true },
-      { id: 'gitleaks.image', label: 'Gitleaks image', required: false, passed: true, skipped: true },
+      {
+        id: 'gitleaks.image',
+        label: 'Gitleaks image',
+        required: false,
+        passed: true,
+        skipped: true,
+      },
     ],
   );
   assert.equal(good.passed, true);
   assert.deepEqual(good.blockingFailures, []);
 
   const missingRequired = buildArtifact(
-    { executeImageProbes: false, gitleaksImage: DEFAULT_GITLEAKS_IMAGE, semgrepImage: DEFAULT_SEMGREP_IMAGE, trivyImage: DEFAULT_TRIVY_IMAGE, k6Image: DEFAULT_K6_IMAGE },
+    {
+      executeImageProbes: false,
+      gitleaksImage: DEFAULT_GITLEAKS_IMAGE,
+      semgrepImage: DEFAULT_SEMGREP_IMAGE,
+      trivyImage: DEFAULT_TRIVY_IMAGE,
+      k6Image: DEFAULT_K6_IMAGE,
+    },
     [
       { id: 'node.version', label: 'Node', required: true, passed: true },
       { id: 'docker.daemon', label: 'Docker', required: true, passed: false },
-      { id: 'gitleaks.image', label: 'Gitleaks image', required: false, passed: true, skipped: true },
+      {
+        id: 'gitleaks.image',
+        label: 'Gitleaks image',
+        required: false,
+        passed: true,
+        skipped: true,
+      },
     ],
   );
   assert.equal(missingRequired.passed, false);
   assert.deepEqual(missingRequired.blockingFailures, ['docker.daemon']);
 
   const failedRequiredProbe = buildArtifact(
-    { executeImageProbes: true, gitleaksImage: DEFAULT_GITLEAKS_IMAGE, semgrepImage: DEFAULT_SEMGREP_IMAGE, trivyImage: DEFAULT_TRIVY_IMAGE, k6Image: DEFAULT_K6_IMAGE },
+    {
+      executeImageProbes: true,
+      gitleaksImage: DEFAULT_GITLEAKS_IMAGE,
+      semgrepImage: DEFAULT_SEMGREP_IMAGE,
+      trivyImage: DEFAULT_TRIVY_IMAGE,
+      k6Image: DEFAULT_K6_IMAGE,
+    },
     [
       { id: 'docker.daemon', label: 'Docker', required: true, passed: true },
       { id: 'semgrep.image', label: 'Semgrep image', required: true, passed: false },
