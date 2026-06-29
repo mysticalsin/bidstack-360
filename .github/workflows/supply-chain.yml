@@ -1,0 +1,56 @@
+name: Supply Chain — IaC scan
+
+# Checkov scans our infrastructure-as-code (Dockerfiles, docker-compose, Azure
+# bicep) for misconfigurations. This closes the gap left by the other security
+# workflows: semgrep covers application SAST and dependency-review + `pnpm audit`
+# cover dependency CVEs, but nothing scanned the infra definitions.
+#
+# SOFT-FAIL for now: findings are surfaced to the Security tab + PR annotations
+# but do NOT block merges, because the baseline (infra/azure/main.bicep is still
+# a draft) has not been triaged. Flip `soft_fail: false` below to make this a
+# hard gate once the baseline is clean.
+
+on:
+  push:
+    branches: [main, demo, 'release/**']
+  pull_request:
+    branches: [main, demo]
+
+permissions:
+  contents: read
+  security-events: write # upload SARIF to the Security tab
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iac-scan:
+    name: IaC misconfiguration scan (Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Dependabot PRs don't change infra; skip to save minutes.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Checkov (Dockerfiles, docker-compose, Azure bicep)
+        uses: bridgecrewio/checkov-action@063da70420ab562cb31f661b374a76b6a42ed6b5 # v12.3108.0
+        with:
+          directory: .
+          framework: dockerfile,docker_compose,bicep
+          skip_path: node_modules
+          quiet: true
+          soft_fail: true # advisory until the baseline is triaged — see header
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+
+      - name: Upload Checkov SARIF to the Security tab
+        if: always()
+        # Don't let a SARIF-path/format hiccup fail the job — the scan itself is
+        # the gate; this step is best-effort reporting.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: checkov.sarif
+          category: checkov-iac
