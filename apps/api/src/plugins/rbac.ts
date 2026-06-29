@@ -10,10 +10,16 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { prisma } from '@bidstack/db';
 import type { PermissionKey } from '@bidstack/shared';
 
+import {
+  apiKeyScopeSatisfiesPermission,
+  allowLegacyRestApiKeyScopes,
+} from '../lib/api-key-scopes.js';
+
 declare module 'fastify' {
   interface FastifyInstance {
     requireRole: (...allowed: string[]) => (req: FastifyRequest) => Promise<void>;
     requirePermission: (permission: PermissionKey) => (req: FastifyRequest) => Promise<void>;
+    requireHumanActor: (message?: string) => (req: FastifyRequest) => Promise<void>;
   }
   // WHY: route config: { permission: '...' } is a convenience annotation used
   // by observability middleware to log which permission gate a route enforces.
@@ -24,8 +30,23 @@ declare module 'fastify' {
 }
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
+  server.decorate(
+    'requireHumanActor',
+    (message = 'Requires a user session') =>
+      async (req: FastifyRequest) => {
+        if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
+          throw req.server.httpErrors.forbidden(message);
+        }
+      },
+  );
+
   server.decorate('requireRole', (...allowed: string[]) => async (req: FastifyRequest) => {
-    if (allowed.includes(req.auth.role)) return;
+    if (req.auth.role === 'api') {
+      throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
+    }
+    const roleNameFilters = allowed.map((name) => ({
+      name: { equals: name, mode: 'insensitive' as const },
+    }));
 
     const assignedRoleCount = await prisma.userRole.count({
       where: {
@@ -33,7 +54,7 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
         user: { orgId: req.auth.orgId, deletedAt: null },
         role: {
           orgId: req.auth.orgId,
-          name: { in: allowed },
+          OR: roleNameFilters,
           deletedAt: null,
         },
       },
@@ -48,9 +69,13 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     'requirePermission',
     (permission: PermissionKey) => async (req: FastifyRequest) => {
       if (req.auth.role === 'api') {
-        const requiredScope = permission.endsWith(':write') ? 'write' : 'read';
-        if (req.auth.scopes.includes(requiredScope)) return;
-        throw req.server.httpErrors.forbidden(`Requires API key scope: ${requiredScope}`);
+        if (apiKeyScopeSatisfiesPermission(req.auth.scopes, permission)) return;
+        const legacyDetail = allowLegacyRestApiKeyScopes()
+          ? ` or legacy ${permission.endsWith(':write') ? 'write' : 'read'}`
+          : '';
+        throw req.server.httpErrors.forbidden(
+          `Requires API key scope: ${permission}${legacyDetail}`,
+        );
       }
 
       const assignedPermissionCount = await prisma.userRole.count({

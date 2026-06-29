@@ -10,6 +10,7 @@ import { prisma } from '@bidstack/db';
 import type { Logger as PinoLogger } from 'pino';
 
 import { getOrgDust } from '../lib/dust-credentials.js';
+import { validateApiKeyScopes } from '../lib/api-key-scopes.js';
 import { enqueueDustResync } from '../queues/dust-poll.js';
 import {
   DustStatus,
@@ -236,10 +237,15 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
         body: z.object({
           name: z.string().min(1).max(80),
           scopes: z
-            .array(z.enum(['read', 'write', 'mcp']))
+            .array(z.string().trim().min(1))
             .min(1)
-            .refine((scopes) => !scopes.includes('mcp') || scopes.includes('read') || scopes.includes('write'), {
-              message: 'MCP keys must include read or write scope',
+            .superRefine((scopes, ctx) => {
+              for (const failure of validateApiKeyScopes(scopes)) {
+                ctx.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  message: failure,
+                });
+              }
             }),
         }),
         response: {

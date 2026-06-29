@@ -11,10 +11,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 import { mintNextCode } from './opportunities.helpers.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
+let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 
 type OpportunityListItem = {
   id: string;
@@ -31,19 +38,24 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
+  const iso = await createIsolatedOrg('opportunities');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   server = await buildServer();
   await server.ready();
-});
+}, 30_000);
 
 afterAll(async () => {
   if (server) await server.close();
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
+    if (!dbReachable || !orgId) {
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });
@@ -54,9 +66,9 @@ describe('opportunities routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ items: OpportunityListItem[] }>();
     expect(Array.isArray(body.items)).toBe(true);
-    // Seed plants 8 fixture opportunities; later sprints may add more
-    // via the create form, so we use ≥ rather than ===.
-    expect(body.items.length).toBeGreaterThanOrEqual(8);
+    // The isolated org owns a compact but complete fixture set; this assertion
+    // proves the route reads tenant data without depending on global demo counts.
+    expect(body.items.length).toBeGreaterThan(0);
     // RFP pipeline tests run in parallel and can create valid RFP-* records.
     // The page head only needs to satisfy the tolerant persisted-read contract.
     expect(body.items[0]).toMatchObject({
@@ -68,11 +80,9 @@ describe('opportunities routes', () => {
       probability: expect.any(Number),
     });
 
-    const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-    expect(org).not.toBeNull();
     const seed = await prisma.opportunity.findFirst({
       where: {
-        orgId: org!.id,
+        orgId: orgId!,
         deletedAt: null,
         code: { startsWith: 'OP-' },
       },
@@ -98,13 +108,20 @@ describe('opportunities routes', () => {
   });
 
   skipIfNoDb('GET /api/opportunities supports search', async () => {
+    const searchable = await prisma.opportunity.findFirst({
+      where: { orgId: orgId!, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, customer: true },
+    });
+    expect(searchable).not.toBeNull();
+
     const res = await server.inject({
       method: 'GET',
-      url: '/api/opportunities?search=MAHLE',
+      url: `/api/opportunities?search=${encodeURIComponent(searchable!.customer)}`,
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.items.some((o: { customer: string }) => o.customer === 'MAHLE')).toBe(true);
+    const body = res.json<{ items: Array<{ id: string; customer: string }> }>();
+    expect(body.items.some((o) => o.id === searchable!.id)).toBe(true);
   });
 
   skipIfNoDb('mintNextCode sorts OP suffixes numerically beyond four digits', async () => {
@@ -207,13 +224,8 @@ describe('opportunities routes', () => {
   });
 
   skipIfNoDb('POST /api/opportunities/:id/stage rejects archived pipeline stages', async () => {
-    const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-    if (!org) {
-      console.warn('[skip] seed org not found');
-      return;
-    }
     const opportunity = await prisma.opportunity.findFirst({
-      where: { orgId: org.id, deletedAt: null },
+      where: { orgId: orgId!, deletedAt: null },
       select: { id: true },
     });
     if (!opportunity) {
@@ -223,14 +235,14 @@ describe('opportunities routes', () => {
 
     const pipeline = await prisma.pipeline.create({
       data: {
-        orgId: org.id,
+        orgId: orgId!,
         name: `Archived pipeline test ${Date.now()}`,
         archived: true,
       },
     });
     const stage = await prisma.pipelineStage.create({
       data: {
-        orgId: org.id,
+        orgId: orgId!,
         pipelineId: pipeline.id,
         key: `archived_stage_${Date.now()}`,
         name: 'Archived Stage',
@@ -256,18 +268,11 @@ describe('opportunities routes', () => {
   skipIfNoDb(
     'DELETE /api/opportunities/:id soft-deletes the record and writes an audit_log entry',
     async () => {
-      // Look up the seed org — the dev auth stub runs every request as this org.
-      const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-      if (!org) {
-        console.warn('[skip] seed org not found');
-        return;
-      }
-
       // Create a throwaway fixture — deleting a seeded record would break the
       // ≥8 count assertion in the GET list test above.
       const fixture = await prisma.opportunity.create({
         data: {
-          orgId: org.id,
+          orgId: orgId!,
           code: `OP-TST-${Date.now()}`,
           name: 'DELETE integration test fixture',
           customer: 'Test Corp',
@@ -311,13 +316,13 @@ describe('contacts + tasks + reports routes', () => {
   skipIfNoDb('GET /api/contacts returns seeded contacts', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/contacts' });
     expect(res.statusCode).toBe(200);
-    expect(res.json().items.length).toBeGreaterThanOrEqual(8);
+    expect(res.json().items.length).toBeGreaterThan(0);
   });
 
   skipIfNoDb('GET /api/tasks returns seeded tasks', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/tasks' });
     expect(res.statusCode).toBe(200);
-    expect(res.json().items.length).toBeGreaterThanOrEqual(7);
+    expect(res.json().items.length).toBeGreaterThan(0);
   });
 
   skipIfNoDb('POST /api/tasks rejects opportunities outside the caller org', async () => {
@@ -346,5 +351,4 @@ describe('contacts + tasks + reports routes', () => {
     expect(body.weightedPipeline).toBeLessThanOrEqual(body.totalValueOpen);
     expect(body.byStage.length).toBeGreaterThan(0);
   });
-
 });

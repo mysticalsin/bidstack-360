@@ -1,15 +1,21 @@
 // Integration tests for the analytics report builder routes.
-// Pattern: tasks.integration.test.ts — buildServer + inject against the
-// org_seed_mantu stub org; every fixture is cleaned up in afterAll.
+// Pattern: tasks.integration.test.ts - buildServer + inject against a
+// throwaway isolated stub org; every fixture is cleaned up in afterAll.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdReportIds: string[] = [];
 
 const TASK_COUNT_QUERY = {
@@ -26,9 +32,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('analytics-reports');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   server = await buildServer();
   await server.ready();
@@ -41,13 +47,15 @@ afterAll(async () => {
     await prisma.analyticsReport.deleteMany({ where: { id } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed org missing`);
+      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });
@@ -229,9 +237,9 @@ describe('analytics reports routes', () => {
     expect(unknown.statusCode).toBe(404);
   });
 
-  skipIfNoDb('cross-org: another org\'s report ids 404 on read, patch, run and delete', async () => {
+  skipIfNoDb("cross-org: another org's report ids 404 on read, patch, run and delete", async () => {
     // Foreign-org fixture created directly in the DB; requests run as the
-    // stub org (org_seed_mantu), so every route must answer 404 — proving
+    // isolated stub org, so every route must answer 404 - proving
     // tenant scoping on the ROUTE layer, not just in compiled SQL.
     const foreignOrg = await prisma.org.create({
       data: { name: 'Analytics XOrg Test', clerkOrg: `org_xorg_${Date.now()}` },
@@ -267,7 +275,10 @@ describe('analytics reports routes', () => {
         payload: {},
       });
       expect(run.statusCode).toBe(404);
-      const del = await server.inject({ method: 'DELETE', url: `/api/reports/${foreignReport.id}` });
+      const del = await server.inject({
+        method: 'DELETE',
+        url: `/api/reports/${foreignReport.id}`,
+      });
       expect(del.statusCode).toBe(404);
     } finally {
       await prisma.analyticsReport.deleteMany({ where: { orgId: foreignOrg.id } });

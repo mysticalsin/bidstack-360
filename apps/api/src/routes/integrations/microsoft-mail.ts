@@ -125,7 +125,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       if (error) {
         server.log.warn({ error }, 'Microsoft Mail OAuth denied');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=outlook_denied`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=outlook_denied`,
         );
       }
       if (!code || !state) {
@@ -165,7 +165,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         const body = await tokenRes.text();
         server.log.error({ status: tokenRes.status, body }, 'MS Graph token exchange failed');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=outlook_token_failed`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=outlook_token_failed`,
         );
       }
 
@@ -246,7 +246,9 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         );
 
         // Create Graph webhook subscription (best-effort — incremental poll fallback if it fails)
-        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(err => server.log.warn({ err }, 'Failed to create subscription in background'));
+        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(
+          (err) => server.log.warn({ err }, 'Failed to create subscription in background'),
+        );
       }
 
       server.log.info(
@@ -255,7 +257,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       );
 
       return reply.redirect(
-        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?connected=outlook`,
+        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&connected=outlook`,
       );
     },
   });

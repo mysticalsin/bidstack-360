@@ -3,10 +3,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdFileIds: string[] = [];
 const createdExtractionIds: string[] = [];
 const createdSolutionIds: string[] = [];
@@ -20,9 +26,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('account-intel');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   server = await buildServer();
   await server.ready();
@@ -36,44 +42,49 @@ afterAll(async () => {
     await prisma.fileAttachment.deleteMany({ where: { id: { in: createdFileIds } } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or seed org missing`);
+      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });
 
 describe('account intelligence extraction routes', () => {
-  skipIfNoDb('creates a pending extraction without reading/parsing the file in the API request', async () => {
-    const accountId = `Async OCR Account ${Date.now()}`;
-    const file = await prisma.fileAttachment.create({
-      data: {
-        orgId: orgId!,
-        accountId,
-        name: 'missing-but-queued.txt',
-        contentType: 'text/plain',
-        bytes: 128,
-        storageKey: `${orgId}/async-ocr/missing-but-queued.txt`,
-      },
-    });
-    createdFileIds.push(file.id);
+  skipIfNoDb(
+    'creates a pending extraction without reading/parsing the file in the API request',
+    async () => {
+      const accountId = `Async OCR Account ${Date.now()}`;
+      const file = await prisma.fileAttachment.create({
+        data: {
+          orgId: orgId!,
+          accountId,
+          name: 'missing-but-queued.txt',
+          contentType: 'text/plain',
+          bytes: 128,
+          storageKey: `${orgId}/async-ocr/missing-but-queued.txt`,
+        },
+      });
+      createdFileIds.push(file.id);
 
-    const res = await server.inject({
-      method: 'POST',
-      url: `/api/v1/accounts/${encodeURIComponent(accountId)}/documents/${file.id}/extract`,
-      payload: {},
-    });
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/v1/accounts/${encodeURIComponent(accountId)}/documents/${file.id}/extract`,
+        payload: {},
+      });
 
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as { id: string; documentId: string; status: string };
-    createdExtractionIds.push(body.id);
-    expect(body.documentId).toBe(file.id);
-    expect(body.status).toBe('pending');
-  });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { id: string; documentId: string; status: string };
+      createdExtractionIds.push(body.id);
+      expect(body.documentId).toBe(file.id);
+      expect(body.status).toBe('pending');
+    },
+  );
 
   skipIfNoDb('returns durable fieldSources for extracted solutions and products', async () => {
     const accountId = `Intel Provenance ${Date.now()}`;
@@ -144,8 +155,18 @@ describe('account intelligence extraction routes', () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json() as {
-      solutions: Array<{ fieldSources: Record<string, { label: string; sourceFileName: string | null; sourceExtractionId: string | null }> }>;
-      products: Array<{ fieldSources: Record<string, { label: string; sourceFileName: string | null; sourceExtractionId: string | null }> }>;
+      solutions: Array<{
+        fieldSources: Record<
+          string,
+          { label: string; sourceFileName: string | null; sourceExtractionId: string | null }
+        >;
+      }>;
+      products: Array<{
+        fieldSources: Record<
+          string,
+          { label: string; sourceFileName: string | null; sourceExtractionId: string | null }
+        >;
+      }>;
     };
     expect(body.solutions[0]?.fieldSources.name).toMatchObject({
       label: 'Dust extraction',

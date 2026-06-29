@@ -2,16 +2,29 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import {
+  _resetIntegrationTokenKey,
+  hashWebhookSigningSecret,
+} from '@bidstack/shared/server-crypto';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let previousSecret: string | undefined;
+let previousDeployEnv: string | undefined;
+let previousTokenKey: string | undefined;
+let restoreAuth: (() => void) | null = null;
 const createdSubscriptionIds: string[] = [];
 const createdOrgIds: string[] = [];
 const eventTypes: string[] = [];
+const TEST_TOKEN_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function sign(body: string, secret: string): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
@@ -45,11 +58,15 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('webhooks');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   previousSecret = process.env.DUST_WEBHOOK_SECRET;
+  previousDeployEnv = process.env.BIDSTACK_DEPLOY_ENV;
+  previousTokenKey = process.env.INTEGRATION_TOKEN_KEY;
+  process.env.INTEGRATION_TOKEN_KEY = TEST_TOKEN_KEY;
+  _resetIntegrationTokenKey();
   server = await buildServer();
   await server.ready();
 });
@@ -62,14 +79,21 @@ afterAll(async () => {
   }
   if (previousSecret === undefined) delete process.env.DUST_WEBHOOK_SECRET;
   else process.env.DUST_WEBHOOK_SECRET = previousSecret;
+  if (previousDeployEnv === undefined) delete process.env.BIDSTACK_DEPLOY_ENV;
+  else process.env.BIDSTACK_DEPLOY_ENV = previousDeployEnv;
+  if (previousTokenKey === undefined) delete process.env.INTEGRATION_TOKEN_KEY;
+  else process.env.INTEGRATION_TOKEN_KEY = previousTokenKey;
+  _resetIntegrationTokenKey();
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or seed org missing`);
+      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });
@@ -86,6 +110,7 @@ describe('Dust webhook receiver', () => {
         orgId: orgId!,
         url: 'https://example.com/webhook',
         secret,
+        secretHash: hashWebhookSigningSecret(secret),
         events: ['document.created'],
         active: true,
       },
@@ -101,6 +126,7 @@ describe('Dust webhook receiver', () => {
         orgId: foreignOrg.id,
         url: 'https://example.com/deleted',
         secret,
+        secretHash: hashWebhookSigningSecret(secret),
         events: ['document.created'],
         active: true,
         deletedAt: new Date(),
@@ -131,6 +157,7 @@ describe('Dust webhook receiver', () => {
           orgId: orgId!,
           url: 'https://example.com/webhook',
           secret,
+          secretHash: hashWebhookSigningSecret(secret),
           events: ['document.created'],
           active: true,
         },
@@ -162,6 +189,7 @@ describe('Dust webhook receiver', () => {
           orgId: orgId!,
           url: 'https://example.com/webhook',
           secret,
+          secretHash: hashWebhookSigningSecret(secret),
           events: ['document.created'],
           active: true,
         },
@@ -205,6 +233,7 @@ describe('Dust webhook receiver', () => {
           orgId: orgId!,
           url: 'https://example.com/webhook',
           secret,
+          secretHash: hashWebhookSigningSecret(secret),
           events: ['document.created'],
           active: true,
         },
@@ -254,4 +283,28 @@ describe('Dust webhook receiver', () => {
       expect(count).toBe(1);
     },
   );
+
+  skipIfNoDb('rejects legacy plaintext subscription lookup in production mode', async () => {
+    const secret = `whsec_${randomUUID()}`;
+    process.env.DUST_WEBHOOK_SECRET = secret;
+    process.env.BIDSTACK_DEPLOY_ENV = 'production';
+    const eventType = `test.no-secret-hash.${randomUUID()}`;
+
+    const sub = await prisma.webhookSubscription.create({
+      data: {
+        orgId: orgId!,
+        url: 'https://example.com/webhook',
+        secret,
+        events: ['document.created'],
+        active: true,
+      },
+    });
+    createdSubscriptionIds.push(sub.id);
+
+    const res = await postDustWebhook({ metadata: { orgId } }, secret, eventType);
+    expect(res.statusCode).toBe(404);
+
+    const count = await prisma.syncEvent.count({ where: { eventType } });
+    expect(count).toBe(0);
+  });
 });

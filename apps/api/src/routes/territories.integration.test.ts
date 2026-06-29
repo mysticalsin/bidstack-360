@@ -7,11 +7,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let seedUserId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdTerritoryIds: string[] = [];
 const foreignOrgIds: string[] = [];
 
@@ -23,9 +29,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('territories');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   const user = await prisma.user.findFirst({
     where: { orgId },
@@ -49,6 +55,8 @@ afterAll(async () => {
     await prisma.org.deleteMany({ where: { id: { in: foreignOrgIds } } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
@@ -56,7 +64,7 @@ const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId || !seedUserId) {
       throw new Error(
-        `[skip] ${name} - DATABASE_URL not reachable, seed org missing, or seed user missing`,
+        `[skip] ${name} - DATABASE_URL not reachable, isolated org missing, or isolated user missing`,
       );
     }
     await fn();
@@ -85,7 +93,7 @@ async function createForeignUser() {
 describe('forecast input validation', () => {
   // WHY: `period` on GET /forecasts has a max(10) guard to prevent ORM
   // LIKE-style DoS via a long query string. Verify it rejects oversized values.
-  it.skipIf(!dbReachable)('GET /api/forecasts rejects period longer than 10 chars', async () => {
+  skipIfNoDb('GET /api/forecasts rejects period longer than 10 chars', async () => {
     const long = 'x'.repeat(11);
     const res = await server.inject({
       method: 'GET',
@@ -94,7 +102,7 @@ describe('forecast input validation', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it.skipIf(!dbReachable)('GET /api/forecasts accepts a valid period string', async () => {
+  skipIfNoDb('GET /api/forecasts accepts a valid period string', async () => {
     const res = await server.inject({
       method: 'GET',
       url: '/api/forecasts?period=2025-01',

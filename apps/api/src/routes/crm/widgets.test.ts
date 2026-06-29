@@ -3,10 +3,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 
 beforeAll(async () => {
   try {
@@ -16,9 +22,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('crm-widgets');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
 
   await prisma.dashboardWidget.deleteMany({
     where: { orgId, kind: 'provider_health' },
@@ -26,7 +32,7 @@ beforeAll(async () => {
 
   server = await buildServer();
   await server.ready();
-});
+}, 30_000);
 
 afterAll(async () => {
   if (orgId) {
@@ -34,14 +40,16 @@ afterAll(async () => {
       where: { orgId, kind: 'provider_health' },
     });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL or seed org not reachable`);
+      throw new Error(`[skip] ${name} — DATABASE_URL or isolated org not reachable`);
     }
     await fn();
   });

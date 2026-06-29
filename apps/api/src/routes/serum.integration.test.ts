@@ -3,11 +3,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 let previousStubRoleHeader: string | undefined;
+let defaultRequesterUserId: string | null = null;
 const configKey = `e2e-${Date.now()}`;
 const approverHeaders = { 'x-bidstack-e2e-role': 'admin' };
 
@@ -21,13 +28,20 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('serum');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
+  const defaultRequester = await prisma.user.findFirst({
+    where: { orgId },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  defaultRequesterUserId = defaultRequester?.id ?? null;
+  await preferDefaultRequester();
 
   server = await buildServer();
   await server.ready();
-});
+}, 30_000);
 
 afterAll(async () => {
   if (dbReachable && orgId) {
@@ -39,6 +53,8 @@ afterAll(async () => {
     });
   }
   if (server) await server.close();
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
   if (previousStubRoleHeader === undefined) {
     delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
@@ -50,10 +66,30 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or seed org missing`);
+      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });
+
+async function preferDefaultRequester(): Promise<void> {
+  if (!orgId || !defaultRequesterUserId) return;
+  // Role-override users are global by email and may carry older createdAt values
+  // into this org; keep the seeded admin as the implicit stub requester.
+  const past = new Date('2000-01-01T00:00:00.000Z');
+  const future = new Date(Date.now() + 60_000);
+  await prisma.user.update({
+    where: { id: defaultRequesterUserId },
+    data: { createdAt: past },
+  });
+  await prisma.user.updateMany({
+    where: {
+      orgId,
+      email: 'e2e-admin@bidstack.local',
+      id: { not: defaultRequesterUserId },
+    },
+    data: { createdAt: future },
+  });
+}
 
 async function publishHighRiskConfig(args: {
   configType:
@@ -69,6 +105,8 @@ async function publishHighRiskConfig(args: {
   configJson: Record<string, unknown>;
   changeReason: string;
 }) {
+  await preferDefaultRequester();
+
   const draft = await server.inject({
     method: 'POST',
     url: `/api/v1/serum/configs/${args.configType}/${args.configKey}/draft`,
@@ -95,6 +133,7 @@ async function publishHighRiskConfig(args: {
     payload: { decisionNotes: `${args.changeReason} separate-admin approval` },
   });
   expect(approve.statusCode).toBe(200);
+  await preferDefaultRequester();
 
   const publish = await server.inject({
     method: 'POST',
@@ -291,15 +330,6 @@ describe('SERUM status route', () => {
     expect(requested.approvalRequestedByCurrentUser).toBe(true);
     expect(requested.approvalReference).toMatch(/^SERUM-AGENTS-/);
 
-    const duplicateRequest = await server.inject({
-      method: 'POST',
-      url: `/api/v1/serum/configs/${draftBody.id}/request-approval`,
-      headers: approverHeaders,
-      payload: { approvalReason: 'try to replace the original approval requester' },
-    });
-    expect(duplicateRequest.statusCode).toBe(409);
-    expect(duplicateRequest.body).toContain('already been requested');
-
     const selfApprove = await server.inject({
       method: 'POST',
       url: `/api/v1/serum/configs/${draftBody.id}/approve`,
@@ -308,6 +338,15 @@ describe('SERUM status route', () => {
     expect(selfApprove.statusCode).toBe(409);
     expect(selfApprove.body).toContain('different admin than the requester');
 
+    const secondRequest = await server.inject({
+      method: 'POST',
+      url: `/api/v1/serum/configs/${draftBody.id}/request-approval`,
+      headers: approverHeaders,
+      payload: { approvalReason: 'try to replace the original approval requester' },
+    });
+    expect(secondRequest.statusCode).toBe(409);
+    expect(secondRequest.body).toContain('already been requested');
+
     const approve = await server.inject({
       method: 'POST',
       url: `/api/v1/serum/configs/${draftBody.id}/approve`,
@@ -315,6 +354,7 @@ describe('SERUM status route', () => {
       payload: { decisionNotes: 'approved after deterministic preflight and admin review' },
     });
     expect(approve.statusCode).toBe(200);
+    await preferDefaultRequester();
     const approved = approve.json() as {
       approvalStatus: string;
       approvedByUserId: string | null;
@@ -1248,7 +1288,9 @@ describe('SERUM status route', () => {
       where: {
         orgId,
         targetType: 'serum_config_version',
-        action: { in: ['serum_config.draft.create', 'serum_config.publish', 'serum_config.rollback'] },
+        action: {
+          in: ['serum_config.draft.create', 'serum_config.publish', 'serum_config.rollback'],
+        },
         at: { gte: new Date(Date.now() - 60_000) },
       },
     });

@@ -9,6 +9,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -17,6 +22,7 @@ let companyId = '';
 let handoffId = '';
 let otherOrgId = '';
 let otherHandoffId = '';
+let restoreAuth: (() => void) | undefined;
 const createdInitiativeIds: string[] = [];
 const createdOpportunityIds: string[] = [];
 
@@ -28,14 +34,16 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const seedOrg = await prisma.org.findFirst({ where: { clerkOrg: 'org_seed_mantu' } });
-  if (!seedOrg) {
-    dbReachable = false;
-    return;
-  }
-  orgId = seedOrg.id;
+  const org = await createIsolatedOrg('kam-handoffs');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const company = await prisma.company.create({
-    data: { orgId, name: `KAMHandoff-${randomUUID().slice(0, 8)}`, source: 'manual', countryCode: 'ES' },
+    data: {
+      orgId,
+      name: `KAMHandoff-${randomUUID().slice(0, 8)}`,
+      source: 'manual',
+      countryCode: 'ES',
+    },
   });
   companyId = company.id;
 
@@ -50,7 +58,11 @@ beforeAll(async () => {
   });
   const initId = init.json().id as string;
   createdInitiativeIds.push(initId);
-  await server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${initId}/transition`, payload: { toStage: 'lead' } });
+  await server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${initId}/transition`,
+    payload: { toStage: 'lead' },
+  });
   const opp = await server.inject({
     method: 'POST',
     url: `/api/v1/kam/initiatives/${initId}/transition`,
@@ -64,9 +76,15 @@ beforeAll(async () => {
     data: { clerkOrg: `org_kamh_other_${randomUUID().slice(0, 8)}`, name: 'KAMH Other' },
   });
   otherOrgId = other.id;
-  const oc = await prisma.company.create({ data: { orgId: other.id, name: `OC-${randomUUID().slice(0, 8)}`, source: 'manual' } });
-  const oi = await prisma.kamInitiative.create({ data: { orgId: other.id, companyId: oc.id, title: 'foreign', stage: 'opportunity' } });
-  const oh = await prisma.kamHandoff.create({ data: { orgId: other.id, companyId: oc.id, initiativeId: oi.id, status: 'draft' } });
+  const oc = await prisma.company.create({
+    data: { orgId: other.id, name: `OC-${randomUUID().slice(0, 8)}`, source: 'manual' },
+  });
+  const oi = await prisma.kamInitiative.create({
+    data: { orgId: other.id, companyId: oc.id, title: 'foreign', stage: 'opportunity' },
+  });
+  const oh = await prisma.kamHandoff.create({
+    data: { orgId: other.id, companyId: oc.id, initiativeId: oi.id, status: 'draft' },
+  });
   otherHandoffId = oh.id;
 });
 
@@ -86,25 +104,33 @@ afterAll(async () => {
   } catch {
     /* ignore */
   }
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   await prisma.$disconnect();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
-    if (!dbReachable) throw new Error(`[skip] ${name} — dev DB / seed org not reachable`);
+    if (!dbReachable) throw new Error(`[skip] ${name} — dev DB / isolated org not reachable`);
     await fn();
   });
 
 describe('KAM handoff export (ABC-OM interface)', () => {
   t('lists the draft handoff minted by the transition', async () => {
-    const res = await server.inject({ method: 'GET', url: `/api/v1/kam/handoffs?companyId=${companyId}` });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/handoffs?companyId=${companyId}`,
+    });
     expect(res.statusCode).toBe(200);
     const items = res.json().items as Array<{ id: string; status: string }>;
     expect(items.find((h) => h.id === handoffId)?.status).toBe('draft');
   });
 
   t('export produces the ABC-OM payload and marks the handoff exported', async () => {
-    const res = await server.inject({ method: 'POST', url: `/api/v1/kam/handoffs/${handoffId}/export` });
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/v1/kam/handoffs/${handoffId}/export`,
+    });
     expect(res.statusCode).toBe(200);
     const { handoff, payload } = res.json();
     expect(handoff.status).toBe('exported');
@@ -127,12 +153,18 @@ describe('KAM handoff export (ABC-OM interface)', () => {
     });
     expect(confirm.statusCode).toBe(200);
     expect(confirm.json()).toMatchObject({ status: 'confirmed', externalRef: 'ABC-OM-12345' });
-    const reExport = await server.inject({ method: 'POST', url: `/api/v1/kam/handoffs/${handoffId}/export` });
+    const reExport = await server.inject({
+      method: 'POST',
+      url: `/api/v1/kam/handoffs/${handoffId}/export`,
+    });
     expect(reExport.statusCode).toBe(409);
   });
 
   t('rejects a cross-tenant handoff export with 404 (B3)', async () => {
-    const res = await server.inject({ method: 'POST', url: `/api/v1/kam/handoffs/${otherHandoffId}/export` });
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/v1/kam/handoffs/${otherHandoffId}/export`,
+    });
     expect(res.statusCode).toBe(404);
   });
 });

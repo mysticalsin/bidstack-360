@@ -2,11 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import {
-  AssignedRoleList,
-  AssignRoleInput,
-  CapabilityManifest,
-} from '@bidstack/shared';
+import { AssignedRoleList, AssignRoleInput, CapabilityManifest } from '@bidstack/shared';
 
 import { getUserPermissions } from '../services/rbac.service.js';
 
@@ -20,8 +16,8 @@ const OrgUser = z.object({
 
 const IdParam = z.object({ id: z.string().uuid() });
 
-function isAdminRole(legacyRole: string, roleNames: string[]): boolean {
-  return legacyRole === 'admin' || roleNames.some((n) => n.toLowerCase() === 'admin');
+function hasDbAdminRole(roleNames: string[]): boolean {
+  return roleNames.some((n) => n.toLowerCase() === 'admin');
 }
 
 export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -56,7 +52,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
         legacyRole: req.auth.role,
         roles,
         permissions,
-        isAdmin: isAdminRole(req.auth.role, roles),
+        isAdmin: hasDbAdminRole(roles),
       };
     },
   );
@@ -111,7 +107,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     '/users/:id/role',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('users:write'),
+      preHandler: [server.requirePermission('users:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({ role: z.enum(['member', 'admin']) }),
@@ -123,13 +119,25 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId },
       });
       if (!user) throw server.httpErrors.notFound('User not found');
-      const updateResult = await prisma.user.updateMany({
-        where: { id: user.id, orgId: req.auth.orgId },
-        data: { role: req.body.role },
+      await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.user.updateMany({
+          where: { id: user.id, orgId: req.auth.orgId },
+          data: { role: req.body.role },
+        });
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('User not found');
+        }
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'user.legacy_role.update',
+            targetType: 'user',
+            targetId: user.id,
+            diff: { previousRole: user.role, newRole: req.body.role },
+          },
+        });
       });
-      if (updateResult.count === 0) {
-        throw server.httpErrors.notFound('User not found');
-      }
       const updated = await prisma.user.findFirstOrThrow({
         where: { id: user.id, orgId: req.auth.orgId },
       });

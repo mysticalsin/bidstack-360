@@ -6,17 +6,23 @@
 //   - mark-read is a write and must stay org+user scoped (no marking someone
 //     else's notification read).
 // Pattern mirrors cross-sell.integration.test.ts: buildServer + inject against
-// the seed org; every fixture cleaned up in afterAll.
+// an isolated org; every fixture cleaned up in afterAll.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let stubUserId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const TITLE_TAG = 'NOTIF-TEST';
 
 beforeAll(async () => {
@@ -27,10 +33,10 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
-  // Stub auth resolves to the oldest user in the seed org — mirror that here so
+  const org = await createIsolatedOrg('notifications');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
+  // Stub auth resolves to the oldest user in the isolated org - mirror that here so
   // fixtures land on the same identity the injected requests authenticate as.
   const user = await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' } });
   stubUserId = user?.id ?? null;
@@ -43,52 +49,57 @@ afterAll(async () => {
     await prisma.notification.deleteMany({ where: { orgId, title: { startsWith: TITLE_TAG } } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
     if (!dbReachable || !orgId || !stubUserId) {
-      throw new Error(`[skip] ${name} — DB/seed org/user unavailable`);
+      throw new Error(`[skip] ${name} - DB/isolated org/user unavailable`);
     }
     await fn();
   });
 
 describe('notifications routes', () => {
-  t('list returns my notifications with an accurate unread count, then mark-read clears it', async () => {
-    const created = await prisma.notification.create({
-      data: {
-        orgId: orgId!,
-        userId: stubUserId!,
-        type: 'assignment',
-        title: `${TITLE_TAG} assigned`,
-        body: 'You own a new action',
-        url: '/accounts/acme',
-      },
-    });
+  t(
+    'list returns my notifications with an accurate unread count, then mark-read clears it',
+    async () => {
+      const created = await prisma.notification.create({
+        data: {
+          orgId: orgId!,
+          userId: stubUserId!,
+          type: 'assignment',
+          title: `${TITLE_TAG} assigned`,
+          body: 'You own a new action',
+          url: '/accounts/acme',
+        },
+      });
 
-    const list = await server.inject({ method: 'GET', url: '/api/notifications' });
-    expect(list.statusCode).toBe(200);
-    const body = list.json() as {
-      items: { id: string; readAt: string | null }[];
-      unread: number;
-    };
-    const mine = body.items.find((n) => n.id === created.id);
-    expect(mine).toBeDefined();
-    expect(mine?.readAt).toBeNull();
-    expect(body.unread).toBeGreaterThanOrEqual(1);
-    const unreadBefore = body.unread;
+      const list = await server.inject({ method: 'GET', url: '/api/notifications' });
+      expect(list.statusCode).toBe(200);
+      const body = list.json() as {
+        items: { id: string; readAt: string | null }[];
+        unread: number;
+      };
+      const mine = body.items.find((n) => n.id === created.id);
+      expect(mine).toBeDefined();
+      expect(mine?.readAt).toBeNull();
+      expect(body.unread).toBeGreaterThanOrEqual(1);
+      const unreadBefore = body.unread;
 
-    const read = await server.inject({
-      method: 'PATCH',
-      url: `/api/notifications/${created.id}/read`,
-    });
-    expect(read.statusCode).toBe(200);
-    expect((read.json() as { readAt: string | null }).readAt).not.toBeNull();
+      const read = await server.inject({
+        method: 'PATCH',
+        url: `/api/notifications/${created.id}/read`,
+      });
+      expect(read.statusCode).toBe(200);
+      expect((read.json() as { readAt: string | null }).readAt).not.toBeNull();
 
-    const after = await server.inject({ method: 'GET', url: '/api/notifications' });
-    expect((after.json() as { unread: number }).unread).toBe(unreadBefore - 1);
-  });
+      const after = await server.inject({ method: 'GET', url: '/api/notifications' });
+      expect((after.json() as { unread: number }).unread).toBe(unreadBefore - 1);
+    },
+  );
 
   t('unreadOnly=true hides already-read notifications', async () => {
     const unread = await prisma.notification.create({

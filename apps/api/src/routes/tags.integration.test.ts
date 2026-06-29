@@ -3,7 +3,7 @@
 // privilege-escalation hole). They now require tags:read on GET/suggest and
 // tags:write on every mutation.
 //
-// The stub-auth identity resolves to the seed org's admin user (holds
+// The stub-auth identity resolves to the isolated org's admin user (holds
 // tags:read + tags:write after the RBAC seed), so this proves the gate is wired
 // and the permission is seeded (happy path). The 403 deny path for a user
 // LACKING the permission is covered generically by rbac-matrix.test.ts, which
@@ -13,10 +13,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const TAG_NAME = `gate-test-${Date.now()}`;
 let createdTagId: string | null = null;
 
@@ -28,8 +34,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
+  const org = await createIsolatedOrg('tags');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   server = await buildServer();
   await server.ready();
 });
@@ -39,12 +46,14 @@ afterAll(async () => {
     await prisma.tag.deleteMany({ where: { orgId, name: TAG_NAME } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
+    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} - DB/isolated org unavailable`);
     await fn();
   });
 

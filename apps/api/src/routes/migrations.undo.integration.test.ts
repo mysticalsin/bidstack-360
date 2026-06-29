@@ -136,7 +136,7 @@ describe('DELETE /api/v1/migrations/:id/undo', () => {
     });
     expect(res.statusCode).toBe(200);
 
-    // deletedCount should be 0 — no rows in seed org carry this tag.
+    // deletedCount should be 0 — no rows in the isolated org carry this tag.
     const body = res.json<{ deletedCount: number }>();
     expect(body.deletedCount).toBe(0);
 

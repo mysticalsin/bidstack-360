@@ -8,6 +8,9 @@ import {
   AppModules,
   AppModulesUpdate,
   APP_MODULES_DEFAULT,
+  ORG_LOCALE_DEFAULT,
+  OrgLocaleSettings,
+  OrgLocaleSettingsUpdate,
   OpportunityFilterRules,
   OpportunityFilterRulesUpdate,
 } from '@bidstack/shared';
@@ -29,7 +32,84 @@ function parseRules(value: unknown): OpportunityFilterRules {
       };
 }
 
+function parseLocaleSettings(
+  row:
+    | {
+        defaultCurrency: string;
+        dateFormat: string;
+        timezone: string;
+      }
+    | null
+    | undefined,
+): OrgLocaleSettings {
+  const parsed = OrgLocaleSettings.safeParse({
+    currency: row?.defaultCurrency ?? ORG_LOCALE_DEFAULT.currency,
+    dateFormat: row?.dateFormat ?? ORG_LOCALE_DEFAULT.dateFormat,
+    timezone: row?.timezone ?? ORG_LOCALE_DEFAULT.timezone,
+  });
+  return parsed.success ? parsed.data : ORG_LOCALE_DEFAULT;
+}
+
 export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
+  server.get(
+    '/org-settings/locale',
+    {
+      preHandler: [server.requirePermission('settings:read')],
+      schema: { response: { 200: OrgLocaleSettings } },
+    },
+    async (req) => {
+      const row = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { defaultCurrency: true, dateFormat: true, timezone: true },
+      });
+      return parseLocaleSettings(row);
+    },
+  );
+
+  server.put(
+    '/org-settings/locale',
+    {
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
+      schema: { body: OrgLocaleSettingsUpdate, response: { 200: OrgLocaleSettings } },
+    },
+    async (req) => {
+      const existing = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { defaultCurrency: true, dateFormat: true, timezone: true },
+      });
+      const locale = OrgLocaleSettings.parse({
+        ...parseLocaleSettings(existing),
+        ...req.body,
+      });
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: {
+          orgId: req.auth.orgId,
+          defaultCurrency: locale.currency,
+          dateFormat: locale.dateFormat,
+          timezone: locale.timezone,
+        },
+        update: {
+          defaultCurrency: locale.currency,
+          dateFormat: locale.dateFormat,
+          timezone: locale.timezone,
+          deletedAt: null,
+        },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.locale.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: req.body as object,
+        },
+      });
+      return locale;
+    },
+  );
+
   server.get(
     '/org-settings/opportunity-filters',
     {

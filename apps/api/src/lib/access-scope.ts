@@ -22,7 +22,9 @@
 //   link/ID. Companies/leads/contacts stay org-visible even though
 //   Company.countryCode exists (v2 candidate).
 // - API-key callers (req.auth.userId = "apikey:<id>", not a User row) are
-//   unrestricted: keys are org-level credentials gated by read/write scopes.
+//   unrestricted for group membership. Their REST power is bounded by exact
+//   permission scopes in production; legacy read/write fallback is dev/migration
+//   only, and MCP uses its own mcp + read/write tool scopes.
 
 import { prisma, type Prisma } from '@bidstack/db';
 
@@ -65,7 +67,7 @@ interface InvalidationMessage {
 export async function getAccessScope(orgId: string, userId: string): Promise<AccessScope> {
   // API keys (and any non-User principal) carry no group membership —
   // querying the uuid column with "apikey:<id>" would throw. Org-level
-  // credentials stay unrestricted; their power is bounded by key scopes.
+  // credentials stay unrestricted; their power is bounded by API-key scopes.
   if (!UUID_RE.test(userId)) {
     return { unrestricted: true, countries: [], userId };
   }

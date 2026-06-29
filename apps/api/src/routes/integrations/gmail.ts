@@ -122,7 +122,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       if (error) {
         server.log.warn({ error }, 'Gmail OAuth denied by user');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=gmail_denied`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=gmail_denied`,
         );
       }
       if (!code || !state) {
@@ -162,7 +162,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         const body = await tokenRes.text();
         server.log.error({ status: tokenRes.status, body }, 'Gmail token exchange failed');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=gmail_token_failed`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=gmail_token_failed`,
         );
       }
 
@@ -176,7 +176,11 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       // Fetch the user's Gmail address for display
       let externalEmail: string | undefined;
-      let gmailProfileEvidence: { emailAddress?: string; messagesTotal?: number; threadsTotal?: number } | null = null;
+      let gmailProfileEvidence: {
+        emailAddress?: string;
+        messagesTotal?: number;
+        threadsTotal?: number;
+      } | null = null;
       try {
         const profileRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -190,9 +194,12 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       try {
-        const gmailProfileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        });
+        const gmailProfileRes = await fetch(
+          'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+          {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          },
+        );
         if (gmailProfileRes.ok) {
           gmailProfileEvidence = (await gmailProfileRes.json()) as {
             emailAddress?: string;
@@ -247,7 +254,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       );
 
       return reply.redirect(
-        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?connected=gmail`,
+        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&connected=gmail`,
       );
     },
   });

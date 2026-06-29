@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { verifyDustSignature } from '@bidstack/dust-client';
+import { hashWebhookSigningSecret } from '@bidstack/shared/server-crypto';
 
 import { redis } from '../redis.js';
 
@@ -67,6 +68,16 @@ function extractPayloadOrgMetadata(payload: Record<string, unknown>): string | n
     documentMetadata?.clerkOrg,
     documentMetadata?.clerk_org,
   );
+}
+
+function isProductionLikeRuntime(): boolean {
+  const nodeEnv = String(process.env.NODE_ENV ?? '')
+    .trim()
+    .toLowerCase();
+  const deployEnv = String(process.env.BIDSTACK_DEPLOY_ENV ?? '')
+    .trim()
+    .toLowerCase();
+  return nodeEnv === 'production' || deployEnv === 'production' || deployEnv === 'staging';
 }
 
 async function rememberOrReject(
@@ -180,17 +191,53 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
         return { ok: true as const };
       }
 
-      // Org resolution: derive from the WebhookSubscription whose secret
-      // matches DUST_WEBHOOK_SECRET. Never trust client-supplied headers
-      // (audit P1.3: x-bidstack-org spoofing). In dev with no subscription
-      // row, fall back to the seed org so local development stays smooth.
-      const subscription = await prisma.webhookSubscription.findFirst({
-        where: { secret, active: true, deletedAt: null },
-        // Deterministic resolution if both old + new active rows ever coexist
-        // during a secret rotation. Pick the most recently created one.
-        orderBy: { createdAt: 'desc' },
-      });
-      const isDevLike = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+      // Org resolution: derive from the WebhookSubscription whose keyed lookup
+      // hash matches DUST_WEBHOOK_SECRET. The secret column is random-IV
+      // ciphertext in production, so plaintext equality lookup is legacy-only.
+      // Never trust client-supplied headers (audit P1.3: x-bidstack-org
+      // spoofing). In dev with no subscription row, fall back to the seed org
+      // so local development stays smooth.
+      const productionLike = isProductionLikeRuntime();
+      let subscription: { orgId: string } | null = null;
+      let hashLookupAvailable = false;
+      try {
+        const secretHash = hashWebhookSigningSecret(secret);
+        hashLookupAvailable = true;
+        subscription = await prisma.webhookSubscription.findFirst({
+          where: { secretHash, active: true, deletedAt: null },
+          // Deterministic resolution if both old + new active rows ever coexist
+          // during a secret rotation. Pick the most recently created one.
+          orderBy: { createdAt: 'desc' },
+        });
+      } catch (err) {
+        if (productionLike) {
+          req.log.error({ err }, 'webhook rejected - secret hash lookup unavailable');
+          throw server.httpErrors.serviceUnavailable(
+            'Webhook secret lookup is not configured; run webhook secret hash backfill',
+          );
+        }
+        req.log.warn(
+          { err },
+          'webhook secret hash lookup unavailable; using dev plaintext fallback',
+        );
+      }
+
+      if (!subscription && !productionLike) {
+        subscription = await prisma.webhookSubscription.findFirst({
+          where: { secret, active: true, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (!subscription && productionLike) {
+        req.log.warn(
+          { eventType, eid, hashLookupAvailable },
+          'webhook rejected - no active subscription secret hash match',
+        );
+      }
+      const isDevLike =
+        !productionLike &&
+        (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test');
       const org = subscription
         ? await prisma.org.findUnique({ where: { id: subscription.orgId } })
         : isDevLike

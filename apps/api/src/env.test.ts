@@ -67,6 +67,35 @@ describe('boot environment validation', () => {
     ).rejects.toThrow('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
   });
 
+  it('requires PII encryption and a valid PII master key in production', async () => {
+    const productionBase = {
+      NODE_ENV: 'production',
+      STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'bidstack-prod-files',
+      S3_REGION: 'us-east-1',
+      STORAGE_SCAN_REQUIRED: 'true',
+      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PUBLIC_BASE_URL: 'https://crm.example.com',
+      BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
+    };
+
+    await expect(
+      loadEnvWith({
+        ...productionBase,
+        PII_FIELD_ENCRYPTION: 'false',
+        PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
+      }),
+    ).rejects.toThrow('PII_FIELD_ENCRYPTION=true is required in production');
+
+    await expect(
+      loadEnvWith({
+        ...productionBase,
+        PII_FIELD_ENCRYPTION: 'true',
+        PII_ENCRYPTION_MASTER_KEY: 'z'.repeat(64),
+      }),
+    ).rejects.toThrow('PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string');
+  });
+
   it('requires a non-loopback HTTPS public web origin in production', async () => {
     const productionBase = {
       NODE_ENV: 'production',
@@ -75,6 +104,8 @@ describe('boot environment validation', () => {
       S3_REGION: 'us-east-1',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PII_FIELD_ENCRYPTION: 'true',
+      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
     };
 
     await expect(
@@ -98,6 +129,8 @@ describe('boot environment validation', () => {
       STORAGE_DRIVER: 'local',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PII_FIELD_ENCRYPTION: 'true',
+      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
       PUBLIC_BASE_URL: 'https://demo.example.com',
       DEMO_MODE: 'true',
       DEMO_SESSION_SECRET: 'demo-session-secret',
@@ -128,6 +161,8 @@ describe('boot environment validation', () => {
         S3_REGION: 'us-east-1',
         STORAGE_SCAN_REQUIRED: 'true',
         INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+        PII_FIELD_ENCRYPTION: 'true',
+        PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
         PUBLIC_BASE_URL: 'https://crm.example.com',
       }),
     ).rejects.toThrow('BIDSTACK_JOB_SIGNING_SECRET is required in production');
@@ -143,6 +178,8 @@ describe('boot environment validation', () => {
       S3_REGION: 'us-east-1',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PII_FIELD_ENCRYPTION: 'true',
+      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
       PUBLIC_BASE_URL: 'https://crm.example.com',
       JOB_SIGNING_SECRET: 'b'.repeat(64),
     });
@@ -158,6 +195,8 @@ describe('boot environment validation', () => {
       S3_REGION: 'us-east-1',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PII_FIELD_ENCRYPTION: 'true',
+      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
       PUBLIC_BASE_URL: 'https://crm.example.com',
       BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
     });

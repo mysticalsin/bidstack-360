@@ -165,7 +165,7 @@ describe('POST /api/v1/bid-workspaces/:workspaceId/matrix/:rowId/rfp-autofill', 
       url: `/api/v1/bid-workspaces/${opp.id}/matrix/${randomUUID()}/rfp-autofill`,
       payload: { orchestrationId: foreignOrch.id, sectionKey: 'security' },
     });
-    // The foreign orchestration's orgId does not match the seed org → 404.
+    // The foreign orchestration's orgId does not match the isolated org → 404.
     expect(res.statusCode).toBe(404);
 
     // Clean up.

@@ -117,7 +117,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (error) {
         server.log.warn({ error }, 'Slack OAuth denied by user');
-        return reply.redirect(`${redirectBase}/settings/integrations?error=slack_denied`);
+        return reply.redirect(`${redirectBase}/settings?tab=integrations&error=slack_denied`);
       }
       if (!code || !state) {
         throw server.httpErrors.badRequest('Missing code or state');
@@ -158,7 +158,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (!tokenRes.ok) {
         server.log.error({ status: tokenRes.status }, 'Slack token exchange HTTP error');
-        return reply.redirect(`${redirectBase}/settings/integrations?error=slack_token_failed`);
+        return reply.redirect(`${redirectBase}/settings?tab=integrations&error=slack_token_failed`);
       }
 
       const tokens = (await tokenRes.json()) as {
@@ -173,7 +173,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (!tokens.ok || !tokens.access_token) {
         server.log.error({ slackError: tokens.error }, 'Slack token exchange failed');
-        return reply.redirect(`${redirectBase}/settings/integrations?error=slack_token_failed`);
+        return reply.redirect(`${redirectBase}/settings?tab=integrations&error=slack_token_failed`);
       }
 
       // Persist the bot token
@@ -262,7 +262,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       server.log.info({ orgId, userId, team: tokens.team?.name }, 'Slack workspace connected');
-      return reply.redirect(`${redirectBase}/settings/integrations?connected=slack`);
+      return reply.redirect(`${redirectBase}/settings?tab=integrations&connected=slack`);
     },
   });
 

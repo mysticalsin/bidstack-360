@@ -5,6 +5,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 const {
   enqueueCrewRunMock,
@@ -35,6 +40,7 @@ let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let userId: string | null = null;
+let restoreAuth: (() => void) | undefined;
 
 const createdCrewIds: string[] = [];
 const createdRunIds: string[] = [];
@@ -67,8 +73,9 @@ beforeAll(async () => {
     return;
   }
 
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
+  const org = await createIsolatedOrg('crews');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const user = orgId
     ? await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' } })
     : null;
@@ -107,6 +114,8 @@ afterAll(async () => {
     if (createdOrgIds.length > 0) {
       await prisma.org.deleteMany({ where: { id: { in: createdOrgIds } } });
     }
+    restoreAuth?.();
+    if (orgId) await dropIsolatedOrg(orgId);
     await prisma.$disconnect();
   }
 }, 60_000);
@@ -114,7 +123,9 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId || !userId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL, seed org, or seed user not reachable`);
+      throw new Error(
+        `[skip] ${name} - DATABASE_URL, isolated org, or isolated user not reachable`,
+      );
     }
     await fn();
   });
@@ -236,7 +247,9 @@ describe('crew run controls', () => {
     });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json<{ message: string }>().message).toContain(`SERUM runtime denied agent "${agentKey}"`);
+    expect(res.json<{ message: string }>().message).toContain(
+      `SERUM runtime denied agent "${agentKey}"`,
+    );
     expect(enqueueCrewRunMock).not.toHaveBeenCalled();
     expect(checkSerumAgentRuntimePolicyMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -251,14 +264,16 @@ describe('crew run controls', () => {
   skipIfNoDb('requires explicit approval before queueing a SERUM-governed crew run', async () => {
     enqueueCrewRunMock.mockClear();
     const { crewId, agentKey } = await createCrewWithAgent();
-    checkSerumAgentRuntimePolicyMock.mockImplementation(async (args: { approvalConfirmed: boolean }) => ({
-      allowed: args.approvalConfirmed,
-      status: args.approvalConfirmed ? 'allowed' : 'denied',
-      reason: args.approvalConfirmed
-        ? 'Agent run is allowed by the active SERUM policy.'
-        : 'Human approval confirmation is required before an agent run can start.',
-      activeConfigVersionId: randomUUID(),
-    }));
+    checkSerumAgentRuntimePolicyMock.mockImplementation(
+      async (args: { approvalConfirmed: boolean }) => ({
+        allowed: args.approvalConfirmed,
+        status: args.approvalConfirmed ? 'allowed' : 'denied',
+        reason: args.approvalConfirmed
+          ? 'Agent run is allowed by the active SERUM policy.'
+          : 'Human approval confirmation is required before an agent run can start.',
+        activeConfigVersionId: randomUUID(),
+      }),
+    );
 
     const blocked = await server.inject({
       method: 'POST',

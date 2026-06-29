@@ -28,7 +28,7 @@ beforeAll(async () => {
     return;
   }
   // Per-file throwaway org so leftover contacts can never collide on a shared
-  // seed org (the old org_seed_mantu pattern made this test flake on re-runs).
+  // tenant fixture between runs.
   const iso = await createIsolatedOrg('contacts');
   orgId = iso.orgId;
   restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
@@ -58,7 +58,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed org missing`);
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });
@@ -112,7 +112,10 @@ describe('contacts routes', () => {
   skipIfNoDb('GET /api/contacts filters by customer', async () => {
     if (createdContactIds.length === 0) return;
     const customer = seedCompanyName ?? 'Integration Account';
-    const res = await server.inject({ method: 'GET', url: `/api/contacts?customer=${encodeURIComponent(customer)}&limit=10` });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/contacts?customer=${encodeURIComponent(customer)}&limit=10`,
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { items: Array<{ customer: string }> };
     expect(body.items.length).toBeGreaterThan(0);

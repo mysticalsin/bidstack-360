@@ -183,6 +183,9 @@ export const envSchema = z.object({
   HUBSPOT_REDIRECT_URI: z.string().url().optional().or(z.literal('')),
   // AES-256-GCM key for encrypting OAuth tokens at rest.
   INTEGRATION_TOKEN_KEY: z.string().min(1).optional().or(z.literal('')),
+  // AES-256-GCM key for Contact/Lead/KamConsultant PII fields at rest.
+  PII_ENCRYPTION_MASTER_KEY: z.string().min(1).optional().or(z.literal('')),
+  PII_FIELD_ENCRYPTION: z.enum(['true', 'false']).default('false'),
 
   // ─── E-signature (DocuSign JWT bearer integration) ────────────────────
   // All optional. When unset, the signature service throws a 503 at call time
@@ -202,7 +205,7 @@ export type Env = z.infer<typeof envSchema>;
 
 let _env: Env | null = null;
 
-function isIntegrationTokenKey(value: string | undefined): boolean {
+function isHex32ByteKey(value: string | undefined): boolean {
   return Boolean(value && /^[0-9a-fA-F]{64}$/.test(value));
 }
 
@@ -266,9 +269,19 @@ export function getEnv(): Env {
   // at rest. Optional in dev (those features degrade gracefully) but mandatory
   // in production — booting without it would let admins save secrets the app
   // then can't decrypt, or (worse) store them weakly.
-  if (env.NODE_ENV === 'production' && !isIntegrationTokenKey(env.INTEGRATION_TOKEN_KEY)) {
+  if (env.NODE_ENV === 'production' && !isHex32ByteKey(env.INTEGRATION_TOKEN_KEY)) {
     semanticErrors.push(
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production (encrypts per-org Dust + OAuth secrets at rest)',
+    );
+  }
+  if (env.NODE_ENV === 'production' && env.PII_FIELD_ENCRYPTION !== 'true') {
+    semanticErrors.push(
+      'PII_FIELD_ENCRYPTION=true is required in production (field-encrypts Contact/Lead/KamConsultant email+phone at rest; User.email is storage-encryption-only pending a User.emailHash migration)',
+    );
+  }
+  if (env.NODE_ENV === 'production' && !isHex32ByteKey(env.PII_ENCRYPTION_MASTER_KEY)) {
+    semanticErrors.push(
+      'PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production',
     );
   }
   // HMAC secret for Apollo enrichment jobs, shared by api (signs/enqueues) and
@@ -276,7 +289,11 @@ export function getEnv(): Env {
   // and the worker rejects every job — enrichment dies with no error. Fail loud
   // at boot. JOB_SIGNING_SECRET is the accepted fallback the queue resolves
   // (BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET).
-  if (env.NODE_ENV === 'production' && !env.BIDSTACK_JOB_SIGNING_SECRET && !env.JOB_SIGNING_SECRET) {
+  if (
+    env.NODE_ENV === 'production' &&
+    !env.BIDSTACK_JOB_SIGNING_SECRET &&
+    !env.JOB_SIGNING_SECRET
+  ) {
     semanticErrors.push(
       'BIDSTACK_JOB_SIGNING_SECRET is required in production (HMAC-signs Apollo enrichment jobs; must match the worker)',
     );

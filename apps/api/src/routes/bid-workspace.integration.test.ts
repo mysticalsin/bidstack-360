@@ -3,11 +3,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let rfpTablesReady = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdIds = {
   opportunities: [] as string[],
   files: [] as string[],
@@ -27,8 +33,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
+  const org = await createIsolatedOrg('bid-workspace');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   server = await buildServer();
   await server.ready();
 });
@@ -52,6 +59,8 @@ afterAll(async () => {
     await prisma.opportunity.deleteMany({ where: { id: { in: createdIds.opportunities } } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
@@ -64,7 +73,7 @@ const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   });
 
 async function createWorkspaceFixture() {
-  if (!orgId) throw new Error('seed org missing');
+  if (!orgId) throw new Error('isolated org missing');
   const code = `RFP-${crypto.randomUUID().slice(0, 8)}`;
   const opportunity = await prisma.opportunity.create({
     data: {

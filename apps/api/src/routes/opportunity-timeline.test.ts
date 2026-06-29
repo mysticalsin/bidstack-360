@@ -3,10 +3,16 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdIds = {
   opportunities: [] as string[],
   tasks: [] as string[],
@@ -18,8 +24,9 @@ describe('opportunity timeline', () => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       dbReachable = true;
-      const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-      orgId = org?.id ?? null;
+      const org = await createIsolatedOrg('opportunity-timeline');
+      orgId = org.orgId;
+      restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
     } catch {
       dbReachable = false;
     }
@@ -33,14 +40,16 @@ describe('opportunity timeline', () => {
       await prisma.opportunity.deleteMany({ where: { id: { in: createdIds.opportunities } } });
     }
     await server.close();
+    if (restoreAuth) restoreAuth();
+    if (orgId) await dropIsolatedOrg(orgId);
     if (dbReachable) await prisma.$disconnect();
   });
 
   const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
     it(name, async () => {
       if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or seed org missing`);
-    }
+        throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
+      }
       await fn();
     });
 
@@ -54,7 +63,7 @@ describe('opportunity timeline', () => {
   });
 
   skipIfNoDb('returns timeline items for an existing opportunity', async () => {
-    if (!orgId) throw new Error('seed org missing');
+    if (!orgId) throw new Error('isolated org missing');
     const code = `TL-${crypto.randomUUID().slice(0, 8)}`;
     const opportunity = await prisma.opportunity.create({
       data: {

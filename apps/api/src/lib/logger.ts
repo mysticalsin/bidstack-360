@@ -25,6 +25,8 @@
 
 import pino from 'pino';
 
+import { scrubPii, scrubTelemetryValue, scrubUrl } from './sentry-privacy.js';
+
 export interface LoggerOptions {
   name?: string;
   level?: string;
@@ -43,6 +45,44 @@ function getDevPrettyTransport(): ReturnType<typeof pino.transport> | undefined 
   return devPrettyTransport;
 }
 
+export function scrubLogMethodArgs(args: Parameters<pino.LogFn>): Parameters<pino.LogFn> {
+  return args.map((arg) => scrubTelemetryValue(arg)) as Parameters<pino.LogFn>;
+}
+
+export const privacyLogSerializers: pino.LoggerOptions['serializers'] = {
+  req(req: {
+    id?: string;
+    method?: string;
+    url?: string;
+    headers?: Record<string, unknown>;
+    remoteAddress?: string;
+    remotePort?: number;
+  }) {
+    return scrubPii({
+      id: req.id,
+      method: req.method,
+      url: req.url ? scrubUrl(req.url) : undefined,
+      headers: req.headers,
+      remoteAddress: req.remoteAddress,
+      remotePort: req.remotePort,
+    });
+  },
+  res(res: { statusCode?: number }) {
+    return {
+      statusCode: res.statusCode,
+    };
+  },
+  err(err: unknown) {
+    return scrubPii(err instanceof Error ? pino.stdSerializers.err(err) : err);
+  },
+};
+
+export const privacyLogHooks: pino.LoggerOptions['hooks'] = {
+  logMethod(args, method) {
+    method.apply(this, scrubLogMethodArgs(args));
+  },
+};
+
 export function createLogger(options: LoggerOptions = {}): pino.Logger {
   const loggerOptions: pino.LoggerOptions = {
     name: options.name ?? 'bidstack',
@@ -54,6 +94,9 @@ export function createLogger(options: LoggerOptions = {}): pino.Logger {
       service: process.env.DD_SERVICE ?? 'bidstack-api',
       env: process.env.DD_ENV ?? process.env.NODE_ENV ?? 'development',
     },
+
+    serializers: privacyLogSerializers,
+    hooks: privacyLogHooks,
 
     // WHY redact: prevent accidental PII/secrets in log output.
     // These paths cover the most common sources of credential leakage.

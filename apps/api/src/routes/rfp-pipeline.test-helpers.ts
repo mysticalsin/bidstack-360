@@ -17,6 +17,11 @@ import type { FastifyInstance } from 'fastify';
 
 import { buildServer } from '../server.js';
 import { redis } from '../redis.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +70,7 @@ export function makeRfpTestContext() {
       auditLogs: [],
     },
   };
+  let restoreAuth: (() => void) | null = null;
 
   beforeAll(async () => {
     try {
@@ -85,10 +91,9 @@ export function makeRfpTestContext() {
     }
     if (!ctx.rfpTablesReady) return;
 
-    // Resolve seed org used by stub auth (auth.ts resolveStubAuth uses org_seed_mantu).
-    const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-    ctx.orgId = org?.id ?? null;
-    if (!ctx.orgId) return;
+    const iso = await createIsolatedOrg('rfp-pipeline');
+    ctx.orgId = iso.orgId;
+    restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
 
     // WHY: the per-org upload rate-limit key persists in Redis across test runs
     // (TTL = 1 hour). Without a flush here the counter accumulates and eventually
@@ -109,7 +114,7 @@ export function makeRfpTestContext() {
 
     ctx.server = await buildServer();
     await ctx.server.ready();
-  });
+  }, 30_000);
 
   afterAll(async () => {
     if (ctx.dbReachable && ctx.rfpTablesReady) {
@@ -161,6 +166,8 @@ export function makeRfpTestContext() {
       }
     }
     if (ctx.server) await ctx.server.close();
+    restoreAuth?.();
+    if (ctx.dbReachable && ctx.orgId) await dropIsolatedOrg(ctx.orgId);
     if (ctx.dbReachable) await prisma.$disconnect();
   });
 
@@ -174,13 +181,13 @@ export function makeRfpTestContext() {
     it(name, async () => {
       if (!ctx.dbReachable || !ctx.rfpTablesReady || !ctx.orgId) {
         throw new Error(
-          `[skip] ${name} — DATABASE_URL not reachable, RFP tables missing, or seed org absent`,
+          `[skip] ${name} — DATABASE_URL not reachable, RFP tables missing, or isolated org absent`,
         );
       }
       await fn();
     });
 
-  /** Create a minimal opportunity owned by the seed org. */
+  /** Create a minimal opportunity owned by the isolated org. */
   async function createOpportunity(label = 'rfp-test') {
     const opp = await prisma.opportunity.create({
       data: {
@@ -195,7 +202,7 @@ export function makeRfpTestContext() {
     return opp;
   }
 
-  /** Create a FileAttachment owned by the seed org. */
+  /** Create a FileAttachment owned by the isolated org. */
   async function createFile(opts: { contentType?: string; bytes?: number } = {}) {
     const file = await prisma.fileAttachment.create({
       data: {
@@ -284,7 +291,7 @@ export function makeRfpTestContext() {
     return { foreignOrg, foreignOpp };
   }
 
-  /** Create a proposal in the seed org, optionally already approved. */
+  /** Create a proposal in the isolated org, optionally already approved. */
   async function createProposal(
     opts: {
       humanReviewRequired?: boolean;

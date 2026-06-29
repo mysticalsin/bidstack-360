@@ -1,6 +1,7 @@
 // Cross-sell action log (A2): structured cross-country/cross-team actions on
 // shared accounts. Pre-sales owns it; assignable + status-tracked.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
@@ -12,6 +13,8 @@ import {
   CrossSellActionPatch,
 } from '@bidstack/shared';
 
+import { canReadAccount } from '../lib/account-access.js';
+import { getAccessScope, type AccessScope } from '../lib/access-scope.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { createNotification } from '../services/notification.service.js';
 
@@ -75,32 +78,82 @@ async function assertAssignee(orgId: string, assigneeId: string | null | undefin
 }
 
 export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
+  async function assertAccountVisible(
+    req: FastifyRequest,
+    accountKey: string,
+    scope?: AccessScope,
+  ): Promise<void> {
+    const access = await canReadAccount({
+      orgId: req.auth.orgId,
+      userId: req.auth.userId,
+      accountId: accountKey,
+      accountName: accountKey,
+      scope,
+      prismaClient: prisma,
+    });
+    if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+  }
+
+  async function filterVisibleRows(req: FastifyRequest, rows: DbRow[]): Promise<DbRow[]> {
+    const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+    if (scope.unrestricted) return rows;
+
+    const visible: DbRow[] = [];
+    for (const row of rows) {
+      const access = await canReadAccount({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: row.accountKey,
+        accountName: row.accountKey,
+        scope,
+        prismaClient: prisma,
+      });
+      if (access.allowed) visible.push(row);
+    }
+    return visible;
+  }
+
+  async function assertHumanWriteActor(req: FastifyRequest): Promise<void> {
+    if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
+      throw server.httpErrors.forbidden('Cross-sell action writes require a user session');
+    }
+  }
+
   server.get(
     '/cross-sell-actions',
-    { schema: { querystring: CrossSellActionFilter, response: { 200: CrossSellActionPage } } },
+    {
+      preHandler: [server.requirePermission('accounts:read')],
+      schema: { querystring: CrossSellActionFilter, response: { 200: CrossSellActionPage } },
+    },
     async (req) => {
+      const accountKey = req.query.accountKey ? normalizeName(req.query.accountKey) : null;
+      if (accountKey) await assertAccountVisible(req, accountKey);
       const rows = await prisma.crossSellAction.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
-          ...(req.query.accountKey ? { accountKey: normalizeName(req.query.accountKey) } : {}),
+          ...(accountKey ? { accountKey } : {}),
           ...(req.query.status ? { status: req.query.status } : {}),
         },
         select: ASSIGNEE_SELECT,
         orderBy: { createdAt: 'desc' },
-        take: 200,
+        take: accountKey ? 200 : 1000,
       });
-      return { items: rows.map(serialize) };
+      const visibleRows = await filterVisibleRows(req, rows);
+      return { items: visibleRows.slice(0, 200).map(serialize) };
     },
   );
 
   server.post(
     '/cross-sell-actions',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), assertHumanWriteActor],
       schema: { body: CrossSellActionCreate, response: { 201: CrossSellAction } },
     },
     async (req, reply) => {
+      await assertHumanWriteActor(req);
+      const accountKey = normalizeName(req.body.accountKey);
+      await assertAccountVisible(req, accountKey);
       try {
         await assertAssignee(req.auth.orgId, req.body.assigneeId);
       } catch {
@@ -110,7 +163,7 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
         const action = await tx.crossSellAction.create({
           data: {
             orgId: req.auth.orgId,
-            accountKey: normalizeName(req.body.accountKey),
+            accountKey,
             description: req.body.description,
             requestingUnit: req.body.requestingUnit,
             assignedUnit: req.body.assignedUnit,
@@ -154,15 +207,17 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/cross-sell-actions/:id',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), assertHumanWriteActor],
       schema: { params: IdParam, body: CrossSellActionPatch, response: { 200: CrossSellAction } },
     },
     async (req) => {
+      await assertHumanWriteActor(req);
       const existing = await prisma.crossSellAction.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, assigneeId: true },
+        select: { id: true, accountKey: true, assigneeId: true },
       });
       if (!existing) throw server.httpErrors.notFound('Cross-sell action not found');
+      await assertAccountVisible(req, existing.accountKey);
       if (req.body.assigneeId !== undefined) {
         try {
           await assertAssignee(req.auth.orgId, req.body.assigneeId);
@@ -227,15 +282,17 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/cross-sell-actions/:id',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), assertHumanWriteActor],
       schema: { params: IdParam, response: { 204: z.null() } },
     },
     async (req, reply) => {
+      await assertHumanWriteActor(req);
       const existing = await prisma.crossSellAction.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, accountKey: true },
       });
       if (!existing) throw server.httpErrors.notFound('Cross-sell action not found');
+      await assertAccountVisible(req, existing.accountKey);
       await prisma.$transaction([
         prisma.crossSellAction.updateMany({
           where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },

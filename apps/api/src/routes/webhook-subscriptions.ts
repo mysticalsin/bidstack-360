@@ -1,11 +1,17 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import type { Prisma } from '@bidstack/db';
 import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
-import { decryptSecretOrPlaintext, encryptSecret } from '@bidstack/shared/server-crypto';
+import {
+  decryptWebhookSigningSecret,
+  encryptSecret,
+  hashWebhookSigningSecret,
+} from '@bidstack/shared/server-crypto';
 import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 import {
   assertSerumConnectorAllowed,
@@ -53,6 +59,32 @@ const WebhookSubUpdate = z.object({
   active: z.boolean().optional(),
 });
 
+async function requireHumanWebhookWrite(req: FastifyRequest): Promise<void> {
+  if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
+    throw req.server.httpErrors.forbidden('Webhook subscription writes require a user session');
+  }
+}
+
+function webhookSubscriptionAuditData(args: {
+  orgId: string;
+  userId: string;
+  action:
+    | 'webhook_subscription.create'
+    | 'webhook_subscription.update'
+    | 'webhook_subscription.delete';
+  subscriptionId: string;
+  diff?: Prisma.InputJsonValue;
+}): Prisma.AuditLogCreateInput {
+  return {
+    org: { connect: { id: args.orgId } },
+    user: { connect: { id: args.userId } },
+    action: args.action,
+    targetType: 'WebhookSubscription',
+    targetId: args.subscriptionId,
+    diff: args.diff ?? {},
+  };
+}
+
 export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/webhook-subscriptions',
@@ -95,7 +127,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     '/webhook-subscriptions',
     {
       config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
         body: WebhookSubCreate,
         response: { 201: WebhookSubCreated },
@@ -108,18 +140,36 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       } catch (err) {
         throw server.httpErrors.badRequest(err instanceof Error ? err.message : 'Invalid URL');
       }
-      const secret = `whsec_${Buffer.from(crypto.randomUUID()).toString('base64url')}`;
-      const created = await prisma.webhookSubscription.create({
-        data: {
-          orgId: req.auth.orgId,
-          url: req.body.url,
-          // Store the HMAC signing secret encrypted at rest; the plaintext is
-          // returned to the caller once below (signingSecret) and never again.
-          secret: encryptSecret(secret),
-          events: req.body.events,
-          active: req.body.active,
-        },
-      });
+      const secret = `whsec_${Buffer.from(randomUUID()).toString('base64url')}`;
+      const subscriptionId = randomUUID();
+      const [created] = await prisma.$transaction([
+        prisma.webhookSubscription.create({
+          data: {
+            id: subscriptionId,
+            orgId: req.auth.orgId,
+            url: req.body.url,
+            // Store the HMAC signing secret encrypted at rest; the plaintext is
+            // returned to the caller once below (signingSecret) and never again.
+            secret: encryptSecret(secret),
+            secretHash: hashWebhookSigningSecret(secret),
+            events: req.body.events,
+            active: req.body.active,
+          },
+        }),
+        prisma.auditLog.create({
+          data: webhookSubscriptionAuditData({
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'webhook_subscription.create',
+            subscriptionId,
+            diff: {
+              active: req.body.active,
+              events: req.body.events,
+              urlHost: new URL(req.body.url).hostname,
+            },
+          }),
+        }),
+      ]);
       return reply.code(201).send({
         id: created.id,
         url: created.url,
@@ -137,7 +187,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.patch(
     '/webhook-subscriptions/:id',
     {
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: WebhookSubUpdate,
@@ -158,14 +208,30 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         }
       }
 
-      const updated = await prisma.webhookSubscription.update({
-        where: { id: existing.id },
-        data: {
-          ...(req.body.url !== undefined ? { url: req.body.url } : {}),
-          ...(req.body.events !== undefined ? { events: req.body.events } : {}),
-          ...(req.body.active !== undefined ? { active: req.body.active } : {}),
-        },
-      });
+      const [updated] = await prisma.$transaction([
+        prisma.webhookSubscription.update({
+          where: { id: existing.id },
+          data: {
+            ...(req.body.url !== undefined ? { url: req.body.url } : {}),
+            ...(req.body.events !== undefined ? { events: req.body.events } : {}),
+            ...(req.body.active !== undefined ? { active: req.body.active } : {}),
+          },
+        }),
+        prisma.auditLog.create({
+          data: webhookSubscriptionAuditData({
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'webhook_subscription.update',
+            subscriptionId: existing.id,
+            diff: {
+              changedFields: Object.keys(req.body),
+              ...(req.body.url !== undefined ? { urlHost: new URL(req.body.url).hostname } : {}),
+              ...(req.body.events !== undefined ? { events: req.body.events } : {}),
+              ...(req.body.active !== undefined ? { active: req.body.active } : {}),
+            },
+          }),
+        }),
+      ]);
       return {
         id: updated.id,
         url: updated.url,
@@ -182,7 +248,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.delete(
     '/webhook-subscriptions/:id',
     {
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.void() },
@@ -193,10 +259,20 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Subscription not found');
-      await prisma.webhookSubscription.update({
-        where: { id: existing.id },
-        data: { deletedAt: new Date() },
-      });
+      await prisma.$transaction([
+        prisma.webhookSubscription.update({
+          where: { id: existing.id },
+          data: { deletedAt: new Date() },
+        }),
+        prisma.auditLog.create({
+          data: webhookSubscriptionAuditData({
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'webhook_subscription.delete',
+            subscriptionId: existing.id,
+          }),
+        }),
+      ]);
       return reply.code(204).send();
     },
   );
@@ -271,7 +347,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     '/webhook-subscriptions/:id/test',
     {
       config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: {
@@ -302,7 +378,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       }
 
       const pingBody = JSON.stringify({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         event: 'ping',
         orgId: req.auth.orgId,
         timestamp: new Date().toISOString(),
@@ -317,11 +393,6 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         connectionTestProbe: true,
       });
 
-      const t = Math.floor(Date.now() / 1000);
-      const sig = createHmac('sha256', decryptSecretOrPlaintext(sub.secret))
-        .update(`${t}.${pingBody}`)
-        .digest('hex');
-      const signature = `t=${t},v1=${sig}`;
       const start = Date.now();
 
       let result: {
@@ -330,7 +401,26 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         durationMs: number;
         error?: string;
       };
+      let signature: string | null = null;
       try {
+        const t = Math.floor(Date.now() / 1000);
+        const signingSecret = decryptWebhookSigningSecret(sub.secret);
+        const sig = createHmac('sha256', signingSecret).update(`${t}.${pingBody}`).digest('hex');
+        signature = `t=${t},v1=${sig}`;
+      } catch {
+        result = {
+          success: false,
+          statusCode: null,
+          durationMs: Date.now() - start,
+          error:
+            'Stored webhook signing secret is unreadable; run webhook secret encryption backfill.',
+        };
+      }
+
+      try {
+        if (!signature) {
+          throw new Error(result!.error);
+        }
         // Close the DNS-rebind gap the comment below names: resolve sub.url and
         // reject if it points at an internal/metadata address before connecting.
         // The static assertSafeWebhookUrl (string) check ran at registration.

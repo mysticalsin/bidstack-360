@@ -22,6 +22,7 @@ import { redisCachePlugin } from './plugins/redis-cache.js';
 import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
+import { privacyLogHooks, privacyLogSerializers } from './lib/logger.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
 // Wave 8 — Y.js CRDT collaborative text editing
@@ -119,6 +120,8 @@ export async function buildServer(): Promise<FastifyInstance> {
         config.NODE_ENV === 'development'
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
+      serializers: privacyLogSerializers,
+      hooks: privacyLogHooks,
     },
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();

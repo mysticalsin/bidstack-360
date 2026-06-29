@@ -1,15 +1,21 @@
 // Integration tests for analytics dashboards + widgets.
-// Pattern: tasks.integration.test.ts — buildServer + inject against the
-// org_seed_mantu stub org; fixtures cleaned up in afterAll.
+// Pattern: tasks.integration.test.ts - buildServer + inject against a
+// throwaway isolated stub org; fixtures cleaned up in afterAll.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdDashboardIds: string[] = [];
 const createdReportIds: string[] = [];
 const createdWidgetIds: string[] = [];
@@ -22,9 +28,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('analytics-dashboards');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   server = await buildServer();
   await server.ready();
@@ -48,13 +54,15 @@ afterAll(async () => {
     await prisma.analyticsReport.deleteMany({ where: { id } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed org missing`);
+      throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
     }
     await fn();
   });

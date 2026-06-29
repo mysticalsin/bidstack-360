@@ -4,11 +4,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let oppId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const CODE = `WL-TEST-${Date.now()}`;
 
 beforeAll(async () => {
@@ -19,9 +25,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('win-loss');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const opp = await prisma.opportunity.create({
     data: { orgId, code: CODE, customer: 'WinLossCo', name: 'WL deal', stage: 'closed_lost' },
   });
@@ -36,15 +42,20 @@ afterAll(async () => {
     await prisma.opportunity.deleteMany({ where: { id: oppId } });
   }
   if (orgId) {
-    await prisma.auditLog.deleteMany({ where: { orgId, action: 'win_loss.record', targetId: oppId ?? undefined } });
+    await prisma.auditLog.deleteMany({
+      where: { orgId, action: 'win_loss.record', targetId: oppId ?? undefined },
+    });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
-    if (!dbReachable || !orgId || !oppId) throw new Error(`[skip] ${name} — DB/seed unavailable`);
+    if (!dbReachable || !orgId || !oppId)
+      throw new Error(`[skip] ${name} - DB/isolated org unavailable`);
     await fn();
   });
 
@@ -53,7 +64,12 @@ describe('win/loss routes', () => {
     const put = await server.inject({
       method: 'PUT',
       url: `/api/win-loss/${oppId}`,
-      payload: { outcome: 'lost', reason: 'price', competitor: 'Acme Rival', note: 'Too expensive' },
+      payload: {
+        outcome: 'lost',
+        reason: 'price',
+        competitor: 'Acme Rival',
+        note: 'Too expensive',
+      },
     });
     expect(put.statusCode).toBe(200);
     expect((put.json() as { reason: string }).reason).toBe('price');
@@ -92,7 +108,13 @@ describe('win/loss routes', () => {
       data: { name: 'WL Foreign', clerkOrg: `org_wl_${Date.now()}` },
     });
     const foreignOpp = await prisma.opportunity.create({
-      data: { orgId: foreignOrg.id, code: `WLF-${Date.now()}`, customer: 'X', name: 'Y', stage: 'closed_won' },
+      data: {
+        orgId: foreignOrg.id,
+        code: `WLF-${Date.now()}`,
+        customer: 'X',
+        name: 'Y',
+        stage: 'closed_won',
+      },
     });
     try {
       const res = await server.inject({

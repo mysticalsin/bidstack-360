@@ -1,9 +1,12 @@
 // Crew + run infrastructure routes — Wave 10.
 //
-// RBAC: admins CREATE / EDIT / DELETE crews (and their tasks); any authenticated
-// member may LIST/GET a crew and RUN it. Runs are owner-scoped on read (a member
-// sees only their own runs; admins see all) — mirrors the proposal model. Crew
-// tables are accessed via parameterized raw SQL (not in the generated client).
+// RBAC: admins CREATE / EDIT / DELETE crews (and their tasks). Running a crew —
+// run / cancel / retry — spends AI compute, so it requires the `agents:write`
+// permission and a human session (no read-scoped roles, no API keys); this
+// mirrors the AI-compute gate on POST /calls/:id/extract-insights. Any
+// authenticated member may LIST/GET a crew. Runs are owner-scoped on read (a
+// member sees only their own runs; admins see all) — mirrors the proposal model.
+// Crew tables are accessed via parameterized raw SQL (not in the generated client).
 
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -535,7 +538,11 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   app.post(
     '/crews/:id/run',
     {
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' }, permission: 'agents:write' },
+      preHandler: [
+        app.requireHumanActor('Running a crew requires a user session'),
+        app.requirePermission('agents:write'),
+      ],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: CrewRunStartBody,
@@ -589,6 +596,8 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   app.post(
     '/crew-runs/:id/cancel',
     {
+      config: { permission: 'agents:write' },
+      preHandler: app.requirePermission('agents:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: RunResponse },
@@ -632,7 +641,11 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   app.post(
     '/crew-runs/:id/retry',
     {
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' }, permission: 'agents:write' },
+      preHandler: [
+        app.requireHumanActor('Retrying a crew run requires a user session'),
+        app.requirePermission('agents:write'),
+      ],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 202: z.object({ runId: z.string().uuid(), status: z.string() }) },
