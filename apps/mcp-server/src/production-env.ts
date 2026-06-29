@@ -1,5 +1,7 @@
 type Env = Record<string, string | undefined>;
 
+const HEX_32_BYTE_KEY = /^[0-9a-fA-F]{64}$/;
+
 function trimmed(env: Env, key: string): string {
   return env[key]?.trim() ?? '';
 }
@@ -57,6 +59,17 @@ export function validateMcpProductionEnv(env: Env = process.env): string[] {
   const failClosed = trimmed(env, 'MCP_RATE_LIMIT_FAIL_CLOSED').toLowerCase();
   if (failClosed === 'false' || failClosed === '0') {
     errors.push('MCP_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
+  }
+
+  if (!HEX_32_BYTE_KEY.test(trimmed(env, 'INTEGRATION_TOKEN_KEY'))) {
+    errors.push('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
+  }
+
+  if (trimmed(env, 'PII_FIELD_ENCRYPTION').toLowerCase() !== 'true') {
+    errors.push('PII_FIELD_ENCRYPTION=true is required in production');
+  }
+  if (!HEX_32_BYTE_KEY.test(trimmed(env, 'PII_ENCRYPTION_MASTER_KEY'))) {
+    errors.push('PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production');
   }
 
   return errors;

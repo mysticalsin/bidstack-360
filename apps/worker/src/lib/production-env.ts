@@ -1,7 +1,7 @@
 type Env = Record<string, string | undefined>;
 
 const REQUIRED_PRODUCTION_KEYS = ['DATABASE_URL', 'REDIS_URL'] as const;
-const INTEGRATION_TOKEN_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
+const HEX_32_BYTE_KEY = /^[0-9a-fA-F]{64}$/;
 
 function trimmed(env: Env, key: string): string {
   return env[key]?.trim() ?? '';
@@ -19,8 +19,15 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
     }
   }
 
-  if (!INTEGRATION_TOKEN_KEY_PATTERN.test(trimmed(env, 'INTEGRATION_TOKEN_KEY'))) {
+  if (!HEX_32_BYTE_KEY.test(trimmed(env, 'INTEGRATION_TOKEN_KEY'))) {
     errors.push('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
+  }
+
+  if (trimmed(env, 'PII_FIELD_ENCRYPTION').toLowerCase() !== 'true') {
+    errors.push('PII_FIELD_ENCRYPTION=true is required in production');
+  }
+  if (!HEX_32_BYTE_KEY.test(trimmed(env, 'PII_ENCRYPTION_MASTER_KEY'))) {
+    errors.push('PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production');
   }
 
   // HMAC secret for Apollo enrichment jobs. Without it the worker's

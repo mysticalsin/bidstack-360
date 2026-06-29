@@ -27,7 +27,7 @@ vi.mock('@bidstack/db', () => ({
 }));
 
 vi.mock('@bidstack/shared/server-crypto', () => ({
-  decryptSecretOrPlaintext: mocks.decrypt,
+  decryptWebhookSigningSecret: mocks.decrypt,
 }));
 
 // createResearchFetch is called at module load (`const safeFetch = ...`), so the
@@ -159,6 +159,37 @@ describe('processDeliveryJob — SSRF guard', () => {
           statusCode: null,
           errorMessage: expect.stringContaining('Unsafe webhook URL'),
         }),
+      }),
+    );
+  });
+});
+
+describe('processDeliveryJob - signing-secret safety', () => {
+  // WHY: legacy webhook rows must be backfilled instead of silently signing
+  // partner traffic with arbitrary plaintext after an unreadable/corrupt secret.
+  it('records a failed delivery when the stored signing secret is unreadable', async () => {
+    mocks.decrypt.mockImplementation(() => {
+      throw new Error('bad secret');
+    });
+
+    await expect(processDeliveryJob(jobOf(), log)).rejects.toThrow(
+      'Stored webhook signing secret is unreadable',
+    );
+
+    expect(mocks.safeFetch).not.toHaveBeenCalled();
+    expect(mocks.deliveryCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          success: false,
+          statusCode: null,
+          errorMessage: expect.stringContaining('Stored webhook signing secret is unreadable'),
+        }),
+      }),
+    );
+    expect(mocks.subUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: SUBSCRIPTION_ID },
+        data: expect.objectContaining({ failureCount: { increment: 1 } }),
       }),
     );
   });

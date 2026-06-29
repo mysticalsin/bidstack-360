@@ -7,6 +7,8 @@ const validProductionEnv = {
   DATABASE_URL: 'postgresql://bidstack:test@postgres:5432/bidstack',
   REDIS_URL: 'redis://:test@redis:6379',
   INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+  PII_FIELD_ENCRYPTION: 'true',
+  PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
   STORAGE_DRIVER: 's3',
   S3_BUCKET: 'bidstack-prod-files',
   S3_REGION: 'us-east-1',
@@ -23,6 +25,8 @@ describe('worker production env contract', () => {
       'DATABASE_URL is required in production',
       'REDIS_URL is required in production',
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production',
+      'PII_FIELD_ENCRYPTION=true is required in production',
+      'PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production',
       'BIDSTACK_JOB_SIGNING_SECRET is required in production',
       'STORAGE_DRIVER=s3 is required in production',
     ]);
@@ -42,6 +46,22 @@ describe('worker production env contract', () => {
         INTEGRATION_TOKEN_KEY: 'z'.repeat(64),
       }),
     ).toContain('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
+  });
+
+  it('requires PII encryption and a valid PII master key in production', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        PII_FIELD_ENCRYPTION: 'false',
+      }),
+    ).toContain('PII_FIELD_ENCRYPTION=true is required in production');
+
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        PII_ENCRYPTION_MASTER_KEY: 'z'.repeat(64),
+      }),
+    ).toContain('PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production');
   });
 
   it('requires durable S3 storage for non-demo production workers', () => {

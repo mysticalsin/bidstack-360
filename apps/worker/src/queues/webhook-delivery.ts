@@ -29,7 +29,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { WEBHOOK_DELIVERY, assertSafeWebhookUrl } from '@bidstack/shared';
-import { decryptSecretOrPlaintext } from '@bidstack/shared/server-crypto';
+import { decryptWebhookSigningSecret } from '@bidstack/shared/server-crypto';
 
 import { createResearchFetch } from '../lib/safe-research-fetch.js';
 import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
@@ -232,12 +232,17 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     return;
   }
 
-  const result = await deliver(
-    sub.url,
-    decryptSecretOrPlaintext(sub.secret),
-    body,
-    stableTSeconds,
-  );
+  let result: Awaited<ReturnType<typeof deliver>>;
+  try {
+    result = await deliver(sub.url, decryptWebhookSigningSecret(sub.secret), body, stableTSeconds);
+  } catch {
+    result = {
+      statusCode: null,
+      durationMs: 0,
+      success: false,
+      error: 'Stored webhook signing secret is unreadable; run webhook secret encryption backfill.',
+    };
+  }
 
   log.info(
     {
