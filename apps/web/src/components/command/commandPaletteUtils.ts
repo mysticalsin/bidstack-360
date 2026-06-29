@@ -68,7 +68,7 @@ export const NAV_TARGETS: NavTarget[] = [
   { to: '/calendar', label: 'Go to Calendar', hint: '' },
   { to: '/calls', label: 'Go to Calls', hint: '' },
   { to: '/workflows', label: 'Go to Workflows', hint: '' },
-  { to: '/custom-objects', label: 'Go to Custom Objects', hint: '' },
+  { to: '/settings/custom-objects', label: 'Go to Custom Objects', hint: '' },
   { to: '/quick-start', label: 'Go to Quick Start', hint: '' },
   { to: '/reports/list', label: 'Go to Reports', hint: 'g r' },
   { to: '/reports/new', label: 'New report', hint: '' },

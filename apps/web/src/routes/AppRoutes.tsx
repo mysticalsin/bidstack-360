@@ -417,13 +417,13 @@ export function AppRoutes() {
           />
 
           {/* ── Custom Objects ───────────────────────────────────────────── */}
+          {/* /custom-objects has no :objectKey, so CustomObjectListPage (a
+              per-object record list keyed off /o/:objectKey) renders its
+              "Custom object '' not found" 404. The object-definition admin lives
+              under /settings/custom-objects — send the bare path there. */}
           <Route
             path="/custom-objects"
-            element={
-              <RequireAuth>
-                <CustomObjectListPage />
-              </RequireAuth>
-            }
+            element={<Navigate to="/settings/custom-objects" replace />}
           />
           <Route
             path="/custom-objects/new"

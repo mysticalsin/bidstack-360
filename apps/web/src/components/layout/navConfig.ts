@@ -122,7 +122,12 @@ export const NAV_SECTIONS: NavSection[] = [
       // /calls route stays (global list, reachable via the command palette) but
       // is no longer a separate rail door.
       { to: '/workflows', label: 'Workflows', labelKey: 'nav.workflows', icon: 'git-branch' },
-      { to: '/custom-objects', label: 'Custom Objects', labelKey: 'nav.customObjects', icon: 'sliders' },
+      {
+        to: '/settings/custom-objects',
+        label: 'Custom Objects',
+        labelKey: 'nav.customObjects',
+        icon: 'sliders',
+      },
       { to: '/intake', label: 'Document Intake', labelKey: 'nav.intake', icon: 'download' },
       // Reports + dashboards live under one Insights surface (Analytics): the
       // page hosts the dashboard switcher, "Manage dashboards", and links to
