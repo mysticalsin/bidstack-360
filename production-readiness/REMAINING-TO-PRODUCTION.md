@@ -103,7 +103,7 @@ the Azure bicep is a never-run draft.
 - [ ] **E4 · `.env.example` completeness** — document `OPENAPI_DOCS_ENABLED`, `RATE_LIMIT_REDIS_REQUIRED`,
       `QUERY_GUARD_REJECT`, `BIDSTACK_TENANT_SCOPE_GUARD`, `BACKUP_S3_BUCKET`, `BACKUP_ENCRYPT_KEY`.
       (Coordinate — `.env.example` is being edited concurrently.) **ENG.**
-- [ ] **E5 · `merge:rollback`** package.json script points to a non-existent file — fix or remove. **ENG.**
+- [x] **E5 · dead `merge:*` scripts** removed (`scripts/merge/` no longer exists) — ✅ done `3a79c751`.
 - [ ] **E6 · Provider-call timeouts** — add `AbortController`/timeouts to inline Gmail/Graph/Twilio/Slack/OAuth
       fetches (bounded only by undici's 300s today). **ENG.**
 - [ ] **E7 · Email/SMS volume + cost caps** on `/email/send` + `/sms/send`. **ENG.**
