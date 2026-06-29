@@ -5,11 +5,11 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { CrossSellStatusControls } from '@/components/account-intel/CrossSellStatusControls';
 import { SourceBadge } from '@/components/cockpit/SourceBadge';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useUsers } from '@/hooks/useUsers';
@@ -20,20 +20,10 @@ import {
 } from '@/hooks/useCrossSell';
 import type { CrossSellAction, GovernanceStatus } from '@bidstack/shared';
 
-const STATUS_TONE: Record<GovernanceStatus, 'gray' | 'amber' | 'jade'> = {
-  open: 'gray',
-  in_progress: 'amber',
-  done: 'jade',
-};
 const STATUS_LABEL: Record<GovernanceStatus, string> = {
   open: 'Open',
   in_progress: 'In progress',
   done: 'Done',
-};
-const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
-  open: 'in_progress',
-  in_progress: 'done',
-  done: 'done',
 };
 
 function dateOnly(value: string | null): string | null {
@@ -124,12 +114,13 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                     </p>
                     <ActionAuditBadges action={action} />
                   </div>
-                  <button
-                    type="button"
-                    disabled={!canWrite || action.status === 'done' || patch.isPending}
-                    onClick={() => {
-                      if (action.status === 'done') return;
-                      const next = NEXT_STATUS[action.status];
+                  <CrossSellStatusControls
+                    action={action}
+                    canWrite={canWrite}
+                    isBusy={patch.isPending}
+                    align="end"
+                    className="shrink-0"
+                    onStatusChange={(next) => {
                       patch.mutate(
                         { id: action.id, body: { status: next } },
                         {
@@ -147,21 +138,7 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                         },
                       );
                     }}
-                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
-                    aria-label={t('crossSell.advanceStatusLabel', 'Advance status of {{description}}', {
-                      description: action.description,
-                    })}
-                    title={
-                      action.status === 'done'
-                        ? t('crossSell.doneStatusHint', 'Completed actions stay closed')
-                        : canWrite
-                          ? t('crossSell.advanceStatusHint', 'Click to advance status')
-                          : undefined
-                    }
-                    data-testid={`cross-sell-${action.id}-status`}
-                  >
-                    <Badge tone={STATUS_TONE[action.status]}>{statusLabel(action.status)}</Badge>
-                  </button>
+                  />
                 </div>
               </li>
             ))}
@@ -191,7 +168,10 @@ function CreateAction({ accountKey }: { accountKey: string }) {
     event.preventDefault();
     if (!form.description.trim() || !form.requestingUnit.trim() || !form.assignedUnit.trim()) {
       toast.error(t('crossSell.toast.missingFieldsTitle', 'Missing fields'), {
-        description: t('crossSell.toast.missingFieldsBody', 'Description and both units are required.'),
+        description: t(
+          'crossSell.toast.missingFieldsBody',
+          'Description and both units are required.',
+        ),
       });
       return;
     }
@@ -209,10 +189,18 @@ function CreateAction({ accountKey }: { accountKey: string }) {
         onSuccess: () => {
           toast.success(t('crossSell.toast.logged', 'Cross-sell action logged'));
           setOpen(false);
-          setForm({ description: '', requestingUnit: '', assignedUnit: '', assigneeId: '', dueDate: '' });
+          setForm({
+            description: '',
+            requestingUnit: '',
+            assignedUnit: '',
+            assigneeId: '',
+            dueDate: '',
+          });
         },
         onError: (err: Error) =>
-          toast.error(t('crossSell.toast.saveError', 'Could not save'), { description: err.message }),
+          toast.error(t('crossSell.toast.saveError', 'Could not save'), {
+            description: err.message,
+          }),
       },
     );
   };
@@ -273,7 +261,9 @@ function CreateAction({ accountKey }: { accountKey: string }) {
       </div>
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? t('crossSell.form.saving', 'Saving…') : t('crossSell.form.save', 'Save')}
+          {create.isPending
+            ? t('crossSell.form.saving', 'Saving…')
+            : t('crossSell.form.save', 'Save')}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
           {t('crossSell.form.cancel', 'Cancel')}

@@ -84,11 +84,12 @@ export function ForecastsPage() {
         toast.success(t('forecasts.toastUpdated', 'Forecast updated'));
       } catch (err) {
         toast.error(t('forecasts.toastUpdateFailed', 'Failed to update forecast'), {
-          description: err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
+          description:
+            err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
         });
       }
     },
-    [createForecast],
+    [createForecast, t],
   );
 
   const handleDeleteRow = useCallback(
@@ -112,12 +113,13 @@ export function ForecastsPage() {
           toast.success(t('forecasts.toastDeleted', 'Forecasts deleted'));
         } catch (err) {
           toast.error(t('forecasts.toastDeleteFailed', 'Failed to delete forecasts'), {
-            description: err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
+            description:
+              err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
           });
         }
       }
     },
-    [deleteForecast],
+    [deleteForecast, t],
   );
 
   return (
@@ -172,7 +174,10 @@ export function ForecastsPage() {
                 setDialogOpen(false);
               } catch (err) {
                 toast.error(t('forecasts.toastCreateFailed', 'Failed to create forecast'), {
-                  description: err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
+                  description:
+                    err instanceof Error
+                      ? err.message
+                      : t('forecasts.unknownError', 'Unknown error'),
                 });
               }
             }}
@@ -204,7 +209,9 @@ export function ForecastsPage() {
         <Tabs value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
           <TabsList aria-label={t('forecasts.periodFilterLabel', 'Period filter')}>
             <TabsTrigger value="monthly">{t('forecasts.periodMonthly', 'Monthly')}</TabsTrigger>
-            <TabsTrigger value="quarterly">{t('forecasts.periodQuarterly', 'Quarterly')}</TabsTrigger>
+            <TabsTrigger value="quarterly">
+              {t('forecasts.periodQuarterly', 'Quarterly')}
+            </TabsTrigger>
             <TabsTrigger value="yearly">{t('forecasts.periodYearly', 'Yearly')}</TabsTrigger>
           </TabsList>
         </Tabs>

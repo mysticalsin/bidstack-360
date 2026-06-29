@@ -24,9 +24,9 @@ export class PublicBookingPage {
     this.heading = page.getByRole('heading', { level: 1 });
     this.calendarGrid = page.getByRole('grid').or(page.locator('[data-testid="booking-calendar"]'));
     this.dateButtons = page.locator('[data-testid="booking-calendar"] button');
-    this.timeSlots = page.locator(
-      '[data-testid="time-slot"], button[aria-label*="slot"], button[aria-label*="available"]',
-    );
+    this.timeSlots = page
+      .getByRole('button', { name: /available slot/i })
+      .or(page.locator('[data-testid="time-slot"]'));
     this.nameInput = page.getByRole('textbox', { name: /name/i });
     this.emailInput = page.getByRole('textbox', { name: /email/i });
     this.confirmButton = page.getByRole('button', { name: /confirm|book|schedule/i });
@@ -66,7 +66,11 @@ export class PublicBookingPage {
       }
 
       const firstSlot = this.timeSlots.first();
-      if (await firstSlot.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      const hasSlot = await firstSlot
+        .waitFor({ state: 'visible', timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (hasSlot) {
         await firstSlot.click();
         return true;
       }

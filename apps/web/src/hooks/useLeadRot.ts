@@ -10,10 +10,11 @@ import type {
 
 const KEY = 'lead-rot-config';
 
-export function useLeadRotConfig() {
+export function useLeadRotConfig(options: { enabled?: boolean } = {}) {
   return useQuery<LeadStageRotConfigList>({
     queryKey: [KEY],
     queryFn: ({ signal }) => api<LeadStageRotConfigList>('/api/lead-rot/config', { signal }),
+    enabled: options.enabled ?? true,
   });
 }
 

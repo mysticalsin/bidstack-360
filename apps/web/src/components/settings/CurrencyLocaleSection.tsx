@@ -1,38 +1,72 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { toast } from '@/components/ui/Toast';
+import { useOrgLocaleSettings, useUpdateOrgLocaleSettings } from '@/hooks/useOrgLocaleSettings';
+import { useIsAdmin } from '@/lib/auth';
+import {
+  ORG_LOCALE_CURRENCIES,
+  ORG_LOCALE_DATE_FORMATS,
+  ORG_LOCALE_TIMEZONES,
+  type OrgLocaleSettings,
+} from '@bidstack/shared';
 
-const STORAGE_KEY = 'bidstack:currency-locale';
-
-interface CurrencyLocale {
-  currency: string;
-  dateFormat: string;
-  timezone: string;
-}
-
-function load(): CurrencyLocale {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return { currency: 'CAD', dateFormat: 'YYYY-MM-DD', timezone: 'America/Toronto' };
-}
+const CURRENCY_LABELS: Record<OrgLocaleSettings['currency'], string> = {
+  CAD: 'CAD - Canadian Dollar',
+  USD: 'USD - US Dollar',
+  EUR: 'EUR - Euro',
+  GBP: 'GBP - British Pound',
+  AUD: 'AUD - Australian Dollar',
+  JPY: 'JPY - Japanese Yen',
+};
 
 export function CurrencyLocaleSection() {
   const { t } = useTranslation('settings');
-  const [values, setValues] = useState(load);
+  const locale = useOrgLocaleSettings();
 
-  const update = (patch: Partial<CurrencyLocale>) => {
-    const next = { ...values, ...patch };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* quota / private mode — silent */
-    }
-    setValues(next);
+  if (locale.isLoading) return <LoadingSkeleton rows={3} />;
+  if (locale.isError || !locale.data) {
+    return (
+      <ErrorState
+        title={t('currencyLocale.loadErrorTitle', 'Could not load currency and locale')}
+        message={
+          locale.error?.message ?? t('currencyLocale.loadErrorMessage', 'Try again shortly.')
+        }
+      />
+    );
+  }
+
+  return <CurrencyLocaleForm key={JSON.stringify(locale.data)} initial={locale.data} />;
+}
+
+function CurrencyLocaleForm({ initial }: { initial: OrgLocaleSettings }) {
+  const { t } = useTranslation('settings');
+  const isAdmin = useIsAdmin();
+  const update = useUpdateOrgLocaleSettings();
+  const [values, setValues] = useState(initial);
+  const changed =
+    values.currency !== initial.currency ||
+    values.dateFormat !== initial.dateFormat ||
+    values.timezone !== initial.timezone;
+
+  const patch = (next: Partial<OrgLocaleSettings>) => {
+    setValues((current) => ({ ...current, ...next }));
   };
+
+  const onSave = () => {
+    update.mutate(values, {
+      onSuccess: () => toast.success(t('currencyLocale.saveSuccess', 'Currency and locale saved')),
+      onError: (err: Error) =>
+        toast.error(t('currencyLocale.saveError', 'Could not save currency and locale'), {
+          description: err.message,
+        }),
+    });
+  };
+
+  const disabled = !isAdmin || update.isPending;
 
   return (
     <Card>
@@ -43,60 +77,95 @@ export function CurrencyLocaleSection() {
           'Default currency, date format, and timezone for your workspace.',
         )}
       />
-      <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3">
         <div>
-          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+          <label
+            htmlFor="org-default-currency"
+            className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+          >
             {t('currencyLocale.currencyLabel', 'Default currency')}
           </label>
           <select
+            id="org-default-currency"
             className="input w-full"
+            disabled={disabled}
             value={values.currency}
-            onChange={(e) => update({ currency: e.target.value })}
+            onChange={(e) => patch({ currency: e.target.value as OrgLocaleSettings['currency'] })}
           >
-            <option value="CAD">{t('currencyLocale.currency.cad', 'CAD — Canadian Dollar')}</option>
-            <option value="USD">{t('currencyLocale.currency.usd', 'USD — US Dollar')}</option>
-            <option value="EUR">{t('currencyLocale.currency.eur', 'EUR — Euro')}</option>
-            <option value="GBP">{t('currencyLocale.currency.gbp', 'GBP — British Pound')}</option>
-            <option value="AUD">{t('currencyLocale.currency.aud', 'AUD — Australian Dollar')}</option>
-            <option value="JPY">{t('currencyLocale.currency.jpy', 'JPY — Japanese Yen')}</option>
+            {ORG_LOCALE_CURRENCIES.map((currency) => (
+              <option key={currency} value={currency}>
+                {t(`currencyLocale.currency.${currency.toLowerCase()}`, CURRENCY_LABELS[currency])}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+          <label
+            htmlFor="org-date-format"
+            className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+          >
             {t('currencyLocale.dateFormatLabel', 'Date format')}
           </label>
           <select
+            id="org-date-format"
             className="input w-full"
+            disabled={disabled}
             value={values.dateFormat}
-            onChange={(e) => update({ dateFormat: e.target.value })}
+            onChange={(e) =>
+              patch({ dateFormat: e.target.value as OrgLocaleSettings['dateFormat'] })
+            }
           >
-            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-            <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-            <option value="DD.MM.YYYY">DD.MM.YYYY</option>
+            {ORG_LOCALE_DATE_FORMATS.map((format) => (
+              <option key={format} value={format}>
+                {format}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+          <label
+            htmlFor="org-timezone"
+            className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+          >
             {t('currencyLocale.timezoneLabel', 'Timezone')}
           </label>
           <select
+            id="org-timezone"
             className="input w-full"
+            disabled={disabled}
             value={values.timezone}
-            onChange={(e) => update({ timezone: e.target.value })}
+            onChange={(e) => patch({ timezone: e.target.value as OrgLocaleSettings['timezone'] })}
           >
-            <option value="America/Toronto">America/Toronto</option>
-            <option value="America/New_York">America/New_York</option>
-            <option value="America/Chicago">America/Chicago</option>
-            <option value="America/Denver">America/Denver</option>
-            <option value="America/Los_Angeles">America/Los_Angeles</option>
-            <option value="Europe/London">Europe/London</option>
-            <option value="Europe/Paris">Europe/Paris</option>
-            <option value="Asia/Tokyo">Asia/Tokyo</option>
-            <option value="Australia/Sydney">Australia/Sydney</option>
-            <option value="UTC">UTC</option>
+            {ORG_LOCALE_TIMEZONES.map((timezone) => (
+              <option key={timezone} value={timezone}>
+                {timezone}
+              </option>
+            ))}
           </select>
         </div>
+      </div>
+      <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-[var(--fg-tertiary)]">
+          {isAdmin
+            ? t(
+                'currencyLocale.persistedHint',
+                'Saved defaults apply to everyone in this workspace.',
+              )
+            : t(
+                'currencyLocale.readOnlyHint',
+                'Workspace defaults are read-only unless you are an admin.',
+              )}
+        </p>
+        <Button
+          variant="primary"
+          onClick={onSave}
+          disabled={disabled || !changed}
+          aria-label={t('currencyLocale.saveButton', 'Save currency and locale')}
+        >
+          {update.isPending
+            ? t('currencyLocale.savingButton', 'Saving...')
+            : t('currencyLocale.saveButton', 'Save currency and locale')}
+        </Button>
       </div>
     </Card>
   );

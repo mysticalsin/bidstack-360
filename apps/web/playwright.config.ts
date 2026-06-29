@@ -16,7 +16,8 @@ const e2eRedisUrl = process.env.E2E_REDIS_URL ?? process.env.REDIS_URL;
 if (e2eRedisUrl) process.env.REDIS_URL = e2eRedisUrl;
 process.env.E2E_DOCUMENT_WORKER_HEALTH_URL = `http://127.0.0.1:${DOCUMENT_WORKER_PORT}/health`;
 const documentWorkerOcrEnabled =
-  process.env.BIDSTACK_OCR_ENABLED ?? (process.env.E2E_DOCUMENT_WORKER_OCR === '1' ? 'true' : 'false');
+  process.env.BIDSTACK_OCR_ENABLED ??
+  (process.env.E2E_DOCUMENT_WORKER_OCR === '1' ? 'true' : 'false');
 process.env.BIDSTACK_OCR_ENABLED = documentWorkerOcrEnabled;
 const reuseExistingServer = process.env.E2E_REUSE_SERVER === '1' && !process.env.CI;
 const startManagedDocumentWorker =
@@ -29,7 +30,9 @@ const webEnv = [
   process.env.VITE_CLERK_PUBLISHABLE_KEY
     ? `VITE_CLERK_PUBLISHABLE_KEY=${process.env.VITE_CLERK_PUBLISHABLE_KEY}`
     : null,
-].filter(Boolean).join(' ');
+]
+  .filter(Boolean)
+  .join(' ');
 const apiEnv = [
   `PORT_API=${API_PORT}`,
   `PUBLIC_BASE_URL=${baseURL}`,
@@ -38,7 +41,9 @@ const apiEnv = [
   'API_RATE_LIMIT_MAX=5000',
   'PUBLIC_BOOKING_RATE_LIMIT_MAX=5000',
   e2eRedisUrl ? `REDIS_URL=${e2eRedisUrl}` : null,
-].filter(Boolean).join(' ');
+]
+  .filter(Boolean)
+  .join(' ');
 const documentWorkerEnv = [
   `DOCUMENT_EXTRACT_WORKER_HEALTH_PORT=${DOCUMENT_WORKER_PORT}`,
   `REDIS_URL=${e2eRedisUrl ?? 'redis://localhost:6380'}`,
@@ -49,8 +54,7 @@ const documentWorkerEnv = [
   `BIDSTACK_OCR_TIMEOUT_MS=${process.env.BIDSTACK_OCR_TIMEOUT_MS ?? '120000'}`,
 ].join(' ');
 const workerCount = Number(process.env.E2E_WORKERS ?? 1);
-const useStubAuthStorage =
-  authMode === 'stub' && !process.env.VITE_CLERK_PUBLISHABLE_KEY;
+const useStubAuthStorage = authMode === 'stub' && !process.env.VITE_CLERK_PUBLISHABLE_KEY;
 const crossBrowserTestMatch = [
   '**/smoke.spec.ts',
   '**/navigation.spec.ts',
@@ -84,7 +88,7 @@ const servers = process.env.E2E_BASE_URL
   : [
       // 1. Boot the API first so the web preview can hit endpoints immediately.
       {
-        command: `pnpm exec cross-env ${apiEnv} pnpm --filter @bidstack/api exec tsx src/main.ts`,
+        command: `corepack pnpm exec cross-env ${apiEnv} corepack pnpm --filter @bidstack/api exec tsx src/main.ts`,
         url: `${API_URL}/health`,
         reuseExistingServer,
         timeout: 120_000,
@@ -94,7 +98,7 @@ const servers = process.env.E2E_BASE_URL
       ...(startManagedDocumentWorker
         ? [
             {
-              command: `pnpm exec cross-env ${documentWorkerEnv} pnpm --filter @bidstack/worker exec tsx src/e2e/document-extract-worker.ts`,
+              command: `corepack pnpm exec cross-env ${documentWorkerEnv} corepack pnpm --filter @bidstack/worker exec tsx src/e2e/document-extract-worker.ts`,
               url: process.env.E2E_DOCUMENT_WORKER_HEALTH_URL,
               reuseExistingServer: false,
               timeout: 120_000,
@@ -106,10 +110,10 @@ const servers = process.env.E2E_BASE_URL
       // 2. Boot the web production preview.
       {
         command: [
-          'pnpm --filter @bidstack/shared build',
-          `pnpm exec cross-env NODE_ENV=production ${webEnv} pnpm --filter @bidstack/web exec tsc -b`,
-          `pnpm exec cross-env NODE_ENV=production ${webEnv} pnpm --filter @bidstack/web exec vite build`,
-          `pnpm exec cross-env ${webEnv} pnpm --filter @bidstack/web exec vite preview --host 127.0.0.1 --port ${PORT}`,
+          'corepack pnpm --filter @bidstack/shared build',
+          `corepack pnpm exec cross-env NODE_ENV=production ${webEnv} corepack pnpm --filter @bidstack/web exec tsc -b`,
+          `corepack pnpm exec cross-env NODE_ENV=production ${webEnv} corepack pnpm --filter @bidstack/web exec vite build`,
+          `corepack pnpm exec cross-env ${webEnv} corepack pnpm --filter @bidstack/web exec vite preview --host 127.0.0.1 --port ${PORT}`,
         ].join(' && '),
         url: baseURL,
         reuseExistingServer,

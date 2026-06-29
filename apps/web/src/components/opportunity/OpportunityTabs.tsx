@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
@@ -5,7 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { SendForSignatureModal } from '@/components/signatures/SendForSignatureModal';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalls } from '@/hooks/useCalls';
 import { api } from '@/lib/api';
@@ -209,9 +212,13 @@ function DecisionUnitPanel({
               </Badge>
               <div
                 className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]"
-                aria-label={t('opportunityTabs.influenceAriaLabel', 'Influence {{value}} out of 5', {
-                  value: r.influence,
-                })}
+                aria-label={t(
+                  'opportunityTabs.influenceAriaLabel',
+                  'Influence {{value}} out of 5',
+                  {
+                    value: r.influence,
+                  },
+                )}
               >
                 {r.influence}/5
               </div>
@@ -358,38 +365,64 @@ function DocumentsPanel({
   documents: NonNullable<OpportunityTabsProps['documents']>;
 }) {
   const { t } = useTranslation('crm');
+  const [sendOpen, setSendOpen] = useState(false);
+  const primaryDocumentId = documents[0]?.id;
+  const sendAction = (
+    <Button variant="secondary" size="sm" onClick={() => setSendOpen(true)}>
+      <Icon name="mail" size={13} />
+      {t('opportunityTabs.sendForSignatureButton', 'Send for Signature')}
+    </Button>
+  );
+
   if (documents.length === 0)
     return (
-      <EmptyState
-        title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
-        message={t('opportunityTabs.documentsEmptyMessage', 'Upload an RFP, SoW, or proposal draft.')}
-      />
+      <>
+        <EmptyState
+          title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
+          message={t(
+            'opportunityTabs.documentsEmptyMessage',
+            'Upload an RFP, SoW, or proposal draft.',
+          )}
+          action={sendAction}
+        />
+        <SendForSignatureModal open={sendOpen} onOpenChange={setSendOpen} />
+      </>
     );
   return (
-    <Card>
-      <SectionHeader
-        title={t('opportunityTabs.documentsTitle', 'Documents')}
-        caption={t('opportunityTabs.documentsCount', '{{count}} files', {
-          count: documents.length,
-        })}
-      />
-      <ul className="divide-y divide-[var(--border-subtle)]">
-        {documents.map((d) => (
-          <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-[var(--fg-primary)] truncate">{d.name}</div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                {d.kind} ·{' '}
-                {d.bytes
-                  ? `${(d.bytes / 1024).toFixed(1)} KB`
-                  : t('opportunityTabs.documentUnknownSize', 'unknown size')}
+    <>
+      <Card>
+        <SectionHeader
+          title={t('opportunityTabs.documentsTitle', 'Documents')}
+          caption={t('opportunityTabs.documentsCount', '{{count}} files', {
+            count: documents.length,
+          })}
+          action={sendAction}
+        />
+        <ul className="divide-y divide-[var(--border-subtle)]">
+          {documents.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
+                  {d.name}
+                </div>
+                <div className="text-xs text-[var(--fg-tertiary)]">
+                  {d.kind} ·{' '}
+                  {d.bytes
+                    ? `${(d.bytes / 1024).toFixed(1)} KB`
+                    : t('opportunityTabs.documentUnknownSize', 'unknown size')}
+                </div>
               </div>
-            </div>
-            <Badge tone="gray">{d.kind}</Badge>
-          </li>
-        ))}
-      </ul>
-    </Card>
+              <Badge tone="gray">{d.kind}</Badge>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <SendForSignatureModal
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        documentId={primaryDocumentId}
+      />
+    </>
   );
 }
 

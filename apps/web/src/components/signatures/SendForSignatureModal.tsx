@@ -87,7 +87,8 @@ export function SendForSignatureModal({
   documentId,
 }: SendForSignatureModalProps) {
   const { t } = useTranslation('signatures');
-  const [step, setStep] = useState(0);
+  const initialStep = documentId ? 1 : 0;
+  const [step, setStep] = useState(initialStep);
   const [templateId, setTemplateId] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [recipients, setRecipients] = useState<Recipient[]>([
@@ -121,7 +122,7 @@ export function SendForSignatureModal({
   };
 
   const reset = () => {
-    setStep(0);
+    setStep(initialStep);
     setTemplateId('');
     setVariables({});
     setRecipients([{ email: '', name: '', role: 'SIGNER' }]);
@@ -191,7 +192,7 @@ export function SendForSignatureModal({
               <RecipientsStep
                 recipients={recipients}
                 onChangeRecipients={setRecipients}
-                onBack={() => setStep(0)}
+                onBack={documentId ? undefined : () => setStep(0)}
                 onNext={() => setStep(2)}
               />
             )}

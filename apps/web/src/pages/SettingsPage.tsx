@@ -138,7 +138,7 @@ export function SettingsPage() {
         </p>
       </header>
 
-      <SettingsLayout active={activeTab} onChange={setActive}>
+      <SettingsLayout active={activeTab}>
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
             {t(`settings.${SECTION_TITLES[activeTab][0]}`, SECTION_TITLES[activeTab][1])}

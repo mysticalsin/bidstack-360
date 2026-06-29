@@ -19,10 +19,11 @@ export interface PipelineStageSettingsList {
   items: PipelineStageSettings[];
 }
 
-export function usePipelineStages() {
+export function usePipelineStages(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['pipeline-stages', 'default'],
     queryFn: ({ signal }) => api<PipelineStageSettingsList>('/api/v1/pipeline-stages', { signal }),
+    enabled: options.enabled ?? true,
   });
 }
 

@@ -52,7 +52,9 @@ export function InsightsBar({
     insights.push({
       tone: 'amber',
       icon: 'pause-circle',
-      message: t('insightsBar.stalledOpps', '{{count}} opportunities stalled', { count: stalledOpps }),
+      message: t('insightsBar.stalledOpps', '{{count}} opportunities stalled', {
+        count: stalledOpps,
+      }),
       href: '/opportunities',
     });
   }

@@ -13,8 +13,19 @@ import { Icon } from '@/components/ui/Icon';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useKamAccounts } from '@/hooks/useKamAccounts';
 
-import { KamAccountHero, KamAccountSwitcher, KamDesignateDialog, KamZeroState } from './kamAccountControls';
-import { KamDraftReview, KamInitiativeBoard, KamKpiStrip, KamTodoCard } from './kamPanels';
+import {
+  KamAccountHero,
+  KamAccountSwitcher,
+  KamDesignateDialog,
+  KamZeroState,
+} from './kamAccountControls';
+import {
+  KamDraftReview,
+  KamHandoffCard,
+  KamInitiativeBoard,
+  KamKpiStrip,
+  KamTodoCard,
+} from './kamPanels';
 
 export default function KamAccountPage() {
   const { data, isLoading } = useKamAccounts();
@@ -56,6 +67,7 @@ export default function KamAccountPage() {
             </div>
             <div className="space-y-4">
               <KamDraftReview companyId={active.id} />
+              <KamHandoffCard companyId={active.id} />
               <KamTodoCard companyId={active.id} />
             </div>
           </div>
@@ -70,7 +82,11 @@ export default function KamAccountPage() {
         onSelect={setCompanyId}
         onDesignate={() => setDesignateOpen(true)}
       />
-      <KamDesignateDialog open={designateOpen} onOpenChange={setDesignateOpen} onDesignated={(id) => setCompanyId(id)} />
+      <KamDesignateDialog
+        open={designateOpen}
+        onOpenChange={setDesignateOpen}
+        onDesignated={(id) => setCompanyId(id)}
+      />
     </div>
   );
 }

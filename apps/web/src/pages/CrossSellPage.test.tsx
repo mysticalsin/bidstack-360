@@ -105,28 +105,41 @@ describe('CrossSellPage', () => {
     expect(screen.getByTestId('cross-sell-overdue-count').textContent).toBe('1');
     expect(screen.getByTestId('cross-sell-unassigned-count').textContent).toBe('1');
     expect(screen.getByTestId('cross-sell-next-due').textContent).toBe('2020-01-01');
+    expect(screen.getByText('Needs owner')).toBeTruthy();
+    expect(screen.getByText('Ready to start')).toBeTruthy();
+    expect(screen.getByText('In motion')).toBeTruthy();
     expect(screen.getByText('Overdue 2020-01-01')).toBeTruthy();
     expect(screen.getByText('Ari Owner')).toBeTruthy();
   });
 
-  it('advances active actions but keeps completed actions closed', () => {
+  it('uses explicit commands to start, complete, and reopen actions', () => {
     hookMocks.actions = [
       action({ id: '11111111-1111-4111-8111-111111111111', status: 'open' }),
+      action({ id: '22222222-2222-4222-8222-222222222222', status: 'in_progress' }),
       action({ id: '44444444-4444-4444-8444-444444444444', status: 'done' }),
     ];
 
     renderPage();
 
+    expect(screen.getByText('Start')).toBeTruthy();
+    expect(screen.getByText('Mark done')).toBeTruthy();
+    expect(screen.getByText('Reopen')).toBeTruthy();
+
     fireEvent.click(screen.getByTestId('cross-sell-11111111-1111-4111-8111-111111111111-status'));
+    fireEvent.click(screen.getByTestId('cross-sell-22222222-2222-4222-8222-222222222222-status'));
+    fireEvent.click(screen.getByTestId('cross-sell-44444444-4444-4444-8444-444444444444-status'));
 
     expect(hookMocks.patchMutate).toHaveBeenCalledWith(
       { id: '11111111-1111-4111-8111-111111111111', body: { status: 'in_progress' } },
       expect.objectContaining({ onError: expect.any(Function), onSuccess: expect.any(Function) }),
     );
-    expect(
-      screen
-        .getByTestId('cross-sell-44444444-4444-4444-8444-444444444444-status')
-        .hasAttribute('disabled'),
-    ).toBe(true);
+    expect(hookMocks.patchMutate).toHaveBeenCalledWith(
+      { id: '22222222-2222-4222-8222-222222222222', body: { status: 'done' } },
+      expect.objectContaining({ onError: expect.any(Function), onSuccess: expect.any(Function) }),
+    );
+    expect(hookMocks.patchMutate).toHaveBeenCalledWith(
+      { id: '44444444-4444-4444-8444-444444444444', body: { status: 'open' } },
+      expect.objectContaining({ onError: expect.any(Function), onSuccess: expect.any(Function) }),
+    );
   });
 });

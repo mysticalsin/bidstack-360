@@ -9,6 +9,8 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { Input } from '@/components/ui/Input';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import {
   ALLOWED_INITIATIVE_TRANSITIONS,
@@ -18,10 +20,15 @@ import {
 } from '@bidstack/shared';
 
 import {
+  type KamHandoffDetailDto,
+  type KamHandoffPayloadDto,
   useApproveDraft,
+  useConfirmKamHandoff,
+  useExportKamHandoff,
   useKamAccountKpi,
   useKamAccountTodos,
   useKamDrafts,
+  useKamHandoffs,
   useKamInitiatives,
   useRejectDraft,
   useTransitionInitiative,
@@ -50,8 +57,18 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 
 export function KamKpiStrip({ companyId }: { companyId: string }) {
   const { data, isLoading, isError } = useKamAccountKpi(companyId);
-  if (isLoading) return <Card><LoadingSkeleton rows={1} /></Card>;
-  if (isError || !data) return <Card><ErrorState title="Couldn't load KPIs" /></Card>;
+  if (isLoading)
+    return (
+      <Card>
+        <LoadingSkeleton rows={1} />
+      </Card>
+    );
+  if (isError || !data)
+    return (
+      <Card>
+        <ErrorState title="Couldn't load KPIs" />
+      </Card>
+    );
   const s = data.initiativesByStage;
   return (
     <Card className="flex flex-wrap divide-x divide-[var(--border-subtle)]">
@@ -60,7 +77,11 @@ export function KamKpiStrip({ companyId }: { companyId: string }) {
       <Stat label="Opportunities" value={s.opportunity} />
       <Stat label="Open to-dos" value={data.openTasks} />
       <Stat label="Prospections" value={data.prospectionCount} />
-      <Stat label="Stale" value={data.staleInitiativeCount} tone={data.staleInitiativeCount > 0 ? 'warn' : undefined} />
+      <Stat
+        label="Stale"
+        value={data.staleInitiativeCount}
+        tone={data.staleInitiativeCount > 0 ? 'warn' : undefined}
+      />
     </Card>
   );
 }
@@ -136,14 +157,27 @@ function InitiativeCard({ init, companyId }: { init: KamInitiativeDetail; compan
 
 export function KamInitiativeBoard({ companyId }: { companyId: string }) {
   const { data, isLoading, isError } = useKamInitiatives(companyId);
-  if (isLoading) return <Card><LoadingSkeleton rows={3} /></Card>;
-  if (isError) return <Card><ErrorState title="Couldn't load initiatives" /></Card>;
+  if (isLoading)
+    return (
+      <Card>
+        <LoadingSkeleton rows={3} />
+      </Card>
+    );
+  if (isError)
+    return (
+      <Card>
+        <ErrorState title="Couldn't load initiatives" />
+      </Card>
+    );
   const items = data?.items ?? [];
   return (
     <Card>
       <SectionHeader title="Initiatives" caption="Initiative → Lead → Opportunity → Dropped" />
       {items.length === 0 ? (
-        <EmptyState title="No initiatives yet" message="Run a workshop and approve a draft, or add one manually." />
+        <EmptyState
+          title="No initiatives yet"
+          message="Run a workshop and approve a draft, or add one manually."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
           {INITIATIVE_STAGES.map((stage) => {
@@ -168,14 +202,30 @@ export function KamInitiativeBoard({ companyId }: { companyId: string }) {
 // ─── Per-account to-do ───────────────────────────────────────────────────────
 export function KamTodoCard({ companyId }: { companyId: string }) {
   const { data, isLoading, isError } = useKamAccountTodos(companyId);
-  if (isLoading) return <Card><LoadingSkeleton rows={3} /></Card>;
-  if (isError) return <Card><ErrorState title="Couldn't load to-dos" /></Card>;
+  if (isLoading)
+    return (
+      <Card>
+        <LoadingSkeleton rows={3} />
+      </Card>
+    );
+  if (isError)
+    return (
+      <Card>
+        <ErrorState title="Couldn't load to-dos" />
+      </Card>
+    );
   const items = data?.items ?? [];
   return (
     <Card>
-      <SectionHeader title="To-do" caption={`${data?.openCount ?? 0} open · ${data?.doneCount ?? 0} done`} />
+      <SectionHeader
+        title="To-do"
+        caption={`${data?.openCount ?? 0} open · ${data?.doneCount ?? 0} done`}
+      />
       {items.length === 0 ? (
-        <EmptyState title="Nothing outstanding" message="No open tasks across this account's initiatives." />
+        <EmptyState
+          title="Nothing outstanding"
+          message="No open tasks across this account's initiatives."
+        />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {items.map((task) => (
@@ -193,19 +243,181 @@ export function KamTodoCard({ companyId }: { companyId: string }) {
   );
 }
 
-// ─── Human-gate draft review ──────────────────────────────────────────────────
+// ABC OM handoffs
+const HANDOFF_TONE: Record<KamHandoffDetailDto['status'], 'gray' | 'blue' | 'jade'> = {
+  draft: 'gray',
+  exported: 'blue',
+  confirmed: 'jade',
+};
+
+export function downloadKamHandoffPayload(payload: KamHandoffPayloadDto) {
+  if (typeof document === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
+    return;
+  }
+  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
+    type: 'application/json',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `abc-om-handoff-${payload.handoffId}.json`;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function shortId(id: string) {
+  return id.slice(0, 8);
+}
+
+export function KamHandoffCard({ companyId }: { companyId: string }) {
+  const { data, isLoading, isError } = useKamHandoffs(companyId);
+  const exportHandoff = useExportKamHandoff(companyId);
+  const confirmHandoff = useConfirmKamHandoff(companyId);
+  const [refs, setRefs] = useState<Record<string, string>>({});
+  const [payloads, setPayloads] = useState<Record<string, KamHandoffPayloadDto>>({});
+
+  if (isLoading)
+    return (
+      <Card>
+        <LoadingSkeleton rows={3} />
+      </Card>
+    );
+  if (isError)
+    return (
+      <Card>
+        <ErrorState title="Couldn't load OM handoffs" />
+      </Card>
+    );
+
+  const items = data?.items ?? [];
+  return (
+    <Card>
+      <SectionHeader title="OM handoffs" caption="ABC opportunity-management export queue" />
+      {items.length === 0 ? (
+        <EmptyState
+          title="No handoffs ready"
+          message="Move a qualified initiative to Opportunity to create one."
+        />
+      ) : (
+        <ul className="divide-y divide-[var(--border-subtle)]">
+          {items.map((handoff) => {
+            const payload = payloads[handoff.id];
+            const ref = refs[handoff.id] ?? handoff.externalRef ?? '';
+            const canConfirm = handoff.status === 'exported' && ref.trim().length > 0;
+            return (
+              <li key={handoff.id} className="space-y-3 px-5 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--fg-primary)]">
+                      Handoff {shortId(handoff.id)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
+                      Target {handoff.targetSystem} · Opportunity{' '}
+                      {handoff.opportunityId ? shortId(handoff.opportunityId) : 'pending'}
+                    </p>
+                  </div>
+                  <Badge tone={HANDOFF_TONE[handoff.status]}>{handoff.status}</Badge>
+                </div>
+
+                {handoff.status === 'confirmed' ? (
+                  <p className="rounded-md bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--fg-secondary)]">
+                    Confirmed in ABC OM as {handoff.externalRef}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={exportHandoff.isPending}
+                      onClick={() =>
+                        exportHandoff.mutate(handoff.id, {
+                          onSuccess: ({ handoff: updated, payload: exportedPayload }) => {
+                            setPayloads((current) => ({
+                              ...current,
+                              [updated.id]: exportedPayload,
+                            }));
+                            downloadKamHandoffPayload(exportedPayload);
+                          },
+                        })
+                      }
+                    >
+                      <Icon name="download" size={14} ariaHidden /> Export JSON
+                    </Button>
+
+                    {handoff.status === 'exported' && (
+                      <div className="space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-page)] p-3">
+                        <Input
+                          label="ABC OM reference"
+                          value={ref}
+                          onChange={(event) =>
+                            setRefs((current) => ({ ...current, [handoff.id]: event.target.value }))
+                          }
+                          placeholder="ABC-OM-12345"
+                          size="sm"
+                        />
+                        <Button
+                          size="sm"
+                          variant="success"
+                          disabled={!canConfirm || confirmHandoff.isPending}
+                          onClick={() =>
+                            confirmHandoff.mutate({
+                              id: handoff.id,
+                              body: { externalRef: ref.trim() },
+                            })
+                          }
+                        >
+                          <Icon name="shield" size={14} ariaHidden /> Confirm
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {payload && (
+                  <pre className="max-h-48 overflow-auto rounded-lg bg-[var(--surface-sunken)] p-3 text-xs text-[var(--fg-secondary)]">
+                    {JSON.stringify(payload, null, 2)}
+                  </pre>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+// Human-gate draft review
 export function KamDraftReview({ companyId }: { companyId: string }) {
   const { data, isLoading, isError } = useKamDrafts(companyId, 'pending');
   const approve = useApproveDraft(companyId);
   const reject = useRejectDraft(companyId);
-  if (isLoading) return <Card><LoadingSkeleton rows={2} /></Card>;
-  if (isError) return <Card><ErrorState title="Couldn't load drafts" /></Card>;
+  if (isLoading)
+    return (
+      <Card>
+        <LoadingSkeleton rows={2} />
+      </Card>
+    );
+  if (isError)
+    return (
+      <Card>
+        <ErrorState title="Couldn't load drafts" />
+      </Card>
+    );
   const items = data?.items ?? [];
   return (
     <Card>
-      <SectionHeader title="Workshop drafts" caption="AI-organized notes + to-dos awaiting your review" />
+      <SectionHeader
+        title="Workshop drafts"
+        caption="AI-organized notes + to-dos awaiting your review"
+      />
       {items.length === 0 ? (
-        <EmptyState title="No drafts to review" message="Ingest a transcript to generate a draft for review." />
+        <EmptyState
+          title="No drafts to review"
+          message="Ingest a transcript to generate a draft for review."
+        />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {items.map((draft) => {
@@ -214,7 +426,9 @@ export function KamDraftReview({ companyId }: { companyId: string }) {
             const tasks = (draft.taskDrafts ?? []) as unknown[];
             return (
               <li key={draft.id} className="space-y-2 px-5 py-3">
-                <p className="text-sm text-[var(--fg-primary)]">{note.summary || 'Untitled draft'}</p>
+                <p className="text-sm text-[var(--fg-primary)]">
+                  {note.summary || 'Untitled draft'}
+                </p>
                 <p className="text-xs text-[var(--fg-tertiary)]">
                   {inits.length} initiative(s) · {tasks.length} task(s) · source {draft.source}
                 </p>
@@ -227,7 +441,12 @@ export function KamDraftReview({ companyId }: { companyId: string }) {
                   >
                     Approve &amp; commit
                   </Button>
-                  <Button size="sm" variant="ghost" disabled={reject.isPending} onClick={() => reject.mutate(draft.id)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={reject.isPending}
+                    onClick={() => reject.mutate(draft.id)}
+                  >
                     Reject
                   </Button>
                 </div>

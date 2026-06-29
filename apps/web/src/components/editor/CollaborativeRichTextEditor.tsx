@@ -81,10 +81,7 @@ export function CollaborativeRichTextEditor({
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
 
-  const localColor = useMemo(
-    () => colorForUser(userId ?? userName),
-    [userId, userName],
-  );
+  const localColor = useMemo(() => colorForUser(userId ?? userName), [userId, userName]);
 
   const { yText, ydoc, connectionState, remoteCursors, setCursor } = useYjsField({
     ...yjsOptions,
@@ -107,8 +104,8 @@ export function CollaborativeRichTextEditor({
         user: { name: userName, color: localColor },
       }),
     ];
-  // Remote cursors change frequently; we only rebuild extensions when ydoc changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Remote cursors change frequently; we only rebuild extensions when ydoc changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ydoc, userName, localColor]);
 
   const editor = useEditor({
@@ -142,32 +139,28 @@ export function CollaborativeRichTextEditor({
       const names = remoteCursors.map((c) => c.name).join(', ');
       setLiveRegionText(
         remoteCursors.length === 1
-          ? t('collaborativeRichTextEditor.editingAnnouncementOne', '{{names}} is editing', { names })
-          : t('collaborativeRichTextEditor.editingAnnouncementOther', '{{names}} are editing', { names }),
+          ? t('collaborativeRichTextEditor.editingAnnouncementOne', '{{names}} is editing', {
+              names,
+            })
+          : t('collaborativeRichTextEditor.editingAnnouncementOther', '{{names}} are editing', {
+              names,
+            }),
       );
     }, 2_000);
 
     return () => {
       if (announcementTimer.current) clearTimeout(announcementTimer.current);
     };
-  }, [remoteCursors]);
+  }, [remoteCursors, t]);
 
   // ─── Connection status badge ───────────────────────────────────────────
 
   const statusLabel = statusBadgeLabel(connectionState, t);
 
   return (
-    <div
-      className={`collaborative-editor relative ${className}`}
-      data-connection={connectionState}
-    >
+    <div className={`collaborative-editor relative ${className}`} data-connection={connectionState}>
       {/* Screen-reader live region for cursor announcements. */}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveRegionText}
       </div>
 
@@ -216,13 +209,7 @@ export function CollaborativeRichTextEditor({
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
-function CursorBadge({
-  cursor,
-  reducedMotion,
-}: {
-  cursor: RemoteCursor;
-  reducedMotion: boolean;
-}) {
+function CursorBadge({ cursor, reducedMotion }: { cursor: RemoteCursor; reducedMotion: boolean }) {
   return (
     <span
       className={[
@@ -235,22 +222,13 @@ function CursorBadge({
       style={{ backgroundColor: cursor.color }}
       title={cursor.name}
     >
-      <span
-        className="block w-1.5 h-1.5 rounded-full bg-white opacity-80"
-        aria-hidden="true"
-      />
+      <span className="block w-1.5 h-1.5 rounded-full bg-white opacity-80" aria-hidden="true" />
       {cursor.name}
     </span>
   );
 }
 
-function ConnectionBadge({
-  label,
-  state,
-}: {
-  label: string;
-  state: ConnectionState;
-}) {
+function ConnectionBadge({ label, state }: { label: string; state: ConnectionState }) {
   const colors: Record<ConnectionState, string> = {
     connected: 'text-emerald-600 dark:text-emerald-400',
     connecting: 'text-amber-500 dark:text-amber-400',
@@ -269,10 +247,14 @@ function ConnectionBadge({
 
 function statusBadgeLabel(state: ConnectionState, t: TFunction): string {
   switch (state) {
-    case 'connected': return t('collaborativeRichTextEditor.statusLive', 'Live');
-    case 'connecting': return t('collaborativeRichTextEditor.statusConnecting', 'Connecting…');
-    case 'disconnected': return t('collaborativeRichTextEditor.statusOffline', 'Offline');
-    case 'error': return t('collaborativeRichTextEditor.statusError', 'Error');
+    case 'connected':
+      return t('collaborativeRichTextEditor.statusLive', 'Live');
+    case 'connecting':
+      return t('collaborativeRichTextEditor.statusConnecting', 'Connecting…');
+    case 'disconnected':
+      return t('collaborativeRichTextEditor.statusOffline', 'Offline');
+    case 'error':
+      return t('collaborativeRichTextEditor.statusError', 'Error');
   }
 }
 
@@ -290,8 +272,12 @@ function createAwarenessShim(cursors: RemoteCursor[]) {
 
   return {
     getStates: () => states,
-    on: () => { /* no-op: updates come via re-render */ },
-    off: () => { /* no-op */ },
+    on: () => {
+      /* no-op: updates come via re-render */
+    },
+    off: () => {
+      /* no-op */
+    },
   };
 }
 

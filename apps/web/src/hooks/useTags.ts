@@ -20,13 +20,14 @@ import type {
 const TAGS_KEY = 'tags';
 const ENTITY_TAGS_KEY = 'entity-tags';
 
-export function useTags(search?: string) {
+export function useTags(search?: string, options: { enabled?: boolean } = {}) {
   return useQuery<TagList>({
     queryKey: [TAGS_KEY, { search: search ?? '' }],
     queryFn: ({ signal }) => {
       const qs = search ? `?search=${encodeURIComponent(search)}` : '';
       return api<TagList>(`/api/tags${qs}`, { signal });
     },
+    enabled: options.enabled ?? true,
   });
 }
 

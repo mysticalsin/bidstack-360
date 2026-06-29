@@ -77,6 +77,11 @@ describe('CrossSellCard trust cues', () => {
     expect(
       screen.getByTestId(`cross-sell-${action.id}-audit-source`).getAttribute('aria-label'),
     ).toBe('Server mutation audit covers create/update/delete events. Last updated 2026-06-03.');
+    expect(screen.getByTestId(`cross-sell-${action.id}-status-badge`).textContent).toBe('Open');
+    expect(screen.getByTestId(`cross-sell-${action.id}-status`).textContent).toContain('Start');
+    expect(screen.getByTestId(`cross-sell-${action.id}-status`).hasAttribute('disabled')).toBe(
+      true,
+    );
     expect(screen.getByTestId(`cross-sell-${action.id}-status`).className).toContain('min-h-11');
     expect(screen.getByTestId(`cross-sell-${action.id}-status`).className).toContain('min-w-11');
   });
