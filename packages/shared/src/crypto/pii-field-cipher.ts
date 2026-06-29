@@ -13,17 +13,13 @@
  *
  * SHA-256 hash for searchable equality: stored in a companion `*_hash` column
  * so equality lookups (find-by-email) work without decrypting every row.
- * The hash is HMAC-SHA256(plaintext, derivedKey) — keyed so that the hash is
- * not preimage-attackable without the master key.
+ * Email hash input is trimmed + lowercased so encrypted lookup preserves the
+ * previous citext-like case-insensitive semantics. The hash is
+ * HMAC-SHA256(canonical_plaintext, derivedKey) — keyed so that the hash is not
+ * preimage-attackable without the master key.
  */
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHmac,
-  hkdfSync,
-  randomBytes,
-} from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_BYTES = 12;
@@ -58,9 +54,7 @@ function getMasterKeyBuffer(): Buffer {
  */
 function deriveOrgKey(orgId: string): Buffer {
   const master = getMasterKeyBuffer();
-  return Buffer.from(
-    hkdfSync('sha256', master, Buffer.from(orgId, 'utf8'), 'pii-field-v1', 32),
-  );
+  return Buffer.from(hkdfSync('sha256', master, Buffer.from(orgId, 'utf8'), 'pii-field-v1', 32));
 }
 
 /**
@@ -86,10 +80,7 @@ export function encryptPiiField(plaintext: string, orgId: string): string {
     authTagLength: TAG_BYTES,
   });
 
-  const ciphertext = Buffer.concat([
-    cipher.update(plaintext, 'utf8'),
-    cipher.final(),
-  ]);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
 
   return (
@@ -106,11 +97,7 @@ export function encryptPiiField(plaintext: string, orgId: string): string {
  * Decrypt a PII field value.
  * Returns the mask string on any error — never throws, never crashes the caller.
  */
-export function decryptPiiField(
-  envelope: string,
-  orgId: string,
-  fieldType: PiiFieldType,
-): string {
+export function decryptPiiField(envelope: string, orgId: string, fieldType: PiiFieldType): string {
   if (!isEncrypted(envelope)) return envelope; // plaintext (pre-migration or encryption disabled)
 
   const mask = fieldType === 'email' ? EMAIL_MASK : PHONE_MASK;
@@ -146,5 +133,6 @@ export function decryptPiiField(
  */
 export function hashPiiField(plaintext: string, orgId: string): string {
   const key = deriveOrgKey(orgId);
-  return createHmac('sha256', key).update(plaintext, 'utf8').digest('hex');
+  const canonical = plaintext.trim().toLowerCase();
+  return createHmac('sha256', key).update(canonical, 'utf8').digest('hex');
 }

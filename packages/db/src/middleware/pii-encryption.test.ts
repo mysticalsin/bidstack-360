@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { isEncrypted } from '@bidstack/shared/crypto/pii-field-cipher';
+import { hashPiiField, isEncrypted } from '@bidstack/shared/crypto/pii-field-cipher';
 
 import { makePiiMiddleware } from './pii-encryption.js';
 
@@ -41,6 +41,7 @@ describe('pii-encryption middleware — bulk createMany path', () => {
     // emailHash drives equality search without decryption — HMAC-SHA256 hex = 64 chars.
     expect(typeof rows[0].emailHash).toBe('string');
     expect((rows[0] as { emailHash: string }).emailHash).toHaveLength(64);
+    expect(rows[0].emailHash).toBe(hashPiiField('alice@example.com', ORG));
     expect(isEncrypted(rows[1].email)).toBe(true);
     // Non-PII fields are left untouched.
     expect(rows[0].firstName).toBe('Alice');
@@ -99,5 +100,84 @@ describe('pii-encryption middleware — bulk createMany path', () => {
     }>;
 
     expect(result[0].email).toBe('roundtrip@example.com');
+  });
+
+  it('rewrites encrypted email equality lookups to emailHash', async () => {
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'Contact',
+      action: 'findFirst',
+      args: { where: { orgId: ORG, email: 'Alice@Example.com', deletedAt: null } },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    expect(params.args.where.email).toBeUndefined();
+    expect(params.args.where.emailHash).toBe(hashPiiField('alice@example.com', ORG));
+    expect(params.args.where.deletedAt).toBeNull();
+  });
+
+  it('rewrites encrypted email IN lookups to emailHash IN', async () => {
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'Lead',
+      action: 'findMany',
+      args: { where: { orgId: ORG, email: { in: ['A@Example.com', 'b@example.com'] } } },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    expect(params.args.where.email).toBeUndefined();
+    expect(params.args.where.emailHash).toEqual({
+      in: [hashPiiField('a@example.com', ORG), hashPiiField('b@example.com', ORG)],
+    });
+  });
+
+  it('FAILS LOUD on encrypted email lookup without orgId', async () => {
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'Contact',
+      action: 'findFirst',
+      args: { where: { email: 'missing-org@example.com' } },
+    };
+
+    await expect(middleware(params, async (rewritten) => rewritten)).rejects.toThrow(/orgId/i);
+  });
+
+  it('decrypts id-only reads when the returned row carries orgId', async () => {
+    const middleware = makePiiMiddleware();
+    const writeParams = {
+      model: 'KamConsultant',
+      action: 'create',
+      args: { data: { orgId: ORG, email: 'consultant@example.com', name: 'Consultant' } },
+    };
+    await middleware(writeParams, async (rewritten) => rewritten);
+    const envelope = writeParams.args.data.email;
+
+    const readParams = {
+      model: 'KamConsultant',
+      action: 'findUnique',
+      args: { where: { id: 'k1' } },
+    };
+    const result = (await middleware(readParams, async () => ({
+      id: 'k1',
+      orgId: ORG,
+      email: envelope,
+    }))) as { email: string };
+
+    expect(result.email).toBe('consultant@example.com');
+  });
+
+  it('does not encrypt User.email until a User.emailHash migration exists', async () => {
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'User',
+      action: 'create',
+      args: { data: { orgId: ORG, email: 'auth-user@example.com' } },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    expect(params.args.data.email).toBe('auth-user@example.com');
   });
 });
