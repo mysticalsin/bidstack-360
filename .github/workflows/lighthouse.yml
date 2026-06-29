@@ -14,6 +14,11 @@ concurrency:
 env:
   PNPM_VERSION: '10'
 
+# Least-privilege default token. The lighthouse job re-grants pull-requests:write
+# at job level for its PR comment.
+permissions:
+  contents: read
+
 jobs:
   lighthouse:
     name: Lighthouse CI

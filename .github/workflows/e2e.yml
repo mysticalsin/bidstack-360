@@ -26,6 +26,10 @@ env:
   PNPM_VERSION: '10'
   NODE_VERSION_FILE: .nvmrc
 
+# Least-privilege default token — these jobs only read + upload artifacts.
+permissions:
+  contents: read
+
 jobs:
   # ─── Build & seed (shared across all shards) ────────────────────────────────
   prepare:
