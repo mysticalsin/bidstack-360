@@ -1,14 +1,20 @@
-name: Supply Chain — IaC scan
+name: Supply Chain — IaC + dependency scan
 
-# Checkov scans our infrastructure-as-code (Dockerfiles, docker-compose, Azure
-# bicep) for misconfigurations. This closes the gap left by the other security
-# workflows: semgrep covers application SAST and dependency-review + `pnpm audit`
-# cover dependency CVEs, but nothing scanned the infra definitions.
+# Two scanners close the gap left by the other security workflows (semgrep =
+# app SAST, dependency-review + `pnpm audit` = dep CVEs, gitleaks = secrets):
+#   1. Checkov — infra-as-code misconfig (Dockerfiles, docker-compose, bicep).
+#   2. Trivy fs — second-opinion dependency CVE + secret + misconfig scan from a
+#      different vuln DB.
 #
-# SOFT-FAIL for now: findings are surfaced to the Security tab + PR annotations
-# but do NOT block merges, because the baseline (infra/azure/main.bicep is still
-# a draft) has not been triaged. Flip `soft_fail: false` below to make this a
-# hard gate once the baseline is clean.
+# Both are SOFT (advisory): findings go to the Security tab + PR annotations but
+# do NOT block merges, because the baselines (e.g. infra/azure/main.bicep is a
+# draft, base-image CVEs) have not been triaged. Flip Checkov `soft_fail: false`
+# / Trivy `exit-code: '1'` to make them hard gates once baselined.
+#
+# NOTE: the built-container OS-CVE scan (scanning the actual deploy image) runs
+# via `pnpm deploy:evidence:container` (scripts/run-container-vulnerability-scan
+# .mjs) in the release/CD pipeline — it needs a built image, so it belongs in CD,
+# not this PR workflow.
 
 on:
   push:
@@ -54,3 +60,32 @@ jobs:
         with:
           sarif_file: checkov.sarif
           category: checkov-iac
+
+  vuln-scan:
+    name: Dependency + secret scan (Trivy fs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Trivy filesystem scan (vuln + secret + misconfig)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: node_modules,dist,build
+          format: sarif
+          output: trivy.sarif
+          exit-code: '0' # advisory — report, don't block (see header)
+
+      - name: Upload Trivy SARIF to the Security tab
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-fs
