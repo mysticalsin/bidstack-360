@@ -92,7 +92,7 @@ Ran the local branch build (Docker came up; Postgres on `:5433` seeded) and re-c
 | `/custom-objects/new` "Object not found" | Reproduced, but the admin's "New Object" is a **dialog** (not a link to that route) → orphan, not user-reachable | Left as-is (unreachable via UI) |
 | Repeated background `401` | **Not reproduced** — clean console on the branch build | Demo-only (stale-session artifact) |
 | Stale duplicate "RECENT" account | **Not reproduced** — local session has its own RECENT | Demo-only (localStorage across demo sessions) |
-| Missing `<h1>` on `/calendar` + `/workspace` | **Reproduced** (`/workspace` uses H2s) | Open — minor a11y |
+| Missing `<h1>` on `/calendar` + `/workspace` | **Reproduced** (`/workspace` uses H2s) | ✅ **FIXED** `d13044b2` — sr-only page `<h1>` added; verified live (1 `<h1>` each) |
 | New-lead create | Could **not** be re-confirmed locally — the throwaway **Redis (`:6380`) was not reachable** (`ECONNREFUSED`), so Redis-dependent endpoints (idempotency on create, `/opportunities/count`, dashboard) 500'd. This is a **local-env Docker/Redis instability, not a branch regression** — create works on the demo (which has Redis). | Re-confirm once Redis is stable |
 
 **Routes confirmed loading on the branch:** dashboard (h1 present; data panel slow on cold dev build),
