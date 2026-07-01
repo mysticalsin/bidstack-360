@@ -1,0 +1,31 @@
+{
+  "created_at": "2026-06-28T11:50:18.6309015-04:00",
+  "scope": "Repository production-readiness verification gates after full API suite passed.",
+  "token_estimate": {
+    "min": 12000,
+    "expected": 24000,
+    "max": 48000
+  },
+  "time_estimate_minutes": {
+    "min": 20,
+    "expected": 60,
+    "max": 150
+  },
+  "cost_estimate_usd": {
+    "min": 0,
+    "expected": 0,
+    "max": 0,
+    "note": "Local shell/test work only; no external paid services intentionally invoked."
+  },
+  "success_criteria": [
+    "Preserve the full @bidstack/api suite pass as release evidence.",
+    "Run repository-level static and build gates that are safe in the current dirty worktree.",
+    "Classify failures as deterministic code/test blockers versus environment/operator blockers.",
+    "Fix deterministic blockers that are safe in the current dirty worktree.",
+    "Rerun the relevant focused or full gate and record honest residual blockers."
+  ],
+  "non_goals": [
+    "Claiming production certification without live infrastructure, backup/restore, load, secret, provider, and staging evidence.",
+    "Running destructive database reset or production migrations."
+  ]
+}
