@@ -17,7 +17,7 @@
 
 ## Data
 
-- PostgreSQL 16 (Prisma). Multi-tenant: every tenant row `orgId`-scoped (manual per-query — no RLS backstop). Money in micros. PII middleware (`packages/db/src/middleware/pii-encryption.ts`) — Contact email/phone, Lead email/phone, and KamConsultant email, gated by `PII_FIELD_ENCRYPTION` (default OFF); `User.email` awaits a generated hash migration or storage-encryption sign-off. Soft-delete + GDPR erasure + tenant-export routes (tested).
+- PostgreSQL 16 (Prisma). Multi-tenant: every tenant row `orgId`-scoped; an opt-in broad-operation guard (`BIDSTACK_TENANT_SCOPE_GUARD=warn|enforce`) catches tenant-model list/count/aggregate/group/update/deleteMany operations without `orgId`, but DB RLS is still not implemented. Money in micros. PII middleware (`packages/db/src/middleware/pii-encryption.ts`) — Contact email/phone, Lead email/phone, and KamConsultant email, gated by `PII_FIELD_ENCRYPTION` (default OFF); `User.email` awaits a generated hash migration or storage-encryption sign-off. Strict release evidence also requires storage-only owner/reference/scope for known plaintext SMS/activity/calendar/KAM PII fields unless those fields are encrypted first. Soft-delete + GDPR erasure + tenant-export routes (tested).
 - Redis 7 (BullMQ + rate-limit store + cache). Sentry. Prometheus metrics. Pino logs (credential redaction in server.ts).
 
 ## Integrations (external)

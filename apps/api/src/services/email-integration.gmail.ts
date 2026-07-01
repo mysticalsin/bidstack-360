@@ -12,6 +12,7 @@ import {
   type SendEmailParams,
   type ServiceLogger,
 } from './email-integration.helpers.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
 
 // ─── Send via Gmail ────────────────────────────────────────────────────────────
 
@@ -46,14 +47,20 @@ export async function sendViaGmail(
 
   const encoded = Buffer.from(lines).toString('base64url');
 
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
+  const res = await fetchWithTimeout(
+    'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+    {
+      provider: 'Gmail',
+      operation: 'messages.send',
+      timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw: encoded }),
     },
-    body: JSON.stringify({ raw: encoded }),
-  });
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -80,9 +87,14 @@ export async function pullGmail(
 
   if (!historyId) {
     // First pull: fetch recent messages (last 50)
-    const listRes = await fetch(
+    const listRes = await fetchWithTimeout(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=in:inbox',
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      {
+        provider: 'Gmail',
+        operation: 'messages.list',
+        timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
     );
     if (!listRes.ok) {
       log.error({ status: listRes.status }, 'Gmail list messages failed');
@@ -95,9 +107,14 @@ export async function pullGmail(
     messages = listData.messages ?? [];
   } else {
     // Incremental: list history changes
-    const histRes = await fetch(
+    const histRes = await fetchWithTimeout(
       `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}&historyTypes=messageAdded`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      {
+        provider: 'Gmail',
+        operation: 'history.list',
+        timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
     );
     if (!histRes.ok) {
       if (histRes.status === 404) {
@@ -125,9 +142,14 @@ export async function pullGmail(
   // Fetch full message details for each and upsert
   for (const msg of messages.slice(0, 30)) {
     try {
-      const detailRes = await fetch(
+      const detailRes = await fetchWithTimeout(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
+        {
+          provider: 'Gmail',
+          operation: 'messages.get',
+          timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
       );
       if (!detailRes.ok) continue;
 

@@ -98,6 +98,16 @@ export const envSchema = z.object({
   // multiplied by the replica count). Set false only for single-process deploys.
   RATE_LIMIT_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
 
+  // Outbound communication abuse/spend caps. These are daily UTC counters backed
+  // by Redis and checked before Gmail/Graph/Twilio egress. 0 disables a cap.
+  OUTBOUND_COMM_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
+  OUTBOUND_EMAIL_DAILY_USER_LIMIT: z.coerce.number().int().nonnegative().default(500),
+  OUTBOUND_EMAIL_DAILY_ORG_LIMIT: z.coerce.number().int().nonnegative().default(50_000),
+  OUTBOUND_SMS_DAILY_USER_LIMIT: z.coerce.number().int().nonnegative().default(100),
+  OUTBOUND_SMS_DAILY_ORG_LIMIT: z.coerce.number().int().nonnegative().default(10_000),
+  OUTBOUND_SMS_DAILY_ORG_COST_CAP_MICROS: z.coerce.bigint().nonnegative().default(500_000_000n),
+  OUTBOUND_SMS_ESTIMATED_SEGMENT_COST_MICROS: z.coerce.bigint().nonnegative().default(8_000n),
+
   // Query guard: reject (vs. only warn on) unbounded Prisma findMany calls.
   // Defaults true so production — where scale/DoS risk is highest — is protected.
   // Set false to downgrade to warn-only (e.g. while migrating a noisy caller).
@@ -112,6 +122,24 @@ export const envSchema = z.object({
   // keep-alive sockets and we avoid races that surface as 502s.
   REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   KEEPALIVE_TIMEOUT_MS: z.coerce.number().int().positive().default(65_000),
+
+  // Provider HTTP timeouts. These cap outbound fetches to Gmail/Google,
+  // Microsoft Graph, Slack, Twilio, and OAuth token endpoints so a hung provider
+  // cannot pin API workers until undici's much longer default timeout.
+  OAUTH_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  GMAIL_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  GOOGLE_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  MICROSOFT_GRAPH_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  SLACK_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  TWILIO_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
+
+  // OAuth refresh single-flight. Redis is required in production so concurrent
+  // refreshes across API replicas do not race a rotating provider refresh token.
+  OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
+  OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
+  OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
+  OAUTH_REFRESH_LOCK_POLL_MS: z.coerce.number().int().positive().default(250),
 
   // OCR
   BIDSTACK_OCR_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -224,6 +252,29 @@ function publicBaseUrlIsLoopback(value: string): boolean {
   );
 }
 
+function redisUrlError(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'redis:' && url.protocol !== 'rediss:') {
+      return 'REDIS_URL must be a valid Redis URL in production';
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === '::1' ||
+      hostname === '[::1]' ||
+      hostname === '0.0.0.0' ||
+      hostname === '[::]' ||
+      hostname.startsWith('127.')
+    ) {
+      return 'REDIS_URL must not point at localhost or loopback in production';
+    }
+    return null;
+  } catch {
+    return 'REDIS_URL must be a valid Redis URL in production';
+  }
+}
+
 export function getEnv(): Env {
   if (_env) return _env;
   const parsed = envSchema.safeParse(process.env);
@@ -253,6 +304,14 @@ export function getEnv(): Env {
       semanticErrors.push(
         'PUBLIC_BASE_URL must be set to the public web origin in production (cannot be loopback)',
       );
+    }
+
+    const rawRedisUrl = process.env.REDIS_URL?.trim() ?? '';
+    if (!rawRedisUrl) {
+      semanticErrors.push('REDIS_URL is required in production');
+    } else {
+      const redisError = redisUrlError(rawRedisUrl);
+      if (redisError) semanticErrors.push(redisError);
     }
   }
 

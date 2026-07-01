@@ -16,6 +16,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma, EmailProvider } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
 import { getAccessToken, GRAPH_BASE, type ServiceLogger } from './microsoft-graph-auth.service.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Email send ────────────────────────────────────────────────────────────────
@@ -106,7 +107,10 @@ export async function sendEmail(
     saveToSentItems: true,
   };
 
-  const res = await fetch(`${GRAPH_BASE}/me/sendMail`, {
+  const res = await fetchWithTimeout(`${GRAPH_BASE}/me/sendMail`, {
+    provider: 'Microsoft Graph',
+    operation: 'mail.send',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -267,7 +271,10 @@ async function fetchDeltaPage(
   accountEmail: string,
   log: ServiceLogger,
 ): Promise<{ persisted: number }> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
+    provider: 'Microsoft Graph',
+    operation: 'mail.delta',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

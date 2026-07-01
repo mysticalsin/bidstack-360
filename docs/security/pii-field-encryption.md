@@ -6,7 +6,7 @@
 
 BidStack 360° encrypts supported CRM/KAM PII fields stored in the `contacts`, `leads`, and `kam_consultants` database tables using AES-256-GCM with per-org HKDF-derived keys.
 
-`User.email` is intentionally not field-encrypted yet: the current schema has no `User.emailHash` column, and auth/assignment flows still rely on case-insensitive email semantics. Treat `User.email` as covered by storage-level database encryption and access controls until a generated migration adds `users.email_hash` and the lookup path is certified.
+`User.email` is intentionally not field-encrypted yet: the current schema has no `User.emailHash` column, and auth/assignment flows still rely on case-insensitive email semantics. Strict release evidence now requires an explicit storage-level-only decision plus storage-encryption proof. The release gate also requires an exact storage-level-only decision scope for remaining plaintext-at-field-level PII (`SmsMessage` numbers/body, `SmsConsent.phoneNumber`, `ActivityAttendee.email`, `CalendarEvent.attendees`, and `KamSession` transcript/attendees). If security chooses field encryption instead, add the generated hash/encryption migrations and certify the lookup path before release.
 
 Encryption is **opt-in** (default off) for backward compatibility. Operators enable it after running the one-shot migration script.
 
@@ -86,6 +86,9 @@ The middleware is registered in `packages/db/src/index.ts` only when `PII_FIELD_
    ```
 2. Store in your secret manager (AWS Secrets Manager, Azure Key Vault, Vault, etc.).
 3. Set `PII_ENCRYPTION_MASTER_KEY=<64-char-hex>` in the API and worker environment.
+4. Confirm release DB storage encryption and capture a reviewable control reference.
+5. Capture the `User.email` at-rest decision owner/reference. Current passing value is `storage-encryption-only`; any other choice blocks the release until a `User.emailHash` migration exists.
+6. Capture the remaining plaintext-PII at-rest decision owner/reference and exact accepted field scope. Current passing value is `storage-encryption-only`; any other choice blocks release until those fields are field-encrypted or the gate is updated with the new schema proof.
 
 ### Step-by-step
 
@@ -109,6 +112,19 @@ Step 4 — Enable encryption:
 Step 5 — Confirm:
   New contacts/leads/KAM consultants created via API should have enc:v1:... email in DB.
   API responses should return plaintext (middleware decrypts on read).
+
+Step 6 — Write release evidence:
+  BIDSTACK_STORAGE_ENCRYPTION_AT_REST=true \
+  BIDSTACK_STORAGE_ENCRYPTION_PROVIDER=<provider-or-control> \
+  BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE=<ticket-or-control-ref> \
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION=storage-encryption-only \
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF=<decision-ref> \
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER=<owner> \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION=storage-encryption-only \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF=<decision-ref> \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER=<owner> \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS=SmsMessage.fromNumber,SmsMessage.toNumber,SmsMessage.body,SmsConsent.phoneNumber,ActivityAttendee.email,CalendarEvent.attendees,KamSession.transcriptText,KamSession.attendees \
+  pnpm deploy:evidence:pii
 ```
 
 ---

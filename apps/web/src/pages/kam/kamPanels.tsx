@@ -250,7 +250,7 @@ const HANDOFF_TONE: Record<KamHandoffDetailDto['status'], 'gray' | 'blue' | 'jad
   confirmed: 'jade',
 };
 
-export function downloadKamHandoffPayload(payload: KamHandoffPayloadDto) {
+function downloadKamHandoffPayload(payload: KamHandoffPayloadDto) {
   if (typeof document === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
     return;
   }

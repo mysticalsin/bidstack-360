@@ -7,6 +7,8 @@ import path from 'node:path';
 
 const DEFAULT_OUTPUT_PATH = 'deploy-evidence/api-connectivity-latest.json';
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_DOMAIN_SMOKE_PATH =
+  '/api/companies?search=__bidstack_release_probe_no_match__&limit=1';
 const AUTH_SCHEMES = new Set(['api-key', 'bearer']);
 
 const PLACEHOLDER_EXACT_VALUES = new Set([
@@ -60,6 +62,8 @@ function parseArgs(argv) {
       '',
     authScheme: normalizeAuthScheme(process.env.BIDSTACK_API_CONNECTIVITY_AUTH_SCHEME),
     expectedOrgId: process.env.BIDSTACK_API_CONNECTIVITY_EXPECTED_ORG_ID ?? '',
+    domainSmokePath:
+      process.env.BIDSTACK_API_CONNECTIVITY_DOMAIN_SMOKE_PATH ?? DEFAULT_DOMAIN_SMOKE_PATH,
     timeoutMs: Number(process.env.BIDSTACK_API_CONNECTIVITY_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
     strict: process.env.BIDSTACK_STRICT_DEPLOY_GATE !== '0',
     selftest: false,
@@ -92,6 +96,9 @@ function parseArgs(argv) {
     } else if (arg === '--expected-org-id') {
       options.expectedOrgId = next;
       index += 1;
+    } else if (arg === '--domain-smoke-path') {
+      options.domainSmokePath = next;
+      index += 1;
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = Number(next);
       index += 1;
@@ -120,6 +127,7 @@ Environment:
   BIDSTACK_API_CONNECTIVITY_API_TOKEN        API key or bearer token
   BIDSTACK_API_CONNECTIVITY_AUTH_SCHEME      api-key (default) or bearer
   BIDSTACK_API_CONNECTIVITY_EXPECTED_ORG_ID  Optional expected tenant org id
+  BIDSTACK_API_CONNECTIVITY_DOMAIN_SMOKE_PATH Optional read-only API path to smoke
   BIDSTACK_API_CONNECTIVITY_EVIDENCE         Output path
   BIDSTACK_API_CONNECTIVITY_TIMEOUT_MS       Per-request timeout
   BIDSTACK_DEPLOY_ENV                        Evidence environment label
@@ -129,6 +137,7 @@ Options:
   --api-token <token>        Override API token
   --auth-scheme <scheme>     api-key or bearer
   --expected-org-id <id>     Require capabilities org id to match
+  --domain-smoke-path <path> Read-only API path to smoke
   --output <path>            Override evidence output path
   --env <name>               Override deploy environment
   --timeout-ms <ms>          Override per-request timeout
@@ -148,6 +157,14 @@ function normalizeTarget(value) {
   return String(value ?? '')
     .trim()
     .replace(/\/+$/, '');
+}
+
+function normalizeSmokePath(value) {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) {
+    return DEFAULT_DOMAIN_SMOKE_PATH;
+  }
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 function isPlaceholderValue(value) {
@@ -221,6 +238,15 @@ function validateLivePreconditions(options) {
     failures.push('Expected API org id cannot be placeholder-like in strict mode.');
   }
 
+  const smokePath = normalizeSmokePath(options.domainSmokePath);
+  if (!smokePath.startsWith('/api/')) {
+    failures.push('API domain smoke path must start with /api/.');
+  }
+
+  if (options.strict && isPlaceholderValue(smokePath)) {
+    failures.push('API domain smoke path cannot be placeholder-like in strict mode.');
+  }
+
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0) {
     failures.push('API connectivity timeout must be a positive number.');
   }
@@ -282,9 +308,26 @@ function makeFailedCheck(error) {
   };
 }
 
+function summarizeDomainReadCheck(response, smokePath) {
+  const items = Array.isArray(response.body?.items) ? response.body.items : null;
+  const itemCount = items?.length ?? null;
+  return {
+    ok: response.ok && Array.isArray(items) && itemCount === 0,
+    status: response.status,
+    path: smokePath,
+    responseShape: Array.isArray(items) ? 'paginated-list' : 'unknown',
+    itemCount,
+    nextCursorPresent: Boolean(response.body?.nextCursor),
+    noMatchProbe: true,
+    rawItemsIncluded: false,
+    rawBodyIncluded: false,
+  };
+}
+
 async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
   const startedAt = new Date().toISOString();
   const target = normalizeTarget(options.target);
+  const domainSmokePath = normalizeSmokePath(options.domainSmokePath);
   const preconditionFailures = validateLivePreconditions(options);
 
   const result = {
@@ -299,6 +342,7 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
     readyz: { ok: false },
     health: { ok: false },
     capabilities: { ok: false },
+    domainRead: { ok: false },
     error: null,
   };
 
@@ -421,11 +465,32 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
     result.capabilities = makeFailedCheck(error);
   }
 
+  try {
+    const domainRead = await fetchJson(
+      fetchFn,
+      buildUrl(target, domainSmokePath),
+      {
+        method: 'GET',
+        headers: createAuthHeaders(options),
+      },
+      options.timeoutMs,
+    );
+    result.domainRead = summarizeDomainReadCheck(domainRead, domainSmokePath);
+  } catch (error) {
+    result.domainRead = {
+      ...makeFailedCheck(error),
+      path: domainSmokePath,
+      rawItemsIncluded: false,
+      rawBodyIncluded: false,
+    };
+  }
+
   result.ok =
     result.livez.ok === true &&
     result.readyz.ok === true &&
     result.health.ok === true &&
-    result.capabilities.ok === true;
+    result.capabilities.ok === true &&
+    result.domainRead.ok === true;
   result.completedAt = new Date().toISOString();
 
   if (!result.ok) {
@@ -458,6 +523,7 @@ function buildArtifact(options, smoke) {
       readyz: smoke.readyz,
       health: smoke.health,
       capabilities: smoke.capabilities,
+      domainRead: smoke.domainRead,
     },
     tenant: {
       orgId: smoke.capabilities?.orgId || null,
@@ -510,6 +576,31 @@ function validateArtifact(artifact, options) {
     if (artifact.checks?.[checkName]?.ok !== true) {
       failures.push(`API ${checkName} check failed.`);
     }
+  }
+
+  const domainRead = artifact.checks?.domainRead ?? {};
+  if (domainRead.ok !== true) {
+    failures.push('API domain read smoke check failed.');
+  }
+
+  if (!String(domainRead.path ?? '').startsWith('/api/')) {
+    failures.push('API domain read smoke path must start with /api/.');
+  }
+
+  if (domainRead.responseShape !== 'paginated-list') {
+    failures.push('API domain read smoke must prove the expected paginated-list response shape.');
+  }
+
+  if (domainRead.noMatchProbe !== true || domainRead.itemCount !== 0) {
+    failures.push('API domain read smoke must use a no-match probe and return zero items.');
+  }
+
+  if (domainRead.rawItemsIncluded !== false || domainRead.rawBodyIncluded !== false) {
+    failures.push('API domain read smoke evidence must not include raw API data.');
+  }
+
+  if ('items' in domainRead || 'body' in domainRead || 'rawBody' in domainRead) {
+    failures.push('API domain read smoke evidence contains raw API response data.');
   }
 
   if (
@@ -617,6 +708,16 @@ function createFakeApiFetch({ ready = true, orgId = 'org_release_1234567890' } =
       });
     }
 
+    if (method === 'GET' && parsed.pathname === '/api/companies') {
+      if (!headers.get('x-api-key') && !headers.get('authorization')) {
+        return makeJsonResponse({ error: 'missing auth' }, 401);
+      }
+
+      return makeJsonResponse({
+        items: [],
+      });
+    }
+
     return makeJsonResponse({ error: 'unexpected selftest request' }, 404);
   };
 
@@ -636,6 +737,7 @@ async function runSelftest() {
       apiToken: 'release_api_token_1234567890abcdef',
       authScheme: 'api-key',
       expectedOrgId: 'org_release_1234567890',
+      domainSmokePath: DEFAULT_DOMAIN_SMOKE_PATH,
       timeoutMs: DEFAULT_TIMEOUT_MS,
       strict: true,
     };
@@ -645,6 +747,9 @@ async function runSelftest() {
     assert.equal(good.exitCode, 0);
     assert.equal(good.artifact.passed, true);
     assert.equal(good.artifact.checks.readyz.storage, true);
+    assert.equal(good.artifact.checks.domainRead.ok, true);
+    assert.equal(good.artifact.checks.domainRead.itemCount, 0);
+    assert.equal('items' in good.artifact.checks.domainRead, false);
     assert.equal(good.artifact.tenant.orgId, 'org_release_1234567890');
     assert.equal(existsSync(good.outputPath), true);
     const authCall = goodFetch.calls.find((call) =>

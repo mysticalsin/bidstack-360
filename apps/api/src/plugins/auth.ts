@@ -15,6 +15,7 @@ import fp from 'fastify-plugin';
 import { prisma } from '@bidstack/db';
 
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { writeAuthAudit } from './auth-audit.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
 import { isDemoMode, resolveDemoAuth } from './demo-auth.js';
@@ -47,8 +48,7 @@ const STUB_ROLE_HEADER = 'x-bidstack-e2e-role';
 // reachable in prod (stub auth itself only runs when CLERK_SECRET_KEY is absent
 // and NODE_ENV is development/test).
 const STUB_ORG_HEADER = 'x-bidstack-e2e-org';
-export const SSO_DOMAIN_REJECTED_MESSAGE =
-  'Sign-in domain is not permitted for this organization.';
+export const SSO_DOMAIN_REJECTED_MESSAGE = 'Sign-in domain is not permitted for this organization.';
 
 // --- Verified-session cache (scale fix) -------------------------------------
 //
@@ -95,12 +95,9 @@ interface VerifiedClaims {
 function authCacheKey(claims: VerifiedClaims): string {
   return createHash('sha256')
     .update(
-      [
-        claims.clerkUserId,
-        claims.sessionId ?? '',
-        claims.clerkOrgId,
-        claims.orgRole ?? '',
-      ].join('|'),
+      [claims.clerkUserId, claims.sessionId ?? '', claims.clerkOrgId, claims.orgRole ?? ''].join(
+        '|',
+      ),
     )
     .digest('hex');
 }
@@ -246,6 +243,7 @@ async function resolveStubRoleOverride(
       update: { orgId, deletedAt: null },
     }),
   ]);
+  invalidateRbacDecisionCache(orgId, user.id);
 
   return {
     orgId,
@@ -396,9 +394,7 @@ async function resolveClerkAuthFromDb(
           existingOrgId: existingEmail.orgId,
         },
       });
-      throw req.server.httpErrors.forbidden(
-        'Email is already registered in another organization',
-      );
+      throw req.server.httpErrors.forbidden('Email is already registered in another organization');
     }
   }
 
@@ -655,7 +651,6 @@ const plugin: FastifyPluginAsync = fp(
       } else {
         req.auth = await resolveStubAuth(req);
       }
-
     });
   },
   { name: 'auth' },

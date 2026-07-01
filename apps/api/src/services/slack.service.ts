@@ -17,6 +17,11 @@ import { prisma, IntegrationProvider } from '@bidstack/db';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import {
+  fetchWithTimeout,
+  isProviderTimeoutError,
+  providerTimeoutMs,
+} from '../lib/fetch-timeout.js';
+import {
   SerumConnectorPolicyError,
   assertSerumConnectorAllowed,
 } from '../lib/serum-connector-policy.js';
@@ -92,14 +97,26 @@ async function slackPost(
   body: Record<string, unknown>,
   log?: ServiceLogger,
 ): Promise<{ ok: boolean; ts?: string; channel?: string; error?: string }> {
-  const res = await fetch(`${SLACK_API}/${method}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json; charset=utf-8',
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${SLACK_API}/${method}`, {
+      provider: 'Slack',
+      operation: method,
+      timeoutMs: providerTimeoutMs('SLACK_HTTP_TIMEOUT_MS', 10_000),
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    if (isProviderTimeoutError(err)) {
+      log?.warn({ method, timeoutMs: err.timeoutMs }, 'Slack API timeout');
+      return { ok: false, error: 'provider_timeout' };
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     const status = res.status;

@@ -1,6 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ORIGINAL_ENV = { ...process.env };
+const COMPLETE_PRODUCTION_ENV = {
+  NODE_ENV: 'production',
+  STORAGE_DRIVER: 's3',
+  S3_BUCKET: 'bidstack-prod-files',
+  S3_REGION: 'us-east-1',
+  STORAGE_SCAN_REQUIRED: 'true',
+  INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+  PII_FIELD_ENCRYPTION: 'true',
+  PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
+  PUBLIC_BASE_URL: 'https://crm.example.com',
+  REDIS_URL: 'redis://:test@redis:6379',
+  BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
+};
 
 function restoreEnv(): void {
   for (const key of Object.keys(process.env)) {
@@ -11,11 +24,18 @@ function restoreEnv(): void {
 
 async function loadEnvWith(overrides: NodeJS.ProcessEnv) {
   restoreEnv();
-  Object.assign(process.env, {
+  const nextEnv: NodeJS.ProcessEnv = {
     DATABASE_URL: 'postgresql://bidstack:bidstack@localhost:5432/bidstack_test',
     PUBLIC_BASE_URL: 'http://localhost:5173',
     ...overrides,
-  });
+  };
+  for (const [key, value] of Object.entries(nextEnv)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
   vi.resetModules();
   const mod = await import('./env.js');
   return mod.getEnv();
@@ -68,20 +88,9 @@ describe('boot environment validation', () => {
   });
 
   it('requires PII encryption and a valid PII master key in production', async () => {
-    const productionBase = {
-      NODE_ENV: 'production',
-      STORAGE_DRIVER: 's3',
-      S3_BUCKET: 'bidstack-prod-files',
-      S3_REGION: 'us-east-1',
-      STORAGE_SCAN_REQUIRED: 'true',
-      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
-      PUBLIC_BASE_URL: 'https://crm.example.com',
-      BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
-    };
-
     await expect(
       loadEnvWith({
-        ...productionBase,
+        ...COMPLETE_PRODUCTION_ENV,
         PII_FIELD_ENCRYPTION: 'false',
         PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
       }),
@@ -89,7 +98,7 @@ describe('boot environment validation', () => {
 
     await expect(
       loadEnvWith({
-        ...productionBase,
+        ...COMPLETE_PRODUCTION_ENV,
         PII_FIELD_ENCRYPTION: 'true',
         PII_ENCRYPTION_MASTER_KEY: 'z'.repeat(64),
       }),
@@ -97,27 +106,16 @@ describe('boot environment validation', () => {
   });
 
   it('requires a non-loopback HTTPS public web origin in production', async () => {
-    const productionBase = {
-      NODE_ENV: 'production',
-      STORAGE_DRIVER: 's3',
-      S3_BUCKET: 'bidstack-prod-files',
-      S3_REGION: 'us-east-1',
-      STORAGE_SCAN_REQUIRED: 'true',
-      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
-      PII_FIELD_ENCRYPTION: 'true',
-      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
-    };
-
     await expect(
       loadEnvWith({
-        ...productionBase,
+        ...COMPLETE_PRODUCTION_ENV,
         PUBLIC_BASE_URL: 'http://crm.example.com',
       }),
     ).rejects.toThrow('PUBLIC_BASE_URL must use https in production');
 
     await expect(
       loadEnvWith({
-        ...productionBase,
+        ...COMPLETE_PRODUCTION_ENV,
         PUBLIC_BASE_URL: 'https://127.0.0.1:5173',
       }),
     ).rejects.toThrow('PUBLIC_BASE_URL must be set to the public web origin in production');
@@ -132,6 +130,7 @@ describe('boot environment validation', () => {
       PII_FIELD_ENCRYPTION: 'true',
       PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
       PUBLIC_BASE_URL: 'https://demo.example.com',
+      REDIS_URL: 'redis://:test@redis:6379',
       DEMO_MODE: 'true',
       DEMO_SESSION_SECRET: 'demo-session-secret',
       BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
@@ -150,6 +149,24 @@ describe('boot environment validation', () => {
     expect(env.STORAGE_DRIVER).toBe('local');
   });
 
+  it('requires an explicit non-loopback Redis URL in production', async () => {
+    await expect(loadEnvWith({ ...COMPLETE_PRODUCTION_ENV, REDIS_URL: undefined })).rejects.toThrow(
+      'REDIS_URL is required in production',
+    );
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        REDIS_URL: 'redis://localhost:6380',
+      }),
+    ).rejects.toThrow('REDIS_URL must not point at localhost or loopback in production');
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        REDIS_URL: 'not-a-redis-url',
+      }),
+    ).rejects.toThrow('REDIS_URL must be a valid Redis URL in production');
+  });
+
   it('requires a job signing secret in production', async () => {
     // Without it enqueueApolloEnrich skips silently and the worker rejects every
     // job — enrichment dies with no error. Production must fail fast at boot.
@@ -164,6 +181,7 @@ describe('boot environment validation', () => {
         PII_FIELD_ENCRYPTION: 'true',
         PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
         PUBLIC_BASE_URL: 'https://crm.example.com',
+        REDIS_URL: 'redis://:test@redis:6379',
       }),
     ).rejects.toThrow('BIDSTACK_JOB_SIGNING_SECRET is required in production');
   });
@@ -172,15 +190,8 @@ describe('boot environment validation', () => {
     // The queue resolves BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET, so
     // the fallback alone must satisfy boot (else valid deploys break).
     const env = await loadEnvWith({
-      NODE_ENV: 'production',
-      STORAGE_DRIVER: 's3',
-      S3_BUCKET: 'bidstack-prod-files',
-      S3_REGION: 'us-east-1',
-      STORAGE_SCAN_REQUIRED: 'true',
-      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
-      PII_FIELD_ENCRYPTION: 'true',
-      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
-      PUBLIC_BASE_URL: 'https://crm.example.com',
+      ...COMPLETE_PRODUCTION_ENV,
+      BIDSTACK_JOB_SIGNING_SECRET: '',
       JOB_SIGNING_SECRET: 'b'.repeat(64),
     });
 
@@ -189,16 +200,7 @@ describe('boot environment validation', () => {
 
   it('accepts explicit durable storage settings for production', async () => {
     const env = await loadEnvWith({
-      NODE_ENV: 'production',
-      STORAGE_DRIVER: 's3',
-      S3_BUCKET: 'bidstack-prod-files',
-      S3_REGION: 'us-east-1',
-      STORAGE_SCAN_REQUIRED: 'true',
-      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
-      PII_FIELD_ENCRYPTION: 'true',
-      PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
-      PUBLIC_BASE_URL: 'https://crm.example.com',
-      BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
+      ...COMPLETE_PRODUCTION_ENV,
     });
 
     expect(env.STORAGE_DRIVER).toBe('s3');

@@ -7,13 +7,13 @@
 import fp from 'fastify-plugin';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
-import { prisma } from '@bidstack/db';
 import type { PermissionKey } from '@bidstack/shared';
 
 import {
   apiKeyScopeSatisfiesPermission,
   allowLegacyRestApiKeyScopes,
 } from '../lib/api-key-scopes.js';
+import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -44,23 +44,8 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     if (req.auth.role === 'api') {
       throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
     }
-    const roleNameFilters = allowed.map((name) => ({
-      name: { equals: name, mode: 'insensitive' as const },
-    }));
-
-    const assignedRoleCount = await prisma.userRole.count({
-      where: {
-        userId: req.auth.userId,
-        user: { orgId: req.auth.orgId, deletedAt: null },
-        role: {
-          orgId: req.auth.orgId,
-          OR: roleNameFilters,
-          deletedAt: null,
-        },
-      },
-    });
-
-    if (assignedRoleCount === 0) {
+    const allowedByDb = await userHasAnyRole(req.auth.orgId, req.auth.userId, allowed);
+    if (!allowedByDb) {
       throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
     }
   });
@@ -78,23 +63,7 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
         );
       }
 
-      const assignedPermissionCount = await prisma.userRole.count({
-        where: {
-          userId: req.auth.userId,
-          user: { orgId: req.auth.orgId, deletedAt: null },
-          role: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            permissions: {
-              some: {
-                permission: { key: permission },
-              },
-            },
-          },
-        },
-      });
-
-      if (assignedPermissionCount > 0) return;
+      if (await userHasPermission(req.auth.orgId, req.auth.userId, permission)) return;
 
       // No claim-based fallback. The previous code allowed `req.auth.role === 'admin'`
       // through unconditionally, which bypassed every granular check whenever the

@@ -15,15 +15,25 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { prisma } from '@bidstack/db';
+import { Prisma, prisma } from '@bidstack/db';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import {
   assertSerumConnectorAllowed,
   recordSerumConnectorTestSuccess,
 } from '../lib/serum-connector-policy.js';
+import {
+  estimateSmsSegments,
+  outboundCommunicationCapConfig,
+  reserveOutboundCommunication,
+} from '../lib/outbound-communication-guard.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
 type SmsEntityType = 'CONTACT' | 'LEAD';
 type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -68,13 +78,20 @@ export interface TwilioInboundSmsPayload {
 
 /**
  * Load and decrypt Twilio credentials for the given org.
- * Returns the first active TWILIO integration token found.
- * WHY first: an org typically has one Twilio account; if multi-account is
- * needed a fromNumber parameter can disambiguate in a future iteration.
+ * Returns the active TWILIO integration token for the given sender number, or
+ * the first active token when the caller has no number context.
  */
-async function loadCredentials(orgId: string): Promise<TwilioCredentials & { tokenId: string; fromNumber: string }> {
+async function loadCredentials(
+  orgId: string,
+  twilioNumber?: string,
+): Promise<TwilioCredentials & { tokenId: string; fromNumber: string }> {
   const token = await prisma.integrationToken.findFirst({
-    where: { orgId, provider: 'twilio', status: 'active' },
+    where: {
+      orgId,
+      provider: 'twilio',
+      status: 'active',
+      ...(twilioNumber ? { externalAccountId: twilioNumber } : {}),
+    },
     select: { id: true, accessTokenEncrypted: true, externalAccountId: true },
   });
 
@@ -115,7 +132,10 @@ async function loadCredentials(orgId: string): Promise<TwilioCredentials & { tok
  * 4. Persist SmsMessage row (status=QUEUED)
  * 5. Log Activity on the linked entity
  */
-export async function sendSms(params: SendSmsParams, log: ServiceLogger): Promise<{ messageId: string }> {
+export async function sendSms(
+  params: SendSmsParams,
+  log: ServiceLogger,
+): Promise<{ messageId: string }> {
   const { orgId, userId, toNumber, body, entityType, entityId } = params;
 
   // Step 2: Consent check
@@ -135,37 +155,66 @@ export async function sendSms(params: SendSmsParams, log: ServiceLogger): Promis
     writeRequested: true,
   });
 
-  // Step 1: Load credentials
-  const { accountSid, authToken, tokenId, fromNumber } = await loadCredentials(orgId);
-
-  // Step 3: POST to Twilio
-  const formBody = new URLSearchParams({
-    From: fromNumber,
-    To: toNumber,
-    Body: body,
-    StatusCallback: `${process.env.PUBLIC_API_URL ?? ''}/api/v1/integrations/twilio/webhook/status`,
-  });
-
-  const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-  const response = await fetch(
-    `${TWILIO_API_BASE}/Accounts/${accountSid}/Messages.json`,
+  const estimatedSegments = estimateSmsSegments(body);
+  const reservation = await reserveOutboundCommunication(
     {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formBody.toString(),
+      channel: 'sms',
+      orgId,
+      userId,
+      units: 1,
+      estimatedCostMicros:
+        BigInt(estimatedSegments) * outboundCommunicationCapConfig().smsEstimatedSegmentCostMicros,
     },
+    log,
   );
 
-  if (!response.ok) {
-    const err = await response.text();
-    log.warn({ toNumber, status: response.status, err }, 'Twilio send failed');
-    throw new Error(`Twilio API error ${response.status}: ${err}`);
-  }
+  let providerAccepted = false;
+  let tokenId: string;
+  let fromNumber: string;
+  let twilioMsg: { sid: string; num_segments: string };
+  try {
+    // Step 1: Load credentials
+    const credentials = await loadCredentials(orgId);
+    const { accountSid, authToken } = credentials;
+    tokenId = credentials.tokenId;
+    fromNumber = credentials.fromNumber;
 
-  const twilioMsg = (await response.json()) as { sid: string; num_segments: string };
+    // Step 3: POST to Twilio
+    const formBody = new URLSearchParams({
+      From: fromNumber,
+      To: toNumber,
+      Body: body,
+      StatusCallback: `${process.env.PUBLIC_API_URL ?? ''}/api/v1/integrations/twilio/webhook/status`,
+    });
+
+    const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const response = await fetchWithTimeout(
+      `${TWILIO_API_BASE}/Accounts/${accountSid}/Messages.json`,
+      {
+        provider: 'Twilio',
+        operation: 'messages.create',
+        timeoutMs: providerTimeoutMs('TWILIO_HTTP_TIMEOUT_MS', 15_000),
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formBody.toString(),
+      },
+    );
+
+    if (!response.ok) {
+      const err = await response.text();
+      log.warn({ toNumber, status: response.status, err }, 'Twilio send failed');
+      throw new Error(`Twilio API error ${response.status}: ${err}`);
+    }
+
+    twilioMsg = (await response.json()) as { sid: string; num_segments: string };
+    providerAccepted = true;
+  } catch (err) {
+    if (!providerAccepted) await reservation.rollback();
+    throw err;
+  }
 
   // Step 4: Persist SmsMessage
   const msg = await prisma.smsMessage.create({
@@ -222,7 +271,10 @@ export async function testTwilioConnection(
 
   const { accountSid, authToken, fromNumber } = await loadCredentials(orgId);
   const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-  const response = await fetch(`${TWILIO_API_BASE}/Accounts/${accountSid}.json`, {
+  const response = await fetchWithTimeout(`${TWILIO_API_BASE}/Accounts/${accountSid}.json`, {
+    provider: 'Twilio',
+    operation: 'account.get',
+    timeoutMs: providerTimeoutMs('TWILIO_HTTP_TIMEOUT_MS', 15_000),
     headers: { Authorization: `Basic ${basicAuth}` },
   });
 
@@ -315,7 +367,13 @@ export async function handleInboundSms(
   if (STOP_KEYWORDS.has(keyword)) {
     await prisma.smsConsent.upsert({
       where: { orgId_phoneNumber: { orgId, phoneNumber: From } },
-      create: { orgId, phoneNumber: From, optedOut: true, optedOutAt: new Date(), source: 'STOP_KEYWORD' },
+      create: {
+        orgId,
+        phoneNumber: From,
+        optedOut: true,
+        optedOutAt: new Date(),
+        source: 'STOP_KEYWORD',
+      },
       update: { optedOut: true, optedOutAt: new Date(), source: 'STOP_KEYWORD' },
     });
     log.info({ From, keyword }, 'STOP keyword received — opt-out recorded');
@@ -328,9 +386,9 @@ export async function handleInboundSms(
     select: { id: true },
   });
 
-  // Find the token that owns the To number for FK integrity
+  // Find the token that owns the To number for FK integrity.
   const token = await prisma.integrationToken.findFirst({
-    where: { orgId, provider: 'twilio', status: 'active' },
+    where: { orgId, provider: 'twilio', status: 'active', externalAccountId: To },
     select: { id: true },
   });
 
@@ -342,23 +400,32 @@ export async function handleInboundSms(
     });
 
     if (adminUser) {
-      await prisma.smsMessage.create({
-        data: {
-          orgId,
-          userId: adminUser.id,
-          integrationTokenId: token.id,
-          fromNumber: From,
-          toNumber: To,
-          body: trimmedBody,
-          status: 'DELIVERED',
-          twilioSid: MessageSid,
-          segments: NumSegments ? parseInt(NumSegments, 10) : 1,
-          sentAt: new Date(),
-          deliveredAt: new Date(),
-          entityType: contact ? 'CONTACT' : null,
-          entityId: contact?.id ?? null,
-        },
-      });
+      try {
+        await prisma.smsMessage.create({
+          data: {
+            orgId,
+            userId: adminUser.id,
+            integrationTokenId: token.id,
+            fromNumber: From,
+            toNumber: To,
+            body: trimmedBody,
+            status: 'DELIVERED',
+            twilioSid: MessageSid,
+            segments: NumSegments ? parseInt(NumSegments, 10) : 1,
+            sentAt: new Date(),
+            deliveredAt: new Date(),
+            entityType: contact ? 'CONTACT' : null,
+            entityId: contact?.id ?? null,
+          },
+        });
+      } catch (err) {
+        if (isUniqueConstraintError(err)) {
+          log.info({ MessageSid, From }, 'Inbound SMS duplicate ignored');
+          return;
+        }
+
+        throw err;
+      }
 
       if (contact) {
         await prisma.activity
@@ -394,9 +461,10 @@ export async function validateTwilioSignature(
   signature: string,
   url: string,
   params: Record<string, string>,
+  twilioNumber?: string,
 ): Promise<boolean> {
   try {
-    const { authToken } = await loadCredentials(orgId);
+    const { authToken } = await loadCredentials(orgId, twilioNumber);
 
     // Build the string to sign: URL + sorted param key-value pairs
     const sortedParams = Object.keys(params)

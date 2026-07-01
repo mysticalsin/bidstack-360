@@ -10,8 +10,18 @@
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { runWithOAuthRefreshLock } from '../lib/oauth-refresh-lock.js';
 
 export type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
+
+function oauthTimeoutMs(): number {
+  return providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000);
+}
+
+function tokenExpiresSoon(expiresAt: Date | null): boolean {
+  return expiresAt ? expiresAt.getTime() < Date.now() + 60_000 : false;
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,7 +62,10 @@ export async function refreshGmailToken(
   refreshToken: string,
   log: ServiceLogger,
 ): Promise<string> {
-  const res = await fetch('https://oauth2.googleapis.com/token', {
+  const res = await fetchWithTimeout('https://oauth2.googleapis.com/token', {
+    provider: 'Gmail',
+    operation: 'oauth.refresh',
+    timeoutMs: oauthTimeoutMs(),
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -96,18 +109,24 @@ export async function refreshMsGraphToken(
   log: ServiceLogger,
 ): Promise<string> {
   const tenant = process.env.MICROSOFT_TENANT_ID ?? 'common';
-  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.MICROSOFT_GRAPH_CLIENT_ID ?? '',
-      client_secret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET ?? '',
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-      scope:
-        'https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.Read offline_access',
-    }).toString(),
-  });
+  const res = await fetchWithTimeout(
+    `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
+    {
+      provider: 'Microsoft Graph',
+      operation: 'oauth.refresh',
+      timeoutMs: oauthTimeoutMs(),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.MICROSOFT_GRAPH_CLIENT_ID ?? '',
+        client_secret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET ?? '',
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+        scope:
+          'https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.Read offline_access',
+      }).toString(),
+    },
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -150,21 +169,34 @@ export async function getAccessToken(
   },
   log: ServiceLogger,
 ): Promise<string> {
-  const isExpired = tokenRecord.expiresAt
-    ? tokenRecord.expiresAt.getTime() < Date.now() + 60_000 // 1 min buffer
-    : false;
+  if (!tokenExpiresSoon(tokenRecord.expiresAt))
+    return decryptToken(tokenRecord.accessTokenEncrypted);
 
-  if (!isExpired) return decryptToken(tokenRecord.accessTokenEncrypted);
+  return runWithOAuthRefreshLock({
+    tokenId: tokenRecord.id,
+    log,
+    getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id),
+    refresh: async () => {
+      if (!tokenRecord.refreshTokenEncrypted) {
+        throw new Error('Token expired and no refresh token available');
+      }
 
-  if (!tokenRecord.refreshTokenEncrypted) {
-    throw new Error('Token expired and no refresh token available');
-  }
+      const refresh = decryptToken(tokenRecord.refreshTokenEncrypted);
+      if (tokenRecord.provider === 'gmail') {
+        return refreshGmailToken(tokenRecord.id, refresh, log);
+      }
+      return refreshMsGraphToken(tokenRecord.id, refresh, log);
+    },
+  });
+}
 
-  const refresh = decryptToken(tokenRecord.refreshTokenEncrypted);
-  if (tokenRecord.provider === 'gmail') {
-    return refreshGmailToken(tokenRecord.id, refresh, log);
-  }
-  return refreshMsGraphToken(tokenRecord.id, refresh, log);
+async function getFreshIntegrationAccessToken(tokenId: string): Promise<string | null> {
+  const token = await prisma.integrationToken.findUnique({
+    where: { id: tokenId },
+    select: { accessTokenEncrypted: true, expiresAt: true, status: true },
+  });
+  if (!token || token.status !== 'active' || tokenExpiresSoon(token.expiresAt)) return null;
+  return decryptToken(token.accessTokenEncrypted);
 }
 
 // ─── Tracking pixel injection ──────────────────────────────────────────────────

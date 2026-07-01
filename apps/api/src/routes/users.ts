@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { AssignedRoleList, AssignRoleInput, CapabilityManifest } from '@bidstack/shared';
 
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { getUserPermissions } from '../services/rbac.service.js';
 
 const OrgUser = z.object({
@@ -235,6 +236,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         });
       });
+      invalidateRbacDecisionCache(req.auth.orgId, user.id);
 
       const rows = await prisma.userRole.findMany({
         where: {
@@ -291,6 +293,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           diff: { roleId: req.params.roleId },
         },
       });
+      invalidateRbacDecisionCache(req.auth.orgId, req.params.id);
       return reply.code(204).send(null);
     },
   );

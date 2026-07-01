@@ -36,8 +36,14 @@ function parseArgs(argv) {
   const parsed = {
     root: process.cwd(),
     outputPath: process.env.BIDSTACK_SENTRY_EVIDENCE_PATH || DEFAULT_OUTPUT_PATH,
-    environment: normalizeEnvironment(process.env.BIDSTACK_DEPLOY_ENV || process.env.SENTRY_ENVIRONMENT || 'staging'),
-    release: process.env.BIDSTACK_SENTRY_RELEASE || process.env.SENTRY_RELEASE || process.env.VITE_SENTRY_RELEASE || '',
+    environment: normalizeEnvironment(
+      process.env.BIDSTACK_DEPLOY_ENV || process.env.SENTRY_ENVIRONMENT || 'staging',
+    ),
+    release:
+      process.env.BIDSTACK_SENTRY_RELEASE ||
+      process.env.SENTRY_RELEASE ||
+      process.env.VITE_SENTRY_RELEASE ||
+      '',
     org: process.env.BIDSTACK_SENTRY_ORG || process.env.SENTRY_ORG || '',
     apiProject: process.env.BIDSTACK_SENTRY_API_PROJECT || '',
     workerProject: process.env.BIDSTACK_SENTRY_WORKER_PROJECT || '',
@@ -243,7 +249,9 @@ Environment:
 }
 
 function normalizeEnvironment(value) {
-  const normalized = String(value || 'staging').trim().toLowerCase();
+  const normalized = String(value || 'staging')
+    .trim()
+    .toLowerCase();
   if (normalized === 'prod') return 'production';
   if (normalized === 'stage') return 'staging';
   return normalized || 'staging';
@@ -284,7 +292,9 @@ function parseRequiredNonNegativeInteger(value, label) {
 }
 
 function normalizeApiBaseUrl(value) {
-  return String(value || '').trim().replace(/\/+$/, '');
+  return String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
 }
 
 function isLocalTarget(target) {
@@ -305,7 +315,9 @@ function isLocalTarget(target) {
 }
 
 function hasPlaceholderSignal(value) {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return false;
   return (
     PLACEHOLDER_EXACT_VALUES.has(normalized) ||
@@ -483,10 +495,13 @@ async function triggerSmokeEvents(options, deps = {}) {
   );
   const triggerFailures = [api, worker]
     .filter((result) => result.passed !== true)
-    .map((result) => `${result.label} returned ${result.status ?? result.error ?? 'unknown failure'}`);
+    .map(
+      (result) => `${result.label} returned ${result.status ?? result.error ?? 'unknown failure'}`,
+    );
 
   if (options.observeDelayMs > 0) {
-    const sleepFn = deps.sleepFn ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
+    const sleepFn =
+      deps.sleepFn ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
     process.stdout.write(`Waiting ${options.observeDelayMs}ms for Sentry ingestion\n`);
     await sleepFn(options.observeDelayMs);
   }
@@ -636,7 +651,8 @@ function collectPrivacySourceProof(root) {
     },
     {
       id: 'web.helper.replayOptIn',
-      passed: /VITE_SENTRY_REPLAY === 'true'/.test(webHelper) && /maskAllInputs:\s*true/.test(webHelper),
+      passed:
+        /VITE_SENTRY_REPLAY === 'true'/.test(webHelper) && /maskAllInputs:\s*true/.test(webHelper),
     },
   ];
 
@@ -653,12 +669,30 @@ function buildArtifact(options, observations) {
     generatedAt: new Date().toISOString(),
     environment: options.environment,
     release: options.release,
+    organization: options.org,
+    projects: {
+      api: options.apiProject,
+      worker: options.workerProject,
+    },
+    markers: {
+      api: options.apiMarker,
+      worker: options.workerMarker,
+    },
     triggerTarget: options.apiBaseUrl || null,
     dsnConfigured: options.dsnConfigured,
     sendDefaultPii: options.sendDefaultPii,
     piiScrubberEnabled: privacy.passed,
     sessionReplayEnabled: options.sessionReplayEnabled,
     legalApproval: options.sessionReplayEnabled ? options.legalApproval : undefined,
+    privacy: {
+      compactIssueMetadataIncluded: true,
+      rawEventPayloadsIncluded: false,
+      stackTracesIncluded: false,
+      requestBodiesIncluded: false,
+      userEmailsIncluded: false,
+      commandStdoutIncluded: false,
+      commandStderrIncluded: false,
+    },
     api5xxSmokeObserved: observations.api.observed,
     workerFailureObserved: observations.worker.observed,
     triggeredSmoke: observations.triggeredSmoke,
@@ -689,16 +723,98 @@ function validateArtifact(artifact) {
   if (artifact.dsnConfigured !== true) failures.push('Sentry DSN must be configured');
   if (!String(artifact.release || '').trim()) failures.push('Sentry release is required');
   if (!String(artifact.environment || '').trim()) failures.push('Sentry environment is required');
-  if (artifact.apiEvidence?.command?.passed !== true) failures.push('API smoke Sentry query did not complete');
-  if (artifact.workerEvidence?.command?.passed !== true) failures.push('Worker smoke Sentry query did not complete');
-  if (artifact.api5xxSmokeObserved !== true) failures.push('API 5xx smoke issue was not observed in Sentry');
-  if (artifact.workerFailureObserved !== true) failures.push('Worker failure smoke issue was not observed in Sentry');
+  if (hasPlaceholderSignal(artifact.release))
+    failures.push('Sentry release looks like placeholder evidence');
+  if (!String(artifact.organization || '').trim()) failures.push('Sentry organization is required');
+  if (hasPlaceholderSignal(artifact.organization)) {
+    failures.push('Sentry organization looks like placeholder evidence');
+  }
+  const apiProject = String(artifact.projects?.api || '').trim();
+  const workerProject = String(artifact.projects?.worker || '').trim();
+  if (!apiProject) failures.push('Sentry API project is required');
+  if (!workerProject) failures.push('Sentry worker project is required');
+  if (hasPlaceholderSignal(apiProject))
+    failures.push('Sentry API project looks like placeholder evidence');
+  if (hasPlaceholderSignal(workerProject)) {
+    failures.push('Sentry worker project looks like placeholder evidence');
+  }
+  failures.push(
+    ...validateObservation('API', artifact.apiEvidence, {
+      marker: artifact.markers?.api,
+      release: artifact.release,
+      environment: artifact.environment,
+      project: apiProject,
+    }),
+  );
+  failures.push(
+    ...validateObservation('Worker', artifact.workerEvidence, {
+      marker: artifact.markers?.worker,
+      release: artifact.release,
+      environment: artifact.environment,
+      project: workerProject,
+    }),
+  );
+  if (artifact.api5xxSmokeObserved !== true)
+    failures.push('API 5xx smoke issue was not observed in Sentry');
+  if (artifact.workerFailureObserved !== true)
+    failures.push('Worker failure smoke issue was not observed in Sentry');
   if (!(artifact.sendDefaultPii === false || artifact.piiScrubberEnabled === true)) {
     failures.push('Sentry privacy controls are not proven');
+  }
+  const privacy = artifact.privacy && typeof artifact.privacy === 'object' ? artifact.privacy : {};
+  for (const [key, label] of [
+    ['rawEventPayloadsIncluded', 'raw event payloads'],
+    ['stackTracesIncluded', 'stack traces'],
+    ['requestBodiesIncluded', 'request bodies'],
+    ['userEmailsIncluded', 'user emails'],
+    ['commandStdoutIncluded', 'raw command stdout'],
+    ['commandStderrIncluded', 'raw command stderr'],
+  ]) {
+    if (privacy[key] !== false) {
+      failures.push(`Sentry evidence must not include ${label}`);
+    }
   }
   if (artifact.sessionReplayEnabled === true && artifact.legalApproval !== true) {
     failures.push('Session replay requires legal approval');
   }
+  return failures;
+}
+
+function validateObservation(label, observation, expected) {
+  const failures = [];
+  const target = String(observation?.target || '').trim();
+  const query = String(observation?.query || '').trim();
+  const issues = Array.isArray(observation?.issues) ? observation.issues : [];
+  const marker = String(expected.marker || '').trim();
+  const release = String(expected.release || '').trim();
+  const environment = String(expected.environment || '').trim();
+  const project = String(expected.project || '').trim();
+
+  if (observation?.command?.passed !== true)
+    failures.push(`${label} smoke Sentry query did not complete`);
+  if (!target) failures.push(`${label} Sentry target is required`);
+  if (hasPlaceholderSignal(target))
+    failures.push(`${label} Sentry target looks like placeholder evidence`);
+  if (project && !target.includes(project)) {
+    failures.push(`${label} Sentry target does not include expected project ${project}`);
+  }
+  if (!query) failures.push(`${label} Sentry query is required`);
+  if (marker && !query.includes(marker))
+    failures.push(`${label} Sentry query does not include marker ${marker}`);
+  if (release && !query.includes(release)) {
+    failures.push(`${label} Sentry query does not include release ${release}`);
+  }
+  if (environment && !query.includes(environment)) {
+    failures.push(`${label} Sentry query does not include environment ${environment}`);
+  }
+  if (observation?.observed !== true || Number(observation?.issueCount ?? 0) <= 0) {
+    failures.push(`${label} Sentry smoke issue was not observed`);
+  }
+  if (issues.length <= 0) failures.push(`${label} Sentry evidence has no compact issue metadata`);
+  if (project && issues.length > 0 && !issues.some((issue) => issue?.project === project)) {
+    failures.push(`${label} Sentry issues do not include expected project ${project}`);
+  }
+
   return failures;
 }
 
@@ -730,7 +846,9 @@ async function runWriter(options, deps = {}) {
   }
   process.stdout.write(`API smoke issues: ${artifact.apiEvidence.issueCount}\n`);
   process.stdout.write(`Worker smoke issues: ${artifact.workerEvidence.issueCount}\n`);
-  process.stdout.write(`Privacy source proof: ${artifact.privacySourceProof.passed ? 'yes' : 'no'}\n`);
+  process.stdout.write(
+    `Privacy source proof: ${artifact.privacySourceProof.passed ? 'yes' : 'no'}\n`,
+  );
 
   if (artifact.validationFailures.length > 0) {
     for (const failure of artifact.validationFailures) {
@@ -743,11 +861,20 @@ async function runWriter(options, deps = {}) {
   return 0;
 }
 
-function fixtureObservation({ observed = true, commandPassed = true } = {}) {
+function fixtureObservation({
+  observed = true,
+  commandPassed = true,
+  label = 'fixture',
+  target = 'bidstack/bidstack-api',
+  project = 'bidstack-api',
+  marker = DEFAULT_API_MARKER,
+  release = 'bidstack@0.1.0+abc123',
+  environment = 'staging',
+} = {}) {
   return {
-    label: 'fixture',
-    target: 'fixture-org/fixture-project',
-    query: 'release:fixture level:error *fixture*',
+    label,
+    target,
+    query: `release:${release} environment:${environment} level:error *${marker}*`,
     observed,
     issueCount: observed ? 1 : 0,
     issues: observed
@@ -761,7 +888,7 @@ function fixtureObservation({ observed = true, commandPassed = true } = {}) {
             count: '1',
             lastSeen: new Date().toISOString(),
             permalink: 'https://sentry.example/issues/123',
-            project: 'fixture-project',
+            project,
           },
         ]
       : [],
@@ -780,6 +907,11 @@ function baseOptions(overrides = {}) {
     outputPath: DEFAULT_OUTPUT_PATH,
     environment: 'staging',
     release: 'bidstack@0.1.0+abc123',
+    org: 'bidstack',
+    apiProject: 'bidstack-api',
+    workerProject: 'bidstack-worker',
+    apiTarget: 'bidstack/bidstack-api',
+    workerTarget: 'bidstack/bidstack-worker',
     apiBaseUrl: 'https://staging-api.bidstack360.com',
     smokeToken: 'release-smoke-token-1234567890',
     apiMarker: DEFAULT_API_MARKER,
@@ -799,14 +931,27 @@ async function runSelftest() {
   const good = buildArtifact(baseOptions(), {
     triggeredSmoke: null,
     api: fixtureObservation(),
-    worker: fixtureObservation(),
+    worker: fixtureObservation({
+      label: 'worker fixture',
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
   });
-  assert.equal(good.passed, true, `expected clean Sentry fixture to pass: ${good.validationFailures.join(', ')}`);
+  assert.equal(
+    good.passed,
+    true,
+    `expected clean Sentry fixture to pass: ${good.validationFailures.join(', ')}`,
+  );
 
   const missingApi = buildArtifact(baseOptions(), {
     triggeredSmoke: null,
     api: fixtureObservation({ observed: false }),
-    worker: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
   });
   assert.equal(missingApi.passed, false, 'expected missing API smoke issue to fail');
   assert.equal(
@@ -818,7 +963,11 @@ async function runSelftest() {
   const queryFailure = buildArtifact(baseOptions(), {
     triggeredSmoke: null,
     api: fixtureObservation({ commandPassed: false }),
-    worker: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
   });
   assert.equal(queryFailure.passed, false, 'expected Sentry CLI query failure to fail');
   assert.equal(
@@ -827,11 +976,18 @@ async function runSelftest() {
     'expected query failure',
   );
 
-  const replayWithoutLegal = buildArtifact(baseOptions({ sessionReplayEnabled: true, legalApproval: false }), {
-    triggeredSmoke: null,
-    api: fixtureObservation(),
-    worker: fixtureObservation(),
-  });
+  const replayWithoutLegal = buildArtifact(
+    baseOptions({ sessionReplayEnabled: true, legalApproval: false }),
+    {
+      triggeredSmoke: null,
+      api: fixtureObservation(),
+      worker: fixtureObservation({
+        target: 'bidstack/bidstack-worker',
+        project: 'bidstack-worker',
+        marker: DEFAULT_WORKER_MARKER,
+      }),
+    },
+  );
   assert.equal(replayWithoutLegal.passed, false, 'expected replay without legal approval to fail');
   assert.equal(
     replayWithoutLegal.validationFailures.some((failure) => failure.includes('legal approval')),
@@ -842,14 +998,22 @@ async function runSelftest() {
   const missingDsn = buildArtifact(baseOptions({ dsnConfigured: false }), {
     triggeredSmoke: null,
     api: fixtureObservation(),
-    worker: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
   });
   assert.equal(missingDsn.passed, false, 'expected missing DSN to fail');
 
   const missingTriggerTarget = buildArtifact(baseOptions({ apiBaseUrl: '' }), {
     triggeredSmoke: null,
     api: fixtureObservation(),
-    worker: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
   });
   assert.equal(missingTriggerTarget.passed, false, 'expected missing trigger target to fail');
   assert.equal(
@@ -861,7 +1025,11 @@ async function runSelftest() {
   const localTriggerTarget = buildArtifact(baseOptions({ apiBaseUrl: 'http://127.0.0.1:4000' }), {
     triggeredSmoke: null,
     api: fixtureObservation(),
-    worker: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
   });
   assert.equal(localTriggerTarget.passed, false, 'expected local trigger target to fail');
   assert.equal(
@@ -870,14 +1038,68 @@ async function runSelftest() {
     'expected non-local trigger target failure',
   );
 
+  const wrongProject = buildArtifact(baseOptions(), {
+    triggeredSmoke: null,
+    api: fixtureObservation({ project: 'other-api' }),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
+  });
+  assert.equal(wrongProject.passed, false, 'expected wrong API project metadata to fail');
+  assert.equal(
+    wrongProject.validationFailures.some((failure) =>
+      failure.includes('expected project bidstack-api'),
+    ),
+    true,
+    'expected API project mismatch failure',
+  );
+
+  const weakQuery = buildArtifact(baseOptions(), {
+    triggeredSmoke: null,
+    api: fixtureObservation({ marker: 'wrong-marker' }),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
+  });
+  assert.equal(weakQuery.passed, false, 'expected missing API marker in query to fail');
+  assert.equal(
+    weakQuery.validationFailures.some((failure) => failure.includes(DEFAULT_API_MARKER)),
+    true,
+    'expected API marker query failure',
+  );
+
+  const rawPrivacy = buildArtifact(baseOptions(), {
+    triggeredSmoke: null,
+    api: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
+  });
+  rawPrivacy.privacy.commandStdoutIncluded = true;
+  assert.equal(
+    validateArtifact(rawPrivacy).some((failure) => failure.includes('raw command stdout')),
+    true,
+  );
+
   const trigger = await triggerSmokeEvents(baseOptions({ triggerSmoke: true }), {
     fetchFn: async (url) => ({
       status: String(url).endsWith('/api') ? 500 : 202,
-      text: async () => (String(url).endsWith('/api') ? '{"error":"controlled"}' : '{"queued":true}'),
+      text: async () =>
+        String(url).endsWith('/api') ? '{"error":"controlled"}' : '{"queued":true}',
     }),
     sleepFn: async () => undefined,
   });
-  assert.equal(trigger.passed, true, `expected trigger fixture to pass: ${trigger.failures.join(', ')}`);
+  assert.equal(
+    trigger.passed,
+    true,
+    `expected trigger fixture to pass: ${trigger.failures.join(', ')}`,
+  );
   assert.equal(trigger.api.status, 500);
   assert.equal(trigger.worker.status, 202);
   assert.equal(trigger.api.marker, DEFAULT_API_MARKER);

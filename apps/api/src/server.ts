@@ -33,25 +33,6 @@ import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
 
-const CONNECT_SRC = [
-  "'self'",
-  'https://api.clerk.com',
-  'https://*.clerk.accounts.dev',
-  'https://dust.tt',
-  'https://*.dust.tt',
-  'https://*.sentry.io',
-  'https://api.apollo.io',
-  // Wave 8 — Video call providers
-  'https://api.zoom.us',
-  'https://zoom.us',
-  'https://api.deepgram.com',
-  'https://graph.microsoft.com',
-  'https://www.googleapis.com',
-  'https://api.twilio.com',
-];
-
-const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges.cloudflare.com'];
-
 /**
  * Parse TRUSTED_PROXIES into a Fastify trustProxy value. Behind Azure Front Door
  * + Container Apps Envoy the client IP is N hops upstream, so a hop COUNT (e.g.
@@ -150,24 +131,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   await server.register(helmet, {
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: config.NODE_ENV === 'development' ? ["'self'", "'unsafe-inline'"] : ["'self'"],
-        imgSrc: ["'self'", 'data:'],
-        connectSrc: CONNECT_SRC,
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        frameSrc: FRAME_SRC,
-        frameAncestors: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-        workerSrc: ["'none'"],
-        mediaSrc: ["'none'"],
-        ...(config.NODE_ENV === 'production' ? { upgradeInsecureRequests: [] } : {}),
-      },
-    },
+    // CSP is owned by securityHeadersPlugin so the effective policy has one
+    // source of truth instead of a dead Helmet policy overwritten onSend.
+    contentSecurityPolicy: false,
     strictTransportSecurity: {
       maxAge: 31536000,
       includeSubDomains: true,
@@ -184,7 +150,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     permittedCrossDomainPolicies: { permittedPolicies: 'none' },
     xssFilter: true,
     xFrameOptions: { action: 'deny' },
-    // permissionsPolicy removed in @fastify/helmet v12 — set via custom header if needed
+    // Permissions-Policy removed in @fastify/helmet v12; securityHeadersPlugin owns it.
   });
   await server.register(cors, {
     origin: (origin, cb) => {
@@ -207,15 +173,6 @@ export async function buildServer(): Promise<FastifyInstance> {
     global: true,
     threshold: 1024,
     encodings: ['br', 'gzip', 'deflate'],
-  });
-
-  // Permissions-Policy is not exposed by @fastify/helmet@12 (helmet@7), so we
-  // set it manually on every outbound response.
-  server.addHook('onSend', async (_req, reply) => {
-    reply.header(
-      'Permissions-Policy',
-      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()',
-    );
   });
 
   // OpenAPI: register BEFORE route plugins so swagger sees all schemas.

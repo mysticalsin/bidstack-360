@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
 
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROLE_WITH_PERMISSIONS = {
   permissions: {
@@ -129,6 +131,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
           include: ROLE_WITH_PERMISSIONS,
         });
       });
+      invalidateRbacDecisionCache(req.auth.orgId);
       reply.status(201);
       return serializeRole(roleWithPerms);
     },
@@ -234,6 +237,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
         return after;
       });
 
+      invalidateRbacDecisionCache(req.auth.orgId);
       return serializeRole(role);
     },
   );
@@ -279,6 +283,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
         });
       });
 
+      invalidateRbacDecisionCache(req.auth.orgId);
       return reply.status(204).send();
     },
   );

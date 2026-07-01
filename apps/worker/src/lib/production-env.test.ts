@@ -32,6 +32,29 @@ describe('worker production env contract', () => {
     ]);
   });
 
+  it('rejects loopback or malformed Redis URLs in production', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        REDIS_URL: 'redis://localhost:6380',
+      }),
+    ).toContain('REDIS_URL must not point at localhost or loopback in production');
+
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        REDIS_URL: 'redis://127.0.0.1:6380',
+      }),
+    ).toContain('REDIS_URL must not point at localhost or loopback in production');
+
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        REDIS_URL: 'not-a-redis-url',
+      }),
+    ).toEqual(['REDIS_URL must be a valid Redis URL in production']);
+  });
+
   it('rejects legacy or malformed integration token keys', () => {
     expect(
       validateWorkerProductionEnv({

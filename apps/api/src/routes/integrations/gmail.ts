@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 
 const GMAIL_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -146,7 +147,10 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       // Exchange auth code for access + refresh tokens
-      const tokenRes = await fetch(GMAIL_TOKEN_URL, {
+      const tokenRes = await fetchWithTimeout(GMAIL_TOKEN_URL, {
+        provider: 'Gmail',
+        operation: 'oauth.exchange',
+        timeoutMs: providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000),
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -182,9 +186,15 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         threadsTotal?: number;
       } | null = null;
       try {
-        const profileRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        });
+        const profileRes = await fetchWithTimeout(
+          'https://www.googleapis.com/oauth2/v1/userinfo?alt=json',
+          {
+            provider: 'Gmail',
+            operation: 'oauth.userinfo',
+            timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          },
+        );
         if (profileRes.ok) {
           const profile = (await profileRes.json()) as { email?: string };
           externalEmail = profile.email;
@@ -194,9 +204,12 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       try {
-        const gmailProfileRes = await fetch(
+        const gmailProfileRes = await fetchWithTimeout(
           'https://gmail.googleapis.com/gmail/v1/users/me/profile',
           {
+            provider: 'Gmail',
+            operation: 'profile.get',
+            timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
             headers: { Authorization: `Bearer ${tokens.access_token}` },
           },
         );

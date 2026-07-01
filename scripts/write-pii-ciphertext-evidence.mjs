@@ -9,6 +9,19 @@ const DEFAULT_OUTPUT_PATH = 'deploy-evidence/pii-ciphertext-latest.json';
 const ENCRYPTED_PREFIX = 'enc:v1:';
 const EMAIL_HASH_PATTERN = '^[0-9a-f]{64}$';
 const DEFAULT_REQUIRED_MODELS = ['contact', 'lead', 'kamConsultant'];
+const USER_EMAIL_STORAGE_ONLY_DECISION = 'storage-encryption-only';
+const MIN_EVIDENCE_REF_LENGTH = 12;
+const PLAINTEXT_PII_STORAGE_ONLY_DECISION = 'storage-encryption-only';
+const REQUIRED_PLAINTEXT_PII_FIELDS = [
+  'SmsMessage.fromNumber',
+  'SmsMessage.toNumber',
+  'SmsMessage.body',
+  'SmsConsent.phoneNumber',
+  'ActivityAttendee.email',
+  'CalendarEvent.attendees',
+  'KamSession.transcriptText',
+  'KamSession.attendees',
+];
 
 const MODEL_DEFINITIONS = [
   {
@@ -59,6 +72,32 @@ function parseArgs(argv) {
     requiredModels: normalizeRequiredModels(
       process.env.BIDSTACK_PII_CIPHERTEXT_REQUIRED_MODELS ?? DEFAULT_REQUIRED_MODELS.join(','),
     ),
+    storageEncryptionAtRest: parseOptionalBoolean(process.env.BIDSTACK_STORAGE_ENCRYPTION_AT_REST),
+    storageEncryptionProvider: normalizeEvidenceText(
+      process.env.BIDSTACK_STORAGE_ENCRYPTION_PROVIDER,
+    ),
+    storageEncryptionEvidenceRef: normalizeEvidenceText(
+      process.env.BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE,
+    ),
+    userEmailDecision: normalizeEvidenceText(process.env.BIDSTACK_USER_EMAIL_AT_REST_DECISION),
+    userEmailDecisionRef: normalizeEvidenceText(
+      process.env.BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF,
+    ),
+    userEmailDecisionOwner: normalizeEvidenceText(
+      process.env.BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER,
+    ),
+    plaintextPiiDecision: normalizeEvidenceText(
+      process.env.BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION,
+    ),
+    plaintextPiiDecisionRef: normalizeEvidenceText(
+      process.env.BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF,
+    ),
+    plaintextPiiDecisionOwner: normalizeEvidenceText(
+      process.env.BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER,
+    ),
+    plaintextPiiAcceptedFields: normalizePlaintextPiiFields(
+      process.env.BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS,
+    ),
     strict: resolveStrictDefault(),
     selftest: false,
   };
@@ -84,6 +123,36 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === '--required-models') {
       options.requiredModels = normalizeRequiredModels(next);
+      index += 1;
+    } else if (arg === '--storage-encryption-at-rest') {
+      options.storageEncryptionAtRest = parseOptionalBoolean(next);
+      index += 1;
+    } else if (arg === '--storage-encryption-provider') {
+      options.storageEncryptionProvider = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--storage-encryption-evidence') {
+      options.storageEncryptionEvidenceRef = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--user-email-decision') {
+      options.userEmailDecision = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--user-email-decision-ref') {
+      options.userEmailDecisionRef = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--user-email-decision-owner') {
+      options.userEmailDecisionOwner = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--plaintext-pii-decision') {
+      options.plaintextPiiDecision = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--plaintext-pii-decision-ref') {
+      options.plaintextPiiDecisionRef = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--plaintext-pii-decision-owner') {
+      options.plaintextPiiDecisionOwner = normalizeEvidenceText(next);
+      index += 1;
+    } else if (arg === '--plaintext-pii-accepted-fields') {
+      options.plaintextPiiAcceptedFields = normalizePlaintextPiiFields(next);
       index += 1;
     } else if (arg === '--allow-empty') {
       options.requiredModels = [];
@@ -113,11 +182,31 @@ Environment:
   DATABASE_URL                               Fallback release database URL
   BIDSTACK_PII_CIPHERTEXT_EVIDENCE           Output path
   BIDSTACK_PII_CIPHERTEXT_REQUIRED_MODELS    CSV: contact,lead,kamConsultant
+  BIDSTACK_STORAGE_ENCRYPTION_AT_REST        true when release DB storage is encrypted
+  BIDSTACK_STORAGE_ENCRYPTION_PROVIDER       Provider/control label, e.g. azure-postgresql-cmk
+  BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE       Reviewable ticket/control evidence reference
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION       Must be storage-encryption-only for this release
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF   Reviewable decision/DPIA/approval reference
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER Decision owner
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION       Must be storage-encryption-only for this release
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF   Reviewable decision/DPIA/approval reference
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER Decision owner
+  BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS CSV of required plaintext PII fields accepted by the decision
   BIDSTACK_DEPLOY_ENV                        Evidence environment label
 
 Options:
   --database-url <url>        Override database URL
   --required-models <csv>     Require non-empty encrypted email rows for models
+  --storage-encryption-at-rest <bool>
+  --storage-encryption-provider <label>
+  --storage-encryption-evidence <ref>
+  --user-email-decision <decision>
+  --user-email-decision-ref <ref>
+  --user-email-decision-owner <owner>
+  --plaintext-pii-decision <decision>
+  --plaintext-pii-decision-ref <ref>
+  --plaintext-pii-decision-owner <owner>
+  --plaintext-pii-accepted-fields <csv>
   --allow-empty               Do not require non-empty model coverage
   --output <path>             Override evidence output path
   --env <name>                Override deploy environment
@@ -148,6 +237,39 @@ function resolveDatabaseUrlFromEnv() {
   return { source: null, value: '' };
 }
 
+function parseOptionalBoolean(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return null;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'n'].includes(normalized)) {
+    return false;
+  }
+  return null;
+}
+
+function normalizeEvidenceText(value) {
+  return String(value ?? '').trim();
+}
+
+function hasPlaceholderSignal(value) {
+  const normalized = normalizeEvidenceText(value).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return /<[^>]+>|\bexample\b|\bplaceholder\b|\breplace[-_ ]?me\b|\bsample\b|\btodo\b|\byour[-_ ]/i.test(
+    normalized,
+  );
+}
+
+function hasReviewableEvidence(value) {
+  const normalized = normalizeEvidenceText(value);
+  return normalized.length >= MIN_EVIDENCE_REF_LENGTH && !hasPlaceholderSignal(normalized);
+}
+
 function normalizeRequiredModels(value) {
   const seen = new Set();
   const result = [];
@@ -164,6 +286,23 @@ function normalizeRequiredModels(value) {
   }
 
   return result;
+}
+
+function normalizePlaintextPiiFields(value) {
+  const seen = new Set();
+  const fields = [];
+
+  for (const item of String(value ?? '')
+    .split(',')
+    .map((field) => field.trim())
+    .filter(Boolean)) {
+    if (!seen.has(item)) {
+      seen.add(item);
+      fields.push(item);
+    }
+  }
+
+  return fields;
 }
 
 function quoteIdentifier(value) {
@@ -400,6 +539,33 @@ function buildArtifact(options, scan) {
       hashesIncluded: false,
       rowIdsIncluded: false,
     },
+    atRestControls: {
+      storageEncryption: {
+        enabled: options.storageEncryptionAtRest,
+        provider: options.storageEncryptionProvider,
+        evidenceRef: options.storageEncryptionEvidenceRef,
+        rawConfigIncluded: false,
+      },
+      userEmail: {
+        fieldEncryptedByPiiMiddleware: false,
+        decision: options.userEmailDecision,
+        decisionRef: options.userEmailDecisionRef,
+        owner: options.userEmailDecisionOwner,
+        rawEmailsIncluded: false,
+      },
+      plaintextPii: {
+        fieldEncryptedByPiiMiddleware: false,
+        decision: options.plaintextPiiDecision,
+        decisionRef: options.plaintextPiiDecisionRef,
+        owner: options.plaintextPiiDecisionOwner,
+        requiredFields: REQUIRED_PLAINTEXT_PII_FIELDS,
+        acceptedFields: options.plaintextPiiAcceptedFields,
+        missingAcceptedFields: REQUIRED_PLAINTEXT_PII_FIELDS.filter(
+          (field) => !options.plaintextPiiAcceptedFields.includes(field),
+        ),
+        rawValuesIncluded: false,
+      },
+    },
     command: {
       source: scan.source,
       ok: scan.ok,
@@ -446,6 +612,10 @@ function validateArtifact(artifact) {
     failures.push('PII ciphertext evidence must not include email hashes.');
   }
 
+  if (artifact.strict) {
+    failures.push(...validateAtRestControls(artifact.atRestControls));
+  }
+
   for (const definition of MODEL_DEFINITIONS) {
     const model = artifact.models[definition.id];
     if (!model || model.passed !== true) {
@@ -473,6 +643,108 @@ function validateArtifact(artifact) {
 
   if (artifact.strict && artifact.totals.emailRows <= 0) {
     failures.push('Strict PII ciphertext evidence requires at least one encrypted email row.');
+  }
+
+  return failures;
+}
+
+function validateAtRestControls(controls) {
+  const failures = [];
+  const storage =
+    controls?.storageEncryption && typeof controls.storageEncryption === 'object'
+      ? controls.storageEncryption
+      : {};
+  const userEmail =
+    controls?.userEmail && typeof controls.userEmail === 'object' ? controls.userEmail : {};
+  const plaintextPii =
+    controls?.plaintextPii && typeof controls.plaintextPii === 'object'
+      ? controls.plaintextPii
+      : {};
+
+  if (storage.enabled !== true) {
+    failures.push(
+      'Storage-level encryption at rest must be explicitly confirmed for PII evidence.',
+    );
+  }
+
+  if (!hasReviewableEvidence(storage.provider)) {
+    failures.push(
+      'Storage-level encryption provider/control label is missing or placeholder-like.',
+    );
+  }
+
+  if (!hasReviewableEvidence(storage.evidenceRef)) {
+    failures.push('Storage-level encryption evidence reference is missing or placeholder-like.');
+  }
+
+  if (storage.rawConfigIncluded !== false) {
+    failures.push('PII evidence must not include raw storage encryption configuration.');
+  }
+
+  if (userEmail.fieldEncryptedByPiiMiddleware !== false) {
+    failures.push('User.email field-encryption posture must be explicit for this release.');
+  }
+
+  if (userEmail.decision !== USER_EMAIL_STORAGE_ONLY_DECISION) {
+    failures.push(
+      `User.email at-rest decision must be ${USER_EMAIL_STORAGE_ONLY_DECISION} until a User.emailHash migration exists.`,
+    );
+  }
+
+  if (!hasReviewableEvidence(userEmail.decisionRef)) {
+    failures.push('User.email at-rest decision reference is missing or placeholder-like.');
+  }
+
+  if (!hasReviewableEvidence(userEmail.owner)) {
+    failures.push('User.email at-rest decision owner is missing or placeholder-like.');
+  }
+
+  if (userEmail.rawEmailsIncluded !== false) {
+    failures.push('PII evidence must not include raw User.email values.');
+  }
+
+  if (plaintextPii.fieldEncryptedByPiiMiddleware !== false) {
+    failures.push('Plaintext-PII field-encryption posture must be explicit for this release.');
+  }
+
+  if (plaintextPii.decision !== PLAINTEXT_PII_STORAGE_ONLY_DECISION) {
+    failures.push(
+      `Plaintext-PII at-rest decision must be ${PLAINTEXT_PII_STORAGE_ONLY_DECISION} until the remaining fields are field-encrypted or formally cut over.`,
+    );
+  }
+
+  if (!hasReviewableEvidence(plaintextPii.decisionRef)) {
+    failures.push('Plaintext-PII at-rest decision reference is missing or placeholder-like.');
+  }
+
+  if (!hasReviewableEvidence(plaintextPii.owner)) {
+    failures.push('Plaintext-PII at-rest decision owner is missing or placeholder-like.');
+  }
+
+  const acceptedFields = Array.isArray(plaintextPii.acceptedFields)
+    ? plaintextPii.acceptedFields
+    : [];
+  const missingFields = REQUIRED_PLAINTEXT_PII_FIELDS.filter(
+    (field) => !acceptedFields.includes(field),
+  );
+  const unsupportedFields = acceptedFields.filter(
+    (field) => !REQUIRED_PLAINTEXT_PII_FIELDS.includes(field),
+  );
+
+  if (missingFields.length > 0) {
+    failures.push(
+      `Plaintext-PII at-rest decision does not cover required field(s): ${missingFields.join(', ')}.`,
+    );
+  }
+
+  if (unsupportedFields.length > 0) {
+    failures.push(
+      `Plaintext-PII at-rest decision names unsupported field(s): ${unsupportedFields.join(', ')}.`,
+    );
+  }
+
+  if (plaintextPii.rawValuesIncluded !== false) {
+    failures.push('PII evidence must not include raw plaintext-PII values.');
   }
 
   return failures;
@@ -563,6 +835,16 @@ async function runSelftest() {
       databaseUrl: 'postgresql://release-db-user:release-db-pass@db.release.internal/bidstack',
       databaseUrlSource: 'DATABASE_URL',
       requiredModels: DEFAULT_REQUIRED_MODELS,
+      storageEncryptionAtRest: true,
+      storageEncryptionProvider: 'azure-postgresql-customer-managed-key',
+      storageEncryptionEvidenceRef: 'MANTU-SEC-48291 storage encryption validation',
+      userEmailDecision: USER_EMAIL_STORAGE_ONLY_DECISION,
+      userEmailDecisionRef: 'MANTU-DPIA-48292 User.email storage-only approval',
+      userEmailDecisionOwner: 'platform-security@bidstack360.com',
+      plaintextPiiDecision: PLAINTEXT_PII_STORAGE_ONLY_DECISION,
+      plaintextPiiDecisionRef: 'MANTU-DPIA-48293 plaintext PII storage-only approval',
+      plaintextPiiDecisionOwner: 'privacy-security@bidstack360.com',
+      plaintextPiiAcceptedFields: REQUIRED_PLAINTEXT_PII_FIELDS,
       strict: true,
     };
 
@@ -571,6 +853,13 @@ async function runSelftest() {
     assert.equal(good.artifact.passed, true);
     assert.equal(good.artifact.totals.plaintextValues, 0);
     assert.equal(good.artifact.privacy.piiValuesIncluded, false);
+    assert.equal(good.artifact.atRestControls.storageEncryption.enabled, true);
+    assert.equal(good.artifact.atRestControls.userEmail.decision, USER_EMAIL_STORAGE_ONLY_DECISION);
+    assert.equal(
+      good.artifact.atRestControls.plaintextPii.decision,
+      PLAINTEXT_PII_STORAGE_ONLY_DECISION,
+    );
+    assert.deepEqual(good.artifact.atRestControls.plaintextPii.missingAcceptedFields, []);
     assert.equal(existsSync(good.outputPath), true);
 
     const serializedGood = JSON.stringify(good.artifact);
@@ -644,6 +933,65 @@ async function runSelftest() {
     );
     assert.equal(missingDatabase.exitCode, 1);
     assert.match(missingDatabase.artifact.validationFailures.join('\n'), /Database URL/);
+
+    const missingStorageProof = await runWriter(
+      {
+        ...baseOptions,
+        outputPath: 'missing-storage-proof.json',
+        storageEncryptionAtRest: null,
+        storageEncryptionEvidenceRef: '',
+      },
+      { collectScan: () => syntheticScan() },
+    );
+    assert.equal(missingStorageProof.exitCode, 1);
+    assert.match(
+      missingStorageProof.artifact.validationFailures.join('\n'),
+      /Storage-level encryption/,
+    );
+
+    const placeholderUserEmailDecision = await runWriter(
+      {
+        ...baseOptions,
+        outputPath: 'placeholder-user-email-decision.json',
+        userEmailDecisionRef: '<approval-ticket>',
+      },
+      { collectScan: () => syntheticScan() },
+    );
+    assert.equal(placeholderUserEmailDecision.exitCode, 1);
+    assert.match(
+      placeholderUserEmailDecision.artifact.validationFailures.join('\n'),
+      /User\.email at-rest decision reference/,
+    );
+
+    const missingPlaintextPiiScope = await runWriter(
+      {
+        ...baseOptions,
+        outputPath: 'missing-plaintext-pii-scope.json',
+        plaintextPiiAcceptedFields: REQUIRED_PLAINTEXT_PII_FIELDS.filter(
+          (field) => field !== 'KamSession.transcriptText',
+        ),
+      },
+      { collectScan: () => syntheticScan() },
+    );
+    assert.equal(missingPlaintextPiiScope.exitCode, 1);
+    assert.match(
+      missingPlaintextPiiScope.artifact.validationFailures.join('\n'),
+      /KamSession\.transcriptText/,
+    );
+
+    const placeholderPlaintextPiiDecision = await runWriter(
+      {
+        ...baseOptions,
+        outputPath: 'placeholder-plaintext-pii-decision.json',
+        plaintextPiiDecisionRef: '<privacy-approval-ticket>',
+      },
+      { collectScan: () => syntheticScan() },
+    );
+    assert.equal(placeholderPlaintextPiiDecision.exitCode, 1);
+    assert.match(
+      placeholderPlaintextPiiDecision.artifact.validationFailures.join('\n'),
+      /Plaintext-PII at-rest decision reference/,
+    );
 
     process.stdout.write('[pii-ciphertext-evidence] selftest passed\n');
   } finally {

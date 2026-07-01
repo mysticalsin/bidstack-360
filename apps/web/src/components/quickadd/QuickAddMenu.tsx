@@ -8,7 +8,7 @@
 
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -50,7 +50,10 @@ const buildOptions = (t: (key: string, defaultValue: string) => string): Option[
     key: 'note',
     label: t('quickAddMenu.option.note.label', 'New note'),
     hint: 'M',
-    description: t('quickAddMenu.option.note.description', 'Drop a thought on the current account.'),
+    description: t(
+      'quickAddMenu.option.note.description',
+      'Drop a thought on the current account.',
+    ),
   },
 ];
 
@@ -62,6 +65,7 @@ export function QuickAddMenu() {
   const [activeIdx, setActiveIdx] = useState(0);
   const reduced = useReducedMotion();
   const navigate = useNavigate();
+  const listboxRef = useRef<HTMLDivElement>(null);
   const OPTIONS = buildOptions(t);
 
   // Global keybinding: `N` opens the menu (when not typing in a field). This
@@ -72,16 +76,13 @@ export function QuickAddMenu() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      const tag = target.tagName;
-      const isInput =
-        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
-      if (isInput) return;
+      if (isTypingTarget(target) || isShortcutScopeBlocked(target)) return;
       e.preventDefault();
       setOpen(true);
       setActiveIdx(0);
     };
-    window.addEventListener('keydown', handler as never);
-    return () => window.removeEventListener('keydown', handler as never);
+    window.addEventListener('keydown', handler as never, true);
+    return () => window.removeEventListener('keydown', handler as never, true);
   }, []);
 
   const choose = (entity: Entity) => {
@@ -110,89 +111,95 @@ export function QuickAddMenu() {
                   className="fixed inset-0 z-40 bg-surface-overlay backdrop-blur-sm"
                 />
               </RadixDialog.Overlay>
-              <RadixDialog.Content asChild forceMount aria-describedby={undefined}>
+              <RadixDialog.Content
+                asChild
+                forceMount
+                aria-describedby={undefined}
+                onOpenAutoFocus={(event) => {
+                  event.preventDefault();
+                  requestAnimationFrame(() => listboxRef.current?.focus());
+                }}
+              >
                 <motion.div
                   initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -8 }}
                   animate={reduced ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
                   exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: -4 }}
                   transition={springModal}
                   className="fixed left-1/2 top-[20vh] z-50 w-[min(440px,92vw)] -translate-x-1/2 overflow-hidden rounded-xl outline-none glass-menu"
-                  // The listbox role + active-descendant pointer + keyboard
-                  // handler all live on this one focused element (Radix focuses
-                  // the Content on open). Keeping role and aria-activedescendant
-                  // on the SAME element is required by WCAG 4.1.2 — a screen
-                  // reader follows the active option via this node's focus.
-                  role="listbox"
-                  aria-label={t('quickAddMenu.title', 'Create')}
-                  aria-activedescendant={`quick-add-option-${OPTIONS[activeIdx]?.key}`}
-                  onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setActiveIdx((i) => Math.min(OPTIONS.length - 1, i + 1));
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setActiveIdx((i) => Math.max(0, i - 1));
-                    } else if (e.key === 'Enter') {
-                      e.preventDefault();
-                      choose(OPTIONS[activeIdx]!.key);
-                    } else {
-                      // Letter shortcut: pressing the hint character picks it.
-                      const k = e.key.toUpperCase();
-                      const opt = OPTIONS.find((o) => o.hint === k);
-                      if (opt) {
-                        e.preventDefault();
-                        choose(opt.key);
-                      }
-                    }
-                  }}
                 >
                   <RadixDialog.Title className="border-b border-[var(--border-subtle)] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                     {t('quickAddMenu.title', 'Create')}
                   </RadixDialog.Title>
-                  {/* Presentational wrapper: the listbox role lives on the
-                      focused Content above so role + aria-activedescendant share
-                      one element. role="presentation" strips the implicit list
-                      semantics so the option group isn't double-announced. */}
-                  <ul role="presentation" className="p-1">
-                    {OPTIONS.map((opt, i) => {
-                      const active = i === activeIdx;
-                      return (
-                        <li
-                          key={opt.key}
-                          id={`quick-add-option-${opt.key}`}
-                          role="option"
-                          aria-selected={active}
-                          onMouseEnter={() => setActiveIdx(i)}
-                          onClick={() => choose(opt.key)}
-                          className="relative flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm transition-colors rounded-lg mx-1.5 my-1 bg-transparent z-10"
-                        >
-                          {active && (
-                            <motion.div
-                              layoutId="quick-add-highlight"
-                              className="absolute inset-0 bg-[var(--surface-hover)] rounded-lg -z-10"
-                              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                            />
-                          )}
-                          <div className="min-w-0">
-                            <div
-                              className={cn(
-                                'font-medium transition-colors',
-                                active ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-primary)]',
-                              )}
-                            >
-                              {opt.label}
+                  <div
+                    ref={listboxRef}
+                    tabIndex={0}
+                    role="listbox"
+                    aria-label={t('quickAddMenu.optionsAriaLabel', 'Create options')}
+                    aria-activedescendant={`quick-add-option-${OPTIONS[activeIdx]?.key}`}
+                    className="outline-none"
+                    onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setActiveIdx((i) => Math.min(OPTIONS.length - 1, i + 1));
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setActiveIdx((i) => Math.max(0, i - 1));
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        choose(OPTIONS[activeIdx]!.key);
+                      } else {
+                        const k = e.key.toUpperCase();
+                        const opt = OPTIONS.find((o) => o.hint === k);
+                        if (opt) {
+                          e.preventDefault();
+                          choose(opt.key);
+                        }
+                      }
+                    }}
+                  >
+                    <ul role="presentation" className="p-1">
+                      {OPTIONS.map((opt, i) => {
+                        const active = i === activeIdx;
+                        return (
+                          <li
+                            key={opt.key}
+                            id={`quick-add-option-${opt.key}`}
+                            role="option"
+                            aria-selected={active}
+                            onMouseEnter={() => setActiveIdx(i)}
+                            onClick={() => choose(opt.key)}
+                            className="relative z-10 mx-1.5 my-1 flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-transparent px-4 py-3 text-sm transition-colors"
+                          >
+                            {active && (
+                              <motion.div
+                                layoutId="quick-add-highlight"
+                                className="absolute inset-0 -z-10 rounded-lg bg-[var(--surface-hover)]"
+                                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <div
+                                className={cn(
+                                  'font-medium transition-colors',
+                                  active
+                                    ? 'text-[var(--brand-primary)]'
+                                    : 'text-[var(--fg-primary)]',
+                                )}
+                              >
+                                {opt.label}
+                              </div>
+                              <div className="text-[11px] text-[var(--fg-tertiary)]">
+                                {opt.description}
+                              </div>
                             </div>
-                            <div className="text-[11px] text-[var(--fg-tertiary)]">
-                              {opt.description}
-                            </div>
-                          </div>
-                          <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-2 py-1 text-[10px] font-mono text-[var(--fg-tertiary)] shadow-sm font-semibold">
-                            {opt.hint}
-                          </kbd>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                            <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-2 py-1 font-mono text-[10px] font-semibold text-[var(--fg-tertiary)] shadow-sm">
+                              {opt.hint}
+                            </kbd>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 </motion.div>
               </RadixDialog.Content>
             </RadixDialog.Portal>
@@ -223,6 +230,26 @@ export function QuickAddMenu() {
       ) : null}
       {pick === 'contact' ? <ContactDialogAuto onDone={() => setPick(null)} /> : null}
     </>
+  );
+}
+
+function isTypingTarget(target: HTMLElement): boolean {
+  const editable = target.closest('input, textarea, select, [contenteditable="true"]');
+  return Boolean(editable);
+}
+
+function isShortcutScopeBlocked(target: HTMLElement): boolean {
+  return Boolean(
+    target.closest(
+      [
+        '[role="dialog"]',
+        '[role="alertdialog"]',
+        '[role="menu"]',
+        '[role="listbox"]',
+        '[role="combobox"]',
+        '[data-radix-popper-content-wrapper]',
+      ].join(','),
+    ),
   );
 }
 

@@ -47,7 +47,7 @@
 
 - Every business table has `org_id` (per `handoff/db.schema.sql`).
 - The auth plugin (`apps/api/src/plugins/auth.ts`) injects `req.auth.orgId` on every request.
-- Every Prisma query MUST include `where: { orgId }`. The `code-quality` rule in `.claude/rules/` is the enforcement floor; reviewer agent flags any missing scope.
+- Every tenant Prisma query MUST include `where: { orgId }`. The `code-quality` rule in `.claude/rules/` is the review floor; `BIDSTACK_TENANT_SCOPE_GUARD=warn|enforce` adds an opt-in Prisma middleware backstop for broad tenant-model operations.
 - The MCP server resolves `orgId` from the API key (`apps/mcp-server/src/auth.ts`), so an MCP client can only see/mutate the org that minted the key.
 
 ## Module boundaries

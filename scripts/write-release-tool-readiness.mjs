@@ -424,6 +424,7 @@ function collectChecks(options) {
     'scripts/write-provider-quality-evidence.mjs',
     'scripts/write-mcp-connectivity-evidence.mjs',
     'scripts/write-sentry-smoke-evidence.mjs',
+    'scripts/write-a11y-evidence.mjs',
     'scripts/write-browser-regression-evidence.mjs',
     'scripts/run-deploy-evidence-bundle.mjs',
     'scripts/verify-deploy-evidence.mjs',

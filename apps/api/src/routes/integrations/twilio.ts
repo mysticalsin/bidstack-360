@@ -72,13 +72,13 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(403).send({ ok: false } as never);
       }
 
-      const toNumber = req.body.To ?? '';
-      // Look up org by matching the toNumber to a Twilio integration token
+      const twilioNumber = req.body.From ?? req.body.To ?? '';
+      // Look up org by matching the Twilio sender number to an integration token.
       const token = await prisma.integrationToken.findFirst({
         where: {
           provider: 'twilio',
           status: 'active',
-          externalAccountId: toNumber,
+          externalAccountId: twilioNumber,
         },
         select: { orgId: true },
       });
@@ -87,7 +87,7 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         // Fallback: try to find by twilioSid in existing message
         const msg = await prisma.smsMessage.findFirst({
           where: { twilioSid: req.body.MessageSid },
-          select: { orgId: true },
+          select: { orgId: true, fromNumber: true },
         });
         if (!msg) return reply.code(404).send({ ok: false } as never);
 
@@ -96,6 +96,7 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
           signature,
           `${process.env.PUBLIC_API_URL ?? ''}/api/v1/integrations/twilio/webhook/status`,
           req.body as Record<string, string>,
+          msg.fromNumber,
         );
         if (!valid) return reply.code(403).send({ ok: false } as never);
 
@@ -108,6 +109,7 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         signature,
         `${process.env.PUBLIC_API_URL ?? ''}/api/v1/integrations/twilio/webhook/status`,
         req.body as Record<string, string>,
+        twilioNumber,
       );
 
       if (!valid) {
@@ -161,6 +163,7 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         signature,
         `${process.env.PUBLIC_API_URL ?? ''}/api/v1/integrations/twilio/webhook/inbound`,
         req.body as Record<string, string>,
+        req.body.To,
       );
 
       if (!valid) return reply.code(403).send({ ok: false } as never);

@@ -7,6 +7,29 @@ function trimmed(env: Env, key: string): string {
   return env[key]?.trim() ?? '';
 }
 
+function redisUrlError(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'redis:' && url.protocol !== 'rediss:') {
+      return 'REDIS_URL must be a valid Redis URL in production';
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === '::1' ||
+      hostname === '[::1]' ||
+      hostname === '0.0.0.0' ||
+      hostname === '[::]' ||
+      hostname.startsWith('127.')
+    ) {
+      return 'REDIS_URL must not point at localhost or loopback in production';
+    }
+    return null;
+  } catch {
+    return 'REDIS_URL must be a valid Redis URL in production';
+  }
+}
+
 export function validateWorkerProductionEnv(env: Env = process.env): string[] {
   if (trimmed(env, 'NODE_ENV') !== 'production') {
     return [];
@@ -17,6 +40,12 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
     if (!trimmed(env, key)) {
       errors.push(`${key} is required in production`);
     }
+  }
+
+  const redisUrl = trimmed(env, 'REDIS_URL');
+  if (redisUrl) {
+    const redisError = redisUrlError(redisUrl);
+    if (redisError) errors.push(redisError);
   }
 
   if (!HEX_32_BYTE_KEY.test(trimmed(env, 'INTEGRATION_TOKEN_KEY'))) {

@@ -9,6 +9,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@bidstack/db';
 import type pino from 'pino';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 
 // pino type alias — avoids importing the heavy pino dep at the route level
 export type SlackRouteLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
@@ -54,7 +55,10 @@ export function redirectUri(): string {
 // ─── Slack API helper ─────────────────────────────────────────────────────────
 
 export async function slackGet<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`https://slack.com/api/${path}`, {
+  const res = await fetchWithTimeout(`https://slack.com/api/${path}`, {
+    provider: 'Slack',
+    operation: path.split('?')[0] ?? 'api.get',
+    timeoutMs: providerTimeoutMs('SLACK_HTTP_TIMEOUT_MS', 10_000),
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.json() as Promise<T>;

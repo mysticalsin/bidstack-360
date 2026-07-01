@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import { toast } from '@/components/ui/Toast';
-import {
+import type {
   KamHandoffConfirmBody as KamHandoffConfirmBodySchema,
   KamHandoffDetail as KamHandoffDetailSchema,
   KamHandoffExportResult as KamHandoffExportResultSchema,

@@ -8,6 +8,8 @@ import type { FastifyRequest } from 'fastify';
 
 import { prisma } from '@bidstack/db';
 
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
+
 /**
  * Maps a Clerk org role string to the internal role name used throughout the
  * application. Throws a typed sentinel string so the caller can detect and
@@ -61,4 +63,5 @@ export async function ensureAdminRoleGrant(
     create: { userId, roleId: adminRole.id, orgId },
     update: { deletedAt: null },
   });
+  invalidateRbacDecisionCache(orgId, userId);
 }

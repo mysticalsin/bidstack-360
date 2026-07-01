@@ -34,6 +34,7 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import {
   SLACK_AUTH_URL,
@@ -150,7 +151,10 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
         redirect_uri: redirectUri(),
       });
 
-      const tokenRes = await fetch(SLACK_TOKEN_URL, {
+      const tokenRes = await fetchWithTimeout(SLACK_TOKEN_URL, {
+        provider: 'Slack',
+        operation: 'oauth.exchange',
+        timeoutMs: providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000),
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString(),
@@ -347,7 +351,10 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
         if (token) {
           const { decryptToken: _dec } = await import('@bidstack/shared/token-crypto');
           const botToken = _dec(token.accessTokenEncrypted);
-          await fetch('https://slack.com/api/auth.revoke', {
+          await fetchWithTimeout('https://slack.com/api/auth.revoke', {
+            provider: 'Slack',
+            operation: 'auth.revoke',
+            timeoutMs: providerTimeoutMs('SLACK_HTTP_TIMEOUT_MS', 10_000),
             method: 'POST',
             headers: {
               Authorization: `Bearer ${botToken}`,

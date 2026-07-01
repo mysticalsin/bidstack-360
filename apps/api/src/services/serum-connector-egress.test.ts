@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getAccessToken: vi.fn(),
   integrationFindFirst: vi.fn(),
   integrationFindUnique: vi.fn(),
+  outboundRollback: vi.fn(),
+  reserveOutboundCommunication: vi.fn(),
   sendViaGmail: vi.fn(),
   sendViaMsGraph: vi.fn(),
   smsConsentFindUnique: vi.fn(),
@@ -18,6 +20,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@bidstack/db', () => ({
+  Prisma: {
+    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
+      readonly code: string;
+
+      constructor(message: string, code = 'P2002') {
+        super(message);
+        this.code = code;
+      }
+    },
+  },
   EmailProvider: {
     GMAIL: 'GMAIL',
     OUTLOOK: 'OUTLOOK',
@@ -72,6 +84,12 @@ vi.mock('./email-integration.gmail.js', () => ({
 vi.mock('./email-integration.graph.js', () => ({
   pullMsGraphMail: vi.fn(),
   sendViaMsGraph: mocks.sendViaMsGraph,
+}));
+
+vi.mock('../lib/outbound-communication-guard.js', () => ({
+  estimateSmsSegments: (body: string) => Math.ceil(Math.max(body.length, 1) / 160),
+  outboundCommunicationCapConfig: () => ({ smsEstimatedSegmentCostMicros: 8_000n }),
+  reserveOutboundCommunication: mocks.reserveOutboundCommunication,
 }));
 
 import { sendEmail } from './email-integration.service.js';
@@ -130,6 +148,8 @@ beforeEach(() => {
     externalAccountEmail: 'seller@example.com',
   });
   mocks.smsConsentFindUnique.mockResolvedValue(null);
+  mocks.outboundRollback.mockResolvedValue(undefined);
+  mocks.reserveOutboundCommunication.mockResolvedValue({ rollback: mocks.outboundRollback });
   vi.stubGlobal('fetch', vi.fn());
 });
 
@@ -161,6 +181,7 @@ describe('API connector SERUM egress gates', () => {
       approvalConfirmed: false,
     });
     expect(mocks.integrationFindFirst).not.toHaveBeenCalled();
+    expect(mocks.reserveOutboundCommunication).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -204,6 +225,36 @@ describe('API connector SERUM egress gates', () => {
     ).rejects.toThrow(/SERUM connector policy denied gmail email\.send/);
 
     expect(mocks.integrationFindFirst).toHaveBeenCalledOnce();
+    expect(mocks.getAccessToken).not.toHaveBeenCalled();
+    expect(mocks.reserveOutboundCommunication).not.toHaveBeenCalled();
+    expect(mocks.sendViaGmail).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('blocks Gmail send before OAuth refresh, vendor egress, or persistence when the outbound cap denies', async () => {
+    mocks.reserveOutboundCommunication.mockRejectedValueOnce(
+      new Error('Daily email org send limit reached.'),
+    );
+
+    await expect(
+      sendEmail(
+        {
+          orgId,
+          userId,
+          to: [{ email: 'buyer@example.com' }],
+          subject: 'Proposal',
+          text: 'Review attached',
+        },
+        log,
+      ),
+    ).rejects.toThrow(/Daily email org send limit/);
+
+    expect(mocks.integrationFindFirst).toHaveBeenCalledOnce();
+    expect(mocks.reserveOutboundCommunication).toHaveBeenCalledWith(
+      { channel: 'email', orgId, userId, units: 1 },
+      log,
+    );
     expect(mocks.getAccessToken).not.toHaveBeenCalled();
     expect(mocks.sendViaGmail).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();

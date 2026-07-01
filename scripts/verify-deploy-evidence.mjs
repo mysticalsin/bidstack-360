@@ -28,11 +28,13 @@ const DEFAULT_PATHS = {
   providers: 'deploy-evidence/provider-quality-latest.json',
   mcp: 'deploy-evidence/mcp-connectivity-latest.json',
   sentry: 'deploy-evidence/sentry-smoke-latest.json',
+  a11y: 'deploy-evidence/a11y-latest.json',
   browser: 'deploy-evidence/browser-regression-latest.json',
   tools: 'deploy-evidence/tool-readiness-latest.json',
   ops: 'deploy-evidence/operational-readiness-latest.json',
 };
 const DEFAULT_LOAD_RAW_SUMMARY = 'load-test-report/k6-summary-latest.json';
+const DEFAULT_A11Y_SOURCE_REPORT = 'deploy-evidence/playwright-a11y.json';
 const DEFAULT_BROWSER_SOURCE_REPORT = 'deploy-evidence/playwright-browser-regression.json';
 const DEFAULT_CONTAINER_RAW_REPORT_DIR = 'deploy-evidence/container-scan-reports';
 const DEFAULT_CONTAINER_SBOM_REPORT_DIR = 'deploy-evidence/container-sboms';
@@ -45,6 +47,12 @@ const DEFAULT_CONTAINER_IMAGES = [
   'bidcrm-migrate:nonroot-probe',
 ];
 const DEFAULT_BROWSER_ROLES = ['admin', 'manager', 'read-only', 'viewer'];
+const DEFAULT_A11Y_PROJECTS = ['chromium-desktop'];
+const DEFAULT_A11Y_SPECS = [
+  'e2e/a11y/axe.spec.ts',
+  'e2e/a11y/color-contrast.spec.ts',
+  'e2e/a11y/keyboard-nav.spec.ts',
+];
 const DEFAULT_BROWSER_PROJECTS = ['chromium-desktop', 'firefox-desktop', 'webkit-desktop'];
 const DEFAULT_BROWSER_SPECS = ['e2e/flows/rbac.spec.ts'];
 const DEFAULT_MCP_REQUIRED_TOOLS = [
@@ -53,7 +61,20 @@ const DEFAULT_MCP_REQUIRED_TOOLS = [
   'tasks.list',
   'crm_search_companies',
 ];
+const USER_EMAIL_STORAGE_ONLY_DECISION = 'storage-encryption-only';
+const PLAINTEXT_PII_STORAGE_ONLY_DECISION = 'storage-encryption-only';
+const REQUIRED_PLAINTEXT_PII_FIELDS = [
+  'SmsMessage.fromNumber',
+  'SmsMessage.toNumber',
+  'SmsMessage.body',
+  'SmsConsent.phoneNumber',
+  'ActivityAttendee.email',
+  'CalendarEvent.attendees',
+  'KamSession.transcriptText',
+  'KamSession.attendees',
+];
 const ACCEPTED_BROWSER_PROFILES = new Set(['cross-role-regression', 'release-regression']);
+const ACCEPTED_A11Y_PROFILES = new Set(['wcag-keyboard-regression', 'release-a11y']);
 const TOOL_DOCKER_IMAGE_PROBES = [
   { runnerId: 'gitleaks.runner', imageId: 'gitleaks.image' },
   { runnerId: 'k6.runner', imageId: 'k6.image' },
@@ -213,6 +234,7 @@ Environment overrides:
   BIDSTACK_PROVIDER_QUALITY_EVIDENCE
   BIDSTACK_MCP_CONNECTIVITY_EVIDENCE
   BIDSTACK_SENTRY_EVIDENCE_PATH
+  BIDSTACK_A11Y_EVIDENCE
   BIDSTACK_BROWSER_REGRESSION_EVIDENCE
   BIDSTACK_TOOL_READINESS_EVIDENCE
   BIDSTACK_OPS_READINESS_EVIDENCE
@@ -286,6 +308,18 @@ function makeConfig(options) {
     .split(',')
     .map((role) => role.trim())
     .filter(Boolean);
+  const requiredA11yProjects = (
+    process.env.BIDSTACK_DEPLOY_REQUIRED_A11Y_PROJECTS || DEFAULT_A11Y_PROJECTS.join(',')
+  )
+    .split(',')
+    .map((project) => project.trim())
+    .filter(Boolean);
+  const requiredA11ySpecs = (
+    process.env.BIDSTACK_DEPLOY_REQUIRED_A11Y_SPECS || DEFAULT_A11Y_SPECS.join(',')
+  )
+    .split(',')
+    .map((spec) => spec.trim())
+    .filter(Boolean);
   const requiredBrowserProjects = (
     process.env.BIDSTACK_DEPLOY_REQUIRED_BROWSER_PROJECTS || DEFAULT_BROWSER_PROJECTS.join(',')
   )
@@ -336,6 +370,8 @@ function makeConfig(options) {
       .filter(Boolean),
     requiredImages,
     requiredBrowserRoles,
+    requiredA11yProjects,
+    requiredA11ySpecs,
     requiredBrowserProjects,
     requiredBrowserSpecs,
     requiredProviders,
@@ -353,6 +389,7 @@ function makeConfig(options) {
       providers: process.env.BIDSTACK_PROVIDER_QUALITY_EVIDENCE || DEFAULT_PATHS.providers,
       mcp: process.env.BIDSTACK_MCP_CONNECTIVITY_EVIDENCE || DEFAULT_PATHS.mcp,
       sentry: process.env.BIDSTACK_SENTRY_EVIDENCE_PATH || DEFAULT_PATHS.sentry,
+      a11y: process.env.BIDSTACK_A11Y_EVIDENCE || DEFAULT_PATHS.a11y,
       browser: process.env.BIDSTACK_BROWSER_REGRESSION_EVIDENCE || DEFAULT_PATHS.browser,
       tools: process.env.BIDSTACK_TOOL_READINESS_EVIDENCE || DEFAULT_PATHS.tools,
       ops: process.env.BIDSTACK_OPS_READINESS_EVIDENCE || DEFAULT_PATHS.ops,
@@ -1284,6 +1321,7 @@ function verifyApiConnectivityEvidence(config, recorder) {
     ['readyz', 'API readiness check passed'],
     ['health', 'API core health check passed'],
     ['capabilities', 'API authenticated capabilities check passed'],
+    ['domainRead', 'API authenticated domain read smoke passed'],
   ]) {
     if (checks[checkName]?.ok === true) {
       recorder.pass(`api.${checkName}`, label);
@@ -1295,6 +1333,63 @@ function verifyApiConnectivityEvidence(config, recorder) {
         String(checks[checkName]?.error || checks[checkName]?.status || 'missing check result'),
       );
     }
+  }
+
+  const domainRead = checks.domainRead ?? {};
+  if (domainRead.ok === true) {
+    recorder.pass(
+      'api.domainReadShape',
+      'API domain read smoke proves a privacy-safe no-match list shape',
+      `path=${domainRead.path || 'missing'} itemCount=${domainRead.itemCount ?? 'missing'}`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'api.domainReadShape',
+      'API domain read smoke does not prove a privacy-safe no-match list shape',
+      String(domainRead.error || domainRead.status || 'missing check result'),
+    );
+  }
+
+  if (!String(domainRead.path || '').startsWith('/api/')) {
+    recorder.softFail(
+      config,
+      'api.domainReadPath',
+      'API domain read smoke path must start with /api/',
+      String(domainRead.path || 'missing'),
+    );
+  } else {
+    recorder.pass('api.domainReadPath', 'API domain read smoke path is API-scoped');
+  }
+
+  if (
+    domainRead.responseShape === 'paginated-list' &&
+    domainRead.noMatchProbe === true &&
+    domainRead.itemCount === 0
+  ) {
+    recorder.pass('api.domainReadNoMatch', 'API domain read smoke returned zero no-match items');
+  } else {
+    recorder.softFail(
+      config,
+      'api.domainReadNoMatch',
+      'API domain read smoke must use a no-match probe and return zero items',
+      `shape=${domainRead.responseShape || 'missing'} noMatch=${domainRead.noMatchProbe ?? 'missing'} itemCount=${domainRead.itemCount ?? 'missing'}`,
+    );
+  }
+
+  if (
+    domainRead.rawItemsIncluded === false &&
+    domainRead.rawBodyIncluded === false &&
+    !('items' in domainRead) &&
+    !('body' in domainRead) &&
+    !('rawBody' in domainRead)
+  ) {
+    recorder.pass('api.domainReadPrivacy', 'API domain read smoke omits raw API data');
+  } else {
+    recorder.fail(
+      'api.domainReadPrivacy',
+      'API domain read smoke evidence must not include raw API response data',
+    );
   }
 
   const readyz = checks.readyz ?? {};
@@ -1467,6 +1562,8 @@ function verifyPiiCiphertextEvidence(config, recorder) {
     );
   }
 
+  verifyPiiAtRestControls(config, recorder, value.atRestControls);
+
   const policy = value.policy && typeof value.policy === 'object' ? value.policy : {};
   const requiredModels = Array.isArray(policy.requiredModels) ? policy.requiredModels : [];
   const supportedModels = new Set(
@@ -1564,6 +1661,248 @@ function verifyPiiCiphertextEvidence(config, recorder) {
       'pii.totals.emailRows',
       'Strict PII evidence requires at least one email row',
       String(totals.emailRows ?? 'missing'),
+    );
+  }
+}
+
+function evidenceValueIsReviewable(value) {
+  const normalized = String(value || '').trim();
+  return normalized.length >= 12 && !hasPlaceholderSignal(normalized);
+}
+
+function verifyPiiAtRestControls(config, recorder, controls) {
+  const posture = controls && typeof controls === 'object' ? controls : {};
+  const storage =
+    posture.storageEncryption && typeof posture.storageEncryption === 'object'
+      ? posture.storageEncryption
+      : {};
+  const userEmail =
+    posture.userEmail && typeof posture.userEmail === 'object' ? posture.userEmail : {};
+  const plaintextPii =
+    posture.plaintextPii && typeof posture.plaintextPii === 'object' ? posture.plaintextPii : {};
+
+  if (storage.enabled === true) {
+    recorder.pass('pii.storageEncryption.enabled', 'PII storage encryption is explicitly enabled');
+  } else {
+    recorder.softFail(
+      config,
+      'pii.storageEncryption.enabled',
+      'PII storage encryption must be explicitly enabled',
+      `enabled=${storage.enabled ?? 'missing'}`,
+    );
+  }
+
+  if (evidenceValueIsReviewable(storage.provider)) {
+    recorder.pass(
+      'pii.storageEncryption.provider',
+      'PII storage encryption provider/control is reviewable',
+      String(storage.provider),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.storageEncryption.provider',
+      'PII storage encryption provider/control is missing or placeholder',
+      String(storage.provider || 'missing'),
+    );
+  }
+
+  if (evidenceValueIsReviewable(storage.evidenceRef)) {
+    recorder.pass(
+      'pii.storageEncryption.evidence',
+      'PII storage encryption has reviewable evidence',
+      String(storage.evidenceRef),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.storageEncryption.evidence',
+      'PII storage encryption evidence is missing or placeholder',
+      String(storage.evidenceRef || 'missing'),
+    );
+  }
+
+  if (storage.rawConfigIncluded === false) {
+    recorder.pass(
+      'pii.storageEncryption.privacy',
+      'PII storage encryption evidence omits raw config',
+    );
+  } else {
+    recorder.fail(
+      'pii.storageEncryption.privacy',
+      'PII storage encryption evidence includes unsafe raw config',
+      `rawConfigIncluded=${storage.rawConfigIncluded ?? 'missing'}`,
+    );
+  }
+
+  if (userEmail.fieldEncryptedByPiiMiddleware === false) {
+    recorder.pass(
+      'pii.userEmail.posture',
+      'User.email field-encryption posture is explicit',
+      'storage-level-only in current schema',
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.userEmail.posture',
+      'User.email field-encryption posture is missing or unsupported',
+      `fieldEncryptedByPiiMiddleware=${userEmail.fieldEncryptedByPiiMiddleware ?? 'missing'}`,
+    );
+  }
+
+  if (userEmail.decision === USER_EMAIL_STORAGE_ONLY_DECISION) {
+    recorder.pass(
+      'pii.userEmail.decision',
+      'User.email at-rest decision is accepted for this schema',
+      userEmail.decision,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.userEmail.decision',
+      'User.email at-rest decision is missing or unsupported',
+      `expected=${USER_EMAIL_STORAGE_ONLY_DECISION} actual=${userEmail.decision || 'missing'}`,
+    );
+  }
+
+  if (evidenceValueIsReviewable(userEmail.decisionRef)) {
+    recorder.pass(
+      'pii.userEmail.decisionRef',
+      'User.email at-rest decision has reviewable evidence',
+      String(userEmail.decisionRef),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.userEmail.decisionRef',
+      'User.email at-rest decision evidence is missing or placeholder',
+      String(userEmail.decisionRef || 'missing'),
+    );
+  }
+
+  if (evidenceValueIsReviewable(userEmail.owner)) {
+    recorder.pass(
+      'pii.userEmail.owner',
+      'User.email at-rest decision owner is reviewable',
+      String(userEmail.owner),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.userEmail.owner',
+      'User.email at-rest decision owner is missing or placeholder',
+      String(userEmail.owner || 'missing'),
+    );
+  }
+
+  if (userEmail.rawEmailsIncluded === false) {
+    recorder.pass('pii.userEmail.privacy', 'PII evidence omits raw User.email values');
+  } else {
+    recorder.fail(
+      'pii.userEmail.privacy',
+      'PII evidence includes raw User.email values',
+      `rawEmailsIncluded=${userEmail.rawEmailsIncluded ?? 'missing'}`,
+    );
+  }
+
+  if (plaintextPii.fieldEncryptedByPiiMiddleware === false) {
+    recorder.pass(
+      'pii.plaintextPii.posture',
+      'Plaintext-PII field-encryption posture is explicit',
+      'storage-level-only in current schema',
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.plaintextPii.posture',
+      'Plaintext-PII field-encryption posture is missing or unsupported',
+      `fieldEncryptedByPiiMiddleware=${plaintextPii.fieldEncryptedByPiiMiddleware ?? 'missing'}`,
+    );
+  }
+
+  if (plaintextPii.decision === PLAINTEXT_PII_STORAGE_ONLY_DECISION) {
+    recorder.pass(
+      'pii.plaintextPii.decision',
+      'Plaintext-PII at-rest decision is accepted for this schema',
+      plaintextPii.decision,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.plaintextPii.decision',
+      'Plaintext-PII at-rest decision is missing or unsupported',
+      `expected=${PLAINTEXT_PII_STORAGE_ONLY_DECISION} actual=${
+        plaintextPii.decision || 'missing'
+      }`,
+    );
+  }
+
+  if (evidenceValueIsReviewable(plaintextPii.decisionRef)) {
+    recorder.pass(
+      'pii.plaintextPii.decisionRef',
+      'Plaintext-PII at-rest decision has reviewable evidence',
+      String(plaintextPii.decisionRef),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.plaintextPii.decisionRef',
+      'Plaintext-PII at-rest decision evidence is missing or placeholder',
+      String(plaintextPii.decisionRef || 'missing'),
+    );
+  }
+
+  if (evidenceValueIsReviewable(plaintextPii.owner)) {
+    recorder.pass(
+      'pii.plaintextPii.owner',
+      'Plaintext-PII at-rest decision owner is reviewable',
+      String(plaintextPii.owner),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.plaintextPii.owner',
+      'Plaintext-PII at-rest decision owner is missing or placeholder',
+      String(plaintextPii.owner || 'missing'),
+    );
+  }
+
+  const acceptedFields = Array.isArray(plaintextPii.acceptedFields)
+    ? plaintextPii.acceptedFields
+    : [];
+  const missingFields = REQUIRED_PLAINTEXT_PII_FIELDS.filter(
+    (field) => !acceptedFields.includes(field),
+  );
+  const unsupportedFields = acceptedFields.filter(
+    (field) => !REQUIRED_PLAINTEXT_PII_FIELDS.includes(field),
+  );
+  if (missingFields.length === 0 && unsupportedFields.length === 0) {
+    recorder.pass(
+      'pii.plaintextPii.scope',
+      'Plaintext-PII at-rest decision covers every required field',
+      `${acceptedFields.length} field(s)`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'pii.plaintextPii.scope',
+      'Plaintext-PII at-rest decision field scope is incomplete or invalid',
+      [
+        missingFields.length ? `missing=${missingFields.join(',')}` : '',
+        unsupportedFields.length ? `unsupported=${unsupportedFields.join(',')}` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+  }
+
+  if (plaintextPii.rawValuesIncluded === false) {
+    recorder.pass('pii.plaintextPii.privacy', 'PII evidence omits raw plaintext-PII values');
+  } else {
+    recorder.fail(
+      'pii.plaintextPii.privacy',
+      'PII evidence includes raw plaintext-PII values',
+      `rawValuesIncluded=${plaintextPii.rawValuesIncluded ?? 'missing'}`,
     );
   }
 }
@@ -2442,6 +2781,19 @@ function verifySentryEvidence(config, recorder) {
   const value = artifact.value;
   checkFreshness(config, recorder, 'sentry.fresh', 'Sentry smoke', artifact, value);
 
+  if (value.passed === true) {
+    recorder.pass('sentry.passed', 'Sentry smoke evidence gate passed');
+  } else {
+    recorder.softFail(
+      config,
+      'sentry.passed',
+      'Sentry smoke evidence gate did not pass',
+      Array.isArray(value.validationFailures)
+        ? value.validationFailures.join(', ')
+        : 'missing validationFailures',
+    );
+  }
+
   requireBooleanEvidence(config, recorder, value, 'sentry.dsn', 'Sentry DSN is configured', [
     'dsnConfigured',
   ]);
@@ -2463,10 +2815,15 @@ function verifySentryEvidence(config, recorder) {
   );
 
   const release = String(value.release || '').trim();
-  if (release) {
+  if (release && !hasPlaceholderSignal(release)) {
     recorder.pass('sentry.release', 'Sentry smoke is tied to a release', release);
   } else {
-    recorder.softFail(config, 'sentry.release', 'Sentry smoke evidence needs a release');
+    recorder.softFail(
+      config,
+      'sentry.release',
+      'Sentry smoke evidence needs a non-placeholder release',
+      release || 'missing',
+    );
   }
 
   const evidenceEnvironment = normalizeOptionalEnvironment(
@@ -2523,6 +2880,21 @@ function verifySentryEvidence(config, recorder) {
     recorder.softFail(config, 'sentry.privacy', 'Sentry privacy controls are not proven');
   }
 
+  verifySentryProjectEvidence(config, recorder, value);
+  verifySentryObservation(config, recorder, 'api', 'API', value.apiEvidence, {
+    project: value.projects?.api,
+    marker: value.markers?.api || 'bidstack-api-sentry-smoke',
+    release,
+    environment: evidenceEnvironment,
+  });
+  verifySentryObservation(config, recorder, 'worker', 'Worker', value.workerEvidence, {
+    project: value.projects?.worker,
+    marker: value.markers?.worker || 'bidstack-worker-sentry-smoke',
+    release,
+    environment: evidenceEnvironment,
+  });
+  verifySentryRawPrivacy(recorder, value.privacy);
+
   if (value.sessionReplayEnabled === true) {
     requireBooleanEvidence(
       config,
@@ -2534,6 +2906,149 @@ function verifySentryEvidence(config, recorder) {
     );
   } else {
     recorder.pass('sentry.replayApproval', 'Session replay is disabled or not in scope');
+  }
+}
+
+function verifySentryProjectEvidence(config, recorder, value) {
+  const organization = String(value.organization || value.org || '').trim();
+  if (organization && !hasPlaceholderSignal(organization)) {
+    recorder.pass('sentry.organization', 'Sentry organization is reviewable', organization);
+  } else {
+    recorder.softFail(
+      config,
+      'sentry.organization',
+      'Sentry organization is missing or placeholder',
+      organization || 'missing',
+    );
+  }
+
+  const projects = value.projects && typeof value.projects === 'object' ? value.projects : {};
+  const missingProjects = ['api', 'worker'].filter((key) => {
+    const project = String(projects[key] || '').trim();
+    return !project || hasPlaceholderSignal(project);
+  });
+  if (missingProjects.length === 0) {
+    recorder.pass(
+      'sentry.projects',
+      'Sentry API and worker projects are reviewable',
+      `api=${projects.api} worker=${projects.worker}`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'sentry.projects',
+      'Sentry project evidence is missing or placeholder',
+      missingProjects.join(', '),
+    );
+  }
+}
+
+function verifySentryObservation(config, recorder, id, label, observation, expected) {
+  const value = observation && typeof observation === 'object' ? observation : {};
+  const target = String(value.target || '').trim();
+  const query = String(value.query || '').trim();
+  const project = String(expected.project || '').trim();
+  const marker = String(expected.marker || '').trim();
+  const release = String(expected.release || '').trim();
+  const environment = String(expected.environment || '').trim();
+  const issues = Array.isArray(value.issues) ? value.issues : [];
+
+  if (value.command?.passed === true) {
+    recorder.pass(`sentry.${id}.command`, `${label} Sentry issue query succeeded`);
+  } else {
+    recorder.softFail(
+      config,
+      `sentry.${id}.command`,
+      `${label} Sentry issue query did not succeed`,
+      String(value.command?.error || value.command?.exitCode || 'missing command proof'),
+    );
+  }
+
+  if (!target) {
+    recorder.softFail(config, `sentry.${id}.target`, `${label} Sentry target is missing`);
+  } else if (hasPlaceholderSignal(target)) {
+    recorder.softFail(
+      config,
+      `sentry.${id}.target`,
+      `${label} Sentry target is placeholder-like`,
+      target,
+    );
+  } else if (project && !target.includes(project)) {
+    recorder.softFail(
+      config,
+      `sentry.${id}.target`,
+      `${label} Sentry target does not include expected project`,
+      `target=${target} project=${project}`,
+    );
+  } else {
+    recorder.pass(`sentry.${id}.target`, `${label} Sentry target is reviewable`, target);
+  }
+
+  const missingQueryParts = [
+    marker && !query.includes(marker) ? `marker=${marker}` : '',
+    release && !query.includes(release) ? `release=${release}` : '',
+    environment && !query.includes(environment) ? `environment=${environment}` : '',
+  ].filter(Boolean);
+  if (query && missingQueryParts.length === 0) {
+    recorder.pass(`sentry.${id}.query`, `${label} Sentry query is release-scoped`, query);
+  } else {
+    recorder.softFail(
+      config,
+      `sentry.${id}.query`,
+      `${label} Sentry query is missing release scope`,
+      missingQueryParts.join(' ') || 'missing query',
+    );
+  }
+
+  if (value.observed === true && Number(value.issueCount ?? 0) > 0) {
+    recorder.pass(`sentry.${id}.observed`, `${label} Sentry smoke issue was observed`);
+  } else {
+    recorder.softFail(
+      config,
+      `sentry.${id}.observed`,
+      `${label} Sentry smoke issue was not observed`,
+      `issueCount=${value.issueCount ?? 'missing'}`,
+    );
+  }
+
+  if (issues.length > 0 && (!project || issues.some((issue) => issue?.project === project))) {
+    recorder.pass(
+      `sentry.${id}.project`,
+      `${label} Sentry issue metadata includes expected project`,
+      project || 'not configured',
+    );
+  } else {
+    recorder.softFail(
+      config,
+      `sentry.${id}.project`,
+      `${label} Sentry issue metadata does not include expected project`,
+      project || 'missing project',
+    );
+  }
+}
+
+function verifySentryRawPrivacy(recorder, privacy) {
+  const value = privacy && typeof privacy === 'object' ? privacy : {};
+  const unsafeFlags = [
+    ['rawEventPayloadsIncluded', 'raw event payloads'],
+    ['stackTracesIncluded', 'stack traces'],
+    ['requestBodiesIncluded', 'request bodies'],
+    ['userEmailsIncluded', 'user emails'],
+    ['commandStdoutIncluded', 'raw command stdout'],
+    ['commandStderrIncluded', 'raw command stderr'],
+  ].filter(([key]) => value[key] !== false);
+
+  if (unsafeFlags.length === 0) {
+    recorder.pass(
+      'sentry.rawPrivacy',
+      'Sentry evidence omits raw events, stack traces, bodies, users, and command output',
+    );
+  } else {
+    recorder.fail(
+      'sentry.rawPrivacy',
+      'Sentry evidence includes unsafe raw detail',
+      unsafeFlags.map(([, label]) => label).join(', '),
+    );
   }
 }
 
@@ -2992,6 +3507,232 @@ function normalizeTechIntelSource(value) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
+function verifyA11yEvidence(config, recorder) {
+  const artifact = readJsonArtifact(
+    config,
+    recorder,
+    'a11y.exists',
+    'Accessibility regression',
+    config.paths.a11y,
+  );
+  if (!artifact) {
+    return;
+  }
+  const value = artifact.value;
+  checkFreshness(config, recorder, 'a11y.fresh', 'Accessibility regression', artifact, value);
+
+  if (
+    value.passed === true &&
+    (value.commandExitCode === undefined || value.commandExitCode === 0)
+  ) {
+    recorder.pass(
+      'a11y.passed',
+      'Accessibility regression gate passed',
+      `profile=${value.profile ?? 'unknown'}`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.passed',
+      'Accessibility regression gate did not pass',
+      `exit=${value.commandExitCode ?? 'unknown'}`,
+    );
+  }
+
+  if (config.strict && !ACCEPTED_A11Y_PROFILES.has(String(value.profile || ''))) {
+    recorder.fail(
+      'a11y.profile',
+      'Accessibility profile must be WCAG keyboard or release a11y',
+      `profile=${value.profile ?? 'missing'}`,
+    );
+  } else {
+    recorder.pass(
+      'a11y.profile',
+      'Accessibility profile is acceptable',
+      `profile=${value.profile ?? 'unknown'}`,
+    );
+  }
+
+  if (config.strict && isLocalTarget(value.target || value.baseURL || value.webBaseUrl || '')) {
+    recorder.fail(
+      'a11y.target',
+      'Strict deploy accessibility evidence cannot target a local app',
+      String(value.target || value.baseURL || value.webBaseUrl || 'missing'),
+    );
+  } else if (value.target || value.baseURL || value.webBaseUrl) {
+    recorder.pass(
+      'a11y.target',
+      'Accessibility target is acceptable',
+      String(value.target || value.baseURL || value.webBaseUrl),
+    );
+  } else {
+    recorder.softFail(config, 'a11y.target', 'Accessibility target is missing');
+  }
+
+  const evidenceEnvironment = normalizeOptionalEnvironment(
+    value.environment || value.deployEnv || value.e2eEnvironment || '',
+  );
+  if (!config.strict || evidenceEnvironment === config.deployEnv) {
+    recorder.pass(
+      'a11y.environment',
+      'Accessibility environment is acceptable',
+      evidenceEnvironment || 'unspecified',
+    );
+  } else {
+    recorder.fail(
+      'a11y.environment',
+      'Accessibility environment does not match deploy target',
+      `expected=${config.deployEnv} actual=${evidenceEnvironment || 'missing'}`,
+    );
+  }
+
+  if (value.productionBuild === true) {
+    recorder.pass('a11y.productionBuild', 'Accessibility evidence used a production build');
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.productionBuild',
+      'Accessibility evidence did not prove production build coverage',
+    );
+  }
+
+  if (value.clerkBackedAuth === true || String(value.authMode || '').toLowerCase() === 'clerk') {
+    recorder.pass('a11y.auth', 'Accessibility evidence used Clerk-backed auth');
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.auth',
+      'Accessibility evidence did not prove Clerk-backed auth',
+    );
+  }
+
+  const sourceReportPath = resolvePathInsideRoot(
+    config.root,
+    value.sourceReport || value.playwrightJsonReport || value.reportPath || '',
+  );
+  if (
+    sourceReportPath.raw &&
+    sourceReportPath.insideRoot &&
+    fileHasValidJson(sourceReportPath.absolutePath)
+  ) {
+    recorder.pass(
+      'a11y.sourceReport',
+      'Accessibility evidence has a Playwright JSON source report',
+      sourceReportPath.raw,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.sourceReport',
+      'Accessibility source report is missing, invalid, or outside the repo',
+      sourceReportPath.raw || 'missing',
+    );
+  }
+
+  const playwrightCommand = String(
+    value.playwrightCommand || value.command || value.commandText || '',
+  ).trim();
+  const commandLooksLikePlaywright =
+    /\bplaywright(?:\.cmd)?\b/i.test(playwrightCommand) && /\btest\b/i.test(playwrightCommand);
+  if (commandLooksLikePlaywright) {
+    recorder.pass(
+      'a11y.command',
+      'Accessibility evidence records the Playwright test command',
+      playwrightCommand,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.command',
+      'Accessibility evidence does not record a Playwright test command',
+      playwrightCommand || 'missing',
+    );
+  }
+
+  const projects = normalizeList(value.projects ?? value.browsers ?? value.browserProjects);
+  const missingProjects = containsAll(projects, config.requiredA11yProjects);
+  if (missingProjects.length === 0) {
+    recorder.pass(
+      'a11y.projects',
+      'Accessibility evidence covers required browser projects',
+      projects.join(', '),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.projects',
+      'Accessibility evidence is missing required browser projects',
+      missingProjects.join(', '),
+    );
+  }
+
+  const specs = normalizeList(value.specs ?? value.testFiles ?? value.files);
+  const missingSpecs = containsAll(specs, config.requiredA11ySpecs, normalizeSpec);
+  if (missingSpecs.length === 0) {
+    recorder.pass(
+      'a11y.specs',
+      'Accessibility evidence covers required specs',
+      specs.map(normalizeSpec).join(', '),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.specs',
+      'Accessibility evidence is missing required specs',
+      missingSpecs.join(', '),
+    );
+  }
+
+  const tests = value.tests && typeof value.tests === 'object' ? value.tests : {};
+  const failed = Number(tests.failed ?? value.failed ?? value.failures ?? 0);
+  const skipped = Number(tests.skipped ?? value.skipped ?? 0);
+  const unknown = Number(tests.unknown ?? value.unknown ?? value.unknownTests ?? 0);
+  const passed = Number(tests.passed ?? value.passedTests ?? value.testsPassed ?? 0);
+  if (
+    Number.isFinite(failed) &&
+    failed === 0 &&
+    Number.isFinite(skipped) &&
+    skipped === 0 &&
+    Number.isFinite(unknown) &&
+    unknown === 0 &&
+    Number.isFinite(passed) &&
+    passed > 0
+  ) {
+    recorder.pass(
+      'a11y.tests',
+      'Accessibility evidence has passing tests and zero failed, skipped, or unknown outcomes',
+      `${passed} passed`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.tests',
+      'Accessibility test counts are not release-clean',
+      `passed=${Number.isFinite(passed) ? passed : 'unknown'} failed=${Number.isFinite(failed) ? failed : 'unknown'} skipped=${Number.isFinite(skipped) ? skipped : 'unknown'} unknown=${Number.isFinite(unknown) ? unknown : 'unknown'}`,
+    );
+  }
+
+  const controls = value.controls && typeof value.controls === 'object' ? value.controls : {};
+  const requiredControls = ['axeCriticalSerious', 'colorContrast', 'keyboardNavigation'];
+  const failedControls = requiredControls.filter(
+    (controlName) => controls[controlName]?.ok !== true,
+  );
+  if (failedControls.length === 0) {
+    recorder.pass(
+      'a11y.controls',
+      'Accessibility evidence covers axe, contrast, and keyboard controls',
+      requiredControls.join(', '),
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'a11y.controls',
+      'Accessibility evidence is missing or failing required controls',
+      failedControls.join(', '),
+    );
+  }
+}
+
 function verifyBrowserEvidence(config, recorder) {
   const artifact = readJsonArtifact(
     config,
@@ -3409,6 +4150,7 @@ function runVerification(options) {
   verifyProviderQualityEvidence(config, recorder);
   verifyMcpConnectivityEvidence(config, recorder);
   verifySentryEvidence(config, recorder);
+  verifyA11yEvidence(config, recorder);
   verifyBrowserEvidence(config, recorder);
 
   const totals = recorder.checks.reduce(
@@ -3662,6 +4404,17 @@ function createSelftestFixtures(root) {
         permissionsCount: 2,
         isAdmin: false,
       },
+      domainRead: {
+        ok: true,
+        status: 200,
+        path: '/api/companies?search=__bidstack_release_probe_no_match__&limit=1',
+        responseShape: 'paginated-list',
+        itemCount: 0,
+        nextCursorPresent: false,
+        noMatchProbe: true,
+        rawItemsIncluded: false,
+        rawBodyIncluded: false,
+      },
     },
     tenant: {
       orgId: 'org_staging_release',
@@ -3693,6 +4446,31 @@ function createSelftestFixtures(root) {
       ciphertextSamplesIncluded: false,
       hashesIncluded: false,
       rowIdsIncluded: false,
+    },
+    atRestControls: {
+      storageEncryption: {
+        enabled: true,
+        provider: 'azure-postgresql-customer-managed-key',
+        evidenceRef: 'MANTU-SEC-48291 storage encryption validation',
+        rawConfigIncluded: false,
+      },
+      userEmail: {
+        fieldEncryptedByPiiMiddleware: false,
+        decision: USER_EMAIL_STORAGE_ONLY_DECISION,
+        decisionRef: 'MANTU-DPIA-48292 User.email storage-only approval',
+        owner: 'platform-security@bidstack360.com',
+        rawEmailsIncluded: false,
+      },
+      plaintextPii: {
+        fieldEncryptedByPiiMiddleware: false,
+        decision: PLAINTEXT_PII_STORAGE_ONLY_DECISION,
+        decisionRef: 'MANTU-DPIA-48293 plaintext PII storage-only approval',
+        owner: 'privacy-security@bidstack360.com',
+        requiredFields: REQUIRED_PLAINTEXT_PII_FIELDS,
+        acceptedFields: REQUIRED_PLAINTEXT_PII_FIELDS,
+        missingAcceptedFields: [],
+        rawValuesIncluded: false,
+      },
     },
     command: {
       source: 'raw-db-pii-ciphertext-scan',
@@ -4094,15 +4872,81 @@ function createSelftestFixtures(root) {
     validationFailures: [],
   });
   writeJson(root, DEFAULT_PATHS.sentry, {
+    schemaVersion: 1,
     generatedAt: now,
     environment: 'staging',
+    organization: 'bidstack',
+    projects: {
+      api: 'bidstack-api',
+      worker: 'bidstack-worker',
+    },
+    markers: {
+      api: 'bidstack-api-sentry-smoke',
+      worker: 'bidstack-worker-sentry-smoke',
+    },
     triggerTarget: releaseApiTarget,
     dsnConfigured: true,
     release: 'bidstack-web@0.1.0+abc123',
+    privacy: {
+      compactIssueMetadataIncluded: true,
+      rawEventPayloadsIncluded: false,
+      stackTracesIncluded: false,
+      requestBodiesIncluded: false,
+      userEmailsIncluded: false,
+      commandStdoutIncluded: false,
+      commandStderrIncluded: false,
+    },
     api5xxSmokeObserved: true,
     workerFailureObserved: true,
+    apiEvidence: {
+      label: 'api-5xx-smoke',
+      target: 'bidstack/bidstack-api',
+      query:
+        'release:bidstack-web@0.1.0+abc123 environment:staging level:error *bidstack-api-sentry-smoke*',
+      observed: true,
+      issueCount: 1,
+      issues: [{ id: '123', shortId: 'BID-123', level: 'error', project: 'bidstack-api' }],
+      command: { command: 'sentry issue list --json', exitCode: 0, passed: true },
+    },
+    workerEvidence: {
+      label: 'worker-failure-smoke',
+      target: 'bidstack/bidstack-worker',
+      query:
+        'release:bidstack-web@0.1.0+abc123 environment:staging level:error *bidstack-worker-sentry-smoke*',
+      observed: true,
+      issueCount: 1,
+      issues: [{ id: '124', shortId: 'BID-124', level: 'error', project: 'bidstack-worker' }],
+      command: { command: 'sentry issue list --json', exitCode: 0, passed: true },
+    },
     sendDefaultPii: false,
+    piiScrubberEnabled: true,
     sessionReplayEnabled: false,
+    passed: true,
+    validationFailures: [],
+  });
+  writeJson(root, DEFAULT_A11Y_SOURCE_REPORT, {
+    suites: [],
+  });
+  writeJson(root, DEFAULT_PATHS.a11y, {
+    generatedAt: now,
+    environment: 'staging',
+    profile: 'wcag-keyboard-regression',
+    target: 'https://staging.bidstack.example',
+    productionBuild: true,
+    clerkBackedAuth: true,
+    commandExitCode: 0,
+    passed: true,
+    projects: DEFAULT_A11Y_PROJECTS,
+    specs: DEFAULT_A11Y_SPECS,
+    tests: { passed: 43, failed: 0, skipped: 0, unknown: 0 },
+    controls: {
+      axeCriticalSerious: { passed: 19, failed: 0, skipped: 0, unknown: 0, ok: true },
+      colorContrast: { passed: 13, failed: 0, skipped: 0, unknown: 0, ok: true },
+      keyboardNavigation: { passed: 11, failed: 0, skipped: 0, unknown: 0, ok: true },
+    },
+    sourceReport: DEFAULT_A11Y_SOURCE_REPORT,
+    playwrightCommand:
+      'pnpm --filter @bidstack/web exec playwright test e2e/a11y/axe.spec.ts e2e/a11y/color-contrast.spec.ts e2e/a11y/keyboard-nav.spec.ts --project chromium-desktop --reporter=json',
   });
   writeJson(root, DEFAULT_BROWSER_SOURCE_REPORT, {
     suites: [],
@@ -4231,6 +5075,66 @@ function runSelftest() {
     );
     rmSync(staleSourceProbePath, { force: true });
 
+    createSelftestFixtures(root);
+    const a11yArtifactPath = path.join(root, DEFAULT_PATHS.a11y);
+    const missingKeyboardA11y = JSON.parse(readFileSync(a11yArtifactPath, 'utf8'));
+    delete missingKeyboardA11y.controls.keyboardNavigation;
+    writeJson(root, DEFAULT_PATHS.a11y, missingKeyboardA11y);
+    const missingKeyboardA11yEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      missingKeyboardA11yEvidence.ok,
+      false,
+      'expected missing keyboard a11y control to fail staging gate',
+    );
+    assert.equal(
+      missingKeyboardA11yEvidence.checks.some(
+        (check) => check.id === 'a11y.controls' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to require keyboard a11y control evidence',
+    );
+
+    createSelftestFixtures(root);
+    const syntheticA11y = JSON.parse(readFileSync(a11yArtifactPath, 'utf8'));
+    delete syntheticA11y.sourceReport;
+    delete syntheticA11y.playwrightCommand;
+    writeJson(root, DEFAULT_PATHS.a11y, syntheticA11y);
+    const syntheticA11yEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      syntheticA11yEvidence.ok,
+      false,
+      'expected synthetic a11y evidence without source proof to fail staging gate',
+    );
+    for (const checkId of ['a11y.sourceReport', 'a11y.command']) {
+      assert.equal(
+        syntheticA11yEvidence.checks.some(
+          (check) => check.id === checkId && check.status === 'fail',
+        ),
+        true,
+        `expected ${checkId} to reject synthetic a11y evidence`,
+      );
+    }
+
+    createSelftestFixtures(root);
+    const skippedA11y = JSON.parse(readFileSync(a11yArtifactPath, 'utf8'));
+    skippedA11y.tests = { passed: 42, failed: 0, skipped: 1, unknown: 0 };
+    skippedA11y.passed = true;
+    writeJson(root, DEFAULT_PATHS.a11y, skippedA11y);
+    const skippedA11yEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      skippedA11yEvidence.ok,
+      false,
+      'expected a11y evidence with skipped tests to fail staging gate',
+    );
+    assert.equal(
+      skippedA11yEvidence.checks.some(
+        (check) => check.id === 'a11y.tests' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to reject skipped a11y outcomes',
+    );
+
+    createSelftestFixtures(root);
     writeJson(root, DEFAULT_PATHS.browser, {
       generatedAt: new Date().toISOString(),
       environment: 'staging',
@@ -4518,6 +5422,67 @@ function runSelftest() {
       ),
       true,
       'expected staging gate to reject local Sentry trigger target',
+    );
+
+    createSelftestFixtures(root);
+    const missingSentryProjects = JSON.parse(readFileSync(sentryArtifactPath, 'utf8'));
+    delete missingSentryProjects.projects;
+    writeJson(root, DEFAULT_PATHS.sentry, missingSentryProjects);
+    const missingSentryProjectsEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      missingSentryProjectsEvidence.ok,
+      false,
+      'expected missing Sentry projects to fail staging gate',
+    );
+    assert.equal(
+      missingSentryProjectsEvidence.checks.some(
+        (check) => check.id === 'sentry.projects' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to require Sentry API/worker project evidence',
+    );
+
+    createSelftestFixtures(root);
+    const failedSentryQuery = JSON.parse(readFileSync(sentryArtifactPath, 'utf8'));
+    failedSentryQuery.apiEvidence.command = {
+      command: 'sentry issue list --json',
+      exitCode: 1,
+      passed: false,
+      error: 'fixture auth failure',
+    };
+    failedSentryQuery.passed = true;
+    writeJson(root, DEFAULT_PATHS.sentry, failedSentryQuery);
+    const failedSentryQueryEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      failedSentryQueryEvidence.ok,
+      false,
+      'expected failed Sentry issue query to fail staging gate',
+    );
+    assert.equal(
+      failedSentryQueryEvidence.checks.some(
+        (check) => check.id === 'sentry.api.command' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to require successful Sentry API issue query',
+    );
+
+    createSelftestFixtures(root);
+    const unsafeSentryEvidence = JSON.parse(readFileSync(sentryArtifactPath, 'utf8'));
+    unsafeSentryEvidence.privacy.commandStdoutIncluded = true;
+    unsafeSentryEvidence.passed = true;
+    writeJson(root, DEFAULT_PATHS.sentry, unsafeSentryEvidence);
+    const unsafeSentryPrivacyEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      unsafeSentryPrivacyEvidence.ok,
+      false,
+      'expected unsafe Sentry raw output evidence to fail staging gate',
+    );
+    assert.equal(
+      unsafeSentryPrivacyEvidence.checks.some(
+        (check) => check.id === 'sentry.rawPrivacy' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to reject raw Sentry command output',
     );
 
     createSelftestFixtures(root);
@@ -4862,6 +5827,47 @@ function runSelftest() {
     );
 
     createSelftestFixtures(root);
+    const missingDomainReadApi = JSON.parse(readFileSync(apiArtifactPath, 'utf8'));
+    delete missingDomainReadApi.checks.domainRead;
+    missingDomainReadApi.passed = true;
+    writeJson(root, DEFAULT_PATHS.api, missingDomainReadApi);
+    const missingDomainReadConnectivity = runVerification({ root, deployEnv: 'production' });
+    assert.equal(
+      missingDomainReadConnectivity.ok,
+      false,
+      'expected missing API domain read smoke to fail production gate',
+    );
+    assert.equal(
+      missingDomainReadConnectivity.checks.some(
+        (check) => check.id === 'api.domainRead' && check.status === 'fail',
+      ),
+      true,
+      'expected production gate to require domain read smoke proof',
+    );
+
+    createSelftestFixtures(root);
+    const rawDomainReadApi = JSON.parse(readFileSync(apiArtifactPath, 'utf8'));
+    rawDomainReadApi.checks.domainRead = {
+      ...rawDomainReadApi.checks.domainRead,
+      items: [{ id: 'company_1', name: 'Sensitive Corp' }],
+      rawItemsIncluded: true,
+    };
+    writeJson(root, DEFAULT_PATHS.api, rawDomainReadApi);
+    const rawDomainReadConnectivity = runVerification({ root, deployEnv: 'production' });
+    assert.equal(
+      rawDomainReadConnectivity.ok,
+      false,
+      'expected raw API response data in domain smoke evidence to fail production gate',
+    );
+    assert.equal(
+      rawDomainReadConnectivity.checks.some(
+        (check) => check.id === 'api.domainReadPrivacy' && check.status === 'fail',
+      ),
+      true,
+      'expected production gate to reject raw API response data in evidence',
+    );
+
+    createSelftestFixtures(root);
     const placeholderApi = JSON.parse(readFileSync(apiArtifactPath, 'utf8'));
     placeholderApi.target = 'https://staging-api.bidstack.example';
     writeJson(root, DEFAULT_PATHS.api, placeholderApi);
@@ -4998,6 +6004,92 @@ function runSelftest() {
       ),
       true,
       'expected production gate to reject evidence that includes hashes',
+    );
+
+    createSelftestFixtures(root);
+    const missingAtRestControlsPii = JSON.parse(readFileSync(piiArtifactPath, 'utf8'));
+    delete missingAtRestControlsPii.atRestControls;
+    missingAtRestControlsPii.passed = true;
+    writeJson(root, DEFAULT_PATHS.pii, missingAtRestControlsPii);
+    const missingAtRestControlsPiiCiphertext = runVerification({ root, deployEnv: 'production' });
+    assert.equal(
+      missingAtRestControlsPiiCiphertext.ok,
+      false,
+      'expected missing PII at-rest controls to fail production gate',
+    );
+    for (const checkId of [
+      'pii.storageEncryption.enabled',
+      'pii.userEmail.decision',
+      'pii.plaintextPii.decision',
+    ]) {
+      assert.equal(
+        missingAtRestControlsPiiCiphertext.checks.some(
+          (check) => check.id === checkId && check.status === 'fail',
+        ),
+        true,
+        `expected ${checkId} to require storage/User.email proof`,
+      );
+    }
+
+    createSelftestFixtures(root);
+    const placeholderUserEmailPii = JSON.parse(readFileSync(piiArtifactPath, 'utf8'));
+    placeholderUserEmailPii.atRestControls.userEmail.decisionRef = '<approval-ticket>';
+    placeholderUserEmailPii.passed = true;
+    writeJson(root, DEFAULT_PATHS.pii, placeholderUserEmailPii);
+    const placeholderUserEmailPiiCiphertext = runVerification({ root, deployEnv: 'production' });
+    assert.equal(
+      placeholderUserEmailPiiCiphertext.ok,
+      false,
+      'expected placeholder User.email decision evidence to fail production gate',
+    );
+    assert.equal(
+      placeholderUserEmailPiiCiphertext.checks.some(
+        (check) => check.id === 'pii.userEmail.decisionRef' && check.status === 'fail',
+      ),
+      true,
+      'expected production gate to reject placeholder User.email decision evidence',
+    );
+
+    createSelftestFixtures(root);
+    const missingPlaintextPiiScope = JSON.parse(readFileSync(piiArtifactPath, 'utf8'));
+    missingPlaintextPiiScope.atRestControls.plaintextPii.acceptedFields =
+      REQUIRED_PLAINTEXT_PII_FIELDS.filter((field) => field !== 'KamSession.transcriptText');
+    missingPlaintextPiiScope.atRestControls.plaintextPii.missingAcceptedFields = [
+      'KamSession.transcriptText',
+    ];
+    missingPlaintextPiiScope.passed = true;
+    writeJson(root, DEFAULT_PATHS.pii, missingPlaintextPiiScope);
+    const missingPlaintextPiiScopeCiphertext = runVerification({ root, deployEnv: 'production' });
+    assert.equal(
+      missingPlaintextPiiScopeCiphertext.ok,
+      false,
+      'expected incomplete plaintext-PII field scope to fail production gate',
+    );
+    assert.equal(
+      missingPlaintextPiiScopeCiphertext.checks.some(
+        (check) => check.id === 'pii.plaintextPii.scope' && check.status === 'fail',
+      ),
+      true,
+      'expected production gate to reject missing plaintext-PII decision scope',
+    );
+
+    createSelftestFixtures(root);
+    const placeholderPlaintextPii = JSON.parse(readFileSync(piiArtifactPath, 'utf8'));
+    placeholderPlaintextPii.atRestControls.plaintextPii.decisionRef = '<privacy-ticket>';
+    placeholderPlaintextPii.passed = true;
+    writeJson(root, DEFAULT_PATHS.pii, placeholderPlaintextPii);
+    const placeholderPlaintextPiiCiphertext = runVerification({ root, deployEnv: 'production' });
+    assert.equal(
+      placeholderPlaintextPiiCiphertext.ok,
+      false,
+      'expected placeholder plaintext-PII decision evidence to fail production gate',
+    );
+    assert.equal(
+      placeholderPlaintextPiiCiphertext.checks.some(
+        (check) => check.id === 'pii.plaintextPii.decisionRef' && check.status === 'fail',
+      ),
+      true,
+      'expected production gate to reject placeholder plaintext-PII decision evidence',
     );
 
     createSelftestFixtures(root);

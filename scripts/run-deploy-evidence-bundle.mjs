@@ -9,6 +9,16 @@ import path from 'node:path';
 const DEFAULT_OUTPUT_PATH = 'deploy-evidence/release-evidence-bundle-latest.json';
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_CAPTURE_CHARS = 16_000;
+const REQUIRED_PLAINTEXT_PII_FIELDS = [
+  'SmsMessage.fromNumber',
+  'SmsMessage.toNumber',
+  'SmsMessage.body',
+  'SmsConsent.phoneNumber',
+  'ActivityAttendee.email',
+  'CalendarEvent.attendees',
+  'KamSession.transcriptText',
+  'KamSession.attendees',
+];
 const OPS_EVIDENCE_REF_ENV = [
   {
     id: 'ops.evidence.approval',
@@ -316,6 +326,13 @@ function buildCommandPlan(deployEnv) {
       id: 'sentry',
       label: 'Sentry smoke evidence',
       script: 'deploy:evidence:sentry:trigger',
+      required: true,
+    },
+    {
+      id: 'a11y',
+      label: 'Accessibility evidence',
+      script: 'deploy:evidence:a11y',
+      preflightDiagnosticScript: 'deploy:evidence:a11y:write',
       required: true,
     },
     {
@@ -1023,6 +1040,94 @@ function collectPreflight(deployEnv, env, root = process.cwd()) {
     { sensitive: true, minLength: 44, nonPlaceholder: true },
   );
   addAny(
+    'pii.storageEncryptionEnabled',
+    'PII storage encryption at rest is confirmed',
+    ['BIDSTACK_STORAGE_ENCRYPTION_AT_REST'],
+    { equals: 'true' },
+  );
+  addAny(
+    'pii.storageEncryptionProvider',
+    'PII storage encryption provider/control is documented',
+    ['BIDSTACK_STORAGE_ENCRYPTION_PROVIDER'],
+    { minLength: 12, nonPlaceholder: true },
+  );
+  addAny(
+    'pii.storageEncryptionEvidence',
+    'PII storage encryption has reviewable evidence',
+    ['BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE'],
+    { minLength: 12, nonPlaceholder: true },
+  );
+  addAny(
+    'pii.userEmailDecision',
+    'User.email at-rest decision is explicit for the release',
+    ['BIDSTACK_USER_EMAIL_AT_REST_DECISION'],
+    { equals: 'storage-encryption-only' },
+  );
+  addAny(
+    'pii.userEmailDecisionRef',
+    'User.email at-rest decision has reviewable evidence',
+    ['BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF'],
+    { minLength: 12, nonPlaceholder: true },
+  );
+  addAny(
+    'pii.userEmailDecisionOwner',
+    'User.email at-rest decision owner is documented',
+    ['BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER'],
+    { minLength: 12, nonPlaceholder: true },
+  );
+  addAny(
+    'pii.plaintextPiiDecision',
+    'Plaintext-PII at-rest decision is explicit for the release',
+    ['BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION'],
+    { equals: 'storage-encryption-only' },
+  );
+  addAny(
+    'pii.plaintextPiiDecisionRef',
+    'Plaintext-PII at-rest decision has reviewable evidence',
+    ['BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF'],
+    { minLength: 12, nonPlaceholder: true },
+  );
+  addAny(
+    'pii.plaintextPiiDecisionOwner',
+    'Plaintext-PII at-rest decision owner is documented',
+    ['BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER'],
+    { minLength: 12, nonPlaceholder: true },
+  );
+  const plaintextPiiScope = presentValue(checkEnv, [
+    'BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS',
+  ]);
+  const acceptedPlaintextPiiFields = normalizeCsv(plaintextPiiScope.value);
+  const missingPlaintextPiiFields = REQUIRED_PLAINTEXT_PII_FIELDS.filter(
+    (field) => !acceptedPlaintextPiiFields.includes(field),
+  );
+  const unsupportedPlaintextPiiFields = acceptedPlaintextPiiFields.filter(
+    (field) => !REQUIRED_PLAINTEXT_PII_FIELDS.includes(field),
+  );
+  addCheck({
+    id: 'pii.plaintextPiiAcceptedFields',
+    label: 'Plaintext-PII at-rest decision covers every required field',
+    names: ['BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS'],
+    present: Boolean(plaintextPiiScope.name),
+    source: plaintextPiiScope.name,
+    passed:
+      Boolean(plaintextPiiScope.name) &&
+      missingPlaintextPiiFields.length === 0 &&
+      unsupportedPlaintextPiiFields.length === 0,
+    detail:
+      missingPlaintextPiiFields.length === 0 && unsupportedPlaintextPiiFields.length === 0
+        ? `${acceptedPlaintextPiiFields.length} field(s)`
+        : [
+            missingPlaintextPiiFields.length
+              ? `missing=${missingPlaintextPiiFields.join(',')}`
+              : '',
+            unsupportedPlaintextPiiFields.length
+              ? `unsupported=${unsupportedPlaintextPiiFields.join(',')}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+  });
+  addAny(
     'webhooks.databaseUrl',
     'Webhook secret ciphertext evidence has a release database URL',
     ['BIDSTACK_WEBHOOK_SECRET_EVIDENCE_DATABASE_URL', 'DATABASE_URL'],
@@ -1331,6 +1436,30 @@ function collectPreflight(deployEnv, env, root = process.cwd()) {
   );
 
   addAny(
+    'a11y.target',
+    'Accessibility evidence has a non-local web target',
+    [
+      'BIDSTACK_A11Y_TARGET',
+      'BIDSTACK_BROWSER_REGRESSION_TARGET',
+      'E2E_BASE_URL',
+      'PUBLIC_BASE_URL',
+    ],
+    { nonLocalUrl: true },
+  );
+  addAny(
+    'a11y.authMode',
+    'Accessibility evidence uses Clerk-backed auth',
+    ['BIDSTACK_A11Y_AUTH_MODE', 'BIDSTACK_BROWSER_AUTH_MODE', 'E2E_AUTH_MODE', 'VITE_AUTH_MODE'],
+    { equals: 'clerk' },
+  );
+  addAny(
+    'a11y.productionBuild',
+    'Accessibility evidence uses a production build',
+    ['BIDSTACK_A11Y_PRODUCTION_BUILD', 'BIDSTACK_BROWSER_PRODUCTION_BUILD'],
+    { equals: 'true' },
+  );
+
+  addAny(
     'browser.target',
     'Browser regression has a non-local web target',
     ['BIDSTACK_BROWSER_REGRESSION_TARGET', 'E2E_BASE_URL', 'PUBLIC_BASE_URL'],
@@ -1621,6 +1750,13 @@ function runSelftest() {
   assert.equal(loadDiagnostic.originalScript, 'deploy:evidence:load');
   assert.equal(loadDiagnostic.command, 'pnpm run deploy:evidence:load');
   assert.equal(loadDiagnostic.preflightDiagnostic, true);
+  const a11yStep = productionPlan.find((step) => step.id === 'a11y');
+  assert.equal(a11yStep.preflightDiagnosticScript, 'deploy:evidence:a11y:write');
+  const a11yDiagnostic = preflightDiagnosticStep(a11yStep);
+  assert.equal(a11yDiagnostic.script, 'deploy:evidence:a11y:write');
+  assert.equal(a11yDiagnostic.originalScript, 'deploy:evidence:a11y');
+  assert.equal(a11yDiagnostic.command, 'pnpm run deploy:evidence:a11y:write');
+  assert.equal(a11yDiagnostic.preflightDiagnostic, true);
   const browserStep = productionPlan.find((step) => step.id === 'browser');
   assert.equal(browserStep.preflightDiagnosticScript, 'deploy:evidence:browser:write');
   const browserDiagnostic = preflightDiagnosticStep(browserStep);
@@ -1647,6 +1783,17 @@ function runSelftest() {
       'postgresql://release-db-user:release-db-pass@db.release.internal:5432/bidstack',
     PII_FIELD_ENCRYPTION: 'true',
     PII_ENCRYPTION_MASTER_KEY: 'release_pii_master_key_1234567890abcdef1234567890abcdef',
+    BIDSTACK_STORAGE_ENCRYPTION_AT_REST: 'true',
+    BIDSTACK_STORAGE_ENCRYPTION_PROVIDER: 'azure-postgresql-customer-managed-key',
+    BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE: 'MANTU-SEC-48291 storage encryption validation',
+    BIDSTACK_USER_EMAIL_AT_REST_DECISION: 'storage-encryption-only',
+    BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF: 'MANTU-DPIA-48292 User.email storage-only approval',
+    BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER: 'platform-security@bidstack360.com',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION: 'storage-encryption-only',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF:
+      'MANTU-DPIA-48293 plaintext PII storage-only approval',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER: 'privacy-security@bidstack360.com',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS: REQUIRED_PLAINTEXT_PII_FIELDS.join(','),
     BIDSTACK_WEBHOOK_SECRET_EVIDENCE_DATABASE_URL:
       'postgresql://release-db-user:release-db-pass@db.release.internal:5432/bidstack',
     INTEGRATION_TOKEN_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
@@ -1736,6 +1883,16 @@ function runSelftest() {
     BIDSTACK_PII_CIPHERTEXT_DATABASE_URL: 'postgresql://user:pass@db.example/bidstack',
     PII_FIELD_ENCRYPTION: 'false',
     PII_ENCRYPTION_MASTER_KEY: '<pii-encryption-master-key>',
+    BIDSTACK_STORAGE_ENCRYPTION_AT_REST: 'false',
+    BIDSTACK_STORAGE_ENCRYPTION_PROVIDER: '<storage-encryption-provider>',
+    BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE: '<storage-encryption-evidence>',
+    BIDSTACK_USER_EMAIL_AT_REST_DECISION: '<user-email-decision>',
+    BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF: '<user-email-decision-ref>',
+    BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER: '<user-email-decision-owner>',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION: '<plaintext-pii-decision>',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF: '<plaintext-pii-decision-ref>',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER: '<plaintext-pii-decision-owner>',
+    BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS: '<plaintext-pii-fields>',
     BIDSTACK_WEBHOOK_SECRET_EVIDENCE_DATABASE_URL: 'postgresql://user:pass@db.example/bidstack',
     INTEGRATION_TOKEN_KEY: '<integration-token-key>',
     BIDSTACK_WEBHOOK_SECRET_PLAINTEXT_FALLBACK: 'true',
@@ -1775,6 +1932,31 @@ function runSelftest() {
   assert.equal(placeholderPreflight.blockingFailures.includes('pii.databaseUrl'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('pii.fieldEncryptionEnabled'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('pii.masterKey'), true);
+  assert.equal(
+    placeholderPreflight.blockingFailures.includes('pii.storageEncryptionEnabled'),
+    true,
+  );
+  assert.equal(
+    placeholderPreflight.blockingFailures.includes('pii.storageEncryptionProvider'),
+    true,
+  );
+  assert.equal(
+    placeholderPreflight.blockingFailures.includes('pii.storageEncryptionEvidence'),
+    true,
+  );
+  assert.equal(placeholderPreflight.blockingFailures.includes('pii.userEmailDecision'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('pii.userEmailDecisionRef'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('pii.userEmailDecisionOwner'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('pii.plaintextPiiDecision'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('pii.plaintextPiiDecisionRef'), true);
+  assert.equal(
+    placeholderPreflight.blockingFailures.includes('pii.plaintextPiiDecisionOwner'),
+    true,
+  );
+  assert.equal(
+    placeholderPreflight.blockingFailures.includes('pii.plaintextPiiAcceptedFields'),
+    true,
+  );
   assert.equal(placeholderPreflight.blockingFailures.includes('webhooks.databaseUrl'), true);
   assert.equal(
     placeholderPreflight.blockingFailures.includes('webhooks.integrationTokenKey'),
@@ -1795,6 +1977,7 @@ function runSelftest() {
   assert.equal(placeholderPreflight.blockingFailures.includes('sentry.authToken'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('sentry.release'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('sentry.org'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('a11y.target'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('browser.target'), true);
 
   const dispositionRoot = mkdtempSync(path.join(tmpdir(), 'bidcrm-bundle-disposition-'));
@@ -1851,6 +2034,16 @@ function runSelftest() {
   assert.equal(blockedPreflight.blockingFailures.includes('pii.databaseUrl'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('pii.fieldEncryptionEnabled'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('pii.masterKey'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.storageEncryptionEnabled'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.storageEncryptionProvider'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.storageEncryptionEvidence'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.userEmailDecision'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.userEmailDecisionRef'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.userEmailDecisionOwner'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.plaintextPiiDecision'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.plaintextPiiDecisionRef'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.plaintextPiiDecisionOwner'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('pii.plaintextPiiAcceptedFields'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('webhooks.databaseUrl'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('webhooks.integrationTokenKey'), true);
   assert.equal(

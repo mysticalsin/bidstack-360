@@ -11,6 +11,10 @@ vi.mock('@bidstack/db', () => ({
 }));
 
 import { prisma } from '@bidstack/db';
+import {
+  clearRbacDecisionCacheForTest,
+  invalidateRbacDecisionCache,
+} from '../lib/rbac-decision-cache.js';
 import { rbacPlugin } from './rbac.js';
 
 const userRoleCount = vi.mocked(prisma.userRole.count);
@@ -60,6 +64,7 @@ async function buildRbacTestServer(auth: {
 describe('rbac plugin', () => {
   beforeEach(() => {
     userRoleCount.mockReset();
+    clearRbacDecisionCacheForTest();
     process.env.NODE_ENV = originalNodeEnv;
     if (originalLegacyScopeFlag === undefined) {
       delete process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES;
@@ -69,6 +74,8 @@ describe('rbac plugin', () => {
   });
 
   afterEach(() => {
+    process.env.NODE_ENV = 'test';
+    clearRbacDecisionCacheForTest();
     process.env.NODE_ENV = originalNodeEnv;
     if (originalLegacyScopeFlag === undefined) {
       delete process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES;
@@ -212,6 +219,59 @@ describe('rbac plugin', () => {
         },
       },
     });
+    await server.close();
+  });
+
+  it('caches permission decisions across requests for the same user/org/permission', async () => {
+    userRoleCount.mockResolvedValue(1);
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const first = await server.inject({ method: 'GET', url: '/permission' });
+    const second = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(userRoleCount).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('invalidates cached permission denies when a user role changes', async () => {
+    userRoleCount.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const denied = await server.inject({ method: 'GET', url: '/permission' });
+    invalidateRbacDecisionCache('org-1', 'user-1');
+    const allowed = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(denied.statusCode).toBe(403);
+    expect(allowed.statusCode).toBe(200);
+    expect(userRoleCount).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
+  it('invalidates cached permission grants when an org role changes', async () => {
+    userRoleCount.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const allowed = await server.inject({ method: 'GET', url: '/permission' });
+    invalidateRbacDecisionCache('org-1');
+    const denied = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(allowed.statusCode).toBe(200);
+    expect(denied.statusCode).toBe(403);
+    expect(userRoleCount).toHaveBeenCalledTimes(2);
     await server.close();
   });
 

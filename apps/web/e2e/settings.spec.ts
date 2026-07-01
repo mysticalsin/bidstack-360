@@ -89,8 +89,8 @@ test.describe('Settings page', () => {
     await page.reload();
     await expect(page.locator('#main')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-visual-effects', 'off');
+    await expect(page.getByRole('heading', { name: 'Appearance', level: 2 })).toBeVisible();
 
-    await openAppearance(page, gotoAndWait);
     const persistedVisualEffects = page.getByRole('checkbox', {
       name: 'Premium visual effects',
     });
@@ -175,7 +175,14 @@ test.describe('Settings page', () => {
       await page.getByLabel('Default currency').selectOption('USD');
       await page.getByLabel('Date format').selectOption('MM/DD/YYYY');
       await page.getByLabel('Timezone').selectOption('America/New_York');
+      const saveResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/v1/org-settings/locale') &&
+          response.request().method() === 'PUT',
+      );
       await page.getByRole('button', { name: 'Save currency and locale' }).click();
+      expect((await saveResponse).ok()).toBe(true);
+      await expect(page.getByText('Currency and locale saved')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Save currency and locale' })).toBeDisabled();
 
       const persisted = await getOrgLocale(request);

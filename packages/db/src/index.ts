@@ -13,6 +13,10 @@ import { PrismaClient } from '../generated/client/index.js';
 import { makeAuditImmutabilityMiddleware } from './middleware/audit-immutability.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
 import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
+import {
+  getTenantScopeGuardMode,
+  makeTenantScopeGuardMiddleware,
+} from './middleware/tenant-scope-guard.js';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
@@ -49,6 +53,11 @@ function buildPrismaClient(): PrismaClient {
   // We apply this globally so developers don't have to constantly append `deletedAt: null`.
   client.$use(makeSoftDeleteMiddleware());
 
+  const tenantScopeGuardMode = getTenantScopeGuardMode();
+  if (tenantScopeGuardMode !== 'off') {
+    client.$use(makeTenantScopeGuardMiddleware({ mode: tenantScopeGuardMode }));
+  }
+
   // Audit immutability: AuditLog is insert-only. Blocks update/delete/upsert via
   // the Prisma client so audit history cannot be silently altered. If/when an
   // AuditLog retention purge is added it must go through $executeRaw, which
@@ -63,8 +72,7 @@ function buildPrismaClient(): PrismaClient {
   // backstop, by a DB-level trigger + REVOKE (see audit-immutability.ts). Leaving
   // the app-layer guard unconditional in test would force every suite onto a raw
   // SQL purge path for no added safety, so we skip registration only under Vitest.
-  const isTestRuntime =
-    process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+  const isTestRuntime = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
   if (!isTestRuntime) {
     client.$use(makeAuditImmutabilityMiddleware());
   }

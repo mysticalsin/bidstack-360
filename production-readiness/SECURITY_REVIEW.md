@@ -6,7 +6,7 @@
 
 ## Summary verdict (security dimension)
 
-Application security is **strong** — multi-tenant org-scoping is pervasive, the RBAC model is DB-authoritative (no admin-claim fallback), SAST is clean, no secrets in repo/bundle/git, and the in-flight WIP _adds_ guards rather than removing any. The prior PII field-encryption trap is now neutralized for supported CRM/KAM PII, but the security dimension is **NOT clear-to-ship** for the PII bar until operator ciphertext evidence, storage-encryption proof, and the `User.email` field-level decision are closed.
+Application security is **strong** — multi-tenant org-scoping is pervasive, the RBAC model is DB-authoritative (no admin-claim fallback), SAST is clean, no secrets in repo/bundle/git, and the in-flight WIP _adds_ guards rather than removing any. The prior PII field-encryption trap is now neutralized for supported CRM/KAM PII, and strict PII evidence now fails without storage-encryption proof, a `User.email` storage-only decision owner/reference, and exact plaintext-PII decision scope for SMS/activity/calendar/KAM fields. The security dimension is still **NOT clear-to-ship** for the PII bar until live operator ciphertext evidence and real platform/security evidence values are captured.
 
 ---
 
@@ -51,13 +51,30 @@ Application security is **strong** — multi-tenant org-scoping is pervasive, th
 - **Tests added:** `apps/api/src/routes/ai-compute-auth.integration.test.ts`; `apps/api/src/plugins/rbac.test.ts`.
 - **Status:** FIXED for API-key/human-session boundary. **Residual risk:** product may later choose finer AI entitlements, but there is no longer an authenticated-only AI compute surface.
 
+### [MEDIUM] Twilio inbound SMS retry could 500 after a successful first delivery
+
+- **Area / file:** Gate 10 · `apps/api/src/services/twilio-sms.service.ts`
+- **Description:** Twilio retries inbound webhooks when acknowledgement is lost. The handler used a plain `SmsMessage.create`, so a replay for the same `MessageSid` could hit the unique `twilioSid` constraint, return 500, and duplicate downstream CRM activity if retried around side effects.
+- **Fix implemented:** inbound SMS now treats `MessageSid` as the idempotency key, catches Prisma `P2002` as already processed, writes activity only after the first successful insert, keeps STOP on `smsConsent.upsert`, selects the integration token by the inbound `To` number, and validates signatures with an explicit Twilio number when available.
+- **Tests added:** `apps/api/src/services/twilio-sms.service.test.ts`.
+- **Status:** FIXED in code. **Residual risk:** staging should replay a real Twilio webhook with the same `MessageSid` before release evidence is closed.
+
 ### [CRITICAL] PII field-encryption trap neutralized for supported models
 
 - **Area / file:** Gate 5/13 · `packages/db/src/middleware/pii-encryption.ts`, `packages/shared/src/crypto/pii-field-cipher.ts`, `scripts/encrypt-existing-pii.ts`, `scripts/decrypt-pii-rollback.ts`
 - **Description:** The middleware now rewrites supported encrypted email equality filters to `emailHash`, hashes emails with trim/lowercase canonicalization, decrypts id-only reads when the returned row carries `orgId`, fails loud when it cannot decrypt safely, removes nonexistent `Contact.mobilePhone`, and excludes `User.email` until a generated `User.emailHash` migration exists.
 - **Backfill/rollback:** `KamConsultant.email` is now included in forward encryption and rollback; rollback still decrypts legacy encrypted `User.email` rows from the older unsafe implementation.
 - **Tests:** `packages/db/src/middleware/pii-encryption.test.ts` covers createMany encryption, fail-loud missing orgId writes/lookups, email equality/in rewrite, KAM id-only read decryption, and User.email exclusion.
-- **Status:** FIXED for `Contact`, `Lead`, and `KamConsultant`. **Residual risk:** `User.email` remains plaintext at field level; production still needs operator dry-run/apply evidence, raw ciphertext proof, storage-level encryption confirmation, and legal/security sign-off.
+- **Status:** FIXED for `Contact`, `Lead`, and `KamConsultant`. **Residual risk:** `User.email` and the SMS/activity/calendar/KAM fields named in the plaintext-PII evidence gate remain plaintext at field level; production still needs operator dry-run/apply evidence, raw ciphertext proof, live storage/User.email/plaintext-PII evidence values, and legal/security sign-off.
+
+---
+
+### [PARTIAL] Tenant isolation backstop added for broad Prisma operations
+
+- **Area / file:** Gate 5 · `packages/db/src/middleware/tenant-scope-guard.ts`, `packages/db/src/index.ts`
+- **Description:** `BIDSTACK_TENANT_SCOPE_GUARD=warn|enforce` registers an opt-in Prisma middleware that discovers models with `orgId` and catches broad `findMany`, `count`, `aggregate`, `groupBy`, `updateMany`, and `deleteMany` operations without tenant scope.
+- **Tests:** `packages/db/src/middleware/tenant-scope-guard.test.ts` covers enforce/warn behavior, direct `orgId`, `AND`, safe/unsafe `OR`, non-tenant models, and intentionally untouched single-record ownership-resolution paths.
+- **Status:** PARTIAL. This is an ORM guard for broad Prisma operations, not DB RLS. Staging must run warn/enforce before production, raw SQL remains manual, and full session-var RLS/design is still open.
 
 ---
 
@@ -66,8 +83,8 @@ Application security is **strong** — multi-tenant org-scoping is pervasive, th
 ### [CRITICAL] PII-at-rest production certification still incomplete
 
 - **Area / file:** Gate 5/13 · `docs/security/pii-field-encryption.md`, production secret store, production database.
-- **Description:** Application field encryption is now safe for `Contact`, `Lead`, and `KamConsultant`, but production still lacks operator dry-run/apply evidence, raw DB ciphertext proof, storage-level encryption confirmation, and the final `User.email` field-level decision.
-- **Status:** OPEN · **Owner:** Tony + platform/security · **Residual risk:** HIGH until production evidence proves CRM/KAM ciphertext at rest and `User.email` is either covered by storage-level encryption or a generated `User.emailHash` migration.
+- **Description:** Application field encryption is now safe for `Contact`, `Lead`, and `KamConsultant`, and the strict PII evidence gate now requires storage-level encryption proof plus `User.email` and exact plaintext-PII storage-only decision references.
+- **Status:** OPEN · **Owner:** Tony + platform/security · **Residual risk:** HIGH until production evidence proves CRM/KAM ciphertext at rest and the live storage/User.email/plaintext-PII evidence values are captured, or generated field-encryption migrations are added.
 
 ---
 
