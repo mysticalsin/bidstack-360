@@ -7,14 +7,18 @@ Task A3 asked to "render the presence that is already built." Investigation foun
 
 1. **DB-backed** — `UserPresence` Prisma model, `GET/POST /api/presence`
    (`apps/api/src/routes/collaboration.ts`), filtered by `recordType`/`recordId`.
-   Pure REST, no TTL, real `userName` via a Prisma join. Already consumed by
-   `useOrgPresence()` in `apps/web/src/hooks/useUsers.ts` (org-wide online dot in
-   the Team settings table).
+   Pure REST, no TTL, real `userName` via a Prisma join. Unconsumed by any
+   frontend code before this task — A3 is its first consumer.
 2. **Redis/WS-backed** — `presence.service.ts` + `plugins/realtime.ts`, keyed
    `presence:org:<orgId>:user:<userId>`, 30s TTL, pushed over `/api/realtime`
    WebSocket (`presence:org:<orgId>` channel) plus a `GET /presence/org` /
-   `GET /presence/entity/:type/:id` polling fallback. **Zero frontend code
-   consumed this** (grepped clean across `apps/web/src`).
+   `GET /presence/entity/:type/:id` polling fallback registered in
+   `apps/api/src/routes/realtime.ts`. **Not fully dead**: the org-scoped route
+   (`GET /presence/org`) IS consumed in production — `useOrgPresence()` in
+   `apps/web/src/hooks/useUsers.ts` polls it every 30s to drive the online/
+   offline dot on the Team settings page (`TeamSection.tsx`). Only the
+   entity-scoped route (`GET /presence/entity/:type/:id`) is unconsumed
+   (grepped clean across `apps/web/src`).
 
 ## Why the DB-backed system won
 
@@ -34,7 +38,14 @@ Task A3 asked to "render the presence that is already built." Investigation foun
   the same gap with a `window.__apiTokenProvider` bridge that is **never set
   anywhere in the codebase** — dead code that happens not to matter in dev/test
   because stub auth doesn't check tokens at all.
-- The DB-backed system is already proven in production by `useOrgPresence()`.
+- `useOrgPresence()` already proves the WS/Redis org-scoped route works
+  end-to-end in production (Team settings online dot), but only because it
+  reads solely `userId` off the response — the response-schema bug above
+  silently drops every other field. This entity-level presence UI needs a
+  real `userName` per viewer for its tooltips, which the DB-backed route
+  already resolves via a Prisma join and the WS route's live schema bug would
+  strip. That's why A3 follows the DB-backed contract instead of fixing the
+  WS route's schema bug as a prerequisite.
 
 ## What A3 built
 
@@ -61,7 +72,15 @@ same opportunity), both keyed `entityType: 'opportunity', entityId:
 
 The Redis/WS presence stack (`presence.service.ts`, `plugins/realtime.ts`'s
 `presence:org:*` handling, `routes/realtime.ts`'s `/presence/org` +
-`/presence/entity/:type/:id`) is unconsumed dead weight with a live response-
-schema bug and a broken name stub. Either wire it up properly (fix the name
-lookup, fix the response schema, solve WS auth for Clerk) or delete it — right
-now it's maintenance surface with no reader.
+`/presence/entity/:type/:id`) has a live response-schema bug (declares
+`{ userId, presence: unknown }`, service returns flat `PresenceEntry` fields,
+so everything but `userId` is silently stripped on the wire) and a broken
+name stub (`name: ''` hardcoded in `plugins/realtime.ts`'s `upsertPresence`
+call sites). **This is not fully unconsumed** — `GET /presence/org` is live
+in production via `useOrgPresence()` → `TeamSection.tsx`'s online dot, which
+happens to tolerate the schema bug because it only needs `userId`. Only
+`GET /presence/entity/:type/:id` has zero callers today. Either fix the name
+lookup + response schema (benefiting the already-live org route too) and
+wire up the entity route, or delete the entity route specifically — but do
+not delete the org route or `presence.service.ts` wholesale without first
+replacing `useOrgPresence()`'s dependency on it.

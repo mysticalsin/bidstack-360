@@ -46,8 +46,12 @@ export function PresenceAvatars({
   const others = viewers.filter((v) => v.userId !== user?.id);
   if (others.length === 0) return null;
 
-  const shown = others.slice(0, max);
-  const overflow = others.length - shown.length;
+  // Stable-sort by userId before slicing: the underlying query has no
+  // server-side ordering, so without this the top-4/"+N" split could flap
+  // between polls even when the actual viewer set hasn't changed.
+  const sorted = [...others].sort((a, b) => a.userId.localeCompare(b.userId));
+  const shown = sorted.slice(0, max);
+  const overflow = sorted.length - shown.length;
 
   return (
     <div
@@ -73,8 +77,15 @@ export function PresenceAvatars({
             <Tooltip content={viewer.userName ?? t('presence.anonymousViewer', 'Teammate')}>
               {/* Radix's asChild trigger clones its child and injects a ref — Avatar
                   is a plain function component (no forwardRef), so it must be wrapped
-                  in a native element rather than passed directly as the trigger child. */}
-              <span className="inline-flex">
+                  in a native element rather than passed directly as the trigger child.
+                  tabIndex makes the trigger keyboard-focusable so the name tooltip
+                  (Radix opens tooltips on focus, not just hover) is reachable without
+                  a mouse; screen readers already get the name via Avatar's own
+                  role="img"/aria-label regardless of focus. */}
+              <span
+                tabIndex={0}
+                className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+              >
                 <Avatar seed={viewer.userName ?? viewer.userId} size={AVATAR_SIZE} />
               </span>
             </Tooltip>

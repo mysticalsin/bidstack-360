@@ -3,16 +3,20 @@
 // Backs onto the already-shipped DB presence surface (UserPresence model,
 // GET/POST /api/presence — apps/api/src/routes/collaboration.ts), NOT the
 // separate Redis/WebSocket presence stack in services/presence.service.ts +
-// plugins/realtime.ts. That WS stack is unconsumed by any frontend code today
-// (grepped clean), always writes `name: ''` server-side (plugins/realtime.ts
-// upsertPresence stub), and its `/presence/entity/:type/:id` REST route has a
-// response-schema bug (schema declares `{ userId, presence: unknown }` but the
-// service returns flat PresenceEntry fields — everything except userId is
-// stripped on the wire). The DB-backed route already resolves real
-// `userName` via a Prisma join and is proven in production by
-// useOrgPresence() (hooks/useUsers.ts), so this hook follows that contract
-// rather than blending two half-built systems. Flagging the WS stack as a
-// cleanup candidate — see docs/solutions/ note left alongside this feature.
+// plugins/realtime.ts + routes/realtime.ts. That WS stack's *entity-scoped*
+// route (`/presence/entity/:type/:id`) is unconsumed by any frontend code
+// today, but its *org-scoped* route (`/presence/org`) IS consumed in
+// production — useOrgPresence() (hooks/useUsers.ts) polls it to drive the
+// Team settings page's online/offline dot. Both WS routes always write
+// `name: ''` server-side (plugins/realtime.ts upsertPresence stub) and share
+// a response-schema bug (schema declares `{ userId, presence: unknown }` but
+// the service returns flat PresenceEntry fields — everything except userId
+// is stripped on the wire); useOrgPresence() happens to tolerate this because
+// it only ever reads `userId` off the response. The DB-backed route this hook
+// uses instead already resolves real `userName` via a Prisma join, which the
+// per-record avatar/tooltip UI here needs and the WS route's live schema bug
+// would silently drop. See docs/solutions/presence-avatars-a3.md for the full
+// comparison and the WS entity-route cleanup that's still outstanding.
 //
 // Contract (packages/shared/src/schemas/collaboration.ts):
 //   GET  /api/presence?recordType=&recordId=  -> { items: UserPresence[] }
