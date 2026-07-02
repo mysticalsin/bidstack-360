@@ -1,22 +1,14 @@
-# deploy.workflow.yml.draft — gated production CD (DRAFT, not active)
-#
-# STATUS: draft on purpose. `.github/workflows/` is coordinate-before-edit
-# (CLAUDE.md); Tony moves this to `.github/workflows/deploy.yml` to activate.
-# Closes the code side of REMAINING-TO-PRODUCTION H6 (gated CD + image scan +
-# SBOM). Referenced secrets/environment must exist before activation:
+# Gated production CD. Requires before first run:
 #   - GitHub environment `production` with required reviewers (the human gate)
 #   - RAILWAY_TOKEN (api/worker/mcp deploy), VERCEL_TOKEN + VERCEL_ORG_ID +
-#     VERCEL_PROJECT_ID (web deploy)
+#     VERCEL_PROJECT_ID (web deploy), PROD_API_URL (repo/environment variable)
 #
-# Design notes (fixes the two defects the old draft was flagged for):
-#   1. "Latent gate-name bug": workflow_run must match the *name:* field of the
-#      triggering workflow exactly. Verified against the live tree:
-#      ci.yml name is "CI", e2e.yml name is "E2E (full suite)".
-#   2. "Vacuous CI-green guard": the old draft only checked the triggering
-#      run's conclusion (a single workflow), which passes even if the other
-#      gate never ran on that SHA. Here the `gates` job re-resolves BOTH
-#      workflows' latest runs for the exact head SHA via the API and requires
-#      both green — deploys never proceed on a partially-tested commit.
+# Design notes:
+#   1. workflow_run matches the *name:* field of the triggering workflow
+#      exactly: ci.yml name is "CI", e2e.yml name is "E2E (full suite)".
+#   2. The `gates` job re-resolves BOTH workflows' latest runs for the exact
+#      head SHA via the API and requires both green — a deploy never proceeds
+#      on a commit where only one of the two gates ran.
 
 name: Deploy (production)
 

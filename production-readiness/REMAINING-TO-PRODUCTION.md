@@ -84,16 +84,16 @@ the Azure bicep is a never-run draft.
 
 ### H6 · Gated CD + built-image OS-CVE scan + SBOM — OPS / ENG
 
-- [x] 2026-07-02: `deploy.workflow.yml.draft` rewritten — the latent gate-name bug is fixed (matches the
-      live `name:` fields, `"CI"` / `"E2E (full suite)"`) and the vacuous CI-green guard is fixed (the
-      `gates` job re-resolves BOTH required workflows' latest run for the exact head SHA via the GitHub
-      API and fails closed if either is missing/non-green, instead of trusting only the triggering run).
-      Also wires trivy CVE scan (fail on HIGH/CRITICAL) + CycloneDX SBOM per image, and a post-deploy
-      `/readyz` probe. Still a `.draft` file at repo root by design (`.github/workflows/` is
-      coordinate-before-edit) — needs Tony to move it into `.github/workflows/deploy.yml`.
-- [ ] Promote the draft to an active gated `environment: production` CD with required reviewers configured
-      in the GitHub environment, and provision `RAILWAY_TOKEN` / `VERCEL_TOKEN` / `VERCEL_ORG_ID` /
-      `VERCEL_PROJECT_ID` secrets.
+- [x] 2026-07-02: `.github/workflows/deploy.yml` is live (promoted from the prior `.draft`, with Tony's
+      explicit go-ahead to touch the coordinate-before-edit `.github/workflows/` directory). The latent
+      gate-name bug is fixed (matches the live `name:` fields, `"CI"` / `"E2E (full suite)"`) and the
+      vacuous CI-green guard is fixed (the `gates` job re-resolves BOTH required workflows' latest run for
+      the exact head SHA via the GitHub API and fails closed if either is missing/non-green, instead of
+      trusting only the triggering run). Also wires trivy CVE scan (fail on HIGH/CRITICAL) + CycloneDX SBOM
+      per image, and a post-deploy `/readyz` probe. YAML validated to parse.
+- [ ] Still needed before this can actually run a deploy (GitHub UI, not code): create the `production`
+      environment with required reviewers configured, and add repo/environment secrets `RAILWAY_TOKEN`,
+      `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, plus the `PROD_API_URL` environment variable.
 - **Acceptance:** no deploy to prod without a green gate + an image scan + an SBOM artifact.
 
 ### H7 · Runtime observability validation (Gate 11) — OPS
