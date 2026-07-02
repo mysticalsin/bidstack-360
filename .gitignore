@@ -123,3 +123,7 @@ scratch-*.js
 
 # Machine-specific tool shims (hardcoded local paths)
 walteur-kit/bin/
+
+# Prisma schema scratch copies (use git history instead)
+packages/db/prisma/schema.prisma.backup
+packages/db/prisma/schema.prisma.pulled

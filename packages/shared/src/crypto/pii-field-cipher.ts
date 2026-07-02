@@ -39,9 +39,18 @@ export type PiiFieldType = 'email' | 'phone';
 function getMasterKeyBuffer(): Buffer {
   const hex = process.env.PII_ENCRYPTION_MASTER_KEY;
   if (!hex || hex.length !== 64) {
+    // A value that is 64 chars only after trim() means the secret was stored
+    // with padding (e.g. `echo` appends \n). Name that cause explicitly — the
+    // boot validators check the RAW value for the same reason, so ops can fix
+    // the secret instead of chasing a "wrong key" red herring.
+    const whitespaceHint =
+      hex && hex.trim().length === 64
+        ? ' The configured value has surrounding whitespace or a newline — remove the padding; the cipher reads the raw value.'
+        : '';
     throw new Error(
       'PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string (32 bytes). ' +
-        'Generate with: openssl rand -hex 32',
+        'Generate with: openssl rand -hex 32' +
+        whitespaceHint,
     );
   }
   return Buffer.from(hex, 'hex');

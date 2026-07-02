@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const DEFAULT_OUTPUT_PATH = 'deploy-evidence/mcp-connectivity-latest.json';
+const DEFAULT_SOURCE_CONTROL_PATH = 'deploy-evidence/source-control-latest.json';
 const DEFAULT_PROTOCOL_VERSION = '2025-06-18';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_REQUIRED_TOOLS = [
@@ -86,6 +87,18 @@ function parseArgs(argv) {
     requiredTools: parseRequiredTools(process.env.BIDSTACK_MCP_CONNECTIVITY_REQUIRED_TOOLS),
     smokeToolName: process.env.BIDSTACK_MCP_CONNECTIVITY_SMOKE_TOOL ?? DEFAULT_SMOKE_TOOL_NAME,
     smokeToolArgumentsJson: process.env.BIDSTACK_MCP_CONNECTIVITY_SMOKE_ARGS ?? '',
+    sourceEvidencePath:
+      process.env.BIDSTACK_SOURCE_CONTROL_EVIDENCE ?? DEFAULT_SOURCE_CONTROL_PATH,
+    releaseCommit:
+      process.env.BIDSTACK_MCP_CONNECTIVITY_RELEASE_COMMIT ??
+      process.env.BIDSTACK_RELEASE_COMMIT ??
+      process.env.BIDSTACK_CI_RELEASE_COMMIT ??
+      '',
+    releaseBranch:
+      process.env.BIDSTACK_MCP_CONNECTIVITY_RELEASE_BRANCH ??
+      process.env.BIDSTACK_RELEASE_BRANCH ??
+      process.env.BIDSTACK_CI_BRANCH ??
+      '',
     timeoutMs: Number(process.env.BIDSTACK_MCP_CONNECTIVITY_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
     protocolVersion:
       process.env.BIDSTACK_MCP_CONNECTIVITY_PROTOCOL_VERSION ?? DEFAULT_PROTOCOL_VERSION,
@@ -122,6 +135,15 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === '--smoke-args') {
       options.smokeToolArgumentsJson = next;
+      index += 1;
+    } else if (arg === '--source-evidence') {
+      options.sourceEvidencePath = next;
+      index += 1;
+    } else if (arg === '--release-commit') {
+      options.releaseCommit = next;
+      index += 1;
+    } else if (arg === '--release-branch') {
+      options.releaseBranch = next;
       index += 1;
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = Number(next);
@@ -163,6 +185,9 @@ Environment:
   BIDSTACK_MCP_CONNECTIVITY_REQUIRED_TOOLS  Comma-separated required tool names
   BIDSTACK_MCP_CONNECTIVITY_SMOKE_TOOL      Read-only tool to call (default crm_search_companies)
   BIDSTACK_MCP_CONNECTIVITY_SMOKE_ARGS      JSON object args for smoke tool
+  BIDSTACK_MCP_CONNECTIVITY_RELEASE_COMMIT  Optional expected release commit
+  BIDSTACK_MCP_CONNECTIVITY_RELEASE_BRANCH  Optional expected release branch
+  BIDSTACK_SOURCE_CONTROL_EVIDENCE          Source-control evidence fallback
   BIDSTACK_MCP_CONNECTIVITY_EVIDENCE        Output path
   BIDSTACK_MCP_CONNECTIVITY_TIMEOUT_MS      Per-request timeout
   BIDSTACK_DEPLOY_ENV                       Evidence environment label
@@ -173,6 +198,9 @@ Options:
   --required-tools <csv>     Override required tool names
   --smoke-tool <name>        Override read-only MCP tool call smoke
   --smoke-args <json>        Override smoke tool JSON arguments
+  --source-evidence <path>   Source-control evidence fallback path
+  --release-commit <sha>     Expected deployed release commit
+  --release-branch <name>    Expected deployed release branch
   --output <path>            Override evidence output path
   --env <name>               Override deploy environment
   --timeout-ms <ms>          Override per-request timeout
@@ -246,6 +274,54 @@ function deriveBaseUrl(mcpUrl) {
   }
 }
 
+function isFullCommitSha(value) {
+  return /^[0-9a-f]{40}$/i.test(String(value ?? '').trim());
+}
+
+function resolveReleaseIdentity(options) {
+  const explicitCommit = String(options.releaseCommit ?? '').trim();
+  const explicitBranch = String(options.releaseBranch ?? '').trim();
+  if (explicitCommit || explicitBranch) {
+    return {
+      source: 'env-or-cli',
+      expectedCommit: explicitCommit || null,
+      expectedBranch: explicitBranch || null,
+    };
+  }
+
+  const sourcePath = resolveOutputPath(options.root, options.sourceEvidencePath);
+  if (existsSync(sourcePath)) {
+    try {
+      const sourceEvidence = JSON.parse(readFileSync(sourcePath, 'utf8'));
+      return {
+        source: 'source-control-evidence',
+        expectedCommit: String(sourceEvidence?.commit ?? '').trim() || null,
+        expectedBranch: String(sourceEvidence?.branch ?? '').trim() || null,
+      };
+    } catch {
+      return {
+        source: 'source-control-evidence-unreadable',
+        expectedCommit: null,
+        expectedBranch: null,
+      };
+    }
+  }
+
+  return {
+    source: 'missing',
+    expectedCommit: null,
+    expectedBranch: null,
+  };
+}
+
+function summarizeReleaseMetadata(body) {
+  const release = body?.release && typeof body.release === 'object' ? body.release : {};
+  return {
+    commit: String(release.commit ?? '').trim() || null,
+    branch: String(release.branch ?? '').trim() || null,
+  };
+}
+
 function isPlaceholderValue(value) {
   const normalized = String(value ?? '')
     .trim()
@@ -271,7 +347,7 @@ function isLocalTarget(value) {
   }
 }
 
-function validateLivePreconditions(options) {
+function validateLivePreconditions(options, releaseIdentity) {
   const failures = [];
   const mcpUrl = normalizeMcpUrl(options.target);
 
@@ -319,6 +395,21 @@ function validateLivePreconditions(options) {
     failures.push('MCP smoke tool name is required.');
   } else if (isPlaceholderValue(options.smokeToolName)) {
     failures.push(`MCP smoke tool name is placeholder-like: ${options.smokeToolName}.`);
+  }
+
+  if (options.strict && !isFullCommitSha(releaseIdentity.expectedCommit)) {
+    failures.push(
+      'Strict MCP connectivity proof requires a full release commit from BIDSTACK_RELEASE_COMMIT or source-control evidence.',
+    );
+  }
+
+  if (
+    options.strict &&
+    (!releaseIdentity.expectedBranch || isPlaceholderValue(releaseIdentity.expectedBranch))
+  ) {
+    failures.push(
+      'Strict MCP connectivity proof requires a non-placeholder release branch from BIDSTACK_RELEASE_BRANCH or source-control evidence.',
+    );
   }
 
   return failures;
@@ -523,13 +614,15 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
   const startedAt = new Date().toISOString();
   const mcpUrl = normalizeMcpUrl(options.target);
   const baseUrl = deriveBaseUrl(mcpUrl);
-  const preconditionFailures = validateLivePreconditions(options);
+  const releaseIdentity = resolveReleaseIdentity(options);
+  const preconditionFailures = validateLivePreconditions(options, releaseIdentity);
 
   const result = {
     source: 'live-mcp-smoke',
     target: options.target ? normalizeTarget(options.target) : '',
     mcpUrl,
     baseUrl,
+    release: releaseIdentity,
     startedAt,
     completedAt: null,
     ok: false,
@@ -573,6 +666,7 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
       status: discovery.status,
       endpoints,
       server: discovery.body?.name ?? discovery.body?.serverInfo?.name ?? null,
+      release: summarizeReleaseMetadata(discovery.body),
     };
   } catch (error) {
     result.discovery = makeFailedCheck(error);
@@ -594,6 +688,7 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
       name: health.body?.name ?? null,
       db: health.body?.db ?? null,
       redis: health.body?.redis ?? null,
+      release: summarizeReleaseMetadata(health.body),
     };
   } catch (error) {
     result.health = makeFailedCheck(error);
@@ -768,6 +863,7 @@ function buildArtifact(options, smoke) {
     target: smoke.target,
     mcpUrl: smoke.mcpUrl,
     requiredTools: options.requiredTools,
+    release: smoke.release,
     command: {
       source: smoke.source,
       ok: smoke.ok,
@@ -868,6 +964,34 @@ function validateArtifact(artifact, options) {
     failures.push('MCP tools/call evidence contains raw result content.');
   }
 
+  const release = artifact.release && typeof artifact.release === 'object' ? artifact.release : {};
+  const expectedCommit = String(release.expectedCommit ?? '').trim();
+  const expectedBranch = String(release.expectedBranch ?? '').trim();
+  if (options.strict && !isFullCommitSha(expectedCommit)) {
+    failures.push('MCP release identity must include a full expected commit SHA.');
+  }
+  if (options.strict && (!expectedBranch || isPlaceholderValue(expectedBranch))) {
+    failures.push('MCP release identity must include a non-placeholder expected branch.');
+  }
+
+  for (const checkName of ['discovery', 'health']) {
+    const observedRelease = artifact.checks?.[checkName]?.release ?? {};
+    const observedCommit = String(observedRelease.commit ?? '').trim();
+    const observedBranch = String(observedRelease.branch ?? '').trim();
+
+    if (options.strict && observedCommit !== expectedCommit) {
+      failures.push(
+        `MCP ${checkName} release commit ${observedCommit || 'missing'} does not match ${expectedCommit || 'missing'}.`,
+      );
+    }
+
+    if (options.strict && observedBranch !== expectedBranch) {
+      failures.push(
+        `MCP ${checkName} release branch ${observedBranch || 'missing'} does not match ${expectedBranch || 'missing'}.`,
+      );
+    }
+  }
+
   return failures;
 }
 
@@ -915,6 +1039,10 @@ function createFakeMcpFetch({
   discoveryEndpoints = ['/mcp'],
   discoveryShape = 'object',
   toolCallOk = true,
+  release = {
+    commit: '0123456789abcdef0123456789abcdef01234567',
+    branch: 'main',
+  },
 } = {}) {
   const calls = [];
 
@@ -934,6 +1062,7 @@ function createFakeMcpFetch({
 
       return makeJsonResponse({
         name: 'BidStack 360 MCP',
+        release,
         endpoints,
       });
     }
@@ -944,6 +1073,7 @@ function createFakeMcpFetch({
         name: 'bidstack-mcp',
         db: 'up',
         redis: 'up',
+        release,
       });
     }
 
@@ -1045,6 +1175,9 @@ async function runSelftest() {
       requiredTools: [...DEFAULT_REQUIRED_TOOLS],
       smokeToolName: DEFAULT_SMOKE_TOOL_NAME,
       smokeToolArguments: { ...DEFAULT_SMOKE_TOOL_ARGUMENTS[DEFAULT_SMOKE_TOOL_NAME] },
+      sourceEvidencePath: DEFAULT_SOURCE_CONTROL_PATH,
+      releaseCommit: '0123456789abcdef0123456789abcdef01234567',
+      releaseBranch: 'main',
       timeoutMs: DEFAULT_TIMEOUT_MS,
       protocolVersion: DEFAULT_PROTOCOL_VERSION,
       strict: true,
@@ -1059,6 +1192,7 @@ async function runSelftest() {
     );
     assert.equal(good.artifact.passed, true);
     assert.equal(good.artifact.checks.initialize.sessionEstablished, true);
+    assert.equal(good.artifact.checks.discovery.release.commit, baseOptions.releaseCommit);
     assert.equal(good.artifact.checks.toolsList.toolCount, DEFAULT_REQUIRED_TOOLS.length);
     assert.equal(good.artifact.checks.toolCall.ok, true);
     assert.equal(good.artifact.checks.toolCall.toolName, DEFAULT_SMOKE_TOOL_NAME);
@@ -1103,6 +1237,23 @@ async function runSelftest() {
     );
     assert.equal(failedToolCall.exitCode, 1);
     assert.match(failedToolCall.artifact.validationFailures.join('\n'), /toolCall/);
+
+    const releaseMismatch = await runWriter(
+      {
+        ...baseOptions,
+        outputPath: 'release-mismatch.json',
+      },
+      {
+        fetchFn: createFakeMcpFetch({
+          release: {
+            commit: 'ffffffffffffffffffffffffffffffffffffffff',
+            branch: 'main',
+          },
+        }),
+      },
+    );
+    assert.equal(releaseMismatch.exitCode, 1);
+    assert.match(releaseMismatch.artifact.validationFailures.join('\n'), /release commit/);
 
     const localTarget = await runWriter(
       {

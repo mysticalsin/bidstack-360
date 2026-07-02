@@ -15,12 +15,12 @@ Per the review rules, these are **UNKNOWN (≠ PASS)** because they require acce
 - **Backup RESTORE drill** (Gate 12, CRITICAL) — `BACKUP_RESTORE_REPORT` needs a real restore with validation. → run in staging.
 - **Pre-migrate backup proof artifact** — migration code now enforces `BIDSTACK_MIGRATE_BACKUP_PROOF` for staging/production, but the actual proof JSON must be generated from a real `pg_dump`, managed snapshot, or PITR restore point before each release. → needs staging/prod DB + backup storage access.
 - **Load / stress / soak** — `pnpm load-test` (k6). → run against staging at expected traffic.
-- **Live API connectivity** — `pnpm deploy:evidence:api` now proves `/livez`, `/readyz`, `/health`, authenticated `/api/me/capabilities`, and a privacy-safe no-match `GET /api/companies` domain read smoke against a non-local API endpoint. → needs deployed API URL + API key or bearer token.
-- **Live MCP connectivity** — `pnpm deploy:evidence:mcp` now proves `/.well-known/mcp`, `/health`, `initialize`, `notifications/initialized`, `tools/list`, and one privacy-safe read-only `tools/call` against a non-local MCP endpoint. → needs deployed MCP URL + bearer token with `mcp` scope.
+- **Live API connectivity** — `pnpm deploy:evidence:api` now proves `/livez`, `/readyz`, `/health`, live release identity matching source control, authenticated `/api/me/capabilities`, and a privacy-safe no-match `GET /api/companies` domain read smoke against a non-local API endpoint. → needs deployed API URL + API key or bearer token.
+- **Live MCP connectivity** — `pnpm deploy:evidence:mcp` now proves `/.well-known/mcp`, `/health`, live release identity matching source control, `initialize`, `notifications/initialized`, `tools/list`, and one privacy-safe read-only `tools/call` against a non-local MCP endpoint. → needs deployed MCP URL + bearer token with `mcp` scope.
 - **Webhook signing-secret ciphertext/hash proof** — `pnpm webhooks:encrypt-secrets` dry-runs historical `WebhookSubscription.secret` rows, `tsx scripts/encrypt-webhook-secrets.ts --apply` encrypts legacy `whsec_` rows and fills missing/invalid `secret_hash`, and `pnpm deploy:evidence:webhooks` writes privacy-safe raw decrypt/hash counts. → needs staging/prod DB access with `INTEGRATION_TOKEN_KEY` and `BIDSTACK_WEBHOOK_SECRET_PLAINTEXT_FALLBACK=false`.
 - **Container image + secret scan** — `pnpm deploy:evidence:container`. → run in CI.
 - **SAST / SCA / secret scan** — `pnpm security:scan` (semgrep), dependency audit. → run + review results.
-- **CI pipeline clean run + branch-protection review** — → needs CI/repo-admin access.
+- **CI repeat evidence + branch-protection review** — `pnpm deploy:evidence:ci` now requires compact proof of 10 consecutive full-suite runs on isolated pgvector-enabled Postgres tied to the exact release commit/branch. → needs CI provider export plus repo-admin branch-protection access.
 - **Rollback drill** — deploy + DB-migration rollback in staging.
 - **Observability runtime** — `deploy:evidence:sentry` now fails closed without release/environment/project-scoped API + worker issue proof and privacy-safe metadata, but production still needs the live Sentry smoke artifact plus test-alert/page validation, dashboards, and log-redaction confirmation.
 
@@ -40,6 +40,6 @@ Per the review rules, these are **UNKNOWN (≠ PASS)** because they require acce
 
 ## Known code-side gaps (verified, deferred)
 
-- Test hermeticity: 39 shared-org integration tests → isolated orgs (needs seed-shape decision).
+- Test hermeticity shared-org marker is now guarded: `pnpm test:hermeticity` scans API tests for `org_seed_mantu`, and root `pnpm test` runs it first. CI release proof is still open until the real 10-run artifact exists.
 - Tenant isolation now has an opt-in Prisma broad-operation guard (`BIDSTACK_TENANT_SCOPE_GUARD=warn|enforce`), but no staging warn/enforce rollout evidence and no DB RLS/session-context backstop yet.
 - Web unit-test coverage low (per prior known-issues).

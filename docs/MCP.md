@@ -83,7 +83,7 @@ Before onboarding real data, run:
 pnpm deploy:evidence:mcp
 ```
 
-The command requires a non-local `BIDSTACK_MCP_CONNECTIVITY_TARGET` and a bearer token with `mcp` plus the needed tool-class scope. It checks discovery, health, session initialize, `tools/list`, and one read-only `tools/call`. The default smoke is `crm_search_companies` with a no-match query and `limit:1`, so the release artifact proves execution without persisting customer records. The artifact must contain only tool names, status, result-shape counts, and privacy flags; raw arguments and raw tool output are release-gate failures.
+The command requires a non-local `BIDSTACK_MCP_CONNECTIVITY_TARGET`, a bearer token with `mcp` plus the needed tool-class scope, and deployed `BIDSTACK_RELEASE_COMMIT` / `BIDSTACK_RELEASE_BRANCH` values that match source-control evidence. It checks discovery, health, release identity, session initialize, `tools/list`, and one read-only `tools/call`. The default smoke is `crm_search_companies` with a no-match query and `limit:1`, so the release artifact proves execution without persisting customer records. The artifact must contain only release identity, tool names, status, result-shape counts, and privacy flags; raw arguments and raw tool output are release-gate failures.
 
 ## Registering with Dust
 

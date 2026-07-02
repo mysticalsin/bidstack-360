@@ -24,3 +24,8 @@ Regression tests must prove both directions:
 - a repeated allowed decision uses the cache and avoids a second DB read;
 - a cached denial is cleared after user-level invalidation;
 - a cached grant is cleared after org-level invalidation.
+
+Test harness rule: when a test replaces the RBAC count/read mock for the same
+org/user/permission tuple, clear the decision cache before making the next
+request. Otherwise the test may assert the cached result from the previous
+matrix row instead of the permissions under test.

@@ -414,6 +414,7 @@ function collectChecks(options) {
     'scripts/run-container-vulnerability-scan.mjs',
     'scripts/write-source-control-evidence.mjs',
     'scripts/write-source-review-plan.mjs',
+    'scripts/write-ci-repeat-evidence.mjs',
     'scripts/write-operational-readiness-evidence.mjs',
     'scripts/verify-azure-infra-policy.mjs',
     'scripts/write-secret-scan-evidence.mjs',

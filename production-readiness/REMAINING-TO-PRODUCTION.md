@@ -73,17 +73,23 @@ the Azure bicep is a never-run draft.
 
 ### H5 · Live API / MCP connectivity evidence (Gate 4) — OPS
 
-- [ ] `pnpm deploy:evidence:api` against the deployed API URL (+ key/bearer).
-- [ ] `pnpm deploy:evidence:mcp` against the deployed MCP URL (+ `mcp`-scope bearer).
+- [ ] `pnpm deploy:evidence:api` against the deployed API URL (+ key/bearer) with live release identity matching `deploy:evidence:source`.
+- [ ] `pnpm deploy:evidence:mcp` against the deployed MCP URL (+ `mcp`-scope bearer) with live release identity matching `deploy:evidence:source`.
 - **Acceptance:** live `/livez`, `/readyz`, `/health`, `/api/me/capabilities`, no-match `GET /api/companies`
   domain read, and MCP `initialize` + `tools/list` + read-only `tools/call` artifacts.
 
 ### H6 · Gated CD + built-image OS-CVE scan + SBOM — OPS / ENG
 
-- [ ] Promote `deploy.workflow.yml.draft` to an active gated `environment: production` CD with required
-      reviewers; fix the latent gate-name bug + the vacuous CI-green guard first.
-- [ ] Wire `pnpm deploy:evidence:container` (trivy on the built image) into the CD path.
-- [ ] Emit a CycloneDX SBOM per immutable image.
+- [x] 2026-07-02: `deploy.workflow.yml.draft` rewritten — the latent gate-name bug is fixed (matches the
+      live `name:` fields, `"CI"` / `"E2E (full suite)"`) and the vacuous CI-green guard is fixed (the
+      `gates` job re-resolves BOTH required workflows' latest run for the exact head SHA via the GitHub
+      API and fails closed if either is missing/non-green, instead of trusting only the triggering run).
+      Also wires trivy CVE scan (fail on HIGH/CRITICAL) + CycloneDX SBOM per image, and a post-deploy
+      `/readyz` probe. Still a `.draft` file at repo root by design (`.github/workflows/` is
+      coordinate-before-edit) — needs Tony to move it into `.github/workflows/deploy.yml`.
+- [ ] Promote the draft to an active gated `environment: production` CD with required reviewers configured
+      in the GitHub environment, and provision `RAILWAY_TOKEN` / `VERCEL_TOKEN` / `VERCEL_ORG_ID` /
+      `VERCEL_PROJECT_ID` secrets.
 - **Acceptance:** no deploy to prod without a green gate + an image scan + an SBOM artifact.
 
 ### H7 · Runtime observability validation (Gate 11) — OPS
@@ -98,22 +104,75 @@ the Azure bicep is a never-run draft.
 
 ### H8 · CI 10×-green on isolated infra (Gate 9) — OPS
 
-- [ ] Now that CI runs on `demo` + pgvector, prove the full suite green 10× consecutively on CI Postgres.
+- [x] Local shared-org regression guard: `pnpm test:hermeticity` fails if API tests reintroduce
+      `org_seed_mantu`, and root `pnpm test` runs it first.
+- [ ] Now that CI runs on `demo` + pgvector, export compact proof for 10 consecutive full-suite CI runs on isolated pgvector-enabled Postgres, then run `pnpm deploy:evidence:ci` and preserve `deploy-evidence/ci-repeat-latest.json`.
+- [ ] Run `pnpm deploy:evidence:production` or the full bundle; the strict verifier now requires the CI artifact to match the exact `deploy:evidence:source` commit/branch, reject failed/skipped suites, and store no raw logs, command output, provider payloads, or secrets.
 
 ---
 
 ## 🟡 ENGINEER remainders (in-repo, small/medium — safe to pick up)
 
-> A second actor is concurrently building the **tenant-scope-guard** ORM backstop
-> (`BIDSTACK_TENANT_SCOPE_GUARD=warn|enforce`). Coordinate before touching `packages/db/src/index.ts`,
-> `.env.example`, or the tenant middleware.
-
+- [x] **E0 · tenant-scope-guard ORM backstop** landed 2026-07-01/02: enforced tier
+      (`findMany`/`findFirst`/`count`/`aggregate`/`groupBy`/`updateMany`/`deleteMany`) throws in `enforce`;
+      a new report-only tier (`findUnique`/`update`/`delete`/`upsert`) never throws but emits
+      `TenantScopeGuardReport` — this is the D2 telemetry source. `orgId: undefined` no longer counts as
+      scoped (Prisma drops undefined keys — was a silent all-tenant-leak shape); composite-unique keys
+      (`{ orgId_userId_provider: {...} }`) are recognized. `BIDSTACK_TENANT_SCOPE_GUARD` is now in the Zod
+      env schema and **required** (`warn`/`enforce`) in production across api/worker/mcp. See
+      `docs/solutions/tenant-scope-guard-middleware.md`.
+- [x] **E1a · IntegrationToken cross-tenant OAuth-token disclosure** fixed 2026-07-01: 8 API service files
+      (Gmail/Graph pull, subscription create, token refresh) plus worker `sms.ts` (Twilio credential fetch)
+      and `calendar-sync.ts` were fetching an `IntegrationToken` by bare `id` and decrypting it — no
+      exploitable caller existed, but one mis-wired future caller would have handed out another tenant's
+      OAuth/Twilio credentials. All sites now scope by `{ id, orgId }`; cross-tenant disclosure tests added.
+- [x] **E1b · ERP integration cross-tenant exposure** fixed 2026-07-01: `erp-integration.ts` had no
+      permission gates and documented a single global ERP connection shared by every org in the
+      deployment. All 6 routes now require `integrations:read`; added a fail-closed `ERP_ENABLED` flag
+      (default `false` — **any deployment currently relying on ERP routes must set it explicitly**). The
+      shared-backend architecture itself is unchanged — still a product decision if BidStack ever hosts two
+      real orgs against the same ERP.
+- [x] **E1c · Optimistic concurrency on Opportunity PATCH** fixed 2026-07-02: `OpportunityPatch` gained an
+      opt-in `expectedUpdatedAt` token; a stale token 409s (both a fast pre-check and a transactional CAS
+      close the fetch→update race window). No token = unchanged legacy last-write-wins behavior. Fixed a
+      latent bug found while wiring this: the detail-view fire-and-forget `viewCount` bump used to go
+      through Prisma's client-managed `@updatedAt`, silently invalidating every viewer's concurrency token
+      on every page view — switched to raw SQL so a *read* can no longer bump `updatedAt`.
 - [ ] **E1 · Extend PII_MAP to the 4 remaining plaintext-PII models** (`SmsMessage` body/numbers,
       `SmsConsent.phoneNumber`, `ActivityAttendee.email`, `CalendarEvent.attendees`). Each needs a schema
       decision (encrypt + hash column, or formally accept as plaintext + storage-encryption-only). **DECISION
       first, then ENG + migration.** 2026-06-29 update: strict `deploy:evidence:pii` now fails closed unless
       `BIDSTACK_PLAINTEXT_PII_AT_REST_*` carries a reviewable storage-only owner/reference and exact field
       scope covering these fields.
+- [x] **E11 · Money-precision fixes (micros float-arithmetic bugs)** fixed 2026-07-01/02: added
+      `packages/shared/src/utils/money.ts` (`microsToUnits`, `sumMicros` — BigInt-safe throughout, single
+      conversion at the boundary) with a dedicated unit suite. Fixed the two originally-flagged hot spots
+      (`accounts.helpers.ts`, and removed the dead unused duplicate `services/territories/forecast.service.ts`
+      which had the same bug with zero callers) plus the LIVE duplicate found while removing the dead file:
+      `routes/territories-forecast.ts`'s `/territories/analytics` and its segment-breakdown route were both
+      summing already-`Number()`-converted per-row totals with a float `reduce()` — fixed with `sumMicros`
+      over the raw BigInt rows, with a regression test asserting an exact (not approximate) sum.
+- [x] **E12 · Dust-poll worker test coverage** fixed 2026-07-01: `apps/worker/src/queues/dust-poll.ts` (the
+      primary Dust ingestion job) had zero tests; added coverage for happy-path sync, idempotent redelivery,
+      cross-org isolation, malformed-payload handling, and Dust API error paths.
+- [x] **E13 · Silent error-swallowing cleanup** fixed 2026-07-01: ~15 sites across worker status writes,
+      API notification sends, MCP `lastUsedAt` updates, and data-provider key resolution changed from
+      `.catch(() => undefined)` to `log.warn(...)` (best-effort semantics preserved — never throws, but a
+      persistent failure is no longer invisible).
+- [x] **E14 · RBAC decision-cache LRU eviction** fixed 2026-07-02: the cache used to `clear()` its entire
+      20k-entry Map at capacity — every org's next permission check re-hit Postgres in the same instant (a
+      stampede). Now evicts exactly the single least-recently-used entry; a cache hit re-inserts to move the
+      key to the MRU end. Structural test asserts the Map's iteration order directly.
+- [x] **E15 · Narrow selects on hot-path Prisma queries** fixed 2026-07-02: `account-intel.ts`,
+      `activities.ts` list route now `select` exactly the fields their serializers read instead of fetching
+      full rows (large JSONB `extractedData`/`metadata` columns were the concern). `analytics-dashboards.ts`
+      widget queries were intentionally left alone — narrowing would require plumbing a new shared row type
+      across two call sites for a Yellow-severity, low-blast-radius finding.
+- [x] **E16 · Analytics report-builder tenancy proof** fixed 2026-07-02: `compileAnalyticsQuery` (the
+      highest-blast-radius raw-SQL surface — guard-exempt, turns user query JSON directly into SQL) already
+      injected `org_id` as a literal first WHERE predicate; added an adversarial test proving a request
+      naming the filter field `orgId`/`org_id` (attempting to smuggle a second org-scope condition) is
+      rejected outright, across all 7 queryable entities, with exactly one org predicate ever compiled.
 - [ ] **E2 · KamSession.transcriptText / attendees** — free-text PII, intentionally plaintext (it's the AI
       input). Needs an explicit privacy sign-off, not code. **DECISION.** 2026-06-29 update: the same strict
       plaintext-PII evidence scope now covers `KamSession.transcriptText` and `KamSession.attendees`.
@@ -165,7 +224,10 @@ the Azure bicep is a never-run draft.
       `storage-encryption-only` with owner/reference evidence. If Tony/security chooses field encryption
       instead, add a `User.emailHash` migration + make every auth/assignment lookup hash-aware before release.
 - [ ] **D2 · Tenant-isolation backstop ADR** — session-var Postgres RLS vs a Prisma `$extends` context guard.
-      (The `tenant-scope-guard` warn/enforce middleware is an interim ORM-level catch, not RLS.)
+      (The `tenant-scope-guard` warn/enforce middleware is an interim ORM-level catch, not RLS.) 2026-07-02:
+      the guard now has a report-only tier for `findUnique`/`update`/`delete`/`upsert` — ops can run
+      `BIDSTACK_TENANT_SCOPE_GUARD=warn` in staging and use the accumulated `TenantScopeGuardReport`
+      warnings as real evidence for this decision instead of deciding blind.
 - [ ] **D3 · Plaintext-at-rest sign-off** — formally accept (or schedule encryption for) the E1/E2 set.
       Strict release evidence now rejects missing, placeholder, incomplete, or unsupported plaintext-PII
       decision scope; operator/security still must supply the real approval values.

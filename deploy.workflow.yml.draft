@@ -1,0 +1,120 @@
+# deploy.workflow.yml.draft — gated production CD (DRAFT, not active)
+#
+# STATUS: draft on purpose. `.github/workflows/` is coordinate-before-edit
+# (CLAUDE.md); Tony moves this to `.github/workflows/deploy.yml` to activate.
+# Closes the code side of REMAINING-TO-PRODUCTION H6 (gated CD + image scan +
+# SBOM). Referenced secrets/environment must exist before activation:
+#   - GitHub environment `production` with required reviewers (the human gate)
+#   - RAILWAY_TOKEN (api/worker/mcp deploy), VERCEL_TOKEN + VERCEL_ORG_ID +
+#     VERCEL_PROJECT_ID (web deploy)
+#
+# Design notes (fixes the two defects the old draft was flagged for):
+#   1. "Latent gate-name bug": workflow_run must match the *name:* field of the
+#      triggering workflow exactly. Verified against the live tree:
+#      ci.yml name is "CI", e2e.yml name is "E2E (full suite)".
+#   2. "Vacuous CI-green guard": the old draft only checked the triggering
+#      run's conclusion (a single workflow), which passes even if the other
+#      gate never ran on that SHA. Here the `gates` job re-resolves BOTH
+#      workflows' latest runs for the exact head SHA via the API and requires
+#      both green — deploys never proceed on a partially-tested commit.
+
+name: Deploy (production)
+
+on:
+  workflow_run:
+    workflows: ['CI', 'E2E (full suite)']
+    types: [completed]
+    branches: [demo]
+  workflow_dispatch: {} # manual redeploy of a known-good SHA still passes gates
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # never kill a half-finished deploy
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Resolve SHA and require BOTH CI and E2E green for it
+        id: resolve
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const sha = context.payload.workflow_run?.head_sha ?? context.sha;
+            core.setOutput('sha', sha);
+            const required = ['CI', 'E2E (full suite)'];
+            for (const name of required) {
+              const runs = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+                per_page: 50,
+              });
+              const match = runs.data.workflow_runs
+                .filter((r) => r.name === name)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+              if (!match) core.setFailed(`Required workflow "${name}" has no run for ${sha}`);
+              else if (match.conclusion !== 'success')
+                core.setFailed(`Required workflow "${name}" for ${sha} concluded: ${match.conclusion}`);
+            }
+
+  image:
+    needs: gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.gates.outputs.sha }}
+      - name: Build API image
+        run: docker build -t bidstack-api:${{ needs.gates.outputs.sha }} .
+      - name: Trivy CVE scan (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # 0.29.0
+        with:
+          image-ref: bidstack-api:${{ needs.gates.outputs.sha }}
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+      - name: SBOM (SPDX)
+        uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
+        with:
+          image: bidstack-api:${{ needs.gates.outputs.sha }}
+          format: spdx-json
+          artifact-name: sbom-api-${{ needs.gates.outputs.sha }}.spdx.json
+
+  deploy:
+    needs: [gates, image]
+    runs-on: ubuntu-latest
+    environment: production # required-reviewer approval gate lives here
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.gates.outputs.sha }}
+      - name: Deploy backend (Railway — api, worker, mcp; runs migrate stage)
+        run: npx railway up --service api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - name: Deploy web (Vercel)
+        run: npx vercel deploy --prod --token "$VERCEL_TOKEN" --yes
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Post-deploy readiness probe
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$PROD_API_URL/readyz" || true)
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::/readyz never returned 200 after deploy" && exit 1
+        env:
+          PROD_API_URL: ${{ vars.PROD_API_URL }}

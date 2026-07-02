@@ -257,6 +257,12 @@ function buildCommandPlan(deployEnv) {
       runAfterFailedStepId: 'source',
     },
     {
+      id: 'ci',
+      label: 'CI repeat evidence',
+      script: 'deploy:evidence:ci',
+      required: true,
+    },
+    {
       id: 'ops',
       label: 'Operational readiness evidence',
       script: 'deploy:evidence:ops',
@@ -709,6 +715,84 @@ function loadOperationalReadinessPreflight(root, env) {
   }
 }
 
+function loadCiRepeatPreflight(root, env) {
+  const inlineJson = String(env.BIDSTACK_CI_REPEAT_RUNS_JSON || '').trim();
+  if (inlineJson) {
+    try {
+      const parsed = JSON.parse(inlineJson);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {
+          configured: true,
+          passed: false,
+          source: 'BIDSTACK_CI_REPEAT_RUNS_JSON',
+          detail: 'BIDSTACK_CI_REPEAT_RUNS_JSON must be a JSON object',
+        };
+      }
+      return {
+        configured: true,
+        passed: true,
+        source: 'BIDSTACK_CI_REPEAT_RUNS_JSON',
+        detail: 'inline CI repeat JSON loaded',
+      };
+    } catch (error) {
+      return {
+        configured: true,
+        passed: false,
+        source: 'BIDSTACK_CI_REPEAT_RUNS_JSON',
+        detail: `BIDSTACK_CI_REPEAT_RUNS_JSON could not be parsed: ${error.message}`,
+      };
+    }
+  }
+
+  const relativePath = String(
+    env.BIDSTACK_CI_REPEAT_INPUT || env.BIDSTACK_CI_REPEAT_EVIDENCE_INPUT || '',
+  ).trim();
+  if (!relativePath) return { configured: false };
+
+  const absolutePath = path.resolve(root, relativePath);
+  if (!existsSync(absolutePath)) {
+    return {
+      configured: true,
+      passed: false,
+      source: env.BIDSTACK_CI_REPEAT_INPUT
+        ? 'BIDSTACK_CI_REPEAT_INPUT'
+        : 'BIDSTACK_CI_REPEAT_EVIDENCE_INPUT',
+      detail: `${relativePath} does not exist`,
+    };
+  }
+
+  try {
+    const parsed = parseJsonFileAllowBom(absolutePath);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        configured: true,
+        passed: false,
+        source: env.BIDSTACK_CI_REPEAT_INPUT
+          ? 'BIDSTACK_CI_REPEAT_INPUT'
+          : 'BIDSTACK_CI_REPEAT_EVIDENCE_INPUT',
+        detail: `${relativePath} must contain a JSON object`,
+      };
+    }
+    return {
+      configured: true,
+      passed: true,
+      source: env.BIDSTACK_CI_REPEAT_INPUT
+        ? 'BIDSTACK_CI_REPEAT_INPUT'
+        : 'BIDSTACK_CI_REPEAT_EVIDENCE_INPUT',
+      detail: `${relativePath} loaded`,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      passed: false,
+      source: env.BIDSTACK_CI_REPEAT_INPUT
+        ? 'BIDSTACK_CI_REPEAT_INPUT'
+        : 'BIDSTACK_CI_REPEAT_EVIDENCE_INPUT',
+      detail: `${relativePath} could not be parsed: ${error.message}`,
+    };
+  }
+}
+
 function isLocalTarget(target) {
   try {
     const hostname = new URL(target).hostname.toLowerCase();
@@ -799,10 +883,15 @@ function isImmutableImageRef(image) {
   return /@sha256:[0-9a-f]{64}$/i.test(String(image || '').trim());
 }
 
+function isFullCommitSha(value) {
+  return /^[0-9a-f]{40}$/i.test(String(value || '').trim());
+}
+
 function collectPreflight(deployEnv, env, root = process.cwd()) {
   const checks = [];
   const secretDisposition = loadSecretDispositionPreflight(root, env);
   const operationalReadiness = loadOperationalReadinessPreflight(root, env);
+  const ciRepeat = loadCiRepeatPreflight(root, env);
   const checkEnv = { ...env };
   if (secretDisposition.configured && secretDisposition.passed && secretDisposition.values) {
     for (const [key, value] of Object.entries(secretDisposition.values)) {
@@ -860,6 +949,10 @@ function collectPreflight(deployEnv, env, root = process.cwd()) {
     if (passed && options.nonPlaceholder && hasPlaceholderSignal(found.value)) {
       passed = false;
       reason = `${found.name} looks like a placeholder value`;
+    }
+    if (passed && options.fullSha && !isFullCommitSha(found.value)) {
+      passed = false;
+      reason = `${found.name} must be a full 40-character commit SHA`;
     }
     if (passed && options.equals) {
       const actual = found.value.toLowerCase();
@@ -977,6 +1070,19 @@ function collectPreflight(deployEnv, env, root = process.cwd()) {
     detail: deployEnv,
   });
 
+  addAny(
+    'release.commit',
+    'Deployment exposes the exact release commit',
+    ['BIDSTACK_RELEASE_COMMIT', 'BIDSTACK_CI_RELEASE_COMMIT'],
+    { fullSha: true, nonPlaceholder: true },
+  );
+  addAny(
+    'release.branch',
+    'Deployment exposes the release branch',
+    ['BIDSTACK_RELEASE_BRANCH', 'BIDSTACK_CI_BRANCH'],
+    { nonPlaceholder: true },
+  );
+
   const containerImageRefs = normalizeCsv(checkEnv.BIDSTACK_CONTAINER_SCAN_IMAGES);
   const mutableContainerImageRefs = containerImageRefs.filter(
     (image) => !isImmutableImageRef(image),
@@ -994,6 +1100,34 @@ function collectPreflight(deployEnv, env, root = process.cwd()) {
         : mutableContainerImageRefs.length > 0
           ? `mutable refs: ${mutableContainerImageRefs.join(', ')}`
           : `${containerImageRefs.length} immutable image ref(s)`,
+  });
+
+  addCheck({
+    id: 'ci.repeatInput',
+    label: 'CI repeat evidence input is available',
+    names: [
+      'BIDSTACK_CI_REPEAT_INPUT',
+      'BIDSTACK_CI_REPEAT_EVIDENCE_INPUT',
+      'BIDSTACK_CI_REPEAT_RUNS_JSON',
+    ],
+    present: ciRepeat.configured === true,
+    source: ciRepeat.source,
+    passed: ciRepeat.configured === true && ciRepeat.passed === true,
+    detail: ciRepeat.configured
+      ? ciRepeat.detail
+      : 'BIDSTACK_CI_REPEAT_INPUT or BIDSTACK_CI_REPEAT_RUNS_JSON missing',
+  });
+
+  const ciRequiredRuns = parseOptionalInteger(checkEnv.BIDSTACK_CI_REQUIRED_RUN_COUNT || '10');
+  addCheck({
+    id: 'ci.requiredRunCount',
+    label: 'CI repeat evidence requires at least 10 runs',
+    names: ['BIDSTACK_CI_REQUIRED_RUN_COUNT'],
+    present: Boolean(checkEnv.BIDSTACK_CI_REQUIRED_RUN_COUNT),
+    source: checkEnv.BIDSTACK_CI_REQUIRED_RUN_COUNT ? 'BIDSTACK_CI_REQUIRED_RUN_COUNT' : 'default',
+    value: String(ciRequiredRuns),
+    passed: ciRequiredRuns !== null && ciRequiredRuns >= 10,
+    detail: `requiredRunCount=${ciRequiredRuns ?? 'missing'}`,
   });
 
   addAny(
@@ -1483,6 +1617,8 @@ function collectPreflight(deployEnv, env, root = process.cwd()) {
 function buildArtifact(options, preflight, steps, startedAt, completedAt) {
   const blockingFailures = [];
   const hasPreflightBlockers = preflight.blockingFailures.length > 0;
+  const preflightActionItems = buildPreflightActionItems(preflight);
+  const preflightSummary = buildPreflightSummary(preflight, preflightActionItems);
 
   for (const id of preflight.blockingFailures) {
     blockingFailures.push(`preflight.${id}`);
@@ -1524,9 +1660,64 @@ function buildArtifact(options, preflight, steps, startedAt, completedAt) {
     passed: blockingFailures.length === 0,
     blockingFailures,
     preflightBlockers: preflight.blockingFailures,
+    preflightSummary,
+    preflightActionItems,
     environmentChecks: preflight.checks,
     steps,
   };
+}
+
+function buildPreflightActionItems(preflight) {
+  return preflight.checks
+    .filter((check) => check.required && check.passed !== true)
+    .map((check) => ({
+      id: check.id,
+      category: preflightCategory(check.id),
+      label: check.label,
+      requiredEnv: Array.isArray(check.names) ? check.names : [],
+      present: check.present === true,
+      source: check.source || undefined,
+      sensitive: check.sensitive === true,
+      detail: String(check.detail || ''),
+    }));
+}
+
+function buildPreflightSummary(preflight, actionItems) {
+  const checks = Array.isArray(preflight.checks) ? preflight.checks : [];
+  const categoryCounts = new Map();
+  for (const item of actionItems) {
+    categoryCounts.set(item.category, (categoryCounts.get(item.category) || 0) + 1);
+  }
+  return {
+    totalChecks: checks.length,
+    passedChecks: checks.filter((check) => check.passed === true).length,
+    failedChecks: actionItems.length,
+    categories: [...categoryCounts.entries()]
+      .map(([category, failures]) => ({ category, failures }))
+      .sort((left, right) => left.category.localeCompare(right.category)),
+  };
+}
+
+function preflightCategory(id) {
+  const prefix = String(id || '').split('.')[0];
+  const labels = {
+    a11y: 'accessibility',
+    api: 'api-connectivity',
+    browser: 'browser-regression',
+    ci: 'ci-repeat',
+    container: 'container-supply-chain',
+    deploy: 'deploy-target',
+    load: 'load-certification',
+    mcp: 'mcp-connectivity',
+    ops: 'operational-readiness',
+    pii: 'privacy-pii',
+    providers: 'provider-quality',
+    release: 'release-identity',
+    secrets: 'secret-history',
+    sentry: 'observability',
+    webhooks: 'webhook-secrets',
+  };
+  return labels[prefix] || prefix || 'general';
 }
 
 function writeArtifact(root, outputPath, artifact) {
@@ -1676,6 +1867,24 @@ function printBundleSummary(options, artifact, absolutePath) {
   if (artifact.blockingFailures.length > 0) {
     process.stdout.write(`${artifact.blockingFailures.join('\n')}\n`);
   }
+  if (artifact.preflightActionItems.length > 0) {
+    process.stdout.write('\nPreflight action summary:\n');
+    for (const category of artifact.preflightSummary.categories) {
+      process.stdout.write(`- ${category.category}: ${category.failures}\n`);
+    }
+
+    const previewItems = artifact.preflightActionItems.slice(0, 12);
+    process.stdout.write('\nFirst required inputs:\n');
+    for (const item of previewItems) {
+      const names = item.requiredEnv.length > 0 ? item.requiredEnv.join(' | ') : 'see detail';
+      process.stdout.write(`- ${item.id}: ${names} (${item.detail})\n`);
+    }
+    if (artifact.preflightActionItems.length > previewItems.length) {
+      process.stdout.write(
+        `- ... ${artifact.preflightActionItems.length - previewItems.length} more in preflightActionItems\n`,
+      );
+    }
+  }
   if (artifact.passed) {
     if (options.preflightOnly) {
       process.stdout.write(
@@ -1708,6 +1917,7 @@ function runSelftest() {
   assert.equal(productionPlan[2].script, 'deploy:evidence:source:plan:write');
   assert.equal(productionPlan[2].diagnostic, true);
   assert.equal(productionPlan[2].runAfterFailedStepId, 'source');
+  assert.equal(productionPlan[3].script, 'deploy:evidence:ci');
   const providersStep = productionPlan.find((step) => step.id === 'providers');
   assert.equal(providersStep.preflightDiagnosticScript, 'deploy:evidence:providers');
   const providersDiagnostic = preflightDiagnosticStep(providersStep);
@@ -1769,8 +1979,52 @@ function runSelftest() {
     true,
   );
 
+  const ciRepeatJson = JSON.stringify({
+    provider: 'github-actions',
+    repository: 'mantu/bidstack-360',
+    workflow: 'ci.yml',
+    environment: 'production',
+    releaseCommit: 'c038c5d9c038c5d9c038c5d9c038c5d9c038c5d9',
+    branch: 'demo',
+    requiredRunCount: 10,
+    requiredChecks: ['install', 'audit', 'db:generate', 'lint', 'typecheck', 'test', 'build'],
+    consecutivePassed: true,
+    isolatedInfrastructure: true,
+    database: { kind: 'postgres', isolated: true, pgvectorEnabled: true },
+    evidenceUrl: 'https://github.com/mantu/bidstack-360/actions?query=branch%3Ademo',
+    privacy: {
+      rawLogsIncluded: false,
+      rawRunPayloadsIncluded: false,
+      commandStdoutIncluded: false,
+      commandStderrIncluded: false,
+      secretsIncluded: false,
+    },
+    runs: Array.from({ length: 10 }, (_, index) => ({
+      runId: `ci-${1000 + index}`,
+      url: `https://github.com/mantu/bidstack-360/actions/runs/${1000 + index}`,
+      commit: 'c038c5d9c038c5d9c038c5d9c038c5d9c038c5d9',
+      branch: 'demo',
+      status: 'success',
+      conclusion: 'success',
+      completedAt: `2026-06-18T10:${String(index + 1).padStart(2, '0')}:00.000Z`,
+      failedSuites: 0,
+      skippedSuites: 0,
+      checks: {
+        install: true,
+        audit: true,
+        'db:generate': true,
+        lint: true,
+        typecheck: true,
+        test: true,
+        build: true,
+      },
+    })),
+  });
+
   const completeEnv = {
     BIDSTACK_DEPLOY_ENV: 'production',
+    BIDSTACK_RELEASE_COMMIT: 'c038c5d9c038c5d9c038c5d9c038c5d9c038c5d9',
+    BIDSTACK_RELEASE_BRANCH: 'demo',
     BIDSTACK_CONTAINER_SCAN_IMAGES:
       'registry.example.com/bidcrm-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,' +
       'registry.example.com/bidcrm-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,' +
@@ -1832,6 +2086,8 @@ function runSelftest() {
     BIDSTACK_OPS_EVIDENCE_ROLLBACK_DRILL: 'docs://runbooks/rollback/drill-2026-06-18T12:00:00.000Z',
     BIDSTACK_OPS_EVIDENCE_MONITORING_ALERTS: 'sentry://alerts/release-2026-06-18-c038c5d9',
     BIDSTACK_OPS_EVIDENCE_ONCALL: 'pagerduty://service/bidstack/release-2026-06-18',
+    BIDSTACK_CI_REPEAT_RUNS_JSON: ciRepeatJson,
+    BIDSTACK_CI_REQUIRED_RUN_COUNT: '10',
     BIDSTACK_PROVIDER_QUALITY_COMPANY_KEY: 'mantu-global-finance',
     BIDSTACK_PROVIDER_QUALITY_TECH_INTEL_SOURCES: 'BuiltWith MCP,Wappalyzer MCP',
     BIDSTACK_MCP_CONNECTIVITY_TARGET: 'https://mcp.release.bidstack360.com',
@@ -1871,6 +2127,8 @@ function runSelftest() {
 
   const placeholderPreflight = collectPreflight('staging', {
     BIDSTACK_DEPLOY_ENV: 'staging',
+    BIDSTACK_RELEASE_COMMIT: '<git-sha>',
+    BIDSTACK_RELEASE_BRANCH: '<branch>',
     API_BASE_URL: 'https://staging-api.bidstack.example',
     API_TOKEN: 'release-api-token',
     BIDSTACK_OPS_RELEASE_ID: '<release-id>',
@@ -1922,7 +2180,10 @@ function runSelftest() {
   });
   assert.equal(placeholderPreflight.blockingFailures.includes('load.apiBaseUrl'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('load.apiToken'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('release.commit'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('release.branch'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('container.images'), true);
+  assert.equal(placeholderPreflight.blockingFailures.includes('ci.repeatInput'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('ops.releaseId'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('ops.approvalTicket'), true);
   assert.equal(placeholderPreflight.blockingFailures.includes('ops.bicepBuild'), true);
@@ -2029,6 +2290,7 @@ function runSelftest() {
     API_BASE_URL: 'http://127.0.0.1:4000',
   });
   assert.equal(blockedPreflight.blockingFailures.includes('load.apiBaseUrl'), true);
+  assert.equal(blockedPreflight.blockingFailures.includes('ci.repeatInput'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('api.target'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('api.apiToken'), true);
   assert.equal(blockedPreflight.blockingFailures.includes('pii.databaseUrl'), true);
@@ -2084,6 +2346,7 @@ function runSelftest() {
       { ...productionPlan[4], skipped: true, passed: false },
       { ...productionPlan[5], skipped: true, passed: false },
       { ...productionPlan[6], skipped: true, passed: false },
+      { ...productionPlan[7], skipped: true, passed: false },
       { ...productionPlan.at(-1), passed: false, exitCode: 1 },
     ],
     now,
@@ -2095,12 +2358,19 @@ function runSelftest() {
     'tools.failed',
     'source.skipped',
     'sourcePlan.skipped',
+    'ci.skipped',
     'ops.skipped',
     'api.skipped',
     'pii.skipped',
     'webhooks.skipped',
     'verify.failed',
   ]);
+  assert.deepEqual(failed.preflightSummary, {
+    totalChecks: 0,
+    passedChecks: 0,
+    failedChecks: 0,
+    categories: [],
+  });
 
   const sourceFailedPlanWritten = buildArtifact(
     {
@@ -2122,7 +2392,7 @@ function runSelftest() {
   );
   assert.deepEqual(sourceFailedPlanWritten.blockingFailures, [
     'source.failed',
-    'ops.skipped',
+    'ci.skipped',
     'verify.failed',
   ]);
 
@@ -2198,6 +2468,75 @@ function runSelftest() {
   );
   assert.equal(blockedPreflightOnly.passed, false);
   assert.deepEqual(blockedPreflightOnly.blockingFailures, ['preflight.sentry.smokeToken']);
+  assert.deepEqual(blockedPreflightOnly.preflightSummary, {
+    totalChecks: 0,
+    passedChecks: 0,
+    failedChecks: 0,
+    categories: [],
+  });
+
+  const actionablePreflightOnly = buildArtifact(
+    {
+      deployEnv: 'production',
+      dryRun: false,
+      preflightOnly: true,
+      continueOnError: false,
+      root: 'D:\\BIDCRM',
+    },
+    {
+      checks: [
+        {
+          required: true,
+          id: 'api.target',
+          label: 'API connectivity has a non-local API target',
+          names: ['BIDSTACK_API_CONNECTIVITY_TARGET', 'API_BASE_URL'],
+          present: false,
+          passed: false,
+          detail: 'BIDSTACK_API_CONNECTIVITY_TARGET or API_BASE_URL missing',
+        },
+        {
+          required: true,
+          id: 'mcp.apiToken',
+          label: 'MCP connectivity has an authenticated API token',
+          names: ['BIDSTACK_MCP_CONNECTIVITY_API_TOKEN', 'MCP_API_TOKEN', 'API_TOKEN'],
+          sensitive: true,
+          present: false,
+          passed: false,
+          detail: 'BIDSTACK_MCP_CONNECTIVITY_API_TOKEN missing',
+        },
+        {
+          required: true,
+          id: 'deploy.environment',
+          label: 'Bundle target environment is release-scoped',
+          names: ['BIDSTACK_DEPLOY_ENV'],
+          present: true,
+          source: 'BIDSTACK_DEPLOY_ENV',
+          passed: true,
+          detail: 'production',
+        },
+      ],
+      blockingFailures: ['api.target', 'mcp.apiToken'],
+    },
+    buildCommandPlan('production').map(preflightStep),
+    now,
+    now,
+  );
+  assert.equal(actionablePreflightOnly.preflightSummary.failedChecks, 2);
+  assert.deepEqual(actionablePreflightOnly.preflightSummary.categories, [
+    { category: 'api-connectivity', failures: 1 },
+    { category: 'mcp-connectivity', failures: 1 },
+  ]);
+  assert.deepEqual(actionablePreflightOnly.preflightActionItems[0], {
+    id: 'api.target',
+    category: 'api-connectivity',
+    label: 'API connectivity has a non-local API target',
+    requiredEnv: ['BIDSTACK_API_CONNECTIVITY_TARGET', 'API_BASE_URL'],
+    present: false,
+    source: undefined,
+    sensitive: false,
+    detail: 'BIDSTACK_API_CONNECTIVITY_TARGET or API_BASE_URL missing',
+  });
+  assert.equal(actionablePreflightOnly.preflightActionItems[1].sensitive, true);
 
   assert.equal(
     redact('Authorization: Bearer super-secret-token'),

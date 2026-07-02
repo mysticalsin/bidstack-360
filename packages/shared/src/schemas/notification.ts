@@ -6,6 +6,7 @@ export const NotificationType = z.enum([
   'assignment',
   'bid_override',
   'stage_change',
+  'task_due',
   'system',
 ]);
 export type NotificationType = z.infer<typeof NotificationType>;
@@ -31,8 +32,9 @@ export type NotificationPage = z.infer<typeof NotificationPage>;
 
 // Per-user notification preferences, persisted server-side (one row per user).
 // mentionPush gates `mention` notifications; dealStageChange gates
-// `stage_change`. taskDueSoon + emailDigest persist for features that emit them
-// (task reminders, the email digest) and are honoured as those land.
+// `stage_change`; taskDueSoon gates `task_due` (the worker cron's task
+// due-soon/overdue nudge). emailDigest persists for the (not-yet-built) digest
+// email.
 export const NotificationPrefs = z.object({
   emailDigest: z.boolean(),
   mentionPush: z.boolean(),

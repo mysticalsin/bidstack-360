@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const DEFAULT_OUTPUT_PATH = 'deploy-evidence/api-connectivity-latest.json';
+const DEFAULT_SOURCE_CONTROL_PATH = 'deploy-evidence/source-control-latest.json';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_DOMAIN_SMOKE_PATH =
   '/api/companies?search=__bidstack_release_probe_no_match__&limit=1';
@@ -64,6 +65,18 @@ function parseArgs(argv) {
     expectedOrgId: process.env.BIDSTACK_API_CONNECTIVITY_EXPECTED_ORG_ID ?? '',
     domainSmokePath:
       process.env.BIDSTACK_API_CONNECTIVITY_DOMAIN_SMOKE_PATH ?? DEFAULT_DOMAIN_SMOKE_PATH,
+    sourceEvidencePath:
+      process.env.BIDSTACK_SOURCE_CONTROL_EVIDENCE ?? DEFAULT_SOURCE_CONTROL_PATH,
+    releaseCommit:
+      process.env.BIDSTACK_API_CONNECTIVITY_RELEASE_COMMIT ??
+      process.env.BIDSTACK_RELEASE_COMMIT ??
+      process.env.BIDSTACK_CI_RELEASE_COMMIT ??
+      '',
+    releaseBranch:
+      process.env.BIDSTACK_API_CONNECTIVITY_RELEASE_BRANCH ??
+      process.env.BIDSTACK_RELEASE_BRANCH ??
+      process.env.BIDSTACK_CI_BRANCH ??
+      '',
     timeoutMs: Number(process.env.BIDSTACK_API_CONNECTIVITY_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
     strict: process.env.BIDSTACK_STRICT_DEPLOY_GATE !== '0',
     selftest: false,
@@ -99,6 +112,15 @@ function parseArgs(argv) {
     } else if (arg === '--domain-smoke-path') {
       options.domainSmokePath = next;
       index += 1;
+    } else if (arg === '--source-evidence') {
+      options.sourceEvidencePath = next;
+      index += 1;
+    } else if (arg === '--release-commit') {
+      options.releaseCommit = next;
+      index += 1;
+    } else if (arg === '--release-branch') {
+      options.releaseBranch = next;
+      index += 1;
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = Number(next);
       index += 1;
@@ -128,6 +150,9 @@ Environment:
   BIDSTACK_API_CONNECTIVITY_AUTH_SCHEME      api-key (default) or bearer
   BIDSTACK_API_CONNECTIVITY_EXPECTED_ORG_ID  Optional expected tenant org id
   BIDSTACK_API_CONNECTIVITY_DOMAIN_SMOKE_PATH Optional read-only API path to smoke
+  BIDSTACK_API_CONNECTIVITY_RELEASE_COMMIT  Optional expected release commit
+  BIDSTACK_API_CONNECTIVITY_RELEASE_BRANCH  Optional expected release branch
+  BIDSTACK_SOURCE_CONTROL_EVIDENCE          Source-control evidence fallback
   BIDSTACK_API_CONNECTIVITY_EVIDENCE         Output path
   BIDSTACK_API_CONNECTIVITY_TIMEOUT_MS       Per-request timeout
   BIDSTACK_DEPLOY_ENV                        Evidence environment label
@@ -138,6 +163,9 @@ Options:
   --auth-scheme <scheme>     api-key or bearer
   --expected-org-id <id>     Require capabilities org id to match
   --domain-smoke-path <path> Read-only API path to smoke
+  --source-evidence <path>   Source-control evidence fallback path
+  --release-commit <sha>     Expected deployed release commit
+  --release-branch <name>    Expected deployed release branch
   --output <path>            Override evidence output path
   --env <name>               Override deploy environment
   --timeout-ms <ms>          Override per-request timeout
@@ -167,6 +195,54 @@ function normalizeSmokePath(value) {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
+function isFullCommitSha(value) {
+  return /^[0-9a-f]{40}$/i.test(String(value ?? '').trim());
+}
+
+function resolveReleaseIdentity(options) {
+  const explicitCommit = String(options.releaseCommit ?? '').trim();
+  const explicitBranch = String(options.releaseBranch ?? '').trim();
+  if (explicitCommit || explicitBranch) {
+    return {
+      source: 'env-or-cli',
+      expectedCommit: explicitCommit || null,
+      expectedBranch: explicitBranch || null,
+    };
+  }
+
+  const sourcePath = resolveOutputPath(options.root, options.sourceEvidencePath);
+  if (existsSync(sourcePath)) {
+    try {
+      const sourceEvidence = JSON.parse(readFileSync(sourcePath, 'utf8'));
+      return {
+        source: 'source-control-evidence',
+        expectedCommit: String(sourceEvidence?.commit ?? '').trim() || null,
+        expectedBranch: String(sourceEvidence?.branch ?? '').trim() || null,
+      };
+    } catch {
+      return {
+        source: 'source-control-evidence-unreadable',
+        expectedCommit: null,
+        expectedBranch: null,
+      };
+    }
+  }
+
+  return {
+    source: 'missing',
+    expectedCommit: null,
+    expectedBranch: null,
+  };
+}
+
+function summarizeReleaseMetadata(body) {
+  const release = body?.release && typeof body.release === 'object' ? body.release : {};
+  return {
+    commit: String(release.commit ?? '').trim() || null,
+    branch: String(release.branch ?? '').trim() || null,
+  };
+}
+
 function isPlaceholderValue(value) {
   const normalized = String(value ?? '')
     .trim()
@@ -192,7 +268,7 @@ function isLocalTarget(value) {
   }
 }
 
-function validateLivePreconditions(options) {
+function validateLivePreconditions(options, releaseIdentity) {
   const failures = [];
   const target = normalizeTarget(options.target);
 
@@ -236,6 +312,21 @@ function validateLivePreconditions(options) {
 
   if (options.strict && isPlaceholderValue(options.expectedOrgId)) {
     failures.push('Expected API org id cannot be placeholder-like in strict mode.');
+  }
+
+  if (options.strict && !isFullCommitSha(releaseIdentity.expectedCommit)) {
+    failures.push(
+      'Strict API connectivity proof requires a full release commit from BIDSTACK_RELEASE_COMMIT or source-control evidence.',
+    );
+  }
+
+  if (
+    options.strict &&
+    (!releaseIdentity.expectedBranch || isPlaceholderValue(releaseIdentity.expectedBranch))
+  ) {
+    failures.push(
+      'Strict API connectivity proof requires a non-placeholder release branch from BIDSTACK_RELEASE_BRANCH or source-control evidence.',
+    );
   }
 
   const smokePath = normalizeSmokePath(options.domainSmokePath);
@@ -328,13 +419,15 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
   const startedAt = new Date().toISOString();
   const target = normalizeTarget(options.target);
   const domainSmokePath = normalizeSmokePath(options.domainSmokePath);
-  const preconditionFailures = validateLivePreconditions(options);
+  const releaseIdentity = resolveReleaseIdentity(options);
+  const preconditionFailures = validateLivePreconditions(options, releaseIdentity);
 
   const result = {
     source: 'live-api-smoke',
     target,
     authScheme: options.authScheme,
     expectedOrgId: String(options.expectedOrgId ?? '').trim(),
+    release: releaseIdentity,
     startedAt,
     completedAt: null,
     ok: false,
@@ -372,6 +465,7 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
       ok: livez.ok && livez.body?.ok === true,
       status: livez.status,
       apiOk: livez.body?.ok ?? null,
+      release: summarizeReleaseMetadata(livez.body),
     };
   } catch (error) {
     result.livez = makeFailedCheck(error);
@@ -399,6 +493,7 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
       db: readyz.body?.db ?? null,
       redis: readyz.body?.redis ?? null,
       storage: readyz.body?.storage ?? null,
+      release: summarizeReleaseMetadata(readyz.body),
     };
   } catch (error) {
     result.readyz = makeFailedCheck(error);
@@ -424,6 +519,7 @@ async function runLiveSmoke(options, fetchFn = globalThis.fetch) {
       apiOk: health.body?.ok ?? null,
       db: health.body?.db ?? null,
       redis: health.body?.redis ?? null,
+      release: summarizeReleaseMetadata(health.body),
     };
   } catch (error) {
     result.health = makeFailedCheck(error);
@@ -511,6 +607,7 @@ function buildArtifact(options, smoke) {
     target: smoke.target,
     authScheme: smoke.authScheme,
     expectedOrgId: smoke.expectedOrgId || null,
+    release: smoke.release,
     command: {
       source: smoke.source,
       ok: smoke.ok,
@@ -626,6 +723,34 @@ function validateArtifact(artifact, options) {
     failures.push(`API capabilities org ${orgId || 'missing'} does not match ${expectedOrgId}.`);
   }
 
+  const release = artifact.release && typeof artifact.release === 'object' ? artifact.release : {};
+  const expectedCommit = String(release.expectedCommit ?? '').trim();
+  const expectedBranch = String(release.expectedBranch ?? '').trim();
+  if (options.strict && !isFullCommitSha(expectedCommit)) {
+    failures.push('API release identity must include a full expected commit SHA.');
+  }
+  if (options.strict && (!expectedBranch || isPlaceholderValue(expectedBranch))) {
+    failures.push('API release identity must include a non-placeholder expected branch.');
+  }
+
+  for (const checkName of ['livez', 'readyz', 'health']) {
+    const observedRelease = artifact.checks?.[checkName]?.release ?? {};
+    const observedCommit = String(observedRelease.commit ?? '').trim();
+    const observedBranch = String(observedRelease.branch ?? '').trim();
+
+    if (options.strict && observedCommit !== expectedCommit) {
+      failures.push(
+        `API ${checkName} release commit ${observedCommit || 'missing'} does not match ${expectedCommit || 'missing'}.`,
+      );
+    }
+
+    if (options.strict && observedBranch !== expectedBranch) {
+      failures.push(
+        `API ${checkName} release branch ${observedBranch || 'missing'} does not match ${expectedBranch || 'missing'}.`,
+      );
+    }
+  }
+
   return failures;
 }
 
@@ -660,7 +785,14 @@ function makeJsonResponse(payload, status = 200) {
   });
 }
 
-function createFakeApiFetch({ ready = true, orgId = 'org_release_1234567890' } = {}) {
+function createFakeApiFetch({
+  ready = true,
+  orgId = 'org_release_1234567890',
+  release = {
+    commit: '0123456789abcdef0123456789abcdef01234567',
+    branch: 'main',
+  },
+} = {}) {
   const calls = [];
 
   const fetchFn = async (url, init = {}) => {
@@ -670,7 +802,7 @@ function createFakeApiFetch({ ready = true, orgId = 'org_release_1234567890' } =
     calls.push({ url: parsed.toString(), method, headers });
 
     if (method === 'GET' && parsed.pathname === '/livez') {
-      return makeJsonResponse({ ok: true });
+      return makeJsonResponse({ ok: true, release });
     }
 
     if (method === 'GET' && parsed.pathname === '/readyz') {
@@ -680,6 +812,7 @@ function createFakeApiFetch({ ready = true, orgId = 'org_release_1234567890' } =
           db: ready,
           redis: ready,
           storage: ready,
+          release,
         },
         ready ? 200 : 503,
       );
@@ -690,6 +823,7 @@ function createFakeApiFetch({ ready = true, orgId = 'org_release_1234567890' } =
         ok: true,
         db: true,
         redis: true,
+        release,
       });
     }
 
@@ -738,6 +872,9 @@ async function runSelftest() {
       authScheme: 'api-key',
       expectedOrgId: 'org_release_1234567890',
       domainSmokePath: DEFAULT_DOMAIN_SMOKE_PATH,
+      sourceEvidencePath: DEFAULT_SOURCE_CONTROL_PATH,
+      releaseCommit: '0123456789abcdef0123456789abcdef01234567',
+      releaseBranch: 'main',
       timeoutMs: DEFAULT_TIMEOUT_MS,
       strict: true,
     };
@@ -747,6 +884,7 @@ async function runSelftest() {
     assert.equal(good.exitCode, 0);
     assert.equal(good.artifact.passed, true);
     assert.equal(good.artifact.checks.readyz.storage, true);
+    assert.equal(good.artifact.checks.livez.release.commit, baseOptions.releaseCommit);
     assert.equal(good.artifact.checks.domainRead.ok, true);
     assert.equal(good.artifact.checks.domainRead.itemCount, 0);
     assert.equal('items' in good.artifact.checks.domainRead, false);
@@ -797,6 +935,23 @@ async function runSelftest() {
     );
     assert.equal(orgMismatch.exitCode, 1);
     assert.match(orgMismatch.artifact.validationFailures.join('\n'), /does not match/);
+
+    const releaseMismatch = await runWriter(
+      {
+        ...baseOptions,
+        outputPath: 'release-mismatch.json',
+      },
+      {
+        fetchFn: createFakeApiFetch({
+          release: {
+            commit: 'ffffffffffffffffffffffffffffffffffffffff',
+            branch: 'main',
+          },
+        }),
+      },
+    );
+    assert.equal(releaseMismatch.exitCode, 1);
+    assert.match(releaseMismatch.artifact.validationFailures.join('\n'), /release commit/);
 
     const localTarget = await runWriter(
       {
