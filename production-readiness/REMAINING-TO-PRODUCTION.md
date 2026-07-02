@@ -1,9 +1,13 @@
 # BidStack 360° — Remaining Work to Production-Ready
 
-**Created:** 2026-06-29 · **Branch:** feat/prod-hardening-mantu
-**Status:** code-complete + committed & green (typecheck/lint/build + DB-free unit suites). The items below
-are everything left between here and a real customer launch. They are **NOT code defects** — they need DB,
-cloud, or human decisions that cannot be done from a repo session.
+**Created:** 2026-06-29 · **Updated:** 2026-07-02 · **Branch:** feat/prod-hardening-mantu
+**Status:** code-complete + committed & green (typecheck/lint/build across all 11 packages + full DB-backed
+test suite, 900+ api tests). Week-1 pre-sales features (bid clock, notification wiring, presence, command
+palette) shipped through implement→adversarial-review→fix, all findings closed and re-verified. A same-session
+incident where concurrent agent edits silently reverted part of the opportunity optimistic-concurrency
+locking is resolved — root cause + fix in `MISTAKES.md` (2026-07-02 entries). The items below are everything
+left between here and a real customer launch. They are **NOT code defects** — they need DB, cloud, or human
+decisions that cannot be done from a repo session.
 
 Companion analysis: `GAP_AUDIT_2026-06-28.md` (the verified gap-of-record). This file is the **execution
 checklist** — work it top to bottom.
