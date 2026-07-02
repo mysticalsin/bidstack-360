@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, beforeAll, afterAll } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -8,6 +8,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -45,13 +46,7 @@ describe('opportunity timeline', () => {
     if (dbReachable) await prisma.$disconnect();
   });
 
-  const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-    it(name, async () => {
-      if (!dbReachable || !orgId) {
-        throw new Error(`[skip] ${name} - DATABASE_URL not reachable or isolated org missing`);
-      }
-      await fn();
-    });
+  const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
   skipIfNoDb('returns 404 for an opportunity that does not exist', async () => {
     const res = await server.inject({

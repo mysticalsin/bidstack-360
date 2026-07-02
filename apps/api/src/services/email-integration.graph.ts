@@ -113,7 +113,10 @@ export async function pullMsGraphMail(
     '@odata.deltaLink'?: string;
   };
 
-  const token = await prisma.integrationToken.findUnique({ where: { id: tokenId } });
+  // WHY findFirst + orgId in where (not findUnique by bare id): tokenId alone
+  // must never resolve a cross-tenant IntegrationToken row — see MISTAKES.md
+  // cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId } });
 
   for (const msg of (data.value ?? []).slice(0, 30)) {
     try {

@@ -12,7 +12,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { checkSerumConnectorRuntimePolicy } from '@bidstack/db/serum-runtime-policy';
+import { prisma } from '@bidstack/db';
 
+import { rbacPlugin } from '../plugins/rbac.js';
+import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
 import { __resetErpClient, erpRoutes } from './erp-integration.js';
 
 vi.mock('@bidstack/db/serum-runtime-policy', () => ({
@@ -23,7 +26,30 @@ vi.mock('@bidstack/db/serum-runtime-policy', () => ({
   recordSerumConnectorConnectionTest: vi.fn(),
 }));
 
+// Every ERP route gates on integrations:read (audit fix: routes were auth-only
+// before). Mock the RBAC decision cache's DB read so the caller in these tests
+// is always granted that permission — the gate itself is exercised separately
+// in rbac-matrix.test.ts. Also stub the models searchLocalCompanies reads
+// (company-autocomplete's local-BidStack-records fallback) — previously this
+// suite ran that query against a real DB (dotenv-flow-loaded DATABASE_URL) and
+// got back an empty set for the fake test org; mocking @bidstack/db for the
+// RBAC gate would otherwise make those calls throw on an undefined model.
+vi.mock('@bidstack/db', () => ({
+  prisma: {
+    userRole: {
+      count: vi.fn(),
+    },
+    companyEnrichment: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    opportunity: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+  },
+}));
+
 const checkConnector = vi.mocked(checkSerumConnectorRuntimePolicy);
+const userRoleCount = vi.mocked(prisma.userRole.count);
 const TEST_ORG_ID = '00000000-0000-4000-8000-000000000001';
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000002';
 
@@ -45,6 +71,7 @@ async function buildApp() {
     };
   });
   await app.register(sensible);
+  await app.register(rbacPlugin);
   await app.register(erpRoutes, { prefix: '/api/integrations' });
   return app;
 }
@@ -61,6 +88,12 @@ describe('erp-integration route', () => {
       reason: 'Connector operation is allowed by the active SERUM policy.',
       activeConfigVersionId: '00000000-0000-4000-8000-000000000099',
     });
+    // Every route in this file gates on integrations:read; grant it by default
+    // so these tests exercise ERP proxy behavior, not the RBAC gate itself
+    // (that's rbac-matrix.test.ts's job). Clear the decision cache first —
+    // it's a module-level Map keyed on the same org/user tuple every test uses.
+    clearRbacDecisionCacheForTest();
+    userRoleCount.mockResolvedValue(1);
     __resetErpClient();
     process.env.ERP_MCP_URL = 'http://erp.test/mcp';
     process.env.ERP_DB = 'mantu-prod';
@@ -74,6 +107,7 @@ describe('erp-integration route', () => {
     delete process.env.ODOO_MCP_BEARER_TOKEN;
     vi.unstubAllGlobals();
     checkConnector.mockReset();
+    userRoleCount.mockReset();
     __resetErpClient();
   });
 
@@ -308,6 +342,28 @@ describe('erp-integration route', () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.body).toContain('SERUM connector policy denied');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // Audit fix regression: these routes were auth-only (no requirePermission /
+  // requireRole gate), so any authenticated caller — regardless of role —
+  // could read through to the single shared ERP connection. Both a GET and
+  // the POST /search route are checked so the gate isn't just wired on one verb.
+  it('rejects a caller without integrations:read before any ERP/network work', async () => {
+    userRoleCount.mockResolvedValue(0);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const app = await buildApp();
+    const statusRes = await app.inject({ method: 'GET', url: '/api/integrations/erp/status' });
+    expect(statusRes.statusCode).toBe(403);
+
+    const searchRes = await app.inject({
+      method: 'POST',
+      url: '/api/integrations/erp/search',
+      payload: { model: 'res.partner', fields: ['name'], limit: 5 },
+    });
+    expect(searchRes.statusCode).toBe(403);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

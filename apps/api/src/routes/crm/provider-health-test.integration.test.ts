@@ -1,9 +1,10 @@
 // Integration test for the on-demand provider-health "Test now" endpoint.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../../server.js';
+import { makeSkipIfNoDb } from '../../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -25,11 +26,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) throw new Error(`[skip] ${name} — DB unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable);
 
 describe('POST /crm/provider-health/test', () => {
   t('re-checks providers on demand and returns a fresh timestamp', async () => {

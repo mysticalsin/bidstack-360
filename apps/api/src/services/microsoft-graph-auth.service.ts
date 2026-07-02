@@ -51,6 +51,7 @@ export function webhookBaseUrl(): string {
 
 export type TokenRow = {
   id: string;
+  orgId: string;
   accessTokenEncrypted: string;
   refreshTokenEncrypted: string | null;
   expiresAt: Date | null;
@@ -72,7 +73,7 @@ export async function getAccessToken(row: TokenRow, log: ServiceLogger): Promise
   return runWithOAuthRefreshLock({
     tokenId: row.id,
     log,
-    getFreshValue: () => getFreshMsGraphAccessToken(row.id),
+    getFreshValue: () => getFreshMsGraphAccessToken(row.id, row.orgId),
     refresh: async () => {
       if (!row.refreshTokenEncrypted) {
         throw new Error('MS Graph token expired and no refresh token is stored');
@@ -84,9 +85,15 @@ export async function getAccessToken(row: TokenRow, log: ServiceLogger): Promise
   });
 }
 
-async function getFreshMsGraphAccessToken(tokenId: string): Promise<string | null> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: tokenId },
+// WHY findFirst + orgId (not findUnique by bare id): IntegrationToken rows are
+// tenant-scoped — resolving by id alone would let a cross-tenant tokenId
+// decrypt another org's Graph access token. See MISTAKES.md.
+async function getFreshMsGraphAccessToken(
+  tokenId: string,
+  orgId: string,
+): Promise<string | null> {
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: tokenId, orgId },
     select: { accessTokenEncrypted: true, expiresAt: true, status: true },
   });
   if (!token || token.status !== 'active' || tokenExpiresSoon(token.expiresAt)) return null;

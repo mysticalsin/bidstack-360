@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from '../server.js';
 import type { FastifyInstance } from 'fastify';
 
-describe.skipIf(!process.env.DATABASE_URL)('proposal routes', () => {
+// WHY plain describe (not describe.skipIf(!DATABASE_URL)): skipIf marks the
+// whole suite "skipped" in vitest's report — a CI run without the env var set
+// would go green with zero proposal coverage. buildServer() below throws in
+// beforeAll when the DB is unreachable, which fails the suite loudly instead.
+describe('proposal routes', () => {
   let server: FastifyInstance;
 
   beforeAll(async () => {

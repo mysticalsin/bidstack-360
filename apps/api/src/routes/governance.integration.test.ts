@@ -1,6 +1,6 @@
 // Integration tests for the comitology / governance log (A4) and the Spotlight
 // Ref receiving end (A5) + opportunity filter rules (M6).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -11,6 +11,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -56,11 +57,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} - DB/isolated org unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('governance meetings', () => {
   t('create with nested actions, then advance an action status', async () => {

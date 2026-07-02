@@ -5,7 +5,7 @@
 // The stub-auth identity is the isolated org's (unrestricted) admin user with zero
 // group memberships. We TRANSIENTLY add it to a fresh FR-only access group to
 // prove the gate, then restore (delete the membership + group + clear the scope cache).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -16,6 +16,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -100,13 +101,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !stubUserId) {
-      throw new Error(`[skip] ${name} - DB/isolated org/user unavailable`);
-    }
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId && !!stubUserId);
 
 describe('opportunity detail-by-id access scoping', () => {
   t('a country-scoped user CAN open an in-scope opportunity', async () => {

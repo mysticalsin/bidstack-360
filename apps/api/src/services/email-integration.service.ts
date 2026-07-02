@@ -137,11 +137,14 @@ export async function sendEmail(
 // ─── Pull emails ───────────────────────────────────────────────────────────────
 
 export async function pullEmails(params: PullEmailsParams, log: ServiceLogger): Promise<void> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: params.integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): prevents a
+  // cross-tenant integrationTokenId from resolving to another org's token —
+  // see MISTAKES.md cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: params.integrationTokenId, orgId: params.orgId },
   });
 
-  if (!token || token.orgId !== params.orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     log.warn({ tokenId: params.integrationTokenId }, 'Skipping pull: token inactive or not found');
     return;
   }

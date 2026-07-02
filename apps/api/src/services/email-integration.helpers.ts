@@ -161,6 +161,7 @@ export async function refreshMsGraphToken(
 export async function getAccessToken(
   tokenRecord: {
     id: string;
+    orgId: string;
     accessTokenEncrypted: string;
     refreshTokenEncrypted: string | null;
     expiresAt: Date | null;
@@ -175,7 +176,7 @@ export async function getAccessToken(
   return runWithOAuthRefreshLock({
     tokenId: tokenRecord.id,
     log,
-    getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id),
+    getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id, tokenRecord.orgId),
     refresh: async () => {
       if (!tokenRecord.refreshTokenEncrypted) {
         throw new Error('Token expired and no refresh token available');
@@ -190,9 +191,16 @@ export async function getAccessToken(
   });
 }
 
-async function getFreshIntegrationAccessToken(tokenId: string): Promise<string | null> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: tokenId },
+// WHY findFirst + orgId (not findUnique by id alone): IntegrationToken rows are
+// tenant-scoped. Fetching by bare id would let a stale/forged tokenId from one
+// org decrypt another org's OAuth credentials — see MISTAKES.md cross-tenant
+// token disclosure finding.
+async function getFreshIntegrationAccessToken(
+  tokenId: string,
+  orgId: string,
+): Promise<string | null> {
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: tokenId, orgId },
     select: { accessTokenEncrypted: true, expiresAt: true, status: true },
   });
   if (!token || token.status !== 'active' || tokenExpiresSoon(token.expiresAt)) return null;

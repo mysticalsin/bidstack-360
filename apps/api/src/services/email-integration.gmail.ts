@@ -185,7 +185,10 @@ export async function pullGmail(
         where: { orgId, email: fromEmail, deletedAt: null },
       });
 
-      const token = await prisma.integrationToken.findUnique({ where: { id: tokenId } });
+      // WHY findFirst + orgId in where (not findUnique by bare id): mirrors the
+      // fix in email-integration.graph.ts's pullMsGraphMail — tokenId alone
+      // must never resolve a cross-tenant IntegrationToken row.
+      const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId } });
 
       await prisma.emailMessage.upsert({
         where: { orgId_externalMessageId: { orgId, externalMessageId: detail.id } },

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -8,6 +8,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -64,13 +65,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !rfpTablesReady || !orgId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL or RFP tables not ready`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && rfpTablesReady && !!orgId);
 
 async function createWorkspaceFixture() {
   if (!orgId) throw new Error('isolated org missing');

@@ -6,7 +6,7 @@
 // round-tripping through Zod, and (c) the action substring filter actually
 // hitting the index. Mocking Prisma would only verify our mock.
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 import { prisma } from '@bidstack/db';
@@ -17,6 +17,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -94,13 +95,7 @@ async function seedAudit(
   return row;
 }
 
-const skipIfNoDb = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('GET /api/audit-logs', () => {
   skipIfNoDb('isolates rows by orgId — foreign org rows are never returned', async () => {

@@ -11,6 +11,7 @@ import {
   hasSampleData,
   listTemplates,
 } from './onboarding.service.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let dbReachable = false;
 let orgId: string | null = null;
@@ -48,11 +49,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/org unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('onboarding service', () => {
   it('lists the four starter templates with stage counts', () => {

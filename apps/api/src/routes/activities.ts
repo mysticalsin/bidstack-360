@@ -150,6 +150,29 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
           orderBy: { occurredAt: 'desc' },
           take: limit,
           skip: offset,
+          // Narrow select matching ActivityRow exactly — serializeActivity's
+          // param type below fails to compile if this list ever drops a field
+          // the serializer needs, so it can't silently drift out of sync.
+          select: {
+            id: true,
+            orgId: true,
+            type: true,
+            subject: true,
+            description: true,
+            startTime: true,
+            endTime: true,
+            status: true,
+            entityType: true,
+            entityId: true,
+            ownerId: true,
+            metadata: true,
+            actorId: true,
+            actorType: true,
+            body: true,
+            occurredAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         }),
         prisma.activity.count({ where }),
       ]);

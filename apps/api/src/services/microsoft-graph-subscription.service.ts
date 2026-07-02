@@ -35,11 +35,14 @@ export async function createSubscription(
   { integrationTokenId, orgId }: { integrationTokenId: string; orgId: string },
   log: ServiceLogger,
 ): Promise<string | null> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): prevents a
+  // cross-tenant integrationTokenId from resolving to another org's token —
+  // see MISTAKES.md cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: integrationTokenId, orgId },
   });
 
-  if (!token || token.orgId !== orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     log.warn({ integrationTokenId }, 'Cannot create subscription: token not active');
     return null;
   }

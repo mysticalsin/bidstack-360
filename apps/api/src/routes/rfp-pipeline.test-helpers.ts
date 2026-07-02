@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, it } from 'vitest';
+import { afterAll, beforeAll } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
@@ -22,6 +22,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,15 +178,7 @@ export function makeRfpTestContext() {
    * Convenience wrapper: throw the canonical skip message when pre-conditions are
    * not met, rather than letting tests silently pass or fail with cryptic errors.
    */
-  const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-    it(name, async () => {
-      if (!ctx.dbReachable || !ctx.rfpTablesReady || !ctx.orgId) {
-        throw new Error(
-          `[skip] ${name} — DATABASE_URL not reachable, RFP tables missing, or isolated org absent`,
-        );
-      }
-      await fn();
-    });
+  const skipIfNoDb = makeSkipIfNoDb(() => ctx.dbReachable && ctx.rfpTablesReady && !!ctx.orgId);
 
   /** Create a minimal opportunity owned by the isolated org. */
   async function createOpportunity(label = 'rfp-test') {

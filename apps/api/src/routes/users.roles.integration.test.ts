@@ -6,7 +6,7 @@
 //     (the whole point of connecting RBAC to the product);
 //   - assignment is idempotent (re-grant clears a prior revoke) and org-scoped
 //     (a foreign role id can't be granted).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -16,6 +16,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -99,13 +100,7 @@ afterAll(async () => {
   }
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !memberId || !roleId) {
-      throw new Error(`[skip] ${name}: DB/isolated fixtures unavailable`);
-    }
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId && !!memberId && !!roleId);
 
 describe('capability manifest + user-role assignment', () => {
   t('GET /me/capabilities reports the caller as an admin with permissions', async () => {

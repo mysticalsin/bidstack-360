@@ -8,7 +8,7 @@
 // and the permission is seeded (happy path). The 403 deny path for a user
 // LACKING the permission is covered generically by rbac-matrix.test.ts, which
 // exercises the same requirePermission decorator.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -18,6 +18,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -51,11 +52,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} - DB/isolated org unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('tags RBAC gate', () => {
   t('GET /tags is allowed for a user with tags:read', async () => {

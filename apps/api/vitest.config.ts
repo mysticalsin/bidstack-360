@@ -11,6 +11,11 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     testTimeout: 15_000,
+    // Integration suites seed a full isolated org in beforeAll (~18s on a
+    // Windows host against dockerized Postgres, longer under load). Vitest's
+    // 10s default hookTimeout kills those hooks mid-seed and the suite dies
+    // with a misleading "Hook timed out" at the SELECT 1 line.
+    hookTimeout: 120_000,
     fileParallelism: false,
     env: {
       NODE_ENV: 'test',

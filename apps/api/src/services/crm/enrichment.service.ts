@@ -90,7 +90,10 @@ export async function upsertVerifiedCompanyEnrichment({
   const seamlessApiKey =
     process.env.NODE_ENV === 'test'
       ? null
-      : ((await resolveDataProviderApiKey(orgId, 'seamless').catch(() => null)) ??
+      : ((await resolveDataProviderApiKey(orgId, 'seamless').catch((err) => {
+          log.warn({ err, orgId }, 'seamless api key resolution failed');
+          return null;
+        })) ??
         process.env.SEAMLESS_API_KEY ??
         null);
   const seamlessProfile = seamlessMcpUrl || seamlessApiKey

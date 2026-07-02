@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -12,6 +12,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -60,15 +61,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !seedUserId) {
-      throw new Error(
-        `[skip] ${name} - DATABASE_URL not reachable, isolated org missing, or isolated user missing`,
-      );
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId && !!seedUserId);
 
 async function createForeignUser() {
   const suffix = randomUUID();
@@ -109,6 +102,65 @@ describe('forecast input validation', () => {
     });
     expect([200, 403]).toContain(res.statusCode);
   });
+});
+
+describe('territories analytics — money precision', () => {
+  // WHY: totals.totalValueMicros used to be `items.reduce((s, i) => s + i.x, 0)`
+  // over already-Number()-converted per-country values — a float accumulation
+  // that can drift off the exact integer sum. Now it sums the raw BigInt
+  // strings via sumMicros before converting once at the boundary. This test
+  // is a regression tripwire: it asserts the endpoint's total exactly equals
+  // an independently-computed BigInt sum, not just "some plausible number".
+  skipIfNoDb(
+    'GET /api/territories/analytics totalValueMicros exactly matches the summed opportunity rows',
+    async () => {
+      // The isolated org is seeded with its own demo opportunities, so assert
+      // a DELTA against a baseline read rather than an absolute total.
+      const before = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
+      expect(before.statusCode).toBe(200);
+      const baseline = (before.json() as { totals: { totalValueMicros: number } }).totals
+        .totalValueMicros;
+
+      const suffix = randomUUID().slice(0, 8);
+      const created = await prisma.opportunity.createMany({
+        data: [
+          {
+            orgId: orgId!,
+            code: `OP-${suffix}1`,
+            customer: 'Precision Co A',
+            name: 'Precision fixture A',
+            stage: 's1_lead',
+            probability: 10,
+            country: 'FR',
+            valueMicros: 123_456_789n,
+          },
+          {
+            orgId: orgId!,
+            code: `OP-${suffix}2`,
+            customer: 'Precision Co B',
+            name: 'Precision fixture B',
+            stage: 's1_lead',
+            probability: 20,
+            country: 'FR',
+            valueMicros: 987_654_321n,
+          },
+        ],
+      });
+      expect(created.count).toBe(2);
+
+      try {
+        const res = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as { totals: { totalValueMicros: number } };
+        // Exact BigInt sum, independent of the route's own arithmetic.
+        expect(body.totals.totalValueMicros - baseline).toBe(123_456_789 + 987_654_321);
+      } finally {
+        await prisma.opportunity.deleteMany({
+          where: { orgId: orgId!, code: { in: [`OP-${suffix}1`, `OP-${suffix}2`] } },
+        });
+      }
+    },
+  );
 });
 
 describe('forecast owner scoping', () => {

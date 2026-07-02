@@ -6,7 +6,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -16,6 +16,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 import { mintNextCode } from './opportunities.helpers.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
@@ -52,13 +53,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or isolated org missing`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('opportunities routes', () => {
   skipIfNoDb('GET /api/opportunities returns the seeded fixtures', async () => {
@@ -266,6 +261,95 @@ describe('opportunities routes', () => {
   });
 
   skipIfNoDb(
+    'POST /api/opportunities/:id/stage notifies the owner when a different actor moves it',
+    async () => {
+      // The stub actor resolves to the isolated org's Admin (oldest user) — a
+      // second, distinct user proves the notification reaches the OWNER, not
+      // the actor performing the move.
+      const owner = await prisma.user.create({
+        data: {
+          orgId: orgId!,
+          clerkUser: `u_stage_owner_${Date.now()}`,
+          email: `stage-owner-${Date.now()}@t.local`,
+          name: 'Stage Owner',
+        },
+      });
+      const opp = await prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-STAGE-${Date.now()}`,
+          customer: 'Stage Notify Co',
+          name: 'Stage notify fixture',
+          stage: 's1_lead',
+          probability: 10,
+          ownerId: owner.id,
+        },
+      });
+      try {
+        const move = await server.inject({
+          method: 'POST',
+          url: `/api/opportunities/${opp.id}/stage`,
+          payload: { stage: 's2_sent' },
+        });
+        expect(move.statusCode).toBe(200);
+
+        const notif = await prisma.notification.findFirst({
+          where: { orgId: orgId!, userId: owner.id, entityType: 'opportunity', entityId: opp.id },
+        });
+        expect(notif).toMatchObject({ type: 'stage_change', userId: owner.id });
+      } finally {
+        await prisma.notification.deleteMany({ where: { entityId: opp.id } });
+        await prisma.opportunity.delete({ where: { id: opp.id } }).catch(() => undefined);
+        await prisma.user.delete({ where: { id: owner.id } }).catch(() => undefined);
+      }
+    },
+  );
+
+  skipIfNoDb(
+    'POST /api/opportunities/:id/stage does not self-notify when the owner moves their own card',
+    async () => {
+      // The stub actor IS the isolated org's Admin — owning the opp here means
+      // actor === owner, so the "someone else" guard must suppress the alert.
+      const adminId = await prisma.user
+        .findFirstOrThrow({ where: { orgId: orgId! }, orderBy: { createdAt: 'asc' } })
+        .then((u) => u.id);
+      const opp = await prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-STAGE-SELF-${Date.now()}`,
+          customer: 'Self Move Co',
+          name: 'Self-notify guard fixture',
+          stage: 's1_lead',
+          probability: 10,
+          ownerId: adminId,
+        },
+      });
+      try {
+        const move = await server.inject({
+          method: 'POST',
+          url: `/api/opportunities/${opp.id}/stage`,
+          payload: { stage: 's2_sent' },
+        });
+        expect(move.statusCode).toBe(200);
+
+        const notif = await prisma.notification.findFirst({
+          where: {
+            orgId: orgId!,
+            userId: adminId,
+            entityType: 'opportunity',
+            entityId: opp.id,
+            type: 'stage_change',
+          },
+        });
+        expect(notif).toBeNull();
+      } finally {
+        await prisma.notification.deleteMany({ where: { entityId: opp.id } });
+        await prisma.opportunity.delete({ where: { id: opp.id } }).catch(() => undefined);
+      }
+    },
+  );
+
+  skipIfNoDb(
     'DELETE /api/opportunities/:id soft-deletes the record and writes an audit_log entry',
     async () => {
       // Create a throwaway fixture — deleting a seeded record would break the
@@ -310,6 +394,126 @@ describe('opportunities routes', () => {
       });
     },
   );
+
+  skipIfNoDb(
+    'PATCH /api/opportunities/:id enforces optimistic concurrency via expectedUpdatedAt',
+    async () => {
+      // WHY: without a concurrency token, two people editing the same bid are
+      // last-write-wins — the loser's fields vanish silently. The token is
+      // opt-in so legacy clients keep working, but when supplied a stale one
+      // must 409, never overwrite.
+      const list = (
+        await server.inject({ method: 'GET', url: '/api/opportunities?limit=1' })
+      ).json();
+      const id = list.items[0].id as string;
+      const detail = (await server.inject({ method: 'GET', url: `/api/opportunities/${id}` })).json();
+      const loadedUpdatedAt = detail.updatedAt as string;
+
+      // Fresh token → accepted.
+      const first = await server.inject({
+        method: 'PATCH',
+        url: `/api/opportunities/${id}`,
+        payload: { probability: 42, expectedUpdatedAt: loadedUpdatedAt },
+      });
+      expect(first.statusCode).toBe(200);
+
+      // Same token again is now stale (first PATCH bumped updatedAt) → 409.
+      const stale = await server.inject({
+        method: 'PATCH',
+        url: `/api/opportunities/${id}`,
+        payload: { probability: 43, expectedUpdatedAt: loadedUpdatedAt },
+      });
+      expect(stale.statusCode).toBe(409);
+      // The stale write must NOT have been applied.
+      const after = (await server.inject({ method: 'GET', url: `/api/opportunities/${id}` })).json();
+      expect(after.probability).toBe(42);
+
+      // No token → legacy last-write-wins behavior preserved.
+      const legacy = await server.inject({
+        method: 'PATCH',
+        url: `/api/opportunities/${id}`,
+        payload: { probability: 44 },
+      });
+      expect(legacy.statusCode).toBe(200);
+    },
+  );
+
+  // A1 (bid clock): dueWithinDays / overdue power the "Due ≤ 7d" and
+  // "Overdue" list chips plus the dashboard "Closing this week" strip.
+  // WHY this exact boundary matters: a bid due in 3 days must appear so a
+  // lead can act on it; a bid due in 30 days must NOT appear in the 7-day
+  // window, or the filter is worthless noise that hides real urgency.
+  skipIfNoDb('GET /api/opportunities?dueWithinDays=7 returns near-term rows and excludes far-out ones', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const now = new Date();
+    const in3Days = new Date(now.getTime() + 3 * 86_400_000);
+    const in30Days = new Date(now.getTime() + 30 * 86_400_000);
+    const yesterday = new Date(now.getTime() - 1 * 86_400_000);
+
+    const [dueSoon, dueFar, overdue] = await prisma.$transaction([
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-DUE3-${suffix}`,
+          customer: 'Due Window Test',
+          name: 'Due in 3 days',
+          stage: 's2_sent',
+          probability: 40,
+          dueDate: in3Days,
+        },
+      }),
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-DUE30-${suffix}`,
+          customer: 'Due Window Test',
+          name: 'Due in 30 days',
+          stage: 's2_sent',
+          probability: 40,
+          dueDate: in30Days,
+        },
+      }),
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-OVERDUE-${suffix}`,
+          customer: 'Due Window Test',
+          name: 'Overdue yesterday',
+          stage: 's2_sent',
+          probability: 40,
+          dueDate: yesterday,
+        },
+      }),
+    ]);
+
+    try {
+      const withinRes = await server.inject({
+        method: 'GET',
+        url: '/api/opportunities?dueWithinDays=7&limit=100',
+      });
+      expect(withinRes.statusCode).toBe(200);
+      const withinIds = withinRes.json<{ items: Array<{ id: string }> }>().items.map((i) => i.id);
+      expect(withinIds).toContain(dueSoon.id);
+      expect(withinIds).not.toContain(dueFar.id);
+      // Overdue rows are strictly before the window's start (today), not
+      // inside [today, today+7] — they must not leak into the "due soon" list.
+      expect(withinIds).not.toContain(overdue.id);
+
+      const overdueRes = await server.inject({
+        method: 'GET',
+        url: '/api/opportunities?overdue=true&limit=100',
+      });
+      expect(overdueRes.statusCode).toBe(200);
+      const overdueIds = overdueRes.json<{ items: Array<{ id: string }> }>().items.map((i) => i.id);
+      expect(overdueIds).toContain(overdue.id);
+      expect(overdueIds).not.toContain(dueSoon.id);
+      expect(overdueIds).not.toContain(dueFar.id);
+    } finally {
+      await prisma.opportunity.deleteMany({
+        where: { id: { in: [dueSoon.id, dueFar.id, overdue.id] } },
+      });
+    }
+  });
 });
 
 describe('contacts + tasks + reports routes', () => {

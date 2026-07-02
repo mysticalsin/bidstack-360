@@ -37,7 +37,11 @@ const BID_WORTHY_CRITERIA = {
 // All 2s → composite 40 → recommendation 'no_bid' (below the 50 floor).
 const BELOW_THRESHOLD_CRITERIA = Object.fromEntries(BID_CRITERIA.map((c) => [c.id, 2]));
 
-describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
+// WHY plain describe (not describe.skipIf(!DATABASE_URL)): skipIf marks the
+// whole suite "skipped" in vitest's report — a CI run without the env var set
+// would go green with zero bid-score coverage. buildServer() below throws in
+// beforeAll when the DB is unreachable, which fails the suite loudly instead.
+describe('bid-score routes', () => {
   let server: FastifyInstance;
   const foreignOrgIds: string[] = [];
   const foreignOpportunityIds: string[] = [];

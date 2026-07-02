@@ -92,7 +92,7 @@ vi.mock('../lib/outbound-communication-guard.js', () => ({
   reserveOutboundCommunication: mocks.reserveOutboundCommunication,
 }));
 
-import { sendEmail } from './email-integration.service.js';
+import { pullEmails, sendEmail } from './email-integration.service.js';
 import { postMessage } from './slack.service.js';
 import { sendSms } from './twilio-sms.service.js';
 
@@ -258,6 +258,25 @@ describe('API connector SERUM egress gates', () => {
     expect(mocks.getAccessToken).not.toHaveBeenCalled();
     expect(mocks.sendViaGmail).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  // WHY this test: IntegrationToken rows carry OAuth access/refresh secrets.
+  // pullEmails() must scope its lookup by { id, orgId } so a tokenId leaked or
+  // guessed from another tenant can never resolve to a foreign org's token and
+  // get decrypted — this is a cross-tenant OAuth token disclosure risk.
+  it('does not decrypt or pull when the integration token id belongs to another org', async () => {
+    // Simulates the org-scoped lookup finding no row: the token with this id
+    // exists, but not for this orgId, so findFirst({ where: { id, orgId } })
+    // correctly returns null instead of leaking the other org's row.
+    mocks.integrationFindFirst.mockResolvedValueOnce(null);
+
+    await pullEmails({ orgId, userId, integrationTokenId: 'token-1' }, log);
+
+    expect(mocks.integrationFindFirst).toHaveBeenCalledWith({
+      where: { id: 'token-1', orgId },
+    });
+    expect(mocks.getAccessToken).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

@@ -159,9 +159,9 @@ export async function persistUpdate(
   // Inline compaction when the update count crosses the threshold.
   // WHY inline rather than always deferring to the background job:
   //   prevents unbounded row growth between 6-hour job windows.
-  const count = await prisma.yjsUpdate.count({ where: { ydocId } });
+  const count = await prisma.yjsUpdate.count({ where: { ydocId, orgId } });
   if (count >= 100) {
-    compactDocInline(ydocId).catch((err: unknown) => {
+    compactDocInline(ydocId, orgId).catch((err: unknown) => {
       logger.error({ ydocId, err }, 'inline yjs compaction failed');
     });
   }
@@ -190,15 +190,18 @@ export async function getUpdatesSince(
  * compare-and-swap on YjsDocument.version, so a stale merge aborts instead of
  * blind-overwriting (which could lose a collaborative edit). (Review finding.)
  */
-export async function compactDoc(ydocId: string): Promise<void> {
-  await compactDocInline(ydocId);
+export async function compactDoc(ydocId: string, orgId: string): Promise<void> {
+  await compactDocInline(ydocId, orgId);
 }
 
 // ─── Internal ──────────────────────────────────────────────────────────────
 
-async function compactDocInline(ydocId: string): Promise<void> {
-  const existing = await prisma.yjsDocument.findUnique({
-    where: { id: ydocId },
+// orgId is required (not just for the where-clause) so a caller with a
+// forged/mistaken ydocId scoped to another org's document gets a clean no-op
+// (existing === null) instead of compacting cross-tenant collaborative data.
+async function compactDocInline(ydocId: string, orgId: string): Promise<void> {
+  const existing = await prisma.yjsDocument.findFirst({
+    where: { id: ydocId, orgId },
     include: { updates: { orderBy: { createdAt: 'asc' } } },
   });
 
@@ -223,12 +226,12 @@ async function compactDocInline(ydocId: string): Promise<void> {
     // Compare-and-swap on version — abort (don't delete the updates) if another
     // compaction wrote the snapshot since our read, so no edit is lost.
     const swapped = await tx.yjsDocument.updateMany({
-      where: { id: ydocId, version: existing.version },
+      where: { id: ydocId, orgId, version: existing.version },
       data: { ydocBinary: encrypt(Buffer.from(mergedUpdate)), version: { increment: 1 } },
     });
     if (swapped.count !== 1) return 0;
     // Delete only the rows we merged — not any that arrived concurrently.
-    await tx.yjsUpdate.deleteMany({ where: { id: { in: updateIds } } });
+    await tx.yjsUpdate.deleteMany({ where: { id: { in: updateIds }, orgId } });
     return updateIds.length;
   });
 

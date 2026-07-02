@@ -66,11 +66,14 @@ export async function sendEmail(
   params: GraphSendEmailParams,
   log: ServiceLogger,
 ): Promise<{ messageId: string }> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: params.integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): prevents a
+  // forged/cross-tenant tokenId from resolving to another org's token row —
+  // see MISTAKES.md cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: params.integrationTokenId, orgId: params.orgId },
   });
 
-  if (!token || token.orgId !== params.orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     throw new Error('Integration token not found or not active');
   }
 
@@ -215,11 +218,13 @@ export async function pullIncrementalSync(
   }: { orgId: string; userId: string; integrationTokenId: string },
   log: ServiceLogger,
 ): Promise<{ persisted: number }> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: integrationTokenId },
+  // WHY findFirst + orgId in where: see sendEmail() above — never resolve an
+  // IntegrationToken by bare id across tenants.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: integrationTokenId, orgId },
   });
 
-  if (!token || token.orgId !== orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     log.warn({ integrationTokenId }, 'Skipping Graph pull: token inactive');
     return { persisted: 0 };
   }

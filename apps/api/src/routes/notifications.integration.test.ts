@@ -7,7 +7,7 @@
 //     else's notification read).
 // Pattern mirrors cross-sell.integration.test.ts: buildServer + inject against
 // an isolated org; every fixture cleaned up in afterAll.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -17,6 +17,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -54,13 +55,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !stubUserId) {
-      throw new Error(`[skip] ${name} - DB/isolated org/user unavailable`);
-    }
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId && !!stubUserId);
 
 describe('notifications routes', () => {
   t(
@@ -161,5 +156,56 @@ describe('notifications routes', () => {
       await prisma.notification.deleteMany({ where: { userId: other.id } });
       await prisma.user.delete({ where: { id: other.id } });
     }
+  });
+});
+
+describe('notification prefs routes', () => {
+  afterAll(async () => {
+    if (stubUserId) await prisma.notificationPref.deleteMany({ where: { userId: stubUserId! } });
+  });
+
+  t('GET returns the shared defaults when no row exists yet', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/notifications/prefs' });
+    expect(res.statusCode).toBe(200);
+    // WHY this must match DEFAULT_NOTIFICATION_PREFS exactly: an absent row
+    // must read identically to what a fresh user actually receives — the API
+    // contract the web NotificationPrefsSection toggles render against.
+    expect(res.json()).toEqual({
+      emailDigest: true,
+      mentionPush: true,
+      taskDueSoon: true,
+      dealStageChange: false,
+    });
+  });
+
+  t('PUT persists the toggles server-side, so a follow-up GET reflects them', async () => {
+    const put = await server.inject({
+      method: 'PUT',
+      url: '/api/notifications/prefs',
+      payload: { emailDigest: false, mentionPush: false, taskDueSoon: false, dealStageChange: true },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).toMatchObject({ taskDueSoon: false, dealStageChange: true });
+
+    // Proves this is server-persisted (not the old localStorage-only toggle) —
+    // a fresh GET on the same account must see the write.
+    const after = await server.inject({ method: 'GET', url: '/api/notifications/prefs' });
+    expect(after.json()).toEqual({
+      emailDigest: false,
+      mentionPush: false,
+      taskDueSoon: false,
+      dealStageChange: true,
+    });
+  });
+
+  t('PUT upserts — a second write on an existing row updates it, not duplicates it', async () => {
+    await server.inject({
+      method: 'PUT',
+      url: '/api/notifications/prefs',
+      payload: { emailDigest: true, mentionPush: true, taskDueSoon: true, dealStageChange: false },
+    });
+    const rows = await prisma.notificationPref.findMany({ where: { userId: stubUserId! } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ taskDueSoon: true, dealStageChange: false });
   });
 });

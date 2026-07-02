@@ -8,6 +8,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 
+import { getEnv } from './env.js';
 import { realtimeRoutes } from './routes/realtime.js';
 import { auditLogsRoutes } from './routes/audit-logs.js';
 import { collaborationRoutes } from './routes/collaboration.js';
@@ -184,17 +185,23 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(dustCredentialsRoutes, { prefix: '/api/v1/integrations' });
   await server.register(agentProviderCredentialsRoutes, { prefix: '/api/v1/integrations' });
   await server.register(dataProviderCredentialsRoutes, { prefix: '/api/v1/integrations' });
-  await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
+  // ERP_ENABLED gates the whole ERP MCP surface off by default: v0.1 shares ONE
+  // global ERP connection across every org in the deployment (see
+  // routes/erp-integration.ts header), so it must stay opt-in until a
+  // per-org connection model ships.
+  if (getEnv().ERP_ENABLED === 'true') {
+    await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
 
-  // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
-  server.get('/api/v1/integrations/odoo/*', async (req, reply) => {
-    const target = req.url.replace('/odoo/', '/erp/');
-    return reply.redirect(target, 307);
-  });
-  server.post('/api/v1/integrations/odoo/*', async (req, reply) => {
-    const target = req.url.replace('/odoo/', '/erp/');
-    return reply.redirect(target, 307);
-  });
+    // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
+    server.get('/api/v1/integrations/odoo/*', async (req, reply) => {
+      const target = req.url.replace('/odoo/', '/erp/');
+      return reply.redirect(target, 307);
+    });
+    server.post('/api/v1/integrations/odoo/*', async (req, reply) => {
+      const target = req.url.replace('/odoo/', '/erp/');
+      return reply.redirect(target, 307);
+    });
+  }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
   await server.register(territoryRoutes, { prefix: '/api/v1' });

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -10,6 +10,7 @@ import {
   dropIsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 const {
   enqueueCrewRunMock,
@@ -41,6 +42,8 @@ let dbReachable = false;
 let orgId: string | null = null;
 let userId: string | null = null;
 let restoreAuth: (() => void) | undefined;
+let previousStubRoleHeader: string | undefined;
+const ADMIN_HEADERS = { 'x-bidstack-e2e-role': 'admin' };
 
 const createdCrewIds: string[] = [];
 const createdRunIds: string[] = [];
@@ -65,6 +68,8 @@ beforeEach(() => {
 });
 
 beforeAll(async () => {
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -118,17 +123,14 @@ afterAll(async () => {
     if (orgId) await dropIsolatedOrg(orgId);
     await prisma.$disconnect();
   }
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
+  }
 }, 60_000);
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !userId) {
-      throw new Error(
-        `[skip] ${name} - DATABASE_URL, isolated org, or isolated user not reachable`,
-      );
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId && !!userId);
 
 async function createCrew(targetOrgId = orgId!, targetUserId: string | null = userId!) {
   const rows = await prisma.$queryRaw<{ id: string }[]>`
@@ -211,6 +213,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
     });
 
@@ -243,6 +246,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
     });
 
@@ -278,6 +282,7 @@ describe('crew run controls', () => {
     const blocked = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' } },
     });
     expect(blocked.statusCode).toBe(409);
@@ -286,6 +291,7 @@ describe('crew run controls', () => {
     const allowed = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
     });
     expect(allowed.statusCode).toBe(202);
@@ -311,6 +317,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/cancel`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(200);
@@ -329,6 +336,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/cancel`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(409);
@@ -344,6 +352,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/retry`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(202);
@@ -373,6 +382,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/cancel`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(404);

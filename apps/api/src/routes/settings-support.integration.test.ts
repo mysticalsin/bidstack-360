@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -24,13 +25,10 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-describe('settings support routes', () => {
-  it('loads bounded admin support data used by Settings', async () => {
-    if (!dbReachable) {
-      console.warn('[skip] settings support routes - DATABASE_URL not reachable');
-      return;
-    }
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
+describe('settings support routes', () => {
+  skipIfNoDb('loads bounded admin support data used by Settings', async () => {
     const leadRot = await server.inject({ method: 'GET', url: '/api/lead-rot/config' });
     expect(leadRot.statusCode).toBe(200);
     expect(leadRot.json()).toMatchObject({

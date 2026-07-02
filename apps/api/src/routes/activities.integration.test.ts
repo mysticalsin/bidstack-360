@@ -10,7 +10,11 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 
-describe.skipIf(!process.env.DATABASE_URL)('activity routes', () => {
+// WHY plain describe (not describe.skipIf(!DATABASE_URL)): skipIf marks the
+// whole suite "skipped" — a CI run missing the env var would go green with
+// zero activity-route coverage. skipIfNoSeed below already throws loudly when
+// the DB/fixtures aren't there, so the suite fails instead of vanishing.
+describe('activity routes', () => {
   let server: FastifyInstance | null = null;
   let dbReachable = false;
   let orgId: string | null = null;

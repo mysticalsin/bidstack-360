@@ -13,6 +13,7 @@ const COMPLETE_PRODUCTION_ENV = {
   PUBLIC_BASE_URL: 'https://crm.example.com',
   REDIS_URL: 'redis://:test@redis:6379',
   BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
+  BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
 };
 
 function restoreEnv(): void {
@@ -134,6 +135,7 @@ describe('boot environment validation', () => {
       DEMO_MODE: 'true',
       DEMO_SESSION_SECRET: 'demo-session-secret',
       BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
+      BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
     };
 
     await expect(loadEnvWith(productionDemo)).rejects.toThrow(
@@ -205,5 +207,21 @@ describe('boot environment validation', () => {
 
     expect(env.STORAGE_DRIVER).toBe('s3');
     expect(env.S3_BUCKET).toBe('bidstack-prod-files');
+  });
+
+  it('requires the tenant-scope guard set to warn or enforce in production', async () => {
+    // BIDSTACK_TENANT_SCOPE_GUARD defaults 'off' for backward compatibility, but
+    // an unscoped tenant-table query in production is an all-tenants data leak
+    // (see packages/db/src/middleware/tenant-scope-guard.ts) — boot must fail
+    // loud rather than silently run unguarded.
+    await expect(
+      loadEnvWith({ ...COMPLETE_PRODUCTION_ENV, BIDSTACK_TENANT_SCOPE_GUARD: undefined }),
+    ).rejects.toThrow("BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production");
+
+    const env = await loadEnvWith({
+      ...COMPLETE_PRODUCTION_ENV,
+      BIDSTACK_TENANT_SCOPE_GUARD: 'warn',
+    });
+    expect(env.BIDSTACK_TENANT_SCOPE_GUARD).toBe('warn');
   });
 });

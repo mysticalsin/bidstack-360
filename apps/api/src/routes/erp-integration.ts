@@ -6,7 +6,10 @@
 // Multi-tenancy note: v0.1 ships with a single global ERP connection
 // (ERP_MCP_URL + the credentials baked into the sidecar). Per-org ERP
 // instances are tracked as a follow-up; for now every org in this BIDCRM
-// deployment sees the same ERP backend.
+// deployment sees the same ERP backend. Because of that shared-backend risk,
+// registration of this whole route surface is opt-in via ERP_ENABLED
+// (apps/api/src/env.ts, default false) and every route additionally gates on
+// the integrations:read RBAC permission (apps/api/src/server.routes.ts).
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -153,45 +156,55 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
   }
 
   // GET /api/integrations/erp/status
-  server.get('/erp/status', { schema: { response: { 200: ErpStatus } } }, async (req) => {
-    const url = process.env.ERP_MCP_URL ?? process.env.ODOO_MCP_URL ?? null;
-    const database = process.env.ERP_DB ?? process.env.ODOO_DB ?? null;
-    const client = getClient();
-    if (!client) {
-      return { configured: false, url, database, reachable: false, toolCount: null, lastError: null };
-    }
-    const decision = await checkErpConnector(req, 'erp.status', { connectionTestProbe: true });
-    if (!decision.allowed) {
-      return {
-        configured: true,
-        url,
-        database,
-        reachable: false,
-        toolCount: null,
-        lastError: `SERUM connector policy denied: ${decision.reason}`,
-      };
-    }
-    try {
-      const tools = await client.listTools();
-      await recordSerumConnectorConnectionTest({
-        orgId: req.auth.orgId,
-        environment: defaultSerumConfigEnvironment(),
-        connectorId: 'odoo',
-        operation: 'erp.status',
-        testedByUserId: req.auth.userId,
-        evidence: { toolCount: tools.length, database },
-      });
-      return { configured: true, url, database, reachable: true, toolCount: tools.length, lastError: null };
-    } catch (err) {
-      req.log.warn({ err }, 'erp status probe failed');
-      return { configured: true, url, database, reachable: false, toolCount: null, lastError: safeErrorMessage(err) };
-    }
-  });
+  server.get(
+    '/erp/status',
+    {
+      preHandler: server.requirePermission('integrations:read'),
+      schema: { response: { 200: ErpStatus } },
+    },
+    async (req) => {
+      const url = process.env.ERP_MCP_URL ?? process.env.ODOO_MCP_URL ?? null;
+      const database = process.env.ERP_DB ?? process.env.ODOO_DB ?? null;
+      const client = getClient();
+      if (!client) {
+        return { configured: false, url, database, reachable: false, toolCount: null, lastError: null };
+      }
+      const decision = await checkErpConnector(req, 'erp.status', { connectionTestProbe: true });
+      if (!decision.allowed) {
+        return {
+          configured: true,
+          url,
+          database,
+          reachable: false,
+          toolCount: null,
+          lastError: `SERUM connector policy denied: ${decision.reason}`,
+        };
+      }
+      try {
+        const tools = await client.listTools();
+        await recordSerumConnectorConnectionTest({
+          orgId: req.auth.orgId,
+          environment: defaultSerumConfigEnvironment(),
+          connectorId: 'odoo',
+          operation: 'erp.status',
+          testedByUserId: req.auth.userId,
+          evidence: { toolCount: tools.length, database },
+        });
+        return { configured: true, url, database, reachable: true, toolCount: tools.length, lastError: null };
+      } catch (err) {
+        req.log.warn({ err }, 'erp status probe failed');
+        return { configured: true, url, database, reachable: false, toolCount: null, lastError: safeErrorMessage(err) };
+      }
+    },
+  );
 
   // GET /api/integrations/erp/presales-kit
   server.get(
     '/erp/presales-kit',
-    { schema: { response: { 200: ErpPresalesKit } } },
+    {
+      preHandler: server.requirePermission('integrations:read'),
+      schema: { response: { 200: ErpPresalesKit } },
+    },
     async (req) => {
       const client = getClient();
       if (!client) {
@@ -219,7 +232,10 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/integrations/erp/company-autocomplete
   server.get(
     '/erp/company-autocomplete',
-    { schema: { querystring: CompanyAutocompleteQuery, response: { 200: ErpCompanyAutocompleteResponse } } },
+    {
+      preHandler: server.requirePermission('integrations:read'),
+      schema: { querystring: CompanyAutocompleteQuery, response: { 200: ErpCompanyAutocompleteResponse } },
+    },
     async (req) => {
       const warnings: string[] = [];
       const client = getClient();
@@ -264,7 +280,10 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/integrations/erp/models
   server.get(
     '/erp/models',
-    { schema: { response: { 200: z.object({ items: z.unknown() }) } } },
+    {
+      preHandler: server.requirePermission('integrations:read'),
+      schema: { response: { 200: z.object({ items: z.unknown() }) } },
+    },
     async (req) => {
       const client = getClient();
       if (!client) throw server.httpErrors.serviceUnavailable('ERP MCP not configured');
@@ -283,7 +302,14 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
   // POST /api/integrations/erp/search
   server.post(
     '/erp/search',
-    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } }, schema: { body: SearchBody, response: { 200: z.object({ rows: z.unknown() }) } } },
+    {
+      // Read-only proxy (searchRecords queries ERP; no BidStack or ERP mutation
+      // in this file), so it gates on integrations:read like every other route
+      // here despite the POST verb (chosen for the structured query body).
+      preHandler: server.requirePermission('integrations:read'),
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      schema: { body: SearchBody, response: { 200: z.object({ rows: z.unknown() }) } },
+    },
     async (req) => {
       const client = getClient();
       if (!client) throw server.httpErrors.serviceUnavailable('ERP MCP not configured');
@@ -302,7 +328,10 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/integrations/erp/:model/:id
   server.get(
     '/erp/:model/:id',
-    { schema: { params: RecordParams, response: { 200: z.object({ record: z.unknown() }) } } },
+    {
+      preHandler: server.requirePermission('integrations:read'),
+      schema: { params: RecordParams, response: { 200: z.object({ record: z.unknown() }) } },
+    },
     async (req) => {
       const client = getClient();
       if (!client) throw server.httpErrors.serviceUnavailable('ERP MCP not configured');
