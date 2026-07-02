@@ -21,6 +21,7 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   assignment: 'target',
   bid_override: 'shield',
   stage_change: 'growth',
+  task_due: 'clock',
   system: 'info',
 };
 

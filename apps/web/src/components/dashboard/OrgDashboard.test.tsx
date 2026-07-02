@@ -31,6 +31,7 @@ vi.mock('./widgets/GettingStarted', () => ({
 }));
 vi.mock('./widgets/KpiRow', () => ({ KpiRow: () => <div data-testid="kpi-row" /> }));
 vi.mock('./widgets/InsightsBar', () => ({ InsightsBar: () => <div /> }));
+vi.mock('./widgets/ClosingThisWeekCard', () => ({ ClosingThisWeekCard: () => <div /> }));
 vi.mock('./widgets/PipelineCard', () => ({ PipelineCard: () => <div /> }));
 vi.mock('./widgets/PipelineByStageMini', () => ({ PipelineByStageMini: () => <div /> }));
 vi.mock('./widgets/AlertCard', () => ({ AlertCard: () => <div /> }));

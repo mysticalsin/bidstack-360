@@ -17,56 +17,23 @@ import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportun
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { springModal } from '@/lib/motion';
 import { cn } from '@/lib/cn';
-
-type Entity = 'opportunity' | 'task' | 'contact' | 'note';
-
-type Option = { key: Entity; label: string; hint: string; description: string };
-
-// `key` and `hint` are logic values (map keys + keyboard shortcuts) and stay
-// untranslated; only the prose `label`/`description` are externalized.
-const buildOptions = (t: (key: string, defaultValue: string) => string): Option[] => [
-  {
-    key: 'opportunity',
-    label: t('quickAddMenu.option.opportunity.label', 'New opportunity'),
-    hint: 'O',
-    description: t('quickAddMenu.option.opportunity.description', 'Add a bid to the pipeline.'),
-  },
-  {
-    key: 'task',
-    label: t('quickAddMenu.option.task.label', 'New task'),
-    hint: 'T',
-    description: t(
-      'quickAddMenu.option.task.description',
-      'Create a follow-up, optionally linked to an opp.',
-    ),
-  },
-  {
-    key: 'contact',
-    label: t('quickAddMenu.option.contact.label', 'New contact'),
-    hint: 'C',
-    description: t('quickAddMenu.option.contact.description', 'Add a decision-maker.'),
-  },
-  {
-    key: 'note',
-    label: t('quickAddMenu.option.note.label', 'New note'),
-    hint: 'M',
-    description: t(
-      'quickAddMenu.option.note.description',
-      'Drop a thought on the current account.',
-    ),
-  },
-];
+import { useQuickAddStore } from '@/stores/quickAdd';
+import { buildQuickAddOptions, chooseQuickAdd, type QuickAddEntity } from './quickAddOptions';
 
 export function QuickAddMenu() {
   const { t } = useTranslation('crm');
-  const [open, setOpen] = useState(false);
-  // After choosing, mount the matching dialog. Cleared when the dialog closes.
-  const [pick, setPick] = useState<Entity | null>(null);
+  // `open`/`pick` live in the shared store (not local state) so the command
+  // palette's ⌘K "Create" group can set `pick` directly and reach the same
+  // dialogs this menu renders below — see quickAddOptions.ts.
+  const open = useQuickAddStore((s) => s.menuOpen);
+  const setOpen = useQuickAddStore((s) => s.setMenuOpen);
+  const pick = useQuickAddStore((s) => s.pick);
+  const setPick = useQuickAddStore((s) => s.setPick);
   const [activeIdx, setActiveIdx] = useState(0);
   const reduced = useReducedMotion();
   const navigate = useNavigate();
   const listboxRef = useRef<HTMLDivElement>(null);
-  const OPTIONS = buildOptions(t);
+  const OPTIONS = buildQuickAddOptions(t);
 
   // Global keybinding: `N` opens the menu (when not typing in a field). This
   // mirrors Linear/Notion's "new record" shortcut.
@@ -83,18 +50,15 @@ export function QuickAddMenu() {
     };
     window.addEventListener('keydown', handler as never, true);
     return () => window.removeEventListener('keydown', handler as never, true);
-  }, []);
+    // `setOpen` now comes from the shared zustand store instead of local
+    // useState — its identity is stable across renders (store actions are
+    // created once in stores/quickAdd.ts), so listing it here is safe and
+    // doesn't cause the listener to be re-attached on every render.
+  }, [setOpen]);
 
-  const choose = (entity: Entity) => {
-    setOpen(false);
-    if (entity === 'note') {
-      // We don't have a global "note" dialog yet — notes live per-account.
-      // Send the user to a known account they can attach a note to.
-      navigate('/accounts/mantu');
-      return;
-    }
-    setPick(entity);
-  };
+  // Delegates to the shared helper (see quickAddOptions.ts) so this menu and
+  // the command palette's "Create" group make the exact same choice.
+  const choose = (entity: QuickAddEntity) => chooseQuickAdd(entity, navigate);
 
   return (
     <>

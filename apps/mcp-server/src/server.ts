@@ -50,6 +50,24 @@ const MAX_SESSIONS = 500;
 /** Evict sessions still open beyond this age (handles unclean client disconnects). */
 const SESSION_TTL_MS = 2 * 60 * 60 * 1_000; // 2 hours
 
+function releaseMetadata(env: NodeJS.ProcessEnv = process.env): {
+  commit: string | null;
+  branch: string | null;
+} {
+  return {
+    commit:
+      env.BIDSTACK_RELEASE_COMMIT?.trim() ||
+      env.GIT_COMMIT?.trim() ||
+      env.GIT_SHA?.trim() ||
+      null,
+    branch:
+      env.BIDSTACK_RELEASE_BRANCH?.trim() ||
+      env.GIT_BRANCH?.trim() ||
+      env.VERCEL_GIT_COMMIT_REF?.trim() ||
+      null,
+  };
+}
+
 function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
   const mcp = new McpServer({ name: 'BidStack 360', version: '0.1.0' });
 
@@ -143,6 +161,7 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
       name: 'bidstack-mcp',
       db: dbOk ? 'up' : 'down',
       redis: redisOk ? 'up' : 'down',
+      release: releaseMetadata(),
     };
     return ok ? body : reply.code(503).send(body);
   });
@@ -151,6 +170,7 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
     name: 'BidStack 360',
     vendor: 'Mantu',
     version: '0.1.0',
+    release: releaseMetadata(),
     transport: 'streamable-http',
     endpoints: {
       mcp: '/mcp',

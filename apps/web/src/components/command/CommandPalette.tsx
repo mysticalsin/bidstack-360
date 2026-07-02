@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
 
-import { findDirectNavTarget, groupTag, type Item } from './commandPaletteUtils';
+import { groupAriaLabel, groupItemsByRun, groupTag, type Item } from './commandPaletteUtils';
 import { usePaletteItems } from './usePaletteItems';
 
 // ── Public component ─────────────────────────────────────────────────────────
@@ -83,9 +83,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   // queryRef is a stable ref to the current query — used in the document
   // keydown handler (closure captures the ref, not the stale state value).
   const queryRef = useRef('');
-  const listRef = useRef<HTMLUListElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  const { items, isFetching, selectNavTarget } = usePaletteItems(query, onClose);
+  const { items, isFetching, selectNavTarget, findDirectNavTarget } = usePaletteItems(
+    query,
+    onClose,
+  );
 
   // Focus the input immediately on mount — both sync (for standard focus) and
   // deferred one frame (for portals that mount slightly after the effect runs).
@@ -116,7 +119,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
 
   // Activate focused list item with Enter / Space for screen-reader users
   // who arrow directly into the listbox via VoiceOver/JAWS gestures.
-  const handleItemKeyDown = (e: KeyboardEvent<HTMLLIElement>, item: Item) => {
+  const handleItemKeyDown = (e: KeyboardEvent<HTMLDivElement>, item: Item) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       item.onSelect();
@@ -183,7 +186,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               setActiveIdx((i) => Math.max(0, i - 1));
             } else if (e.key === 'Enter') {
               e.preventDefault();
-              const directRoute = findDirectNavTarget(queryRef.current || e.currentTarget.value);
+              const directRoute = findDirectNavTarget(
+                queryRef.current || e.currentTarget.value,
+              );
               if (directRoute) {
                 selectNavTarget(directRoute);
                 return;
@@ -207,70 +212,94 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         </kbd>
       </div>
 
-      <ul ref={listRef} id="cmdk-list" role="listbox" className="max-h-[60vh] overflow-y-auto py-2">
+      <div
+        ref={listRef}
+        id="cmdk-list"
+        role="listbox"
+        className="max-h-[60vh] overflow-y-auto py-2"
+      >
         {items.length === 0 ? (
-          <li className="px-4 py-6 text-center text-xs text-[var(--fg-tertiary)]">
+          <div className="px-4 py-6 text-center text-xs text-[var(--fg-tertiary)]">
             {isFetching
               ? t('commandPalette.searching', 'Searching…')
               : t('commandPalette.noMatches', 'No matches.')}
-          </li>
+          </div>
         ) : null}
-        {items.map((item, i) => {
-          const active = i === safeIdx;
-          return (
-            <li
-              id={`cmdk-option-${i}`}
-              key={item.id}
-              data-cmdk-idx={i}
-              role="option"
-              aria-selected={active}
-              tabIndex={active ? 0 : -1}
-              onMouseEnter={() => setActiveIdx(i)}
-              onClick={item.onSelect}
-              onKeyDown={(e) => handleItemKeyDown(e, item)}
-              // min-h-11 keeps touch targets ≥ 44px (WCAG 2.5.5 AA)
-              className="relative flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg mx-2 my-0.5 bg-transparent z-10"
-            >
-              {active && (
-                <motion.div
-                  layoutId="command-palette-highlight"
-                  className="absolute inset-0 bg-[var(--surface-hover)] rounded-lg -z-10"
-                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                />
-              )}
-              <div className="flex items-center gap-2 min-w-0">
-                {item.leading ? (
-                  <span className="shrink-0" aria-hidden>
-                    {item.leading}
-                  </span>
-                ) : (
-                  <span
-                    className={cn(
-                      'text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md font-mono border transition-all',
-                      active
-                        ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
-                        : 'border-[var(--border-default)] bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]',
-                    )}
-                  >
-                    {groupTag(item.group)}
-                  </span>
-                )}
-                <span
-                  className={cn(
-                    'truncate transition-colors',
-                    active ? 'text-[var(--brand-primary)] font-medium' : 'text-[var(--fg-primary)]',
-                  )}
+        {/* Wrap contiguous same-group runs in role="group" + aria-label so
+            screen readers get "Create", "Navigate", "Accounts", etc.
+            announced — the mono badge (groupTag) below only carries that
+            info visually, and is suppressed entirely on icon-led rows
+            (leading logos). Grouping is derived purely for rendering; the
+            flat `index` from the original `items` array is preserved on
+            each row so keyboard nav / aria-activedescendant is unaffected. */}
+        {groupItemsByRun(items).map((run) => (
+          <div
+            key={`group-${run.group}-${run.entries[0]?.index}`}
+            role="group"
+            aria-label={groupAriaLabel(run.group)}
+          >
+            {run.entries.map(({ item, index }) => {
+              const active = index === safeIdx;
+              return (
+                <div
+                  id={`cmdk-option-${index}`}
+                  key={item.id}
+                  data-cmdk-idx={index}
+                  role="option"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  onMouseEnter={() => setActiveIdx(index)}
+                  onClick={item.onSelect}
+                  onKeyDown={(e) => handleItemKeyDown(e, item)}
+                  // min-h-11 keeps touch targets ≥ 44px (WCAG 2.5.5 AA)
+                  className="relative flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg mx-2 my-0.5 bg-transparent z-10"
                 >
-                  {highlightText(item.label, query, active)}
-                </span>
-              </div>
-              {item.hint ? (
-                <span className="shrink-0 text-[10px] text-[var(--fg-tertiary)]">{item.hint}</span>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+                  {active && (
+                    <motion.div
+                      layoutId="command-palette-highlight"
+                      className="absolute inset-0 bg-[var(--surface-hover)] rounded-lg -z-10"
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <div className="flex items-center gap-2 min-w-0">
+                    {item.leading ? (
+                      <span className="shrink-0" aria-hidden>
+                        {item.leading}
+                      </span>
+                    ) : (
+                      <span
+                        className={cn(
+                          'text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md font-mono border transition-all',
+                          active
+                            ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+                            : 'border-[var(--border-default)] bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]',
+                        )}
+                      >
+                        {groupTag(item.group)}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        'truncate transition-colors',
+                        active
+                          ? 'text-[var(--brand-primary)] font-medium'
+                          : 'text-[var(--fg-primary)]',
+                      )}
+                    >
+                      {highlightText(item.label, query, active)}
+                    </span>
+                  </div>
+                  {item.hint ? (
+                    <span className="shrink-0 text-[10px] text-[var(--fg-tertiary)]">
+                      {item.hint}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

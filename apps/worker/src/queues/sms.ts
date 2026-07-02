@@ -154,8 +154,11 @@ export async function processSingleSend(
 
   // Token fetch/decrypt must precede the claim: the reconcile branch needs
   // fromNumber to rebuild a lost DB row.
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: data.integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): the job payload
+  // is the only provenance for integrationTokenId — scoping by data.orgId
+  // guarantees a forged/stale id can never decrypt another org's Twilio creds.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: data.integrationTokenId, orgId: data.orgId },
     select: { accessTokenEncrypted: true, externalAccountId: true },
   });
   if (!token) throw new Error(`IntegrationToken ${data.integrationTokenId} not found`);

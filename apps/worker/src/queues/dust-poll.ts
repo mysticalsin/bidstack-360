@@ -42,7 +42,7 @@ let circuitOpenUntil = 0;
  * metadata only routes a doc to the right entity type. Writes a stub sync_event
  * when the org has no Dust configured, so the integration UI still has feedback.
  */
-async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
+export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log.child({ orgId, kind: 'dust' }));
   const dataSourceId = creds?.dataSourceId;
   if (!dust || !dataSourceId) {
@@ -113,7 +113,7 @@ const ORG_BATCH_SIZE = 200;
  * bounded per-org jobs drained by the worker's concurrency + limiter, instead
  * of being serialised into one ever-growing job that overlaps the next tick.
  */
-async function fanoutOrgPolls(queue: Queue, log: pino.Logger): Promise<void> {
+export async function fanoutOrgPolls(queue: Queue, log: pino.Logger): Promise<void> {
   // Window bucket dedups per-org jobs across overlapping fanout runs (e.g. a
   // delayed tick + the next on-time tick), mirroring email-sync's fanout.
   const windowBucket = Math.floor(Date.now() / REPEAT_EVERY_MS);

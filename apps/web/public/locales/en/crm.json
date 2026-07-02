@@ -2061,6 +2061,9 @@
     "exportCsv": "Export CSV",
     "stageFilterGroupLabel": "Filter opportunities by stage",
     "stageAll": "All",
+    "dueFilterGroupLabel": "Filter opportunities by due date",
+    "dueWithin7": "Due ≤ 7d",
+    "dueOverdue": "Overdue",
     "bulkActionsLabel": "Bulk actions",
     "selectedCount": "{{count}} selected",
     "moveSelectionLabel": "Move selection to stage",
@@ -3903,5 +3906,20 @@
     "queueEmptyDetail": "Queue monitor rows have not been recorded yet for this org.",
     "backendSignalsEyebrow": "Backend signals",
     "backendSignalsTitle": "Signal availability"
+  },
+  "dueDateChip": {
+    "noDate": "No date",
+    "overdueBy": "{{count}}d overdue",
+    "dueToday": "Due today",
+    "daysLeft": "{{count}}d left",
+    "ariaLabel": "Due {{date}}",
+    "ariaLabelNoDate": "No due date set"
+  },
+  "closingThisWeek": {
+    "heading": "Closing this week",
+    "viewAll": "View all",
+    "errorMessage": "Couldn't load bids closing this week.",
+    "retry": "Retry",
+    "empty": "No bids closing this week."
   }
 }

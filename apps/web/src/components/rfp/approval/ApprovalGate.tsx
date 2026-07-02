@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useIsAdmin } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { Sentry } from '@/lib/sentry';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useRfpDraft } from '@/hooks/rfp/useRfpDraft';
 
@@ -69,7 +70,10 @@ export function ApprovalGate() {
       // P0 FIX: Do NOT overwrite the pipeline stage to 'failed'.
       // The mutation's isError state already surfaces the error in the UI.
       // Nuking the stage destroys the approval context and forces a full restart.
-      console.error('Approval mutation failed:', err);
+      if (import.meta.env.DEV) {
+        console.error('Approval mutation failed:', err);
+      }
+      Sentry.captureException(err);
     },
   });
 

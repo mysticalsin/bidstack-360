@@ -169,12 +169,76 @@ export default defineConfig(({ command, mode }) => {
             // kanban. Bundle-analyzer (2026-05-28) confirmed these transitive
             // deps were silently inflating the vendor catch-all.
             //
-            // recharts + its entire d3 family, animation helpers, and
-            // comparison utilities — only WidgetRenderer (→ AnalyticsDashboardPage,
-            // lazy). Bundle-analyzer (2026-05-28) revealed the full transitive
-            // closure leaking into vendor. Capturing them here eliminates a
-            // charts→vendor→charts circular chunk warning from Rollup.
-            // Note: charts-related libs are merged into vendor to avoid circular chunks (charts -> vendor -> charts) which caused runtime crashes.
+            // recharts + its FULL transitive closure — only WidgetRenderer
+            // (-> AnalyticsDashboardPage) and ReportPreview (-> report builder),
+            // both lazy. victory-vendor is the load-bearing entry here: its
+            // export files do `export * from 'd3-shape'` etc, re-exporting the
+            // real d3-* packages below. If victory-vendor is left unmatched
+            // (falls to 'vendor') while those d3-* packages land in 'charts',
+            // Rollup produces a genuine circular chunk — vendor imports charts
+            // (via victory-vendor's re-export) while charts imports vendor (via
+            // recharts's own `import ... from 'victory-vendor'`) — which Rollup
+            // only warns about but ships anyway, crashing at runtime with
+            // "X is not a function" (a binding read before its chunk finished
+            // initializing) on EVERY route, chart or not, because the circular
+            // edge forces the browser to eagerly fetch the "lazy" charts chunk
+            // alongside vendor. Reproduced + confirmed via `pnpm build` (Rollup
+            // "Circular chunk: charts -> vendor -> charts" warning) and preview
+            // + chrome devtools (uncaught TypeError booting /dashboard, a
+            // chartless route) 2026-07-01.
+            //
+            // clsx, use-sync-external-store, and d3-color are deliberately NOT
+            // included here even though recharts's closure touches them: all
+            // three are shared leaves pulled in by OTHER chunks too — clsx via
+            // `@/lib/cn` (used app-wide), use-sync-external-store via
+            // @clerk/shared / @tiptap/react / zustand, and d3-color via
+            // react-simple-maps's d3-zoom/d3-transition (the 'maps' route's pan
+            // /zoom, which resolves its own d3-interpolate@2/d3-ease@2/d3-timer@2
+            // line and stays in 'vendor'). Bucketing a shared leaf into 'charts'
+            // would either force those chunks to eagerly pull in 'charts', or
+            // (for d3-color specifically) put a 'vendor'-resident package
+            // (d3-transition) one hop from something in 'charts' — recreating
+            // the exact cycle below.
+            //
+            // d3-array / d3-ease / d3-interpolate / d3-timer / internmap are
+            // version-anchored (`@3.`/`@2.`) rather than matched by bare
+            // package name: pnpm resolves TWO copies of each — an old `@2.x`
+            // line used only by react-simple-maps's d3-zoom/d3-transition (maps,
+            // stays in 'vendor') and the `@3.x`/`internmap@2.x` line used by
+            // victory-vendor (charts). A bare `/d3-array/` substring match
+            // can't tell the folders apart (both are named `d3-array`, just
+            // nested under different `.pnpm/d3-array@<version>/` parents) and
+            // would sweep the maps-only copy into 'charts' too — which, because
+            // d3-zoom/d3-transition themselves stay in 'vendor' (no rule claims
+            // them), re-creates a vendor->charts edge and reproduces the cycle.
+            if (
+              normalized.includes('/recharts/') ||
+              normalized.includes('/victory-vendor/') ||
+              normalized.includes('/decimal.js-light/') ||
+              normalized.includes('/es-toolkit/') ||
+              normalized.includes('/eventemitter3/') ||
+              normalized.includes('/tiny-invariant/') ||
+              normalized.includes('/immer/') ||
+              normalized.includes('/@reduxjs/toolkit/') ||
+              normalized.includes('/react-redux/') ||
+              normalized.includes('/reselect/') ||
+              normalized.includes('/redux-thunk/') ||
+              normalized.includes('/node_modules/redux/') ||
+              normalized.includes('/@standard-schema/') ||
+              normalized.includes('/d3-array@3.') ||
+              normalized.includes('/d3-ease@3.') ||
+              normalized.includes('/d3-format/') ||
+              normalized.includes('/d3-interpolate@3.') ||
+              normalized.includes('/d3-path/') ||
+              normalized.includes('/d3-scale/') ||
+              normalized.includes('/d3-shape/') ||
+              normalized.includes('/d3-time-format/') ||
+              normalized.includes('/d3-time/') ||
+              normalized.includes('/d3-timer@3.') ||
+              normalized.includes('/internmap@2.')
+            ) {
+              return 'charts';
+            }
             // react-simple-maps + d3-geo + topojson — only TerritoriesPage (lazy)
             if (
               normalized.includes('/react-simple-maps/') ||

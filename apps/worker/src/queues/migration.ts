@@ -726,7 +726,9 @@ export async function startMigrationWorker(
             ])}::jsonb
             ELSE error_summary
           END
-          WHERE id = ${migrationJobId}::uuid`.catch(() => undefined);
+          WHERE id = ${migrationJobId}::uuid`.catch((rawErr) =>
+          log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
+        );
       }
     }
   });

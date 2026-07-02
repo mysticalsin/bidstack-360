@@ -1,7 +1,9 @@
 // a11y regression test for the overdue affordance (WCAG 1.4.1 Use of Color):
-// an overdue opportunity must surface its state via a VISIBLE "Overdue" badge
-// (icon + text) AND via the card's accessible name — never by the red card
-// tint alone. These assertions fail the moment that dual signal regresses.
+// an overdue opportunity must surface its state via a VISIBLE icon+text cue
+// (the DueDateChip's danger state, e.g. "3d overdue" — the card's sole
+// overdue pill since A1 consolidated it with the old dedicated Badge) AND
+// via the card's accessible name — never by the red card tint alone. These
+// assertions fail the moment that dual signal regresses.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -81,22 +83,22 @@ function renderCard(opp: Opportunity) {
 afterEach(cleanup);
 
 describe('PipelineCard overdue affordance', () => {
-  it('shows a visible Overdue badge and appends ", overdue" to the accessible name when past due', () => {
+  it('shows a visible overdue cue and appends ", overdue" to the accessible name when past due', () => {
     // Past due + an open stage ("S1 Ongoing") => isStalled === true.
     renderCard({ ...BASE_OPP, dueDate: '2020-01-01' });
 
     // Visible text, not color alone (getByText throws if absent).
-    expect(screen.getByText('Overdue')).toBeDefined();
+    expect(screen.getByText(/overdue/i)).toBeDefined();
 
     // The accessible name carries the state for screen readers.
     const link = screen.getByRole('link');
     expect(link.getAttribute('aria-label')).toContain(', overdue');
   });
 
-  it('omits the Overdue badge and suffix when the opportunity is not past due', () => {
+  it('omits the overdue cue and suffix when the opportunity is not past due', () => {
     renderCard({ ...BASE_OPP, dueDate: '2099-12-31' });
 
-    expect(screen.queryByText('Overdue')).toBeNull();
+    expect(screen.queryByText(/overdue/i)).toBeNull();
     const link = screen.getByRole('link');
     expect(link.getAttribute('aria-label')).not.toContain(', overdue');
   });

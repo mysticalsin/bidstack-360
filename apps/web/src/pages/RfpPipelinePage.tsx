@@ -7,6 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { PresenceAvatars } from '@/components/presence/PresenceAvatars';
 import { useRfpPipeline } from '@/hooks/rfp/useRfpPipeline';
 import { useRfpLatestOrchestration, RESUMABLE_STATES } from '@/hooks/rfp/useRfpLatestOrchestration';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
@@ -121,7 +122,7 @@ export function RfpPipelinePage() {
       </nav>
 
       {/* Page heading */}
-      <header className="page-head">
+      <header className="page-head flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
             {t('nav.rfpSection')}
@@ -129,6 +130,8 @@ export function RfpPipelinePage() {
           <h1 className="page-title">{t('pipeline.title')}</h1>
           <p className="page-sub">{t('pipeline.subtitle')}</p>
         </div>
+        {/* A3 — same bid, same presence signal as the opportunity detail header. */}
+        <PresenceAvatars entityType="opportunity" entityId={opportunityId} />
       </header>
 
       {/* Stage progress bar (only shown once pipeline has started) */}

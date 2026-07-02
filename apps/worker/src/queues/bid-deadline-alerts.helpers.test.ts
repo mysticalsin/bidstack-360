@@ -7,10 +7,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEADLINE_THRESHOLD_DAYS,
+  OVERDUE_DEDUPE_THRESHOLD,
   daysUntilDue,
   deadlineDedupeUrl,
   dueInLabel,
+  isOverdue,
   nearestCrossedThreshold,
+  overdueByLabel,
   thresholdsFor,
 } from './bid-deadline-alerts.helpers.js';
 
@@ -116,5 +119,39 @@ describe('dueInLabel', () => {
   it('collapses due-today / overdue to "today"', () => {
     expect(dueInLabel(0)).toBe('today');
     expect(dueInLabel(-3)).toBe('today');
+  });
+});
+
+describe('isOverdue', () => {
+  it('is true only once daysUntil is negative — matches thresholdsFor going silent', () => {
+    // WHY this pairing matters: nearestCrossedThreshold returns null both
+    // "further out than 7d" (2000, not yet a concern) and "overdue" (-1, the
+    // one case the 3(b) gap-fix must catch) — isOverdue is what tells the
+    // worker which of those two it is looking at.
+    expect(isOverdue(1)).toBe(false);
+    expect(isOverdue(0)).toBe(false);
+    expect(isOverdue(-1)).toBe(true);
+    expect(isOverdue(-30)).toBe(true);
+  });
+});
+
+describe('overdueByLabel', () => {
+  it('states days overdue, never "today" — a missed deadline is not still on time', () => {
+    // WHY distinct from dueInLabel: dueInLabel(-3) collapses to 'today', which
+    // would misleadingly imply the deadline hasn't passed yet.
+    expect(overdueByLabel(1)).toBe('overdue by 1 day'); // singular
+    expect(overdueByLabel(3)).toBe('overdue by 3 days');
+  });
+});
+
+describe('OVERDUE_DEDUPE_THRESHOLD', () => {
+  it('never collides with a real 7/3/1 dedupe key', () => {
+    // WHY: if this ever equalled one of DEADLINE_THRESHOLD_DAYS, the overdue
+    // alert's dedupeUrl would collide with (and suppress, or be suppressed
+    // by) a real on-time boundary alert for the same opportunity.
+    expect(DEADLINE_THRESHOLD_DAYS).not.toContain(OVERDUE_DEDUPE_THRESHOLD);
+    const overdueUrl = deadlineDedupeUrl('opp-1', OVERDUE_DEDUPE_THRESHOLD);
+    const onTimeUrls = DEADLINE_THRESHOLD_DAYS.map((t) => deadlineDedupeUrl('opp-1', t));
+    expect(onTimeUrls).not.toContain(overdueUrl);
   });
 });

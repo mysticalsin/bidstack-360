@@ -236,7 +236,10 @@ async function runIncrementalPull(
   userId: string,
   log: pino.Logger,
 ): Promise<void> {
-  const token = await prisma.integrationToken.findUnique({ where: { id: tokenId } });
+  // WHY findFirst + orgId in where (not findUnique by bare id): defense-in-depth —
+  // callers pass ids from org-scoped fetches today, but the helper must not
+  // decrypt a cross-tenant token if a future caller passes a mismatched pair.
+  const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId } });
   if (!token || token.status !== 'active') return;
 
   const accessToken = decryptToken(token.accessTokenEncrypted);

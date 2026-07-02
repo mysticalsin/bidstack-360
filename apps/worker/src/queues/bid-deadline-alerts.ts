@@ -11,6 +11,13 @@
  * key, so an opp first seen already inside a tight window gets one accurate alert
  * (not 7d+3d+1d at once), and still receives each 7/3/1 boundary at most once.
  *
+ * The same scan ALSO covers the overdue case (dueDate already passed): a single
+ * once-ever alert per opportunity, distinct dedupe bucket from the 7/3/1
+ * boundaries (see OVERDUE_DEDUPE_THRESHOLD) — missing the deadline entirely is
+ * the single most important "deadline discipline" scenario, and there is no
+ * double-notify risk since the 7/3/1 buckets never fire once daysUntil is
+ * negative (thresholdsFor returns []).
+ *
  * IDEMPOTENCY (no schema marker / migration): each (opportunity, threshold)
  * alert carries a deterministic dedupe URL (deadlineDedupeUrl). Before creating,
  * the worker checks whether a notification with that exact url already exists for
@@ -32,10 +39,13 @@ import { prisma, OpportunityStage, Prisma } from '@bidstack/db';
 
 import {
   DEADLINE_THRESHOLD_DAYS,
+  OVERDUE_DEDUPE_THRESHOLD,
   daysUntilDue,
   deadlineDedupeUrl,
   dueInLabel,
+  isOverdue,
   nearestCrossedThreshold,
+  overdueByLabel,
   type DeadlineThresholdDay,
 } from './bid-deadline-alerts.helpers.js';
 
@@ -51,6 +61,18 @@ const SCAN_INTERVAL_MINUTES = 60;
  * is paged consistently scan-to-scan.
  */
 const SCAN_BATCH_SIZE = 1000;
+
+/**
+ * How far past its due date the scan still looks for a NOT-YET-ALERTED overdue
+ * opportunity. Bounded (not unbounded) so a large tenant's old, still-open,
+ * long-overdue backlog can't grow the scan query without limit; 30 days covers
+ * the realistic window in which a missed-deadline nudge is still actionable —
+ * an opp overdue longer than that has almost certainly already been
+ * renegotiated, closed, or otherwise handled outside this alert. Once alerted,
+ * the existence check makes re-scanning a within-window overdue row cheap
+ * regardless (indexed by notifications_deadline_dedupe_uq).
+ */
+const OVERDUE_LOOKBACK_DAYS = 30;
 
 /** BullMQ job options — local mirror of the shared QueueConfig shape. */
 const JOB_OPTIONS = {
@@ -122,14 +144,57 @@ async function alertIfNew(
   }
 }
 
+/**
+ * Create the once-ever overdue alert for one opportunity IF it does not
+ * already exist. Mirrors alertIfNew's existence-check + P2002 shape but keyed
+ * on OVERDUE_DEDUPE_THRESHOLD instead of a real 7/3/1 boundary — a distinct
+ * dedupe URL, so it can never collide with (or suppress) an on-time alert.
+ * `daysUntil` is negative here; the copy states how many days OVERDUE the opp
+ * is, not "due in -3 days". Returns true when a new notification was written.
+ */
+async function alertOverdueIfNew(opp: ScannedOpp, daysUntil: number): Promise<boolean> {
+  const url = deadlineDedupeUrl(opp.id, OVERDUE_DEDUPE_THRESHOLD);
+  const existing = await prisma.notification.findFirst({
+    where: { orgId: opp.orgId, userId: opp.ownerId, url },
+    select: { id: true },
+  });
+  if (existing) return false;
+
+  const label = overdueByLabel(-daysUntil);
+  try {
+    await prisma.notification.create({
+      data: {
+        orgId: opp.orgId,
+        userId: opp.ownerId,
+        // 'system' — see the matching comment on alertIfNew's create() above.
+        type: 'system',
+        title: `Bid deadline missed: ${opp.name}`,
+        body: `${opp.customer} — proposal for "${opp.name}" is ${label}.`,
+        entityType: 'opportunity',
+        entityId: opp.id,
+        url,
+      },
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return false;
+    }
+    throw err;
+  }
+}
+
 async function scanDeadlines(log: pino.Logger): Promise<void> {
   const now = new Date();
   const maxThreshold = Math.max(...DEADLINE_THRESHOLD_DAYS);
-  // Only fetch opps whose deadline is at/after today and within the widest
-  // threshold window — keeps the scan set small and the maths cheap. dueDate is
-  // a Postgres `date`, so bound on the UTC day to match daysUntilDue's basis.
-  const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const windowEnd = new Date(windowStart.getTime() + maxThreshold * 86_400_000);
+  // dueDate is a Postgres `date`, so bound on the UTC day to match
+  // daysUntilDue's basis. windowStart reaches OVERDUE_LOOKBACK_DAYS into the
+  // past (to also catch not-yet-alerted overdue opps); windowEnd reaches the
+  // widest on-time threshold into the future — keeps the scan set bounded on
+  // both ends.
+  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const windowStart = new Date(todayUTC.getTime() - OVERDUE_LOOKBACK_DAYS * 86_400_000);
+  const windowEnd = new Date(todayUTC.getTime() + maxThreshold * 86_400_000);
 
   const opps = await prisma.opportunity.findMany({
     where: {
@@ -170,9 +235,16 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
     // bucket fires that bucket via its own dedupe key → the intended 7→3→1 cadence.
     const daysUntil = daysUntilDue(scanned.dueDate, now);
     const threshold = nearestCrossedThreshold(daysUntil);
-    if (threshold === null) continue;
+    // Overdue opps fall outside every 7/3/1 bucket (threshold === null) but
+    // still need the single, distinct once-ever overdue alert — see the
+    // module doc comment and alertOverdueIfNew.
+    if (threshold === null && !isOverdue(daysUntil)) continue;
     try {
-      if (await alertIfNew(scanned, threshold, daysUntil)) created += 1;
+      if (threshold !== null) {
+        if (await alertIfNew(scanned, threshold, daysUntil)) created += 1;
+      } else if (await alertOverdueIfNew(scanned, daysUntil)) {
+        created += 1;
+      }
     } catch (err) {
       // Per-opp isolation — one failed insert must not abort the rest of the scan.
       log.error({ err, opportunityId: scanned.id, threshold }, 'bid-deadline alert failed');

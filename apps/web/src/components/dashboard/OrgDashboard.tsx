@@ -19,6 +19,7 @@ import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
 import { InsightsBar } from './widgets/InsightsBar';
+import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { PipelineCard } from './widgets/PipelineCard';
 import { PipelineByStageMini } from './widgets/PipelineByStageMini';
 import { AlertCard } from './widgets/AlertCard';
@@ -276,6 +277,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
               newLeads={s?.leads ?? 0}
               pipelineValue={s?.pipelineValue ?? 0}
             />
+          </Reveal>
+
+          <Reveal delay={0.07}>
+            <ClosingThisWeekCard />
           </Reveal>
 
           <Reveal delay={0.08}>

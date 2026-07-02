@@ -186,7 +186,9 @@ export async function ensureExtractedText(
         where: { id: documentVersionId, orgId, deletedAt: null },
         data: { extractionStatus: 'failed', ocrStatus: 'failed' },
       })
-      .catch(() => undefined);
+      .catch((updateErr) =>
+        log.warn({ err: updateErr }, 'best-effort documentVersion failure status write failed'),
+      );
     throw err instanceof Error ? err : new Error(String(err));
   }
 }

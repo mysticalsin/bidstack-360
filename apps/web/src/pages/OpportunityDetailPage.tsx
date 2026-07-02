@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -18,6 +19,7 @@ import {
   InlineEditText,
 } from '@/components/opportunity/InlineEdit';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
+import { PresenceAvatars } from '@/components/presence/PresenceAvatars';
 import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
@@ -170,27 +172,31 @@ export function OpportunityDetailPage() {
         className="border-none bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-sunken-alpha)] shadow-2xl"
       >
         <header>
-          <nav
-            aria-label={t('opportunityDetail.breadcrumbAriaLabel', 'Breadcrumb')}
-            className="text-xs text-[var(--fg-tertiary)] mb-4"
-          >
-            <ol className="flex items-center gap-2">
-              <li>
-                <Link
-                  to="/opportunities"
-                  className="hover:text-[var(--brand-primary)] transition-colors"
-                >
-                  {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
-                </Link>
-              </li>
-              <li aria-hidden="true" className="opacity-30">
-                /
-              </li>
-              <li aria-current="page" className="font-mono">
-                {data.code}
-              </li>
-            </ol>
-          </nav>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <nav
+              aria-label={t('opportunityDetail.breadcrumbAriaLabel', 'Breadcrumb')}
+              className="text-xs text-[var(--fg-tertiary)]"
+            >
+              <ol className="flex items-center gap-2">
+                <li>
+                  <Link
+                    to="/opportunities"
+                    className="hover:text-[var(--brand-primary)] transition-colors"
+                  >
+                    {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
+                  </Link>
+                </li>
+                <li aria-hidden="true" className="opacity-30">
+                  /
+                </li>
+                <li aria-current="page" className="font-mono">
+                  {data.code}
+                </li>
+              </ol>
+            </nav>
+            {/* A3 — who else is looking at this bid right now. */}
+            <PresenceAvatars entityType="opportunity" entityId={data.id} />
+          </div>
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="min-w-0 flex-1">
               <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
@@ -370,7 +376,7 @@ export function OpportunityDetailPage() {
                     <span>{t('opportunityDetail.likely', 'likely')}</span>
                   </span>
                   <span className="opacity-30">·</span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-2">
                     <Icon name="clock" size={12} />
                     <InlineEditDate
                       value={data.dueDate}
@@ -378,6 +384,7 @@ export function OpportunityDetailPage() {
                       label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
                       display={(v) => formatDate(v)}
                     />
+                    <DueDateChip dueDate={data.dueDate} size="lg" />
                   </span>
                 </div>
               </div>

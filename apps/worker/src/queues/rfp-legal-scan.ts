@@ -292,7 +292,9 @@ async function processJob(
       orgId,
       'legal_scan',
       'Document is NDA-restricted; AI review blocked',
-    ).catch(() => undefined);
+    ).catch((err) =>
+      log.warn({ err }, 'best-effort orchestration failure mark write failed (nda block)'),
+    );
     return;
   }
 
@@ -421,7 +423,9 @@ export async function startRfpLegalScan(
         orgId,
         'legal_scan',
         (err as Error).message?.slice(0, 2000) ?? 'unknown error',
-      ).catch(() => undefined);
+      ).catch((markErr) =>
+        log.warn({ err: markErr }, 'best-effort orchestration failure mark write failed'),
+      );
     }
   });
 

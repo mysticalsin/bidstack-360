@@ -252,6 +252,59 @@ export function OppStageChips({
   );
 }
 
+// ── OppDueChips ───────────────────────────────────────────────────────────────
+// A1 (bid clock): quick filters for the two urgency buckets that matter for
+// action — "due soon" and "already missed". Same toggle-pill pattern as
+// OppStageChips (click again to clear) so the two chip rows read as one
+// filtering language, not two different UI idioms.
+
+export type DueQuickFilter = 'within7' | 'overdue' | null;
+
+export function OppDueChips({
+  dueFilter,
+  onSetDueFilter,
+}: {
+  dueFilter: DueQuickFilter;
+  onSetDueFilter: (next: DueQuickFilter) => void;
+}) {
+  const { t } = useTranslation('crm');
+  const chipClass = (active: boolean, tone: 'amber' | 'tomato') =>
+    cn(
+      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]',
+      active
+        ? tone === 'amber'
+          ? 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]'
+          : 'bg-[var(--tag-tomato-bg)] text-[var(--tag-tomato-fg)]'
+        : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]',
+    );
+
+  return (
+    <div
+      role="group"
+      aria-label={t('oppToolbar.dueFilterGroupLabel', 'Filter opportunities by due date')}
+      className="flex flex-wrap items-center gap-1.5"
+    >
+      <button
+        type="button"
+        aria-pressed={dueFilter === 'within7'}
+        onClick={() => onSetDueFilter(dueFilter === 'within7' ? null : 'within7')}
+        className={chipClass(dueFilter === 'within7', 'amber')}
+      >
+        {t('oppToolbar.dueWithin7', 'Due ≤ 7d')}
+      </button>
+      <button
+        type="button"
+        aria-pressed={dueFilter === 'overdue'}
+        onClick={() => onSetDueFilter(dueFilter === 'overdue' ? null : 'overdue')}
+        className={chipClass(dueFilter === 'overdue', 'tomato')}
+      >
+        {t('oppToolbar.dueOverdue', 'Overdue')}
+      </button>
+    </div>
+  );
+}
+
 // ── OppBulkBar ────────────────────────────────────────────────────────────────
 
 export function OppBulkBar({

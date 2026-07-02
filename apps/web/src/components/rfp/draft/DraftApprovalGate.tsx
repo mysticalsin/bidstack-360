@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useIsAdmin } from '@/lib/auth';
+import { Sentry } from '@/lib/sentry';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useApproveDrafting } from '@/hooks/rfp/useApproveDrafting';
 
@@ -36,7 +37,12 @@ export function DraftApprovalGate() {
           });
         },
         onError: (err) => {
-          console.error('Draft Approval mutation failed:', err);
+          // Dev-console visibility + prod error tracking, mirroring the
+          // global handlers in main.tsx / ErrorBoundary.tsx.
+          if (import.meta.env.DEV) {
+            console.error('Draft Approval mutation failed:', err);
+          }
+          Sentry.captureException(err);
         },
       }
     );

@@ -34,7 +34,14 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { Row } from './opportunities/OpportunityRow';
 import { OpportunitiesTableHead } from './opportunities/OpportunitiesTableHead';
-import { OppBulkBar, OppKpiBar, OppPageHeader, OppStageChips } from './opportunities/OppToolbar';
+import {
+  OppBulkBar,
+  OppDueChips,
+  OppKpiBar,
+  OppPageHeader,
+  OppStageChips,
+  type DueQuickFilter,
+} from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
 
 export function OpportunitiesPage() {
@@ -56,8 +63,20 @@ export function OpportunitiesPage() {
     setSearchParams(params, { replace: true });
   };
 
-  // Cursor pagination — reset to page 1 whenever the search/stage filter changes.
-  const pager = useCursorPagination(`${search}|${stageFilter}`);
+  // A1 (bid clock) quick filters — "due" is independent of stage, so both can
+  // be active together (e.g. "S2 Sent, overdue").
+  const dueParam = searchParams.get('due');
+  const dueFilter: DueQuickFilter = dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
+  const setDueFilter = (next: DueQuickFilter) => {
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('due', next);
+    else params.delete('due');
+    params.delete('search');
+    setSearchParams(params, { replace: true });
+  };
+
+  // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
+  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -69,6 +88,8 @@ export function OpportunitiesPage() {
           ? { stage: stageFilter }
           : {}
       : {}),
+    ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
+    ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
@@ -371,11 +392,14 @@ export function OpportunitiesPage() {
       />
 
       {!search && (
-        <OppStageChips
-          stageFilter={stageFilter}
-          stageOptions={stageOptions}
-          onSetStageFilter={setStageFilter}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <OppStageChips
+            stageFilter={stageFilter}
+            stageOptions={stageOptions}
+            onSetStageFilter={setStageFilter}
+          />
+          <OppDueChips dueFilter={dueFilter} onSetDueFilter={setDueFilter} />
+        </div>
       )}
 
       {/* Industry visibility — the bids we're working on, split by sector. */}

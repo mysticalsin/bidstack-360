@@ -95,7 +95,9 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
   }
 
   // Fire-and-forget update of lastUsedAt
-  prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+  prisma.apiKey
+    .update({ where: { id: key.id }, data: { lastUsedAt: new Date() } })
+    .catch((err) => req.log.warn({ err, keyId: key.id }, 'apiKey lastUsedAt write failed'));
 
   // Sampled audit-log entry — see APIKEY_USED_SAMPLE_RATE comment for why
   // this isn't 100%. Await it for deterministic audit semantics, but swallow

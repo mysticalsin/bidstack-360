@@ -14,6 +14,9 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { NAV_SECTIONS } from '@/components/layout/navConfig';
+import { buildQuickAddOptions, chooseQuickAdd } from '@/components/quickadd/quickAddOptions';
+import { useAppModules } from '@/hooks/useAppModules';
 import { useCommandContextStore } from '@/hooks/useCommandContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
@@ -21,6 +24,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useTasks } from '@/hooks/useTasks';
 import { api } from '@/lib/api';
+import { useIsAdmin } from '@/lib/auth';
 import { getRecents, pushRecent, type RecentEntry } from '@/lib/palette-recents';
 import { useAccountHistory } from '@/stores/accountHistory';
 import type { OpportunityPage } from '@bidstack/shared';
@@ -29,7 +33,8 @@ import {
   ACCOUNT_RESULT_LIMIT,
   CONTACT_RESULT_LIMIT,
   TASK_RESULT_LIMIT,
-  NAV_TARGETS,
+  buildNavTargets,
+  findDirectNavTarget as findDirectNavTargetIn,
   type Item,
   type NavTarget,
   matchCompanies,
@@ -44,6 +49,9 @@ export interface UsePaletteItemsResult {
   items: Item[];
   isFetching: boolean;
   selectNavTarget: (target: NavTarget) => void;
+  /** Bound to the current (flag-filtered) nav target list — see CommandPalette's
+   *  Enter-key "jump straight to an exact route match" shortcut. */
+  findDirectNavTarget: (query: string) => NavTarget | undefined;
 }
 
 export function usePaletteItems(query: string, onClose: () => void): UsePaletteItemsResult {
@@ -92,6 +100,29 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   // pattern). Appear at the top of the list so page-specific actions are
   // immediately reachable without scrolling.
   const contextualCommands = useCommandContextStore((s) => s.commands);
+
+  // Org module flags (agent-studio, AppFlowy, SERUM) gate whole nav sections.
+  // Reusing the sidebar's query key means cached data renders instantly (no
+  // loading flash) — but useAppModules sets staleTime:0/refetchOnMount:'always'
+  // (flags must reflect the current org config, not a stale cache; see that
+  // hook's own WHY comment), so a background refetch still fires on every
+  // ⌘K open. Cheap endpoint, so not a functional problem — just don't assume
+  // this avoids the network round-trip.
+  const appModules = useAppModules();
+
+  const isAdmin = useIsAdmin();
+
+  // Palette nav targets, derived from NAV_SECTIONS (the sidebar's single
+  // source of truth) instead of a hand-maintained duplicate list — see
+  // buildNavTargets' doc comment for the drift bug this replaces. isAdmin
+  // gates the one hand-added permission-restricted palette-only route
+  // (/audit-log) the same way SettingsLayout gates its `admin: true` tabs.
+  const navTargets = useMemo(
+    () => buildNavTargets(NAV_SECTIONS, appModules.data, isAdmin),
+    [appModules.data, isAdmin],
+  );
+
+  const quickAddOptions = useMemo(() => buildQuickAddOptions(t), [t]);
 
   const selectNavTarget = useCallback(
     (target: NavTarget) => {
@@ -177,7 +208,29 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       }
     }
 
-    for (const n of NAV_TARGETS) {
+    // "Create" group — same entities/dialogs as the `N`-key quick-add menu
+    // (quickAddOptions.ts), reachable from ⌘K without duplicating the forms.
+    // NOTE: deliberately NOT passing opt.hint ('O'/'T'/'C'/'M') through as the
+    // row hint — those single-letter keys are only live bindings inside
+    // QuickAddMenu's own listbox. Inside the palette the input has focus, so
+    // pressing them just types into the search box; showing them here would
+    // imply a working shortcut that isn't (the "fake shortcut" anti-pattern
+    // NAV_CHORD_HINTS above deliberately avoids for nav rows).
+    for (const opt of quickAddOptions) {
+      if (!q || opt.label.toLowerCase().includes(q) || opt.key.includes(q)) {
+        out.push({
+          id: `create:${opt.key}`,
+          group: 'create',
+          label: opt.label,
+          onSelect: () => {
+            chooseQuickAdd(opt.key, navigate);
+            onClose();
+          },
+        });
+      }
+    }
+
+    for (const n of navTargets) {
       if (!q || n.label.toLowerCase().includes(q)) {
         out.push({
           id: `nav:${n.to}`,
@@ -311,8 +364,15 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     accountRecents,
     selectNavTarget,
     contextualCommands,
+    navTargets,
+    quickAddOptions,
     t,
   ]);
 
-  return { items, isFetching: oppSearch.isFetching, selectNavTarget };
+  const findDirectNavTarget = useCallback(
+    (q: string) => findDirectNavTargetIn(navTargets, q),
+    [navTargets],
+  );
+
+  return { items, isFetching: oppSearch.isFetching, selectNavTarget, findDirectNavTarget };
 }

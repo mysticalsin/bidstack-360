@@ -168,7 +168,9 @@ export async function startRfpProposalCompile(
         orgId,
         'proposal_compile',
         (err as Error).message.slice(0, 2000),
-      ).catch(() => undefined);
+      ).catch((markErr) =>
+        log.warn({ err: markErr }, 'best-effort orchestration failure mark write failed'),
+      );
     }
   });
 

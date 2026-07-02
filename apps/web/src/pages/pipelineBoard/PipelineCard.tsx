@@ -7,9 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { formatDate } from '@/lib/format';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
@@ -111,20 +111,6 @@ export const PipelineCard = memo(function PipelineCard({
           {opp.name}
         </div>
 
-        {/* Overdue badge — visible icon+text so the past-due state isn't
-            conveyed by the red card tint alone (WCAG 1.4.1). aria-hidden
-            because the card's aria-label already appends ", overdue", so the
-            badge would otherwise be announced twice. tomato tone = AA-paired
-            light/dark tokens. */}
-        {isStalled && (
-          <div className="mt-1.5">
-            <Badge tone="tomato" aria-hidden className="text-[9px] px-1.5 py-0">
-              <Icon name="warning" size={10} strokeWidth={2} />
-              {t('crm.pipelineCardOverdueBadge', 'Overdue')}
-            </Badge>
-          </div>
-        )}
-
         {/* Territory badge */}
         {opp.territoryName && (
           <div className="mt-1.5">
@@ -159,12 +145,13 @@ export const PipelineCard = memo(function PipelineCard({
           </span>
         </div>
 
-        {/* Date + code */}
+        {/* Due-date urgency + code. Replaces the old bare date — a bid due in
+            3 days looked identical to one due in 90 days before this. This is
+            now the card's ONLY overdue signal (icon+text, not aria-hidden —
+            WCAG 1.4.1) — a separate static "Overdue" badge used to render
+            alongside it, duplicating the same state as two tomato pills. */}
         <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--fg-tertiary)]">
-          <span className="inline-flex items-center gap-1">
-            <Icon name="clock" size={10} strokeWidth={2} />
-            {opp.dueDate ? formatDate(opp.dueDate) : t('crm.pipelineCardNoDate', 'No date')}
-          </span>
+          <DueDateChip dueDate={opp.dueDate} size="sm" />
           <span className="font-mono">{opp.code}</span>
         </div>
       </Link>

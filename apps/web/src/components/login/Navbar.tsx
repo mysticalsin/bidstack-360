@@ -38,11 +38,14 @@ export function Navbar() {
     >
       {/* Left Side (logo) */}
       <div className="flex-1 hidden md:flex flex-col items-start justify-center">
-        <img
-          src="/logo-clear.png"
-          alt="BidStack360"
-          className="h-24 md:h-32 lg:h-40 w-auto object-contain -ml-2"
-        />
+        <picture>
+          <source srcSet="/logo-clear.webp" type="image/webp" />
+          <img
+            src="/logo-clear.png"
+            alt="BidStack360"
+            className="h-24 md:h-32 lg:h-40 w-auto object-contain -ml-2"
+          />
+        </picture>
       </div>
 
       {/* Center Menu */}
@@ -63,11 +66,14 @@ export function Navbar() {
 
       {/* Mobile Logo */}
       <div className="md:hidden flex flex-col items-start justify-center">
-        <img
-          src="/logo-clear.png"
-          alt="BidStack360"
-          className="h-16 w-auto object-contain -ml-1"
-        />
+        <picture>
+          <source srcSet="/logo-clear.webp" type="image/webp" />
+          <img
+            src="/logo-clear.png"
+            alt="BidStack360"
+            className="h-16 w-auto object-contain -ml-1"
+          />
+        </picture>
       </div>
 
       {/* Right Side — Auth Buttons */}

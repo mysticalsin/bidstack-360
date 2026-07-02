@@ -12,7 +12,7 @@ import { processSingleSend } from './sms.js';
 vi.mock('@bidstack/db', () => ({
   prisma: {
     smsConsent: { findUnique: vi.fn() },
-    integrationToken: { findUnique: vi.fn() },
+    integrationToken: { findFirst: vi.fn() },
     smsMessage: { create: vi.fn(), upsert: vi.fn() },
   },
 }));
@@ -24,7 +24,7 @@ vi.mock('@bidstack/shared/token-crypto', () => ({
 }));
 
 const consentFind = vi.mocked(prisma.smsConsent.findUnique);
-const tokenFind = vi.mocked(prisma.integrationToken.findUnique);
+const tokenFind = vi.mocked(prisma.integrationToken.findFirst);
 const messageCreate = vi.mocked(prisma.smsMessage.create);
 const messageUpsert = vi.mocked(prisma.smsMessage.upsert);
 
@@ -143,6 +143,30 @@ describe('processSingleSend idempotency', () => {
     await processSingleSend(jobData, 'job-1', redis.connection, log);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(messageCreate).toHaveBeenCalledTimes(1);
+  });
+
+  // WHY this test: the job payload is the only provenance for integrationTokenId,
+  // so the token lookup must be scoped { id, orgId }. Without it, a forged/stale
+  // id in a job payload could decrypt another org's Twilio credentials and send
+  // on their account — cross-tenant OAuth token disclosure.
+  it('a token id belonging to another org is not returned or decrypted', async () => {
+    // Org-scoped findFirst finds no row when the id exists under a different org.
+    tokenFind.mockResolvedValue(null as never);
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(twilioOkResponse());
+    const redis = makeFakeRedis();
+
+    await expect(
+      processSingleSend(jobData, 'job-1', redis.connection, log),
+    ).rejects.toThrow(`IntegrationToken ${integrationTokenId} not found`);
+
+    expect(tokenFind).toHaveBeenCalledWith({
+      where: { id: integrationTokenId, orgId },
+      select: { accessTokenEncrypted: true, externalAccountId: true },
+    });
+    // No creds → no claim, no Twilio call, no row.
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(messageCreate).not.toHaveBeenCalled();
   });
 
   it('opted-out recipient is skipped before any claim or send', async () => {
