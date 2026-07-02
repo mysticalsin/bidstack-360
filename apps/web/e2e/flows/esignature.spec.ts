@@ -5,23 +5,57 @@
  * link means contracts never close. This spec covers the full lifecycle:
  * send for signature, public signing page, and status update in the CRM.
  */
-import { test, expect } from '@playwright/test';
-import { seededValue } from '../fixtures/env.js';
+import { test, expect, request as pwRequest } from '@playwright/test';
 import { PublicSignPage } from '../pages/PublicSignPage.js';
 
-const TEST_SIGN_TOKEN = seededValue('E2E_SIGN_TOKEN', 'test-sign-token');
+const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4010';
+
+// Seeded by packages/db/src/seed.ts as a persistent Document row (distinct
+// from the one-shot SignatureRequest also seeded there, which the "full sign
+// flow" test below consumes). Reused here only as the documentId FK required
+// by POST /signatures/requests — never signed itself.
+const SEEDED_DOCUMENT_ID = 'd0c00000-0000-0000-0000-000000000000';
+
+// Freshly minted (not DB-seeded) in beforeAll below, so a Playwright CI retry
+// (playwright.config.ts sets retries: 1 in CI) or a local re-run without a DB
+// reset re-enters this serial suite against a brand-new, never-consumed token
+// instead of the one the "full sign flow" test already signed.
+let signToken: string;
 
 test.describe('E-signature flow', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeAll(async () => {
+    const ctx = await pwRequest.newContext();
+    const res = await ctx.post(`${API_URL}/api/v1/signatures/requests`, {
+      data: {
+        documentId: SEEDED_DOCUMENT_ID,
+        recipients: [{ email: 'e2e-signer@example.com', name: 'E2E Signer', role: 'SIGNER' }],
+        provider: 'INTERNAL',
+      },
+      timeout: 10_000,
+    });
+    if (!res.ok()) {
+      throw new Error(
+        `esignature.spec.ts beforeAll: failed to mint a fresh signature request (${res.status()}): ${await res.text()}`,
+      );
+    }
+    const body = (await res.json()) as { signingUrl?: string | null };
+    if (!body.signingUrl) {
+      throw new Error('esignature.spec.ts beforeAll: signature request response had no signingUrl');
+    }
+    signToken = new URL(body.signingUrl).pathname.split('/').pop() ?? '';
+    await ctx.dispose();
+  });
+
   test('signing page renders for a valid token', async ({ page }) => {
     const signPage = new PublicSignPage(page);
-    await signPage.navigate(TEST_SIGN_TOKEN);
+    await signPage.navigate(signToken);
 
     const expired = await signPage.isExpired();
     expect(
       expired,
-      `Seeded signing token "${TEST_SIGN_TOKEN}" must be valid before the suite runs`,
+      `Freshly minted signing token "${signToken}" must be valid before the suite runs`,
     ).toBe(false);
 
     await expect(signPage.signaturePad.or(signPage.documentViewer)).toBeVisible({
@@ -40,17 +74,17 @@ test.describe('E-signature flow', () => {
 
   test('signature pad is interactable', async ({ page }) => {
     const signPage = new PublicSignPage(page);
-    await signPage.navigate(TEST_SIGN_TOKEN);
+    await signPage.navigate(signToken);
 
     const expired = await signPage.isExpired();
-    expect(expired, `Seeded signing token "${TEST_SIGN_TOKEN}" must be valid`).toBe(false);
+    expect(expired, `Freshly minted signing token "${signToken}" must be valid`).toBe(false);
 
     await signPage.startSigning();
 
     const padVisible = await signPage.signaturePad
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
-    expect(padVisible, 'Signature pad must be visible for the seeded request').toBe(true);
+    expect(padVisible, 'Signature pad must be visible for the freshly minted request').toBe(true);
 
     await signPage.drawSignature();
     const continueBtn = page.getByRole('button', { name: /continue/i });
@@ -59,17 +93,17 @@ test.describe('E-signature flow', () => {
 
   test('full sign flow: draw, submit, confirmation', async ({ page }) => {
     const signPage = new PublicSignPage(page);
-    await signPage.navigate(TEST_SIGN_TOKEN);
+    await signPage.navigate(signToken);
 
     const expired = await signPage.isExpired();
-    expect(expired, `Seeded signing token "${TEST_SIGN_TOKEN}" must be valid`).toBe(false);
+    expect(expired, `Freshly minted signing token "${signToken}" must be valid`).toBe(false);
 
     await signPage.startSigning();
 
     const padVisible = await signPage.signaturePad
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
-    expect(padVisible, 'Signature pad must be visible for the seeded request').toBe(true);
+    expect(padVisible, 'Signature pad must be visible for the freshly minted request').toBe(true);
 
     await signPage.signAndSubmit();
     await signPage.assertSigned();

@@ -55,8 +55,31 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
-      - name: Test (no DB — integration suites self-skip via DATABASE_URL guard)
-        run: pnpm -r test
+      - name: Test (no DB — all packages except api)
+        run: pnpm --filter '!@bidstack/api' -r test
+
+      # api's DB-touching suites now FAIL LOUD (not self-skip) when Postgres is
+      # unreachable — makeSkipIfNoDb (src/test-support/skip-if-no-db.ts) throws
+      # instead of silently passing, so this job (no Postgres service) must
+      # exclude them by name here. They still run for real against Postgres in
+      # the `integration` job below (`pnpm --filter @bidstack/api test`, no
+      # excludes). Keep this list in sync with `grep -rl makeSkipIfNoDb
+      # apps/api/src` — most matches are *.integration.test.ts (covered by the
+      # first glob), plus these plain-named suites that also hit a real DB.
+      - name: Test (no DB — api, DB-dependent suites excluded)
+        run: >-
+          pnpm --filter @bidstack/api test --
+          --exclude "**/*.integration.test.ts"
+          --exclude "src/routes/audit-logs.test.ts"
+          --exclude "src/routes/companies.test.ts"
+          --exclude "src/routes/crm/companies.test.ts"
+          --exclude "src/routes/crm/connectors.test.ts"
+          --exclude "src/routes/crm/dashboard.test.ts"
+          --exclude "src/routes/crm/health.test.ts"
+          --exclude "src/routes/crm/summary.test.ts"
+          --exclude "src/routes/crm/widgets.test.ts"
+          --exclude "src/routes/notes.test.ts"
+          --exclude "src/routes/opportunity-timeline.test.ts"
 
       - name: Build
         run: pnpm -r build

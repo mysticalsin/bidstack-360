@@ -37,6 +37,7 @@ describe('CurrencyLocaleSection', () => {
     cleanup();
     vi.clearAllMocks();
     authMocks.isAdmin = true;
+    window.localStorage.clear();
   });
 
   it('loads workspace defaults from the server and saves through the mutation hook', () => {
@@ -74,6 +75,52 @@ describe('CurrencyLocaleSection', () => {
         onSuccess: expect.any(Function),
       }),
     );
+  });
+
+  it('syncs the loaded locale into the bidstack:currency-locale localStorage key on load', () => {
+    // WHY this matters: lib/format.ts's detectCurrency() reads this exact
+    // localStorage key to pick formatMoney's default currency for non-React
+    // callsites. If the load path doesn't sync it, formatMoney is stuck on the
+    // EUR fallback regardless of the org's saved currency.
+    hookMocks.useOrgLocaleSettings.mockReturnValue({
+      data: { currency: 'GBP', dateFormat: 'DD/MM/YYYY', timezone: 'Europe/London' },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useUpdateOrgLocaleSettings.mockReturnValue({
+      isPending: false,
+      mutate: hookMocks.mutate,
+    });
+
+    render(<CurrencyLocaleSection />);
+
+    expect(window.localStorage.getItem('bidstack:currency-locale')).toBe(
+      JSON.stringify({ currency: 'GBP', dateFormat: 'DD/MM/YYYY', timezone: 'Europe/London' }),
+    );
+  });
+
+  it('syncs the saved locale into localStorage after a successful save', () => {
+    hookMocks.useOrgLocaleSettings.mockReturnValue({
+      data: { currency: 'CAD', dateFormat: 'YYYY-MM-DD', timezone: 'America/Toronto' },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useUpdateOrgLocaleSettings.mockReturnValue({
+      isPending: false,
+      mutate: hookMocks.mutate,
+    });
+
+    render(<CurrencyLocaleSection />);
+
+    fireEvent.change(screen.getByLabelText('Default currency'), { target: { value: 'USD' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save currency and locale' }));
+
+    // Simulate the mutation resolving with the server-normalized response.
+    const [, callbacks] = hookMocks.mutate.mock.calls[0]!;
+    const saved = { currency: 'USD', dateFormat: 'YYYY-MM-DD', timezone: 'America/Toronto' };
+    callbacks.onSuccess(saved);
+
+    expect(window.localStorage.getItem('bidstack:currency-locale')).toBe(JSON.stringify(saved));
   });
 
   it('renders workspace defaults read-only for non-admin users', () => {

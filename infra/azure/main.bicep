@@ -67,6 +67,10 @@ param piiEncryptionMasterKey string
 param jobSigningSecret string
 
 @secure()
+@description('Pre-migrate backup proof JSON (schemaVersion 1; see scripts/run-safe-migrate-deploy.mjs), produced fresh by the deploy pipeline right before the migrate job runs and verified against DATABASE_URL. Same contract as docker-compose.prod.yml BIDSTACK_MIGRATE_BACKUP_PROOF. REQUIRED — the migrate image refuses `prisma migrate deploy` in a production-like environment without it.')
+param migrateBackupProofJson string
+
+@secure()
 @description('Clerk secret key (sk_live_...).')
 param clerkSecretKey string
 
@@ -406,6 +410,7 @@ var secretMap = {
   'integration-token-key': integrationTokenKey
   'pii-encryption-master-key': piiEncryptionMasterKey
   'job-signing-secret': jobSigningSecret
+  'migrate-backup-proof': migrateBackupProofJson
   'clerk-secret-key': clerkSecretKey
   's3-access-key-id': s3AccessKeyId
   's3-secret-access-key': s3SecretAccessKey
@@ -506,10 +511,25 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
       replicaTimeout: 600
       replicaRetryLimit: 1
       manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
-      secrets: [kvSecret('database-url-direct', managedIdentityId, kvUri)]
+      secrets: [
+        kvSecret('database-url-direct', managedIdentityId, kvUri)
+        kvSecret('migrate-backup-proof', managedIdentityId, kvUri)
+      ]
       registries: registries
     }
     template: {
+      // VALIDATE: ACA "secret volume" shape (storageType: 'Secret' + per-file
+      // `path`) — mounts the migrate-backup-proof KV secret as a real file so
+      // run-safe-migrate-deploy.mjs can `readFileSync` it, mirroring
+      // docker-compose.prod.yml's bind-mounted BIDSTACK_MIGRATE_BACKUP_PROOF
+      // file (same fixed in-container path, same env var, same JSON contract).
+      volumes: [
+        {
+          name: 'migrate-backup-proof-vol'
+          storageType: 'Secret'
+          secrets: [{ secretRef: 'migrate-backup-proof', path: 'migrate-backup-proof.json' }]
+        }
+      ]
       containers: [
         {
           name: 'migrate'
@@ -517,8 +537,13 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
             { name: 'NODE_ENV', value: 'production' }
+            { name: 'BIDSTACK_DEPLOY_ENV', value: 'production' }
             { name: 'DATABASE_URL', secretRef: 'database-url-direct' } // direct :5432, no pooler
+            // Fixed in-container path the secret volume below mounts the proof
+            // file at — same value docker-compose.prod.yml uses.
+            { name: 'BIDSTACK_MIGRATE_BACKUP_PROOF', value: '/run/bidstack/migrate-backup-proof.json' }
           ]
+          volumeMounts: [{ volumeName: 'migrate-backup-proof-vol', mountPath: '/run/bidstack' }]
         }
       ]
     }

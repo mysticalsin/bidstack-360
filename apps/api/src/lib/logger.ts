@@ -45,8 +45,34 @@ function getDevPrettyTransport(): ReturnType<typeof pino.transport> | undefined 
   return devPrettyTransport;
 }
 
+// pino's own `req`/`res`/`err` serializers (privacyLogSerializers below)
+// already extract the fields they need and scrub the resulting plain
+// object. If we deep-scrub the *live* req/res/err values here, we run
+// before serialization: Error.message/stack are non-enumerable so scrubbing
+// the raw Error strips them (emitting `err: {}`), Fastify's req/res getters
+// (method/url/statusCode) live on the prototype so they're lost the same
+// way, and walking the raw req can chase req -> socket -> server for every
+// log line. So the merging object's req/res/err keys (and a bare Error
+// passed directly, which pino wraps into `{ err }` itself) are passed
+// through untouched; every other field is scrubbed here as before.
+const SERIALIZED_LOG_KEYS = new Set(['req', 'res', 'err']);
+
+function scrubLogMergingObject(value: unknown): unknown {
+  if (value instanceof Error) return value;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return scrubTelemetryValue(value);
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, fieldValue] of Object.entries(value as Record<string, unknown>)) {
+    result[key] = SERIALIZED_LOG_KEYS.has(key) ? fieldValue : scrubTelemetryValue(fieldValue, key, 1);
+  }
+  return result;
+}
+
 export function scrubLogMethodArgs(args: Parameters<pino.LogFn>): Parameters<pino.LogFn> {
-  return args.map((arg) => scrubTelemetryValue(arg)) as Parameters<pino.LogFn>;
+  return args.map((arg, index) =>
+    index === 0 ? scrubLogMergingObject(arg) : scrubTelemetryValue(arg),
+  ) as Parameters<pino.LogFn>;
 }
 
 export const privacyLogSerializers: pino.LoggerOptions['serializers'] = {

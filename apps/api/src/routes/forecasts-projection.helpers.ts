@@ -76,6 +76,42 @@ export function resolveStageProbability(
   return stageProbabilities.get(stage) ?? STAGE_WIN_PROBABILITY[stage] ?? 0;
 }
 
+/** Manual "commit" forecast row as read from the DB (pre-currency-filter). */
+export interface ManualCommitRow {
+  period: string;
+  amountMicros: number | bigint;
+  currency: string;
+}
+
+export interface ManualCommitAggregation {
+  byPeriod: Map<string, number>;
+  /** Rows excluded because their currency didn't match the reporting currency. */
+  excludedCount: number;
+}
+
+/**
+ * Sums manual "commit" forecast rows per period, restricted to the endpoint's
+ * reporting currency. A row in a different currency can't be added to the
+ * total without a conversion — summing raw micros across currencies would
+ * silently misstate the number — so non-matching rows are excluded and
+ * counted for the caller to log (exclusion should never be silent).
+ */
+export function aggregateManualCommit(
+  rows: ManualCommitRow[],
+  reportingCurrency: string,
+): ManualCommitAggregation {
+  const byPeriod = new Map<string, number>();
+  let excludedCount = 0;
+  for (const row of rows) {
+    if (row.currency !== reportingCurrency) {
+      excludedCount += 1;
+      continue;
+    }
+    byPeriod.set(row.period, (byPeriod.get(row.period) ?? 0) + Number(row.amountMicros));
+  }
+  return { byPeriod, excludedCount };
+}
+
 /** Grouped opportunity row from the DB aggregate query. */
 export interface ProjectionRow {
   period: string | null; // null = outside the window (skipped)

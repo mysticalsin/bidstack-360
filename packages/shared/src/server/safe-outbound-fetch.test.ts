@@ -51,15 +51,55 @@ describe('createSafeFetch', () => {
     lookupMock.mockResolvedValue([{ address: '10.1.2.3' }]);
     const baseFetch = vi.fn();
     const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
-    await expect(safe('https://evil.example.com')).rejects.toThrow();
+    await expect(safe('https://evil.example.com', { redirect: 'manual' })).rejects.toThrow();
     expect(baseFetch).not.toHaveBeenCalled();
   });
 
-  it('calls the base fetch for a public URL', async () => {
+  it('calls the base fetch for a public URL with redirect: manual', async () => {
     lookupMock.mockResolvedValue([{ address: '93.184.216.34' }]);
     const baseFetch = vi.fn().mockResolvedValue(new Response('ok'));
     const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
-    await safe('https://example.com');
+    await safe('https://example.com', { redirect: 'manual' });
+    expect(baseFetch).toHaveBeenCalledOnce();
+  });
+
+  // Regression: undici/fetch defaults to redirect: 'follow', which would let a
+  // validated public host 302 to an internal/metadata IP with no re-validation
+  // (SSRF bypass via redirect hop). createSafeFetch must refuse to proceed
+  // unless the caller opts into manual redirect handling.
+  it('throws synchronously when redirect is omitted (unsafe fetch default)', () => {
+    const baseFetch = vi.fn();
+    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
+    expect(() => safe('https://example.com')).toThrow(/redirect/i);
+    expect(baseFetch).not.toHaveBeenCalled();
+    expect(lookupMock).not.toHaveBeenCalled();
+  });
+
+  it("throws synchronously when the caller explicitly passes redirect: 'follow'", () => {
+    const baseFetch = vi.fn();
+    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
+    expect(() => safe('https://example.com', { redirect: 'follow' })).toThrow(/redirect/i);
+    expect(baseFetch).not.toHaveBeenCalled();
+    expect(lookupMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts redirect: 'manual'", async () => {
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }]);
+    const baseFetch = vi.fn().mockResolvedValue(new Response('ok'));
+    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
+    await expect(safe('https://example.com', { redirect: 'manual' })).resolves.toBeInstanceOf(
+      Response,
+    );
+    expect(baseFetch).toHaveBeenCalledOnce();
+  });
+
+  it("accepts redirect: 'error'", async () => {
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }]);
+    const baseFetch = vi.fn().mockResolvedValue(new Response('ok'));
+    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
+    await expect(safe('https://example.com', { redirect: 'error' })).resolves.toBeInstanceOf(
+      Response,
+    );
     expect(baseFetch).toHaveBeenCalledOnce();
   });
 });

@@ -168,6 +168,56 @@ describe('pii-encryption middleware — bulk createMany path', () => {
     expect(result.email).toBe('consultant@example.com');
   });
 
+  // WHY: an orgId inside a NOT clause names the org the results are NOT from.
+  // The old code harvested it as decryption context and preferred it over the
+  // row's own orgId — decrypting with the wrong org's key does not error, it
+  // silently returns mask strings, corrupting every PII read on such queries.
+  it('decrypts rows with their OWN orgId when the query orgId only appears in a NOT clause', async () => {
+    const middleware = makePiiMiddleware();
+    const OTHER_ORG = '00000000-0000-4000-8000-0000000000bb';
+
+    const writeParams = {
+      model: 'Contact',
+      action: 'create',
+      args: { data: { orgId: ORG, email: 'not-clause@example.com' } },
+    };
+    await middleware(writeParams, async (rewritten) => rewritten);
+    const envelope = writeParams.args.data.email;
+    expect(isEncrypted(envelope)).toBe(true);
+
+    const readParams = {
+      model: 'Contact',
+      action: 'findMany',
+      args: { where: { NOT: { orgId: OTHER_ORG } } },
+    };
+    const result = (await middleware(readParams, async () => [
+      { orgId: ORG, email: envelope },
+    ])) as Array<{ email: string }>;
+
+    expect(result[0].email).toBe('not-clause@example.com');
+  });
+
+  it('FAILS LOUD (never wrong-key decrypts) when the only query orgId is in a NOT clause and the row has none', async () => {
+    const middleware = makePiiMiddleware();
+    const writeParams = {
+      model: 'Contact',
+      action: 'create',
+      args: { data: { orgId: ORG, email: 'orphan-row@example.com' } },
+    };
+    await middleware(writeParams, async (rewritten) => rewritten);
+    const envelope = writeParams.args.data.email;
+
+    const readParams = {
+      model: 'Contact',
+      action: 'findMany',
+      args: { where: { NOT: { orgId: ORG } } },
+    };
+
+    await expect(
+      middleware(readParams, async () => [{ email: envelope }]),
+    ).rejects.toThrow(/without orgId for decryption/);
+  });
+
   it('does not encrypt User.email until a User.emailHash migration exists', async () => {
     const middleware = makePiiMiddleware();
     const params = {

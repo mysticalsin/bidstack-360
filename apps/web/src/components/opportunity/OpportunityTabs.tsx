@@ -367,26 +367,40 @@ function DocumentsPanel({
   const { t } = useTranslation('crm');
   const [sendOpen, setSendOpen] = useState(false);
   const primaryDocumentId = documents[0]?.id;
-  const sendAction = (
+  const hasDocument = documents.length > 0;
+  // A signature request needs a Document id, not a DocumentTemplate id — with
+  // no document uploaded there is nothing to send, so the trigger is disabled
+  // rather than opening a modal that could only send a broken fallback id.
+  const sendAction = hasDocument ? (
     <Button variant="secondary" size="sm" onClick={() => setSendOpen(true)}>
+      <Icon name="mail" size={13} />
+      {t('opportunityTabs.sendForSignatureButton', 'Send for Signature')}
+    </Button>
+  ) : (
+    <Button
+      variant="secondary"
+      size="sm"
+      disabled
+      title={t(
+        'opportunityTabs.sendForSignatureDisabledTitle',
+        'Upload a document before sending it for signature',
+      )}
+    >
       <Icon name="mail" size={13} />
       {t('opportunityTabs.sendForSignatureButton', 'Send for Signature')}
     </Button>
   );
 
-  if (documents.length === 0)
+  if (!hasDocument)
     return (
-      <>
-        <EmptyState
-          title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
-          message={t(
-            'opportunityTabs.documentsEmptyMessage',
-            'Upload an RFP, SoW, or proposal draft.',
-          )}
-          action={sendAction}
-        />
-        <SendForSignatureModal open={sendOpen} onOpenChange={setSendOpen} />
-      </>
+      <EmptyState
+        title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
+        message={t(
+          'opportunityTabs.documentsEmptyMessage',
+          'Upload an RFP, SoW, or proposal draft.',
+        )}
+        action={sendAction}
+      />
     );
   return (
     <>

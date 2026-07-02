@@ -45,6 +45,54 @@ export type FetchWithTimeoutInit = FetchInit & {
   timeoutMs?: number;
 };
 
+// WHY: fetch() resolves as soon as response *headers* arrive, not once the
+// body is fully read. Guards each body-consuming method so the deadline
+// (and the abort it triggers) stays armed until the body actually finishes,
+// instead of being disarmed the moment headers land — otherwise a provider
+// that stalls mid-body can pin the caller forever inside res.json()/
+// res.text()/res.arrayBuffer().
+function guardBodyRead<R>(
+  read: () => Promise<R>,
+  clearDeadline: () => void,
+  isTimedOut: () => boolean,
+  provider: string,
+  operation: string,
+  timeoutMs: number,
+): () => Promise<R> {
+  return async () => {
+    try {
+      return await read();
+    } catch (err) {
+      if (isTimedOut()) {
+        throw new ProviderTimeoutError(provider, operation, timeoutMs);
+      }
+      throw err;
+    } finally {
+      clearDeadline();
+    }
+  };
+}
+
+function guardResponseBody(
+  response: Response,
+  clearDeadline: () => void,
+  isTimedOut: () => boolean,
+  provider: string,
+  operation: string,
+  timeoutMs: number,
+): Response {
+  const guard = <R>(read: () => Promise<R>) =>
+    guardBodyRead(read, clearDeadline, isTimedOut, provider, operation, timeoutMs);
+
+  return Object.assign(response, {
+    json: guard(response.json.bind(response)),
+    text: guard(response.text.bind(response)),
+    arrayBuffer: guard(response.arrayBuffer.bind(response)),
+    blob: guard(response.blob.bind(response)),
+    formData: guard(response.formData.bind(response)),
+  });
+}
+
 export async function fetchWithTimeout(
   input: FetchInput,
   init: FetchWithTimeoutInit,
@@ -60,6 +108,7 @@ export async function fetchWithTimeout(
   const boundedTimeoutMs = parseTimeoutMs(String(timeoutMs), DEFAULT_PROVIDER_TIMEOUT_MS);
   const controller = new AbortController();
   let timedOut = false;
+  let deadlineCleared = false;
 
   const abortFromCaller = () => controller.abort(signal?.reason);
   if (signal?.aborted) {
@@ -73,15 +122,32 @@ export async function fetchWithTimeout(
     controller.abort();
   }, boundedTimeoutMs);
 
+  // Idempotent: called either from the header-phase catch below or from the
+  // body-read guard once the body settles, whichever happens first.
+  const clearDeadline = () => {
+    if (deadlineCleared) return;
+    deadlineCleared = true;
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', abortFromCaller);
+  };
+
+  let response: Response;
   try {
-    return await fetch(input, { ...fetchInit, signal: controller.signal });
+    response = await fetch(input, { ...fetchInit, signal: controller.signal });
   } catch (err) {
+    clearDeadline();
     if (timedOut) {
       throw new ProviderTimeoutError(provider, operation, boundedTimeoutMs);
     }
     throw err;
-  } finally {
-    clearTimeout(timeoutId);
-    signal?.removeEventListener('abort', abortFromCaller);
   }
+
+  return guardResponseBody(
+    response,
+    clearDeadline,
+    () => timedOut,
+    provider,
+    operation,
+    boundedTimeoutMs,
+  );
 }

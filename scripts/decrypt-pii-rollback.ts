@@ -11,6 +11,12 @@
  * WARNING: Running this script stores PII as plaintext in PostgreSQL.
  * Use only under an approved incident/rollback plan.
  *
+ * SAFETY: every decrypted value is checked against the decryption-failure
+ * masks before it is written. If the master key is wrong/rotated, the script
+ * aborts on the first undecryptable row instead of overwriting ciphertext
+ * with masks (which would be unrecoverable). Run --dry-run first — it
+ * decrypts and validates every row without writing.
+ *
  * EXECUTION ORDER:
  *   1. Disable PII_FIELD_ENCRYPTION=false (or remove the env var)
  *   2. Deploy the API build with encryption disabled
@@ -27,6 +33,35 @@ import { decryptPiiField, isEncrypted } from '../packages/shared/src/crypto/pii-
 
 const CHUNK_SIZE = 1000;
 const DRY_RUN = process.argv.includes('--dry-run');
+
+// decryptPiiField NEVER throws — on any failure (wrong/rotated master key,
+// corrupt envelope) it returns these masks. Writing a mask over the ciphertext
+// would permanently destroy the PII: the mask has no enc:v1: prefix, so a
+// re-run skips the row as plaintext and the original envelope is gone. Guard
+// every decrypted value and abort loudly instead (same contract as
+// encrypt-existing-pii.ts's EMAIL_DECRYPTION_MASK check).
+const DECRYPTION_MASKS: Record<'email' | 'phone', string> = {
+  email: '***@***.***',
+  phone: '***-***-****',
+};
+
+function decryptOrAbort(
+  model: string,
+  rowId: string,
+  envelope: string,
+  orgId: string,
+  fieldType: 'email' | 'phone',
+): string {
+  const plain = decryptPiiField(envelope, orgId, fieldType);
+  if (plain === DECRYPTION_MASKS[fieldType]) {
+    throw new Error(
+      `Unable to decrypt ${model} ${rowId} ${fieldType}; ` +
+        'check PII_ENCRYPTION_MASTER_KEY before continuing. ' +
+        'No mask was written — the ciphertext is intact.',
+    );
+  }
+  return plain;
+}
 
 const prisma = new PrismaClient({ log: ['warn', 'error'] });
 
@@ -57,7 +92,7 @@ async function rollbackContacts(): Promise<Stats> {
       let needsUpdate = false;
 
       if (typeof row.email === 'string' && isEncrypted(row.email)) {
-        updates.email = decryptPiiField(row.email, row.orgId, 'email');
+        updates.email = decryptOrAbort('Contact', row.id, row.email, row.orgId, 'email');
         updates.emailHash = null; // clear the search hash
         needsUpdate = true;
       } else if (row.emailHash !== null) {
@@ -65,7 +100,7 @@ async function rollbackContacts(): Promise<Stats> {
         needsUpdate = true;
       }
       if (typeof row.phone === 'string' && isEncrypted(row.phone)) {
-        updates.phone = decryptPiiField(row.phone, row.orgId, 'phone');
+        updates.phone = decryptOrAbort('Contact', row.id, row.phone, row.orgId, 'phone');
         needsUpdate = true;
       }
 
@@ -109,7 +144,7 @@ async function rollbackLeads(): Promise<Stats> {
       let needsUpdate = false;
 
       if (typeof row.email === 'string' && isEncrypted(row.email)) {
-        updates.email = decryptPiiField(row.email, row.orgId, 'email');
+        updates.email = decryptOrAbort('Lead', row.id, row.email, row.orgId, 'email');
         updates.emailHash = null;
         needsUpdate = true;
       } else if (row.emailHash !== null) {
@@ -117,7 +152,7 @@ async function rollbackLeads(): Promise<Stats> {
         needsUpdate = true;
       }
       if (typeof row.phone === 'string' && isEncrypted(row.phone)) {
-        updates.phone = decryptPiiField(row.phone, row.orgId, 'phone');
+        updates.phone = decryptOrAbort('Lead', row.id, row.phone, row.orgId, 'phone');
         needsUpdate = true;
       }
 
@@ -157,7 +192,7 @@ async function rollbackKamConsultants(): Promise<Stats> {
       stats.processed++;
 
       if (typeof row.email === 'string' && isEncrypted(row.email)) {
-        const plain = decryptPiiField(row.email, row.orgId, 'email');
+        const plain = decryptOrAbort('KamConsultant', row.id, row.email, row.orgId, 'email');
         const updates = { email: plain, emailHash: null };
         stats.decrypted++;
         if (!DRY_RUN) {
@@ -204,7 +239,7 @@ async function rollbackLegacyUsers(): Promise<Stats> {
       stats.processed++;
 
       if (typeof row.email === 'string' && isEncrypted(row.email)) {
-        const plain = decryptPiiField(row.email, row.orgId, 'email');
+        const plain = decryptOrAbort('User', row.id, row.email, row.orgId, 'email');
         stats.decrypted++;
         if (!DRY_RUN) {
           await prisma.user.update({ where: { id: row.id }, data: { email: plain } });

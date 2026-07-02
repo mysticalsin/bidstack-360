@@ -27,6 +27,7 @@ vi.mock('@bidstack/db', () => ({
 
 import { prisma } from '@bidstack/db';
 import { rbacPlugin } from '../plugins/rbac.js';
+import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
 
 const findMany = vi.mocked(prisma.userRole.findMany);
 const count = vi.mocked(prisma.userRole.count) as unknown as {
@@ -36,10 +37,11 @@ const count = vi.mocked(prisma.userRole.count) as unknown as {
 };
 
 // ─── Matrix-driven gate helpers (shared by the allow / deny suites below) ────
-// The plugin's requirePermission calls prisma.userRole.count with the checked
-// permission key nested at where.role.permissions.some.permission.key. We read
-// that key back so the count mock can simulate a DB seeded from the canonical
-// RBAC_MATRIX, rather than returning a hardcoded 1/0 that ignores the role.
+// The plugin's requirePermission calls the RBAC decision cache, which loads from
+// prisma.userRole.count with the checked permission key nested at
+// where.role.permissions.some.permission.key. We read that key back so the count
+// mock can simulate a DB seeded from the canonical RBAC_MATRIX, rather than
+// returning a hardcoded 1/0 that ignores the role.
 
 /** Pull the permission key out of the plugin's prisma.userRole.count(where). */
 function permKeyFromCountArgs(args: unknown): string | undefined {
@@ -53,6 +55,7 @@ function permKeyFromCountArgs(args: unknown): string | undefined {
 
 /** Mock the DB so a role only "holds" the permissions its matrix entry lists. */
 function mockCountFromMatrix(role: SystemRoleName): void {
+  clearRbacDecisionCacheForTest();
   const granted = new Set<string>(RBAC_MATRIX[role]);
   count.mockImplementation(async (args?: unknown) => {
     const key = permKeyFromCountArgs(args);
@@ -107,7 +110,9 @@ async function _buildServer(grantedPermissions: string[]) {
       role: {
         permissions: [{ permission: { key } }],
       },
-    })) as ReturnType<typeof findMany extends (...args: unknown[]) => Promise<infer R> ? () => Promise<R> : never>,
+    })) as ReturnType<
+      typeof findMany extends (...args: unknown[]) => Promise<infer R> ? () => Promise<R> : never
+    >,
   );
 
   // Provide count result for the plugin's requirePermission
@@ -207,15 +212,16 @@ describe('RBAC_MATRIX', () => {
   });
 
   // Admin is the superset of all other roles
-  it.each(
-    SYSTEM_ROLE_NAMES.filter((r): r is SystemRoleName => r !== 'Admin'),
-  )('%s permissions are a subset of Admin permissions', (role: SystemRoleName) => {
-    const adminSet = new Set(RBAC_MATRIX['Admin']);
-    const rolePerms = RBAC_MATRIX[role];
-    for (const perm of rolePerms) {
-      expect(adminSet.has(perm)).toBe(true);
-    }
-  });
+  it.each(SYSTEM_ROLE_NAMES.filter((r): r is SystemRoleName => r !== 'Admin'))(
+    '%s permissions are a subset of Admin permissions',
+    (role: SystemRoleName) => {
+      const adminSet = new Set(RBAC_MATRIX['Admin']);
+      const rolePerms = RBAC_MATRIX[role];
+      for (const perm of rolePerms) {
+        expect(adminSet.has(perm)).toBe(true);
+      }
+    },
+  );
 });
 
 // ─── Fastify plugin integration — allow / deny matrix ────────────────────────
@@ -297,6 +303,7 @@ describe('requirePermission — deny matrix', () => {
       const key = permKeyFromCountArgs(args);
       return key !== undefined && leaked.has(key) ? 1 : 0;
     });
+    clearRbacDecisionCacheForTest();
     const server = Fastify({ logger: false });
     await server.register(sensible);
     await server.register(rbacPlugin);
@@ -329,6 +336,7 @@ describe('new settings:write gates reject non-permissioned callers', () => {
   /** Stand up a route guarded exactly like the new email-templates / lead-rot
    *  mutation hooks (settings:write), then return its status for a given grant. */
   async function settingsWriteGateStatus(holdsSettingsWrite: boolean): Promise<number> {
+    clearRbacDecisionCacheForTest();
     count.mockImplementation(async (args?: unknown) =>
       permKeyFromCountArgs(args) === 'settings:write' && holdsSettingsWrite ? 1 : 0,
     );
@@ -358,6 +366,59 @@ describe('new settings:write gates reject non-permissioned callers', () => {
   it('admits a caller who holds settings:write (Admin)', async () => {
     expect(RBAC_MATRIX['Admin']).toContain('settings:write');
     expect(await settingsWriteGateStatus(true)).toBe(200);
+  });
+});
+
+// ─── integrations:write gate — granted alongside contacts:write ─────────────
+// POST /sms/send and POST /email/send (apps/api/src/routes/integrations/
+// {twilio,email}.ts) are gated by requirePermission('integrations:write').
+// packages/db/src/seed.rbac.ts now grants integrations:write to every seeded
+// role that already holds contacts:write via writeKeys (Sales, Sales Manager,
+// Account Executive, SDR, Customer Success) — see
+// packages/db/src/seed.rbac.permission-sync.test.ts for the pin against that
+// exact seed role list (RBAC_MATRIX here only covers the 6 canonical spec
+// roles, a narrower set than the full seed catalogue, so it can't stand in for
+// that pin). This suite instead exercises the same requirePermission seam the
+// routes use, proving the gate itself correctly admits/denies on the
+// integrations:write key once a role holds (or lacks) it.
+describe('integrations:write gate reject non-permissioned callers', () => {
+  beforeEach(() => {
+    count.mockReset();
+  });
+
+  /** Stand up a route guarded exactly like POST /sms/send and POST /email/send
+   *  (integrations:write), then return its status for a given grant. */
+  async function integrationsWriteGateStatus(holdsIntegrationsWrite: boolean): Promise<number> {
+    clearRbacDecisionCacheForTest();
+    count.mockImplementation(async (args?: unknown) =>
+      permKeyFromCountArgs(args) === 'integrations:write' && holdsIntegrationsWrite ? 1 : 0,
+    );
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(rbacPlugin);
+    server.addHook('onRequest', async (req) => {
+      req.auth = { orgId: 'org-1', userId: 'u-1', role: 'member', scopes: [] };
+    });
+    server.post(
+      '/sms/send',
+      { preHandler: server.requirePermission('integrations:write') },
+      async () => ({ ok: true }),
+    );
+    await server.ready();
+    const res = await server.inject({ method: 'POST', url: '/sms/send' });
+    await server.close();
+    return res.statusCode;
+  }
+
+  it('rejects a caller without integrations:write (e.g. a read-only role)', async () => {
+    // Read-Only holds no write permissions at all in the canonical matrix,
+    // including integrations:write.
+    expect(RBAC_MATRIX['Read-Only']).not.toContain('integrations:write');
+    expect(await integrationsWriteGateStatus(false)).toBe(403);
+  });
+
+  it('admits a caller who holds integrations:write (a seller-write role per seed.rbac.ts)', async () => {
+    expect(await integrationsWriteGateStatus(true)).toBe(200);
   });
 });
 

@@ -162,7 +162,13 @@ function decryptRecord(
   if (!config) return record;
 
   const result = { ...record };
-  const recordOrgId = orgId ?? (typeof result.orgId === 'string' ? result.orgId : null);
+  // Prefer the row's OWN orgId over the query-extracted one: the query value
+  // can name a different org than the row (e.g. harvested from an unrelated
+  // where branch), and decrypting with the wrong org's key does not fail — it
+  // silently returns mask strings. The row itself is the authoritative record
+  // of which org's key sealed its fields.
+  const rowOrgId = typeof result.orgId === 'string' ? result.orgId : null;
+  const recordOrgId = rowOrgId ?? orgId;
 
   for (const { name, type } of config.fields) {
     const val = result[name];
@@ -449,7 +455,10 @@ function collectOrgIds(value: unknown, orgIds: Set<string>): void {
   const record = value as Record<string, unknown>;
   if (typeof record.orgId === 'string') orgIds.add(record.orgId);
 
-  for (const key of ['AND', 'OR', 'NOT']) {
+  // NOT is deliberately excluded: an orgId inside a NOT branch names the org
+  // the results are NOT from, so using it as decryption context would apply
+  // the wrong org's key (which silently yields mask strings, not an error).
+  for (const key of ['AND', 'OR']) {
     collectOrgIds(record[key], orgIds);
   }
 }

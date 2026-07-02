@@ -49,14 +49,22 @@ function buildPrismaClient(): PrismaClient {
     client.$use(makePiiMiddleware());
   }
 
-  // Soft delete middleware automatically filters out records where deletedAt is not null.
-  // We apply this globally so developers don't have to constantly append `deletedAt: null`.
-  client.$use(makeSoftDeleteMiddleware());
-
+  // WHY this runs BEFORE soft-delete: makeSoftDeleteMiddleware rewrites
+  // `findUnique` → `findFirst` in place before calling next, and findFirst is a
+  // GUARDED action while findUnique is report-only. Registered after
+  // soft-delete, the guard would see the rewritten action and escalate every
+  // legitimate fetch-by-unique-key on a soft-delete tenant model (including
+  // auth's `user.findUnique({ where: { clerkUser } })`) to a hard violation —
+  // an outage in enforce mode. Before soft-delete it classifies the caller's
+  // original action.
   const tenantScopeGuardMode = getTenantScopeGuardMode();
   if (tenantScopeGuardMode !== 'off') {
     client.$use(makeTenantScopeGuardMiddleware({ mode: tenantScopeGuardMode }));
   }
+
+  // Soft delete middleware automatically filters out records where deletedAt is not null.
+  // We apply this globally so developers don't have to constantly append `deletedAt: null`.
+  client.$use(makeSoftDeleteMiddleware());
 
   // Audit immutability: AuditLog is insert-only. Blocks update/delete/upsert via
   // the Prisma client so audit history cannot be silently altered. If/when an

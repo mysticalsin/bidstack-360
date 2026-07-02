@@ -10,11 +10,12 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { seedStandardCrew, STANDARD_CREW, STANDARD_CREW_KEY } from './crew-standard.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let dbReady = false;
 const createdOrgIds: string[] = [];
@@ -54,13 +55,7 @@ const countTasks = (crewId: string) =>
     SELECT task_key FROM crew_tasks WHERE crew_id = ${crewId}::uuid
   `;
 
-const skipIfNoDb = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReady) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or crew tables missing`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReady);
 
 describe('seedStandardCrew', () => {
   skipIfNoDb('seeds one standard crew with the stable standard_key', async () => {

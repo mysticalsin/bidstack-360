@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 
 import {
   STAGE_WIN_PROBABILITY,
+  aggregateManualCommit,
   aggregateProjection,
   buildProjectionWindow,
   quarterLabel,
   quarterPeriodKey,
   quarterStart,
   resolveStageProbability,
+  type ManualCommitRow,
   type ProjectionRow,
 } from './forecasts-projection.helpers.js';
 
@@ -125,5 +127,42 @@ describe('aggregateProjection', () => {
     );
     expect(result.find((p) => p.period === '2026-Q2')!.manualCommitMicros).toBeNull();
     expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe(9_000_000);
+  });
+});
+
+describe('aggregateManualCommit', () => {
+  const commitRow = (over: Partial<ManualCommitRow>): ManualCommitRow => ({
+    period: '2026-Q2',
+    amountMicros: 1_000_000,
+    currency: 'EUR',
+    ...over,
+  });
+
+  it('sums only rows matching the reporting currency', () => {
+    // A commit row booked in USD must never be blended into a EUR total —
+    // that would silently misstate the headline by whatever the FX delta is.
+    const { byPeriod, excludedCount } = aggregateManualCommit(
+      [commitRow({ amountMicros: 1_000_000, currency: 'EUR' }), commitRow({ amountMicros: 5_000_000, currency: 'USD' })],
+      'EUR',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(1_000_000);
+    expect(excludedCount).toBe(1);
+  });
+
+  it('reports zero exclusions when every row matches', () => {
+    const { byPeriod, excludedCount } = aggregateManualCommit(
+      [commitRow({ amountMicros: 2_000_000 }), commitRow({ amountMicros: 3_000_000 })],
+      'EUR',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(5_000_000);
+    expect(excludedCount).toBe(0);
+  });
+
+  it('handles bigint amountMicros from the Prisma driver', () => {
+    const { byPeriod } = aggregateManualCommit(
+      [commitRow({ amountMicros: BigInt(7_000_000) })],
+      'EUR',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(7_000_000);
   });
 });

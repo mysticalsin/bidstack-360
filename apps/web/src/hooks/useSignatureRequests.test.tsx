@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '@/lib/api';
-import { useBulkVoidSignatures } from './useSignatureRequests';
+import { useBulkVoidSignatures, useSendForSignature } from './useSignatureRequests';
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn(),
@@ -24,6 +24,32 @@ function createHarness() {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe('useSendForSignature', () => {
+  it('posts to /api/v1/signatures/requests — the only route the API registers', async () => {
+    // WHY this matters: the API only registers POST /signatures/requests
+    // under the /api/v1 prefix. The old '/api/signatures' path 404'd on every
+    // send, making Send for Signature a dead flow.
+    const { wrapper } = createHarness();
+    vi.mocked(api).mockResolvedValueOnce({ id: 'sig-1' });
+
+    const { result } = renderHook(() => useSendForSignature(), { wrapper });
+
+    const body = {
+      documentId: 'doc-1',
+      recipients: [{ email: 'a@example.com', name: 'A', role: 'SIGNER' as const }],
+      provider: 'DOCUSIGN' as const,
+    };
+    await act(async () => {
+      await result.current.mutateAsync(body);
+    });
+
+    expect(api).toHaveBeenCalledWith('/api/v1/signatures/requests', {
+      method: 'POST',
+      body,
+    });
+  });
 });
 
 describe('useBulkVoidSignatures', () => {

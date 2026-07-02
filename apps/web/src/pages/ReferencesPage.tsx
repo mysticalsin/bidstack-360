@@ -23,6 +23,19 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
 
+// Defense in depth: the API now rejects non-http(s) documentUrl values on
+// write, but existing rows (or a future write path) could still carry a
+// javascript:/data: URL — rendering it as a clickable <a href> would execute
+// it. Only render the link when the scheme is verifiably http(s).
+export function isSafeHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function ReferencesPage() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
@@ -229,7 +242,7 @@ export function ReferencesPage() {
                     </p>
                   )}
 
-                  {ref.documentUrl && (
+                  {ref.documentUrl && isSafeHttpUrl(ref.documentUrl) ? (
                     <a
                       href={ref.documentUrl}
                       target="_blank"
@@ -238,7 +251,11 @@ export function ReferencesPage() {
                     >
                       {t('references.viewDocument', 'View document')}
                     </a>
-                  )}
+                  ) : ref.documentUrl ? (
+                    <span className="mt-2 inline-flex items-center text-xs text-[var(--fg-tertiary)]">
+                      {t('references.unsafeDocumentUrl', 'Document link unavailable')}
+                    </span>
+                  ) : null}
 
                   {ref.tags.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">

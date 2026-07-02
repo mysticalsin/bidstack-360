@@ -176,7 +176,6 @@ export function ApiKeysSection() {
                           <input
                             type="checkbox"
                             name={`scope-${s}`}
-                            defaultChecked={s === 'read' || s === 'mcp'}
                             className="mt-0.5 accent-[var(--brand-primary)]"
                           />
                           <span>

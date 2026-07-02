@@ -7,12 +7,14 @@
 // Manual /forecasts rows are surfaced as per-period commit overrides; the
 // derived baseline never goes blank while open pipeline exists.
 
+import type { FastifyBaseLogger } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { prisma, Prisma } from '@bidstack/db';
 import { ForecastProjection } from '@bidstack/shared';
 
 import {
+  aggregateManualCommit,
   aggregateProjection,
   buildProjectionWindow,
   type ProjectionRow,
@@ -59,7 +61,7 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
           o.stage::text AS stage,
           COALESCE(SUM(o.value_micros), 0)::text AS "valueMicros"
         FROM opportunities o
-        LEFT JOIN users u ON u.id = o.owner_id
+        LEFT JOIN users u ON u.id = o.owner_id AND u.org_id = o.org_id
         WHERE o.org_id = ${orgId}::uuid
           AND o.deleted_at IS NULL
           AND o.stage <> 'closed_lost'
@@ -68,7 +70,7 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
 
       const [stageProbabilities, manualCommitByPeriod] = await Promise.all([
         loadStageProbabilities(orgId),
-        loadManualCommit(orgId, window.periods),
+        loadManualCommit(orgId, window.periods, FORECAST_CURRENCY, req.log),
       ]);
 
       const periods = aggregateProjection(rows, window, stageProbabilities, manualCommitByPeriod);
@@ -90,14 +92,28 @@ async function loadStageProbabilities(orgId: string): Promise<Map<string, number
   return map;
 }
 
-/** Sum of manual commit forecasts per in-window period (the override headline). */
-async function loadManualCommit(orgId: string, periods: string[]): Promise<Map<string, number>> {
+/**
+ * Sum of manual commit forecasts per in-window period (the override headline),
+ * restricted to the endpoint's reporting currency. Rows in another currency
+ * are excluded (not converted/blended) and logged so the exclusion isn't silent.
+ */
+async function loadManualCommit(
+  orgId: string,
+  periods: string[],
+  currency: string,
+  logger: FastifyBaseLogger,
+): Promise<Map<string, number>> {
   const rows = await prisma.forecast.findMany({
     where: { orgId, deletedAt: null, category: 'commit', period: { in: periods } },
-    select: { period: true, amountMicros: true },
+    select: { period: true, amountMicros: true, currency: true },
     take: 500,
   });
-  const map = new Map<string, number>();
-  for (const r of rows) map.set(r.period, (map.get(r.period) ?? 0) + Number(r.amountMicros));
-  return map;
+  const { byPeriod, excludedCount } = aggregateManualCommit(rows, currency);
+  if (excludedCount > 0) {
+    logger.warn(
+      { orgId, excludedCount, currency },
+      'forecasts-projection: excluded manual commit forecast rows in a non-reporting currency',
+    );
+  }
+  return byPeriod;
 }

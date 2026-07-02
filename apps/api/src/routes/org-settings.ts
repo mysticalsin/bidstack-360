@@ -54,7 +54,11 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/org-settings/locale',
     {
-      preHandler: [server.requirePermission('settings:read')],
+      // Locale defaults (currency/dateFormat/timezone) are non-sensitive
+      // workspace config, and the settings UI shows this section read-only to
+      // every role — AE/SDR/CS hold no settings:read grant, so gating on it
+      // 403'd a screen they're meant to see. Any authenticated, org-scoped
+      // caller may read; only PUT stays behind settings:write + admin.
       schema: { response: { 200: OrgLocaleSettings } },
     },
     async (req) => {

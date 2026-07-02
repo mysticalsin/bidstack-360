@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Job } from 'bullmq';
+import { UnrecoverableError, type Job } from 'bullmq';
 import type pino from 'pino';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   deliveryCreate: vi.fn(),
   subUpdate: vi.fn(),
   decrypt: vi.fn((s: string) => s),
+  isLegacySecret: vi.fn((s: string) => s.startsWith('whsec_')),
   serumDenial: vi.fn(async () => null as string | null),
 }));
 
@@ -28,6 +29,7 @@ vi.mock('@bidstack/db', () => ({
 
 vi.mock('@bidstack/shared/server-crypto', () => ({
   decryptWebhookSigningSecret: mocks.decrypt,
+  isLegacyWebhookSigningSecret: mocks.isLegacySecret,
 }));
 
 // createResearchFetch is called at module load (`const safeFetch = ...`), so the
@@ -90,6 +92,7 @@ function jobOf(
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.decrypt.mockImplementation((s: string) => s);
+  mocks.isLegacySecret.mockImplementation((s: string) => s.startsWith('whsec_'));
   mocks.serumDenial.mockResolvedValue(null);
   mocks.deliveryCreate.mockResolvedValue({ id: 'del-1' });
   mocks.subUpdate.mockResolvedValue({ id: SUBSCRIPTION_ID });
@@ -167,14 +170,20 @@ describe('processDeliveryJob — SSRF guard', () => {
 describe('processDeliveryJob - signing-secret safety', () => {
   // WHY: legacy webhook rows must be backfilled instead of silently signing
   // partner traffic with arbitrary plaintext after an unreadable/corrupt secret.
-  it('records a failed delivery when the stored signing secret is unreadable', async () => {
+  // A decrypt failure is also deterministic — retrying can never fix it — so
+  // the job must fail as UnrecoverableError instead of burning BullMQ's
+  // 5-attempt/~1.5h retry schedule before the subscription silently
+  // auto-disables.
+  it('throws UnrecoverableError with a backfill message when legacy plaintext fallback is disabled', async () => {
+    const job = jobOf();
+    mocks.isLegacySecret.mockReturnValue(true);
     mocks.decrypt.mockImplementation(() => {
-      throw new Error('bad secret');
+      throw new Error('legacy plaintext disabled');
     });
 
-    await expect(processDeliveryJob(jobOf(), log)).rejects.toThrow(
-      'Stored webhook signing secret is unreadable',
-    );
+    const err: unknown = await processDeliveryJob(job, log).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UnrecoverableError);
+    expect((err as Error).message).toContain('run the webhook secret encryption backfill');
 
     expect(mocks.safeFetch).not.toHaveBeenCalled();
     expect(mocks.deliveryCreate).toHaveBeenCalledWith(
@@ -182,14 +191,38 @@ describe('processDeliveryJob - signing-secret safety', () => {
         data: expect.objectContaining({
           success: false,
           statusCode: null,
-          errorMessage: expect.stringContaining('Stored webhook signing secret is unreadable'),
+          errorMessage: expect.stringContaining('run the webhook secret encryption backfill'),
         }),
       }),
     );
+    // The failure row + failureCount bookkeeping still happens as before —
+    // only the retry decision changes.
     expect(mocks.subUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: SUBSCRIPTION_ID },
         data: expect.objectContaining({ failureCount: { increment: 1 } }),
+      }),
+    );
+  });
+
+  it('throws UnrecoverableError with a key-mismatch message when the secret is not legacy plaintext', async () => {
+    const job = jobOf();
+    mocks.isLegacySecret.mockReturnValue(false);
+    mocks.decrypt.mockImplementation(() => {
+      throw new Error('bad ciphertext');
+    });
+
+    const err: unknown = await processDeliveryJob(job, log).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UnrecoverableError);
+    expect((err as Error).message).toContain('backfill will not fix this');
+
+    expect(mocks.deliveryCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          success: false,
+          statusCode: null,
+          errorMessage: expect.stringContaining('backfill will not fix this'),
+        }),
       }),
     );
   });

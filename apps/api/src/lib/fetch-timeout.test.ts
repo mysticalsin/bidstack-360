@@ -71,6 +71,44 @@ describe('fetchWithTimeout', () => {
     await assertion;
   });
 
+  it('keeps the deadline armed through body consumption and aborts a stalled body read', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      const response = new Response(null, { status: 200 });
+      const hang = () =>
+        new Promise<never>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => {
+              const err = new Error('aborted');
+              err.name = 'AbortError';
+              reject(err);
+            },
+            { once: true },
+          );
+        });
+      return Object.assign(response, { json: hang, text: hang, arrayBuffer: hang });
+    });
+
+    const response = await fetchWithTimeout('https://provider.example/slow-body', {
+      provider: 'Gmail',
+      operation: 'messages.get',
+      timeoutMs: 25,
+    });
+
+    const assertion = expect(response.json()).rejects.toMatchObject({
+      name: 'ProviderTimeoutError',
+      code: 'PROVIDER_HTTP_TIMEOUT',
+      statusCode: 504,
+      provider: 'Gmail',
+      operation: 'messages.get',
+      timeoutMs: 25,
+    });
+
+    await vi.advanceTimersByTimeAsync(25);
+    await assertion;
+  });
+
   it('parses positive timeout env values and falls back on unsafe values', () => {
     process.env.TEST_PROVIDER_TIMEOUT_MS = '2500';
     expect(providerTimeoutMs('TEST_PROVIDER_TIMEOUT_MS', 1000)).toBe(2500);

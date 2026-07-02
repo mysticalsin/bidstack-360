@@ -397,6 +397,17 @@ function smokeEndpointUrl(apiBaseUrl, endpoint) {
   return `${normalizeApiBaseUrl(apiBaseUrl)}/api/v1/ops/sentry-smoke/${endpoint}`;
 }
 
+function isLikelyJsonText(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return false;
+  try {
+    JSON.parse(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function postSmokeEndpoint(options, label, endpoint, marker, expectedStatuses, deps = {}) {
   const fetchFn = deps.fetchFn ?? globalThis.fetch;
   if (typeof fetchFn !== 'function') {
@@ -434,7 +445,12 @@ async function postSmokeEndpoint(options, label, endpoint, marker, expectedStatu
       status: response.status,
       passed: expectedStatuses.includes(response.status),
       expectedStatuses,
-      bodyPreview: text.slice(0, 500),
+      // Never persist raw response bytes in evidence — only a size/shape summary.
+      bodySummary: {
+        statusCode: response.status,
+        contentLength: text.length,
+        looksLikeJson: isLikelyJsonText(text),
+      },
     };
   } catch (error) {
     return {
@@ -569,7 +585,7 @@ function queryIssues(options, label, target, query) {
         command: result.command,
         exitCode: result.exitCode,
         passed: false,
-        error: result.error || normalizeStderr(result.stderr),
+        ...summarizeCommandFailure(result),
       },
     };
   }
@@ -607,13 +623,18 @@ function queryIssues(options, label, target, query) {
   }
 }
 
-function normalizeStderr(stderr) {
-  return String(stderr || '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 4)
-    .join(' ');
+// Never surface raw sentry CLI stderr in evidence (may carry tokens/URLs from the query args);
+// keep only a boolean signal plus a fixed, non-content-bearing summary string.
+function summarizeCommandFailure(result) {
+  const hasStderr = Boolean(String(result.stderr || '').trim());
+  return {
+    error:
+      result.error ||
+      (hasStderr
+        ? 'sentry CLI reported an error (stderr redacted)'
+        : 'sentry CLI exited non-zero with no stderr output'),
+    hasStderr,
+  };
 }
 
 function readTextIfExists(root, relativePath) {
@@ -708,6 +729,34 @@ function buildArtifact(options, observations) {
   };
 }
 
+// Recursively scans the serialized artifact for the specific raw-content shapes this
+// evidence must never carry: a `bodyPreview` field (raw HTTP response bytes) or an
+// `error` field containing newline-joined raw command output (e.g. joined CLI stderr
+// lines). Returns human-readable failure strings, or [] when clean.
+function scanForRawContentLeaks(node, keyPath = '') {
+  const leaks = [];
+  if (Array.isArray(node)) {
+    node.forEach((item, index) => {
+      leaks.push(...scanForRawContentLeaks(item, `${keyPath}[${index}]`));
+    });
+    return leaks;
+  }
+  if (!node || typeof node !== 'object') return leaks;
+  for (const [key, child] of Object.entries(node)) {
+    const childPath = keyPath ? `${keyPath}.${key}` : key;
+    if (key === 'bodyPreview') {
+      leaks.push(`${childPath} must not persist a raw response body preview`);
+      continue;
+    }
+    if (key === 'error' && typeof child === 'string' && /[\r\n]/.test(child)) {
+      leaks.push(`${childPath} must not persist newline-joined raw command output`);
+      continue;
+    }
+    leaks.push(...scanForRawContentLeaks(child, childPath));
+  }
+  return leaks;
+}
+
 function validateArtifact(artifact) {
   const failures = [];
   if (artifact.triggeredSmoke?.requested === true && artifact.triggeredSmoke?.passed !== true) {
@@ -774,6 +823,10 @@ function validateArtifact(artifact) {
       failures.push(`Sentry evidence must not include ${label}`);
     }
   }
+  // The flags above are self-reported; independently scan the serialized artifact so a
+  // future regression that re-introduces raw content fails the gate instead of relying
+  // solely on the (possibly stale) hardcoded privacy flags.
+  failures.push(...scanForRawContentLeaks(artifact));
   if (artifact.sessionReplayEnabled === true && artifact.legalApproval !== true) {
     failures.push('Session replay requires legal approval');
   }
@@ -1087,6 +1140,68 @@ async function runSelftest() {
     true,
   );
 
+  // The hardcoded privacy flags are self-reported and can drift from reality (that was the
+  // bug: they said `false` while raw stderr/body content was actually embedded elsewhere).
+  // These two cases prove the independent structural scan catches that regression even when
+  // the flags themselves still claim everything is clean.
+  const leakedBodyPreview = buildArtifact(baseOptions(), {
+    triggeredSmoke: null,
+    api: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
+  });
+  leakedBodyPreview.triggeredSmoke = {
+    requested: true,
+    passed: true,
+    api: { bodyPreview: '{"token":"super-secret"}' },
+  };
+  assert.equal(
+    validateArtifact(leakedBodyPreview).some((failure) => failure.includes('bodyPreview')),
+    true,
+    'expected a reintroduced bodyPreview field to fail validation even though privacy flags say false',
+  );
+
+  const leakedRawStderr = buildArtifact(baseOptions(), {
+    triggeredSmoke: null,
+    api: fixtureObservation(),
+    worker: fixtureObservation({
+      target: 'bidstack/bidstack-worker',
+      project: 'bidstack-worker',
+      marker: DEFAULT_WORKER_MARKER,
+    }),
+  });
+  leakedRawStderr.apiEvidence.command.error = 'error: unauthorized\nauth token abc123\nretrying';
+  assert.equal(
+    validateArtifact(leakedRawStderr).some((failure) => failure.includes('newline-joined')),
+    true,
+    'expected newline-joined raw command error text to fail validation',
+  );
+
+  // summarizeCommandFailure must never let raw multi-line CLI stderr (which may contain
+  // secrets from query args) reach the evidence file — only a boolean + fixed summary.
+  const stderrFailure = summarizeCommandFailure({
+    error: '',
+    stderr: 'auth failed for token=abc123\nsecond line\nthird line',
+  });
+  assert.equal(stderrFailure.hasStderr, true, 'expected hasStderr signal to be preserved');
+  assert.equal(
+    /[\r\n]/.test(stderrFailure.error),
+    false,
+    'expected sanitized error to contain no raw newline-joined stderr',
+  );
+  assert.equal(
+    stderrFailure.error.includes('abc123'),
+    false,
+    'expected raw stderr content (including secrets) to be redacted',
+  );
+
+  const spawnFailure = summarizeCommandFailure({ error: 'ENOENT', stderr: '' });
+  assert.equal(spawnFailure.hasStderr, false, 'expected no stderr signal when stderr is empty');
+  assert.equal(spawnFailure.error, 'ENOENT', 'expected genuine spawn error codes to pass through');
+
   const trigger = await triggerSmokeEvents(baseOptions({ triggerSmoke: true }), {
     fetchFn: async (url) => ({
       status: String(url).endsWith('/api') ? 500 : 202,
@@ -1103,6 +1218,18 @@ async function runSelftest() {
   assert.equal(trigger.api.status, 500);
   assert.equal(trigger.worker.status, 202);
   assert.equal(trigger.api.marker, DEFAULT_API_MARKER);
+  assert.equal(
+    trigger.api.bodyPreview,
+    undefined,
+    'expected raw response bodyPreview to never be persisted',
+  );
+  assert.equal(trigger.api.bodySummary?.looksLikeJson, true, 'expected JSON body to be detected');
+  assert.equal(trigger.api.bodySummary?.statusCode, 500);
+  assert.equal(
+    trigger.api.bodySummary?.contentLength,
+    '{"error":"controlled"}'.length,
+    'expected content length to be recorded without keeping the raw bytes',
+  );
 
   const missingTriggerToken = await triggerSmokeEvents(
     baseOptions({ triggerSmoke: true, smokeToken: 'too-short' }),

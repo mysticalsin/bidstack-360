@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
@@ -22,6 +22,22 @@ const CURRENCY_LABELS: Record<OrgLocaleSettings['currency'], string> = {
   AUD: 'AUD - Australian Dollar',
   JPY: 'JPY - Japanese Yen',
 };
+
+// bidstack/src/lib/format.ts's detectCurrency() reads this exact flat shape
+// to pick formatMoney's default currency for non-React callsites. Keep it in
+// sync with the server-persisted org setting on every load and save, or
+// formatMoney silently falls back to EUR regardless of the saved workspace
+// currency.
+const CURRENCY_LOCALE_STORAGE_KEY = 'bidstack:currency-locale';
+
+function syncCurrencyLocaleStorage(settings: OrgLocaleSettings): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CURRENCY_LOCALE_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    /* ignore — storage may be blocked by browser policy */
+  }
+}
 
 export function CurrencyLocaleSection() {
   const { t } = useTranslation('settings');
@@ -52,13 +68,23 @@ function CurrencyLocaleForm({ initial }: { initial: OrgLocaleSettings }) {
     values.dateFormat !== initial.dateFormat ||
     values.timezone !== initial.timezone;
 
+  // Sync on every successful load — this form remounts (via the `key` on the
+  // parent) whenever fresh server data arrives, so keying the effect on
+  // `initial` covers both the first load and any refetch.
+  useEffect(() => {
+    syncCurrencyLocaleStorage(initial);
+  }, [initial]);
+
   const patch = (next: Partial<OrgLocaleSettings>) => {
     setValues((current) => ({ ...current, ...next }));
   };
 
   const onSave = () => {
     update.mutate(values, {
-      onSuccess: () => toast.success(t('currencyLocale.saveSuccess', 'Currency and locale saved')),
+      onSuccess: (data) => {
+        syncCurrencyLocaleStorage(data);
+        toast.success(t('currencyLocale.saveSuccess', 'Currency and locale saved'));
+      },
       onError: (err: Error) =>
         toast.error(t('currencyLocale.saveError', 'Could not save currency and locale'), {
           description: err.message,

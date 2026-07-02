@@ -47,10 +47,28 @@ export async function assertUrlResolvesPublic(rawUrl: string): Promise<URL> {
  * Wrap a fetch so it refuses any URL — the initial one, and (when the caller
  * follows redirects manually and re-invokes this) every redirect hop — that
  * resolves to internal space. The DNS check runs before each request.
+ *
+ * Redirects MUST be handled manually by the caller. undici/fetch's default
+ * (`redirect: 'follow'`, also what happens when `redirect` is omitted) would
+ * transparently follow a 302 from a validated public host to an internal or
+ * cloud-metadata address without ever re-running the DNS gate — an SSRF
+ * bypass via redirect hop. To close that gap, this wrapper THROWS
+ * synchronously unless the caller explicitly passes `redirect: 'manual'` or
+ * `redirect: 'error'`; on `'manual'` the caller is responsible for reading
+ * the `Location` header and re-validating it with `assertUrlResolvesPublic`
+ * before following it.
  */
 export function createSafeFetch(baseFetch: FetchLike = fetch): FetchLike {
-  return async (input, init) => {
-    const url = await assertUrlResolvesPublic(input.toString());
-    return baseFetch(url.toString(), init);
+  return (input, init) => {
+    const redirect = init?.redirect ?? 'follow';
+    if (redirect === 'follow') {
+      throw new Error(
+        "createSafeFetch: redirect 'follow' is unsafe (this is also the default when `redirect` is omitted) — a validated public host can respond with a redirect to an internal or cloud-metadata address, bypassing the SSRF gate. Pass { redirect: 'manual' } or { redirect: 'error' } and, for 'manual', re-validate the Location header with assertUrlResolvesPublic before following it.",
+      );
+    }
+    return (async () => {
+      const url = await assertUrlResolvesPublic(input.toString());
+      return baseFetch(url.toString(), init);
+    })();
   };
 }

@@ -52,6 +52,12 @@ export const envSchema = z.object({
   DUST_BASE_URL: z.string().url().optional().or(z.literal('')),
   DUST_MCP_PUBLIC_URL: z.string().url().optional().or(z.literal('')),
 
+  // ERP MCP connector. Off by default: v0.1 ships ONE global ERP connection
+  // shared by every org in this deployment (see routes/erp-integration.ts
+  // header) — an intentional single-tenant limitation, not a bug. Default-off
+  // so a fresh multi-tenant deployment doesn't expose the shared backend
+  // across orgs until an operator explicitly opts in.
+  ERP_ENABLED: z.enum(['true', 'false']).default('false'),
   ERP_URL: z.string().url().optional().or(z.literal('')),
   ERP_DB: z.string().min(1).optional().or(z.literal('')),
   ERP_API_KEY: z.string().min(1).optional().or(z.literal('')),
@@ -70,6 +76,7 @@ export const envSchema = z.object({
   ODOO_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
 
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  LOCAL_STORAGE_ROOT: z.string().min(1).optional().or(z.literal('')),
   S3_BUCKET: z.string().min(1).optional().or(z.literal('')),
   S3_REGION: z.string().min(1).optional().or(z.literal('')),
   S3_ENDPOINT: z.string().url().optional().or(z.literal('')),
@@ -113,6 +120,14 @@ export const envSchema = z.object({
   // Set false to downgrade to warn-only (e.g. while migrating a noisy caller).
   QUERY_GUARD_REJECT: z.enum(['true', 'false']).default('true'),
 
+  // Tenant-scope guard (Prisma middleware, packages/db/src/middleware/tenant-scope-guard.ts)
+  // applied to the shared Prisma client used by api, worker, and mcp-server.
+  // 'off' disables it, 'warn' logs a violation and lets the query through,
+  // 'enforce' throws before an unscoped tenant-table query can run. Defaults
+  // 'off' so existing deployments aren't broken by a config oversight;
+  // production requires 'warn' or 'enforce' (see semantic check below).
+  BIDSTACK_TENANT_SCOPE_GUARD: z.enum(['off', 'warn', 'enforce']).default('off'),
+
   // ─── HTTP server timeouts (bound per-Node-worker resource pinning) ─────
   // Without these Fastify defaults to 0 (unbounded): a slow query or hung
   // downstream pins a Node worker + its DB connection forever, so at 100k
@@ -130,6 +145,11 @@ export const envSchema = z.object({
   GMAIL_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   GOOGLE_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   MICROSOFT_GRAPH_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  MICROSOFT_GRAPH_CLIENT_ID: z.string().optional().or(z.literal('')),
+  MICROSOFT_GRAPH_CLIENT_SECRET: z.string().optional().or(z.literal('')),
+  ZOOM_SECRET_TOKEN: z.string().optional().or(z.literal('')),
+  APOLLO_MCP_URL: z.string().url().optional().or(z.literal('')),
+  APOLLO_MCP_BEARER_TOKEN: z.string().optional().or(z.literal('')),
   SLACK_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   TWILIO_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
@@ -200,9 +220,16 @@ export const envSchema = z.object({
   SENTRY_RELEASE: z.string().optional(),
   SENTRY_SMOKE_ENABLED: z.enum(['true', 'false']).default('false'),
   SENTRY_SMOKE_TOKEN: z.string().optional().or(z.literal('')),
+  BIDSTACK_RELEASE_COMMIT: z.string().optional().or(z.literal('')),
+  BIDSTACK_RELEASE_BRANCH: z.string().optional().or(z.literal('')),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_SERVICE_NAME: z.string().default('bidstack-api'),
   OTEL_SERVICE_VERSION: z.string().default('0.1.0'),
+  DD_SERVICE: z.string().optional(),
+  DD_ENV: z.string().optional(),
+  // Bearer token gating the /metrics route (health.ts): unset -> 404
+  // (route doesn't exist to a prober), set -> 401 without it, 200 with it.
+  METRICS_BEARER_TOKEN: z.string().optional().or(z.literal('')),
 
   // ─── Migration connectors (Wave 3) ────────────────────────────────────
   // HubSpot OAuth — create app at https://app.hubspot.com/developer
@@ -357,6 +384,15 @@ export function getEnv(): Env {
       'BIDSTACK_JOB_SIGNING_SECRET is required in production (HMAC-signs Apollo enrichment jobs; must match the worker)',
     );
   }
+  // Tenant-scope guard defends the shared Prisma client (api + worker +
+  // mcp-server) against a `where` missing orgId compiling to an all-tenants
+  // query. Off by default so an existing deployment isn't broken by a config
+  // oversight, but production must run at least 'warn'.
+  if (env.NODE_ENV === 'production' && env.BIDSTACK_TENANT_SCOPE_GUARD === 'off') {
+    semanticErrors.push(
+      "BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production (recommend 'enforce')",
+    );
+  }
   // Demo-mode gate: the public passwordless door must never run alongside real
   // Clerk auth, and needs its own HMAC secret to sign session tokens.
   if (env.DEMO_MODE === 'true') {
@@ -379,6 +415,9 @@ export function getEnv(): Env {
   }
   if (env.LMS_360L_ENABLED === 'true' && (!env.LMS_360L_BASE_URL || !env.LMS_360L_API_KEY)) {
     semanticErrors.push('LMS_360L_ENABLED=true requires LMS_360L_BASE_URL and LMS_360L_API_KEY');
+  }
+  if (env.ERP_ENABLED === 'true' && !env.ERP_MCP_URL && !env.ODOO_MCP_URL) {
+    semanticErrors.push('ERP_ENABLED=true requires ERP_MCP_URL (or the legacy ODOO_MCP_URL)');
   }
   if (env.SERUM_DEMO_MODE_ENABLED === 'true' && env.NODE_ENV === 'production') {
     semanticErrors.push('SERUM_DEMO_MODE_ENABLED=true is not allowed in production');

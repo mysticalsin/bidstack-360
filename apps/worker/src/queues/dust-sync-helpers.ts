@@ -207,10 +207,21 @@ export async function upsertLeadFromDust(
     throw new Error('Missing lead_email or lead_last_name in Dust document metadata');
   }
 
-  const existing = await prisma.lead.findFirst({
-    where: { orgId, email: email || undefined },
-    select: { id: true, dustLastPushedAt: true },
-  });
+  // When the doc has no email, do NOT run an email-keyed lookup — Prisma drops
+  // undefined where-keys, so `{ orgId, email: undefined }` silently became
+  // `{ orgId }` and findFirst matched (then upsert overwrote) an ARBITRARY
+  // pre-existing lead in the org. Instead match by this document's own
+  // dustDocId (idempotency key for re-delivery), same pattern as
+  // upsertNoteFromDust above.
+  const existing = email
+    ? await prisma.lead.findFirst({
+        where: { orgId, email },
+        select: { id: true, dustLastPushedAt: true },
+      })
+    : await prisma.lead.findFirst({
+        where: { orgId, dustDocId: doc.document_id },
+        select: { id: true, dustLastPushedAt: true },
+      });
 
   if (isInConflictWindow(existing?.dustLastPushedAt ?? null)) {
     return { id: existing!.id, created: false, skipped: true };

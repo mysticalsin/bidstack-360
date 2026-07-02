@@ -286,9 +286,11 @@ export function ProposalDetailPage() {
                   value={proposal.dueDate ? proposal.dueDate.slice(0, 10) : ''}
                   disabled={updateDueDate.isPending}
                   onChange={(e) =>
-                    updateDueDate.mutate(
-                      e.target.value ? new Date(e.target.value).toISOString() : null,
-                    )
+                    // The API schema requires YYYY-MM-DD (z.string().date()); the
+                    // native date input's value is already in that format, so
+                    // wrapping it in new Date().toISOString() (a full timestamp)
+                    // 400'd on every save.
+                    updateDueDate.mutate(e.target.value || null)
                   }
                   aria-label={t('proposalDetail.dueDateLabel', 'Due date')}
                   className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs disabled:opacity-60"
@@ -321,6 +323,11 @@ export function ProposalDetailPage() {
           {updateStatus.isError && (
             <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
               {t('proposalDetail.statusUpdateError', 'Could not update status. Please try again.')}
+            </p>
+          )}
+          {updateDueDate.isError && (
+            <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+              {t('proposalDetail.dueDateUpdateError', 'Could not update due date. Please try again.')}
             </p>
           )}
           {deleteProposal.isError && (

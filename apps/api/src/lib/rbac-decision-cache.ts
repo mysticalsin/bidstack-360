@@ -22,6 +22,13 @@ interface InvalidationMessage {
 
 const decisionCache = new Map<string, CacheEntry>();
 
+// Bumped on every invalidation (local or cross-replica pub/sub). getDecision
+// captures this before its DB load and refuses to write the cache if it
+// changed while the load was in flight — otherwise a load started before a
+// revocation can resolve `allowed: true` and land in the cache AFTER the
+// invalidation already ran, re-caching a stale ALLOW for the full TTL.
+let invalidationEpoch = 0;
+
 export async function userHasAnyRole(
   orgId: string,
   userId: string,
@@ -93,6 +100,15 @@ export function clearRbacDecisionCacheForTest(): void {
   decisionCache.clear();
 }
 
+// Exposes Map iteration order (= LRU order: oldest/least-recently-touched
+// first) so eviction behavior is directly assertable instead of inferred.
+export function getRbacDecisionCacheKeysForTest(): string[] {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('getRbacDecisionCacheKeysForTest is only available in NODE_ENV=test');
+  }
+  return [...decisionCache.keys()];
+}
+
 async function getDecision(
   orgId: string,
   userId: string,
@@ -101,15 +117,40 @@ async function getDecision(
 ): Promise<boolean> {
   const key = cacheKey(orgId, userId, discriminator);
   const hit = decisionCache.get(key);
-  if (hit && hit.expiresAt > Date.now()) return hit.allowed;
+  if (hit && hit.expiresAt > Date.now()) {
+    // Touch: re-insert to move this key to the MRU end (Map preserves
+    // insertion order), so a hot key survives eviction below.
+    decisionCache.delete(key);
+    decisionCache.set(key, hit);
+    return hit.allowed;
+  }
 
+  const epochAtLoadStart = invalidationEpoch;
   const allowed = await load();
-  if (decisionCache.size >= MAX_CACHE_ENTRIES) decisionCache.clear();
+
+  // An invalidation landed while `load()` was in flight: its result may
+  // reflect permissions from before the revocation. Return it to this caller
+  // (a stale ALLOW here is no worse than the request having started a moment
+  // earlier) but do NOT cache it, so the next call re-checks the DB instead
+  // of reading back the same stale answer for the rest of the TTL.
+  if (invalidationEpoch !== epochAtLoadStart) {
+    return allowed;
+  }
+
+  if (decisionCache.size >= MAX_CACHE_ENTRIES) {
+    // Evict only the single least-recently-used entry (Map's first key),
+    // not the whole cache — a full clear() at the cap makes every org's next
+    // request re-hit Postgres simultaneously (a decision-cache stampede).
+    const lruKey = decisionCache.keys().next().value;
+    if (lruKey !== undefined) decisionCache.delete(lruKey);
+  }
   decisionCache.set(key, { allowed, expiresAt: Date.now() + CACHE_TTL_MS });
   return allowed;
 }
 
 function applyInvalidation(orgId: string, userId?: string): void {
+  invalidationEpoch++;
+
   if (userId) {
     const prefix = `${orgId}:${userId}:`;
     for (const key of decisionCache.keys()) {

@@ -47,17 +47,30 @@ function main() {
   const command = buildMigrateCommand(options);
   console.log(`[safe-migrate] running ${command.displayName}; backup gate=${preflight.status}`);
 
-  const result = spawnSync(command.bin, command.args, {
-    env: process.env,
-    shell: false,
-    stdio: 'inherit',
-  });
+  const result = runMigrateCommand(command);
 
   if (result.error) {
     throw new Error(`[safe-migrate] failed to start migrate command: ${result.error.message}`);
   }
 
   process.exit(result.status ?? 1);
+}
+
+function runMigrateCommand(command) {
+  // Node >= 20.12 refuses to spawn .cmd shims (pnpm.cmd) without a shell
+  // (CVE-2024-27980 fix throws EINVAL), so Windows must route through the
+  // shell like write-a11y-evidence.mjs does. Quote shell args ourselves
+  // because Node does not quote them when shell mode is enabled.
+  const useShell = process.platform === 'win32';
+  return spawnSync(
+    useShell ? quoteForCmdShell(command.bin) : command.bin,
+    useShell ? command.args.map(quoteForCmdShell) : command.args,
+    {
+      env: process.env,
+      shell: useShell,
+      stdio: 'inherit',
+    },
+  );
 }
 
 function parseArgs(args) {
@@ -358,6 +371,12 @@ function redactLocation(location) {
   } catch {
     return String(location).replace(/[?].*$/u, '?<redacted>');
   }
+}
+
+function quoteForCmdShell(value) {
+  // cmd.exe splits unquoted spaces, so a prisma bin or schema path with
+  // spaces would silently become multiple arguments without this.
+  return /\s/u.test(value) ? `"${value}"` : value;
 }
 
 function buildMigrateCommand(options) {

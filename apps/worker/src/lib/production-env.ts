@@ -52,11 +52,28 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
     errors.push('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
   }
 
-  if (trimmed(env, 'PII_FIELD_ENCRYPTION').toLowerCase() !== 'true') {
-    errors.push('PII_FIELD_ENCRYPTION=true is required in production');
+  // The consumer (isPiiEncryptionEnabled in
+  // packages/db/src/middleware/pii-encryption.ts) requires the RAW value to be
+  // exactly 'true' — a trimmed/case-folded gate here would boot green while
+  // encryption silently stays OFF.
+  const piiFlag = env.PII_FIELD_ENCRYPTION ?? '';
+  if (piiFlag !== 'true') {
+    errors.push(
+      piiFlag.trim().toLowerCase() === 'true'
+        ? "PII_FIELD_ENCRYPTION must be set to exactly 'true' (lowercase, no surrounding whitespace/newline) in production"
+        : 'PII_FIELD_ENCRYPTION=true is required in production',
+    );
   }
-  if (!HEX_32_BYTE_KEY.test(trimmed(env, 'PII_ENCRYPTION_MASTER_KEY'))) {
-    errors.push('PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production');
+  // getMasterKeyBuffer (packages/shared/src/crypto/pii-field-cipher.ts) reads
+  // the RAW value, so validating a trimmed copy would boot green and then
+  // throw on the first PII operation.
+  const piiMasterKey = env.PII_ENCRYPTION_MASTER_KEY ?? '';
+  if (!HEX_32_BYTE_KEY.test(piiMasterKey)) {
+    errors.push(
+      HEX_32_BYTE_KEY.test(piiMasterKey.trim())
+        ? 'PII_ENCRYPTION_MASTER_KEY has surrounding whitespace or a newline — the PII cipher reads the raw value; remove the padding'
+        : 'PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production',
+    );
   }
 
   // HMAC secret for Apollo enrichment jobs. Without it the worker's
@@ -66,6 +83,15 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
   // queue resolves (BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET).
   if (!trimmed(env, 'BIDSTACK_JOB_SIGNING_SECRET') && !trimmed(env, 'JOB_SIGNING_SECRET')) {
     errors.push('BIDSTACK_JOB_SIGNING_SECRET is required in production');
+  }
+
+  // The tenant-scope guard (packages/db/src/middleware/tenant-scope-guard.ts)
+  // is applied to the shared Prisma client this worker imports from
+  // @bidstack/db, so a missing/'off' value here leaves worker queries just as
+  // exposed to an all-tenants leak as the API. Defaults to 'off' when unset.
+  const tenantScopeGuardMode = trimmed(env, 'BIDSTACK_TENANT_SCOPE_GUARD').toLowerCase();
+  if (tenantScopeGuardMode !== 'warn' && tenantScopeGuardMode !== 'enforce') {
+    errors.push("BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production");
   }
 
   const storageDriver = trimmed(env, 'STORAGE_DRIVER').toLowerCase();

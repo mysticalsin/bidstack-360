@@ -18,6 +18,7 @@ const STRICT_ENVS = new Set(['production', 'staging']);
 const DEFAULT_MAX_AGE_HOURS = 24;
 const DEFAULT_PATHS = {
   source: 'deploy-evidence/source-control-latest.json',
+  ci: 'deploy-evidence/ci-repeat-latest.json',
   load: 'load-test-report/production-load-latest.json',
   semgrep: 'deploy-evidence/semgrep-latest.json',
   container: 'deploy-evidence/container-scan-latest.json',
@@ -225,6 +226,7 @@ Usage:
 
 Environment overrides:
   BIDSTACK_SOURCE_CONTROL_EVIDENCE
+  BIDSTACK_CI_REPEAT_EVIDENCE
   BIDSTACK_LOAD_CERT_PATH
   BIDSTACK_SEMGREP_REPORT
   BIDSTACK_CONTAINER_SCAN_REPORT
@@ -379,6 +381,7 @@ function makeConfig(options) {
     requiredMcpTools,
     paths: {
       source: process.env.BIDSTACK_SOURCE_CONTROL_EVIDENCE || DEFAULT_PATHS.source,
+      ci: process.env.BIDSTACK_CI_REPEAT_EVIDENCE || DEFAULT_PATHS.ci,
       load: process.env.BIDSTACK_LOAD_CERT_PATH || DEFAULT_PATHS.load,
       semgrep: process.env.BIDSTACK_SEMGREP_REPORT || DEFAULT_PATHS.semgrep,
       container: process.env.BIDSTACK_CONTAINER_SCAN_REPORT || DEFAULT_PATHS.container,
@@ -684,6 +687,15 @@ function isImmutableImageRef(image) {
   return /@sha256:[0-9a-f]{64}$/i.test(String(image || '').trim());
 }
 
+function isHttpsEvidenceUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim());
+    return url.protocol === 'https:' && !hasPlaceholderSignal(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function verifySourceControlEvidence(config, recorder) {
   const artifact = readJsonArtifact(
     config,
@@ -781,6 +793,327 @@ function verifySourceControlEvidence(config, recorder) {
       'source.clean',
       'Git worktree must be clean for staging/production release evidence',
       `status=${value.statusEntryCount ?? 'unknown'} tracked=${value.trackedDirtyCount ?? 'unknown'} untracked=${value.untrackedCount ?? 'unknown'}`,
+    );
+  }
+}
+
+function readSourceEvidence(config) {
+  const absolutePath = resolveArtifact(config, config.paths.source);
+  if (!existsSync(absolutePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(absolutePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function readSourceEvidenceForCi(config) {
+  return readSourceEvidence(config);
+}
+
+function isFullCommitSha(value) {
+  return /^[0-9a-f]{40}$/i.test(String(value || '').trim());
+}
+
+function verifyRuntimeReleaseIdentity(config, recorder, prefix, label, value, checkNames) {
+  const release = value.release && typeof value.release === 'object' ? value.release : {};
+  const expectedCommit = String(
+    release.expectedCommit || release.commit || value.releaseCommit || '',
+  ).trim();
+  const expectedBranch = String(
+    release.expectedBranch || release.branch || value.releaseBranch || '',
+  ).trim();
+  const sourceEvidence = readSourceEvidence(config);
+  const sourceCommit = String(sourceEvidence?.commit || '').trim();
+  const sourceBranch = String(sourceEvidence?.branch || '').trim();
+
+  if (isFullCommitSha(expectedCommit)) {
+    recorder.pass(
+      `${prefix}.releaseCommit`,
+      `${label} evidence has a release commit`,
+      expectedCommit,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      `${prefix}.releaseCommit`,
+      `${label} evidence is missing a full release commit`,
+      expectedCommit || 'missing',
+    );
+  }
+
+  if (sourceCommit && expectedCommit === sourceCommit) {
+    recorder.pass(
+      `${prefix}.sourceCommit`,
+      `${label} release commit matches source-control evidence`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      `${prefix}.sourceCommit`,
+      `${label} release commit must match source-control evidence`,
+      `runtime=${expectedCommit || 'missing'} source=${sourceCommit || 'missing'}`,
+    );
+  }
+
+  if (
+    expectedBranch &&
+    !hasPlaceholderSignal(expectedBranch) &&
+    (!sourceBranch || expectedBranch === sourceBranch)
+  ) {
+    recorder.pass(
+      `${prefix}.releaseBranch`,
+      `${label} release branch matches source-control evidence`,
+      expectedBranch,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      `${prefix}.releaseBranch`,
+      `${label} release branch must match source-control evidence`,
+      `runtime=${expectedBranch || 'missing'} source=${sourceBranch || 'missing'}`,
+    );
+  }
+
+  const checks = value.checks && typeof value.checks === 'object' ? value.checks : {};
+  const mismatchedChecks = checkNames.filter((checkName) => {
+    const observedRelease = checks[checkName]?.release ?? {};
+    const observedCommit = String(observedRelease.commit || '').trim();
+    const observedBranch = String(observedRelease.branch || '').trim();
+    return observedCommit !== expectedCommit || observedBranch !== expectedBranch;
+  });
+
+  if (mismatchedChecks.length === 0) {
+    recorder.pass(
+      `${prefix}.runtimeRelease`,
+      `${label} runtime checks all report the approved release identity`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      `${prefix}.runtimeRelease`,
+      `${label} runtime checks must report the approved release identity`,
+      mismatchedChecks.join(', '),
+    );
+  }
+}
+
+function ciCheckPassed(value) {
+  if (value && typeof value === 'object') {
+    return (
+      value.passed === true ||
+      value.ok === true ||
+      ['success', 'succeeded', 'passed'].includes(
+        String(value.conclusion || value.status || '')
+          .trim()
+          .toLowerCase(),
+      )
+    );
+  }
+  if (value === true) return true;
+  return ['success', 'succeeded', 'passed', 'true', '1'].includes(
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  );
+}
+
+function ciRunPassed(run, requiredChecks) {
+  const conclusion = String(run?.conclusion || run?.status || '')
+    .trim()
+    .toLowerCase();
+  const statusPassed = ['success', 'succeeded', 'passed', 'true'].includes(conclusion);
+  const checks = run?.checks && typeof run.checks === 'object' ? run.checks : {};
+  return (
+    statusPassed &&
+    Number(run?.failedSuites || 0) === 0 &&
+    Number(run?.skippedSuites || 0) === 0 &&
+    requiredChecks.every((check) => ciCheckPassed(checks[check]))
+  );
+}
+
+function verifyCiRepeatEvidence(config, recorder) {
+  const artifact = readJsonArtifact(config, recorder, 'ci.exists', 'CI repeat', config.paths.ci);
+  if (!artifact) {
+    return;
+  }
+  const value = artifact.value;
+  checkFreshness(config, recorder, 'ci.fresh', 'CI repeat', artifact, value);
+
+  if (
+    value.passed === true &&
+    Array.isArray(value.validationFailures) &&
+    value.validationFailures.length === 0
+  ) {
+    recorder.pass('ci.passed', 'CI repeat evidence gate passed');
+  } else {
+    recorder.softFail(
+      config,
+      'ci.passed',
+      'CI repeat evidence gate did not pass',
+      Array.isArray(value.validationFailures)
+        ? value.validationFailures.join(', ')
+        : 'missing validationFailures',
+    );
+  }
+
+  const provider = String(value.provider || '').trim();
+  const workflow = String(value.workflow || '').trim();
+  if (provider && !hasPlaceholderSignal(provider) && workflow && !hasPlaceholderSignal(workflow)) {
+    recorder.pass(
+      'ci.identity',
+      'CI provider and workflow are identified',
+      `${provider}/${workflow}`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'ci.identity',
+      'CI provider and workflow must be non-placeholder values',
+      `provider=${provider || 'missing'} workflow=${workflow || 'missing'}`,
+    );
+  }
+
+  const sourceEvidence = readSourceEvidenceForCi(config);
+  const sourceCommit = String(sourceEvidence?.commit || '').trim();
+  const sourceBranch = String(sourceEvidence?.branch || '').trim();
+  const releaseCommit = String(value.releaseCommit || value.commit || value.sha || '').trim();
+  const branch = String(value.branch || value.ref || '').trim();
+
+  if (/^[0-9a-f]{40}$/i.test(releaseCommit)) {
+    recorder.pass('ci.commit', 'CI repeat evidence has a full release commit', releaseCommit);
+  } else {
+    recorder.softFail(config, 'ci.commit', 'CI repeat evidence is missing a full commit SHA');
+  }
+
+  if (sourceCommit && releaseCommit === sourceCommit) {
+    recorder.pass('ci.sourceCommit', 'CI repeat evidence matches source-control commit');
+  } else {
+    recorder.softFail(
+      config,
+      'ci.sourceCommit',
+      'CI repeat evidence must match the source-control commit',
+      `ci=${releaseCommit || 'missing'} source=${sourceCommit || 'missing'}`,
+    );
+  }
+
+  if (branch && !hasPlaceholderSignal(branch) && (!sourceBranch || branch === sourceBranch)) {
+    recorder.pass('ci.branch', 'CI repeat evidence branch matches release source', branch);
+  } else {
+    recorder.softFail(
+      config,
+      'ci.branch',
+      'CI repeat evidence branch must match release source',
+      `ci=${branch || 'missing'} source=${sourceBranch || 'missing'}`,
+    );
+  }
+
+  const evidenceUrl = String(value.evidenceUrl || value.url || '').trim();
+  if (isHttpsEvidenceUrl(evidenceUrl)) {
+    recorder.pass('ci.evidenceUrl', 'CI repeat evidence has a reviewable HTTPS URL', evidenceUrl);
+  } else {
+    recorder.softFail(
+      config,
+      'ci.evidenceUrl',
+      'CI repeat evidence must link to a non-placeholder HTTPS CI URL',
+      evidenceUrl || 'missing',
+    );
+  }
+
+  const requiredRunCount = Number(value.requiredRunCount || 0);
+  const passedRunCount = Number(value.passedRunCount || 0);
+  const failedRunCount = Number(value.failedRunCount || 0);
+  if (requiredRunCount >= 10 && passedRunCount >= requiredRunCount && failedRunCount === 0) {
+    recorder.pass(
+      'ci.runCount',
+      'CI repeat evidence has at least 10 passing runs',
+      `${passedRunCount}/${requiredRunCount}`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'ci.runCount',
+      'CI repeat evidence must prove at least 10 passing runs and zero failed runs',
+      `passed=${passedRunCount} required=${requiredRunCount} failed=${failedRunCount}`,
+    );
+  }
+
+  if (value.consecutivePassed === true) {
+    recorder.pass('ci.consecutive', 'CI repeat evidence is consecutive');
+  } else {
+    recorder.softFail(config, 'ci.consecutive', 'CI repeat evidence must be consecutive');
+  }
+
+  if (
+    value.isolatedInfrastructure === true &&
+    value.database?.isolated === true &&
+    value.database?.pgvectorEnabled === true
+  ) {
+    recorder.pass('ci.isolatedDb', 'CI repeat evidence used isolated pgvector Postgres');
+  } else {
+    recorder.softFail(
+      config,
+      'ci.isolatedDb',
+      'CI repeat evidence must use isolated pgvector-enabled Postgres',
+    );
+  }
+
+  const skippedSuites = Number(value.skippedSuiteCount || 0);
+  const failedSuites = Number(value.failedSuiteCount || 0);
+  if (skippedSuites === 0 && failedSuites === 0) {
+    recorder.pass('ci.suites', 'CI repeat evidence has zero skipped or failed suites');
+  } else {
+    recorder.softFail(
+      config,
+      'ci.suites',
+      'CI repeat evidence must have zero skipped or failed suites',
+      `skipped=${skippedSuites} failed=${failedSuites}`,
+    );
+  }
+
+  const privacy = value.privacy && typeof value.privacy === 'object' ? value.privacy : {};
+  const unsafePrivacy = [
+    'rawLogsIncluded',
+    'rawRunPayloadsIncluded',
+    'commandStdoutIncluded',
+    'commandStderrIncluded',
+    'secretsIncluded',
+  ].filter((flag) => privacy[flag] === true);
+  if (privacy.compactRunMetadataIncluded === true && unsafePrivacy.length === 0) {
+    recorder.pass('ci.privacy', 'CI repeat evidence stores compact metadata only');
+  } else {
+    recorder.softFail(
+      config,
+      'ci.privacy',
+      'CI repeat evidence must exclude raw logs, command output, and secrets',
+      unsafePrivacy.join(', ') || 'compactRunMetadataIncluded missing',
+    );
+  }
+
+  const requiredChecks = normalizeList(value.requiredChecks);
+  const runs = Array.isArray(value.runs) ? value.runs : [];
+  const badRuns = runs.filter(
+    (run) =>
+      run.commit !== releaseCommit ||
+      run.branch !== branch ||
+      !isHttpsEvidenceUrl(run.url) ||
+      !isIsoTimestamp(run.completedAt) ||
+      !ciRunPassed(run, requiredChecks),
+  );
+  if (runs.length >= requiredRunCount && badRuns.length === 0 && requiredChecks.length > 0) {
+    recorder.pass(
+      'ci.runs',
+      'Every CI run summary is tied to the release and required checks',
+      `${runs.length} run(s), ${requiredChecks.length} check(s)`,
+    );
+  } else {
+    recorder.softFail(
+      config,
+      'ci.runs',
+      'CI run summaries must all match release commit, branch, URL, timestamp, and checks',
+      `runs=${runs.length} bad=${badRuns.length} requiredChecks=${requiredChecks.length}`,
     );
   }
 }
@@ -1302,6 +1635,12 @@ function verifyApiConnectivityEvidence(config, recorder) {
   } else {
     recorder.pass('api.target', 'API connectivity target is acceptable', target);
   }
+
+  verifyRuntimeReleaseIdentity(config, recorder, 'api', 'API connectivity', value, [
+    'livez',
+    'readyz',
+    'health',
+  ]);
 
   const authScheme = String(value.authScheme || '').trim();
   if (authScheme === 'api-key' || authScheme === 'bearer') {
@@ -2893,7 +3232,7 @@ function verifySentryEvidence(config, recorder) {
     release,
     environment: evidenceEnvironment,
   });
-  verifySentryRawPrivacy(recorder, value.privacy);
+  verifySentryRawPrivacy(recorder, value);
 
   if (value.sessionReplayEnabled === true) {
     requireBooleanEvidence(
@@ -3027,8 +3366,9 @@ function verifySentryObservation(config, recorder, id, label, observation, expec
   }
 }
 
-function verifySentryRawPrivacy(recorder, privacy) {
-  const value = privacy && typeof privacy === 'object' ? privacy : {};
+function verifySentryRawPrivacy(recorder, artifact) {
+  const value = artifact && typeof artifact === 'object' ? artifact : {};
+  const privacy = value.privacy && typeof value.privacy === 'object' ? value.privacy : {};
   const unsafeFlags = [
     ['rawEventPayloadsIncluded', 'raw event payloads'],
     ['stackTracesIncluded', 'stack traces'],
@@ -3036,9 +3376,36 @@ function verifySentryRawPrivacy(recorder, privacy) {
     ['userEmailsIncluded', 'user emails'],
     ['commandStdoutIncluded', 'raw command stdout'],
     ['commandStderrIncluded', 'raw command stderr'],
-  ].filter(([key]) => value[key] !== false);
+  ].filter(([key]) => privacy[key] !== false);
 
-  if (unsafeFlags.length === 0) {
+  // The flags above are self-reported by the writer and can drift from reality (that was
+  // the bug: they claimed `false` while raw CLI stderr / response bodies were actually
+  // embedded elsewhere in the artifact). Independently walk the serialized artifact for the
+  // concrete forbidden shapes so a future regression fails this gate instead of silently
+  // passing on stale flags.
+  const rawContentLeaks = [];
+  const scanForRawContent = (node, keyPath) => {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => scanForRawContent(item, `${keyPath}[${index}]`));
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, child] of Object.entries(node)) {
+      const childPath = keyPath ? `${keyPath}.${key}` : key;
+      if (key === 'bodyPreview') {
+        rawContentLeaks.push(`${childPath} persists a raw response body preview`);
+        continue;
+      }
+      if (key === 'error' && typeof child === 'string' && /[\r\n]/.test(child)) {
+        rawContentLeaks.push(`${childPath} persists newline-joined raw command output`);
+        continue;
+      }
+      scanForRawContent(child, childPath);
+    }
+  };
+  scanForRawContent(value, '');
+
+  if (unsafeFlags.length === 0 && rawContentLeaks.length === 0) {
     recorder.pass(
       'sentry.rawPrivacy',
       'Sentry evidence omits raw events, stack traces, bodies, users, and command output',
@@ -3047,7 +3414,7 @@ function verifySentryRawPrivacy(recorder, privacy) {
     recorder.fail(
       'sentry.rawPrivacy',
       'Sentry evidence includes unsafe raw detail',
-      unsafeFlags.map(([, label]) => label).join(', '),
+      [...unsafeFlags.map(([, label]) => label), ...rawContentLeaks].join(', '),
     );
   }
 }
@@ -3353,6 +3720,11 @@ function verifyMcpConnectivityEvidence(config, recorder) {
   } else {
     recorder.pass('mcp.target', 'MCP connectivity target is acceptable', target);
   }
+
+  verifyRuntimeReleaseIdentity(config, recorder, 'mcp', 'MCP connectivity', value, [
+    'discovery',
+    'health',
+  ]);
 
   const checks = value.checks && typeof value.checks === 'object' ? value.checks : {};
   for (const [checkName, label] of [
@@ -4138,6 +4510,7 @@ function runVerification(options) {
   const recorder = createRecorder();
 
   verifySourceControlEvidence(config, recorder);
+  verifyCiRepeatEvidence(config, recorder);
   verifyToolReadinessEvidence(config, recorder);
   verifyOperationalReadinessEvidence(config, recorder);
   verifyLoadEvidence(config, recorder);
@@ -4329,6 +4702,67 @@ function createSelftestFixtures(root) {
     passed: true,
     validationFailures: [],
   });
+  const ciRequiredChecks = [
+    'install',
+    'audit',
+    'db:generate',
+    'lint',
+    'typecheck',
+    'test',
+    'build',
+  ];
+  const ciChecks = Object.fromEntries(ciRequiredChecks.map((check) => [check, true]));
+  const sourceCommit = sourceSnapshot.commit || '0123456789abcdef0123456789abcdef01234567';
+  const sourceBranch = sourceSnapshot.branch || 'main';
+  writeJson(root, DEFAULT_PATHS.ci, {
+    schemaVersion: 1,
+    generatedAt: now,
+    runner: 'ci-repeat-evidence',
+    provider: 'github-actions',
+    repository: 'mantu/bidstack-360',
+    workflow: 'ci.yml',
+    environment: 'staging',
+    releaseCommit: sourceCommit,
+    branch: sourceBranch,
+    requiredRunCount: 10,
+    requiredChecks: ciRequiredChecks,
+    consecutivePassed: true,
+    passedRunCount: 10,
+    failedRunCount: 0,
+    failedSuiteCount: 0,
+    skippedSuiteCount: 0,
+    isolatedInfrastructure: true,
+    database: {
+      kind: 'postgres',
+      isolated: true,
+      pgvectorEnabled: true,
+    },
+    evidenceUrl: 'https://github.com/mantu/bidstack-360/actions?query=branch%3Amain',
+    privacy: {
+      compactRunMetadataIncluded: true,
+      rawLogsIncluded: false,
+      rawRunPayloadsIncluded: false,
+      commandStdoutIncluded: false,
+      commandStderrIncluded: false,
+      secretsIncluded: false,
+    },
+    runs: Array.from({ length: 10 }, (_, index) => ({
+      runId: `ci-${1000 + index}`,
+      attempt: 1,
+      url: `https://github.com/mantu/bidstack-360/actions/runs/${1000 + index}`,
+      commit: sourceCommit,
+      branch: sourceBranch,
+      status: 'success',
+      conclusion: 'success',
+      startedAt: `2026-06-18T10:${String(index).padStart(2, '0')}:00.000Z`,
+      completedAt: `2026-06-18T10:${String(index + 1).padStart(2, '0')}:00.000Z`,
+      failedSuites: 0,
+      skippedSuites: 0,
+      checks: ciChecks,
+    })),
+    passed: true,
+    validationFailures: [],
+  });
   writeJson(root, DEFAULT_LOAD_RAW_SUMMARY, {
     metrics: {},
   });
@@ -4365,6 +4799,11 @@ function createSelftestFixtures(root) {
     target: releaseApiTarget,
     authScheme: 'api-key',
     expectedOrgId: 'org_staging_release',
+    release: {
+      source: 'source-control-evidence',
+      expectedCommit: sourceCommit,
+      expectedBranch: sourceBranch,
+    },
     command: {
       source: 'live-api-smoke',
       ok: true,
@@ -4377,6 +4816,10 @@ function createSelftestFixtures(root) {
         ok: true,
         status: 200,
         apiOk: true,
+        release: {
+          commit: sourceCommit,
+          branch: sourceBranch,
+        },
       },
       readyz: {
         ok: true,
@@ -4385,6 +4828,10 @@ function createSelftestFixtures(root) {
         db: true,
         redis: true,
         storage: true,
+        release: {
+          commit: sourceCommit,
+          branch: sourceBranch,
+        },
       },
       health: {
         ok: true,
@@ -4392,6 +4839,10 @@ function createSelftestFixtures(root) {
         apiOk: true,
         db: true,
         redis: true,
+        release: {
+          commit: sourceCommit,
+          branch: sourceBranch,
+        },
       },
       capabilities: {
         ok: true,
@@ -4809,6 +5260,11 @@ function createSelftestFixtures(root) {
     target: 'https://mcp.staging.bidstack360.com',
     mcpUrl: 'https://mcp.staging.bidstack360.com/mcp',
     requiredTools: DEFAULT_MCP_REQUIRED_TOOLS,
+    release: {
+      source: 'source-control-evidence',
+      expectedCommit: sourceCommit,
+      expectedBranch: sourceBranch,
+    },
     command: {
       source: 'live-mcp-smoke',
       ok: true,
@@ -4822,6 +5278,10 @@ function createSelftestFixtures(root) {
         status: 200,
         endpoints: [{ type: 'streamable-http', url: '/mcp' }],
         server: 'BidStack 360 MCP',
+        release: {
+          commit: sourceCommit,
+          branch: sourceBranch,
+        },
       },
       health: {
         ok: true,
@@ -4829,6 +5289,10 @@ function createSelftestFixtures(root) {
         name: 'bidstack-mcp',
         db: 'up',
         redis: 'up',
+        release: {
+          commit: sourceCommit,
+          branch: sourceBranch,
+        },
       },
       initialize: {
         ok: true,
@@ -5018,6 +5482,7 @@ function runSelftest() {
   const originalEnv = {};
   for (const key of [
     'BIDSTACK_SOURCE_CONTROL_EVIDENCE',
+    'BIDSTACK_CI_REPEAT_EVIDENCE',
     'BIDSTACK_LOAD_CERT_PATH',
     'BIDSTACK_SEMGREP_REPORT',
     'BIDSTACK_CONTAINER_SCAN_REPORT',
@@ -5074,6 +5539,124 @@ function runSelftest() {
       'expected staging gate to require current source-control evidence',
     );
     rmSync(staleSourceProbePath, { force: true });
+
+    createSelftestFixtures(root);
+    rmSync(path.join(root, DEFAULT_PATHS.ci), { force: true });
+    const missingCiRepeat = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      missingCiRepeat.ok,
+      false,
+      'expected missing CI repeat proof to fail staging gate',
+    );
+    assert.equal(
+      missingCiRepeat.checks.some((check) => check.id === 'ci.exists' && check.status === 'fail'),
+      true,
+      'expected staging gate to require CI repeat proof',
+    );
+
+    createSelftestFixtures(root);
+    const ciArtifactPath = path.join(root, DEFAULT_PATHS.ci);
+    const wrongCiCommit = JSON.parse(readFileSync(ciArtifactPath, 'utf8'));
+    wrongCiCommit.releaseCommit = 'ffffffffffffffffffffffffffffffffffffffff';
+    wrongCiCommit.runs = wrongCiCommit.runs.map((run) => ({
+      ...run,
+      commit: 'ffffffffffffffffffffffffffffffffffffffff',
+    }));
+    writeJson(root, DEFAULT_PATHS.ci, wrongCiCommit);
+    const wrongCiCommitEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      wrongCiCommitEvidence.ok,
+      false,
+      'expected CI repeat proof for the wrong commit to fail staging gate',
+    );
+    assert.equal(
+      wrongCiCommitEvidence.checks.some(
+        (check) => check.id === 'ci.sourceCommit' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to tie CI proof to source-control commit',
+    );
+
+    createSelftestFixtures(root);
+    const apiReleaseArtifactPath = path.join(root, DEFAULT_PATHS.api);
+    const wrongApiRelease = JSON.parse(readFileSync(apiReleaseArtifactPath, 'utf8'));
+    wrongApiRelease.release.expectedCommit = 'ffffffffffffffffffffffffffffffffffffffff';
+    for (const checkName of ['livez', 'readyz', 'health']) {
+      wrongApiRelease.checks[checkName].release.commit = 'ffffffffffffffffffffffffffffffffffffffff';
+    }
+    writeJson(root, DEFAULT_PATHS.api, wrongApiRelease);
+    const wrongApiReleaseEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      wrongApiReleaseEvidence.ok,
+      false,
+      'expected API connectivity proof for the wrong commit to fail staging gate',
+    );
+    assert.equal(
+      wrongApiReleaseEvidence.checks.some(
+        (check) => check.id === 'api.sourceCommit' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to tie API connectivity proof to source-control commit',
+    );
+
+    createSelftestFixtures(root);
+    const mcpReleaseArtifactPath = path.join(root, DEFAULT_PATHS.mcp);
+    const wrongMcpRelease = JSON.parse(readFileSync(mcpReleaseArtifactPath, 'utf8'));
+    wrongMcpRelease.release.expectedCommit = 'ffffffffffffffffffffffffffffffffffffffff';
+    for (const checkName of ['discovery', 'health']) {
+      wrongMcpRelease.checks[checkName].release.commit = 'ffffffffffffffffffffffffffffffffffffffff';
+    }
+    writeJson(root, DEFAULT_PATHS.mcp, wrongMcpRelease);
+    const wrongMcpReleaseEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      wrongMcpReleaseEvidence.ok,
+      false,
+      'expected MCP connectivity proof for the wrong commit to fail staging gate',
+    );
+    assert.equal(
+      wrongMcpReleaseEvidence.checks.some(
+        (check) => check.id === 'mcp.sourceCommit' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to tie MCP connectivity proof to source-control commit',
+    );
+
+    createSelftestFixtures(root);
+    const skippedCiSuite = JSON.parse(readFileSync(ciArtifactPath, 'utf8'));
+    skippedCiSuite.skippedSuiteCount = 1;
+    skippedCiSuite.runs[2] = { ...skippedCiSuite.runs[2], skippedSuites: 1 };
+    writeJson(root, DEFAULT_PATHS.ci, skippedCiSuite);
+    const skippedCiSuiteEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      skippedCiSuiteEvidence.ok,
+      false,
+      'expected CI repeat proof with skipped suites to fail staging gate',
+    );
+    assert.equal(
+      skippedCiSuiteEvidence.checks.some(
+        (check) => check.id === 'ci.suites' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to reject skipped CI suites',
+    );
+
+    createSelftestFixtures(root);
+    const unsafeCiArtifact = JSON.parse(readFileSync(ciArtifactPath, 'utf8'));
+    unsafeCiArtifact.privacy.rawLogsIncluded = true;
+    writeJson(root, DEFAULT_PATHS.ci, unsafeCiArtifact);
+    const unsafeCiRepeatEvidence = runVerification({ root, deployEnv: 'staging' });
+    assert.equal(
+      unsafeCiRepeatEvidence.ok,
+      false,
+      'expected CI repeat proof with raw logs to fail staging gate',
+    );
+    assert.equal(
+      unsafeCiRepeatEvidence.checks.some(
+        (check) => check.id === 'ci.privacy' && check.status === 'fail',
+      ),
+      true,
+      'expected staging gate to require compact CI metadata',
+    );
 
     createSelftestFixtures(root);
     const a11yArtifactPath = path.join(root, DEFAULT_PATHS.a11y);
@@ -7098,7 +7681,7 @@ function runSelftest() {
 
     process.stdout.write('deploy evidence selftest passed\n');
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     for (const [key, value] of Object.entries(originalEnv)) {
       if (value === undefined) {
         delete process.env[key];

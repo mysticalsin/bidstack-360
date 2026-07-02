@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -11,6 +11,7 @@ import {
   type IsolatedOrg,
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -46,13 +47,7 @@ afterAll(async () => {
   }
 }, 30_000);
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !isolatedOrg) {
-      throw new Error(`[skip] ${name} - DATABASE_URL not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!isolatedOrg);
 
 describe('org locale settings', () => {
   skipIfNoDb('GET defaults then PUT persists audited workspace locale settings', async () => {
@@ -118,6 +113,37 @@ describe('org locale settings', () => {
     });
     expect(res.statusCode).toBe(403);
   });
+
+  skipIfNoDb(
+    'GET succeeds for an API key holding no settings:read scope — locale is non-sensitive workspace config',
+    async () => {
+      // WHY this matters: locale defaults are shown read-only to every human
+      // role (including AE/SDR/CS, which hold no settings:read grant in the
+      // RBAC matrix). Gating the read behind settings:read 403'd a screen
+      // they're meant to see. Only PUT stays behind settings:write + admin —
+      // asserted separately below.
+      const rawKey = `itest_locale_read_${Date.now()}`;
+      const apiKey = await prisma.apiKey.create({
+        data: {
+          orgId: isolatedOrg!.orgId,
+          name: 'integration-test locale read key (no settings scope)',
+          hashedKey: createHash('sha256').update(rawKey).digest('hex'),
+          prefix: rawKey.slice(0, 8),
+          scopes: ['accounts:read'],
+        },
+      });
+      try {
+        const res = await server.inject({
+          method: 'GET',
+          url: '/api/org-settings/locale',
+          headers: { 'x-api-key': rawKey },
+        });
+        expect(res.statusCode).toBe(200);
+      } finally {
+        await prisma.apiKey.delete({ where: { id: apiKey.id } });
+      }
+    },
+  );
 
   skipIfNoDb('PUT rejects API keys even with settings write scope', async () => {
     const rawKey = `itest_locale_${Date.now()}`;

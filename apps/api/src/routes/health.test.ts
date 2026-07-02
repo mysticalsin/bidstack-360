@@ -18,8 +18,46 @@ describe('health route contract', () => {
     const res = await app.inject({ method: 'GET', url: '/livez' });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true });
+    // Outside production, release metadata is exposed unauthenticated (matches
+    // /metrics' own non-production behavior) — see the production case below
+    // for the gate that matters in a real deployment.
+    expect(res.json()).toEqual({ ok: true, release: { commit: null, branch: null } });
     await app.close();
+  });
+
+  it('omits release metadata from /livez for an unauthenticated caller in production', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalToken = process.env.METRICS_BEARER_TOKEN;
+    process.env.NODE_ENV = 'production';
+    process.env.METRICS_BEARER_TOKEN = 'health-test-token';
+    try {
+      const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
+      app.setValidatorCompiler(validatorCompiler);
+      app.setSerializerCompiler(serializerCompiler);
+      await app.register(healthRoute);
+
+      // Anonymous caller: commit SHA / branch must not leak to the public internet.
+      const anon = await app.inject({ method: 'GET', url: '/livez' });
+      expect(anon.statusCode).toBe(200);
+      expect(anon.json()).toEqual({ ok: true });
+      expect(anon.json()).not.toHaveProperty('release');
+
+      // Caller with the correct bearer token still gets the release block.
+      const authed = await app.inject({
+        method: 'GET',
+        url: '/livez',
+        headers: { authorization: 'Bearer health-test-token' },
+      });
+      expect(authed.statusCode).toBe(200);
+      expect(authed.json()).toEqual({ ok: true, release: { commit: null, branch: null } });
+
+      await app.close();
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = originalNodeEnv;
+      if (originalToken === undefined) delete process.env.METRICS_BEARER_TOKEN;
+      else process.env.METRICS_BEARER_TOKEN = originalToken;
+    }
   });
 
   it('treats local storage as not production-ready (non-demo)', () => {
