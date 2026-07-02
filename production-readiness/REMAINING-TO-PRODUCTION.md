@@ -224,6 +224,8 @@ the Azure bicep is a never-run draft.
 
 ## ⚖️ DECISIONS only Tony (+ security) can make
 
+**Full recommendation brief with options/tradeoffs for each: `DECISION_BRIEF.md`.**
+
 - [ ] **D1 · `User.email` at rest** — current release gate accepts only documented
       `storage-encryption-only` with owner/reference evidence. If Tony/security chooses field encryption
       instead, add a `User.emailHash` migration + make every auth/assignment lookup hash-aware before release.
