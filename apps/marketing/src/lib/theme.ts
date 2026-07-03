@@ -4,6 +4,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 
+import { reapplyAccent } from '@/lib/accent';
+
 export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'bidstack-theme';
@@ -36,6 +38,8 @@ export function useTheme(): { theme: Theme; toggle: () => void; setTheme: (t: Th
       } catch {
         /* ignore */
       }
+      // Accent primaries differ per theme — re-derive for the new theme.
+      reapplyAccent();
     }
   }, []);
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useTheme } from '@/lib/theme';
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
+import { AccentPicker } from '@/components/AccentPicker';
 
 // Sticky top nav. Scroll-aware: solid background once the viewport has scrolled
 // past the hero. Includes the dark-mode toggle so visitors who prefer a single
@@ -74,6 +75,8 @@ export function NavBar() {
         </nav>
 
         <div className="flex-1" />
+
+        <AccentPicker />
 
         <button
           type="button"
