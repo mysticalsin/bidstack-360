@@ -5,12 +5,16 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { useThemeStore } from '@/stores/theme';
+import { useAccentStore } from '@/stores/accent';
+import { ACCENTS, type AccentId } from '@/lib/accent';
 import { usePreferences, type Density, type MotionPref } from '@/stores/preferences';
 import { playUiSound, type UiSoundKind } from '@/lib/soundEngine';
 import { cn } from '@/lib/cn';
 
 export function AppearanceSection() {
   const { theme, setTheme } = useThemeStore();
+  const accent = useAccentStore((s) => s.accent);
+  const setAccent = useAccentStore((s) => s.setAccent);
   const density = usePreferences((s) => s.density);
   const setDensity = usePreferences((s) => s.setDensity);
   const motion = usePreferences((s) => s.motion);
@@ -72,6 +76,33 @@ export function AppearanceSection() {
               </span>
             </span>
           </label>
+        </div>
+      </Card>
+
+      <Card>
+        <SectionHeader
+          title={t('appearance.accentTitle', 'Accent color')}
+          caption={t(
+            'appearance.accentCaption',
+            'Tint buttons, links, and highlights. Applies on top of your light/dark theme.',
+          )}
+        />
+        <div className="p-5">
+          <fieldset>
+            <legend className="sr-only">{t('appearance.accentLegend', 'Accent color')}</legend>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {ACCENTS.map((a) => (
+                <AccentOption
+                  key={a.id}
+                  id={a.id}
+                  label={t(`appearance.accent.${a.id}`, a.label)}
+                  swatch={a.swatch}
+                  checked={accent === a.id}
+                  onChange={() => setAccent(a.id)}
+                />
+              ))}
+            </div>
+          </fieldset>
         </div>
       </Card>
 
@@ -276,6 +307,69 @@ function SoundTestChip({
       <Icon name="play" size={13} ariaHidden />
       {label}
     </button>
+  );
+}
+
+function AccentOption({
+  id,
+  label,
+  swatch,
+  checked,
+  onChange,
+}: {
+  id: AccentId;
+  label: string;
+  swatch: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label
+      className={cn(
+        'flex min-h-11 cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-2.5 transition-colors',
+        'has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--brand-primary)] has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[var(--surface-page)]',
+        checked
+          ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)]'
+          : 'border-[var(--border-default)] hover:bg-[var(--surface-sunken)]',
+      )}
+    >
+      <input
+        type="radio"
+        name="accent"
+        value={id}
+        checked={checked}
+        onChange={onChange}
+        className="sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="grid h-8 w-8 place-items-center rounded-full ring-1 ring-black/10 dark:ring-white/15"
+        style={{ background: swatch }}
+      >
+        {checked ? (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        ) : null}
+      </span>
+      <span
+        className={cn(
+          'text-xs',
+          checked ? 'font-semibold text-[var(--fg-primary)]' : 'text-[var(--fg-secondary)]',
+        )}
+      >
+        {label}
+      </span>
+    </label>
   );
 }
 
