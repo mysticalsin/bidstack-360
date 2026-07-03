@@ -3,7 +3,7 @@ import { Hero } from '@/components/login';
 import { DemoSignIn } from '@/components/login/DemoSignIn';
 
 /**
- * BidStack 360° glassmorphism login page.
+ * Polo PreSales glassmorphism login page.
  *
  * Full-screen video background with glassmorphism cards, minimal navbar,
  * and integrated Microsoft/Google SSO authentication.

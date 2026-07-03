@@ -2546,7 +2546,7 @@
     "clear": "清除",
     "securityContractTitle": "安全约定",
     "securityReturn2xx": "在 10 秒内返回 2xx 状态。",
-    "securityVerifyHeader": "验证 X-Polo PreSales-Signature 标头。",
+    "securityVerifyHeader": "验证 X-BidStack-Signature 标头。",
     "securityRejectOld": "拒绝超过 5 分钟的签名。",
     "securityAsync": "确认后异步处理繁重的工作。",
     "selectedEventsLabel": "已选事件",

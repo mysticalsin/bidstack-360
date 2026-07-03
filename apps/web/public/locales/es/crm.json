@@ -2579,7 +2579,7 @@
     "clear": "Borrar",
     "securityContractTitle": "Contrato de seguridad",
     "securityReturn2xx": "Devuelve un estado 2xx en 10 segundos.",
-    "securityVerifyHeader": "Verifica la cabecera X-Polo PreSales-Signature.",
+    "securityVerifyHeader": "Verifica la cabecera X-BidStack-Signature.",
     "securityRejectOld": "Rechaza firmas con más de 5 minutos de antigüedad.",
     "securityAsync": "Procesa el trabajo pesado de forma asíncrona tras confirmar.",
     "selectedEventsLabel": "Eventos seleccionados",

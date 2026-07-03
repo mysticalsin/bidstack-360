@@ -2601,7 +2601,7 @@
     "clear": "Effacer",
     "securityContractTitle": "Contrat de sécurité",
     "securityReturn2xx": "Renvoyez un statut 2xx en 10 secondes.",
-    "securityVerifyHeader": "Vérifiez l'en-tête X-Polo PreSales-Signature.",
+    "securityVerifyHeader": "Vérifiez l'en-tête X-BidStack-Signature.",
     "securityRejectOld": "Rejetez les signatures datant de plus de 5 minutes.",
     "securityAsync": "Traitez les tâches lourdes de manière asynchrone après l'accusé de réception.",
     "selectedEventsLabel": "Événements sélectionnés",

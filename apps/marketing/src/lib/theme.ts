@@ -54,6 +54,7 @@ export function useTheme(): { theme: Theme; toggle: () => void; setTheme: (t: Th
       if (e.key === STORAGE_KEY && (e.newValue === 'light' || e.newValue === 'dark')) {
         setThemeState(e.newValue);
         document.documentElement.dataset.theme = e.newValue;
+        reapplyAccent();
       }
     };
     window.addEventListener('storage', onStorage);

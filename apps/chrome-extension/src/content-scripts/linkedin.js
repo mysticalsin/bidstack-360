@@ -30,7 +30,7 @@ function extractProfileContext() {
   };
 }
 
-async function handleAddToPolo PreSales() {
+async function handleAddToBidStack() {
   const ctx = extractProfileContext();
   try {
     const lead = await sendToBackground('CREATE_LEAD', {
@@ -60,7 +60,7 @@ function inject() {
   container.id = INJECT_CONTAINER_ID;
   container.style.cssText = 'display:inline-flex; align-items:center; margin-left:8px;';
 
-  const btn = createAddToBidStackButton(handleAddToPolo PreSales);
+  const btn = createAddToBidStackButton(handleAddToBidStack);
   container.appendChild(btn);
   actionsSection.appendChild(container);
 }

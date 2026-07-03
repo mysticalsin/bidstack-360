@@ -2546,7 +2546,7 @@
     "clear": "Cancella",
     "securityContractTitle": "Contratto di sicurezza",
     "securityReturn2xx": "Restituisci uno stato 2xx entro 10 secondi.",
-    "securityVerifyHeader": "Verifica l'intestazione X-Polo PreSales-Signature.",
+    "securityVerifyHeader": "Verifica l'intestazione X-BidStack-Signature.",
     "securityRejectOld": "Rifiuta le firme più vecchie di 5 minuti.",
     "securityAsync": "Elabora il lavoro pesante in modo asincrono dopo la conferma.",
     "selectedEventsLabel": "Eventi selezionati",

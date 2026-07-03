@@ -2546,7 +2546,7 @@
     "clear": "Limpar",
     "securityContractTitle": "Contrato de segurança",
     "securityReturn2xx": "Retorne um status 2xx em 10 segundos.",
-    "securityVerifyHeader": "Verifique o cabeçalho X-Polo PreSales-Signature.",
+    "securityVerifyHeader": "Verifique o cabeçalho X-BidStack-Signature.",
     "securityRejectOld": "Rejeite assinaturas com mais de 5 minutos.",
     "securityAsync": "Processe o trabalho pesado de forma assíncrona após confirmar.",
     "selectedEventsLabel": "Eventos selecionados",

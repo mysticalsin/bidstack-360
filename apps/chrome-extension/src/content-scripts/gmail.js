@@ -25,7 +25,7 @@ function extractEmailContext() {
   };
 }
 
-async function handleAddToPolo PreSales() {
+async function handleAddToBidStack() {
   const ctx = extractEmailContext();
   try {
     const lead = await sendToBackground('CREATE_LEAD', {
@@ -44,7 +44,7 @@ function injectIntoEmail(toolbar) {
   if (toolbar.hasAttribute(INJECTED_ATTR)) return;
   toolbar.setAttribute(INJECTED_ATTR, 'true');
 
-  const btn = createAddToBidStackButton(handleAddToPolo PreSales);
+  const btn = createAddToBidStackButton(handleAddToBidStack);
   toolbar.appendChild(btn);
 }
 

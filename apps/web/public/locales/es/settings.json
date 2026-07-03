@@ -159,7 +159,7 @@
     "metricNone": "Ninguno",
     "metricLive": "Activo",
     "readinessSignedTitle": "Firmado de forma predeterminada",
-    "readinessSignedBody": "Cada entrega incluye X-Polo PreSales-Signature con un HMAC con marca de tiempo.",
+    "readinessSignedBody": "Cada entrega incluye X-BidStack-Signature con un HMAC con marca de tiempo.",
     "readinessStatusRequired": "Obligatorio",
     "readinessBudgetTitle": "Presupuesto de receptor de 10 segundos",
     "readinessBudgetBody": "Confirma rápido y luego procesa de forma asíncrona. Las respuestas distintas de 2xx se reintentan.",

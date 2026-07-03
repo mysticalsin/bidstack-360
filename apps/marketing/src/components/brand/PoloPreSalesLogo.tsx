@@ -50,7 +50,9 @@ export function PoloPreSalesLogo({
       role={title ? 'img' : undefined}
       aria-labelledby={titleId}
       aria-hidden={title ? undefined : true}
-      className={cx('h-10 w-auto shrink-0', toneClass, className)}
+      // No tailwind-merge here (unlike apps/web's cn); callers set the height,
+      // so we don't bake in an h-10 default that a passed `className` can't win.
+      className={cx('w-auto shrink-0', toneClass, className)}
       fill="none"
       {...rest}
     >

@@ -53,6 +53,8 @@ function tokens(p: string, dark: boolean): Record<string, string> {
     '--brand-primary-tint': dark ? rgba(p, 0.18) : lighten(p, 0.92),
     '--brand-deep': dark ? lighten(p, 0.12) : darken(p, 0.38),
     '--border-focus': p,
+    '--focus-ring': `0 0 0 3px ${rgba(p, dark ? 0.22 : 0.14)}`,
+    '--focus-ring-color': rgba(p, dark ? 0.45 : 0.35),
     '--brand-gradient': `linear-gradient(135deg, ${p} 0%, ${lighten(p, dark ? 0.22 : 0.28)} 100%)`,
   };
 }

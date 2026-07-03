@@ -30,7 +30,7 @@ vi.mock('@bidstack/db/serum-runtime-policy', () => ({
 // before). Mock the RBAC decision cache's DB read so the caller in these tests
 // is always granted that permission — the gate itself is exercised separately
 // in rbac-matrix.test.ts. Also stub the models searchLocalCompanies reads
-// (company-autocomplete's local-Polo PreSales-records fallback) — previously this
+// (company-autocomplete's local-BidStack-records fallback) — previously this
 // suite ran that query against a real DB (dotenv-flow-loaded DATABASE_URL) and
 // got back an empty set for the fake test org; mocking @bidstack/db for the
 // RBAC gate would otherwise make those calls throw on an undefined model.

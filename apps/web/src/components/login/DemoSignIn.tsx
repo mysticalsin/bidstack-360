@@ -127,7 +127,7 @@ export function DemoSignIn() {
               transition={{ duration: 0.6, delay: 0.05 }}
               className="mb-4 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-[#34405a] sm:text-5xl md:text-6xl"
             >
-              {t('demoSignIn.heading', 'Explore BidStack 360°')}
+              {t('demoSignIn.heading', 'Explore Polo PreSales')}
             </motion.h1>
 
             <motion.p

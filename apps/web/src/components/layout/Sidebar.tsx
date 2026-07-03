@@ -92,7 +92,7 @@ export function Sidebar() {
 
         <div className="sb-brand">
           <div className="sb-mark" aria-hidden>
-            <PoloPreSalesLogo variant="mark" tone="inverse" className="h-5 w-5" />
+            <PoloPreSalesLogo variant="mark" tone="inverse" title="" className="h-5 w-5" />
           </div>
           <div>
             <div className="sb-name">

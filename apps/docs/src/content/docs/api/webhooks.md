@@ -66,12 +66,12 @@ Every delivery is an HTTP POST with `Content-Type: application/json`:
 
 ## Signature Verification
 
-Every delivery includes an `X-Polo PreSales-Signature` header. Verify it to confirm the request genuinely came from Polo PreSales.
+Every delivery includes an `X-BidStack-Signature` header. Verify it to confirm the request genuinely came from Polo PreSales.
 
 ### Header Format
 
 ```
-X-Polo PreSales-Signature: t=1748000000,v1=3d7a5c2f...
+X-BidStack-Signature: t=1748000000,v1=3d7a5c2f...
 ```
 
 - `t` — Unix timestamp (seconds) of the delivery attempt.

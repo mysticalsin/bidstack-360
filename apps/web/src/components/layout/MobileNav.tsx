@@ -79,7 +79,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="sb-mark" aria-hidden>
-            <PoloPreSalesLogo variant="mark" tone="inverse" className="h-5 w-5" />
+            <PoloPreSalesLogo variant="mark" tone="inverse" title="" className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-[var(--fg-primary)] leading-tight">

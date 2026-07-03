@@ -433,8 +433,8 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Polo PreSales-Signature': signature,
-              'User-Agent': 'Polo PreSales-Webhooks/1.0',
+              'X-BidStack-Signature': signature,
+              'User-Agent': 'BidStack-Webhooks/1.0',
             },
             body: pingBody,
             signal: controller.signal,

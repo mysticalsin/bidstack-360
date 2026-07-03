@@ -53,7 +53,12 @@ export function NavBar() {
           aria-label="Polo PreSales home"
           className="link-inline flex items-center"
         >
-          <PoloPreSalesLogo variant="full" title="" className="h-7 w-auto" />
+          <PoloPreSalesLogo
+            variant="full"
+            title=""
+            tone={theme === 'dark' ? 'inverse' : 'default'}
+            className="h-7 w-auto"
+          />
         </Link>
 
         <nav
@@ -100,20 +105,20 @@ export function NavBar() {
 
         <a
           href="https://app.bidstack.dev/sign-in"
-          className="link-inline hidden md:inline-flex items-center text-sm font-medium text-[color:var(--fg-secondary)] hover:text-[color:var(--fg-primary)] px-2"
+          className="link-inline hidden! md:inline-flex! items-center text-sm font-medium text-[color:var(--fg-secondary)] hover:text-[color:var(--fg-primary)] px-2"
         >
           Sign in
         </a>
         <a
           href="https://app.bidstack.dev/sign-up"
-          className="mkt-btn mkt-btn-primary hidden md:inline-flex"
+          className="mkt-btn mkt-btn-primary hidden! md:inline-flex!"
         >
           Start free
         </a>
 
         <button
           type="button"
-          className="mkt-btn mkt-btn-ghost h-11 w-11 p-0 md:hidden"
+          className="mkt-btn mkt-btn-ghost h-11 w-11 p-0 md:hidden!"
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={mobileOpen}
           aria-controls="mobile-menu"

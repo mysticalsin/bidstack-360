@@ -1149,10 +1149,6 @@ a {
   letter-spacing: 0;
   line-height: 1.1;
 }
-.sb-name .deg {
-  color: var(--brand-primary);
-  margin-left: 1px;
-}
 .sb-tag {
   font-size: 10.5px;
   color: var(--fg-tertiary);

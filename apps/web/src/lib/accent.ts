@@ -76,6 +76,7 @@ function tokens(p: string, dark: boolean): Record<string, string> {
     '--border-glow-strong': rgba(p, dark ? 0.3 : 0.16),
     '--brand-gradient-start': p,
     '--brand-gradient-end': dark ? lighten(p, 0.2) : darken(p, 0.15),
+    '--brand-gradient': `linear-gradient(135deg, ${p} 0%, ${dark ? lighten(p, 0.2) : darken(p, 0.15)} 100%)`,
   };
 }
 
