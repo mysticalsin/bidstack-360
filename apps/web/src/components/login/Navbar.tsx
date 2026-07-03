@@ -5,6 +5,7 @@ import { ChevronRight, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { EmailSignIn, GoogleSignInButton, MicrosoftSignInButton } from '@/components/auth';
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 
 interface NavItem {
   label: string;
@@ -38,14 +39,7 @@ export function Navbar() {
     >
       {/* Left Side (logo) */}
       <div className="flex-1 hidden md:flex flex-col items-start justify-center">
-        <picture>
-          <source srcSet="/logo-clear.webp" type="image/webp" />
-          <img
-            src="/logo-clear.png"
-            alt="BidStack360"
-            className="h-24 md:h-32 lg:h-40 w-auto object-contain -ml-2"
-          />
-        </picture>
+        <PoloPreSalesLogo variant="full" className="h-14 md:h-16 lg:h-20 w-auto -ml-2" />
       </div>
 
       {/* Center Menu */}
@@ -66,14 +60,7 @@ export function Navbar() {
 
       {/* Mobile Logo */}
       <div className="md:hidden flex flex-col items-start justify-center">
-        <picture>
-          <source srcSet="/logo-clear.webp" type="image/webp" />
-          <img
-            src="/logo-clear.png"
-            alt="BidStack360"
-            className="h-16 w-auto object-contain -ml-1"
-          />
-        </picture>
+        <PoloPreSalesLogo variant="full" className="h-10 w-auto -ml-1" />
       </div>
 
       {/* Right Side — Auth Buttons */}

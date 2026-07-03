@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { api, ApiError } from '@/lib/api';
 import { DEMO_TOKEN_KEY, DEMO_EMAIL_KEY, useSignInAction } from '@/lib/auth';
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 
 /**
  * Demo sign-in (VITE_AUTH_MODE=demo) rendered as the full branded login.
@@ -89,16 +90,11 @@ export function DemoSignIn() {
         <div className="relative z-10 flex h-full flex-col">
           {/* Header: real logo + author attribution */}
           <header className="flex items-center justify-between gap-4 px-6 py-5 md:px-10">
-            <picture>
-              <source srcSet="/brand/bidstack360-logo.webp" type="image/webp" />
-              <img
-                src="/brand/bidstack360-logo.png"
-                alt={t('demoSignIn.logoAlt', 'BidStack 360')}
-                className="h-12 w-auto drop-shadow-sm sm:h-14 md:h-16 lg:h-20"
-                width={1170}
-                height={315}
-              />
-            </picture>
+            <PoloPreSalesLogo
+              variant="full"
+              title={t('demoSignIn.logoAlt', 'Polo PreSales')}
+              className="h-10 w-auto drop-shadow-sm sm:h-12 md:h-14 lg:h-16"
+            />
             <a
               href={LINKEDIN_URL}
               target="_blank"
