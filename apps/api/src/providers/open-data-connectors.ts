@@ -429,7 +429,7 @@ async function fetchJson<T>(
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
     if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (!headers.has('User-Agent')) {
-      headers.set('User-Agent', process.env.SEC_USER_AGENT ?? 'BidStack360 contact@example.com');
+      headers.set('User-Agent', process.env.SEC_USER_AGENT ?? 'Polo PreSales contact@example.com');
     }
     const res = await fetchImpl(url, {
       ...init,
