@@ -390,7 +390,7 @@
     },
     "sync": {
       "result": "已丰富 {{enriched}} / 已缓存 {{cached}}",
-      "buttonTitle": "将 ERP sale.order 的主要客户同步到已验证的 BidStack 客户",
+      "buttonTitle": "将 ERP sale.order 的主要客户同步到已验证的 Polo PreSales 客户",
       "inProgress": "同步中…",
       "button": "同步 ERP 客户",
       "errorTitle": "ERP 客户同步失败",
@@ -2022,7 +2022,7 @@
     "errorBookingFailed": "预约失败",
     "notFoundTitle": "未找到预约页面",
     "notFoundBody": "此预约链接无效或已停止接受会议。",
-    "eyebrow": "BidStack 预约",
+    "eyebrow": "Polo PreSales 预约",
     "loadingTitle": "正在加载预约页面",
     "confirmedTitle": "预约已确认",
     "confirmedBody": "您已成功预约。确认邮件即将发送。",
@@ -2153,9 +2153,9 @@
   },
   "commandCenter": {
     "region": {
-      "ariaLabel": "BidStack 指挥中心"
+      "ariaLabel": "Polo PreSales 指挥中心"
     },
-    "kicker": "BidStack 指挥中心",
+    "kicker": "Polo PreSales 指挥中心",
     "actions": {
       "ariaLabel": "客户决策信号"
     },
@@ -2535,7 +2535,7 @@
     "adminOnlyBadge": "仅限管理员",
     "editTitle": "编辑 Webhook 订阅",
     "createTitle": "新建 Webhook 订阅",
-    "subtitle": "请使用生产环境的 HTTPS 端点。BidStack 使用 HMAC-SHA256 对每次投递进行签名。",
+    "subtitle": "请使用生产环境的 HTTPS 端点。Polo PreSales 使用 HMAC-SHA256 对每次投递进行签名。",
     "closeAriaLabel": "关闭",
     "endpointUrlLabel": "端点 URL",
     "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
@@ -2546,7 +2546,7 @@
     "clear": "清除",
     "securityContractTitle": "安全约定",
     "securityReturn2xx": "在 10 秒内返回 2xx 状态。",
-    "securityVerifyHeader": "验证 X-BidStack-Signature 标头。",
+    "securityVerifyHeader": "验证 X-Polo PreSales-Signature 标头。",
     "securityRejectOld": "拒绝超过 5 分钟的签名。",
     "securityAsync": "确认后异步处理繁重的工作。",
     "selectedEventsLabel": "已选事件",
@@ -3424,8 +3424,8 @@
     "submit": "转化线索",
     "cancel": "取消"
   },
-  "bidStack360Logo": {
-    "title": "BidStack 360",
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
     "tagline": "招标管理平台"
   },
   "leadRow": {
@@ -3566,7 +3566,7 @@
   },
   "kpiSidebar": {
     "title": "平台状态",
-    "caption": "最新可用的 BidStack 指标",
+    "caption": "最新可用的 Polo PreSales 指标",
     "releaseScore": "发布评分",
     "providersHealthy": "健康的提供商",
     "queueBacklog": "队列积压",

@@ -382,7 +382,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         event: 'ping',
         orgId: req.auth.orgId,
         timestamp: new Date().toISOString(),
-        data: { message: 'This is a test ping from BidStack webhooks.' },
+        data: { message: 'This is a test ping from Polo PreSales webhooks.' },
       });
 
       await assertSerumConnectorAllowed({
@@ -433,8 +433,8 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-BidStack-Signature': signature,
-              'User-Agent': 'BidStack-Webhooks/1.0',
+              'X-Polo PreSales-Signature': signature,
+              'User-Agent': 'Polo PreSales-Webhooks/1.0',
             },
             body: pingBody,
             signal: controller.signal,

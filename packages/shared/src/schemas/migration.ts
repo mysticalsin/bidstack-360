@@ -25,7 +25,7 @@ export type MigrationStatus = z.infer<typeof MigrationStatusEnum>;
 // ─── Column-mapping types ────────────────────────────────────────────────────
 
 // One entry in a column-mapping: user picked which source column maps to which
-// target field in BidStack (or null to skip the column).
+// target field in Polo PreSales (or null to skip the column).
 export const ColumnMapping = z.object({
   sourceColumn: z.string().min(1),
   targetField: z.string().nullable(),
@@ -195,7 +195,7 @@ export const MigrationErrorRow = z.object({
 });
 export type MigrationErrorRow = z.infer<typeof MigrationErrorRow>;
 
-// ─── Smart default mappings (Salesforce → BidStack) ─────────────────────────
+// ─── Smart default mappings (Salesforce → Polo PreSales) ─────────────────────────
 // Why here: both the API (validation) and frontend (pre-populate wizard) need
 // the same defaults. One source of truth prevents drift.
 

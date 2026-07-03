@@ -7,7 +7,7 @@ sidebar:
 
 # Errors
 
-Every error response from the BidStack API uses a consistent JSON envelope. Client errors are in the `4xx` range; server errors are `5xx`.
+Every error response from the Polo PreSales API uses a consistent JSON envelope. Client errors are in the `4xx` range; server errors are `5xx`.
 
 ## Error Envelope
 

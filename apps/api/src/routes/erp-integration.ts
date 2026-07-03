@@ -256,7 +256,7 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
           req.log.warn({ err }, 'erp company autocomplete failed');
         }
       } else {
-        warnings.push('ERP MCP is not configured; using local BidStack records.');
+        warnings.push('ERP MCP is not configured; using local Polo PreSales records.');
       }
 
       const orgId = authOrgId(req);
@@ -303,7 +303,7 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/erp/search',
     {
-      // Read-only proxy (searchRecords queries ERP; no BidStack or ERP mutation
+      // Read-only proxy (searchRecords queries ERP; no Polo PreSales or ERP mutation
       // in this file), so it gates on integrations:read like every other route
       // here despite the POST verb (chosen for the structured query body).
       preHandler: server.requirePermission('integrations:read'),

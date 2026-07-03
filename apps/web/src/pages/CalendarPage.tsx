@@ -2,7 +2,7 @@
  * CalendarPage — month/week/day view of synced events with two-way sync support.
  *
  * WHY a custom calendar grid instead of FullCalendar: no additional dep to
- * bundle; the week view is sufficient for BidStack's use case and stays within
+ * bundle; the week view is sufficient for Polo PreSales's use case and stays within
  * our 400-line file limit.
  *
  * Features:

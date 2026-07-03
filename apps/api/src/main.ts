@@ -68,7 +68,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 try {
   await server.listen({ port, host });
-  server.log.info({ port, host }, 'BidStack 360° API ready');
+  server.log.info({ port, host }, 'Polo PreSales API ready');
 } catch (err) {
   server.log.error(err, 'failed to start');
   process.exit(1);

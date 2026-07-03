@@ -7,7 +7,7 @@
  *  - groups:read         — list private channels (channel picker)
  *  - im:write            — open direct message channels
  *  - users:read          — resolve user details for DM routing
- *  - users:read.email    — match BidStack users to Slack users by email
+ *  - users:read.email    — match Polo PreSales users to Slack users by email
  *
  * WHY groups:read over channels:read only: private channels are visible in
  * the picker so admins can route sensitive deal alerts to private channels.

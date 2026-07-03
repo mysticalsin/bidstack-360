@@ -177,7 +177,7 @@ export function sourceLabel(source: string): string {
   if (normalized.includes('logo_dev')) return 'Logo provider';
   if (normalized.includes('official')) return 'Official';
   if (normalized.includes('favicon')) return 'Favicon';
-  if (normalized.includes('bidstack')) return 'BidStack';
+  if (normalized.includes('bidstack')) return 'Polo PreSales';
   if (normalized.includes('verified_data')) return 'Verified';
   return titleCase(source.replace(/[-.]/g, ' '));
 }

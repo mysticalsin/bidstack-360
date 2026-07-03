@@ -1,5 +1,5 @@
 /**
- * Gmail content script — injects "Add to BidStack" into email toolbar.
+ * Gmail content script — injects "Add to Polo PreSales" into email toolbar.
  *
  * Observation: Gmail renders email threads dynamically (SPA). We use a
  * MutationObserver to detect new email views and inject our button each time.
@@ -25,7 +25,7 @@ function extractEmailContext() {
   };
 }
 
-async function handleAddToBidStack() {
+async function handleAddToPolo PreSales() {
   const ctx = extractEmailContext();
   try {
     const lead = await sendToBackground('CREATE_LEAD', {
@@ -34,9 +34,9 @@ async function handleAddToBidStack() {
       source: ctx.source,
       notes: `From Gmail subject: ${ctx.subject}`,
     });
-    showToast(`Lead "${lead.name}" added to BidStack`, 'success');
+    showToast(`Lead "${lead.name}" added to Polo PreSales`, 'success');
   } catch (err) {
-    showToast(`BidStack: ${err.message}`, 'error');
+    showToast(`Polo PreSales: ${err.message}`, 'error');
   }
 }
 
@@ -44,7 +44,7 @@ function injectIntoEmail(toolbar) {
   if (toolbar.hasAttribute(INJECTED_ATTR)) return;
   toolbar.setAttribute(INJECTED_ATTR, 'true');
 
-  const btn = createAddToBidStackButton(handleAddToBidStack);
+  const btn = createAddToBidStackButton(handleAddToPolo PreSales);
   toolbar.appendChild(btn);
 }
 

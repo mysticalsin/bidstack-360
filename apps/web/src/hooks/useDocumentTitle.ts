@@ -26,7 +26,7 @@ export function useDocumentTitle(): void {
   const { pathname } = useLocation();
   useEffect(() => {
     const segment = '/' + (pathname.split('/').filter(Boolean)[0] ?? '');
-    const label = ROUTE_TITLES[segment] ?? 'BidStack 360°';
-    document.title = label === 'BidStack 360°' ? label : `${label} · BidStack 360°`;
+    const label = ROUTE_TITLES[segment] ?? 'Polo PreSales';
+    document.title = label === 'Polo PreSales' ? label : `${label} · Polo PreSales`;
   }, [pathname]);
 }

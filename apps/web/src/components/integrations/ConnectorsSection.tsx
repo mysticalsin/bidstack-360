@@ -84,7 +84,7 @@ export function ConnectorsSection() {
         title={t('connectors.header.title', 'Connectors catalog')}
         caption={t(
           'connectors.header.caption',
-          'External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials.',
+          'External data sources Polo PreSales can reach. Open feeds run without keys; licensed feeds need credentials.',
         )}
         action={
           <Badge

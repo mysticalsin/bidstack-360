@@ -59,7 +59,7 @@ export function LegalLayout({ title, updated, intro, children }: LegalLayoutProp
             <p className="mt-12 pt-6 border-t border-[color:var(--border-default)] text-xs text-[color:var(--fg-tertiary)]">
               This document contains placeholder fields (
               <code>[COMPANY NAME]</code>, <code>[JURISDICTION]</code>,{' '}
-              <code>[EFFECTIVE DATE]</code>) that will be replaced when BidStack incorporates and
+              <code>[EFFECTIVE DATE]</code>) that will be replaced when Polo PreSales incorporates and
               publishes its production legal pack. Review with counsel before relying on this
               document as a final agreement.
             </p>

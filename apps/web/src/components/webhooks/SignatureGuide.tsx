@@ -79,7 +79,7 @@ export function SignatureGuide() {
         <p className="mt-1 text-xs leading-5 text-[var(--fg-secondary)]">
           {t('signatureGuide.introBefore', 'Every delivery includes an')}{' '}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 font-mono text-[11px]">
-            X-BidStack-Signature
+            X-Polo PreSales-Signature
           </code>{' '}
           {t('signatureGuide.introAfter', 'header. Verify it before trusting the payload. Format:')}{' '}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 font-mono text-[11px]">

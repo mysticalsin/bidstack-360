@@ -28,7 +28,7 @@ const server = await buildMcpServer();
 
 try {
   await server.listen({ port, host });
-  server.log.info({ port, host }, 'BidStack MCP server ready');
+  server.log.info({ port, host }, 'Polo PreSales MCP server ready');
 } catch (err) {
   server.log.error(err, 'failed to start mcp-server');
   process.exit(1);

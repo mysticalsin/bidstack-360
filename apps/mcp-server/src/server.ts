@@ -69,7 +69,7 @@ function releaseMetadata(env: NodeJS.ProcessEnv = process.env): {
 }
 
 function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
-  const mcp = new McpServer({ name: 'BidStack 360', version: '0.1.0' });
+  const mcp = new McpServer({ name: 'Polo PreSales', version: '0.1.0' });
 
   for (const name of Object.keys(tools) as ToolName[]) {
     const tool = tools[name];
@@ -167,7 +167,7 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
   });
 
   server.get('/.well-known/mcp', async () => ({
-    name: 'BidStack 360',
+    name: 'Polo PreSales',
     vendor: 'Mantu',
     version: '0.1.0',
     release: releaseMetadata(),

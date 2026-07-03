@@ -26,7 +26,7 @@ export type TaggableEntityType = z.infer<typeof TaggableEntityType>;
  * from luminance so contrast always stays above 4.5:1.
  */
 export const TAG_COLORS = [
-  '#A78BFA', // violet-400 (default — matches BidStack brand)
+  '#A78BFA', // violet-400 (default — matches Polo PreSales brand)
   '#F472B6', // pink-400
   '#FB7185', // rose-400
   '#FB923C', // orange-400

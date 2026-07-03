@@ -132,10 +132,10 @@ export function SerumCommandBar({
         variant="ghost"
         size="sm"
         disabled
-        title={t('crm.serumCommandBar.askDisabledTitle', 'Ask BidStack requires registry-backed tools')}
+        title={t('crm.serumCommandBar.askDisabledTitle', 'Ask Polo PreSales requires registry-backed tools')}
       >
         <Icon name="sparkle" size={15} ariaHidden />
-        {t('crm.serumCommandBar.ask', 'Ask BidStack')}
+        {t('crm.serumCommandBar.ask', 'Ask Polo PreSales')}
       </Button>
     </SerumGlassToolbar>
   );

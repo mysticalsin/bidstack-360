@@ -110,7 +110,7 @@ const slackCommandsPlugin: FastifyPluginAsync = async (fastify) => {
         const message = err instanceof Error ? err.message : 'An error occurred';
         return reply.send({
           response_type: 'ephemeral',
-          text: `:x: BidStack error: ${message}`,
+          text: `:x: Polo PreSales error: ${message}`,
         });
       }
     },
@@ -135,11 +135,11 @@ async function dispatchCommand(
       return {
         response_type: 'ephemeral',
         text: [
-          ':wave: *BidStack 360*',
+          ':wave: *Polo PreSales*',
           '',
           '*Available commands:*',
           '`/bidstack lead create <name>` - Create a new lead',
-          '`/bidstack search <query>` - Search BidStack records',
+          '`/bidstack search <query>` - Search Polo PreSales records',
           "`/bidstack tasks today` - View today's tasks",
         ].join('\n'),
       };
@@ -162,7 +162,7 @@ async function handleLeadCommand(action: string | undefined, args: string, teamI
   if (!workspace) {
     return {
       response_type: 'ephemeral',
-      text: ':warning: BidStack is not connected to this Slack workspace.',
+      text: ':warning: Polo PreSales is not connected to this Slack workspace.',
     };
   }
 
@@ -195,7 +195,7 @@ async function handleLeadCommand(action: string | undefined, args: string, teamI
         },
         accessory: {
           type: 'button',
-          text: { type: 'plain_text', text: 'View in BidStack' },
+          text: { type: 'plain_text', text: 'View in Polo PreSales' },
           url: `https://app.bidstack.io/leads/${lead.id}`,
           action_id: 'view_lead',
         },
@@ -220,7 +220,7 @@ async function handleSearchCommand(query: string, teamId: string) {
   if (!workspace) {
     return {
       response_type: 'ephemeral',
-      text: ':warning: BidStack is not connected to this Slack workspace.',
+      text: ':warning: Polo PreSales is not connected to this Slack workspace.',
     };
   }
 
@@ -276,7 +276,7 @@ async function handleTasksCommand(slackUserId: string, teamId: string) {
   if (!workspace) {
     return {
       response_type: 'ephemeral',
-      text: ':warning: BidStack is not connected to this Slack workspace.',
+      text: ':warning: Polo PreSales is not connected to this Slack workspace.',
     };
   }
 
@@ -288,7 +288,7 @@ async function handleTasksCommand(slackUserId: string, teamId: string) {
   if (!userMapping) {
     return {
       response_type: 'ephemeral',
-      text: ':information_source: Your Slack account is not linked to a BidStack user.',
+      text: ':information_source: Your Slack account is not linked to a Polo PreSales user.',
     };
   }
 

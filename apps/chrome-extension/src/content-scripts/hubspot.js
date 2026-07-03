@@ -2,7 +2,7 @@
  * HubSpot content script — light migration prompt.
  *
  * When a user is actively working in HubSpot, offer a one-time banner
- * suggesting they try BidStack. Shown at most once per session.
+ * suggesting they try Polo PreSales. Shown at most once per session.
  *
  * WHY light/non-intrusive: we never inject UI into HubSpot's own record
  * forms or obstruct their UI. We only append a dismissible banner at the
@@ -36,11 +36,11 @@ function injectBanner() {
   banner.innerHTML = `
     <div class="bidstack-hs-banner-inner">
       <strong>Considering a switch?</strong>
-      BidStack 360° is a bid-focused CRM built for presales teams.
+      Polo PreSales is a bid-focused CRM built for presales teams.
       <a href="https://bidstack.io?utm_source=chrome-ext&utm_medium=hubspot-banner" target="_blank" rel="noopener noreferrer">
         Learn more
       </a>
-      <button id="bidstack-hs-dismiss" aria-label="Dismiss BidStack banner">✕</button>
+      <button id="bidstack-hs-dismiss" aria-label="Dismiss Polo PreSales banner">✕</button>
     </div>
   `;
 

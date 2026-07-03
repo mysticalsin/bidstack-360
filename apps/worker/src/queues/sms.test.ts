@@ -44,7 +44,7 @@ const jobData = {
   userId,
   integrationTokenId,
   toNumber: '+15557654321',
-  body: 'Hello from BidStack',
+  body: 'Hello from Polo PreSales',
 };
 
 /**

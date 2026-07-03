@@ -1,4 +1,4 @@
-// InfoSearch MCP client — surfaces call lists / lead intel inside BidStack so
+// InfoSearch MCP client — surfaces call lists / lead intel inside Polo PreSales so
 // managers stop visiting the platform separately. Pattern: a thin streamable-
 // HTTP JSON-RPC client (same shape as packages/odoo-mcp-client, kept as an api
 // lib since one route consumes it).

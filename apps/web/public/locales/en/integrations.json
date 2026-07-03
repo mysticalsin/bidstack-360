@@ -1,6 +1,6 @@
 {
   "title": "Integrations",
-  "subtitle": "Connect BidStack to your tools and services",
+  "subtitle": "Connect Polo PreSales to your tools and services",
   "connected": "Connected",
   "disconnected": "Disconnected",
   "connect": "Connect",
@@ -18,13 +18,13 @@
   },
   "gmail": {
     "name": "Gmail",
-    "description": "Sync your Gmail emails and activities with BidStack.",
+    "description": "Sync your Gmail emails and activities with Polo PreSales.",
     "permissionsRequired": "Read-access to emails required",
     "connectViaGoogle": "Connect via Google"
   },
   "microsoft": {
     "name": "Microsoft 365",
-    "description": "Sync Outlook, Calendar and Teams with BidStack.",
+    "description": "Sync Outlook, Calendar and Teams with Polo PreSales.",
     "connectViaMicrosoft": "Connect via Microsoft"
   },
   "slack": {
@@ -36,7 +36,7 @@
   },
   "zapier": {
     "name": "Zapier",
-    "description": "Automate BidStack with thousands of apps via Zapier.",
+    "description": "Automate Polo PreSales with thousands of apps via Zapier.",
     "apiKey": "Zapier API key",
     "viewZaps": "View my Zaps"
   },
@@ -157,7 +157,7 @@
     },
     "header": {
       "title": "Connectors catalog",
-      "caption": "External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials.",
+      "caption": "External data sources Polo PreSales can reach. Open feeds run without keys; licensed feeds need credentials.",
       "sourcesBadge": "{{count}} sources"
     },
     "error": {
@@ -213,7 +213,7 @@
     "notConfigured": {
       "set": "Set",
       "andOptionally": "and optionally",
-      "tail": "to reach the ERP MCP sidecar. Until then, BidStack uses local verified data and verified data connectors."
+      "tail": "to reach the ERP MCP sidecar. Until then, Polo PreSales uses local verified data and verified data connectors."
     },
     "stat": {
       "endpoint": "Endpoint",
@@ -228,7 +228,7 @@
     },
     "kit": {
       "title": "ERP bid operating kit",
-      "subtitle": "Partner, opportunity, quote, activity, document, and handoff patterns adapted for BidStack presales.",
+      "subtitle": "Partner, opportunity, quote, activity, document, and handoff patterns adapted for Polo PreSales presales.",
       "badge": {
         "sidecar": "sidecar",
         "fixSidecar": "fix sidecar",
@@ -237,11 +237,11 @@
     },
     "autocomplete": {
       "title": "Partner autocomplete",
-      "subtitle": "ERP-style legal entity lookup with BidStack fallback.",
+      "subtitle": "ERP-style legal entity lookup with Polo PreSales fallback.",
       "ariaLabel": "Company autocomplete query",
       "placeholder": "Name, domain, VAT, or DUNS",
       "check": "Check",
-      "empty": "No company suggestions yet. Add ERP MCP credentials or verify this account in BidStack."
+      "empty": "No company suggestions yet. Add ERP MCP credentials or verify this account in Polo PreSales."
     },
     "item": {
       "vat": "VAT {{value}}",
@@ -259,7 +259,7 @@
       "mcp": {
         "title": "MCP server",
         "eyebrow": "Custom tools",
-        "summary": "Register BidStack as an MCP server for Dust, Claude Desktop, or internal agents."
+        "summary": "Register Polo PreSales as an MCP server for Dust, Claude Desktop, or internal agents."
       },
       "rest": {
         "title": "REST API",

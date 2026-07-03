@@ -1,7 +1,7 @@
 /**
  * ToolkitStoreSection — the stored sales-toolkit collateral (decks/templates/
  * battle-cards). Org-scoped CRUD via useSalesToolkitStore. Normally kept in
- * SharePoint; stored here so it's managed in BidStack + readable by the MCP.
+ * SharePoint; stored here so it's managed in Polo PreSales + readable by the MCP.
  */
 import { useMemo, useState } from 'react';
 

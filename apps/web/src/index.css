@@ -1,4 +1,4 @@
-/* BidStack 360° — design tokens + Tailwind 4
+/* Polo PreSales — design tokens + Tailwind 4
    Source: src/tokens.css (prototype) + dark-mode peer + Apple HIG spacing.
    ============================================================ */
 
@@ -817,7 +817,7 @@ a {
 
 /* ============================================================
    Prototype component classes — ported from CRM_extracted/src/styles.css
-   plus BidStack 360° additions (account cards, open-issues, motion).
+   plus Polo PreSales additions (account cards, open-issues, motion).
    ============================================================ */
 
 /* ---------- Type utilities ---------- */
@@ -2902,7 +2902,7 @@ a {
   padding: 12px;
 }
 
-/* ---------- BidStack command center ---------- */
+/* ---------- Polo PreSales command center ---------- */
 .command-center {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.35fr);

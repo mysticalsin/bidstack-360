@@ -141,7 +141,7 @@ export function ErpConnectorCard() {
           <code className="font-mono text-xs">ERP_DB</code>{' '}
           {t(
             'erpConnector.notConfigured.tail',
-            'to reach the ERP MCP sidecar. Until then, BidStack uses local verified data and verified data connectors.',
+            'to reach the ERP MCP sidecar. Until then, Polo PreSales uses local verified data and verified data connectors.',
           )}
         </div>
       ) : (
@@ -191,7 +191,7 @@ export function ErpConnectorCard() {
                 <p className="mt-1 text-xs text-[var(--fg-secondary)]">
                   {t(
                     'erpConnector.kit.subtitle',
-                    'Partner, opportunity, quote, activity, document, and handoff patterns adapted for BidStack presales.',
+                    'Partner, opportunity, quote, activity, document, and handoff patterns adapted for Polo PreSales presales.',
                   )}
                 </p>
               </div>
@@ -254,7 +254,7 @@ export function ErpConnectorCard() {
                   <p className="mt-1 text-xs text-[var(--fg-secondary)]">
                     {t(
                       'erpConnector.autocomplete.subtitle',
-                      'ERP-style legal entity lookup with BidStack fallback.',
+                      'ERP-style legal entity lookup with Polo PreSales fallback.',
                     )}
                   </p>
                 </div>
@@ -331,7 +331,7 @@ export function ErpConnectorCard() {
                   <li className="p-4 text-sm text-[var(--fg-secondary)]">
                     {t(
                       'erpConnector.autocomplete.empty',
-                      'No company suggestions yet. Add ERP MCP credentials or verify this account in BidStack.',
+                      'No company suggestions yet. Add ERP MCP credentials or verify this account in Polo PreSales.',
                     )}
                   </li>
                 ) : null}

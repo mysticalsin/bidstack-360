@@ -8,7 +8,7 @@
  * callers enqueue one job per matching active subscription.
  *
  * Signature format (matches /docs/api/webhooks.md):
- *   X-BidStack-Signature: t=<unix-seconds>,v1=<hmac-sha256-hex>
+ *   X-Polo PreSales-Signature: t=<unix-seconds>,v1=<hmac-sha256-hex>
  *   where the HMAC covers the string `${t}.${rawJsonBody}`.
  *
  * Retry schedule (configured in queue-config.ts WEBHOOK_DELIVERY):
@@ -143,8 +143,8 @@ async function deliver(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-BidStack-Signature': signature,
-          'User-Agent': 'BidStack-Webhooks/1.0',
+          'X-Polo PreSales-Signature': signature,
+          'User-Agent': 'Polo PreSales-Webhooks/1.0',
         },
         body,
         signal: controller.signal,

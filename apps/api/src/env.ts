@@ -175,7 +175,7 @@ export const envSchema = z.object({
   // Served to the SPA via GET /api/v1/config/features so a flag flip is a
   // restart, not a rebuild. Default false: dependent blocks hide entirely
   // (the brief forbids empty/null states for unavailable data sources).
-  // Win/Loss block — derived from the account's own BidStack opportunity
+  // Win/Loss block — derived from the account's own Polo PreSales opportunity
   // pipeline (won/lost stages), so the data is real today. Default on; set
   // false only to hide the block.
   WIN_LOSS_DATA_AVAILABLE: z.enum(['true', 'false']).default('true'),

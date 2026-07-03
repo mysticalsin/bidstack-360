@@ -247,7 +247,7 @@ export async function buildUserMappings(
 
   if (emailMap.size === 0) return;
 
-  // Match against BidStack users in this org
+  // Match against Polo PreSales users in this org
   const orgUsers = await prisma.user.findMany({
     where: { orgId },
     select: { id: true, email: true },

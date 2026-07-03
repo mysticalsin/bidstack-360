@@ -7,7 +7,7 @@ sidebar:
 
 # Webhooks
 
-BidStack can push real-time notifications to your server whenever domain events occur (lead created, deal stage changed, etc.). This page covers subscription management, payload format, signature verification, and retry behaviour.
+Polo PreSales can push real-time notifications to your server whenever domain events occur (lead created, deal stage changed, etc.). This page covers subscription management, payload format, signature verification, and retry behaviour.
 
 ## Creating a Subscription
 
@@ -66,12 +66,12 @@ Every delivery is an HTTP POST with `Content-Type: application/json`:
 
 ## Signature Verification
 
-Every delivery includes an `X-BidStack-Signature` header. Verify it to confirm the request genuinely came from BidStack.
+Every delivery includes an `X-Polo PreSales-Signature` header. Verify it to confirm the request genuinely came from Polo PreSales.
 
 ### Header Format
 
 ```
-X-BidStack-Signature: t=1748000000,v1=3d7a5c2f...
+X-Polo PreSales-Signature: t=1748000000,v1=3d7a5c2f...
 ```
 
 - `t` — Unix timestamp (seconds) of the delivery attempt.
@@ -165,7 +165,7 @@ app.post('/webhooks/bidstack', express.raw({ type: '*/*' }), (req, res) => {
 
 ## Retry Schedule
 
-BidStack retries failed deliveries with exponential backoff:
+Polo PreSales retries failed deliveries with exponential backoff:
 
 | Attempt | Delay after previous |
 | ------- | -------------------- |

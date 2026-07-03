@@ -100,7 +100,7 @@ export function Footer() {
               B
             </span>
             <span>
-              BidStack 360° &copy; {new Date().getFullYear()} BidStack, Inc. All rights reserved.
+              Polo PreSales &copy; {new Date().getFullYear()} Polo PreSales, Inc. All rights reserved.
             </span>
           </div>
           <div className="text-xs text-[color:var(--fg-muted)]">

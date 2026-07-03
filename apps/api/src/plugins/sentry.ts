@@ -2,7 +2,7 @@
  * Sentry Node SDK plugin for Fastify.
  *
  * PII scrubbing:
- * BidStack handles personal data. We must not send names, emails, phone
+ * Polo PreSales handles personal data. We must not send names, emails, phone
  * numbers, tokens, or raw request bodies to Sentry without field-name
  * redaction. The beforeSend hook strips these fields before transmission.
  *

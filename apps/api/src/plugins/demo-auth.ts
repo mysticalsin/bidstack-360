@@ -197,7 +197,7 @@ export async function provisionDemoSession(email: string, name?: string): Promis
     org = await prisma.$transaction(
       async (tx) => {
         const created = await tx.org.create({
-          data: { clerkOrg: `${DEMO_ORG_PREFIX}${slug}`, name: 'BidStack Demo Workspace' },
+          data: { clerkOrg: `${DEMO_ORG_PREFIX}${slug}`, name: 'Polo PreSales Demo Workspace' },
         });
         await seedOrgData(tx, created.id, {
           ownerEmail: normalized,

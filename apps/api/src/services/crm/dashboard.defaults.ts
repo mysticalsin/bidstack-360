@@ -229,7 +229,7 @@ export function defaultCompliance(): z.infer<typeof AccountCockpitSnapshot>['com
       sourceAttribution: [
         attribution({
           source: 'manual',
-          label: 'BidStack compliance library',
+          label: 'Polo PreSales compliance library',
           sourceUrl: null,
           confidence: 0.86,
         }),
@@ -243,7 +243,7 @@ export function defaultCompliance(): z.infer<typeof AccountCockpitSnapshot>['com
       sourceAttribution: [
         attribution({
           source: 'manual',
-          label: 'BidStack compliance library',
+          label: 'Polo PreSales compliance library',
           sourceUrl: null,
           confidence: 0.82,
         }),

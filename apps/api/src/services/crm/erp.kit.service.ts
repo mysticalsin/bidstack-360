@@ -98,7 +98,7 @@ export function buildPresalesKit({
     partnerAutocomplete: {
       inputs: ['legal name', 'domain', 'VAT', 'DUNS', 'GST', 'registry id'],
       fallback:
-        'ERP MCP when configured; otherwise BidStack verified data, external CRM customers, and verified data adapters.',
+        'ERP MCP when configured; otherwise Polo PreSales verified data, external CRM customers, and verified data adapters.',
       validates: [
         'country/state normalization',
         'industry mapping',
@@ -135,14 +135,14 @@ export function buildPresalesKit({
     nextActions: configured
       ? reachable
         ? [
-            'Map res.partner rows into BidStack verified data cache.',
+            'Map res.partner rows into Polo PreSales verified data cache.',
             'Sync ERP crm.lead stage changes into bid opportunity audit logs.',
             'Attach sale.order commercial context to proposal readiness scoring.',
           ]
-        : ['Fix ERP_MCP_URL or sidecar credentials; local BidStack fallback remains active.']
+        : ['Fix ERP_MCP_URL or sidecar credentials; local Polo PreSales fallback remains active.']
       : [
           'Set ERP_MCP_URL when the ERP sidecar is ready.',
-          'Keep using BidStack verified data and verified data connectors until then.',
+          'Keep using Polo PreSales verified data and verified data connectors until then.',
         ],
     lastError,
   };

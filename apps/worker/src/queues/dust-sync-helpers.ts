@@ -1,4 +1,4 @@
-// Shared helpers for mapping Dust documents to BidStack CRM entities.
+// Shared helpers for mapping Dust documents to Polo PreSales CRM entities.
 // Used by both the scheduled poll worker and the webhook processor.
 //
 // Conflict resolution: if a CRM record has dustLastPushedAt within the last

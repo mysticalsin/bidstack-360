@@ -7,7 +7,7 @@ import { FEATURES, TESTIMONIALS, PRICING_TEASER, COMPARE_ROWS, useJsonLd } from 
 
 export function HomePage() {
   useSeo({
-    title: 'BidStack 360° — The CRM built for winning bids',
+    title: 'Polo PreSales — The CRM built for winning bids',
     description:
       'Pipeline, proposals, and AI co-pilots for sales teams who live in RFPs. Start free, no credit card.',
     canonical: 'https://bidstack.dev/',
@@ -59,7 +59,7 @@ export function HomePage() {
 
       {/* ---------- SOCIAL PROOF ---------- */}
       <section
-        aria-label="Customers using BidStack"
+        aria-label="Customers using Polo PreSales"
         className="border-y border-[color:var(--border-subtle)] py-8 md:py-10 bg-[color:var(--surface-card)]"
       >
         <div className="mkt-container">
@@ -83,9 +83,9 @@ export function HomePage() {
       {/* ---------- FEATURES ---------- */}
       <Section
         id="why"
-        eyebrow="Why BidStack"
+        eyebrow="Why Polo PreSales"
         title="Built for the deals nobody else automates"
-        lead="Generic CRMs treat every deal the same. BidStack treats RFPs like RFPs — with the workflows, AI, and compliance scaffolding bid teams actually need."
+        lead="Generic CRMs treat every deal the same. Polo PreSales treats RFPs like RFPs — with the workflows, AI, and compliance scaffolding bid teams actually need."
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {FEATURES.map(({ Icon: I, title, body }) => (
@@ -118,7 +118,7 @@ export function HomePage() {
               <tr>
                 <th scope="col">Capability</th>
                 <th scope="col" className="text-center">
-                  BidStack
+                  Polo PreSales
                 </th>
                 <th scope="col" className="text-center">
                   Salesforce
@@ -170,7 +170,7 @@ export function HomePage() {
         id="ai"
         eyebrow="AI, done seriously"
         title="Built with AI co-pilots, not AI gimmicks"
-        lead="Every BidStack deployment ships with Dust agents wired in: bid qualifier, proposal drafter, account researcher. They live inside your workspace, not in a separate tab."
+        lead="Every Polo PreSales deployment ships with Dust agents wired in: bid qualifier, proposal drafter, account researcher. They live inside your workspace, not in a separate tab."
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           <div className="space-y-5">
@@ -186,7 +186,7 @@ export function HomePage() {
                   Agents that read your data, not just public web
                 </h3>
                 <p className="mt-1 text-[15px] text-[color:var(--fg-secondary)] leading-relaxed">
-                  BidStack ships an MCP server so agents query opportunities, accounts, and past
+                  Polo PreSales ships an MCP server so agents query opportunities, accounts, and past
                   proposals with org-scoped permissions baked in.
                 </p>
               </div>

@@ -177,7 +177,7 @@ async function htmlToBasicPdf(html: string): Promise<Buffer> {
     drawWrappedLine({
       page,
       font: bold,
-      text: 'BidStack 360 signed document',
+      text: 'Polo PreSales signed document',
       x: PAGE_MARGIN,
       y,
       maxWidth: A4.width - PAGE_MARGIN * 2,

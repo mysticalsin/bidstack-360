@@ -2,7 +2,7 @@
  * erp.partners.service.ts — searchErpPartners and searchLocalCompanies.
  *
  * Extracted from erp.service.ts (BS-R1 file-size refactor).
- * Handles both ERP MCP partner lookup and local BidStack company search.
+ * Handles both ERP MCP partner lookup and local Polo PreSales company search.
  */
 import { prisma, type Prisma } from '@bidstack/db';
 import type { OdooMcpClient as ErpMcpClient } from '@bidstack/odoo-mcp-client';

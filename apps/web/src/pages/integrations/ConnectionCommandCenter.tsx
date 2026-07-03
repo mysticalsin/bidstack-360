@@ -45,7 +45,7 @@ const PATHS: Array<{
     icon: 'git-branch',
     title: 'MCP server',
     eyebrow: 'Custom tools',
-    summary: 'Register BidStack as an MCP server for Dust, Claude Desktop, or internal agents.',
+    summary: 'Register Polo PreSales as an MCP server for Dust, Claude Desktop, or internal agents.',
   },
   {
     key: 'rest',

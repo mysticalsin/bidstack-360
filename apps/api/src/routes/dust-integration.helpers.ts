@@ -283,7 +283,7 @@ export function buildIntegrationSetupGuide() {
   const workspaceId = envString('DUST_WORKSPACE_ID');
   const dustMcpToolConfig = JSON.stringify(
     {
-      name: 'BidStack 360',
+      name: 'Polo PreSales',
       transport: 'streamable-http',
       url: mcpUrl,
       headers: { Authorization: 'Bearer <BIDSTACK_API_KEY>' },

@@ -139,13 +139,13 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
               {t(
                 'settingsOverview.heroTitle',
-                'Configure BidStack once. Make every team move the same way.',
+                'Configure Polo PreSales once. Make every team move the same way.',
               )}
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
               {t(
                 'settingsOverview.heroSubtitle',
-                'Settings now surfaces the working controls that affect BidStack across the app: workspace membership, roles, currencies, pipeline stages, lead recovery rules, tags, email templates, custom fields, API keys, and webhooks.',
+                'Settings now surfaces the working controls that affect Polo PreSales across the app: workspace membership, roles, currencies, pipeline stages, lead recovery rules, tags, email templates, custom fields, API keys, and webhooks.',
               )}
             </p>
           </div>

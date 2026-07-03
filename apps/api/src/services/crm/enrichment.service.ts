@@ -152,7 +152,7 @@ export async function upsertVerifiedCompanyEnrichment({
     ...(openProfile?.logoUrl ? [] : favicon.sourceAttribution),
     attribution({
       source: isMantu ? 'official_website' : 'verified_data_source',
-      label: isMantu ? 'Mantu official website' : 'BidStack verified data cache',
+      label: isMantu ? 'Mantu official website' : 'Polo PreSales verified data cache',
       sourceUrl: website,
       confidence: isMantu ? 0.99 : 0.72,
     }),

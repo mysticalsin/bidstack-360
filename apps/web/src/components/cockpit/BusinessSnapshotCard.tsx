@@ -72,7 +72,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
             state: 'crm',
             hint: t(
               'businessSnapshot.source.crmNameHint',
-              'Name is carried by the BidStack account record.',
+              'Name is carried by the Polo PreSales account record.',
             ),
           },
     },
@@ -103,7 +103,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
             state: 'crm',
             hint: t(
               'businessSnapshot.source.derivedHeadquarters',
-              'Derived from BidStack account geography rules.',
+              'Derived from Polo PreSales account geography rules.',
             ),
           }
         : missingSource(
@@ -202,7 +202,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         state: 'crm',
         hint: t(
           'businessSnapshot.source.crmSnapshotHint',
-          'Timestamp from the BidStack account snapshot.',
+          'Timestamp from the Polo PreSales account snapshot.',
         ),
       },
     },

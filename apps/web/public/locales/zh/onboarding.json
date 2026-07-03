@@ -7,7 +7,7 @@
     "finish": "完成",
     "stepOf": "第 {{current}} / {{total}} 步",
     "welcome": {
-      "title": "欢迎使用 BidStack 360°",
+      "title": "欢迎使用 Polo PreSales",
       "body": "Mantu 的投标与售前管理平台。2 分钟内快速上手。"
     },
     "pipeline": {
@@ -62,7 +62,7 @@
       }
     },
     "completed": "快速开始完成！",
-    "completedBody": "您已掌握 BidStack 360° 的基础知识，祝您投标顺利。",
+    "completedBody": "您已掌握 Polo PreSales 的基础知识，祝您投标顺利。",
     "dismiss": "关闭",
     "tourButton": "参加 2 分钟产品导览",
     "items": {
@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "添加你的第一个潜在客户",
-        "description": "捕获入站兴趣，让 BidStack 自动评分。"
+        "description": "捕获入站兴趣，让 Polo PreSales 自动评分。"
       },
       "firstActivity": {
         "label": "记录你的第一项活动",

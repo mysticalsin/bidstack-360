@@ -2,7 +2,7 @@
 //
 // What a user sees must mirror their group access in the source systems
 // (ABC, Opportunity Management). Connectors don't exist yet, so groups are
-// ADMIN-MANAGED in BidStack (Settings → Access groups); a future sync job
+// ADMIN-MANAGED in Polo PreSales (Settings → Access groups); a future sync job
 // will maintain the same UserGroup/UserGroupMember tables.
 //
 // Semantics v1 — country-scoped OPPORTUNITIES only:

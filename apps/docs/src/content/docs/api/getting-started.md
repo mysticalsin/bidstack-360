@@ -7,7 +7,7 @@ sidebar:
 
 # Getting Started
 
-BidStack 360° provides a REST API for integrating with your bid/presales workflows. This guide walks you through authentication, your first request, and the conventions you'll encounter throughout the reference docs.
+Polo PreSales provides a REST API for integrating with your bid/presales workflows. This guide walks you through authentication, your first request, and the conventions you'll encounter throughout the reference docs.
 
 ## Base URL
 
@@ -21,7 +21,7 @@ Every authenticated endpoint lives under `/api/v1/`. The version prefix is stabl
 
 ## Authentication
 
-BidStack supports two authentication methods:
+Polo PreSales supports two authentication methods:
 
 ### API Key (recommended for server-to-server)
 

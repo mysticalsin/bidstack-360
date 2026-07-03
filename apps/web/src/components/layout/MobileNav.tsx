@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { useUiStore } from '@/stores/ui';
 import { useAccountHistory } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
@@ -78,11 +79,11 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="sb-mark" aria-hidden>
-            B
+            <PoloPreSalesLogo variant="mark" tone="inverse" className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-[var(--fg-primary)] leading-tight">
-              BidStack 360
+              Polo PreSales
             </span>
             <span className="text-[10px] text-[var(--fg-tertiary)] font-normal leading-tight">
               Creator: Tony

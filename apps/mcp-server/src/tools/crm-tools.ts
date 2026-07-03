@@ -21,7 +21,7 @@ import {
 } from './crm-tools.helpers.js';
 
 export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
-  description: 'Search CRM companies from Twenty-backed opportunities and BidStack enrichments.',
+  description: 'Search CRM companies from Twenty-backed opportunities and Polo PreSales enrichments.',
   input: CompanySearchInput,
   inputJsonSchema: {
     type: 'object',

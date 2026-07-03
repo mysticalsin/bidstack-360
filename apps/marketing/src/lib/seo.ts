@@ -37,7 +37,7 @@ function upsertLink(rel: string, href: string) {
 
 export function useSeo({ title, description, canonical, ogImage }: SeoMeta): void {
   useEffect(() => {
-    const fullTitle = title.includes('BidStack') ? title : `${title} — BidStack 360°`;
+    const fullTitle = title.includes('Polo PreSales') ? title : `${title} — Polo PreSales`;
     document.title = fullTitle;
     upsertMeta('description', description);
     upsertMeta('og:title', fullTitle, 'property');

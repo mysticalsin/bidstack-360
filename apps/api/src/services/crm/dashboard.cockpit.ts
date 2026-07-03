@@ -599,7 +599,7 @@ export function buildCockpit({
     sourceHint:
       company.source === 'verified_data'
         ? 'Verified company cache'
-        : 'BidStack CRM pipeline record',
+        : 'Polo PreSales CRM pipeline record',
   };
   const missingApolloSource = {
     sourceLabel: 'Needs enrichment',
@@ -611,7 +611,7 @@ export function buildCockpit({
   const internalSource = {
     sourceLabel: 'Internal',
     sourceState: 'crm' as const,
-    sourceHint: 'Computed from BidStack opportunities.',
+    sourceHint: 'Computed from Polo PreSales opportunities.',
   };
   const overrideSource = {
     sourceLabel: 'Manual override',

@@ -173,7 +173,7 @@ async function runReviewAgent(opts: {
 
   const userMessage = buildAgentUserMessage({
     template:
-      'You are {{ROLE}} in the BidStack RFP response crew. {{INSTRUCTION}} ' +
+      'You are {{ROLE}} in the Polo PreSales RFP response crew. {{INSTRUCTION}} ' +
       'Return concise markdown with: Critical risks, Required owner actions, Missing information, and Go-forward recommendation. ' +
       'Do not approve the bid; humans approve gates.',
     trusted: { ROLE: agent.role, INSTRUCTION: agent.instruction, PROPOSAL_ID: proposalId },

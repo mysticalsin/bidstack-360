@@ -30,7 +30,7 @@ vi.mock('@bidstack/db/serum-runtime-policy', () => ({
 // before). Mock the RBAC decision cache's DB read so the caller in these tests
 // is always granted that permission — the gate itself is exercised separately
 // in rbac-matrix.test.ts. Also stub the models searchLocalCompanies reads
-// (company-autocomplete's local-BidStack-records fallback) — previously this
+// (company-autocomplete's local-Polo PreSales-records fallback) — previously this
 // suite ran that query against a real DB (dotenv-flow-loaded DATABASE_URL) and
 // got back an empty set for the fake test org; mocking @bidstack/db for the
 // RBAC gate would otherwise make those calls throw on an undefined model.
@@ -168,7 +168,7 @@ describe('erp-integration route', () => {
     expect(res.json()).toMatchObject({ configured: false, reachable: false });
   });
 
-  it('returns the BidStack presales kit even when ERP is not configured', async () => {
+  it('returns the Polo PreSales presales kit even when ERP is not configured', async () => {
     delete process.env.ERP_MCP_URL;
     delete process.env.ODOO_MCP_URL;
     __resetErpClient();
@@ -266,7 +266,7 @@ describe('erp-integration route', () => {
       reachable: false,
       source: 'none',
       items: [],
-      warnings: ['ERP MCP is not configured; using local BidStack records.'],
+      warnings: ['ERP MCP is not configured; using local Polo PreSales records.'],
     });
   });
 

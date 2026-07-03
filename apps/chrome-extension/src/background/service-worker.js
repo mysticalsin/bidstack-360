@@ -1,9 +1,9 @@
 /**
- * BidStack Chrome Extension — Background Service Worker (Manifest V3).
+ * Polo PreSales Chrome Extension — Background Service Worker (Manifest V3).
  *
  * Responsibilities:
  *  - Handle messages from content scripts (create lead, search records).
- *  - Proxy API calls to BidStack so content scripts never hold the API key in DOM.
+ *  - Proxy API calls to Polo PreSales so content scripts never hold the API key in DOM.
  *  - Manage token storage via chrome.storage.local.
  *
  * WHY proxy through service worker: content scripts run in web page context and
@@ -47,7 +47,7 @@ async function handleMessage(message) {
 async function getApi() {
   const config = await getConfig();
   if (!config.apiKey) {
-    throw new Error('BidStack API key not configured. Open the extension options to set it.');
+    throw new Error('Polo PreSales API key not configured. Open the extension options to set it.');
   }
   return new BidStackAPI(config.apiKey, config.hostUrl);
 }

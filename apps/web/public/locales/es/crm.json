@@ -453,7 +453,7 @@
     },
     "sync": {
       "result": "{{enriched}} enriquecidas / {{cached}} en caché",
-      "buttonTitle": "Sincroniza los principales clientes sale.order del ERP en cuentas verificadas de BidStack",
+      "buttonTitle": "Sincroniza los principales clientes sale.order del ERP en cuentas verificadas de Polo PreSales",
       "inProgress": "Sincronizando...",
       "button": "Sincronizar cuentas del ERP",
       "errorTitle": "Falló la sincronización de cuentas del ERP",
@@ -2055,7 +2055,7 @@
     "errorBookingFailed": "Error en la reserva",
     "notFoundTitle": "Página de reserva no encontrada",
     "notFoundBody": "Este enlace de programación no es válido o ya no acepta reuniones.",
-    "eyebrow": "Programación de BidStack",
+    "eyebrow": "Programación de Polo PreSales",
     "loadingTitle": "Cargando página de reserva",
     "confirmedTitle": "Reserva confirmada",
     "confirmedBody": "Tu reserva está hecha. Pronto recibirás un correo de confirmación.",
@@ -2186,9 +2186,9 @@
   },
   "commandCenter": {
     "region": {
-      "ariaLabel": "Centro de mando de BidStack"
+      "ariaLabel": "Centro de mando de Polo PreSales"
     },
-    "kicker": "Centro de mando de BidStack",
+    "kicker": "Centro de mando de Polo PreSales",
     "actions": {
       "ariaLabel": "Señales de decisión de la cuenta"
     },
@@ -2568,7 +2568,7 @@
     "adminOnlyBadge": "Solo administradores",
     "editTitle": "Editar suscripción de webhook",
     "createTitle": "Nueva suscripción de webhook",
-    "subtitle": "Usa un endpoint HTTPS de producción. BidStack firma cada entrega con HMAC-SHA256.",
+    "subtitle": "Usa un endpoint HTTPS de producción. Polo PreSales firma cada entrega con HMAC-SHA256.",
     "closeAriaLabel": "Cerrar",
     "endpointUrlLabel": "URL del endpoint",
     "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
@@ -2579,7 +2579,7 @@
     "clear": "Borrar",
     "securityContractTitle": "Contrato de seguridad",
     "securityReturn2xx": "Devuelve un estado 2xx en 10 segundos.",
-    "securityVerifyHeader": "Verifica la cabecera X-BidStack-Signature.",
+    "securityVerifyHeader": "Verifica la cabecera X-Polo PreSales-Signature.",
     "securityRejectOld": "Rechaza firmas con más de 5 minutos de antigüedad.",
     "securityAsync": "Procesa el trabajo pesado de forma asíncrona tras confirmar.",
     "selectedEventsLabel": "Eventos seleccionados",
@@ -3457,8 +3457,8 @@
     "submit": "Convertir cliente potencial",
     "cancel": "Cancelar"
   },
-  "bidStack360Logo": {
-    "title": "BidStack 360",
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
     "tagline": "PLATAFORMA DE PILOTAJE DE LICITACIONES"
   },
   "leadRow": {
@@ -3599,7 +3599,7 @@
   },
   "kpiSidebar": {
     "title": "Estado de la plataforma",
-    "caption": "Últimas métricas disponibles de BidStack",
+    "caption": "Últimas métricas disponibles de Polo PreSales",
     "releaseScore": "Puntuación de lanzamiento",
     "providersHealthy": "Proveedores en buen estado",
     "queueBacklog": "Cola pendiente",

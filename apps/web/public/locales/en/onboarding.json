@@ -7,7 +7,7 @@
     "finish": "Finish",
     "stepOf": "Step {{current}} of {{total}}",
     "welcome": {
-      "title": "Welcome to BidStack 360°",
+      "title": "Welcome to Polo PreSales",
       "body": "Mantu's platform for bid and presales management. Get up to speed in under 2 minutes."
     },
     "pipeline": {
@@ -62,7 +62,7 @@
       }
     },
     "completed": "Quick start complete!",
-    "completedBody": "You now know the essentials of BidStack 360°. Good luck with your bids.",
+    "completedBody": "You now know the essentials of Polo PreSales. Good luck with your bids.",
     "dismiss": "Dismiss",
     "tourButton": "Take the 2-minute product tour",
     "items": {
@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Add your first lead",
-        "description": "Capture inbound interest and let BidStack score it automatically."
+        "description": "Capture inbound interest and let Polo PreSales score it automatically."
       },
       "firstActivity": {
         "label": "Log your first activity",

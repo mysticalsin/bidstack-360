@@ -1,5 +1,5 @@
 /**
- * BidStack extension options page script.
+ * Polo PreSales extension options page script.
  * Loads saved config, saves updates, and tests API connectivity.
  */
 

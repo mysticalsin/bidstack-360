@@ -1,6 +1,6 @@
 // Spotlight Ref receiving end (A5) — validated project references attached to
 // an account. The consultant->manager authoring flow happens upstream in
-// Spotlight Ref (ingestion is a stub until that system is reworked); BidStack
+// Spotlight Ref (ingestion is a stub until that system is reworked); Polo PreSales
 // owns the display + the pre-sales validation step.
 import { z } from 'zod';
 

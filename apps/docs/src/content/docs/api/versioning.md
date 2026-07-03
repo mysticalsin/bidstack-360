@@ -7,7 +7,7 @@ sidebar:
 
 # API Versioning
 
-The BidStack API uses **URL-based versioning**. The current stable version is `v1`.
+The Polo PreSales API uses **URL-based versioning**. The current stable version is `v1`.
 
 ## URL Structure
 
@@ -19,7 +19,7 @@ The version segment is the second path component after `/api/`. All new features
 
 ## What Counts as a Breaking Change
 
-BidStack treats the following as breaking changes — they always require a new version:
+Polo PreSales treats the following as breaking changes — they always require a new version:
 
 - Removing an endpoint
 - Removing a required or optional field from a response

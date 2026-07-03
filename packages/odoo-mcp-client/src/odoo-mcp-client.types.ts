@@ -19,7 +19,7 @@ export interface OdooMcpClientOptions {
   logger?: pino.Logger;
   /** MCP protocol version the client speaks. Bumped via PR if upstream moves. */
   protocolVersion?: string;
-  /** Identity reported in initialize. Defaults to BidStack 360°. */
+  /** Identity reported in initialize. Defaults to Polo PreSales. */
   clientInfo?: { name: string; version: string };
 }
 

@@ -55,7 +55,7 @@ export function buildCrewEvidenceInput(
   const requirements = snapshot.requirements.slice(0, MAX_REQUIREMENTS);
 
   const lines = [
-    'RFP evidence bundle from BidStack 360 bid workspace.',
+    'RFP evidence bundle from Polo PreSales bid workspace.',
     `Opportunity: ${opportunityLabel}`,
     `Opportunity ID: ${snapshot.opportunityId}`,
     '',

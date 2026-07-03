@@ -3314,3 +3314,9 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **Prevention rule:** When any agent (fixer, reviewer, or remediation pass) reverts or restores part of a file's working-tree state, treat it as a full-file revert for audit purposes — diff the ENTIRE file against its state immediately before that agent ran (not just the lines it says it changed), not just against HEAD. A partial "I reverted X" claim is not proof that Y and Z in the same file survived.
 - **Fix:** Reapplied `expectedUpdatedAt` to `OpportunityPatch`, the CAS transaction + 409 handling to the PATCH route, and the raw-SQL view-count fix. Re-verified: `@bidstack/shared`/`api`/`web` typecheck clean, `opportunities.integration.test.ts` + `opportunities.detail-scope.integration.test.ts` 18/18 passing including the 409-on-stale-token case and the `dueWithinDays`/`overdue` filters together.
 - **Files affected:** packages/shared/src/schemas/opportunity.ts, apps/api/src/routes/opportunities.ts
+
+### 2026-07-03 PROCESS: Deleted untracked asset that was later needed for a revert
+- **What went wrong:** During the Polo PreSales logo rebrand I `rm`'d `logo-clear.png` (used by the login nav). The user then said "don't change the login page", requiring the original back — but the file was untracked, so `git checkout HEAD --` could not restore it.
+- **Root cause:** Deleted a binary asset without first checking git-tracked status. Untracked files are invisible to git and unrecoverable once removed.
+- **Prevention rule:** Before `rm`-ing any asset/binary during a rebrand or refactor, run `git ls-files <file>`. If UNTRACKED, move it to the scratchpad instead of deleting (recoverable); only `git rm` tracked files. Recovery here worked only by luck — the sibling `logo-clear.webp` was tracked, so I reconstructed the PNG from it via a headless-Chrome canvas export.
+- **Files affected:** apps/web/public/logo-clear.png

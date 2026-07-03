@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "BidStack 360° CRM",
-  "short_name": "BidStack",
+  "name": "Polo PreSales CRM",
+  "short_name": "Polo PreSales",
   "version": "0.1.0",
-  "description": "Add contacts, create leads, and manage your BidStack CRM directly from Gmail, Outlook, LinkedIn, and HubSpot.",
+  "description": "Add contacts, create leads, and manage your Polo PreSales CRM directly from Gmail, Outlook, LinkedIn, and HubSpot.",
 
   "icons": {
     "16":  "src/icons/icon-16.png",
@@ -13,7 +13,7 @@
 
   "action": {
     "default_popup": "src/popup/popup.html",
-    "default_title": "BidStack CRM",
+    "default_title": "Polo PreSales CRM",
     "default_icon": {
       "16":  "src/icons/icon-16.png",
       "48":  "src/icons/icon-48.png"

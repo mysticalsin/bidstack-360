@@ -3,7 +3,7 @@
 //     live (no local storage); sample fallback when the LMS isn't configured.
 //  2. /sales-toolkits/store — STORED toolkit collateral (decks/templates/
 //     battle-cards), org-scoped CRUD. Normally kept in SharePoint; stored here so
-//     it's managed in BidStack + readable by the MCP (the MCP tool reads this
+//     it's managed in Polo PreSales + readable by the MCP (the MCP tool reads this
 //     same table, so an added toolkit is immediately available to agents).
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';

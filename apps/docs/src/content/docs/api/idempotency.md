@@ -7,14 +7,14 @@ sidebar:
 
 # Idempotency
 
-Network failures happen. Without idempotency, retrying a `POST` can create duplicate records. BidStack supports the `Idempotency-Key` header on all mutating endpoints (`POST`, `PUT`, `PATCH`, `DELETE`) so you can safely retry without side effects.
+Network failures happen. Without idempotency, retrying a `POST` can create duplicate records. Polo PreSales supports the `Idempotency-Key` header on all mutating endpoints (`POST`, `PUT`, `PATCH`, `DELETE`) so you can safely retry without side effects.
 
 ## How It Works
 
 1. You generate a unique key (UUID recommended) for each logical operation.
 2. You include it as a request header.
-3. BidStack processes the request and caches the response for **24 hours**.
-4. If you retry with the same key (and the same payload), BidStack returns the **cached response** without re-executing the operation.
+3. Polo PreSales processes the request and caches the response for **24 hours**.
+4. If you retry with the same key (and the same payload), Polo PreSales returns the **cached response** without re-executing the operation.
 
 ## Usage
 
@@ -49,7 +49,7 @@ A cached response (retry with same key) returns the original status code and bod
 
 ## Payload Mismatch
 
-If you send the same key with a **different payload**, BidStack returns `409 Conflict` rather than silently applying the wrong payload:
+If you send the same key with a **different payload**, Polo PreSales returns `409 Conflict` rather than silently applying the wrong payload:
 
 ```json
 {

@@ -111,7 +111,7 @@ describe('processDeliveryJob — HMAC signature contract', () => {
     expect(mocks.safeFetch).toHaveBeenCalledTimes(1);
     const [, init] = mocks.safeFetch.mock.calls[0]!;
     const sentBody = init.body as string;
-    const header = (init.headers as Record<string, string>)['X-BidStack-Signature'];
+    const header = (init.headers as Record<string, string>)['X-Polo PreSales-Signature'];
 
     const m = header.match(/^t=(\d+),v1=([0-9a-f]+)$/);
     expect(m).not.toBeNull();

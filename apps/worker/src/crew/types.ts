@@ -1,5 +1,5 @@
 // Crew kit — TypeScript port of CrewAI's core structure (Agent / Task / Crew /
-// Process), tuned for the BidStack RFP workflow. The downloaded CrewAI source
+// Process), tuned for the Polo PreSales RFP workflow. The downloaded CrewAI source
 // (Python) is the semantic reference; this is a faithful, lean TS port.
 //
 // An Agent is a role persona (role + goal + backstory) realised entirely through

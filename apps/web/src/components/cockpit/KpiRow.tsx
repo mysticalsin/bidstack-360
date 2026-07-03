@@ -120,7 +120,7 @@ function KpiBlock({
               <SourceBadge
                 label={kpi.overridden ? t('kpiRow.manuallyOverridden', 'Manually overridden') : (kpi.sourceLabel ?? t('kpiRow.internal', 'Internal'))}
                 state={kpi.sourceState ?? 'crm'}
-                hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'BidStack internal data')}
+                hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'Polo PreSales internal data')}
               />
               {(editable || kpi.overridden) && kpi.fieldKey ? (
                 <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />

@@ -136,7 +136,7 @@ async function buildRenderContext(args: {
     opportunity: opportunity
       ? {
           name: opportunity.name,
-          // BidStack stores values as micros (millionths) to avoid float math.
+          // Polo PreSales stores values as micros (millionths) to avoid float math.
           // Render in the opportunity's country-implied currency (EUR fallback).
           amount: formatAmount(
             Number(opportunity.valueMicros) / 1_000_000,

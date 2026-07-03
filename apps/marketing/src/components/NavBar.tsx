@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useTheme } from '@/lib/theme';
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 
 // Sticky top nav. Scroll-aware: solid background once the viewport has scrolled
 // past the hero. Includes the dark-mode toggle so visitors who prefer a single
@@ -48,19 +49,10 @@ export function NavBar() {
       <div className="mkt-container flex items-center gap-4 py-3">
         <Link
           to="/"
-          aria-label="BidStack 360° home"
-          className="link-inline flex items-center gap-2 font-semibold text-[15px] text-[color:var(--fg-primary)]"
+          aria-label="Polo PreSales home"
+          className="link-inline flex items-center"
         >
-          <span
-            aria-hidden="true"
-            className="grid h-8 w-8 place-items-center rounded-[9px] text-white font-bold text-sm"
-            style={{ background: 'var(--brand-gradient)' }}
-          >
-            B
-          </span>
-          <span>
-            BidStack <span className="text-[color:var(--brand-primary)]">360°</span>
-          </span>
+          <PoloPreSalesLogo variant="full" title="" className="h-7 w-auto" />
         </Link>
 
         <nav
@@ -74,7 +66,7 @@ export function NavBar() {
             Pricing
           </NavLink>
           <a href="/#why" className={linkClass(false)}>
-            Why BidStack
+            Why Polo PreSales
           </a>
           <a href="/#ai" className={linkClass(false)}>
             AI
@@ -152,7 +144,7 @@ export function NavBar() {
               Pricing
             </Link>
             <a href="/#why" onClick={() => setMobileOpen(false)} className="link-inline py-3 text-[color:var(--fg-primary)] font-medium">
-              Why BidStack
+              Why Polo PreSales
             </a>
             <a href="/#ai" onClick={() => setMobileOpen(false)} className="link-inline py-3 text-[color:var(--fg-primary)] font-medium">
               AI

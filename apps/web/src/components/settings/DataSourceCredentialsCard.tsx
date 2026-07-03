@@ -33,7 +33,7 @@ export function DataSourceCredentialsCard() {
         title={t('dataSourceCredentials.cardTitle', 'Data sources')}
         caption={t(
           'dataSourceCredentials.cardCaption',
-          'Plug in an external data API for live enrichment — paste a key, test it, save. Keys are encrypted at rest and never shown again. Without one, BidStack uses free open data (Wikipedia/Wikidata + news).',
+          'Plug in an external data API for live enrichment — paste a key, test it, save. Keys are encrypted at rest and never shown again. Without one, Polo PreSales uses free open data (Wikipedia/Wikidata + news).',
         )}
       />
       <div className="p-5">
