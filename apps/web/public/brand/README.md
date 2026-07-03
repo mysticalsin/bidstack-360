@@ -15,15 +15,18 @@ external docs).
 
 ## Palette
 
-| Token           | Hex       | Role                                        |
-| --------------- | --------- | ------------------------------------------- |
-| `--polo-ink`    | `#0A0A2E` | "Polo" wordmark, headings                   |
-| `--polo-violet` | `#4A17F0` | "PreSales" wordmark, primary accent (light) |
-| `--polo-indigo` | `#3F16E8` | Gradient start (mark)                       |
-| `--polo-magenta`| `#E4069F` | Gradient end / signal dots (accent only)    |
+These are the brand hex values baked into the logo SVG/component. They are **not**
+CSS variables — the live UI accent is driven by `--brand-primary` (see below).
 
-The mark gradient runs indigo → violet → magenta. `--polo-violet` clears WCAG AA
-(7.75:1 on white); `--polo-magenta` is an accent/large-text color only (4.35:1).
+| Color   | Hex       | Role                                        |
+| ------- | --------- | ------------------------------------------- |
+| Ink     | `#0A0A2E` | "Polo" wordmark, headings                   |
+| Violet  | `#4A17F0` | "PreSales" wordmark, primary accent (light) |
+| Indigo  | `#3F16E8` | Gradient start (mark)                       |
+| Magenta | `#E4069F` | Gradient end / signal dots (accent only)    |
+
+The mark gradient runs indigo → violet → magenta. Violet clears WCAG AA
+(7.75:1 on white); magenta is an accent/large-text color only (4.35:1).
 Dark mode lifts the accent to `#8B6DFF`. The live UI accent is driven by
 `--brand-primary` in `apps/web/src/index.css`.
 
