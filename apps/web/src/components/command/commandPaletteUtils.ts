@@ -67,6 +67,7 @@ const NAV_CHORD_HINTS: Record<string, string> = {
 const PALETTE_ONLY_TARGETS: NavTarget[] = [
   { to: '/pipeline', label: 'Go to Pipeline (kanban)', hint: 'g p' },
   { to: '/calls', label: 'Go to Calls', hint: '' },
+  { to: '/service-desk', label: 'Go to Service Desk', hint: '' },
   { to: '/reports/list', label: 'Go to Reports', hint: 'g r' },
   { to: '/reports/new', label: 'New report', hint: '' },
   { to: '/integrations', label: 'Go to Integrations', hint: '' },

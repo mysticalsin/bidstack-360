@@ -104,9 +104,6 @@ export const ReferencesPage = lazy(() =>
 export const RfpPipelinePage = lazy(() =>
   import('@/pages/RfpPipelinePage').then((m) => ({ default: m.RfpPipelinePage })),
 );
-export const RfpResponseHubPage = lazy(() =>
-  import('@/pages/RfpResponseHubPage').then((m) => ({ default: m.RfpResponseHubPage })),
-);
 export const AgentStudioPage = lazy(() =>
   import('@/pages/AgentStudioPage').then((m) => ({ default: m.AgentStudioPage })),
 );
@@ -137,9 +134,6 @@ export const DashboardsListPage = lazy(() =>
 );
 export const ReportsListPage = lazy(() =>
   import('@/pages/ReportsListPage').then((m) => ({ default: m.ReportsListPage })),
-);
-export const ReportsPage = lazy(() =>
-  import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 );
 export const ReportBuilderPage = lazy(() =>
   import('@/pages/ReportBuilderPage').then((m) => ({ default: m.ReportBuilderPage })),

@@ -46,7 +46,6 @@ import {
   PipelinePage,
   QuickStartPage,
   ReportsListPage,
-  ReportsPage,
   ReportBuilderPage,
   SearchPage,
   SerumMissionControlPage,
@@ -347,14 +346,9 @@ export function AppRoutes() {
           />
 
           {/* ── Reporting & Analytics ────────────────────────────────────── */}
-          <Route
-            path="/reports"
-            element={
-              <RequireAuth>
-                <ReportsPage />
-              </RequireAuth>
-            }
-          />
+          {/* Legacy canned-stats page folded into /analytics — same redirect
+              treatment as /integrations, /webhooks, /audit-log, /rfp-response. */}
+          <Route path="/reports" element={<Navigate to="/analytics" replace />} />
           <Route
             path="/reports/list"
             element={
