@@ -25,6 +25,7 @@ const PREFETCH_MAP: Record<string, Prefetcher> = {
   '/pipeline': () => import('@/pages/PipelinePage'),
   '/contacts': () => import('@/pages/ContactsPage'),
   '/tasks': () => import('@/pages/TasksPage'),
+  '/workload': () => import('@/pages/WorkloadPage'),
   '/reports/list': () => import('@/pages/ReportsListPage'),
   '/win-loss': () => import('@/pages/WinLossPage'),
   '/analytics': () => import('@/pages/AnalyticsDashboardPage'),

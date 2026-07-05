@@ -57,6 +57,7 @@ import {
   TerritoriesPage,
   TopAccountsPage,
   WinLossPage,
+  WorkloadPage,
   PublicSignPage,
   PublicBookingPage,
 } from './lazyPages';
@@ -326,6 +327,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <TasksPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/workload"
+            element={
+              <RequireAuth>
+                <WorkloadPage />
               </RequireAuth>
             }
           />

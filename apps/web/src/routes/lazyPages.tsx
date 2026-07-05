@@ -123,6 +123,8 @@ export const TaskDetailPage = lazy(() =>
 export const TasksPage = lazy(() =>
   import('@/pages/TasksPage').then((m) => ({ default: m.TasksPage })),
 );
+// Default export — no .then() reshaping needed.
+export const WorkloadPage = lazy(() => import('@/pages/WorkloadPage'));
 
 // ─── Reporting & Analytics ────────────────────────────────────────────────────
 

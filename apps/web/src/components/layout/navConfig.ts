@@ -123,6 +123,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'tasks',
     items: [
       { to: '/tasks', label: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
+      { to: '/workload', label: 'Team Workload', labelKey: 'nav.workload', icon: 'contacts' },
       { to: '/calendar', label: 'Calendar', labelKey: 'nav.calendar', icon: 'clock' },
       // Calls now live in context on the Opportunity detail (Calls tab). The
       // /calls route stays (global list, reachable via the command palette) but
