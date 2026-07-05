@@ -222,6 +222,23 @@ describe('capability manifest + user-role assignment', () => {
     expect(audit).not.toBeNull();
   });
 
+  // WHY roster openness is pinned: GET /users feeds every owner/assignee
+  // picker in the product (useUsers → QuickStart, Forecasts owner filter,
+  // cross-sell, territory dialogs), and seeded personas like Sales, Account
+  // Executive, SDR and Customer Success hold no users:read grant. Copying the
+  // sibling routes' users:read + admin preHandler onto the roster would 403
+  // those screens (same trap documented on GET /org-settings/locale). If this
+  // test fails because a gate was added, fix the pickers' personas first.
+  t('GET /users roster stays readable by a non-admin org member', async () => {
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/users',
+      headers: { 'x-bidstack-e2e-role': 'read-only' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { items: unknown[] }).items.length).toBeGreaterThan(0);
+  });
+
   t('assigning a role from another org is rejected with 400', async () => {
     const foreignOrg = await prisma.org.create({
       data: { name: 'RBAC Foreign', clerkOrg: `org_rbac_${Date.now()}` },

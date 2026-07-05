@@ -11,6 +11,7 @@ import {
 } from '@bidstack/shared';
 
 import { cacheKey } from '../lib/redis-cache.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { notifyUsers } from '../services/notification.service.js';
 
 // Best-effort deep link for a mention notification. Unknown target types get no
@@ -26,6 +27,24 @@ function commentTargetUrl(targetType: string, targetId: string): string | null {
   };
   const segment = route[targetType];
   return segment ? `/${segment}/${targetId}` : null;
+}
+
+// FK-graft guard (B3, kam-access.ts idiom): Comment.targetId is a polymorphic
+// reference with no @relation in schema.prisma, so the DB can't reject a
+// foreign id — this app-level check is the only tenant-integrity enforcement.
+// The shared tenantEntityBelongsToOrg helper covers every commentable type
+// except bid_score; inline that case rather than widening the shared helper
+// for one consumer (tags.helpers.ts precedent). Unknown target types fail
+// closed.
+async function commentTargetInOrg(
+  targetType: string,
+  targetId: string,
+  orgId: string,
+): Promise<boolean> {
+  if (targetType === 'bid_score') {
+    return (await prisma.bidScore.count({ where: { id: targetId, orgId, deletedAt: null } })) > 0;
+  }
+  return tenantEntityBelongsToOrg(targetType, targetId, orgId);
 }
 
 type MentionSummaryPayload = z.infer<typeof MentionSummary>;
@@ -127,6 +146,15 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      // Verify the polymorphic target exists in the caller's org before
+      // persisting. Without this, any org member could plant comments (and
+      // @mention notifications deep-linking) against another tenant's record
+      // ids. 404 for missing and cross-org alike so a probe can't confirm a
+      // foreign id exists.
+      if (!(await commentTargetInOrg(req.body.targetType, req.body.targetId, req.auth.orgId))) {
+        throw server.httpErrors.notFound('Comment target not found');
+      }
+
       let mentionedUserIds: string[] = [];
       const created = await prisma.$transaction(async (tx) => {
         const comment = await tx.comment.create({

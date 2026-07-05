@@ -58,6 +58,14 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  // GET /users — the org roster (id/name/email/legacy role). Intentionally NOT
+  // gated on users:read: every owner/assignee picker in the product (useUsers →
+  // QuickStart, Forecasts owner filter, cross-sell, territory dialogs) reads
+  // it, and seeded personas like Sales, Account Executive, SDR and Customer
+  // Success hold no users:read grant — copying the sibling routes' users:read
+  // + admin preHandler here would 403 screens those roles are meant to see
+  // (same trap documented on GET /org-settings/locale). Role management below
+  // stays users:* + admin gated.
   server.get(
     '/users',
     {
