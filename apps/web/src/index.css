@@ -2323,10 +2323,14 @@ a {
 .kpi-grid.cols-6 {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
-@media (max-width: 1280px) {
+@media (max-width: 1560px) {
+  /* 6-across only on genuinely wide screens; laptops get 3 wide cards so the
+     number + inline sparkline never crowd each other. */
   .kpi-grid.cols-6 {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+@media (max-width: 1280px) {
   .kpi-grid.cols-4 {
     grid-template-columns: repeat(2, 1fr);
   }
