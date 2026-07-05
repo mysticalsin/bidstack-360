@@ -325,14 +325,18 @@ export function TasksPage() {
               <LoadingSkeleton />
             ) : items.length === 0 ? (
               <EmptyState
+                icon={filter === 'all' ? 'tasks' : 'search'}
                 title={
                   filter === 'all'
-                    ? t('tasks.empty.title', 'No tasks yet')
+                    ? t('tasks.empty.headline', 'Nothing on the bid clock')
                     : t('tasks.empty.filteredTitle', 'No tasks match this filter')
                 }
                 message={
                   filter === 'all'
-                    ? t('tasks.empty.message', 'Create a follow-up to get started.')
+                    ? t(
+                        'tasks.empty.body',
+                        'Deadlines, follow-ups, and deliverables all land here. Add the next action on a live bid so nothing slips before submission day.',
+                      )
                     : undefined
                 }
                 action={filter === 'all' ? <CreateTaskDialog /> : null}

@@ -13,7 +13,7 @@ import { SpotlightTable } from '@/components/ui/SpotlightTable';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import type { SortState } from '@/components/ui/SortableHeader';
 import { useTableSort } from '@/hooks/useTableSort';
-import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { useDeleteLead, useLeads, useUpdateLeadById } from '@/hooks/useLeads';
@@ -52,6 +52,9 @@ export function LeadsPage() {
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<LeadPriority | ''>('');
+  // Distinguishes "org has zero leads" from "filters matched nothing" so the
+  // zero-state can pitch first-lead capture vs. suggest loosening filters.
+  const hasLeadFilters = Boolean(deferredSearch.trim() || statusFilter || priorityFilter);
   const [searchParams, setSearchParams] = useSearchParams();
   const pager = useCursorPagination(`${deferredSearch}|${statusFilter}|${priorityFilter}`);
   const { data, isLoading, isError, error, refetch } = useLeads({
@@ -345,12 +348,34 @@ export function LeadsPage() {
         <TableSkeleton rows={8} />
       ) : items.length === 0 ? (
         <EmptyState
-          title={t('leads.empty.title', 'No leads yet')}
-          message={t('leads.empty.message', 'Create your first lead to start tracking prospects.')}
+          icon={hasLeadFilters ? 'search' : 'zap'}
+          title={
+            hasLeadFilters
+              ? t('leads.empty.filteredHeadline', 'No leads match these filters')
+              : t('leads.empty.headline', 'The funnel is empty')
+          }
+          message={
+            hasLeadFilters
+              ? t(
+                  'leads.empty.filteredBody',
+                  'Loosen the status or priority filters, or clear the search.',
+                )
+              : t(
+                  'leads.empty.body',
+                  'Log the first inbound RFP, referral, or event contact. Qualify it here — the good ones convert into bids in one click.',
+                )
+          }
           action={
             <Button onClick={() => nav('/leads/new')}>
               {t('leads.actions.newLead', 'New lead')}
             </Button>
+          }
+          secondary={
+            hasLeadFilters ? null : (
+              <EmptyStateLink to="/settings?tab=data-import">
+                {t('leads.empty.importCsv', 'Or import leads from CSV')}
+              </EmptyStateLink>
+            )
           }
         />
       ) : (

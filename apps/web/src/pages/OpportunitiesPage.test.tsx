@@ -175,7 +175,11 @@ describe('OpportunitiesPage', () => {
     expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('overdue');
   });
 
-  it('renders an empty state when no opportunities exist', () => {
+  // WHY: the zero-state is a bid team's first impression of the list — it must
+  // pitch the two real ways an opportunity is born (convert a lead / log an
+  // RFP) and offer a working escape hatch into the CSV importer, not a
+  // generic "no data" shrug that dead-ends the user.
+  it('renders the bid-specific empty state when no opportunities exist', () => {
     mockOpportunities({
       data: { items: [], nextCursor: null },
       isLoading: false,
@@ -185,7 +189,11 @@ describe('OpportunitiesPage', () => {
 
     renderWithProviders(<OpportunitiesPage />);
 
-    expect(screen.getByText('No opportunities yet')).toBeTruthy();
-    expect(screen.getByText('Create your first opportunity to start tracking bids.')).toBeTruthy();
+    expect(screen.getByText('No open bids yet')).toBeTruthy();
+    expect(screen.getByText(/Convert a qualified lead or log the RFP/)).toBeTruthy();
+    // Secondary path must land on the real CSV import wizard in Settings.
+    expect(
+      screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href'),
+    ).toBe('/settings?tab=data-import');
   });
 });

@@ -6,7 +6,12 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { BulkActionBar } from '@/components/ui/BulkActionBar';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import {
+  EmptyState,
+  EmptyStateLink,
+  ErrorState,
+  LoadingSkeleton,
+} from '@/components/ui/StateMessages';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { SpotlightTable } from '@/components/ui/SpotlightTable';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
@@ -326,10 +331,11 @@ export function CompaniesPage() {
         />
       ) : !companies.data || companies.data.items.length === 0 ? (
         <EmptyState
+          icon={searchTerm ? 'search' : 'building'}
           title={
             searchTerm
               ? t('companies.empty.searchTitle', 'No companies match your search')
-              : t('companies.empty.title', 'No companies found')
+              : t('companies.empty.headline', 'No accounts on the radar')
           }
           message={
             searchTerm
@@ -339,9 +345,16 @@ export function CompaniesPage() {
                   { term: searchTerm },
                 )
               : t(
-                  'companies.empty.message',
-                  'Create the first company to start building your account list.',
+                  'companies.empty.body',
+                  'Add the companies you bid into. Contacts, intel signals, and every opportunity hang off an account — start with your top target.',
                 )
+          }
+          secondary={
+            searchTerm ? null : (
+              <EmptyStateLink to="/settings?tab=data-import">
+                {t('companies.empty.importCsv', 'Or import accounts from CSV')}
+              </EmptyStateLink>
+            )
           }
           action={
             searchTerm ? (

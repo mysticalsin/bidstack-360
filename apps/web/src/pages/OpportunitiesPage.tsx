@@ -13,7 +13,7 @@ import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportun
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
@@ -428,12 +428,18 @@ export function OpportunitiesPage() {
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
-            title={t('opportunities.empty.title', 'No opportunities yet')}
+            icon="target"
+            title={t('opportunities.empty.headline', 'No open bids yet')}
             message={t(
-              'opportunities.empty.message',
-              'Create your first opportunity to start tracking bids.',
+              'opportunities.empty.body',
+              "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
             )}
             action={<CreateOpportunityDialog />}
+            secondary={
+              <EmptyStateLink to="/settings?tab=data-import">
+                {t('opportunities.empty.importCsv', 'Or import your deal book (CSV)')}
+              </EmptyStateLink>
+            }
           />
         ) : (
           <div className="overflow-x-auto">
