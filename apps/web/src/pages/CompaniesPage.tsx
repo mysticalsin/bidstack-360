@@ -13,6 +13,7 @@ import {
   LoadingSkeleton,
 } from '@/components/ui/StateMessages';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { SpotlightTable } from '@/components/ui/SpotlightTable';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import type { SortState } from '@/components/ui/SortableHeader';
@@ -26,6 +27,8 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 
+import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
+
 import { CompanyRow } from './companiesPage/CompanyRow';
 import { NewCompanyDialog } from './companiesPage/NewCompanyDialog';
 
@@ -33,6 +36,7 @@ export function CompaniesPage() {
   const { t } = useTranslation('crm');
   const [params, setParams] = useSearchParams();
   const [showNew, setShowNew] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
 
   const searchParam = params.get('search') ?? undefined;
   // Debounce the value that feeds the query key so a server fetch fires once the
@@ -212,10 +216,21 @@ export function CompaniesPage() {
                 })}
           </p>
         </div>
-        <LiquidGlassButton onClick={() => setShowNew(true)}>
-          <Icon name="plus" size={14} />
-          {t('companies.newCompany', 'New company')}
-        </LiquidGlassButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <SavedViewsBar
+            surface="companies"
+            basePath="/companies"
+            namePlaceholder={t('companies.savedViews.placeholder', 'e.g. "Aerospace targets, A–Z"')}
+          />
+          <Button variant="secondary" onClick={() => setShowDuplicates(true)}>
+            <Icon name="copy" size={14} />
+            {t('companies.findDuplicates', 'Find duplicates')}
+          </Button>
+          <LiquidGlassButton onClick={() => setShowNew(true)}>
+            <Icon name="plus" size={14} />
+            {t('companies.newCompany', 'New company')}
+          </LiquidGlassButton>
+        </div>
       </header>
 
       <section
@@ -309,6 +324,8 @@ export function CompaniesPage() {
           isPending={createCompany.isPending}
         />
       )}
+
+      <DuplicatesDialog entity="company" open={showDuplicates} onOpenChange={setShowDuplicates} />
 
       <BulkActionBar
         count={bulk.count}

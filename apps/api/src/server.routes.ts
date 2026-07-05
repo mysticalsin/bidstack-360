@@ -49,6 +49,8 @@ import { reportsRoutes } from './routes/reports.js';
 // Analytics report builder (custom reports + dashboards + entity field metadata)
 import { analyticsReportsRoutes } from './routes/analytics-reports.js';
 import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
+// Team workload / capacity view (per-owner open-bid + task aggregates)
+import { analyticsWorkloadRoutes } from './routes/analytics-workload.js';
 import { configFeaturesRoutes } from './routes/config-features.js';
 import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
@@ -74,6 +76,7 @@ import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
+import { duplicatesRoutes } from './routes/duplicates.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
 import { roleRoutes } from './routes/roles.js';
 // M7 — access groups (admin-managed data-scoping groups)
@@ -151,6 +154,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // radix tree keeps the legacy static /reports/{pipeline,...} routes winning.
   await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
+  await server.register(analyticsWorkloadRoutes, { prefix: '/api/v1' });
   await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
   await server.register(serumRoutes, { prefix: '/api/v1' });
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
@@ -224,6 +228,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(duplicatesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
   await server.register(roleRoutes, { prefix: '/api/v1' });
   await server.register(userGroupRoutes, { prefix: '/api/v1' });
