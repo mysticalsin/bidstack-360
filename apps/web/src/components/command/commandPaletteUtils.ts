@@ -38,7 +38,8 @@ export interface Item {
     | 'note'
     | 'invoice'
     | 'agent'
-    | 'create';
+    | 'create'
+    | 'ask';
   label: string;
   hint?: string;
   /** Optional leading visual (e.g. CompanyLogo for account rows). Group
@@ -283,6 +284,7 @@ export function groupTag(group: Item['group']): string {
   if (group === 'contact') return 'who';
   if (group === 'task') return 'todo';
   if (group === 'agent') return 'agent';
+  if (group === 'ask') return 'ai';
   return group;
 }
 
@@ -302,6 +304,7 @@ const GROUP_ARIA_LABELS: Record<Item['group'], string> = {
   invoice: 'Invoices',
   agent: 'Agents',
   create: 'Create',
+  ask: 'Copilot',
 };
 
 export function groupAriaLabel(group: Item['group']): string {

@@ -16,6 +16,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -32,6 +33,8 @@ import {
   groupTag,
   type Item,
 } from './commandPaletteUtils';
+import { buildAskCopilotItem, CopilotPanel, type CopilotKeyHandler } from './CopilotPanel';
+import { isCopilotQuery, looksLikeCopilotAsk, stripCopilotPrefix } from './copilotActions';
 import { usePaletteItems } from './usePaletteItems';
 
 // ── Public component ─────────────────────────────────────────────────────────
@@ -91,10 +94,37 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const queryRef = useRef('');
   const listRef = useRef<HTMLDivElement | null>(null);
 
+  // Copilot mode is DERIVED from the query (leading '?' or '>'), not stored —
+  // erasing the prefix drops straight back to search with zero extra state.
+  const copilotMode = isCopilotQuery(query);
+  const copilotKeyRef = useRef<CopilotKeyHandler | null>(null);
+  const [copilotActiveId, setCopilotActiveId] = useState<string | null>(null);
+
+  // Feed an empty query while in copilot mode so the debounced server
+  // searches never fire against a natural-language prompt.
   const { items, isFetching, selectNavTarget, findDirectNavTarget } = usePaletteItems(
-    query,
+    copilotMode ? '' : query,
     onClose,
   );
+
+  const enterCopilot = useCallback((q: string) => {
+    const next = `? ${q.trim()}`;
+    queryRef.current = next;
+    setQuery(next);
+    setActiveIdx(0);
+    inputRef.current?.focus();
+  }, []);
+
+  // Sentence-like queries grow an "Ask Copilot" escape hatch APPENDED to the
+  // results — never ranked into them, so search ordering/muscle memory hold.
+  const displayItems = useMemo(() => {
+    if (copilotMode || !looksLikeCopilotAsk(query)) return items;
+    // enterCopilot only reads refs when invoked from the item's onSelect
+    // handler (a user event), never during render — buildAskCopilotItem stores
+    // it, it does not call it. The refs rule can't prove that, so scope it here.
+    // eslint-disable-next-line react-hooks/refs
+    return [...items, buildAskCopilotItem(query, t, enterCopilot)];
+  }, [items, query, copilotMode, t, enterCopilot]);
 
   // Focus the input immediately on mount — both sync (for standard focus) and
   // deferred one frame (for portals that mount slightly after the effect runs).
@@ -115,13 +145,13 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   // class before we measure.
   useEffect(() => {
     if (!listRef.current) return;
-    const safe = items.length === 0 ? 0 : Math.min(activeIdx, items.length - 1);
+    const safe = displayItems.length === 0 ? 0 : Math.min(activeIdx, displayItems.length - 1);
     const node = listRef.current.querySelector<HTMLElement>(`[data-cmdk-idx="${safe}"]`);
     node?.scrollIntoView({ block: 'nearest' });
-  }, [activeIdx, items.length]);
+  }, [activeIdx, displayItems.length]);
 
   // Clamp activeIdx when the result set shrinks (user typed more specifically).
-  const safeIdx = items.length === 0 ? 0 : Math.min(activeIdx, items.length - 1);
+  const safeIdx = displayItems.length === 0 ? 0 : Math.min(activeIdx, displayItems.length - 1);
 
   // Activate focused list item with Enter / Space for screen-reader users
   // who arrow directly into the listbox via VoiceOver/JAWS gestures.
@@ -184,9 +214,15 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
             setActiveIdx(0);
           }}
           onKeyDown={(e) => {
+            // Copilot mode owns the keyboard: the panel moves its own
+            // highlight and runs actions; everything else still types.
+            if (copilotMode) {
+              if (copilotKeyRef.current?.(e)) e.preventDefault();
+              return;
+            }
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setActiveIdx((i) => Math.min(items.length - 1, i + 1));
+              setActiveIdx((i) => Math.min(displayItems.length - 1, i + 1));
             } else if (e.key === 'ArrowUp') {
               e.preventDefault();
               setActiveIdx((i) => Math.max(0, i - 1));
@@ -199,7 +235,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                 selectNavTarget(directRoute);
                 return;
               }
-              items[safeIdx]?.onSelect();
+              displayItems[safeIdx]?.onSelect();
             }
           }}
           placeholder={t(
@@ -210,21 +246,35 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           aria-label={t('commandPalette.searchAriaLabel', 'Search across the workspace')}
           aria-autocomplete="list"
           aria-expanded="true"
-          aria-controls="cmdk-list"
-          aria-activedescendant={items.length ? `cmdk-option-${safeIdx}` : undefined}
+          aria-controls={copilotMode ? 'copilot-list' : 'cmdk-list'}
+          aria-activedescendant={
+            copilotMode
+              ? (copilotActiveId ?? undefined)
+              : displayItems.length
+                ? `cmdk-option-${safeIdx}`
+                : undefined
+          }
         />
         <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--fg-tertiary)]">
           esc
         </kbd>
       </div>
 
+      {copilotMode ? (
+        <CopilotPanel
+          prompt={stripCopilotPrefix(query)}
+          onClose={onClose}
+          keyHandlerRef={copilotKeyRef}
+          onActiveOptionChange={setCopilotActiveId}
+        />
+      ) : (
       <div
         ref={listRef}
         id="cmdk-list"
         role="listbox"
         className="max-h-[60vh] overflow-y-auto py-2"
       >
-        {items.length === 0 ? (
+        {displayItems.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-[var(--fg-tertiary)]">
             {isFetching
               ? t('commandPalette.searching', 'Searching…')
@@ -238,7 +288,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
             (leading logos). Grouping is derived purely for rendering; the
             flat `index` from the original `items` array is preserved on
             each row so keyboard nav / aria-activedescendant is unaffected. */}
-        {groupItemsByRun(items).map((run) => (
+        {groupItemsByRun(displayItems).map((run) => (
           <div
             key={`group-${run.group}-${run.entries[0]?.index}`}
             role="group"
@@ -306,6 +356,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -333,9 +384,11 @@ function highlightText(text: string, query: string, active: boolean) {
         run.hit ? (
           <mark
             key={i}
+            // Theme tokens (not raw yellow-*) so the highlight resolves in
+            // both modes: --tag-amber-* is defined per theme in index.css.
             className={cn(
-              'bg-yellow-500/20 text-yellow-900 dark:bg-yellow-500/30 dark:text-yellow-100 rounded-sm px-0.5 font-semibold',
-              active && 'bg-yellow-500/30 font-bold',
+              'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] rounded-sm px-0.5 font-semibold',
+              active && 'font-bold',
             )}
           >
             {run.chars}
