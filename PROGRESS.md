@@ -4,6 +4,28 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-05 — "Best CRM" audit + fix + wow program (two-wave swarm)
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode, 42-agent Sonnet/Fable swarm (8-lens audit → adversarial verify → 13 fixers → 7 builders), 13 commits.
+
+**Audit (22 Sonnet agents, read-only, 0 stray writes):** 48 findings, 0 refuted by the adversarial verify pass — 16 defects (4 BLOCKER), 8 overlap/duplication surfaces, 6 rebrand leaks, 9 UX wow-gaps, 8 product gaps.
+
+**Wave 1 — fixes (6 commits, every fix red→green regression-proven):**
+- **Security:** comment FK-graft org verification (existence-safe 404s); Dust client injectable DNS-rebind-safe fetch (api+worker wiring); users-roster RBAC finding refuted with documented rationale + pinning test.
+- **api:** companies cursor off-by-one (1 row lost per page); activity timeline/feed compound (occurredAt,id) cursor + stable totals; migration undo in one $transaction.
+- **worker/db:** calendar push per-job Redis claim (Google+Microsoft); migration cursor+counter atomic; dust-poll breaker per-org; PII middleware update-by-id + decrypt-write-results; soft-delete upsert scoping (GDPR bypass preserved).
+- **web:** per-row cross-sell pending; PipelineCard/DueDateChip due-today parity; palette loading row (no "No matches" flash); API-key default scopes.
+- **Rebrand:** X-Polo-Signature dual-emitted with legacy X-BidStack-Signature (UI copy, 6 locales, public docs); PoloPreSales-* UAs; polo-presales- export filenames (9 paths). `api.bidstack.mantu.com` docs domain left for infra owner.
+- **Consolidation:** /reports → /analytics redirect + ReportsPage deleted; dead RfpResponseHubPage chunk deleted; /service-desk palette-exposed; /kam relabeled "KAM Initiatives".
+
+**Wave 2 — wow + product (7 commits):** cinematic org command-center hero (AnimatedNumber, focus sentence, signal band — no new endpoints); ⌘K fuzzy matching + frecency + match highlighting (35/35 palette tests); bespoke zero-states on the 5 core lists; 11 raw "Loading…" states → shimmer skeletons; calendar Deadlines lane (new org-scoped RBAC'd aggregate endpoint); /win-loss quarterly review page (nav+palette+prefetch); opportunity timeline merged with the Activity feed (cross-org leak tests).
+
+**Verified:** typecheck 12/12 projects · lint clean on every changed file · db 26/26, dust-client 5/5, worker 40/40 (isolated — batch flake = documented pre-existing cross-file leakage), api 49/49, web 108/108 · web build ✓ · live browser walk (dashboard hero, gtd→Dashboard fuzzy, calendar deadline chip deep-link, /win-loss, /reports redirect, timeline tab) with zero console errors.
+
+**Remaining roadmap (audit-confirmed, not yet built):** account-surface consolidation (Accounts/Key Accounts/Top Accounts/KAM = 4 doors), Sector View + Territories merge, /opportunities+/pipeline single implementation, palette AI copilot (GOAL Phase 5), multi-stage bid approval chains, duplicate detect/merge, team workload view, saved views beyond Tasks, proposal revision history, shared Table keyboard model extraction.
+
+---
+
 ## 2026-06-23 — Modules toggle + AppFlowy embed + KAM premium account UX
 
 Three follow-on features on `feat/prod-hardening-mantu`.
