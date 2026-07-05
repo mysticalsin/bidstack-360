@@ -269,6 +269,26 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
+  it('themes the live-refresh banner with paired amber tokens, never light-only yellows', () => {
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: dashboardSnapshot('fresh'),
+      isLoading: false,
+      isError: true,
+      error: new Error('Request failed (500)'),
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    const banner = screen.getByRole('status');
+    // Raw yellow-* utilities have no dark-mode pairing — in dark mode they
+    // render a near-white pill on the cinematic cockpit. The banner must use
+    // the --tag-amber-* tokens, which flip with the active theme.
+    expect(banner.className).not.toContain('yellow');
+    expect(banner.className).toContain('var(--tag-amber-bg)');
+    expect(banner.className).toContain('var(--tag-amber-fg)');
+  });
+
   it('shows the fatal cockpit error only when no snapshot exists', () => {
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: undefined,

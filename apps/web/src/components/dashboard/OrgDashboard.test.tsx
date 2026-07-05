@@ -30,6 +30,9 @@ vi.mock('./widgets/GettingStarted', () => ({
   GettingStarted: () => <div data-testid="getting-started" />,
 }));
 vi.mock('./widgets/KpiRow', () => ({ KpiRow: () => <div data-testid="kpi-row" /> }));
+vi.mock('./widgets/OrgCommandHero', () => ({
+  OrgCommandHero: () => <div data-testid="org-command-hero" />,
+}));
 vi.mock('./widgets/InsightsBar', () => ({ InsightsBar: () => <div /> }));
 vi.mock('./widgets/ClosingThisWeekCard', () => ({ ClosingThisWeekCard: () => <div /> }));
 vi.mock('./widgets/PipelineCard', () => ({ PipelineCard: () => <div /> }));
@@ -94,6 +97,7 @@ describe('OrgDashboard first-run state', () => {
     expect(screen.getByTestId('getting-started')).toBeDefined();
     // The full command center must not also render for an empty org.
     expect(screen.queryByTestId('kpi-row')).toBeNull();
+    expect(screen.queryByTestId('org-command-hero')).toBeNull();
   });
 
   it('renders the command center once any record exists', () => {
@@ -106,6 +110,8 @@ describe('OrgDashboard first-run state', () => {
     renderDashboard();
 
     expect(screen.getByTestId('kpi-row')).toBeDefined();
+    // The cinematic hero band is the landing moment for any org with data.
+    expect(screen.getByTestId('org-command-hero')).toBeDefined();
     expect(screen.queryByTestId('getting-started')).toBeNull();
   });
 });

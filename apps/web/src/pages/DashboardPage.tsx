@@ -192,9 +192,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   return (
     <>
       {dashboard.isError && (
-        <div role="status" className="bg-yellow-50 text-yellow-800 px-4 py-2 text-sm text-center rounded-md mb-4 flex items-center justify-center gap-2">
+        // Theme-token amber pair (not raw yellow-* utilities) so the banner
+        // follows light/dark like every other surface on this screen.
+        <div role="status" className="bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] px-4 py-1 text-sm text-center rounded-md mb-4 flex items-center justify-center gap-2">
           <span>{t('dashboard.liveRefreshFailed', 'Warning: Live refresh failed, showing the last verified snapshot.')}</span>
-          <button type="button" onClick={() => void dashboard.refetch()} className="font-semibold underline hover:no-underline">
+          <button type="button" onClick={() => void dashboard.refetch()} className="min-h-[44px] rounded-md px-2 font-semibold underline hover:no-underline">
             {t('dashboard.retry', 'Retry')}
           </button>
         </div>
