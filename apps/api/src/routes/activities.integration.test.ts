@@ -159,4 +159,93 @@ describe('activity routes', () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  // WHY: occurredAt is not unique — concurrent writes land on the same
+  // millisecond. The timeline used to order by occurredAt alone and page with a
+  // strict `lt` timestamp cursor, so a tie straddling a page boundary was
+  // silently and permanently dropped from the feed (never on the emitting page,
+  // excluded from the next). Users read the timeline as the audit trail of an
+  // entity — a row that exists in the DB but never renders is data loss to them.
+  skipIfNoSeed(
+    'GET entity timeline returns occurredAt ties straddling a page boundary exactly once',
+    async (app) => {
+      const tiedAt = new Date('2031-01-01T12:00:00.000Z');
+      await prisma.activity.createMany({
+        data: [0, 1, 2].map((i) => ({
+          orgId: orgId!,
+          type: 'call' as const,
+          subject: `tied call ${i}`,
+          entityType: 'contact',
+          entityId: contactId!,
+          occurredAt: tiedAt,
+        })),
+      });
+
+      const page1 = await app.inject({
+        method: 'GET',
+        url: `/api/v1/entities/contact/${contactId}/activities?limit=2&typeFilter=call`,
+      });
+      expect(page1.statusCode).toBe(200);
+      const body1 = page1.json();
+      expect(body1.items).toHaveLength(2);
+      expect(body1.nextCursor).not.toBeNull();
+
+      const page2 = await app.inject({
+        method: 'GET',
+        url: `/api/v1/entities/contact/${contactId}/activities?limit=2&typeFilter=call&cursor=${encodeURIComponent(body1.nextCursor)}`,
+      });
+      expect(page2.statusCode).toBe(200);
+      const body2 = page2.json();
+
+      // Every tied row comes back, none twice — the boundary tie is not dropped.
+      const ids = [...body1.items, ...body2.items].map((a: { id: string }) => a.id);
+      expect(ids).toHaveLength(3);
+      expect(new Set(ids).size).toBe(3);
+      expect(body2.nextCursor).toBeNull();
+    },
+  );
+
+  // WHY x2: (1) the generic feed shares the tie-at-page-boundary guarantee with
+  // the timeline; (2) `total` must be the stable count of the caller's filter —
+  // it previously counted under the cursor-narrowed where, so it shrank as the
+  // client paged and broke any pager deriving page count from it.
+  skipIfNoSeed(
+    'GET /api/v1/activities pages occurredAt ties once and keeps total stable across pages',
+    async (app) => {
+      const tiedAt = new Date('2031-02-02T08:00:00.000Z');
+      await prisma.activity.createMany({
+        data: [0, 1, 2].map((i) => ({
+          orgId: orgId!,
+          type: 'email' as const,
+          subject: `tied email ${i}`,
+          entityType: 'contact',
+          entityId: contactId!,
+          occurredAt: tiedAt,
+        })),
+      });
+
+      const page1 = await app.inject({
+        method: 'GET',
+        url: `/api/v1/activities?type=email&entityId=${contactId}&limit=2`,
+      });
+      expect(page1.statusCode).toBe(200);
+      const body1 = page1.json();
+      expect(body1.items).toHaveLength(2);
+      expect(body1.total).toBe(3);
+      expect(body1.nextCursor).not.toBeNull();
+
+      const page2 = await app.inject({
+        method: 'GET',
+        url: `/api/v1/activities?type=email&entityId=${contactId}&limit=2&cursor=${encodeURIComponent(body1.nextCursor)}`,
+      });
+      expect(page2.statusCode).toBe(200);
+      const body2 = page2.json();
+
+      const ids = [...body1.items, ...body2.items].map((a: { id: string }) => a.id);
+      expect(ids).toHaveLength(3);
+      expect(new Set(ids).size).toBe(3);
+      // total is the whole filtered set on every page, not a countdown.
+      expect(body2.total).toBe(3);
+    },
+  );
 });

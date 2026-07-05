@@ -79,6 +79,27 @@ export async function logActivity(input: LogActivityInput) {
   });
 }
 
+// Compound pagination cursor "<occurredAt ISO>|<id>". occurredAt carries no
+// uniqueness guarantee (concurrent writes land on the same millisecond), so a
+// timestamp-only cursor with a strict `lt` permanently skipped rows that
+// shared the boundary timestamp — they were never on the emitting page and the
+// next page excluded them too. The id half breaks the tie; opaque to clients.
+export function encodeActivityCursor(row: { occurredAt: Date; id: string }): string {
+  return `${row.occurredAt.toISOString()}|${row.id}`;
+}
+
+export function activityCursorWhere(cursor: string): Prisma.ActivityWhereInput {
+  const sep = cursor.indexOf('|');
+  // Legacy bare-ISO cursors (issued before the tiebreaker existed) degrade to
+  // the old timestamp-only paging instead of erroring mid-scroll.
+  if (sep === -1) return { occurredAt: { lt: new Date(cursor) } };
+  const occurredAt = new Date(cursor.slice(0, sep));
+  const id = cursor.slice(sep + 1);
+  return {
+    OR: [{ occurredAt: { lt: occurredAt } }, { occurredAt, id: { lt: id } }],
+  };
+}
+
 export async function getTimeline(input: TimelineInput) {
   const rows = await prisma.activity.findMany({
     where: {
@@ -86,15 +107,18 @@ export async function getTimeline(input: TimelineInput) {
       entityType: input.entityType,
       entityId: input.entityId,
       deletedAt: null,
-      ...(input.cursor ? { occurredAt: { lt: new Date(input.cursor) } } : {}),
+      ...(input.cursor ? activityCursorWhere(input.cursor) : {}),
       ...(input.typeFilter?.length ? { type: { in: input.typeFilter } } : {}),
     },
-    orderBy: { occurredAt: 'desc' },
+    // id tiebreaker matches the compound cursor above — ordering must be total
+    // or ties at a page boundary are returned twice or not at all.
+    orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
     take: input.limit + 1,
   });
 
   const pageRows = rows.slice(0, input.limit);
-  const next = rows.length > input.limit ? pageRows.at(-1)?.occurredAt.toISOString() ?? null : null;
+  const last = pageRows.at(-1);
+  const next = rows.length > input.limit && last ? encodeActivityCursor(last) : null;
 
   return {
     items: pageRows.map(serializeTimelineActivity),

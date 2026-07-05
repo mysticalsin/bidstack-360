@@ -69,6 +69,17 @@ export const ActivityPatch = z.object({
   body: z.record(z.unknown()).optional(),
 });
 
+// Pagination cursor for activity feeds: either a bare ISO datetime (legacy
+// clients) or "<ISO datetime>|<activity id>". occurredAt is not unique, so the
+// id half is the tiebreaker that keeps rows sharing an exact timestamp from
+// being skipped at a page boundary. Clients must treat the string as opaque
+// and echo it back unchanged.
+export const ActivityCursor = z
+  .string()
+  .refine((value) => !Number.isNaN(Date.parse(value.split('|')[0] ?? '')), {
+    message: 'Invalid activity cursor',
+  });
+
 export const ActivityFilter = z.object({
   entityType: z.string().optional(),
   entityId: z.string().uuid().optional(),
@@ -78,16 +89,16 @@ export const ActivityFilter = z.object({
   actorId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   offset: z.coerce.number().int().min(0).optional().default(0),
-  cursor: z.string().datetime().optional(),
+  cursor: ActivityCursor.optional(),
 });
 
 export const ActivityList = z.object({
   items: z.array(Activity),
   total: z.number().int(),
-  nextCursor: z.string().datetime().nullable().optional(),
+  nextCursor: ActivityCursor.nullable().optional(),
 });
 
 export const TimelinePage = z.object({
   items: z.array(Activity),
-  nextCursor: z.string().datetime().nullable(),
+  nextCursor: ActivityCursor.nullable(),
 });

@@ -12,12 +12,18 @@ import {
   Activity,
   ActivityCreate,
   ActivityPatch,
+  ActivityCursor,
   ActivityFilter,
   ActivityList,
   TimelinePage,
 } from '@bidstack/shared';
 import { normalizeTenantEntityType, tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
-import { logActivity, getTimeline } from '../services/activity.service.js';
+import {
+  logActivity,
+  getTimeline,
+  activityCursorWhere,
+  encodeActivityCursor,
+} from '../services/activity.service.js';
 import type { ActivityEventType } from '../services/activity.service.js';
 
 type ActivityRow = {
@@ -83,7 +89,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
           entityId: z.string().uuid(),
         }),
         querystring: z.object({
-          cursor: z.string().datetime().optional(),
+          cursor: ActivityCursor.optional(),
           limit: z.coerce.number().int().min(1).max(100).optional().default(25),
           typeFilter: z
             .string()
@@ -132,7 +138,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       const { entityType, entityId, type, status, ownerId, actorId, limit, offset, cursor } =
         req.query;
 
-      const where: Prisma.ActivityWhereInput = {
+      const baseWhere: Prisma.ActivityWhereInput = {
         orgId: req.auth.orgId,
         deletedAt: null,
         ...(entityType ? { entityType } : {}),
@@ -141,13 +147,21 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(status ? { status } : {}),
         ...(ownerId ? { ownerId } : {}),
         ...(actorId ? { actorId } : {}),
-        ...(cursor ? { occurredAt: { lt: new Date(cursor) } } : {}),
+      };
+      // Cursor only narrows the page fetch — `total` counts baseWhere so it
+      // stays the stable size of the filtered set instead of shrinking as the
+      // client pages forward.
+      const where: Prisma.ActivityWhereInput = {
+        ...baseWhere,
+        ...(cursor ? activityCursorWhere(cursor) : {}),
       };
 
       const [items, total] = await Promise.all([
         prisma.activity.findMany({
           where,
-          orderBy: { occurredAt: 'desc' },
+          // id tiebreaker matches the compound cursor — occurredAt alone is not
+          // unique, and ties at a page boundary were permanently skipped.
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
           take: limit,
           skip: offset,
           // Narrow select matching ActivityRow exactly — serializeActivity's
@@ -174,15 +188,15 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
             updatedAt: true,
           },
         }),
-        prisma.activity.count({ where }),
+        prisma.activity.count({ where: baseWhere }),
       ]);
 
       const serialized = items.map(serializeActivity);
       // Only advertise a next page when THIS page is full; a partial page is the
       // last page, so emitting a cursor there produced a phantom 'next' that
       // fetched 0 rows.
-      const nextCursor =
-        items.length === limit ? items[items.length - 1]?.occurredAt.toISOString() ?? null : null;
+      const lastItem = items[items.length - 1];
+      const nextCursor = items.length === limit && lastItem ? encodeActivityCursor(lastItem) : null;
 
       return { items: serialized, total, nextCursor };
     },

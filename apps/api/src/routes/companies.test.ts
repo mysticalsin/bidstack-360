@@ -34,7 +34,7 @@ beforeAll(async () => {
 
   server = await buildServer();
   await server.ready();
-});
+}, 30_000);
 
 afterEach(async () => {
   if (!dbReachable) return;
@@ -149,6 +149,56 @@ describe('companies routes', () => {
       });
       auditIds.push(...genericRows.map((audit) => audit.id));
       expect(genericRows).toHaveLength(0);
+    },
+  );
+
+  skipIfNoDb(
+    'cursor pagination covers every row across pages — no gap, no overlap',
+    async () => {
+      // WHY: nextCursor must be the id of the LAST row the client actually
+      // received, not the discarded look-ahead probe row. When the cursor
+      // points at the probe, the next query (cursor + skip: 1) starts strictly
+      // AFTER a row that was never returned — silently and permanently hiding
+      // one company per page boundary from every org's Companies list.
+      const suffix = randomUUID().slice(0, 8);
+      const base = Date.now();
+      const created = await Promise.all(
+        [0, 1, 2, 3].map((i) =>
+          prisma.company.create({
+            data: {
+              orgId: orgId!,
+              name: `Cursor Page ${suffix} ${i}`,
+              // Distinct createdAt per row keeps the createdAt-desc ordering
+              // deterministic so the page boundary always falls between row 2
+              // and row 3.
+              createdAt: new Date(base - i * 60_000),
+            },
+            select: { id: true },
+          }),
+        ),
+      );
+      createdCompanyIds.push(...created.map((c) => c.id));
+
+      const page1 = await server.inject({
+        method: 'GET',
+        url: `/api/v1/companies?search=${suffix}&limit=3`,
+      });
+      expect(page1.statusCode).toBe(200);
+      const page1Body = page1.json<{ items: Array<{ id: string }>; nextCursor?: string }>();
+      expect(page1Body.items).toHaveLength(3);
+      expect(page1Body.nextCursor).toBe(page1Body.items[2]!.id);
+
+      const page2 = await server.inject({
+        method: 'GET',
+        url: `/api/v1/companies?search=${suffix}&limit=3&cursor=${page1Body.nextCursor}`,
+      });
+      expect(page2.statusCode).toBe(200);
+      const page2Body = page2.json<{ items: Array<{ id: string }>; nextCursor?: string }>();
+      expect(page2Body.nextCursor).toBeUndefined();
+
+      const seen = [...page1Body.items, ...page2Body.items].map((c) => c.id);
+      expect(new Set(seen).size).toBe(seen.length); // no overlap
+      expect(new Set(seen)).toEqual(new Set(created.map((c) => c.id))); // no gap
     },
   );
 });

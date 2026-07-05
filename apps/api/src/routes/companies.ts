@@ -72,13 +72,11 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(req.query.cursor ? { skip: 1, cursor: { id: req.query.cursor } } : {}),
       });
 
-      let nextCursor: string | undefined;
-      if (items.length > req.query.limit) {
-        nextCursor = items[req.query.limit]!.id;
-        items.pop();
-      }
+      const hasMore = items.length > req.query.limit;
+      const sliced = hasMore ? items.slice(0, -1) : items;
+      const nextCursor = hasMore ? sliced[sliced.length - 1]?.id : undefined;
 
-      return { items: items.map(serializeCompany), nextCursor };
+      return { items: sliced.map(serializeCompany), nextCursor };
     },
   );
 
