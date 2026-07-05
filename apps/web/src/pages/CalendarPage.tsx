@@ -21,6 +21,8 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { CalendarEvent, CreateEventBody } from './calendarPage/types';
 import { CreateEventModal } from './calendarPage/CreateEventModal';
+import { DeadlinesRow } from './calendarPage/DeadlinesRow';
+import { toLocalIsoDate as toIso } from './calendarPage/dateUtils';
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 
@@ -57,15 +59,8 @@ function getWeekDays(anchor: Date): Date[] {
   return days;
 }
 
-function toIso(d: Date): string {
-  // Local Y-M-D, NOT toISOString().slice(0,10): the grid renders local days and
-  // hours, so day-bucketing must use the local calendar date. toISOString shifts
-  // across midnight for any non-UTC offset, which put events on the wrong day.
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+// toIso (local Y-M-D bucketing) moved to ./calendarPage/dateUtils.ts so the
+// deadlines lane buckets chips onto the same local days as the event grid.
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const PROVIDER_COLORS: Record<string, string> = {
@@ -84,6 +79,8 @@ export function CalendarPage() {
   const [providerFilter, setProviderFilter] = useState<
     'all' | 'google_workspace' | 'microsoft_graph'
   >('all');
+  // Deadlines lane defaults ON — surfacing the bid clock is the point.
+  const [showDeadlines, setShowDeadlines] = useState(true);
 
   const weekDays = useMemo(() => getWeekDays(anchor), [anchor]);
   const weekStart = weekDays[0] ?? anchor;
@@ -185,6 +182,24 @@ export function CalendarPage() {
           ))}
         </div>
 
+        {/* Deadlines lane toggle. Real theme tokens (not the page's legacy
+            --color-* vars) so active/inactive states render in both modes. */}
+        <button
+          onClick={() => setShowDeadlines((v) => !v)}
+          aria-pressed={showDeadlines}
+          className={`min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] transition-colors ${
+            showDeadlines
+              ? 'bg-[var(--brand-primary)] text-[var(--fg-on-brand)]'
+              : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className="inline-block h-1.5 w-1.5 rotate-45 border border-current"
+          />
+          {t('calendar.deadlinesToggle', 'Deadlines')}
+        </button>
+
         <button
           onClick={() => {
             setSelectedDate(undefined);
@@ -236,6 +251,10 @@ export function CalendarPage() {
               );
             })}
           </div>
+
+          {/* All-day deadlines lane — bid/proposal due dates, distinct from
+              timed meeting bars. Toggleable from the toolbar. */}
+          {showDeadlines && <DeadlinesRow days={weekDays} />}
 
           {/* Hour rows */}
           <div className="grid grid-cols-[56px_repeat(7,1fr)]">

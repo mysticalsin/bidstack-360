@@ -91,6 +91,7 @@ import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
 import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
 import { calendarRoutes } from './routes/calendar.js';
+import { calendarDeadlineRoutes } from './routes/calendar-deadlines.js';
 import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
 // Wave 4 — AI assistant
@@ -241,6 +242,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(exchangeRatesRoutes, { prefix: '/api/v1' });
   // Wave 3 — calendar + booking
   await server.register(calendarRoutes, { prefix: '/api/v1' });
+  await server.register(calendarDeadlineRoutes, { prefix: '/api/v1' });
   // Public booking routes skip auth middleware — register without /api/v1 prefix
   // so /book/:slug resolves cleanly for the public page
   await server.register(bookingsRoutes, { prefix: '/api/v1' });
