@@ -127,8 +127,10 @@ export function CountryDetailPanel({
         <div className="space-y-4 p-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
+              {/* Metric-label icons inherit the label's tertiary tone — the old
+                  per-icon amber/blue/emerald/purple sprinkle read as rainbow. */}
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
-                <Icon name="target" size={10} className="text-amber-500" />
+                <Icon name="target" size={10} />
                 {t('territoryPanels.opportunities', 'Opportunities')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
@@ -137,7 +139,7 @@ export function CountryDetailPanel({
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
-                <Icon name="dollar" size={10} className="text-blue-500" />
+                <Icon name="dollar" size={10} />
                 {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
@@ -150,7 +152,9 @@ export function CountryDetailPanel({
             <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 <span className="flex items-center gap-1.5">
-                  <Icon name="activity" size={11} className="text-emerald-500" />
+                  {/* "growth" is a registered glyph — "activity" wasn't, so the
+                      Icon component silently rendered nothing here. */}
+                  <Icon name="growth" size={11} />
                   {t('territoryPanels.globalPipelineShare', 'Global Pipeline Share')}
                 </span>
                 <span className="font-extrabold text-[var(--fg-primary)] tabular-nums">
@@ -158,8 +162,10 @@ export function CountryDetailPanel({
                 </span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                {/* Solid brand fill — the blue→indigo (and dark blue→green!)
+                    gradient broke the one-accent rule. */}
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-[var(--brand-primary)] dark:to-[var(--success-fg)] rounded-full transition-all duration-500"
+                  className="h-full bg-[var(--brand-primary)] rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(100, Math.max(0, sharePct))}%` }}
                 />
               </div>
@@ -169,7 +175,7 @@ export function CountryDetailPanel({
           <div className="space-y-3 border-t border-[var(--border-subtle)] pt-3">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
-                <Icon name="git-branch" size={11} className="text-purple-500" />
+                <Icon name="git-branch" size={11} />
                 {t('territoryPanels.assignedTerritories', 'Assigned Territories')}
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -192,7 +198,7 @@ export function CountryDetailPanel({
 
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
-                <Icon name="user" size={11} className="text-emerald-500" />
+                <Icon name="user" size={11} />
                 {t('territoryPanels.accountOwners', 'Account Owners')}
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -202,7 +208,7 @@ export function CountryDetailPanel({
                       key={o}
                       className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--fg-secondary)] shadow-sm"
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--presence-online)] mr-1.5 animate-pulse" />
                       {o}
                     </span>
                   ))
@@ -215,7 +221,8 @@ export function CountryDetailPanel({
         </div>
       ) : (
         <div className="flex flex-col h-48 items-center justify-center text-center p-4">
-          <div className="rounded-full bg-[var(--surface-sunken)] p-3 mb-2.5 text-[var(--fg-tertiary)] animate-pulse">
+          {/* No pulse: an empty state that throbs reads as a stuck loader. */}
+          <div className="rounded-full bg-[var(--surface-sunken)] p-3 mb-2.5 text-[var(--fg-tertiary)]">
             <Icon name="globe" size={24} />
           </div>
           <span className="text-xs font-semibold text-[var(--fg-secondary)]">
@@ -257,7 +264,7 @@ export function TerritoryListPanel({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)] flex items-center gap-1.5">
-          <Icon name="building" size={14} className="text-indigo-500" />
+          <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
           {t('territoryPanels.territories', 'Territories')}
         </h2>
         <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
@@ -311,7 +318,7 @@ export function TerritoryListPanel({
                     selectedCountryCode && isMatch && territory.countryCodes.length > 0
                       ? {
                           borderColor: 'var(--brand-primary)',
-                          boxShadow: '0 0 12px rgba(168,85,247,0.1)',
+                          boxShadow: '0 0 12px var(--border-glow-strong)',
                         }
                       : undefined
                   }
@@ -333,7 +340,9 @@ export function TerritoryListPanel({
                         )}
                       </div>
                       <div className="text-[11px] text-[var(--fg-secondary)] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-indigo-500/80 dark:text-indigo-400/80">
+                        {/* brand-deep: AA at 11px in both themes (indigo-500/80
+                            was ~3.5:1 on white) and stays inside the one accent. */}
+                        <span className="font-semibold text-[var(--brand-deep)]">
                           {territory.region ?? t('territoryPanels.global', 'Global')}
                         </span>
                         <span className="text-[var(--border-strong)]">·</span>
@@ -411,7 +420,7 @@ export function RoutingRuleListPanel({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)] flex items-center gap-1.5">
-          <Icon name="git-branch" size={14} className="text-purple-500" />
+          <Icon name="git-branch" size={14} className="text-[var(--brand-primary)]" />
           {t('territoryPanels.leadRoutingRules', 'Lead Routing Rules')}
         </h2>
         <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
@@ -481,7 +490,7 @@ export function RoutingRuleListPanel({
                     selectedCountryCode && isMatch && criteria.countryCode
                       ? {
                           borderColor: 'var(--brand-primary)',
-                          boxShadow: '0 0 12px rgba(168,85,247,0.1)',
+                          boxShadow: '0 0 12px var(--border-glow-strong)',
                         }
                       : undefined
                   }
@@ -514,7 +523,7 @@ export function RoutingRuleListPanel({
                           })}
                         </span>
                         <span className="text-[var(--border-strong)]">·</span>
-                        <span className="inline-flex items-center gap-1 text-violet-500 font-semibold dark:text-violet-400">
+                        <span className="inline-flex items-center gap-1 text-[var(--brand-deep)] font-semibold">
                           <Icon name={assignIcon} size={10} />
                           {assignText}
                         </span>

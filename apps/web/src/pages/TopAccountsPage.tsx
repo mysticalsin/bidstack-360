@@ -348,14 +348,16 @@ export function TopAccountsPage() {
               <Card>
                 <div className="flex items-center gap-4 p-4">
                   {/* Rank */}
+                  {/* Gold/silver/bronze medal hues are rank semantics — kept, with
+                      dark equivalents so the pastel chips don't glare on void black. */}
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                       index === 0
-                        ? 'bg-amber-100 text-amber-700'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                         : index === 1
-                          ? 'bg-slate-100 text-slate-600'
+                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                           : index === 2
-                            ? 'bg-orange-100 text-orange-700'
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
                             : 'bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]'
                     }`}
                   >

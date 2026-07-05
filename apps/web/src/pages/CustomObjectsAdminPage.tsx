@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from '@/components/ui/Toast';
 import {
@@ -148,10 +149,10 @@ export function CustomObjectsAdminPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+          <h1 className="text-2xl font-semibold text-[var(--fg-primary)]">
             {t('customObjectsAdmin.title', 'Custom Objects')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
             {t(
               'customObjectsAdmin.subtitle',
               'Define new entity types for your organisation — Projects, Vendors, Assets, and more.',
@@ -163,12 +164,12 @@ export function CustomObjectsAdminPage() {
           onClick={() => setShowCreate(true)}
           className={cn(
             'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium',
-            'bg-[var(--accent)] text-white hover:opacity-90 active:opacity-80',
+            'bg-[var(--brand-primary)] text-[var(--fg-on-brand)] hover:opacity-90 active:opacity-80',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
             'transition-opacity min-h-[44px]',
           )}
         >
-          <span aria-hidden="true">＋</span> {t('customObjectsAdmin.newObjectButton', 'New Object')}
+          <Icon name="plus" size={14} /> {t('customObjectsAdmin.newObjectButton', 'New Object')}
         </button>
       </div>
 
@@ -179,7 +180,7 @@ export function CustomObjectsAdminPage() {
           aria-label={t('customObjectsAdmin.loadingLabel', 'Loading custom objects')}
         >
           {[1, 2, 3].map((i) => (
-            <li key={i} className="h-28 rounded-xl bg-[var(--surface-2)] animate-pulse" />
+            <li key={i} className="bs-shimmer h-28 rounded-xl" />
           ))}
         </ul>
       )}
@@ -188,7 +189,7 @@ export function CustomObjectsAdminPage() {
       {isError && (
         <div
           role="alert"
-          className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+          className="p-4 rounded-lg bg-[var(--error-surface)] text-[var(--fg-error)]"
         >
           {t('customObjectsAdmin.errorLoad', 'Failed to load custom objects. Please refresh.')}
         </div>
@@ -196,9 +197,12 @@ export function CustomObjectsAdminPage() {
 
       {/* State: empty */}
       {!isLoading && !isError && data?.items.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--text-secondary)]">
-          <span className="text-4xl mb-4" aria-hidden="true">
-            📦
+        <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--fg-secondary)]">
+          <span
+            className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]"
+            aria-hidden="true"
+          >
+            <Icon name="package" size={24} />
           </span>
           <p className="font-medium">
             {t('customObjectsAdmin.emptyTitle', 'No custom objects yet')}
@@ -220,8 +224,8 @@ export function CustomObjectsAdminPage() {
               <Link
                 to={`/settings/custom-objects/${def.id}`}
                 className={cn(
-                  'flex items-start gap-3 p-4 rounded-xl border border-[var(--border)]',
-                  'bg-[var(--surface)] hover:bg-[var(--surface-2)]',
+                  'flex items-start gap-3 p-4 rounded-xl border border-[var(--border-subtle)]',
+                  'bg-[var(--surface-card)] hover:bg-[var(--surface-hover)]',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
                   'transition-colors min-h-[44px]',
                 )}
@@ -233,17 +237,17 @@ export function CustomObjectsAdminPage() {
                   aria-hidden="true"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[var(--text-primary)] truncate">
+                  <p className="font-semibold text-[var(--fg-primary)] truncate">
                     {def.labelSingular}
                   </p>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">{def.key}</p>
+                  <p className="text-xs text-[var(--fg-secondary)] mt-0.5">{def.key}</p>
                   {def.description && (
-                    <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-2">
+                    <p className="text-sm text-[var(--fg-secondary)] mt-1 line-clamp-2">
                       {def.description}
                     </p>
                   )}
                 </div>
-                <span className="text-xs text-[var(--text-tertiary)] ml-auto whitespace-nowrap">
+                <span className="text-xs text-[var(--fg-tertiary)] ml-auto whitespace-nowrap">
                   {t('customObjectsAdmin.recordCount', '{{count}} records', {
                     count: def.recordCount ?? 0,
                   })}
@@ -259,7 +263,7 @@ export function CustomObjectsAdminPage() {
                 }}
                 className={cn(
                   'absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100',
-                  'text-[var(--text-tertiary)] hover:text-red-500 transition-opacity',
+                  'text-[var(--fg-tertiary)] hover:text-[var(--fg-error)] transition-opacity',
                   'focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
                   'min-w-[44px] min-h-[44px] flex items-center justify-center',
                 )}
@@ -267,7 +271,7 @@ export function CustomObjectsAdminPage() {
                   label: def.labelSingular,
                 })}
               >
-                ✕
+                <Icon name="x" size={14} />
               </button>
             </li>
           ))}
@@ -284,8 +288,8 @@ export function CustomObjectsAdminPage() {
         }}
         labelId="create-obj-title"
       >
-        <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-          <h2 id="create-obj-title" className="text-lg font-semibold text-[var(--text-primary)]">
+        <div className="bg-[var(--surface-card)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <h2 id="create-obj-title" className="text-lg font-semibold text-[var(--fg-primary)]">
             {t('customObjectsAdmin.modalTitle', 'New Custom Object')}
           </h2>
           <form
@@ -295,7 +299,7 @@ export function CustomObjectsAdminPage() {
             className="space-y-3"
           >
             {formError && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              <p role="alert" className="text-sm text-[var(--fg-error)]">
                 {formError}
               </p>
             )}
@@ -303,7 +307,7 @@ export function CustomObjectsAdminPage() {
             <div>
               <label
                 htmlFor="co-label-singular"
-                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+                className="block text-sm font-medium text-[var(--fg-primary)] mb-1"
               >
                 {t('customObjectsAdmin.fieldSingularLabel', 'Singular label')}{' '}
                 <span aria-hidden="true">*</span>
@@ -323,7 +327,7 @@ export function CustomObjectsAdminPage() {
             <div>
               <label
                 htmlFor="co-label-plural"
-                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+                className="block text-sm font-medium text-[var(--fg-primary)] mb-1"
               >
                 {t('customObjectsAdmin.fieldPluralLabel', 'Plural label')}{' '}
                 <span aria-hidden="true">*</span>
@@ -343,10 +347,10 @@ export function CustomObjectsAdminPage() {
             <div>
               <label
                 htmlFor="co-key"
-                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+                className="block text-sm font-medium text-[var(--fg-primary)] mb-1"
               >
                 {t('customObjectsAdmin.fieldKeyLabel', 'API key')}{' '}
-                <span className="text-[var(--text-tertiary)] font-normal">
+                <span className="text-[var(--fg-tertiary)] font-normal">
                   {t('customObjectsAdmin.fieldKeyAuto', '(auto)')}
                 </span>
               </label>
@@ -362,7 +366,7 @@ export function CustomObjectsAdminPage() {
                 aria-required="true"
                 aria-describedby="co-key-hint"
               />
-              <p id="co-key-hint" className="text-xs text-[var(--text-tertiary)] mt-0.5">
+              <p id="co-key-hint" className="text-xs text-[var(--fg-tertiary)] mt-0.5">
                 {t(
                   'customObjectsAdmin.fieldKeyHint',
                   'Lowercase letters, digits, _ or - only. Immutable after creation.',
@@ -373,7 +377,7 @@ export function CustomObjectsAdminPage() {
             <div>
               <label
                 htmlFor="co-description"
-                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+                className="block text-sm font-medium text-[var(--fg-primary)] mb-1"
               >
                 {t('customObjectsAdmin.fieldDescriptionLabel', 'Description')}
               </label>
@@ -389,7 +393,7 @@ export function CustomObjectsAdminPage() {
 
             {/* Color picker */}
             <fieldset>
-              <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">
+              <legend className="text-sm font-medium text-[var(--fg-primary)] mb-1">
                 {t('customObjectsAdmin.fieldColorLegend', 'Color')}
               </legend>
               <div className="flex gap-2 flex-wrap">
@@ -400,8 +404,10 @@ export function CustomObjectsAdminPage() {
                     onClick={() => handleField('color', c)}
                     className={cn(
                       'w-7 h-7 rounded-full border-2 transition-transform hover:scale-110',
+                      // Gap ring matches the modal surface in both themes —
+                      // border-white vanished against the light-mode modal.
                       form.color === c
-                        ? 'border-white ring-2 ring-[var(--ring)]'
+                        ? 'border-[var(--surface-card)] ring-2 ring-[var(--ring)]'
                         : 'border-transparent',
                     )}
                     style={{ backgroundColor: c }}
@@ -422,14 +428,14 @@ export function CustomObjectsAdminPage() {
                   setForm(INITIAL_FORM);
                   setFormError(null);
                 }}
-                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
+                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-default)] text-sm font-medium text-[var(--fg-primary)] hover:bg-[var(--surface-hover)] transition-colors min-h-[44px]"
               >
                 {t('customObjectsAdmin.cancelButton', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={createDef.isPending}
-                className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-[var(--fg-on-brand)] text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
                 {createDef.isPending
                   ? t('customObjectsAdmin.creatingButton', 'Creating…')

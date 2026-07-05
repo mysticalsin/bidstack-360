@@ -143,7 +143,7 @@ function ExtractedGroup({
                 aria-label={t('reviewStep.removeAria', 'Remove {{name}}', { name: item.name })}
                 onClick={() => onDelete(item.id, item.name)}
                 disabled={isDeleting}
-                className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+                className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
               >
                 <Icon name="trash" size={14} />
               </button>
@@ -161,7 +161,9 @@ function ConfidenceBadge({ bps }: { bps: number }) {
   const pct = Math.round(bps / 100);
   let color = 'text-[var(--fg-tertiary)] bg-[var(--surface-sunken)]';
   if (bps >= 8000) color = 'text-[var(--success)] bg-[var(--success-tint)]';
-  else if (bps >= 6000) color = 'text-[var(--info)] bg-[var(--info-tint)]';
+  // --info-strong, not --info: plain info is 3.9:1 on the light tint — below
+  // AA for this 10px badge text; info-strong is the tint-safe variant (≈5.2:1).
+  else if (bps >= 6000) color = 'text-[var(--info-strong)] bg-[var(--info-tint)]';
   else if (bps >= 4000) color = 'text-[var(--warning)] bg-[var(--warning-tint)]';
   return (
     <span

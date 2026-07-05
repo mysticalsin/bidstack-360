@@ -117,9 +117,11 @@ export function CustomObjectDetailPage() {
 
   if (recordQuery.isLoading || !defsData) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-4 animate-pulse">
-        <div className="h-8 w-40 bg-[var(--surface-card)] rounded" />
-        <div className="h-64 bg-[var(--surface-card)] rounded-xl" />
+      // Shared bs-shimmer skeleton — surface-card blocks were invisible on the
+      // white page background in light mode.
+      <div className="p-6 max-w-3xl mx-auto space-y-4" role="status" aria-busy="true">
+        <div className="bs-shimmer h-8 w-40" aria-hidden />
+        <div className="bs-shimmer h-64 rounded-xl" aria-hidden />
       </div>
     );
   }
@@ -182,9 +184,9 @@ export function CustomObjectDetailPage() {
             void handleDelete();
           }}
           className={cn(
-            'px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800',
-            'text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400',
+            'px-3 py-1.5 rounded-lg border border-[var(--danger)]/40',
+            'text-sm text-[var(--fg-error)] hover:bg-[var(--error-surface)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]',
             'transition-colors min-h-[44px]',
           )}
         >
@@ -207,7 +209,8 @@ export function CustomObjectDetailPage() {
               className={cn(
                 'grid grid-cols-3 items-start px-5 py-4',
                 i > 0 && 'border-t border-[var(--border-subtle)]',
-                editField === key && 'bg-[var(--surface-card)]',
+                // Sunken tint — surface-card on a surface-card section was invisible.
+                editField === key && 'bg-[var(--surface-sunken)]',
               )}
             >
               <dt className="text-sm font-medium text-[var(--fg-secondary)] capitalize">
@@ -277,7 +280,7 @@ export function CustomObjectDetailPage() {
                         void saveEdit();
                       }}
                       disabled={updateRecord.isPending}
-                      className="px-3 py-1 rounded-lg bg-[var(--brand-primary)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+                      className="px-3 py-1 rounded-lg bg-[var(--brand-primary)] text-[var(--fg-on-brand)] text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
                     >
                       {updateRecord.isPending
                         ? t('customObjectDetail.saving', '…')
@@ -297,7 +300,7 @@ export function CustomObjectDetailPage() {
                     onClick={() => startEdit(key)}
                     className={cn(
                       'w-full text-left text-sm px-2 py-1 -ml-2 rounded',
-                      'text-[var(--fg-primary)] hover:bg-[var(--surface-card)]',
+                      'text-[var(--fg-primary)] hover:bg-[var(--surface-hover)]',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
                       'transition-colors min-h-[44px] flex items-center',
                     )}
@@ -310,7 +313,7 @@ export function CustomObjectDetailPage() {
                   </button>
                 )}
                 {editField === key && editError && (
-                  <p role="alert" className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  <p role="alert" className="text-xs text-[var(--fg-error)] mt-1">
                     {editError}
                   </p>
                 )}
@@ -338,7 +341,7 @@ export function CustomObjectDetailPage() {
         <p>{t('customObjectDetail.createdAt', 'Created {{time}}', { time: relativeTime(record.createdAt) })}</p>
         <p>{t('customObjectDetail.updatedAt', 'Updated {{time}}', { time: relativeTime(record.updatedAt) })}</p>
         {record.deletedAt && (
-          <p className="text-red-500">
+          <p className="text-[var(--danger)]">
             {t('customObjectDetail.deletedAt', 'Deleted {{time}}', { time: relativeTime(record.deletedAt) })}
           </p>
         )}

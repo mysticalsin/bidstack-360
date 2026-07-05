@@ -32,12 +32,13 @@ function formatDateTime(iso: string): string {
 
 function MetricPill({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value * 100);
+  // Semantic tint tokens — contrast-verified in both themes in index.css.
   const colorClass =
     pct >= 70
-      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+      ? 'bg-[var(--success-tint)] text-[var(--success-fg)]'
       : pct >= 50
-      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      ? 'bg-[var(--warning-tint)] text-[var(--warning-fg)]'
+      : 'bg-[var(--error-surface)] text-[var(--fg-error)]';
 
   return (
     <span
@@ -80,7 +81,7 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
 
   if (models.length === 0) {
     return (
-      <p className="text-sm text-[var(--color-neutral-500)] py-4">
+      <p className="text-sm text-[var(--fg-secondary)] py-4">
         {t(
           'predictiveAdmin.modelTableEmpty',
           'No {{entityType}} models trained yet. Click "Retrain Now" to train the first model.',
@@ -99,20 +100,20 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
           })}
         </caption>
         <thead>
-          <tr className="border-b border-[var(--color-border)] dark:border-[var(--color-border-dark)]">
-            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+          <tr className="border-b border-[var(--border-subtle)]">
+            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--fg-tertiary)] uppercase tracking-wide">
               {t('predictiveAdmin.colVersion', 'Version')}
             </th>
-            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--fg-tertiary)] uppercase tracking-wide">
               {t('predictiveAdmin.colAccuracyMetrics', 'Accuracy Metrics')}
             </th>
-            <th scope="col" className="py-2 pr-4 text-right text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+            <th scope="col" className="py-2 pr-4 text-right text-xs font-semibold text-[var(--fg-tertiary)] uppercase tracking-wide">
               {t('predictiveAdmin.colSamples', 'Samples')}
             </th>
-            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--fg-tertiary)] uppercase tracking-wide">
               {t('predictiveAdmin.colTrained', 'Trained')}
             </th>
-            <th scope="col" className="py-2 text-center text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+            <th scope="col" className="py-2 text-center text-xs font-semibold text-[var(--fg-tertiary)] uppercase tracking-wide">
               {t('predictiveAdmin.colActive', 'Active')}
             </th>
           </tr>
@@ -122,11 +123,11 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
             <tr
               key={m.id}
               className={[
-                'border-b border-[var(--color-border)] dark:border-[var(--color-border-dark)]',
-                m.isActive ? 'bg-[var(--color-primary-50)] dark:bg-[var(--color-primary-900)]/10' : '',
+                'border-b border-[var(--border-subtle)]',
+                m.isActive ? 'bg-[var(--brand-primary-tint)]' : '',
               ].join(' ')}
             >
-              <td className="py-3 pr-4 font-mono text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
+              <td className="py-3 pr-4 font-mono text-[var(--fg-secondary)]">
                 v{m.version}
               </td>
               <td className="py-3 pr-4">
@@ -137,21 +138,22 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
                   <MetricPill label={t('predictiveAdmin.metricRecall', 'Rec')} value={m.accuracyMetrics.recall} />
                 </div>
               </td>
-              <td className="py-3 pr-4 text-right tabular-nums text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
+              <td className="py-3 pr-4 text-right tabular-nums text-[var(--fg-secondary)]">
                 {m.sampleCount.toLocaleString()}
               </td>
-              <td className="py-3 pr-4 text-[var(--color-neutral-600)] dark:text-[var(--color-neutral-400)]">
+              <td className="py-3 pr-4 text-[var(--fg-secondary)]">
                 {formatDateTime(m.trainedAt)}
               </td>
               <td className="py-3 text-center">
+                {/* Presence tokens: status-dot colors with verified 3:1 UI contrast */}
                 {m.isActive ? (
                   <span
-                    className="inline-block w-2 h-2 rounded-full bg-emerald-500"
+                    className="inline-block w-2 h-2 rounded-full bg-[var(--presence-online)]"
                     aria-label={t('predictiveAdmin.activeModelLabel', 'Active model')}
                   />
                 ) : (
                   <span
-                    className="inline-block w-2 h-2 rounded-full bg-[var(--color-neutral-300)]"
+                    className="inline-block w-2 h-2 rounded-full bg-[var(--presence-offline)]"
                     aria-label={t('predictiveAdmin.inactiveModelLabel', 'Inactive')}
                   />
                 )}
@@ -182,13 +184,13 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
   };
 
   return (
-    <section className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-elevated)] p-6">
+    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6">
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div>
-          <h2 className="font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] capitalize">
+          <h2 className="font-semibold text-[var(--fg-primary)] capitalize">
             {t('predictiveAdmin.sectionHeading', '{{entityType}} Scoring Model', { entityType })}
           </h2>
-          <p className="text-xs text-[var(--color-neutral-500)] mt-0.5">
+          <p className="text-xs text-[var(--fg-tertiary)] mt-0.5">
             {t('predictiveAdmin.sectionSubtitle', 'Logistic regression · per-org · retrained weekly')}
           </p>
         </div>
@@ -203,9 +205,11 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
           className={[
             'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium',
             'min-h-[44px] min-w-[44px]',
-            'bg-[var(--color-primary-600)] text-white',
-            'hover:bg-[var(--color-primary-700)]',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-500)] focus-visible:ring-offset-1',
+            // --color-primary-* never existed in this design system — the CTA
+            // rendered as white-on-transparent. Brand tokens resolve in both themes.
+            'bg-[var(--brand-primary)] text-[var(--fg-on-brand)]',
+            'hover:bg-[var(--brand-primary-hover)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-1',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'transition-colors motion-reduce:transition-none',
           ].join(' ')}
@@ -229,7 +233,7 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
         <div
           role="status"
           aria-live="polite"
-          className="mb-4 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 text-sm"
+          className="mb-4 px-3 py-2 rounded-lg bg-[var(--success-surface)] text-[var(--success-fg)] text-sm"
         >
           {success}
         </div>
@@ -237,7 +241,7 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
       {retrain.isError && (
         <div
           role="alert"
-          className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 text-sm"
+          className="mb-4 px-3 py-2 rounded-lg bg-[var(--error-surface)] text-[var(--fg-error)] text-sm"
         >
           {t('predictiveAdmin.retrainError', 'Retrain failed. Please try again.')}
         </div>
@@ -256,10 +260,10 @@ export default function PredictiveAdminPage() {
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)]">
+        <h1 className="text-2xl font-bold text-[var(--fg-primary)]">
           {t('predictiveAdmin.pageTitle', 'Predictive Scoring')}
         </h1>
-        <p className="text-sm text-[var(--color-neutral-500)] mt-1">
+        <p className="text-sm text-[var(--fg-secondary)] mt-1">
           {t(
             'predictiveAdmin.pageSubtitle',
             "ML-based lead and opportunity scoring — trained on your org's closed deal history. Models are automatically retrained every Sunday at 02:00 UTC.",
@@ -268,8 +272,8 @@ export default function PredictiveAdminPage() {
       </div>
 
       {/* Info banner */}
-      <div className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-neutral-50)] dark:bg-[var(--color-neutral-800)]/50 p-4">
-        <p className="text-sm text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
+        <p className="text-sm text-[var(--fg-secondary)]">
           <strong>{t('predictiveAdmin.dataPrivacyLabel', 'Data privacy:')}</strong>{' '}
           {t(
             'predictiveAdmin.dataPrivacyBody',

@@ -20,6 +20,7 @@ import {
 } from '@/hooks/useCustomObjects';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
+import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 
 export function CustomObjectListPage() {
@@ -60,9 +61,11 @@ export function CustomObjectListPage() {
 
   if (defsLoading) {
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-4 animate-pulse">
-        <div className="h-8 w-48 bg-[var(--surface-card)] rounded" />
-        <div className="h-64 bg-[var(--surface-card)] rounded-xl" />
+      // Shared bs-shimmer skeleton — surface-card blocks were invisible on the
+      // white page background in light mode.
+      <div className="p-6 max-w-5xl mx-auto space-y-4" role="status" aria-busy="true">
+        <div className="bs-shimmer h-8 w-48" aria-hidden />
+        <div className="bs-shimmer h-64 rounded-xl" aria-hidden />
       </div>
     );
   }
@@ -114,21 +117,21 @@ export function CustomObjectListPage() {
           onClick={() => setShowCreate(true)}
           className={cn(
             'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium',
-            'bg-[var(--brand-primary)] text-white hover:opacity-90 active:opacity-80',
+            'bg-[var(--brand-primary)] text-[var(--fg-on-brand)] hover:opacity-90 active:opacity-80',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
             'transition-opacity min-h-[44px]',
           )}
         >
-          <span aria-hidden="true">＋</span>{' '}
+          <Icon name="plus" size={14} />
           {t('customObjectList.newRecordButton', 'New {{label}}', { label: def.labelSingular })}
         </button>
       </div>
 
       {/* Table */}
       {recordsQuery.isLoading && (
-        <div className="space-y-2">
+        <div className="space-y-2" role="status" aria-busy="true">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-12 bg-[var(--surface-card)] rounded animate-pulse" />
+            <div key={i} className="bs-shimmer h-12" aria-hidden />
           ))}
         </div>
       )}
@@ -136,7 +139,7 @@ export function CustomObjectListPage() {
       {recordsQuery.isError && (
         <div
           role="alert"
-          className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+          className="p-4 rounded-lg bg-[var(--error-surface)] text-[var(--fg-error)]"
         >
           {t('customObjectList.loadError', 'Failed to load records.')}
         </div>
@@ -181,7 +184,7 @@ export function CustomObjectListPage() {
               {records.map((record) => (
                 <tr
                   key={record.id}
-                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-card)] transition-colors"
+                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] transition-colors"
                 >
                   <td className="px-4 py-3 font-mono text-xs text-[var(--fg-tertiary)] whitespace-nowrap">
                     <Link
@@ -216,7 +219,7 @@ export function CustomObjectListPage() {
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
+            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-hover)] transition-colors min-h-[44px]"
           >
             {t('customObjectList.previous', '← Previous')}
           </button>
@@ -227,7 +230,7 @@ export function CustomObjectListPage() {
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
+            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-hover)] transition-colors min-h-[44px]"
           >
             {t('customObjectList.next', 'Next →')}
           </button>
@@ -255,7 +258,7 @@ export function CustomObjectListPage() {
             className="space-y-3"
           >
             {createError && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              <p role="alert" className="text-sm text-[var(--fg-error)]">
                 {createError}
               </p>
             )}
@@ -285,14 +288,14 @@ export function CustomObjectListPage() {
                   setCreateValues({ name: '' });
                   setCreateError(null);
                 }}
-                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-sm hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
+                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-sm hover:bg-[var(--surface-hover)] transition-colors min-h-[44px]"
               >
                 {t('customObjectList.cancel', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={createRecord.isPending}
-                className="flex-1 px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-[var(--fg-on-brand)] text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
                 {createRecord.isPending
                   ? t('customObjectList.creating', 'Creating…')
