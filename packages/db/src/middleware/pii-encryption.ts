@@ -151,6 +151,52 @@ function encryptWritePayload(
   return data;
 }
 
+/**
+ * Resolves the orgId of the row targeted by a unique `where`, or null when it
+ * cannot be determined. Injectable so tests can stub the DB lookup.
+ */
+type RowOrgIdResolver = (modelName: string, where: unknown) => Promise<string | null>;
+
+/**
+ * Default resolver: read the target row's own orgId through the shared client.
+ *
+ * WHY: the codebase's sanctioned multi-tenancy pattern is an org-scoped fetch
+ * to verify ownership, then `update({ where: { id }, data })` — the update
+ * itself carries no orgId in data OR where (tenant-scope-guard classifies
+ * `update` as report-only for exactly this shape). Failing loud on it would
+ * turn every contact/lead edit that touches email/phone into a hard error the
+ * moment PII_FIELD_ENCRYPTION flips on. The row is the authoritative record of
+ * which org's key seals its fields — the same rule decryptRecord applies on
+ * the read side — so consult the row instead of the args.
+ *
+ * The import is lazy because index.ts registers this middleware (a static
+ * import would be circular). Going through the shared client re-enters the
+ * middleware chain, which is safe: a `select: { orgId }` read carries no PII
+ * to encrypt, decrypt, or hash-rewrite, and soft-delete scoping means a
+ * tombstoned row resolves to null → the write still fails loud. NOTE: the
+ * probe runs outside any interactive transaction the update is in; orgId is
+ * immutable and set at insert, so any committed row answers correctly. A row
+ * created inside the SAME open transaction must keep carrying orgId in its
+ * update args, exactly as before this fallback existed.
+ */
+async function lookupRowOrgId(modelName: string, where: unknown): Promise<string | null> {
+  if (!where || typeof where !== 'object') return null;
+  const { prisma } = await import('../index.js');
+  const delegateName = modelName.charAt(0).toLowerCase() + modelName.slice(1);
+  const delegate = (
+    prisma as unknown as Record<
+      string,
+      | { findUnique(args: { where: unknown; select: { orgId: boolean } }): Promise<unknown> }
+      | undefined
+    >
+  )[delegateName];
+  if (!delegate) return null;
+  const row = (await delegate.findUnique({ where, select: { orgId: true } })) as {
+    orgId?: unknown;
+  } | null;
+  return typeof row?.orgId === 'string' ? row.orgId : null;
+}
+
 // ----- Read-side helpers ----------------------------------------------------
 
 function decryptRecord(
@@ -346,7 +392,9 @@ function rewriteEmailFilterArray(
  * - makePiiMiddleware() for legacy $use()
  * - makePiiExtension() for the modern $extends() query extension
  */
-export function makePiiMiddleware(): Prisma.Middleware {
+export function makePiiMiddleware(
+  resolveRowOrgId: RowOrgIdResolver = lookupRowOrgId,
+): Prisma.Middleware {
   return async (params, next) => {
     if (!isPiiEncryptionEnabled()) return next(params);
     if (!params.model) return next(params);
@@ -389,27 +437,42 @@ export function makePiiMiddleware(): Prisma.Middleware {
           params.args.data = encryptWritePayload(model, record, orgId, 'createMany');
         }
       } else if (params.args?.data) {
-        const orgId = extractOrgId(params.args);
-        params.args.data = encryptWritePayload(
-          model,
-          params.args.data as Record<string, unknown>,
-          orgId,
-          params.action,
-        );
+        const data = params.args.data as Record<string, unknown>;
+        let orgId = extractOrgId(params.args);
+        // Single-row update on the repo's sanctioned pattern (org-scoped fetch,
+        // then `update({ where: { id }, data })`) carries no orgId anywhere in
+        // its args. Resolve it from the target row itself — but only when the
+        // payload actually holds plaintext PII, so non-PII updates never pay
+        // for a DB probe. A null resolution still fails loud in
+        // encryptWritePayload below: silent plaintext is never an option.
+        if (!orgId && params.action === 'update' && hasPlaintextPii(model, data)) {
+          orgId = await resolveRowOrgId(params.model, params.args.where);
+        }
+        params.args.data = encryptWritePayload(model, data, orgId, params.action);
       }
     }
 
     const result = await next(params);
 
     // ----- Read path --------------------------------------------------------
-    const readActions = [
+    // create/update/upsert are decrypted too: Prisma returns the written row,
+    // whose PII fields the write path above rewrote to ciphertext envelopes.
+    // Without this, the caller that just supplied 'foo@bar.com' gets 'enc:v1:…'
+    // back in the same response (API/MCP serialize write results directly),
+    // violating the runbook's plaintext-response contract
+    // (docs/security/pii-field-encryption.md). createMany/updateMany return
+    // only { count } — nothing to decrypt.
+    const decryptActions = [
       'findUnique',
       'findFirst',
       'findMany',
       'findUniqueOrThrow',
       'findFirstOrThrow',
+      'create',
+      'update',
+      'upsert',
     ];
-    if (readActions.includes(params.action) && result) {
+    if (decryptActions.includes(params.action) && result) {
       const orgId = extractOrgId(params.args);
       return decryptResult(model, result, orgId);
     }

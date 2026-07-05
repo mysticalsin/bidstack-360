@@ -83,12 +83,24 @@ export function makeSoftDeleteMiddleware(): Prisma.Middleware {
         // (Prisma 5 extendedWhereUnique lets `update` carry a non-unique filter
         // alongside its unique selector, so this is valid for single update too.)
         //
+        // upsert is scoped for the same reason: its unique-key match happens at
+        // the DB level, so without deletedAt: null a tombstoned row reserving the
+        // key would take the update branch — silently reviving/mutating a hidden
+        // record. Scoped, upsert takes the create branch instead and fails loud
+        // on the still-live unique constraint rather than corrupting the
+        // tombstone. Privileged ops (GDPR erasure, restore, admin merge) keep the
+        // documented bypass: an explicit where.deletedAt passes through untouched.
+        //
         // delete/deleteMany are intentionally NOT scoped here: hard delete stays
         // the teardown/admin path, and scoping it would strand soft-deleted rows
         // that later collide on (orgId, name)-style unique constraints. Converting
         // hard delete into soft delete is a separate product decision, not a
         // silent middleware change.
-        if (params.action === 'update' || params.action === 'updateMany') {
+        if (
+          params.action === 'update' ||
+          params.action === 'updateMany' ||
+          params.action === 'upsert'
+        ) {
           scopeWhereToLiveRows(params);
         }
 

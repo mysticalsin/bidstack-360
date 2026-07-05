@@ -446,20 +446,23 @@ export async function fetchHubSpotPage(
 
 // ─── Job bookkeeping ───────────────────────────────────────────────────────
 
-/** Atomic counter bump + capped JSONB error append (concurrent chunks are safe). */
+/** Atomic counter bump + capped JSONB error append (concurrent chunks are safe).
+ * Runs on the caller's transaction client so the counters commit together with
+ * the resume-cursor audit row — see commitChunkProgress for WHY. */
 async function recordChunkOutcome(
+  tx: Prisma.TransactionClient,
   migrationJobId: string,
   processed: number,
   errored: number,
   errors: MigrationJobError[],
 ): Promise<void> {
-  await prisma.migrationJob.update({
+  await tx.migrationJob.update({
     where: { id: migrationJobId },
     data: { processedRows: { increment: processed }, errorRows: { increment: errored } },
   });
   if (errors.length > 0) {
     // Cap stored errors at 200 — the CSV download stays useful, the row stays small.
-    await prisma.$executeRaw`
+    await tx.$executeRaw`
       UPDATE migration_jobs
       SET error_summary = CASE
         WHEN jsonb_array_length(error_summary) < 200
@@ -471,6 +474,50 @@ async function recordChunkOutcome(
 }
 
 /**
+ * Persist a finished chunk's bookkeeping: the undo-trail/resume-cursor audit
+ * row plus the processedRows/errorRows counter bump. ONE transaction, on
+ * purpose: the audit row's `rowsConsumed` is the retry resume cursor, so if it
+ * ever became durable without the matching counter increment (crash between
+ * the two writes), the BullMQ retry would resume PAST every row while adding
+ * zero to the counters — permanently undercounting processedRows, which
+ * maybeComplete compares to totalRows, stranding the job in RUNNING forever.
+ */
+export async function commitChunkProgress(chunk: {
+  orgId: string;
+  userId: string;
+  migrationJobId: string;
+  entity: TargetEntity;
+  chunkOffset: number;
+  resumeFrom: number;
+  createdIds: string[];
+  processed: number;
+  errors: MigrationJobError[];
+}): Promise<void> {
+  const { migrationJobId, processed, errors } = chunk;
+  await prisma.$transaction(async (tx) => {
+    if (chunk.createdIds.length > 0 || processed > 0 || errors.length > 0) {
+      const rowsConsumed = chunk.resumeFrom + processed + errors.length;
+      await tx.auditLog.create({
+        data: {
+          orgId: chunk.orgId,
+          userId: chunk.userId,
+          action: 'migration.chunk.imported',
+          targetType: 'MigrationJob',
+          targetId: migrationJobId,
+          diff: {
+            entity: chunk.entity,
+            createdIds: chunk.createdIds,
+            chunkOffset: chunk.chunkOffset,
+            rowsConsumed,
+          },
+        },
+      });
+    }
+    await recordChunkOutcome(tx, migrationJobId, processed, errors.length, errors);
+  });
+}
+
+/**
  * Returns how many rows of this chunk a prior (retried) run already committed, so
  * the import loop resumes PAST them instead of restarting. WHY audit-log based:
  * the chunk audit row is the only durable per-chunk record, and it is written in
@@ -478,7 +525,7 @@ async function recordChunkOutcome(
  * errored). Returns 0 when this chunk has never run (the common, first-attempt
  * path). Org-scoped; never reads another tenant's chunk progress.
  */
-async function resolveChunkResumeCursor(
+export async function resolveChunkResumeCursor(
   orgId: string,
   migrationJobId: string,
   chunkOffset: number,
@@ -651,22 +698,19 @@ export async function startMigrationWorker(
 
       // ── Undo trail: contacts/opportunities have no `source` column, so the
       // undo route reads these audit rows to find what this job created. The
-      // `rowsConsumed` field doubles as the resume cursor for retry idempotency. ──
-      if (createdIds.length > 0 || processed > 0 || errors.length > 0) {
-        const rowsConsumed = resumeFrom + processed + errors.length;
-        await prisma.auditLog.create({
-          data: {
-            orgId: payload.orgId,
-            userId: payload.userId,
-            action: 'migration.chunk.imported',
-            targetType: 'MigrationJob',
-            targetId: payload.migrationJobId,
-            diff: { entity, createdIds, chunkOffset: payload.chunkOffset, rowsConsumed },
-          },
-        });
-      }
-
-      await recordChunkOutcome(payload.migrationJobId, processed, errors.length, errors);
+      // `rowsConsumed` field doubles as the resume cursor for retry idempotency,
+      // so it commits atomically with the counters (see commitChunkProgress). ──
+      await commitChunkProgress({
+        orgId: payload.orgId,
+        userId: payload.userId,
+        migrationJobId: payload.migrationJobId,
+        entity,
+        chunkOffset: payload.chunkOffset,
+        resumeFrom,
+        createdIds,
+        processed,
+        errors,
+      });
 
       // ── HubSpot pagination: enqueue the next page while there is one. ──
       if (payload.source === 'HUBSPOT_OAUTH' && nextAfter) {

@@ -113,6 +113,8 @@ export async function startCalendarSync(
             event,
             operation: data.operation,
             accessToken,
+            connection,
+            jobId: String(job.id),
             log: childLog,
           });
         } else if (token.provider === 'microsoft_graph') {
@@ -120,6 +122,8 @@ export async function startCalendarSync(
             event,
             operation: data.operation,
             accessToken,
+            connection,
+            jobId: String(job.id),
             log: childLog,
           });
         }

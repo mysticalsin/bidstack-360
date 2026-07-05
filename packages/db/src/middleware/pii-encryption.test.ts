@@ -231,3 +231,146 @@ describe('pii-encryption middleware — bulk createMany path', () => {
     expect(params.args.data.email).toBe('auth-user@example.com');
   });
 });
+
+describe('pii-encryption middleware — find-then-update-by-id pattern', () => {
+  // WHY this suite exists: the repo's sanctioned multi-tenancy pattern is an
+  // org-scoped findFirst to verify ownership, then `update({ where: { id },
+  // data })` with NO orgId anywhere in the update args (contacts PATCH, MCP
+  // leads-update, and the migration worker all do this; tenant-scope-guard
+  // classifies `update` as report-only for exactly this shape). Failing loud
+  // on unresolvable orgId is right for createMany, but here it turned the
+  // PRIMARY edit path for email/phone — the very fields this middleware
+  // protects — into a hard 500 the moment PII_FIELD_ENCRYPTION was enabled.
+
+  it('encrypts an update-by-bare-id by resolving the row’s own orgId instead of throwing', async () => {
+    const probes: Array<{ model: string; where: unknown }> = [];
+    const middleware = makePiiMiddleware(async (model, where) => {
+      probes.push({ model, where });
+      return ORG;
+    });
+    const params = {
+      model: 'Contact',
+      action: 'update',
+      args: { where: { id: 'c1' }, data: { email: 'patched@example.com', phone: '+15551234567' } },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    expect(isEncrypted(params.args.data.email)).toBe(true);
+    expect(isEncrypted(params.args.data.phone)).toBe(true);
+    // The ROW's org key must seal the fields — hash equality proves which key was used.
+    expect((params.args.data as { emailHash?: string }).emailHash).toBe(
+      hashPiiField('patched@example.com', ORG),
+    );
+    expect(probes).toEqual([{ model: 'Contact', where: { id: 'c1' } }]);
+  });
+
+  it('still FAILS LOUD when the target row resolves no orgId (never silent plaintext)', async () => {
+    const middleware = makePiiMiddleware(async () => null);
+    const params = {
+      model: 'Lead',
+      action: 'update',
+      args: { where: { id: 'missing-or-tombstoned' }, data: { email: 'leak@example.com' } },
+    };
+
+    await expect(middleware(params, async (rewritten) => rewritten)).rejects.toThrow(/orgId/i);
+  });
+
+  it('never probes the DB when the update has no plaintext PII or already carries orgId', async () => {
+    // WHY: the row lookup is a last-resort fallback, not a per-update tax —
+    // non-PII updates and already-scoped updates must stay probe-free.
+    let probeCount = 0;
+    const middleware = makePiiMiddleware(async () => {
+      probeCount += 1;
+      return ORG;
+    });
+
+    const nonPii = {
+      model: 'Contact',
+      action: 'update',
+      args: { where: { id: 'c1' }, data: { firstName: 'NoPiiHere' } },
+    };
+    await middleware(nonPii, async (rewritten) => rewritten);
+
+    const scoped = {
+      model: 'Contact',
+      action: 'update',
+      args: { where: { id: 'c1', orgId: ORG }, data: { email: 'scoped@example.com' } },
+    };
+    await middleware(scoped, async (rewritten) => rewritten);
+
+    expect(probeCount).toBe(0);
+    expect(isEncrypted(scoped.args.data.email)).toBe(true);
+  });
+});
+
+describe('pii-encryption middleware — write results return plaintext', () => {
+  // WHY this suite exists: Prisma returns the written row for create/update/
+  // upsert, and by then the write path has rewritten email/phone to enc:v1:…
+  // envelopes. The API and MCP layers serialize that result straight into the
+  // response (contacts POST/PATCH return serializeContact(created/updated)),
+  // so without result decryption the caller that just supplied 'foo@bar.com'
+  // renders ciphertext — breaking every save-then-show flow and the runbook's
+  // promise that endpoints return plaintext (docs/security/pii-field-encryption.md).
+
+  it('create: caller gets plaintext back while the DB payload stores ciphertext', async () => {
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'Contact',
+      action: 'create',
+      args: { data: { orgId: ORG, email: 'fresh@example.com', phone: '+15550001111' } },
+    };
+
+    const result = (await middleware(params, async (rewritten) => ({
+      id: 'c-new',
+      ...(rewritten.args.data as Record<string, unknown>),
+    }))) as { email: string; phone: string };
+
+    // The DB-bound payload is sealed…
+    expect(isEncrypted(params.args.data.email)).toBe(true);
+    expect(isEncrypted(params.args.data.phone)).toBe(true);
+    // …but the caller sees exactly what it sent.
+    expect(result.email).toBe('fresh@example.com');
+    expect(result.phone).toBe('+15550001111');
+  });
+
+  it('update-by-id: result decrypts with the ROW’s own orgId even though args carry none', async () => {
+    const middleware = makePiiMiddleware(async () => ORG);
+    const params = {
+      model: 'Lead',
+      action: 'update',
+      args: { where: { id: 'l1' }, data: { email: 'renamed@example.com' } },
+    };
+
+    const result = (await middleware(params, async (rewritten) => ({
+      id: 'l1',
+      orgId: ORG,
+      ...(rewritten.args.data as Record<string, unknown>),
+    }))) as { email: string };
+
+    expect(isEncrypted(params.args.data.email)).toBe(true);
+    expect(result.email).toBe('renamed@example.com');
+  });
+
+  it('upsert: returned row decrypts', async () => {
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'Contact',
+      action: 'upsert',
+      args: {
+        where: { id: 'c9', orgId: ORG },
+        create: { orgId: ORG, email: 'upserted@example.com' },
+        update: { email: 'upserted@example.com' },
+      },
+    };
+
+    const result = (await middleware(params, async (rewritten) => ({
+      id: 'c9',
+      orgId: ORG,
+      ...(rewritten.args.create as Record<string, unknown>),
+    }))) as { email: string };
+
+    expect(isEncrypted(params.args.create.email)).toBe(true);
+    expect(result.email).toBe('upserted@example.com');
+  });
+});

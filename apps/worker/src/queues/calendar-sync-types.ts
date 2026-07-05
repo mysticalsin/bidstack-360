@@ -1,5 +1,6 @@
 // Types, interfaces, Zod schemas, and error classes for the calendar-sync worker.
 
+import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { z } from 'zod';
 
@@ -36,6 +37,9 @@ export interface PushParams {
   };
   operation: 'push' | 'update' | 'delete';
   accessToken: string;
+  /** Redis connection + BullMQ job id for the per-job push idempotency claim (calendar-sync-claim.ts) */
+  connection: IORedis;
+  jobId: string;
   log: pino.Logger;
 }
 
