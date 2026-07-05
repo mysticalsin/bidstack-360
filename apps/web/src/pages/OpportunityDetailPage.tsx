@@ -29,7 +29,6 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
-import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
@@ -44,6 +43,7 @@ import {
   NewsCard,
 } from './opportunityDetail/IntelCards';
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
+import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 
 export function OpportunityDetailPage() {
   const { t } = useTranslation('crm');
@@ -63,7 +63,6 @@ export function OpportunityDetailPage() {
   const { data, isLoading, isError, error } = useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
-  const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
   const nav = useNavigate();
@@ -145,12 +144,6 @@ export function OpportunityDetailPage() {
     );
   }
 
-  const timelineItems =
-    timeline.data?.items.map((t: { createdAt: string; kind: string; text: string }) => ({
-      at: t.createdAt,
-      kind: t.kind,
-      text: t.text,
-    })) ?? [];
   const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
   const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
   const isOutcomeLocked = isWon || isLost;
@@ -421,7 +414,7 @@ export function OpportunityDetailPage() {
         customer={data.customer}
         intelDecisionUnit={intel.decisionUnit ?? []}
         documents={data.documents}
-        timeline={timelineItems}
+        activityContent={<TimelinePanel oppId={data.id} />}
       />
 
       <CustomFieldValuesSection entityType="opportunity" entityId={id!} />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
@@ -39,7 +39,10 @@ interface OpportunityTabsProps {
     power: 'decision' | 'champion' | 'influencer' | 'gatekeeper' | 'approver';
   }>;
   documents?: Array<{ id: string; name: string; kind: string; bytes: number | null }>;
-  timeline?: Array<{ at: string; kind: string; text: string }>;
+  // The Activity tab body — the page injects the timeline component
+  // (pages/opportunityDetail/TimelinePanel) so this container stays dumb about
+  // how the deal narrative is fetched and rendered.
+  activityContent?: ReactNode;
 }
 
 export function OpportunityTabs({
@@ -47,7 +50,7 @@ export function OpportunityTabs({
   customer,
   intelDecisionUnit = [],
   documents = [],
-  timeline = [],
+  activityContent = null,
 }: OpportunityTabsProps) {
   const { t } = useTranslation('crm');
   return (
@@ -80,9 +83,7 @@ export function OpportunityTabs({
       <TabsContent value="calls">
         <CallsPanel oppId={oppId} />
       </TabsContent>
-      <TabsContent value="activity">
-        <ActivityPanel timeline={timeline} />
-      </TabsContent>
+      <TabsContent value="activity">{activityContent}</TabsContent>
     </Tabs>
   );
 }
@@ -437,40 +438,5 @@ function DocumentsPanel({
         documentId={primaryDocumentId}
       />
     </>
-  );
-}
-
-function ActivityPanel({ timeline }: { timeline: NonNullable<OpportunityTabsProps['timeline']> }) {
-  const { t } = useTranslation('crm');
-  if (timeline.length === 0)
-    return (
-      <EmptyState
-        title={t('opportunityTabs.activityEmptyTitle', 'No activity yet')}
-        message={t(
-          'opportunityTabs.activityEmptyMessage',
-          'Stage moves, Dust webhooks, and notes will appear here.',
-        )}
-      />
-    );
-  return (
-    <Card>
-      <SectionHeader title={t('opportunityTabs.activityTitle', 'Activity')} />
-      <ol className="px-5 py-4 space-y-3">
-        {timeline.map((e, i) => (
-          <li key={i} className="flex items-start gap-3">
-            <div
-              className="mt-1.5 h-2 w-2 rounded-full bg-[var(--brand-primary)] shrink-0"
-              aria-hidden
-            />
-            <div className="min-w-0">
-              <div className="text-sm text-[var(--fg-primary)]">{e.text}</div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                {e.kind} · {formatDate(e.at)}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Card>
   );
 }
