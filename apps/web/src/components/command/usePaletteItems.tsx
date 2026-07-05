@@ -1,7 +1,9 @@
 /**
  * usePaletteItems — builds the full command-palette item list from all data
  * sources (contextual commands, recents, nav targets, accounts, contacts,
- * tasks, global search, opportunity search).
+ * tasks, global search, opportunity search), scores every row against the
+ * query (paletteFuzzy) and ranks by text relevance + frecency
+ * (paletteFrecency) so frequently-used targets float to the top.
  *
  * Extracted from CommandPalette.tsx to keep the palette shell under the
  * 400-line file cap. Returns items + loading state + selectNavTarget so the
@@ -34,9 +36,12 @@ import {
   CONTACT_RESULT_LIMIT,
   TASK_RESULT_LIMIT,
   buildNavTargets,
+  finalizePaletteItems,
   findDirectNavTarget as findDirectNavTargetIn,
+  fuzzyMatch,
   type Item,
   type NavTarget,
+  type RankedPaletteEntry,
   matchCompanies,
   matchContacts,
   matchTasks,
@@ -44,6 +49,11 @@ import {
   contactSubtitle,
   taskSubtitle,
 } from './commandPaletteUtils';
+import { getFrecencyScores, recordPaletteSelection } from './paletteFrecency';
+
+// Non-label hits (hint text, quick-add key) score just above zero: findable,
+// but never outranking a real label match.
+const WEAK_MATCH_SCORE = 1;
 
 export interface UsePaletteItemsResult {
   items: Item[];
@@ -61,6 +71,9 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   // Snapshot recents at mount — stable while palette is open so items don't
   // shift as the user types (could change their index mid-selection).
   const [recents] = useState<RecentEntry[]>(() => getRecents());
+
+  // Frecency snapshot, same rationale: no reshuffling from one's own picks.
+  const [frecency] = useState<ReadonlyMap<string, number>>(() => getFrecencyScores());
 
   // Recently-visited accounts from the cockpit history store. Slice in memo
   // rather than in the selector — a selector that slices returns a new array
@@ -126,6 +139,9 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
 
   const selectNavTarget = useCallback(
     (target: NavTarget) => {
+      // Recorded here (not in the item wrapper) so the Enter-to-exact-route
+      // shortcut also accrues frecency without double-counting row clicks.
+      recordPaletteSelection(`nav:${target.to}`);
       pushRecent({
         id: `nav:${target.to}`,
         group: 'navigate',
@@ -140,18 +156,56 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   );
 
   const items: Item[] = useMemo(() => {
-    const out: Item[] = [];
+    const entries: RankedPaletteEntry[] = [];
     const q = query.trim().toLowerCase();
 
+    // Label score: neutral 0 when browsing (empty query keeps curated
+    // section order), fuzzy score when typing, null → row filtered out.
+    const scoreLabel = (label: string): number | null =>
+      q ? (fuzzyMatch(q, label)?.score ?? null) : 0;
+
+    // Shared push for rows that navigate on select. `remember` preserves the
+    // old split: fresh hits go into palette-recents; rows that came FROM a
+    // recents source are not re-pushed (no reshuffling the list just used).
+    const pushNavigable = (
+      score: number,
+      partial: Omit<Item, 'onSelect'>,
+      route: string,
+      remember: boolean,
+    ) => {
+      entries.push({
+        score,
+        item: {
+          ...partial,
+          onSelect: () => {
+            if (remember) {
+              pushRecent({
+                id: partial.id,
+                // Navigable rows never carry the palette-local 'action'/'create'
+                // groups, so the narrower RecentEntry union holds.
+                group: partial.group as RecentEntry['group'],
+                label: partial.label,
+                ...(partial.hint ? { hint: partial.hint } : {}),
+                route,
+              });
+            }
+            navigate(route);
+            onClose();
+          },
+        },
+      });
+    };
+
     // Contextual commands from the active page (e.g. "Create task for this opp").
-    // Filtered by query when one is typed.
+    // Filtered by query when one is typed; hint text is a weak fallback match.
     for (const cmd of contextualCommands) {
-      if (
-        !q ||
-        cmd.label.toLowerCase().includes(q) ||
-        (cmd.hint?.toLowerCase().includes(q) ?? false)
-      ) {
-        out.push({
+      const score =
+        scoreLabel(cmd.label) ??
+        (cmd.hint?.toLowerCase().includes(q) ? WEAK_MATCH_SCORE : null);
+      if (score === null) continue;
+      entries.push({
+        score,
+        item: {
           id: `ctx:${cmd.id}`,
           group: 'action',
           label: cmd.label,
@@ -160,24 +214,25 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
             cmd.onSelect();
             onClose();
           },
-        });
-      }
+        },
+      });
     }
 
     // Palette-recents (user's previous palette selections). Shown when empty
     // query — Spotlight-style "continue where you left off".
     if (!q && recents.length > 0) {
       for (const r of recents) {
-        out.push({
-          id: `recent:${r.id}`,
-          group: r.group,
-          label: r.label,
-          hint: r.hint ?? t('usePaletteItems.recentlyVisited', 'Recently visited'),
-          onSelect: () => {
-            navigate(r.route);
-            onClose();
+        pushNavigable(
+          0,
+          {
+            id: `recent:${r.id}`,
+            group: r.group,
+            label: r.label,
+            hint: r.hint ?? t('usePaletteItems.recentlyVisited', 'Recently visited'),
           },
-        });
+          r.route,
+          false,
+        );
       }
     }
 
@@ -186,25 +241,25 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     if (!q && accountRecents.length > 0) {
       for (const acc of accountRecents) {
         const company = companies.find((c) => c.id === acc.slug);
-        const route = `/accounts/${encodeURIComponent(acc.slug)}`;
-        out.push({
-          id: `recent-account:${acc.slug}`,
-          group: 'account',
-          label: acc.name,
-          hint: t('usePaletteItems.recentlyVisited', 'Recently visited'),
-          leading: company ? (
-            <CompanyLogo
-              name={company.name}
-              logo={company.logo}
-              domain={company.domain}
-              size={18}
-            />
-          ) : undefined,
-          onSelect: () => {
-            navigate(route);
-            onClose();
+        pushNavigable(
+          0,
+          {
+            id: `recent-account:${acc.slug}`,
+            group: 'account',
+            label: acc.name,
+            hint: t('usePaletteItems.recentlyVisited', 'Recently visited'),
+            leading: company ? (
+              <CompanyLogo
+                name={company.name}
+                logo={company.logo}
+                domain={company.domain}
+                size={18}
+              />
+            ) : undefined,
           },
-        });
+          `/accounts/${encodeURIComponent(acc.slug)}`,
+          false,
+        );
       }
     }
 
@@ -217,8 +272,11 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     // imply a working shortcut that isn't (the "fake shortcut" anti-pattern
     // NAV_CHORD_HINTS above deliberately avoids for nav rows).
     for (const opt of quickAddOptions) {
-      if (!q || opt.label.toLowerCase().includes(q) || opt.key.includes(q)) {
-        out.push({
+      const score = scoreLabel(opt.label) ?? (opt.key.includes(q) ? WEAK_MATCH_SCORE : null);
+      if (score === null) continue;
+      entries.push({
+        score,
+        item: {
           id: `create:${opt.key}`,
           group: 'create',
           label: opt.label,
@@ -226,131 +284,85 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
             chooseQuickAdd(opt.key, navigate);
             onClose();
           },
-        });
-      }
+        },
+      });
     }
 
     for (const n of navTargets) {
-      if (!q || n.label.toLowerCase().includes(q)) {
-        out.push({
+      const score = scoreLabel(n.label);
+      if (score === null) continue;
+      entries.push({
+        score,
+        item: {
           id: `nav:${n.to}`,
           group: 'navigate',
           label: n.label,
           hint: n.hint,
           onSelect: () => selectNavTarget(n),
-        });
-      }
-    }
-
-    for (const c of matchCompanies(companies, q, ACCOUNT_RESULT_LIMIT)) {
-      const route = `/accounts/${encodeURIComponent(c.id)}`;
-      const subtitle = accountSubtitle(c);
-      out.push({
-        id: `account:${c.id}`,
-        group: 'account',
-        label: c.name,
-        hint: subtitle,
-        leading: <CompanyLogo name={c.name} logo={c.logo} domain={c.domain} size={18} />,
-        onSelect: () => {
-          pushRecent({
-            id: `account:${c.id}`,
-            group: 'account',
-            label: c.name,
-            ...(subtitle ? { hint: subtitle } : {}),
-            route,
-          });
-          navigate(route);
-          onClose();
         },
       });
     }
 
-    for (const p of matchContacts(contacts.data?.items ?? [], q, CONTACT_RESULT_LIMIT)) {
-      const route = `/contacts?search=${encodeURIComponent(p.name)}`;
-      const subtitle = contactSubtitle(p);
-      out.push({
-        id: `contact:${p.id}`,
-        group: 'contact',
-        label: p.name,
-        hint: subtitle,
-        onSelect: () => {
-          pushRecent({
-            id: `contact:${p.id}`,
-            group: 'contact',
-            label: p.name,
-            ...(subtitle ? { hint: subtitle } : {}),
-            route,
-          });
-          navigate(route);
-          onClose();
+    for (const { value: c, score } of matchCompanies(companies, q, ACCOUNT_RESULT_LIMIT)) {
+      pushNavigable(
+        score,
+        {
+          id: `account:${c.id}`,
+          group: 'account',
+          label: c.name,
+          hint: accountSubtitle(c),
+          leading: <CompanyLogo name={c.name} logo={c.logo} domain={c.domain} size={18} />,
         },
-      });
+        `/accounts/${encodeURIComponent(c.id)}`,
+        true,
+      );
     }
 
-    for (const t of matchTasks(tasks.data?.items ?? [], q, TASK_RESULT_LIMIT)) {
-      const route = `/tasks?search=${encodeURIComponent(t.title)}`;
-      const subtitle = taskSubtitle(t);
-      out.push({
-        id: `task:${t.id}`,
-        group: 'task',
-        label: t.title,
-        hint: subtitle,
-        onSelect: () => {
-          pushRecent({
-            id: `task:${t.id}`,
-            group: 'task',
-            label: t.title,
-            ...(subtitle ? { hint: subtitle } : {}),
-            route,
-          });
-          navigate(route);
-          onClose();
-        },
-      });
+    for (const { value: p, score } of matchContacts(
+      contacts.data?.items ?? [],
+      q,
+      CONTACT_RESULT_LIMIT,
+    )) {
+      pushNavigable(
+        score,
+        { id: `contact:${p.id}`, group: 'contact', label: p.name, hint: contactSubtitle(p) },
+        `/contacts?search=${encodeURIComponent(p.name)}`,
+        true,
+      );
     }
 
+    for (const { value: task, score } of matchTasks(tasks.data?.items ?? [], q, TASK_RESULT_LIMIT)) {
+      pushNavigable(
+        score,
+        { id: `task:${task.id}`, group: 'task', label: task.title, hint: taskSubtitle(task) },
+        `/tasks?search=${encodeURIComponent(task.title)}`,
+        true,
+      );
+    }
+
+    // Server searches matched on fields we may not display — keep every row
+    // (score-0 floor), but let label matches rank alongside local sources.
     for (const g of globalSearch.data?.items ?? []) {
-      out.push({
-        id: `search:${g.type}:${g.id}`,
-        group: g.type,
-        label: g.title,
-        hint: g.subtitle,
-        onSelect: () => {
-          pushRecent({
-            id: `search:${g.type}:${g.id}`,
-            group: g.type,
-            label: g.title,
-            hint: g.subtitle,
-            route: g.url,
-          });
-          navigate(g.url);
-          onClose();
-        },
-      });
+      pushNavigable(
+        q ? (fuzzyMatch(q, g.title)?.score ?? 0) : 0,
+        { id: `search:${g.type}:${g.id}`, group: g.type, label: g.title, hint: g.subtitle },
+        g.url,
+        true,
+      );
     }
 
     for (const o of oppSearch.data?.items ?? []) {
-      const route = `/opportunities/${o.id}`;
-      out.push({
-        id: `opp:${o.id}`,
-        group: 'opportunity',
-        label: `${o.code} — ${o.name}`,
-        hint: o.customer,
-        onSelect: () => {
-          pushRecent({
-            id: `opp:${o.id}`,
-            group: 'opportunity',
-            label: `${o.code} — ${o.name}`,
-            hint: o.customer,
-            route,
-          });
-          navigate(route);
-          onClose();
-        },
-      });
+      const label = `${o.code} — ${o.name}`;
+      pushNavigable(
+        q ? (fuzzyMatch(q, label)?.score ?? 0) : 0,
+        { id: `opp:${o.id}`, group: 'opportunity', label, hint: o.customer },
+        `/opportunities/${o.id}`,
+        true,
+      );
     }
 
-    return out;
+    // Rank by fuzzy + frecency (typed query only); wrap rows for recording.
+    return finalizePaletteItems(entries, q, frecency);
   }, [
     query,
     companies,
@@ -366,6 +378,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     contextualCommands,
     navTargets,
     quickAddOptions,
+    frecency,
     t,
   ]);
 

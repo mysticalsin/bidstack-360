@@ -25,7 +25,13 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
 
-import { groupAriaLabel, groupItemsByRun, groupTag, type Item } from './commandPaletteUtils';
+import {
+  fuzzyMatch,
+  groupAriaLabel,
+  groupItemsByRun,
+  groupTag,
+  type Item,
+} from './commandPaletteUtils';
 import { usePaletteItems } from './usePaletteItems';
 
 // ── Public component ─────────────────────────────────────────────────────────
@@ -307,12 +313,24 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
 // ── Inline JSX helpers (only used in this file, not worth a separate .tsx) ───
 
 function highlightText(text: string, query: string, active: boolean) {
-  if (!query) return <span>{text}</span>;
-  const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'gi'));
+  // Fuzzy indices (not a substring regex) so the highlight shows exactly the
+  // characters that earned the row its rank — an acronym match like "gtd" →
+  // "Go to Dashboard" renders three separate marks. No match (e.g. a server
+  // hit that matched on a hidden field) renders plain.
+  const match = query.trim() ? fuzzyMatch(query, text) : null;
+  if (!match) return <span>{text}</span>;
+  const matched = new Set(match.indices);
+  const runs: { chars: string; hit: boolean }[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const hit = matched.has(i);
+    const last = runs[runs.length - 1];
+    if (last && last.hit === hit) last.chars += text.charAt(i);
+    else runs.push({ chars: text.charAt(i), hit });
+  }
   return (
     <span>
-      {parts.map((part, i) =>
-        part.toLowerCase() === query.toLowerCase() ? (
+      {runs.map((run, i) =>
+        run.hit ? (
           <mark
             key={i}
             className={cn(
@@ -320,16 +338,12 @@ function highlightText(text: string, query: string, active: boolean) {
               active && 'bg-yellow-500/30 font-bold',
             )}
           >
-            {part}
+            {run.chars}
           </mark>
         ) : (
-          part
+          run.chars
         ),
       )}
     </span>
   );
-}
-
-function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

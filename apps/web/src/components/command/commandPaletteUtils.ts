@@ -1,8 +1,10 @@
 /**
- * commandPaletteUtils — pure types, constants, matchers, and formatters.
- * No React/JSX — safe to import from tests or server-only code.
+ * commandPaletteUtils — pure types, constants, matchers, ranking, and
+ * formatters. No React/JSX — safe to import from tests or server-only code.
  * `highlightText` (requires JSX) lives in CommandPalette.tsx because it is
  * only used there and is not worth a separate .tsx file.
+ * Fuzzy scoring lives in paletteFuzzy.ts, frecency in paletteFrecency.ts;
+ * this file composes them into the palette's match → rank pipeline.
  */
 import type { ReactNode } from 'react';
 import type { Contact, CrmCompany, Task } from '@bidstack/shared';
@@ -12,6 +14,9 @@ import {
   type NavModuleFlags,
   type NavSection,
 } from '@/components/layout/navConfig';
+
+import { canonicalPaletteId, frecencyBoost, recordPaletteSelection } from './paletteFrecency';
+import { fuzzyMatch } from './paletteFuzzy';
 
 // Per-section result caps keep the palette scannable on large tenants.
 // Cap each section independently so no single group dominates the list.
@@ -120,39 +125,114 @@ export function buildNavTargets(
   ];
 }
 
-// ── Substring matchers ───────────────────────────────────────────────────────
-// No fuzzy lib — cheap, predictable, and overkill-free for the dashboard lists.
+// ── Fuzzy matchers & ranking ─────────────────────────────────────────────────
+// Scoring model lives in paletteFuzzy.ts (pure, dependency-free); re-exported
+// here so palette consumers and tests keep one import surface.
+export { fuzzyMatch, type FuzzyMatch } from './paletteFuzzy';
 
-export function matchCompanies(companies: CrmCompany[], q: string, limit: number): CrmCompany[] {
-  if (!q) return companies.slice(0, limit);
-  const out: CrmCompany[] = [];
-  for (const c of companies) {
-    const haystack = [c.name, c.legalName ?? '', c.domain ?? ''].join('\n').toLowerCase();
-    if (haystack.includes(q)) out.push(c);
-    if (out.length >= limit) break;
-  }
-  return out;
+export interface ScoredResult<T> {
+  value: T;
+  score: number;
 }
 
-export function matchContacts(contacts: Contact[], q: string, limit: number): Contact[] {
-  if (!q) return [];
-  const out: Contact[] = [];
-  for (const c of contacts) {
-    const haystack = [c.name, c.email ?? '', c.role ?? '', c.customer].join('\n').toLowerCase();
-    if (haystack.includes(q)) out.push(c);
-    if (out.length >= limit) break;
+/** Best fuzzy score across an entity's searchable fields, or null when none
+ *  match — a domain/email hit must rank the row as well as a name hit
+ *  would, so we keep the max rather than a name-only score. */
+function bestFieldScore(q: string, fields: (string | null | undefined)[]): number | null {
+  let best: number | null = null;
+  for (const field of fields) {
+    if (!field) continue;
+    const m = fuzzyMatch(q, field);
+    if (m && (best === null || m.score > best)) best = m.score;
   }
-  return out;
+  return best;
 }
 
-export function matchTasks(tasks: Task[], q: string, limit: number): Task[] {
-  if (!q) return [];
-  const out: Task[] = [];
-  for (const t of tasks) {
-    if (t.title.toLowerCase().includes(q)) out.push(t);
-    if (out.length >= limit) break;
+function matchScored<T>(
+  values: T[],
+  fieldsOf: (value: T) => (string | null | undefined)[],
+  q: string,
+  limit: number,
+): ScoredResult<T>[] {
+  const scored: ScoredResult<T>[] = [];
+  for (const value of values) {
+    const score = bestFieldScore(q, fieldsOf(value));
+    if (score !== null) scored.push({ value, score });
   }
-  return out;
+  // Sort BEFORE capping — the old first-N-substring-hits approach could drop
+  // the best match entirely when a weak hit filled the cap first.
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+export function matchCompanies(
+  companies: CrmCompany[],
+  q: string,
+  limit: number,
+): ScoredResult<CrmCompany>[] {
+  if (!q) return companies.slice(0, limit).map((value) => ({ value, score: 0 }));
+  return matchScored(companies, (c) => [c.name, c.legalName, c.domain], q, limit);
+}
+
+export function matchContacts(
+  contacts: Contact[],
+  q: string,
+  limit: number,
+): ScoredResult<Contact>[] {
+  if (!q) return [];
+  return matchScored(contacts, (c) => [c.name, c.email, c.role, c.customer], q, limit);
+}
+
+export function matchTasks(tasks: Task[], q: string, limit: number): ScoredResult<Task>[] {
+  if (!q) return [];
+  return matchScored(tasks, (t) => [t.title], q, limit);
+}
+
+export interface RankedPaletteEntry {
+  item: Item;
+  score: number;
+}
+
+/** Stable descending sort — ties keep source insertion order (contextual →
+ *  create → nav → entities), which is what made the old fixed grouping feel
+ *  predictable. */
+export function rankPaletteItems(entries: readonly RankedPaletteEntry[]): Item[] {
+  return [...entries].sort((a, b) => b.score - a.score).map((entry) => entry.item);
+}
+
+/**
+ * Final assembly for the palette list: boost text scores with frecency and
+ * rank (only when a query is typed — the empty-query palette keeps its
+ * curated section order), then wrap every row's onSelect so repeat
+ * selections accrue frecency for future opens.
+ */
+export function finalizePaletteItems(
+  entries: readonly RankedPaletteEntry[],
+  q: string,
+  frecency: ReadonlyMap<string, number>,
+): Item[] {
+  const ranked = q
+    ? rankPaletteItems(
+        entries.map(({ item, score }) => ({
+          item,
+          score: score + frecencyBoost(frecency.get(canonicalPaletteId(item.id)) ?? 0),
+        })),
+      )
+    : entries.map((entry) => entry.item);
+  return ranked.map(withSelectionRecording);
+}
+
+/** Nav rows are deliberately excluded — selectNavTarget records those itself
+ *  so the Enter-to-exact-route shortcut (which bypasses the items list
+ *  entirely) still counts toward frecency without double-counting clicks. */
+function withSelectionRecording(item: Item): Item {
+  if (item.id.startsWith('nav:')) return item;
+  return {
+    ...item,
+    onSelect: () => {
+      recordPaletteSelection(canonicalPaletteId(item.id));
+      item.onSelect();
+    },
+  };
 }
 
 // ── Subtitle formatters ──────────────────────────────────────────────────────
