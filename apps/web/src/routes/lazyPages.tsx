@@ -77,6 +77,8 @@ export const PipelinePage = lazy(() =>
 export const ForecastsPage = lazy(() =>
   import('@/pages/ForecastsPage').then((m) => ({ default: m.ForecastsPage })),
 );
+// Default export — no .then() reshaping needed.
+export const WinLossPage = lazy(() => import('@/pages/WinLossPage'));
 export const SalesToolkitsPage = lazy(() => import('@/pages/SalesToolkitsPage'));
 export const SectorViewPage = lazy(() => import('@/pages/SectorViewPage'));
 export const CrossSellPage = lazy(() => import('@/pages/CrossSellPage'));

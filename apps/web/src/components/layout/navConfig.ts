@@ -62,6 +62,9 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'dollar',
     items: [
       { to: '/forecasts', label: 'Forecasts', labelKey: 'nav.forecasts', icon: 'growth' },
+      // 'reports' is otherwise unused in the rail, so the collapsed icon-only
+      // mode keeps Win/Loss distinguishable from Forecasts ('growth').
+      { to: '/win-loss', label: 'Win/Loss Review', labelKey: 'nav.winLoss', icon: 'reports' },
       { to: '/sales-toolkits', label: 'Sales Toolkits', labelKey: 'nav.salesToolkits', icon: 'book' },
     ],
   },

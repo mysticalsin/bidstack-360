@@ -56,6 +56,7 @@ import {
   TasksPage,
   TerritoriesPage,
   TopAccountsPage,
+  WinLossPage,
   PublicSignPage,
   PublicBookingPage,
 } from './lazyPages';
@@ -283,6 +284,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <SalesToolkitsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/win-loss"
+            element={
+              <RequireAuth>
+                <WinLossPage />
               </RequireAuth>
             }
           />

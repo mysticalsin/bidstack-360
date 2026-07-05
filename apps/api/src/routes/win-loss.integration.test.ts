@@ -1,4 +1,6 @@
 // Integration tests for win/loss reason capture + pattern flagging.
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
@@ -97,6 +99,60 @@ describe('win/loss routes', () => {
     expect(body.totalLost).toBeGreaterThanOrEqual(1);
     expect(body.topLossReason).not.toBeNull();
     expect(body.rows.some((r) => r.outcome === 'lost')).toBe(true);
+  });
+
+  t('analysis buckets by quarter, breaks down reasons, and lists the closed bid', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/win-loss/analysis' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      totalWon: number;
+      totalLost: number;
+      winRatePct: number | null;
+      quarters: { quarter: string; won: number; lost: number }[];
+      reasons: { reason: string; won: number; lost: number }[];
+      recent: { opportunityId: string; name: string; decidedAt: string }[];
+    };
+    expect(body.totalLost).toBeGreaterThanOrEqual(1);
+    expect(body.winRatePct).not.toBeNull();
+    // Quarter buckets must account for every closed record — the trend chart
+    // is wrong if the buckets and the totals disagree.
+    const bucketSum = body.quarters.reduce((s, q) => s + q.won + q.lost, 0);
+    expect(bucketSum).toBe(body.totalWon + body.totalLost);
+    expect(body.quarters.every((q) => /^\d{4}-Q[1-4]$/.test(q.quarter))).toBe(true);
+    // The loss recorded above (reason re-upserted to "timing") shows in the
+    // reason breakdown and the recent closed table deep-link payload.
+    expect(body.reasons.some((r) => r.reason === 'timing' && r.lost >= 1)).toBe(true);
+    expect(body.recent.some((r) => r.opportunityId === oppId && r.name === 'WL deal')).toBe(true);
+  });
+
+  t('analysis owner + date filters scope the aggregate (org-scoped, no leakage)', async () => {
+    // A random owner uuid matches nothing — filters must reach through the
+    // opportunity join, not silently return the unfiltered aggregate.
+    const owned = await server.inject({
+      method: 'GET',
+      url: `/api/win-loss/analysis?ownerId=${randomUUID()}`,
+    });
+    expect(owned.statusCode).toBe(200);
+    const ownedBody = owned.json() as { totalWon: number; totalLost: number; recent: unknown[] };
+    expect(ownedBody.totalWon + ownedBody.totalLost).toBe(0);
+    expect(ownedBody.recent).toHaveLength(0);
+
+    // A future-only date range excludes today's record.
+    const future = await server.inject({
+      method: 'GET',
+      url: '/api/win-loss/analysis?from=2099-01-01&to=2099-12-31',
+    });
+    expect(future.statusCode).toBe(200);
+    const futureBody = future.json() as { totalWon: number; totalLost: number; winRatePct: number | null };
+    expect(futureBody.totalWon + futureBody.totalLost).toBe(0);
+    expect(futureBody.winRatePct).toBeNull();
+
+    // Malformed date rejected by schema, not treated as "no filter".
+    const bad = await server.inject({
+      method: 'GET',
+      url: '/api/win-loss/analysis?from=01-01-2099',
+    });
+    expect(bad.statusCode).toBe(400);
   });
 
   t('recording against another org’s opportunity 404s (tenant guard)', async () => {
