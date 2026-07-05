@@ -72,7 +72,10 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'building',
     items: [
       { to: '/accounts', label: 'Accounts', labelKey: 'nav.accounts', icon: 'building' },
-      { to: '/kam', label: 'Key Account Mgmt', labelKey: 'nav.kam', icon: 'target' },
+      // "KAM Initiatives", not "Key Account Mgmt": the old label sat one row
+      // above "Key Accounts" (an unrelated leaderboard) and read as the same
+      // feature — the label itself must disambiguate the initiative workflow.
+      { to: '/kam', label: 'KAM Initiatives', labelKey: 'nav.kam', icon: 'target' },
       { to: '/key-accounts', label: 'Key Accounts', labelKey: 'nav.keyAccounts', icon: 'star' },
       { to: '/top-accounts', label: 'Top Accounts', labelKey: 'nav.topAccounts', icon: 'trophy' },
       { to: '/companies', label: 'Companies', labelKey: 'nav.companies', icon: 'list' },

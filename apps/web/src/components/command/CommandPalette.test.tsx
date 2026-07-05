@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './CommandPalette';
 import { QuickAddMenu } from '@/components/quickadd/QuickAddMenu';
 import { useAppModules } from '@/hooks/useAppModules';
+import { api } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
 import { useQuickAddStore } from '@/stores/quickAdd';
 import type { AppModules, CrmCompany } from '@bidstack/shared';
@@ -134,6 +135,16 @@ function renderPaletteWithQuickAdd(onOpenChange: (open: boolean) => void = () =>
   );
 }
 
+// Manually-settled promise so a test can control the exact order in which the
+// palette's two independent server searches resolve.
+function deferredResponse() {
+  let resolve!: (value: unknown) => void;
+  const promise = new Promise<unknown>((res) => {
+    resolve = res;
+  });
+  return { resolve, promise };
+}
+
 afterEach(() => {
   // vitest.config.ts runs with `globals: false`, so testing-library's
   // automatic afterEach-cleanup never registers — without this, each test's
@@ -193,10 +204,10 @@ describe('CommandPalette — nav targets derived from NAV_SECTIONS', () => {
     mockAppModules({});
     renderPalette();
 
-    // /kam ("Key Account Mgmt") has no featureKey — it is unconditionally
+    // /kam ("KAM Initiatives") has no featureKey — it is unconditionally
     // visible — and was NOT one of the ~30 hand-copied NAV_TARGETS entries,
     // so its presence proves the list is now generated, not hand-maintained.
-    expect(screen.queryByText('Go to Key Account Mgmt')).not.toBeNull();
+    expect(screen.queryByText('Go to KAM Initiatives')).not.toBeNull();
   });
 
   // Review finding: /audit-log is a PALETTE_ONLY_TARGETS entry (it has no
@@ -263,5 +274,77 @@ describe('CommandPalette — Create action group', () => {
     const group = option?.closest('[role="group"]');
     expect(group).not.toBeNull();
     expect(group?.getAttribute('aria-label')).toBe('Create');
+  });
+});
+
+// Review finding: the palette merges TWO debounced server searches
+// (opportunities + global search) into one flat list, but only reported
+// oppSearch.isFetching. When the opportunity search resolved empty while the
+// global search (leads/contacts/companies/tasks/notes) was still in flight,
+// the empty state flashed "No matches." — a false negative on the app's
+// primary discovery surface — before flipping to real results moments later.
+describe('CommandPalette — loading state while server searches are pending', () => {
+  afterEach(() => {
+    vi.mocked(api).mockImplementation(async () => ({ items: [] }));
+  });
+
+  it('keeps "Searching…" up until the global search settles, even after the opportunity search resolves empty', async () => {
+    mockAppModules({});
+    const oppRequest = deferredResponse();
+    const globalRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) =>
+      path.startsWith('/api/search') ? globalRequest.promise : oppRequest.promise,
+    );
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+          <CommandPalette open={true} onOpenChange={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    // "zzgap" matches nothing local (companies/nav/create rows), so the list
+    // stays empty until a server search returns — the exact flash window.
+    fireEvent.change(input, { target: { value: 'zzgap' } });
+
+    // Both debounced (200ms) server queries fire once the user pauses typing.
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search'),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText('Searching…')).toBeTruthy();
+
+    // Opportunity search lands first with zero matches; global search is
+    // still in flight — the palette must NOT claim "No matches." yet.
+    oppRequest.resolve({ items: [] });
+    await waitFor(() =>
+      expect(client.getQueryState(['palette:opps', 'zzgap'])?.fetchStatus).toBe('idle'),
+    );
+    expect(screen.getByText('Searching…')).toBeTruthy();
+    expect(screen.queryByText('No matches.')).toBeNull();
+
+    // Once the global search settles, its results render — proving the
+    // empty-state verdict waited for every server source feeding the list.
+    globalRequest.resolve({
+      items: [
+        {
+          id: 'lead_1',
+          type: 'lead',
+          title: 'Globex Industries',
+          subtitle: 'Lead — Globex',
+          url: '/leads/lead_1',
+          score: 1,
+        },
+      ],
+      total: 1,
+      query: 'zzgap',
+    });
+    await screen.findByText('Globex Industries');
+    expect(screen.queryByText('Searching…')).toBeNull();
   });
 });

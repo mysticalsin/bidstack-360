@@ -171,6 +171,12 @@ export function ApiKeysSection() {
                       <div className="text-xs font-semibold text-[var(--fg-secondary)]">
                         {t('apiKeys.scopeGroup.mcp', 'MCP')}
                       </div>
+                      {/* Deliberately NO defaultChecked on any scope (here or
+                          in the REST ScopeGroups below): new keys start
+                          least-privilege. read+mcp used to be pre-ticked,
+                          which silently over-scoped every key created for
+                          REST-only callers — see ApiKeysSection.test.tsx,
+                          which pins the all-unchecked default. */}
                       {MCP_SCOPES.map((s) => (
                         <label key={s} className="flex items-start gap-2 text-sm">
                           <input

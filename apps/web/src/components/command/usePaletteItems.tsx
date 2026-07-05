@@ -374,5 +374,14 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     [navTargets],
   );
 
-  return { items, isFetching: oppSearch.isFetching, selectNavTarget, findDirectNavTarget };
+  // Both server searches feed the merged items list, so loading must reflect
+  // BOTH — reporting only oppSearch here made the palette flash "No matches."
+  // whenever the opportunity search resolved empty while the global search
+  // was still in flight (false negative on the app's main discovery surface).
+  return {
+    items,
+    isFetching: oppSearch.isFetching || globalSearch.isFetching,
+    selectNavTarget,
+    findDirectNavTarget,
+  };
 }

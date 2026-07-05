@@ -93,6 +93,29 @@ describe('PipelineCard overdue affordance', () => {
     // The accessible name carries the state for screen readers.
     const link = screen.getByRole('link');
     expect(link.getAttribute('aria-label')).toContain(', overdue');
+
+    // The red tint accompanies the text cue — asserting it here anchors the
+    // class name the due-today test below relies on being absent.
+    expect(link.className).toContain('border-red-300/40');
+  });
+
+  it('agrees with the DueDateChip for an opportunity due today: warning, not overdue', () => {
+    // "Due today" is the boundary the old raw `new Date(dueDate) < new Date()`
+    // comparison got wrong: it tinted the card red and appended ", overdue"
+    // for the entire due day while the chip (UTC-day-bucketed) read "Due
+    // today" in amber. Contradictory urgency signals on the same card are
+    // exactly the deadline-slippage confusion this feature exists to prevent,
+    // so the tint and accessible name must follow the chip's calculation.
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    renderCard({ ...BASE_OPP, dueDate: todayUtc });
+
+    // The chip's own signal for today...
+    expect(screen.getByText(/due today/i)).toBeDefined();
+    // ...and no overdue signal anywhere: visible text, accessible name, tint.
+    expect(screen.queryByText(/overdue/i)).toBeNull();
+    const link = screen.getByRole('link');
+    expect(link.getAttribute('aria-label')).not.toContain(', overdue');
+    expect(link.className).not.toContain('border-red-300/40');
   });
 
   it('omits the overdue cue and suffix when the opportunity is not past due', () => {

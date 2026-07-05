@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
-import { DueDateChip } from '@/components/ui/DueDateChip';
+import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout } from '@/lib/motion';
@@ -41,9 +41,11 @@ export const PipelineCard = memo(function PipelineCard({
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
+  // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
+  // compare, which flagged "due today" as overdue for the whole day while the
+  // DueDateChip below said "Due today". Tint/aria-label must agree with the chip.
   const isStalled =
-    opp.dueDate != null &&
-    new Date(opp.dueDate) < new Date() &&
+    dueDateUrgency(opp.dueDate).urgency === 'danger' &&
     stageName !== 'Closed Won' &&
     stageName !== 'Closed Lost';
 

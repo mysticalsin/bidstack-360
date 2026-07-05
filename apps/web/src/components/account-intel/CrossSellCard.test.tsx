@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CrossSellCard } from './CrossSellCard';
 import type { CrossSellAction } from '@bidstack/shared';
@@ -7,6 +7,9 @@ import type { CrossSellAction } from '@bidstack/shared';
 const hookMocks = vi.hoisted(() => ({
   actions: [] as CrossSellAction[],
   patchMutate: vi.fn(),
+  patchIsPending: false,
+  patchVariables: undefined as { id: string } | undefined,
+  canWrite: false,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -19,7 +22,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/hooks/useCapabilities', () => ({
-  useHasPermission: () => false,
+  useHasPermission: () => hookMocks.canWrite,
 }));
 
 vi.mock('@/hooks/useUsers', () => ({
@@ -35,7 +38,8 @@ vi.mock('@/hooks/useCrossSell', () => ({
   }),
   usePatchCrossSellAction: () => ({
     mutate: hookMocks.patchMutate,
-    isPending: false,
+    isPending: hookMocks.patchIsPending,
+    variables: hookMocks.patchVariables,
   }),
   useCreateCrossSellAction: () => ({
     mutate: vi.fn(),
@@ -57,6 +61,22 @@ const action: CrossSellAction = {
   createdAt: '2026-06-01T10:00:00.000Z',
   updatedAt: '2026-06-03T12:00:00.000Z',
 };
+
+const secondAction: CrossSellAction = {
+  ...action,
+  id: '22222222-2222-4222-8222-222222222222',
+  description: 'Introduce cybersecurity offer to UK account team',
+  requestingUnit: 'Germany',
+  assignedUnit: 'UK',
+};
+
+beforeEach(() => {
+  cleanup();
+  hookMocks.actions = [];
+  hookMocks.patchIsPending = false;
+  hookMocks.patchVariables = undefined;
+  hookMocks.canWrite = false;
+});
 
 describe('CrossSellCard trust cues', () => {
   it('shows manual and audit provenance cues with a 44px status target', () => {
@@ -84,5 +104,26 @@ describe('CrossSellCard trust cues', () => {
     );
     expect(screen.getByTestId(`cross-sell-${action.id}-status`).className).toContain('min-h-11');
     expect(screen.getByTestId(`cross-sell-${action.id}-status`).className).toContain('min-w-11');
+  });
+
+  it('scopes the busy state to the row being patched so other rows stay actionable', () => {
+    // WHY: the card shares one mutation object across every row. If its
+    // pending flag is passed unscoped, patching action A disables and
+    // relabels B's button "updating..." — misrepresenting per-action state
+    // in a governance feature whose whole point is who-owns-what accuracy.
+    hookMocks.actions = [action, secondAction];
+    hookMocks.canWrite = true;
+    hookMocks.patchIsPending = true;
+    hookMocks.patchVariables = { id: action.id };
+
+    render(<CrossSellCard accountKey="mantu" />);
+
+    const busyButton = screen.getByTestId(`cross-sell-${action.id}-status`);
+    expect(busyButton.hasAttribute('disabled')).toBe(true);
+    expect(busyButton.textContent).toContain('updating...');
+
+    const idleButton = screen.getByTestId(`cross-sell-${secondAction.id}-status`);
+    expect(idleButton.hasAttribute('disabled')).toBe(false);
+    expect(idleButton.textContent).toContain('Start');
   });
 });

@@ -114,10 +114,13 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                     </p>
                     <ActionAuditBadges action={action} />
                   </div>
+                  {/* One mutation object serves every row: scope pending state
+                      to the action being patched (same pattern as CrossSellPage)
+                      so other rows do not falsely read as updating. */}
                   <CrossSellStatusControls
                     action={action}
                     canWrite={canWrite}
-                    isBusy={patch.isPending}
+                    isBusy={patch.isPending && patch.variables?.id === action.id}
                     align="end"
                     className="shrink-0"
                     onStatusChange={(next) => {
