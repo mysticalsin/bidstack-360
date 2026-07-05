@@ -118,7 +118,7 @@ export function WebhooksSection() {
           title={t('webhooks.readinessSignedTitle', 'Signed by default')}
           body={t(
             'webhooks.readinessSignedBody',
-            'Every delivery includes X-BidStack-Signature with a timestamped HMAC.',
+            'Every delivery includes X-Polo-Signature with a timestamped HMAC.',
           )}
           status={t('webhooks.readinessStatusRequired', 'Required')}
           tone="jade"

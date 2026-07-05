@@ -433,8 +433,10 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'X-Polo-Signature': signature,
+              // Legacy header kept during the rebrand deprecation window.
               'X-BidStack-Signature': signature,
-              'User-Agent': 'BidStack-Webhooks/1.0',
+              'User-Agent': 'PoloPreSales-Webhooks/1.0',
             },
             body: pingBody,
             signal: controller.signal,

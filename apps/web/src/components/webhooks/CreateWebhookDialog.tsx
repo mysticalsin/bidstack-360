@@ -212,7 +212,7 @@ export function CreateWebhookDialog({
               <ul className="mt-3 space-y-2 text-xs leading-5 text-[var(--fg-secondary)]">
                 <li>{t('createWebhook.securityReturn2xx', 'Return a 2xx status within 10 seconds.')}</li>
                 <li>
-                  {t('createWebhook.securityVerifyHeader', 'Verify the X-BidStack-Signature header.')}
+                  {t('createWebhook.securityVerifyHeader', 'Verify the X-Polo-Signature header.')}
                 </li>
                 <li>
                   {t('createWebhook.securityRejectOld', 'Reject signatures older than 5 minutes.')}

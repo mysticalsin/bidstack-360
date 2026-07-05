@@ -111,7 +111,11 @@ describe('processDeliveryJob — HMAC signature contract', () => {
     expect(mocks.safeFetch).toHaveBeenCalledTimes(1);
     const [, init] = mocks.safeFetch.mock.calls[0]!;
     const sentBody = init.body as string;
-    const header = (init.headers as Record<string, string>)['X-BidStack-Signature'];
+    const headers = init.headers as Record<string, string>;
+    const header = headers['X-Polo-Signature'];
+    // Rebrand deprecation window: the legacy header must carry the identical
+    // signature so partners verifying against either name keep working.
+    expect(headers['X-BidStack-Signature']).toBe(header);
 
     const m = header.match(/^t=(\d+),v1=([0-9a-f]+)$/);
     expect(m).not.toBeNull();

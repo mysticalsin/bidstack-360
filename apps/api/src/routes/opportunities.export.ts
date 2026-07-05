@@ -90,7 +90,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       const stream = new PassThrough();
       reply
         .type('text/csv; charset=utf-8')
-        .header('Content-Disposition', `attachment; filename="bidstack-opportunities-${stamp}.csv"`)
+        .header('Content-Disposition', `attachment; filename="polo-presales-opportunities-${stamp}.csv"`)
         .header('Cache-Control', 'no-store');
 
       const writeExport = async () => {

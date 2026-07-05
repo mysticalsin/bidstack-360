@@ -302,7 +302,7 @@ export function OpportunitiesPage() {
     const stamp = new Date().toISOString().slice(0, 10);
     setIsExporting(true);
     try {
-      await downloadFromApi('/api/opportunities/export', `bidstack-opportunities-${stamp}.csv`, {
+      await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
         // Mirror the list query's stage branching: a configured stage is a UUID
         // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
         // legacy enum as pipelineStageId 400s the export.

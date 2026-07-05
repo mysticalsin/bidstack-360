@@ -156,7 +156,7 @@
     "metricNone": "无",
     "metricLive": "实时",
     "readinessSignedTitle": "默认签名",
-    "readinessSignedBody": "每次投递都包含带时间戳 HMAC 的 X-BidStack-Signature。",
+    "readinessSignedBody": "每次投递都包含带时间戳 HMAC 的 X-Polo-Signature。",
     "readinessStatusRequired": "必需",
     "readinessBudgetTitle": "10 秒接收方预算",
     "readinessBudgetBody": "快速确认，然后异步处理。非 2xx 响应会被重试。",

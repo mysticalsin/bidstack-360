@@ -84,7 +84,7 @@
     "metricNone": "None",
     "metricLive": "Live",
     "readinessSignedTitle": "Signed by default",
-    "readinessSignedBody": "Every delivery includes X-BidStack-Signature with a timestamped HMAC.",
+    "readinessSignedBody": "Every delivery includes X-Polo-Signature with a timestamped HMAC.",
     "readinessStatusRequired": "Required",
     "readinessBudgetTitle": "10 second receiver budget",
     "readinessBudgetBody": "Acknowledge fast, then process asynchronously. Non-2xx responses are retried.",

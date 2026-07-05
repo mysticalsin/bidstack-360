@@ -237,7 +237,7 @@ export function ContactsPage() {
       { key: 'createdAt', label: t('contacts.column.createdAt', 'Created at') },
     ]);
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`bidstack-contacts-${stamp}`, csv);
+    downloadCsv(`polo-presales-contacts-${stamp}`, csv);
     toast.success(
       t('contacts.toast.exportedCount', 'Exported {{count}} contacts', { count: rows.length }),
     );

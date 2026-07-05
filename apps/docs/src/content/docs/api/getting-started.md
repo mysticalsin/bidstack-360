@@ -124,12 +124,12 @@ No official SDK yet. All endpoints follow OpenAPI 3.0 — generate a typed clien
 
 ```bash
 # Node.js (openapi-typescript)
-npx openapi-typescript https://api.bidstack.mantu.com/api/openapi.json -o ./bidstack-api.d.ts
+npx openapi-typescript https://api.bidstack.mantu.com/api/openapi.json -o ./polo-presales-api.d.ts
 
 # Python (openapi-generator)
 openapi-generator-cli generate \
   -i https://api.bidstack.mantu.com/api/openapi.json \
-  -g python -o ./bidstack-python-client
+  -g python -o ./polo-presales-python-client
 ```
 
 Download the spec directly: `GET /api/openapi.json` or `GET /api/openapi.yaml`.

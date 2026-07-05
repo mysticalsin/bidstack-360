@@ -185,7 +185,7 @@ async function freshDownloadUrl(row: TenantExport): Promise<string | null> {
   const storage = await getStorage();
   if (storage.driver === 's3') {
     const result = await storage.getDownload(row.storageKey, {
-      filename: `bidstack-export-${row.id}.ndjson.gz`,
+      filename: `polo-presales-export-${row.id}.ndjson.gz`,
       contentType: 'application/gzip',
     });
     return result.url ?? null;

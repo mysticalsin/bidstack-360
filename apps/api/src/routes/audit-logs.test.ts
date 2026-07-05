@@ -189,7 +189,7 @@ describe('GET /api/audit-logs', () => {
     expect(res.headers['content-type']).toContain(
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    expect(res.headers['content-disposition']).toContain('bidstack-audit-log-');
+    expect(res.headers['content-disposition']).toContain('polo-presales-audit-log-');
 
     const xlsx = require('@e965/xlsx') as XlsxModule;
     const workbook = xlsx.read(Buffer.from(res.rawPayload), { type: 'buffer' });

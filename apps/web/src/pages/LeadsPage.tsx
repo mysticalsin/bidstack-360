@@ -170,7 +170,7 @@ export function LeadsPage() {
         { key: 'createdAt', label: t('leads.csv.created', 'Created') },
       ],
     );
-    downloadCsv(`bidstack-leads-${new Date().toISOString().slice(0, 10)}`, csv);
+    downloadCsv(`polo-presales-leads-${new Date().toISOString().slice(0, 10)}`, csv);
     toast.success(
       t('leads.toast.exported', 'Exported {{count}} lead', { count: bulk.selectedItems.length }),
     );
@@ -238,7 +238,7 @@ export function LeadsPage() {
                   { key: 'createdAt', label: t('leads.csv.created', 'Created') },
                 ],
               );
-              downloadCsv(`bidstack-leads-${new Date().toISOString().slice(0, 10)}`, csv);
+              downloadCsv(`polo-presales-leads-${new Date().toISOString().slice(0, 10)}`, csv);
               toast.success(
                 t('leads.toast.exported', 'Exported {{count}} lead', { count: items.length }),
               );

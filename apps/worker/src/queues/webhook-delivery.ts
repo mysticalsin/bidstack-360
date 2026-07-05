@@ -8,8 +8,10 @@
  * callers enqueue one job per matching active subscription.
  *
  * Signature format (matches /docs/api/webhooks.md):
- *   X-BidStack-Signature: t=<unix-seconds>,v1=<hmac-sha256-hex>
+ *   X-Polo-Signature: t=<unix-seconds>,v1=<hmac-sha256-hex>
  *   where the HMAC covers the string `${t}.${rawJsonBody}`.
+ *   The legacy X-BidStack-Signature header carries the same value during the
+ *   rebrand deprecation window so existing receivers keep verifying.
  *
  * Retry schedule (configured in queue-config.ts WEBHOOK_DELIVERY):
  *   attempt 1: immediate
@@ -143,8 +145,10 @@ async function deliver(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Polo-Signature': signature,
+          // Legacy header kept during the rebrand deprecation window.
           'X-BidStack-Signature': signature,
-          'User-Agent': 'BidStack-Webhooks/1.0',
+          'User-Agent': 'PoloPreSales-Webhooks/1.0',
         },
         body,
         signal: controller.signal,

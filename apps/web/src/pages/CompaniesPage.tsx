@@ -138,7 +138,7 @@ export function CompaniesPage() {
         { key: 'countryCode', label: 'Country' },
       ],
     );
-    downloadCsv(`bidstack-companies-${new Date().toISOString().slice(0, 10)}`, csv);
+    downloadCsv(`polo-presales-companies-${new Date().toISOString().slice(0, 10)}`, csv);
     toast.success(
       bulk.selectedItems.length === 1
         ? t('companies.toast.exportedOne', 'Exported {{count}} company', {

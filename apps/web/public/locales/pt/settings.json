@@ -156,7 +156,7 @@
     "metricNone": "Nenhum",
     "metricLive": "Ativo",
     "readinessSignedTitle": "Assinado por padrão",
-    "readinessSignedBody": "Cada entrega inclui X-BidStack-Signature com um HMAC com carimbo de data/hora.",
+    "readinessSignedBody": "Cada entrega inclui X-Polo-Signature com um HMAC com carimbo de data/hora.",
     "readinessStatusRequired": "Obrigatório",
     "readinessBudgetTitle": "Orçamento de receptor de 10 segundos",
     "readinessBudgetBody": "Confirme rapidamente e depois processe de forma assíncrona. Respostas diferentes de 2xx são repetidas.",
