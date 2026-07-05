@@ -4,6 +4,27 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-05 (pm) — Finish-everything wave: features, live-bug fixes, anti-slop
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode, Fable plan/review + Sonnet swarm (6 builders; session limit hit mid-wave — 2 returned clean, 4 completed work + tests but died on final return, all salvaged).
+
+**Live bugs the user reported, fixed + browser-verified:**
+- **"Couldn't load opportunities"** — environmental (local API was down / port 4000 shadowed by a foreign FastAPI); on a healthy stack `/api/v1/opportunities` returns 200, zero console errors. No code defect. Documented dev-port setup: web 38081, api `PORT_API=4100`.
+- **Text overlapping** — the dashboard workspace-metric cards overflowed the big KPI number on top of the inline sparkline at laptop widths (1366/1440): the inline `icon|number|signal` layout switched on *viewport* ≥960px but the grid stayed 6-across until 1280px, so cramped ~160px cards collided. Fixed with a container query (stacks the sparkline when the card itself is narrow) + a 6→3 column breakpoint at 1560px. Verified overlap-free at 1366 and 1792.
+
+**Features shipped (all wired + live-verified):**
+- **⌘K AI Copilot** (GOAL Phase 5): sentence / leading-`?` switches the palette into Copilot running the existing ai-assistant actions (draft email, summarize intel, deal sentiment, meeting prep), each context-gated with disable hints. Additive — fuzzy/frecency/recents/a11y preserved.
+- **Saved views on all core lists** (was Tasks-only): generalized SavedViewsBar on Opportunities/Leads/Companies/Contacts, per-surface namespaced presets.
+- **Team Workload / capacity view** (`/analytics/workload` + `/workload`): per-owner live bids, weighted pipeline, overdue tasks, closing-≤7d, capacity flags (Over capacity/Stretched/Can take a bid), unassigned-bids row.
+- **Duplicate detect + merge** (`/duplicates/{companies,contacts}` + `/duplicates/merge`): normalized-name/domain/email clustering, survivor-choice FK re-point + soft-delete in one audited tx, Find-duplicates dialog on Companies/Contacts.
+- **Anti-slop dark-mode/token pass** (2 lanes, 22 files): every status/score chip + several pages moved off light-only / non-existent `--color-*` tokens (which rendered transparent in dark) to real `--fg-*/--surface-*/--border-*`; one coherent chip system.
+
+**Verified:** typecheck 12/12 · lint clean (one justified `react-hooks/refs` disable — callback reads refs only in an onSelect handler) · salvaged feature tests 46 green (29 web + 17 api) · live browser walk: dashboard overlap fixed, `gtd`→Dashboard fuzzy, Copilot actions, Workload table, Duplicates dialog, Companies/Contacts/Leads lists all clean, zero console errors.
+
+**Deferred + flagged (need Tony / migration / bigger refactor):** proposal revision history (needs a `ProposalRevision` migration + live-DB handoff); account-surface deep merge (Accounts/Key/Top/KAM = 4 doors — destructive product call, kept reversible); Sector View ↔ Territories merge; Opportunities/Pipeline single implementation; `?`-copilot-prefix collides with the global `?` help-drawer shortcut (minor); saved views are localStorage-backed (server SavedView API exists for cross-device/share as a follow-up); test-data junk names (KAMDraft-*, SCOPE-*) visible in the Companies list on the demo org.
+
+---
+
 ## 2026-07-05 — "Best CRM" audit + fix + wow program (two-wave swarm)
 
 **Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode, 42-agent Sonnet/Fable swarm (8-lens audit → adversarial verify → 13 fixers → 7 builders), 13 commits.
