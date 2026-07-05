@@ -13,7 +13,8 @@
  *   - Bars have aria-valuenow.
  *   - prefers-reduced-motion: bars appear instantly, no transition.
  *
- * Dark mode: all colors via CSS variables + Tailwind dark: prefix.
+ * Dark mode: theme tokens only (--fg-*, --surface-*, --border-*, --success,
+ * --danger) — every color resolves in both themes from index.css.
  */
 
 import { useTranslation } from 'react-i18next';
@@ -72,7 +73,7 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
     <li className="flex items-center gap-3 text-sm py-1">
       {/* Label */}
       <span
-        className="w-40 flex-shrink-0 text-right text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)] truncate"
+        className="w-40 flex-shrink-0 text-right text-[var(--fg-secondary)] truncate"
         title={featureLabel(factor.feature, t)}
       >
         {featureLabel(factor.feature, t)}
@@ -81,15 +82,13 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
       {/* Bidirectional bar */}
       <div className="flex-1 flex items-center h-5 relative" aria-hidden="true">
         {/* Center line */}
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[var(--color-border)] dark:bg-[var(--color-border-dark)]" />
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[var(--border-default)]" />
 
         {/* Bar segment */}
         <div
           className={[
             'absolute top-1 bottom-1 rounded transition-all',
-            positive
-              ? 'left-1/2 bg-emerald-500 dark:bg-emerald-400'
-              : 'right-1/2 bg-red-500 dark:bg-red-400',
+            positive ? 'left-1/2 bg-[var(--success)]' : 'right-1/2 bg-[var(--danger)]',
             'motion-reduce:transition-none',
           ].join(' ')}
           style={{ width: `${widthPct / 2}%` }}
@@ -104,9 +103,7 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
         })}
         className={[
           'w-12 text-right tabular-nums font-mono text-xs flex-shrink-0',
-          positive
-            ? 'text-emerald-700 dark:text-emerald-300'
-            : 'text-red-700 dark:text-red-300',
+          positive ? 'text-[var(--success-fg)]' : 'text-[var(--fg-error)]',
         ].join(' ')}
       >
         {positive ? '+' : ''}{(factor.contribution * 100).toFixed(1)}
@@ -127,9 +124,9 @@ function PanelSkeleton() {
     >
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">
-          <div className="h-4 w-36 bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] rounded" />
-          <div className="flex-1 h-4 bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] rounded" />
-          <div className="h-4 w-10 bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] rounded" />
+          <div className="h-4 w-36 bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] rounded" />
+          <div className="flex-1 h-4 bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] rounded" />
+          <div className="h-4 w-10 bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] rounded" />
         </div>
       ))}
     </div>
@@ -184,19 +181,19 @@ function PanelContent({
   const maxAbs = top5.reduce((m, f) => Math.max(m, Math.abs(f.contribution)), 0.01);
 
   return (
-    <section className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-elevated)] p-4">
+    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)]">
+        <h3 className="font-semibold text-sm text-[var(--fg-primary)]">
           {t('scoreFactors.title', 'ML Score Analysis')}
         </h3>
-        <span className="text-xs text-[var(--color-neutral-500)]">{label}: {score}</span>
+        <span className="text-xs text-[var(--fg-muted)]">{label}: {score}</span>
       </div>
 
       {/* Recommendation */}
       {recommendation && (
-        <div className="mb-4 p-3 rounded-lg bg-[var(--color-neutral-50)] dark:bg-[var(--color-neutral-800)] border border-[var(--color-border)] dark:border-[var(--color-border-dark)]">
-          <p className="text-sm text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)] leading-relaxed">
+        <div className="mb-4 p-3 rounded-lg bg-[var(--surface-soft)] border border-[var(--border-subtle)]">
+          <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
             {recommendation}
           </p>
         </div>
@@ -222,7 +219,7 @@ function PanelContent({
       <FactorTable factors={top5} />
 
       {/* Footer */}
-      <p className="mt-3 text-[10px] text-[var(--color-neutral-400)] text-right">
+      <p className="mt-3 text-[10px] text-[var(--fg-muted)] text-right">
         {t('scoreFactors.footer', 'Model v{{modelVersion}} · Logistic regression · Updated hourly', {
           modelVersion,
         })}

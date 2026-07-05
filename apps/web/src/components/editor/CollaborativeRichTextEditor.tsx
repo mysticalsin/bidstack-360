@@ -28,16 +28,22 @@ import type { RemoteCursor, ConnectionState } from '@/lib/yjs-client';
 
 // ─── Cursor colours pool ──────────────────────────────────────────────────
 // Deterministic colour per user so it stays stable across reconnects.
+// These are literal hex on purpose: a collaborator's colour travels over the
+// wire and must render identically for every client in either theme, so it
+// cannot be a theme token. Each hue sits in the luminance band where WHITE
+// label text is ≥ 4.5:1 AND the caret keeps ≥ 3:1 against both the white and
+// the near-black editor surface (the previous 500-weight pool failed the
+// white-label check on 6 of 8 hues).
 
 const CURSOR_COLORS = [
-  '#6366f1', // indigo
-  '#ec4899', // pink
-  '#f59e0b', // amber
-  '#10b981', // emerald
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#ef4444', // red
-  '#14b8a6', // teal
+  '#4f46e5', // indigo — white 6.3:1
+  '#db2777', // pink — white 4.6:1
+  '#b45309', // amber — white 5.0:1
+  '#047857', // emerald — white 5.5:1
+  '#2563eb', // blue — white 5.2:1
+  '#7c3aed', // violet — white 5.7:1
+  '#dc2626', // red — white 4.8:1
+  '#0f766e', // teal — white 5.5:1
 ];
 
 function colorForUser(userId: string): string {
@@ -184,9 +190,9 @@ export function CollaborativeRichTextEditor({
       <div
         className={[
           'prose prose-sm dark:prose-invert max-w-none',
-          'border border-[var(--border)] rounded-md p-3',
+          'border border-[var(--border-default)] rounded-md p-3',
           'focus-within:ring-2 focus-within:ring-[var(--ring)] focus-within:ring-offset-1',
-          'bg-[var(--surface)] text-[var(--text-primary)]',
+          'bg-[var(--surface-card)] text-[var(--text-primary)]',
           readOnly ? 'opacity-60 pointer-events-none' : '',
         ]
           .filter(Boolean)
@@ -243,11 +249,13 @@ function CursorBadge({ cursor, reducedMotion }: { cursor: RemoteCursor; reducedM
 }
 
 function ConnectionBadge({ label, state }: { label: string; state: ConnectionState }) {
+  // Theme tokens only — the semantic fg tokens already flip per theme, so no
+  // dark: mirrors (and no raw palette classes that ignore data-theme).
   const colors: Record<ConnectionState, string> = {
-    connected: 'text-emerald-600 dark:text-emerald-400',
-    connecting: 'text-amber-500 dark:text-amber-400',
+    connected: 'text-[var(--success-fg)]',
+    connecting: 'text-[var(--warning-fg)]',
     disconnected: 'text-[var(--text-muted)]',
-    error: 'text-red-500 dark:text-red-400',
+    error: 'text-[var(--fg-error)]',
   };
 
   return (

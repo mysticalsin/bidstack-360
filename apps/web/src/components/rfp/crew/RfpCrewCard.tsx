@@ -13,16 +13,18 @@ import type { RfpCrewMember } from './rfpCrew';
 
 export type CrewStatus = 'waiting' | 'working' | 'done' | 'overseeing';
 
+// Theme tokens only — --success/--warning resolve per theme (deep in light,
+// pastel in dark), so no dark: mirrors and no raw palette classes.
 const STATUS_META: Record<CrewStatus, { dot: string; text: string }> = {
   waiting: { dot: 'bg-[var(--fg-tertiary)]', text: 'text-[var(--fg-tertiary)]' },
   working: {
     dot: 'bg-[var(--brand-primary)]',
     text: 'text-[var(--brand-primary)]',
   },
-  done: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+  done: { dot: 'bg-[var(--success)]', text: 'text-[var(--success-fg)]' },
   overseeing: {
-    dot: 'bg-amber-500',
-    text: 'text-amber-600 dark:text-amber-400',
+    dot: 'bg-[var(--warning)]',
+    text: 'text-[var(--warning-fg)]',
   },
 };
 
@@ -64,7 +66,7 @@ export function RfpCrewCard({
       className={cn(
         'group relative rounded-xl border bg-[var(--surface-card)] p-3 text-left transition-colors',
         'border-[var(--border-subtle)]',
-        member.isMaster && 'border-amber-300/70 dark:border-amber-700/60',
+        member.isMaster && 'border-[var(--warning)]/40',
         selected && 'ring-2 ring-[var(--brand-primary)]',
         isDragging && 'opacity-60 shadow-lg',
       )}
@@ -75,7 +77,7 @@ export function RfpCrewCard({
           className={cn(
             'grid h-9 w-9 shrink-0 place-items-center rounded-lg',
             member.isMaster
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+              ? 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]'
               : 'bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]',
           )}
         >
