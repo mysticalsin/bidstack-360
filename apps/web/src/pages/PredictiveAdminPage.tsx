@@ -58,11 +58,23 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
 
   if (isLoading) {
     return (
+      // Shimmer rows shaped like the model history table — shared bs-shimmer
+      // system instead of a single generic pulse block.
       <div
-        className="animate-pulse h-24 rounded-lg bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)]"
+        className="space-y-3 py-2"
         aria-busy="true"
+        aria-live="polite"
         aria-label={t('predictiveAdmin.modelTableLoadingLabel', 'Loading models...')}
-      />
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4" aria-hidden>
+            <span className="bs-shimmer h-4 w-16" />
+            <span className="bs-shimmer h-4 flex-1" />
+            <span className="bs-shimmer h-4 w-12" />
+            <span className="bs-shimmer h-4 w-20" />
+          </div>
+        ))}
+      </div>
     );
   }
 

@@ -64,8 +64,20 @@ export function LeadRotSection() {
   if (isLoading) {
     return (
       <Card>
-        <div className="p-6 text-sm text-[var(--fg-secondary)]">
-          {t('leadRot.loading', 'Loading…')}
+        {/* Shimmer rows shaped like per-status threshold rows — shared
+            bs-shimmer system, not a bare "Loading…" string. */}
+        <div
+          className="divide-y divide-[var(--border-subtle)]"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label={t('leadRot.loading', 'Loading…')}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3" aria-hidden>
+              <span className="bs-shimmer h-4 w-32" />
+              <span className="bs-shimmer ml-auto h-8 w-20 rounded-md" />
+            </div>
+          ))}
         </div>
       </Card>
     );

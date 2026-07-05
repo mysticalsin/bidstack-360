@@ -192,12 +192,26 @@ export function CollaborativeRichTextEditor({
           .filter(Boolean)
           .join(' ')}
       >
-        {!yText && (
-          // Placeholder shown while Y.Doc is loading.
-          <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
-            {placeholder ?? t('collaborativeRichTextEditor.loading', 'Loading…')}
-          </p>
-        )}
+        {!yText &&
+          // Shown while Y.Doc is loading: the caller's placeholder text if
+          // provided, otherwise shimmer text lines from the shared skeleton
+          // system (never a bare "Loading…" string).
+          (placeholder ? (
+            <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
+              {placeholder}
+            </p>
+          ) : (
+            <div
+              className="space-y-2"
+              aria-busy="true"
+              aria-live="polite"
+              aria-label={t('collaborativeRichTextEditor.loading', 'Loading…')}
+            >
+              <span className="bs-shimmer block h-3 w-3/4" aria-hidden />
+              <span className="bs-shimmer block h-3 w-full" aria-hidden />
+              <span className="bs-shimmer block h-3 w-2/3" aria-hidden />
+            </div>
+          ))}
         {yText && <EditorContent editor={editor} />}
       </div>
 

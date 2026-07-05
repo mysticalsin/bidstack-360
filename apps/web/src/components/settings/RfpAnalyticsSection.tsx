@@ -111,8 +111,17 @@ export function RfpAnalyticsSection() {
           </h3>
         </div>
         {q.isLoading ? (
-          <div className="p-6 text-sm text-[var(--fg-secondary)]">
-            {t('rfpAnalytics.loading', 'Loading…')}
+          // Shimmer pills shaped like the status chips — shared bs-shimmer
+          // system, not a bare "Loading…" string.
+          <div
+            className="flex flex-wrap gap-2 p-4"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label={t('rfpAnalytics.loading', 'Loading…')}
+          >
+            {Array.from({ length: 4 }).map((_, i) => (
+              <span key={i} className="bs-shimmer h-6 w-24 rounded-full" aria-hidden />
+            ))}
           </div>
         ) : !q.data?.byStatus.length ? (
           <div className="p-6">
@@ -150,8 +159,21 @@ export function RfpAnalyticsSection() {
           </p>
         </div>
         {q.isLoading ? (
-          <div className="p-6 text-sm text-[var(--fg-secondary)]">
-            {t('rfpAnalytics.loading', 'Loading…')}
+          // Shimmer rows shaped like the per-owner table — shared bs-shimmer
+          // system, not a bare "Loading…" string.
+          <div
+            className="space-y-3 p-4"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label={t('rfpAnalytics.loading', 'Loading…')}
+          >
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4" aria-hidden>
+                <span className="bs-shimmer h-4 w-40" />
+                <span className="bs-shimmer h-4 w-16" />
+                <span className="bs-shimmer ml-auto h-4 w-24" />
+              </div>
+            ))}
           </div>
         ) : !q.data?.byOwner.length ? (
           <div className="p-6">

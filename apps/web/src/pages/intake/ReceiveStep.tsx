@@ -146,8 +146,25 @@ export function ReceiveStep({
           message={files.error?.message}
         />
       ) : files.isLoading ? (
-        <div className="h-32 flex items-center justify-center text-xs text-[var(--fg-tertiary)]">
-          {t('crm.receiveStep.loading', 'Loading...')}
+        // Shimmer rows shaped like the selectable file rows below — shared
+        // bs-shimmer system, not a bare "Loading..." string.
+        <div
+          className="space-y-2"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label={t('crm.receiveStep.loading', 'Loading...')}
+        >
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3"
+              aria-hidden
+            >
+              <span className="bs-shimmer h-5 w-5 rounded" />
+              <span className="bs-shimmer h-4 w-1/2" />
+              <span className="bs-shimmer ml-auto h-3 w-16" />
+            </div>
+          ))}
         </div>
       ) : files.data?.items.length === 0 ? (
         <EmptyState

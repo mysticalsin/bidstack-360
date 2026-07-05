@@ -104,7 +104,22 @@ export function TagsSection() {
           </h3>
         </div>
         {isLoading ? (
-          <div className="p-6 text-sm text-[var(--fg-secondary)]">{t('tags.loading', 'Loading…')}</div>
+          // Shimmer rows shaped like tag library rows (name + chip) — shared
+          // bs-shimmer system, not a bare "Loading…" string.
+          <div
+            className="divide-y divide-[var(--border-subtle)]"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label={t('tags.loading', 'Loading…')}
+          >
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-2.5" aria-hidden>
+                <span className="bs-shimmer h-4 w-40" />
+                <span className="bs-shimmer h-6 w-16 rounded-full" />
+                <span className="bs-shimmer ml-auto h-4 w-10" />
+              </div>
+            ))}
+          </div>
         ) : tags.length === 0 ? (
           <div className="p-6">
             <EmptyState

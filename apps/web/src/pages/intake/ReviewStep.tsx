@@ -55,8 +55,24 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
       </div>
 
       {intel.isLoading ? (
-        <div className="h-32 flex items-center justify-center text-xs text-[var(--fg-tertiary)]">
-          {t('reviewStep.loading', 'Loading…')}
+        // Shimmer blocks shaped like the two extracted-data groups — shared
+        // bs-shimmer system, not a bare "Loading…" string.
+        <div
+          className="space-y-4"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label={t('reviewStep.loading', 'Loading…')}
+        >
+          {Array.from({ length: 2 }).map((_, g) => (
+            <div key={g} className="space-y-2" aria-hidden>
+              <span className="bs-shimmer block h-4 w-28" />
+              <div className="flex flex-wrap gap-2">
+                <span className="bs-shimmer h-6 w-24 rounded-full" />
+                <span className="bs-shimmer h-6 w-32 rounded-full" />
+                <span className="bs-shimmer h-6 w-20 rounded-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <>
