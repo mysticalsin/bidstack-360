@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { SpotlightTable } from '@/components/ui/SpotlightTable';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import type { SortState } from '@/components/ui/SortableHeader';
@@ -104,6 +105,36 @@ export function LeadsPage() {
     state: sortState,
     onChange: setSortState,
   });
+
+  // Saved views. Search/status/priority live in component state (not the URL),
+  // so the bar can't just bookmark location.search — serialize the live filter
+  // state on save, re-apply it on recall. Sort does ride the URL, so it's
+  // captured from and restored to the query string.
+  const buildViewQuery = () => {
+    const p = new URLSearchParams();
+    if (search.trim()) p.set('q', search.trim());
+    if (statusFilter) p.set('status', statusFilter);
+    if (priorityFilter) p.set('priority', priorityFilter);
+    const sortParam = searchParams.get('sort');
+    if (sortParam) p.set('sort', sortParam);
+    const qs = p.toString();
+    return qs ? `?${qs}` : '';
+  };
+  const restoreView = (query: string) => {
+    const p = new URLSearchParams(query);
+    setSearch(p.get('q') ?? '');
+    // safeParse guards against a stale view saved before an enum value was
+    // renamed — an unknown value degrades to "all" instead of crashing.
+    const status = LeadStatus.safeParse(p.get('status'));
+    setStatusFilter(status.success ? status.data : '');
+    const priority = LeadPriority.safeParse(p.get('priority'));
+    setPriorityFilter(priority.success ? priority.data : '');
+    const next = new URLSearchParams(searchParams);
+    const sortParam = p.get('sort');
+    if (sortParam) next.set('sort', sortParam);
+    else next.delete('sort');
+    setSearchParams(next, { replace: true });
+  };
   // useTableSort returns ReadonlyArray; downstream consumers (bulk selection,
   // stats) take a mutable array. `sorted` is memoized so this keeps a stable
   // identity — we never mutate it.
@@ -299,6 +330,13 @@ export function LeadsPage() {
               </option>
             ))}
           </select>
+          <SavedViewsBar
+            surface="leads"
+            basePath="/leads"
+            namePlaceholder={t('leads.savedViews.placeholder', 'e.g. "Critical, still uncontacted"')}
+            getQuery={buildViewQuery}
+            onRestore={restoreView}
+          />
         </div>
       </Card>
 

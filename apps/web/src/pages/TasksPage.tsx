@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
-import { SavedViewsBar } from '@/components/task/SavedViewsBar';
+import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { TaskCalendar } from '@/components/task/TaskCalendar';
@@ -217,7 +217,11 @@ export function TasksPage() {
           >
             {t('tasks.actions.exportCsv', 'Export CSV')}
           </Button>
-          <SavedViewsBar />
+          <SavedViewsBar
+            surface="tasks"
+            basePath="/tasks"
+            namePlaceholder={t('savedViewsBar.namePromptPlaceholder', 'e.g. "My overdue today"')}
+          />
           <CreateTaskDialog />
         </div>
       </header>

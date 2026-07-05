@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
+import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
@@ -391,16 +392,30 @@ export function OpportunitiesPage() {
         onExportCsv={() => void exportCsv()}
       />
 
-      {!search && (
-        <div className="flex flex-wrap items-center gap-3">
-          <OppStageChips
-            stageFilter={stageFilter}
-            stageOptions={stageOptions}
-            onSetStageFilter={setStageFilter}
+      {/* Chips hide while a search is active (existing behavior); the saved-views
+          bar stays mounted so a preset that includes a search remains recallable. */}
+      <div className="flex flex-wrap items-center gap-3">
+        {!search && (
+          <>
+            <OppStageChips
+              stageFilter={stageFilter}
+              stageOptions={stageOptions}
+              onSetStageFilter={setStageFilter}
+            />
+            <OppDueChips dueFilter={dueFilter} onSetDueFilter={setDueFilter} />
+          </>
+        )}
+        <div className="ml-auto">
+          <SavedViewsBar
+            surface="opportunities"
+            basePath="/opportunities"
+            namePlaceholder={t(
+              'opportunities.savedViews.placeholder',
+              'e.g. "Submitted — due within 7 days"',
+            )}
           />
-          <OppDueChips dueFilter={dueFilter} onSetDueFilter={setDueFilter} />
         </div>
-      )}
+      </div>
 
       {/* Industry visibility — the bids we're working on, split by sector. */}
       <OppIndustryBreakdown />
