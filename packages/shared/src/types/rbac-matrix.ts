@@ -28,6 +28,7 @@ const ALL_READ: PermissionKey[] = [
   'agents:read',
   'audit-log:read',
   'bid-scores:read',
+  'comments:read',
   'companies:read',
   'contacts:read',
   'documents:read',
@@ -55,6 +56,7 @@ const ALL_WRITE: PermissionKey[] = [
   'accounts:write',
   'activities:write',
   'agents:write',
+  'comments:write',
   'companies:write',
   'contacts:write',
   'documents:write',
@@ -98,6 +100,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
     ...write(
       'accounts',
       'activities',
+      'comments',
       'contacts',
       'kam',
       'leads',
@@ -114,6 +117,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
     ...read(
       'accounts',
       'activities',
+      'comments',
       'companies',
       'contacts',
       'leads',
@@ -127,6 +131,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
     ...write(
       'accounts',
       'activities',
+      'comments',
       'contacts',
       'kam',
       'leads',
@@ -138,14 +143,15 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
   ],
 
   SDR: [
-    ...read('accounts', 'activities', 'companies', 'contacts', 'leads', 'tasks'),
-    ...write('activities', 'contacts', 'leads', 'tasks'),
+    ...read('accounts', 'activities', 'comments', 'companies', 'contacts', 'leads', 'tasks'),
+    ...write('activities', 'comments', 'contacts', 'leads', 'tasks'),
   ],
 
   'Customer Success': [
     ...read(
       'accounts',
       'activities',
+      'comments',
       'companies',
       'contacts',
       'opportunities',
@@ -153,7 +159,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'service-desk',
       'tasks',
     ),
-    ...write('accounts', 'activities', 'contacts', 'kam', 'service-desk', 'tasks'),
+    ...write('accounts', 'activities', 'comments', 'contacts', 'kam', 'service-desk', 'tasks'),
   ],
 
   'Read-Only': ALL_READ.filter((k) => !k.startsWith('mcp:') && k !== 'audit-log:read'),
@@ -166,6 +172,7 @@ export const MATRIX_RESOURCES = [
   'agents',
   'audit-log',
   'bid-scores',
+  'comments',
   'companies',
   'contacts',
   'documents',
