@@ -17,7 +17,7 @@ import {
 import { scaleSequential } from 'd3-scale';
 
 import { cn } from '@/lib/cn';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useThemeStore } from '@/stores/theme';
 import { Icon } from '@/components/ui/Icon';
 
@@ -247,6 +247,11 @@ export const WorldMap = memo(function WorldMap({
 }: WorldMapProps) {
   const { t } = useTranslation('crm');
   const theme = useThemeStore((s) => s.theme);
+  // Currency-aware formatter so the legend, per-country aria-label, and hover
+  // tooltip track the user's selected display currency like every other money
+  // surface — the module-level formatMoneyMicros hardcoded EUR and diverged
+  // from the KPI tiles/other panels on Territories & Sector View.
+  const { formatMoneyMicros } = useFormatMoney();
   const [hovered, setHovered] = useState<{
     item: TerritoryAnalyticsItem;
     x: number;
@@ -341,7 +346,7 @@ export const WorldMap = memo(function WorldMap({
   const legendItems = Array.from({ length: legendSteps }, (_, i) => {
     const t = i / (legendSteps - 1);
     const value = Math.round(maxValue * t);
-    return { color: interpolateBrand(t), label: formatMoneyMicros(String(value), 'EUR') };
+    return { color: interpolateBrand(t), label: formatMoneyMicros(String(value)) };
   });
 
   return (
@@ -435,7 +440,7 @@ export const WorldMap = memo(function WorldMap({
                 const countryLabel = item
                   ? t('worldMap.country.ariaLabel', '{{country}}: {{value}}', {
                       country: item.countryCode,
-                      value: formatMoneyMicros(item.totalValueMicros, 'EUR'),
+                      value: formatMoneyMicros(item.totalValueMicros),
                     })
                   : undefined;
 
@@ -653,7 +658,7 @@ export const WorldMap = memo(function WorldMap({
             </span>
             <span className="text-[var(--border-subtle)]">·</span>
             <span className="font-semibold text-[var(--brand-primary)]">
-              {formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}
+              {formatMoneyMicros(hovered.item.totalValueMicros)}
             </span>
           </div>
           <div className="text-[10px] font-medium tabular-nums text-[var(--fg-tertiary)] mt-0.5">
