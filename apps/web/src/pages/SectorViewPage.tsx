@@ -19,7 +19,7 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
@@ -416,6 +416,11 @@ function SectorMetric({
 
 function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const { t } = useTranslation('crm');
+  // Use the currency-aware formatter so this figure tracks the user's selected
+  // display currency like every other money surface — the module-level
+  // formatMoneyMicros hardcoded EUR and diverged from Territories/Opportunities
+  // showing the same segment data in the chosen currency.
+  const { formatMoneyMicros } = useFormatMoney();
   if (items.length === 0) {
     return (
       <EmptyState
@@ -435,7 +440,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatMoneyMicros(seg.totalValueMicros, 'EUR'),
+                value: formatMoneyMicros(seg.totalValueMicros),
               })}
             </span>
           </div>
