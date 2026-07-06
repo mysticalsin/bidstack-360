@@ -11,6 +11,8 @@ export const PERMISSION_KEYS = [
   'audit-log:read',
   'bid-scores:read',
   'bid-scores:write',
+  'comments:read',
+  'comments:write',
   'companies:read',
   'companies:write',
   'contacts:read',

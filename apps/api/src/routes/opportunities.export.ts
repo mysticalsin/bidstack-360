@@ -18,6 +18,9 @@ import { PassThrough } from 'node:stream';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
+import { microsToUnits } from '@bidstack/shared';
+
+import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
 
 const BATCH_SIZE = 250;
 
@@ -35,10 +38,13 @@ function csvRow(cells: string[]): string {
   return cells.map(csvCell).join(',') + '\r\n';
 }
 
-// Micros → display value (× 1e-6, two decimal places)
+// Micros → display value (× 1e-6, two decimal places). Routed through the
+// shared `microsToUnits` helper (BigInt whole/remainder split) rather than the
+// naive `Number(micros) / 1e6`, which rounds the BigInt→Number conversion
+// *before* dividing and silently corrupts any single value above
+// ~$9.007B (Number.MAX_SAFE_INTEGER micros). See packages/shared/src/utils/money.ts.
 function formatMicros(micros: bigint | number): string {
-  const n = typeof micros === 'bigint' ? Number(micros) : micros;
-  return (n / 1_000_000).toFixed(2);
+  return microsToUnits(micros).toFixed(2);
 }
 
 const CSV_HEADERS = [
@@ -76,14 +82,22 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       const orgId = req.auth.orgId;
       const stamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-      const where = {
-        orgId,
-        deletedAt: null,
-        ...(pipelineStageId ? { pipelineStageId } : {}),
-        ...(stage ? { stage: stage as PrismaStage } : {}),
-        ...(industry ? { industry } : {}),
-        ...(owner ? { owner: { email: owner } } : {}),
-      };
+      // M7 access scoping: a group-restricted user's CSV must contain exactly
+      // the rows they can see in the list/detail views — never a full-org
+      // pipeline dump. Mirror the sibling list route (opportunities.ts) by
+      // wrapping the where clause with applyOpportunityScope. See lib/access-scope.ts.
+      const accessScope = await getAccessScope(orgId, req.auth.userId);
+      const where = applyOpportunityScope(
+        {
+          orgId,
+          deletedAt: null,
+          ...(pipelineStageId ? { pipelineStageId } : {}),
+          ...(stage ? { stage: stage as PrismaStage } : {}),
+          ...(industry ? { industry } : {}),
+          ...(owner ? { owner: { email: owner } } : {}),
+        },
+        accessScope,
+      );
 
       // Stream through Fastify so global headers (CORS/security) still apply
       // while keeping memory flat for large exports.
@@ -114,7 +128,13 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
               owner: { select: { name: true, email: true } },
               territory: { select: { name: true } },
             },
-            orderBy: { updatedAt: 'desc' },
+            // Compound (updatedAt, id) order so ties on the non-unique
+            // updatedAt column don't drop rows at a batch boundary: Prisma's
+            // cursor can't distinguish already-returned from not-yet-returned
+            // rows sharing an updatedAt value without a unique tiebreaker.
+            // id: 'asc' matches the tiebreaker direction used in companies.ts /
+            // contacts.ts / tasks.ts (Rule 11 — codebase convention).
+            orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
             take: BATCH_SIZE,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
           });

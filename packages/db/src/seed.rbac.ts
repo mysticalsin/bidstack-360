@@ -47,6 +47,12 @@ const PERMISSION_SEEDS = [
   permission('audit-log:read', 'Read audit log', 'View security, admin, and data audit history.'),
   permission('bid-scores:read', 'Read bid scores', 'View bid/no-bid scoring and rationale.'),
   permission('bid-scores:write', 'Manage bid scores', 'Create and update bid/no-bid scoring.'),
+  permission('comments:read', 'Read comments', 'View collaboration comments and @mentions on records.'),
+  permission(
+    'comments:write',
+    'Manage comments',
+    'Author, reply to, and delete collaboration comments (fires @mention notifications).',
+  ),
   permission('companies:read', 'Read companies', 'View company records.'),
   permission('companies:write', 'Manage companies', 'Create and update company records.'),
   permission('contacts:read', 'Read contacts', 'View contact records.'),
@@ -140,6 +146,7 @@ export const ROLE_SEEDS = [
     ...readKeys(
       'accounts',
       'activities',
+      'comments',
       'companies',
       'contacts',
       'kam',
@@ -153,6 +160,7 @@ export const ROLE_SEEDS = [
     ...writeKeys(
       'accounts',
       'activities',
+      'comments',
       'contacts',
       'integrations',
       'kam',
@@ -170,6 +178,7 @@ export const ROLE_SEEDS = [
         'accounts',
         'activities',
         'bid-scores',
+        'comments',
         'companies',
         'contacts',
         'documents',
@@ -184,6 +193,7 @@ export const ROLE_SEEDS = [
       ...writeKeys(
         'activities',
         'bid-scores',
+        'comments',
         'documents',
         'files',
         'kam',
@@ -203,6 +213,7 @@ export const ROLE_SEEDS = [
     ...writeKeys(
       'activities',
       'bid-scores',
+      'comments',
       'kam',
       'leads',
       'opportunities',
@@ -222,6 +233,7 @@ export const ROLE_SEEDS = [
     ...readKeys(
       'accounts',
       'activities',
+      'comments',
       'companies',
       'contacts',
       'reports',
@@ -229,7 +241,7 @@ export const ROLE_SEEDS = [
       'tags',
       'tasks',
     ),
-    ...writeKeys('activities', 'service-desk', 'tags', 'tasks'),
+    ...writeKeys('activities', 'comments', 'service-desk', 'tags', 'tasks'),
   ]),
   role(
     'Read-only',
@@ -250,6 +262,7 @@ export const ROLE_SEEDS = [
       ...writeKeys(
         'accounts',
         'activities',
+        'comments',
         'contacts',
         'integrations',
         'kam',
@@ -270,6 +283,7 @@ export const ROLE_SEEDS = [
       ...readKeys(
         'accounts',
         'activities',
+        'comments',
         'companies',
         'contacts',
         'kam',
@@ -283,6 +297,7 @@ export const ROLE_SEEDS = [
       ...writeKeys(
         'accounts',
         'activities',
+        'comments',
         'contacts',
         'integrations',
         'kam',
@@ -295,8 +310,17 @@ export const ROLE_SEEDS = [
     ],
   ),
   role('SDR', 'Inbound/outbound lead development; limited to leads and early-stage pipeline.', [
-    ...readKeys('accounts', 'activities', 'companies', 'contacts', 'leads', 'tags', 'tasks'),
-    ...writeKeys('activities', 'contacts', 'integrations', 'leads', 'tags', 'tasks'),
+    ...readKeys(
+      'accounts',
+      'activities',
+      'comments',
+      'companies',
+      'contacts',
+      'leads',
+      'tags',
+      'tasks',
+    ),
+    ...writeKeys('activities', 'comments', 'contacts', 'integrations', 'leads', 'tags', 'tasks'),
   ]),
   role(
     'Customer Success',
@@ -305,6 +329,7 @@ export const ROLE_SEEDS = [
       ...readKeys(
         'accounts',
         'activities',
+        'comments',
         'companies',
         'contacts',
         'kam',
@@ -317,6 +342,7 @@ export const ROLE_SEEDS = [
       ...writeKeys(
         'accounts',
         'activities',
+        'comments',
         'contacts',
         'integrations',
         'service-desk',
