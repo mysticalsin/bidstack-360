@@ -20,15 +20,15 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
-import { isSyntheticAccountName } from './accountsPage/testDataFilter';
+import { isSyntheticAccountName } from './testDataFilter';
 
-import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
-import { keyAccountSignal } from './accountsPage/strategicSignals';
+import { StrategicSignalInsight } from './StrategicSignalInsight';
+import { keyAccountSignal } from './strategicSignals';
 
 const KEY_ACCOUNTS_PAGE_SIZE = 50;
 const KEY_ACCOUNTS_SIGNAL_SIZE = 200;
 
-export function KeyAccountsPage() {
+export function AccountsKeySegment() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');

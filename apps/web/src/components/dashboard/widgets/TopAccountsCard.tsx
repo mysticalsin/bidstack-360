@@ -46,7 +46,7 @@ export function TopAccountsCard() {
             </Badge>
           ) : null}
         </div>
-        <Link to="/top-accounts" className="text-xs text-[var(--brand-primary)] hover:underline">
+        <Link to="/accounts?view=top" className="text-xs text-[var(--brand-primary)] hover:underline">
           {t('topAccounts.viewAll', 'View all')}
         </Link>
       </div>

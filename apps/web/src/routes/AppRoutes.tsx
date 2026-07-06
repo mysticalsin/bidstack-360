@@ -36,7 +36,6 @@ import {
   CrossSellPage,
   KamAccountPage,
   WorkspacePage,
-  KeyAccountsPage,
   LeadDetailPage,
   LeadsPage,
   LoginPage,
@@ -55,7 +54,6 @@ import {
   TaskDetailPage,
   TasksPage,
   TerritoriesPage,
-  TopAccountsPage,
   WinLossPage,
   WorkloadPage,
   PublicSignPage,
@@ -188,14 +186,9 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
-          <Route
-            path="/key-accounts"
-            element={
-              <RequireAuth>
-                <KeyAccountsPage />
-              </RequireAuth>
-            }
-          />
+          {/* Key/Top accounts consolidated into /accounts?view= — keep the old
+              paths alive as redirects so bookmarks and the command palette resolve. */}
+          <Route path="/key-accounts" element={<Navigate to="/accounts?view=key" replace />} />
           <Route
             path="/kam"
             element={
@@ -212,14 +205,7 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
-          <Route
-            path="/top-accounts"
-            element={
-              <RequireAuth>
-                <TopAccountsPage />
-              </RequireAuth>
-            }
-          />
+          <Route path="/top-accounts" element={<Navigate to="/accounts?view=top" replace />} />
 
           {/* ── Leads ───────────────────────────────────────────────────── */}
           <Route

@@ -2150,7 +2150,7 @@
   },
   "topAccounts": {
     "heading": "Comptes principaux",
-    "badgeCurated": "Sélection — top 10 mondial Amaris",
+    "badgeCurated": "Sélection — top 10 mondial",
     "badgeAuto": "Classé automatiquement par valeur du pipeline",
     "subtitleCurated": "Le top 10 mondial, sélectionné et classé par les administrateurs dans les Paramètres.",
     "subtitleAuto": "Comptes à plus forte valeur classés par pipeline total et chiffre d'affaires.",

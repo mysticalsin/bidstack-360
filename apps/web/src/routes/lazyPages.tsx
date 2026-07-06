@@ -47,9 +47,6 @@ export const ContactsPage = lazy(() =>
 export const ContactDetailPage = lazy(() =>
   import('@/pages/ContactDetailPage').then((m) => ({ default: m.ContactDetailPage })),
 );
-export const KeyAccountsPage = lazy(() =>
-  import('@/pages/KeyAccountsPage').then((m) => ({ default: m.KeyAccountsPage })),
-);
 export const LeadsPage = lazy(() =>
   import('@/pages/LeadsPage').then((m) => ({ default: m.LeadsPage })),
 );
@@ -58,9 +55,6 @@ export const LeadDetailPage = lazy(() =>
 );
 export const NewLeadPage = lazy(() =>
   import('@/pages/NewLeadPage').then((m) => ({ default: m.NewLeadPage })),
-);
-export const TopAccountsPage = lazy(() =>
-  import('@/pages/TopAccountsPage').then((m) => ({ default: m.TopAccountsPage })),
 );
 
 // ─── Opportunities & Pipeline ─────────────────────────────────────────────────

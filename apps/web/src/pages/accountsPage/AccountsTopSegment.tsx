@@ -18,11 +18,11 @@ import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
-import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
-import { topAccountSignal } from './accountsPage/strategicSignals';
-import { isSyntheticAccountName } from './accountsPage/testDataFilter';
+import { StrategicSignalInsight } from './StrategicSignalInsight';
+import { topAccountSignal } from './strategicSignals';
+import { isSyntheticAccountName } from './testDataFilter';
 
-export function TopAccountsPage() {
+export function AccountsTopSegment() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
@@ -91,7 +91,7 @@ export function TopAccountsPage() {
             source === 'curated' ? (
               <Badge tone="amber">
                 <Icon name="trophy" size={11} ariaHidden />
-                {t('topAccounts.badgeCurated', 'Curated — Amaris global top 10')}
+                {t('topAccounts.badgeCurated', 'Curated — global top 10')}
               </Badge>
             ) : (
               <Badge tone="gray">{t('topAccounts.badgeAuto', 'Auto-ranked by pipeline value')}</Badge>

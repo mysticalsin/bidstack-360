@@ -192,7 +192,7 @@ test.describe('SERUM and account experience controls', () => {
     await expect(configTestResults.getByText('Human approval', { exact: true })).toBeVisible();
     await expect(page.getByText('SERUM status is unavailable')).toHaveCount(0);
 
-    await gotoAndWait('/key-accounts');
+    await gotoAndWait('/accounts?view=key');
     await expect(page.getByRole('heading', { name: 'Strategic Accounts' })).toBeVisible();
     const keySignal = page.getByRole('region', { name: 'Key account industry signal' });
     await expect(keySignal).toBeVisible({ timeout: 15_000 });
@@ -204,7 +204,7 @@ test.describe('SERUM and account experience controls', () => {
     await page.getByRole('button', { name: 'Reset' }).click();
     await expect(keyIndustry).toHaveAttribute('aria-pressed', 'false');
 
-    await gotoAndWait('/top-accounts');
+    await gotoAndWait('/accounts?view=top');
     await expect(page.getByRole('heading', { name: 'Top accounts' })).toBeVisible();
     const rankingPanel = page.getByRole('region', { name: 'Account ranking command panel' });
     await expect(rankingPanel).toBeVisible({ timeout: 15_000 });

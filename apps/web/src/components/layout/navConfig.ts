@@ -79,8 +79,9 @@ export const NAV_SECTIONS: NavSection[] = [
       // above "Key Accounts" (an unrelated leaderboard) and read as the same
       // feature — the label itself must disambiguate the initiative workflow.
       { to: '/kam', label: 'KAM Initiatives', labelKey: 'nav.kam', icon: 'target' },
-      { to: '/key-accounts', label: 'Key Accounts', labelKey: 'nav.keyAccounts', icon: 'star' },
-      { to: '/top-accounts', label: 'Top Accounts', labelKey: 'nav.topAccounts', icon: 'trophy' },
+      // Key Accounts + Top Accounts are now the Key/Top views of /accounts
+      // (?view=key|top) — reachable from the in-page switcher and ⌘K, so they
+      // are no longer standalone rail doors.
       { to: '/companies', label: 'Companies', labelKey: 'nav.companies', icon: 'list' },
       { to: '/sector-view', label: 'Sector View', labelKey: 'nav.sectorView', icon: 'globe' },
       { to: '/cross-sell', label: 'Cross-sell', labelKey: 'nav.crossSell', icon: 'git-branch' },

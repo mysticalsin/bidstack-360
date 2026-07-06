@@ -2105,7 +2105,7 @@
   },
   "topAccounts": {
     "heading": "Top accounts",
-    "badgeCurated": "Curated — Amaris global top 10",
+    "badgeCurated": "Curated — global top 10",
     "badgeAuto": "Auto-ranked by pipeline value",
     "subtitleCurated": "The global top 10, hand-picked and ordered by admins in Settings.",
     "subtitleAuto": "Highest-value accounts ranked by total pipeline and revenue.",

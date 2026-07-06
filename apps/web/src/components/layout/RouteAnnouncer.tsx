@@ -47,6 +47,7 @@ function routeTitles(t: TFunction): Record<string, string> {
 
 function titleFor(
   pathname: string,
+  search: string,
   params: Record<string, string | undefined>,
   t: TFunction,
 ): string {
@@ -55,6 +56,17 @@ function titleFor(
     return t('routeAnnouncer.accountDetail', 'Account: {{name}}', {
       name: decodeURIComponent(params.accountId),
     });
+  }
+
+  // /accounts is one surface with All/Key/Top segments driven by ?view= — the
+  // pathname never changes between them, so read the param to announce the
+  // active segment (and to speak the right title on the /key-accounts and
+  // /top-accounts redirect landing).
+  if (pathname === '/accounts') {
+    const view = new URLSearchParams(search).get('view');
+    if (view === 'key') return t('routeAnnouncer.routeKeyAccounts', 'Key Accounts');
+    if (view === 'top') return t('routeAnnouncer.routeTopAccounts', 'Top Accounts');
+    return t('routeAnnouncer.routeAccounts', 'Accounts');
   }
   if (pathname.startsWith('/opportunities/') && params.id) {
     return t('routeAnnouncer.opportunityDetail', 'Opportunity detail');
@@ -89,7 +101,7 @@ function titleFor(
 }
 
 export function RouteAnnouncer() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const params = useParams<Record<string, string>>();
   const { t } = useTranslation('crm');
   const [message, setMessage] = useState('');
@@ -123,7 +135,7 @@ export function RouteAnnouncer() {
     }
 
     const next = t('routeAnnouncer.nowOn', 'Now on {{title}}', {
-      title: titleFor(pathname, params, t),
+      title: titleFor(pathname, search, params, t),
     });
     // Set after a beat so the change is detected as a live-region update
     // rather than initial content.
@@ -142,7 +154,7 @@ export function RouteAnnouncer() {
       window.clearTimeout(handle);
       window.clearTimeout(focusHandle);
     };
-  }, [pathname, params, t]);
+  }, [pathname, search, params, t]);
 
   return (
     <div

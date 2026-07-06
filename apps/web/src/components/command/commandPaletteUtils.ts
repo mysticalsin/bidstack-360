@@ -71,6 +71,10 @@ const NAV_CHORD_HINTS: Record<string, string> = {
 // belongs in PALETTE_ONLY_ADMIN_TARGETS below so it isn't spliced in for
 // every user regardless of role.
 const PALETTE_ONLY_TARGETS: NavTarget[] = [
+  // Key/Top accounts dropped from the sidebar rail (folded into /accounts as
+  // ?view= segments) but kept ⌘K-discoverable here so muscle memory still works.
+  { to: '/accounts?view=key', label: 'Go to Key accounts', hint: '' },
+  { to: '/accounts?view=top', label: 'Go to Top accounts', hint: '' },
   { to: '/pipeline', label: 'Go to Pipeline (kanban)', hint: 'g p' },
   { to: '/calls', label: 'Go to Calls', hint: '' },
   { to: '/service-desk', label: 'Go to Service Desk', hint: '' },

@@ -2095,7 +2095,7 @@
   },
   "topAccounts": {
     "heading": "Principais contas",
-    "badgeCurated": "Selecionado — top 10 global da Amaris",
+    "badgeCurated": "Selecionado — top 10 global",
     "badgeAuto": "Classificado automaticamente por valor do pipeline",
     "subtitleCurated": "O top 10 global, selecionado e ordenado pelos administradores nas Configurações.",
     "subtitleAuto": "Contas de maior valor classificadas por pipeline total e receita.",
