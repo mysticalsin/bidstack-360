@@ -4,6 +4,29 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-06 — Logo redesign + enterprise-readiness audit & fixes
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode — Fable red-team/plan + Sonnet execute; account-merge (recon→red-team→build→verify), enterprise audit (6-lens verify-first), audit fixers (7 clusters). 8 commits.
+
+**Logo (10x):** replaced the hand-drawn "P + 3 signal lines + 3 dots" mark (which garbled to "FP/EP" at 16-20px rail size) with one bold filled geometric **P whose counter is a forward play-triangle** ("pre-sales in motion") — legible at hero and rail, holds up mono/inverse. Rail badge → squircle chip with 3-stop gradient + hairline highlight + ambient lift. Favicon + brand SVGs synced. Verified both scales.
+
+**Account-surface consolidation:** Accounts / Key Accounts / Top Accounts → one `/accounts` with an All/Key/Top switcher (`?view=`), structural (verbatim segment bodies keep own hook/money-formatter/pagination), redirects preserve bookmarks, RouteAnnouncer reads `?view=` (a11y), nav 9→7 doors, KAM+Companies untouched. Red-team caught + I fixed a raw-NUL source byte + 44px tab target; money-unit trap confirmed clean. All 3 segments + redirects browser-verified.
+
+**Rebrand + demo hygiene:** last "Amaris" UI strings → "Mantu" (6 locales, eval fixtures kept); All-accounts now applies the synthetic-name filter (extended: KAMDraft-*/ConvertCorp-*/*-test) → 12 real companies instead of 28 with test junk.
+
+**Enterprise-readiness audit (6 lenses, adversarial verify):** 13 confirmed (4 distinct BLOCKER, 7 MAJOR), 1 refuted, 6 MINOR. ALL fixed with red→green tests:
+- **BLOCKER** duplicate-merge could create a `parentId` cycle (ancestor→descendant merge) and the hierarchy traversal had no cycle guard → infinite loop hanging the whole multi-tenant process. Reject-on-ancestor (409) + visited-set guards. *(bug was from this session's dedup code.)*
+- **BLOCKER** `/opportunities/:id/timeline` had no RBAC gate — added `opportunities:read`; then a follow-up gated the raw audit `diff` behind `audit-log:read` via a new reusable `server.hasPermission()`.
+- **BLOCKER** calendar-sync crons loaded every integration token deployment-wide, unbounded → cursor-paginated fan-out (take:200) + a 30-min sweep recovering stranded push idempotency claims.
+- **BLOCKER** Key-Accounts KPI strip summed only the current page but read as portfolio totals → honest "On this page" scope label.
+- **MAJOR** workload overdue used `now` not day-boundary; All-accounts silently showed a capped snapshot → visible cap indicator; copilot cap-error message; duplicates dialog i18n; emoji→Icon (Calls, MS SSO, win toast); saved-view delete-selected; win-loss truncation flag.
+
+**Verified:** typecheck 12/12 · lint clean · ~60 new/updated tests green (worker batch flake = known cross-file leakage, all pass isolated) · browser walk (new logo hero+rail, all 3 account segments + redirects, Key KPI scope label, duplicates dialog, copilot) zero console errors.
+
+**Deferred (flagged, not done):** the "3 design languages behind the account switcher" harmonization (segments are verbatim-different by design — a careful design pass); Sector↔Territories + Opportunities/Pipeline merges; proposal revision history (migration + live-DB handoff); polluted dev-DB purge (the filter is the non-destructive stopgap); a DB-level `parentId` acyclicity constraint (app-layer guards are the only protection today).
+
+---
+
 ## 2026-07-05 (pm) — Finish-everything wave: features, live-bug fixes, anti-slop
 
 **Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode, Fable plan/review + Sonnet swarm (6 builders; session limit hit mid-wave — 2 returned clean, 4 completed work + tests but died on final return, all salvaged).
