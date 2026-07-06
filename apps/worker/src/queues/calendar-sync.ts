@@ -30,6 +30,21 @@ import {
 } from './calendar-sync-google.js';
 import { handleMicrosoftPush, pullMicrosoftIncremental } from './calendar-sync-microsoft.js';
 
+// ─── Scheduling / fan-out constants ────────────────────────────────────────
+
+const PULL_REPEAT_EVERY_MS = 2 * 60 * 1000;
+const WATCH_REPEAT_EVERY_MS = 24 * 60 * 60 * 1000;
+const PUSH_SWEEP_EVERY_MS = 30 * 60 * 1000;
+
+/** Bounded page size so a single fan-out tick never loads every token/event at once. */
+const FANOUT_BATCH_SIZE = 200;
+
+// A row still PENDING_PUSH this long after its last write is stranded (POST-before-
+// commit crash). Well past the ~21s retry window and far under the 24h claim TTL.
+const PUSH_STRANDED_AFTER_MS = 30 * 60 * 1000;
+
+const PUSH_SWEEP_JOB = 'calendar.push-sweep';
+
 // ─── Exported queue/worker starters ───────────────────────────────────────
 
 export async function startCalendarSync(
@@ -75,10 +90,27 @@ export async function startCalendarSync(
     },
   );
 
+  // Schedule the stranded-push recovery sweep every 30 min (see sweepStrandedPushes).
+  await pushQueue.add(
+    PUSH_SWEEP_JOB,
+    {},
+    {
+      jobId: 'calendar-push-sweep-cron',
+      repeat: { every: PUSH_SWEEP_EVERY_MS },
+      removeOnComplete: { age: 3600, count: 100 },
+      removeOnFail: { age: 86_400 },
+    },
+  );
+
   // Push worker — processes events needing to be pushed/updated/deleted in provider
   const pushWorker = new Worker(
     CALENDAR_PUSH.name,
     async (job) => {
+      if (job.name === PUSH_SWEEP_JOB) {
+        await sweepStrandedPushes(pushQueue, log);
+        return;
+      }
+
       const data = PushJobData.parse(job.data);
       const childLog = log.child({ job: job.name, jobId: job.id, ...data });
 
@@ -151,22 +183,10 @@ export async function startCalendarSync(
     async (job) => {
       const raw = job.data as Record<string, unknown>;
 
-      // Fan-out: if orgId === 'all', pull for all active integration tokens
+      // Fan-out tick: enqueue bounded per-token pull jobs and return, never loop
+      // every token inline (that would overrun the 2-min interval at scale).
       if (raw['orgId'] === 'all') {
-        const tokens = await prisma.integrationToken.findMany({
-          where: { status: 'active', deletedAt: null },
-          select: { id: true, orgId: true, userId: true },
-        });
-
-        for (const t of tokens) {
-          await job.updateProgress(0);
-          const childLog = log.child({ tokenId: t.id, orgId: t.orgId, userId: t.userId });
-          try {
-            await runIncrementalPull(t.id, t.orgId, t.userId, childLog);
-          } catch (err) {
-            childLog.error({ err }, 'Incremental pull failed for token');
-          }
-        }
+        await fanoutIncrementalPulls(pullQueue, log);
         return;
       }
 
@@ -184,45 +204,13 @@ export async function startCalendarSync(
     async (job) => {
       const raw = job.data as Record<string, unknown>;
 
-      const tokens = await prisma.integrationToken.findMany({
-        where: {
-          provider: 'google_workspace',
-          status: 'active',
-          deletedAt: null,
-          ...(raw['integrationTokenId'] !== 'all'
-            ? { id: raw['integrationTokenId'] as string }
-            : {}),
-        },
-        select: {
-          id: true,
-          orgId: true,
-          userId: true,
-          accessTokenEncrypted: true,
-          deltaState: true,
-        },
-      });
-
-      for (const t of tokens) {
-        const childLog = log.child({ tokenId: t.id });
-        try {
-          const deltaState = t.deltaState as Record<string, unknown>;
-          const channelExpiry = deltaState['watchChannelExpiry'] as string | undefined;
-
-          // Renew if expiry is within 24h
-          const shouldRenew =
-            !channelExpiry || new Date(channelExpiry).getTime() - Date.now() < 24 * 60 * 60 * 1000;
-
-          if (!shouldRenew) {
-            childLog.debug({ tokenId: t.id }, 'Watch channel still valid; skipping renewal');
-            continue;
-          }
-
-          const accessToken = decryptToken(t.accessTokenEncrypted);
-          await renewGoogleWatchChannel(t.orgId, t.id, accessToken, childLog);
-        } catch (err) {
-          childLog.error({ err, tokenId: t.id }, 'Watch channel renewal failed');
-        }
+      // Fan-out tick: enqueue bounded per-token renewal jobs, never loop inline.
+      if (raw['integrationTokenId'] === 'all') {
+        await fanoutWatchRenewals(watchQueue, log);
+        return;
       }
+
+      await renewWatchForToken(raw['integrationTokenId'] as string, log);
     },
     { connection, concurrency: 2 },
   );
@@ -230,6 +218,161 @@ export async function startCalendarSync(
 
   log.info('Calendar sync workers started (push + pull-incremental + watch-renew)');
   return { pushQueue, pullQueue, watchQueue };
+}
+
+// ─── Fan-out dispatchers (bounded, cursor-paginated) ──────────────────────
+
+/**
+ * Fan out the incremental-pull tick: cursor-paginate active tokens in bounded
+ * batches and enqueue ONE per-token pull job each. Keeps the tick inside its 2-min
+ * window even at 100k+ tokens — heavy decrypt + provider I/O runs in bounded jobs
+ * drained by worker concurrency, not one ever-growing inline loop that overlaps the
+ * next tick. Mirrors dust-poll.ts fanoutOrgPolls; window-bucketed jobIds dedup ticks.
+ */
+export async function fanoutIncrementalPulls(queue: Queue, log: pino.Logger): Promise<void> {
+  const windowBucket = Math.floor(Date.now() / PULL_REPEAT_EVERY_MS);
+  let cursor: string | undefined;
+  let dispatched = 0;
+
+  while (true) {
+    const batch = await prisma.integrationToken.findMany({
+      where: { status: 'active', deletedAt: null },
+      select: { id: true, orgId: true, userId: true },
+      take: FANOUT_BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
+    if (batch.length === 0) break;
+
+    for (const t of batch) {
+      await queue.add(
+        'calendar.pull-incremental',
+        { orgId: t.orgId, userId: t.userId, integrationTokenId: t.id },
+        { jobId: `calendar-pull:${t.id}:${windowBucket}` },
+      );
+      dispatched++;
+    }
+
+    cursor = batch[batch.length - 1]!.id;
+    if (batch.length < FANOUT_BATCH_SIZE) break;
+  }
+
+  log.info({ dispatched, windowBucket }, 'calendar.pull-incremental fanout dispatched');
+}
+
+/** Fan out the daily watch-renewal tick: bounded, cursor-paginated per-token jobs. */
+export async function fanoutWatchRenewals(queue: Queue, log: pino.Logger): Promise<void> {
+  const windowBucket = Math.floor(Date.now() / WATCH_REPEAT_EVERY_MS);
+  let cursor: string | undefined;
+  let dispatched = 0;
+
+  while (true) {
+    const batch = await prisma.integrationToken.findMany({
+      where: { provider: 'google_workspace', status: 'active', deletedAt: null },
+      select: { id: true },
+      take: FANOUT_BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
+    if (batch.length === 0) break;
+
+    for (const t of batch) {
+      await queue.add(
+        'calendar.watch-renew',
+        { integrationTokenId: t.id },
+        { jobId: `calendar-watch:${t.id}:${windowBucket}` },
+      );
+      dispatched++;
+    }
+
+    cursor = batch[batch.length - 1]!.id;
+    if (batch.length < FANOUT_BATCH_SIZE) break;
+  }
+
+  log.info({ dispatched, windowBucket }, 'calendar.watch-renew fanout dispatched');
+}
+
+/** Renew the Google watch channel for a single token (per-token fan-out job). */
+async function renewWatchForToken(tokenId: string, log: pino.Logger): Promise<void> {
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: tokenId, provider: 'google_workspace', status: 'active', deletedAt: null },
+    select: { id: true, orgId: true, accessTokenEncrypted: true, deltaState: true },
+  });
+  if (!token) return;
+
+  const childLog = log.child({ tokenId: token.id });
+  try {
+    const deltaState = token.deltaState as Record<string, unknown>;
+    const channelExpiry = deltaState['watchChannelExpiry'] as string | undefined;
+
+    // Renew if expiry is within 24h
+    const shouldRenew =
+      !channelExpiry || new Date(channelExpiry).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+
+    if (!shouldRenew) {
+      childLog.debug({ tokenId: token.id }, 'Watch channel still valid; skipping renewal');
+      return;
+    }
+
+    const accessToken = decryptToken(token.accessTokenEncrypted);
+    await renewGoogleWatchChannel(token.orgId, token.id, accessToken, childLog);
+  } catch (err) {
+    childLog.error({ err, tokenId: token.id }, 'Watch channel renewal failed');
+  }
+}
+
+// ─── Stranded-push recovery sweep ─────────────────────────────────────────
+
+/**
+ * Recover events stranded in PENDING_PUSH by a worker crash between the provider
+ * POST and the DB commit: the claim key survives as 'pending', so BullMQ's
+ * stalled-job retry (same jobId) hits it, skips the re-POST, and completes,
+ * leaving the event unsent forever (nothing else scans stuck PENDING_PUSH rows).
+ * Re-enqueue a FRESH calendar.push job — a new jobId mints a new claim key, so the
+ * recovery attempt owns the create and re-POSTs, exactly like a user re-edit would.
+ * Narrowed to locally-created rows (externalId:null, not soft-deleted): update/delete
+ * crashes self-heal via BullMQ retry (no create claim held), so the re-enqueued
+ * 'push' can never duplicate an already-created provider event. Window-bucketed
+ * jobIds dedup overlapping sweeps and never collide with the stranded claim.
+ */
+export async function sweepStrandedPushes(queue: Queue, log: pino.Logger): Promise<void> {
+  const now = Date.now();
+  const windowBucket = Math.floor(now / PUSH_SWEEP_EVERY_MS);
+  const staleBefore = new Date(now - PUSH_STRANDED_AFTER_MS);
+  let cursor: string | undefined;
+  let recovered = 0;
+
+  while (true) {
+    const batch = await prisma.calendarEvent.findMany({
+      where: {
+        syncState: 'PENDING_PUSH',
+        externalId: null,
+        deletedAt: null,
+        updatedAt: { lt: staleBefore },
+      },
+      select: { id: true, orgId: true, ownerId: true },
+      take: FANOUT_BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
+    if (batch.length === 0) break;
+
+    for (const e of batch) {
+      await queue.add(
+        'calendar.push',
+        { orgId: e.orgId, userId: e.ownerId, calendarEventId: e.id, operation: 'push' },
+        { jobId: `calendar-push-sweep:${e.id}:${windowBucket}` },
+      );
+      recovered++;
+    }
+
+    cursor = batch[batch.length - 1]!.id;
+    if (batch.length < FANOUT_BATCH_SIZE) break;
+  }
+
+  if (recovered > 0) {
+    log.warn({ recovered, windowBucket }, 'calendar push sweep re-enqueued stranded events');
+  }
 }
 
 // ─── Incremental pull dispatcher ──────────────────────────────────────────
