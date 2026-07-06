@@ -4,6 +4,28 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-06 (pm) — Whole-app enterprise audit + account harmonization + StatTile polish
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode — 2 audit workflows (this-session then whole-app, both verify-first read-only) + 2 fixer swarms + account-harmonization build→verify. ~10 commits.
+
+**Account-segment harmonization** (closed the first audit's last MAJOR): shared `AccountsChrome.tsx` primitives — SegmentHeader / StatTile / InsightPanel / FilterRow — applied across All/Key/Top so they read as one system. Purely presentational; money formatters + pagination preserved (StatTile typed `value: string` so no raw amount crosses the micros/float boundary — adversary-verified). Then a polish pass: machined inset-highlight + GPU-safe hover lift + tabular-nums.
+
+**Whole-app enterprise audit** (5 lenses — tenancy/IDOR, RBAC, money-integrity, resilience, input — across core production paths, not just this session): 8 confirmed (2 BLOCKER, 6 MAJOR), 3 MINOR, **0 refuted**. ALL fixed with red→green tests:
+- **BLOCKER** `POST /comments` had NO RBAC gate — a Read-Only user could write org-visible comments on any viewable record and fan out @mention notifications. Added `comments:read/write` PermissionKey + seed grants (3-source lockstep) + a plugin gate mirroring tags.ts; matrix synced; parentId FK-graft closed.
+- **BLOCKER** `GET /opportunities/export` bypassed M7 row-level access-scope — a group-restricted user could CSV-dump the full org pipeline. Now applies getAccessScope + applyOpportunityScope, plus compound cursor + BigInt-safe money.
+- **MAJOR** BigInt→Number precision loss in the pipeline funnel KPI (corrupts sums > ~$9B); WorldMap + Win/Loss hardcoded EUR (ignored display currency); single-column cursor row-drop on ties in opportunities list + export + service-desk + tenant-export.
+- **Sector View** currency bug (hardcoded EUR) fixed separately.
+
+**Consolidations — declined with reasoning** (not silent skips): Sector↔Territories (two different features sharing one already-shared map widget — merging degrades both for one nav door; fixed the currency bug it surfaced instead); Opportunities/Pipeline (already share the data hook + stage mutation via React Query — full page-merge is modest value, real risk).
+
+**Logo** (earlier same day): bold gradient "P" with a forward play-triangle counter, premium squircle badge; favicon + brand SVGs synced; legible hero + rail.
+
+**Verified:** typecheck 12/12 · lint clean · ~120 new/updated tests green across the two fixer swarms · browser-verified (harmonized accounts one system + money correct, logo hero+rail, Key KPI scope label, duplicates dialog). **Login left untouched per Tony's prior "don't change the login page".**
+
+**Deferred (flagged):** tenant-scope-guard middleware enforce-mode extension for update/delete/findUnique (MINOR — deferred by the fixer as too risky vs the documented GDPR-erasure/restore/admin-merge bypasses; needs a careful dedicated pass); proposal revision history (migration + live-DB handoff); polluted dev-DB purge (operator); DB-level `parentId` acyclicity constraint (app guards cover it).
+
+---
+
 ## 2026-07-06 — Logo redesign + enterprise-readiness audit & fixes
 
 **Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode — Fable red-team/plan + Sonnet execute; account-merge (recon→red-team→build→verify), enterprise audit (6-lens verify-first), audit fixers (7 clusters). 8 commits.
