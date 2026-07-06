@@ -1,5 +1,6 @@
 // Key Accounts — strategically important accounts flagged by admins.
-// Shows full portfolio view with pipeline, contacts, and proactive alerts.
+// Paginated list (≤50/page) with pipeline, contacts, and proactive alerts.
+// The KPI strip totals are scoped to the current page, not the whole portfolio.
 
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -263,24 +264,32 @@ export function AccountsKeySegment() {
           : ''}
       </p>
 
-      {/* Stats strip */}
+      {/* Stats strip — totals are scoped to the accounts on the CURRENT page,
+          not the whole portfolio. GET /api/accounts/key is cursor-paginated
+          (≤50/page) and returns no org-wide aggregate, so summing `items`
+          (this page) and labelling it a portfolio total would silently
+          under-report and shift as the user pages. The 'On this page' eyebrow
+          makes the page-scope explicit rather than overclaiming. */}
       {!accounts.isError ? (
-        <motion.div
+        <motion.section
           variants={reducedMotion ? undefined : staggerChild}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+          aria-label={t('keyAccounts.statsStripAria', 'Key account totals on this page')}
+          className="space-y-2"
         >
-          <StatCard label={t('keyAccounts.statKeyAccounts', 'Key accounts')} value={items.length} />
-          <StatCard
-            label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
-            value={formatMoney(
-              totalPipeline,
-              'EUR',
-            )}
-          />
-          <StatCard label={t('keyAccounts.statOpenDeals', 'Open deals')} value={openDeals} />
-          <StatCard label={t('keyAccounts.statContacts', 'Contacts')} value={contactCount} />
-          <StatCard label={t('keyAccounts.statOpportunities', 'Opportunities')} value={opportunityCount} />
-        </motion.div>
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+            {t('keyAccounts.statsScope', 'On this page')}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label={t('keyAccounts.statKeyAccounts', 'Key accounts')} value={items.length} />
+            <StatCard
+              label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
+              value={formatMoney(totalPipeline, 'EUR')}
+            />
+            <StatCard label={t('keyAccounts.statOpenDeals', 'Open deals')} value={openDeals} />
+            <StatCard label={t('keyAccounts.statContacts', 'Contacts')} value={contactCount} />
+            <StatCard label={t('keyAccounts.statOpportunities', 'Opportunities')} value={opportunityCount} />
+          </div>
+        </motion.section>
       ) : null}
 
       {/* Account grid */}

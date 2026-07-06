@@ -30,6 +30,20 @@ import {
 // Render a bounded page rather than every derived row in one paint.
 const ACCOUNTS_PAGE_SIZE = 30;
 
+// The /crm/dashboard snapshot is server-bounded: its `companies` array is built
+// from the most-recent opportunities (take:100) + company enrichments (take:200)
+// in dashboard.service.ts, deduped by name — so it is NOT the full company table
+// and carries no total. This "All accounts" view searches/filters entirely
+// client-side over that array, so an account outside the snapshot is unreachable
+// and a search for it wrongly reads as "record absent". The endpoint takes no
+// search/limit param (server-side account search is the real follow-up fix), so
+// the honest interim is to make the cap visible once the payload is large enough
+// to be truncated. Threshold is the enrichment take:200 ceiling — reaching it
+// means a source is at its cap and more accounts almost certainly exist beyond
+// the snapshot. Kept conservative so small orgs (whose snapshot IS complete) are
+// never falsely warned.
+const SNAPSHOT_ACCOUNT_CAP = 200;
+
 export function AccountsAllSegment() {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
@@ -212,6 +226,11 @@ export function AccountsAllSegment() {
     (p) => p.status === 'healthy',
   ).length;
   const providerCount = dashboard.data.providerHealth.length;
+  // Raw payload size (pre synthetic-name filter) — reflects the server cap
+  // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
+  const loadedAccountCount = dashboard.data.companies.length;
+  const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
+  const filtersActive = Boolean(search || industry || technology || segment !== 'all');
 
   const syncErpAccounts = () => {
     autopopulate.mutate(
@@ -513,8 +532,32 @@ export function AccountsAllSegment() {
             : t('accounts.liveRegion.count_other', '{{count}} accounts', { count: rows.length })}
       </p>
 
+      {snapshotCapped ? (
+        <p
+          role="status"
+          className="mb-4 flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--fg-secondary)]"
+        >
+          <Icon name="info" size={14} />
+          {t(
+            'accounts.cap.notice',
+            'Showing your most active {{count}} accounts from the live dashboard — this view can’t list the full portfolio yet. Search filters the accounts loaded here; use global search to open one that isn’t. Full account search is on the roadmap.',
+            { count: loadedAccountCount },
+          )}
+        </p>
+      ) : null}
+
       {rows.length === 0 ? (
-        <EmptyState title={t('accounts.empty.filtered', 'No accounts match your filters')} />
+        <EmptyState
+          title={t('accounts.empty.filtered', 'No accounts match your filters')}
+          message={
+            snapshotCapped && filtersActive
+              ? t(
+                  'accounts.empty.filteredCapped',
+                  'This view searches only the accounts loaded from your live dashboard. The account you’re after may exist outside it — try global search.',
+                )
+              : undefined
+          }
+        />
       ) : (
         <>
           <motion.section
