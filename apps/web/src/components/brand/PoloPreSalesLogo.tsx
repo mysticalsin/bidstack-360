@@ -12,11 +12,16 @@ interface PoloPreSalesLogoProps extends ComponentPropsWithoutRef<'svg'> {
   title?: string;
 }
 
-// The "P" mark + three inbound "signal" lines with an arrow head — evokes
-// pre-sales pipeline velocity. Gradient runs indigo → violet → magenta,
-// sampled from the master brand mark.
+// A single bold, geometric "P" letterform whose counter is cut as a forward
+// play-triangle — "pre-sales in motion". Deliberately decluttered: the previous
+// mark stacked three signal lines + three dots + an arrow to the LEFT of the P,
+// which collapsed into unreadable noise at 16–20px rail size. One confident
+// filled glyph reads at any size and holds up in a monochrome/inverse tint.
+//
+// fill-rule="evenodd": the outer P silhouette minus the triangular counter.
 const MARK_PATH =
-  'M19 41 L19 14 C19 10 21.5 7.5 26.5 7.5 L29.5 7.5 C36.5 7.5 41 11.5 41 18 C41 24.5 36.5 28 29.5 28 L22.5 28';
+  'M13 40.5 V11 C13 8.79 14.79 7 17 7 H29 C36.73 7 42 11.9 42 19 C42 26.1 36.73 31 29 31 H20 V40.5 C20 42.43 18.43 44 16.5 44 C14.57 44 13 42.43 13 40.5 Z ' +
+  'M20 13.5 V24.5 L29.5 19 Z';
 
 export function PoloPreSalesLogo({
   variant = 'full',
@@ -31,19 +36,17 @@ export function PoloPreSalesLogo({
   const resolvedTitle = title ?? t('poloPreSalesLogo.title', 'Polo PreSales');
   const titleId = resolvedTitle ? `polo-logo-${rawId}` : undefined;
 
-  // In mono/inverse tones the mark collapses to a single ink so it reads on
-  // busy or colored surfaces; default tone uses the brand gradient.
+  // Default tone paints the mark in the brand gradient; mono/inverse collapse to
+  // a single ink so it reads on busy or colored surfaces (e.g. the rail badge).
   const useGradient = tone === 'default';
-  const markStroke = useGradient ? `url(#${gradId})` : 'currentColor';
-  const dotTop = useGradient ? '#4A17F0' : 'currentColor';
-  const dotMid = useGradient ? '#9A1AC4' : 'currentColor';
-  const dotBot = useGradient ? '#E4069F' : 'currentColor';
+  const markFill = useGradient ? `url(#${gradId})` : 'currentColor';
   const inkColor = tone === 'inverse' ? '#ffffff' : tone === 'mono' ? 'currentColor' : '#0A0A2E';
-  const preColor = tone === 'inverse' ? 'rgba(255,255,255,0.86)' : tone === 'mono' ? 'currentColor' : '#4A17F0';
+  const preColor =
+    tone === 'inverse' ? 'rgba(255,255,255,0.82)' : tone === 'mono' ? 'currentColor' : '#7A1FD6';
 
   return (
     <svg
-      viewBox={variant === 'mark' ? '0 0 48 48' : '0 0 232 48'}
+      viewBox={variant === 'mark' ? '0 0 48 48' : '0 0 236 48'}
       role={resolvedTitle ? 'img' : undefined}
       aria-labelledby={titleId}
       aria-hidden={resolvedTitle ? undefined : true}
@@ -54,35 +57,20 @@ export function PoloPreSalesLogo({
       {resolvedTitle ? <title id={titleId}>{resolvedTitle}</title> : null}
       {useGradient ? (
         <defs>
-          <linearGradient id={gradId} x1="10" y1="6" x2="26" y2="42" gradientUnits="userSpaceOnUse">
+          <linearGradient id={gradId} x1="12" y1="6" x2="40" y2="44" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#3F16E8" />
             <stop offset="0.5" stopColor="#7A1FD6" />
             <stop offset="1" stopColor="#E4069F" />
           </linearGradient>
         </defs>
       ) : null}
-      <g>
-        <path
-          d={MARK_PATH}
-          stroke={markStroke}
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path d="M4 16 H14" stroke={markStroke} strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M14 13 L18.5 16 L14 19 Z" fill={markStroke} />
-        <path d="M4 23 H12.5" stroke={markStroke} strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M4 30 H11" stroke={markStroke} strokeWidth="2.6" strokeLinecap="round" />
-        <circle cx="3.8" cy="16" r="2.1" fill={dotTop} />
-        <circle cx="3.8" cy="23" r="2.1" fill={dotMid} />
-        <circle cx="3.8" cy="30" r="2.1" fill={dotBot} />
-      </g>
+      <path d={MARK_PATH} fill={markFill} fillRule="evenodd" clipRule="evenodd" />
       {variant === 'full' ? (
         <g fontFamily="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif">
-          <text x="56" y="33" fontSize="27" fontWeight="700" letterSpacing="-0.5" fill={inkColor}>
+          <text x="60" y="32" fontSize="26" fontWeight="700" letterSpacing="-0.6" fill={inkColor}>
             Polo
           </text>
-          <text x="120" y="33" fontSize="27" fontWeight="600" letterSpacing="-0.5" fill={preColor}>
+          <text x="123" y="32" fontSize="26" fontWeight="600" letterSpacing="-0.6" fill={preColor}>
             PreSales
           </text>
         </g>
