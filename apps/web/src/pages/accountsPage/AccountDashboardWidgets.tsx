@@ -1,33 +1,11 @@
-// Small display-only widgets used in the Accounts page header strip.
-// WHY combined: SourceStat (9 lines) and IntegrationMotionRail (~30 lines) are
-// both tiny and only used by AccountsPage — splitting them into separate files
-// would add navigation overhead without any clarity benefit.
+// Small display-only widget used in the Accounts page header strip.
+// The per-stat cards now come from the shared StatTile primitive in
+// AccountsChrome.tsx; this file keeps the integration-status rail, which is
+// specific to the "All accounts" segment.
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
-
 import { sourceLabel } from './accountUtils';
-
-export function SourceStat({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="account-source-stat">
-      <span>{label}</span>
-      <strong>
-        <AnimatedMetric value={value} />
-      </strong>
-      <small>{detail}</small>
-    </div>
-  );
-}
 
 export function IntegrationMotionRail({
   providers,

@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { KeyAccountBadge, TopAccountBadge } from '@/components/company/AccountTierBadges';
@@ -18,6 +17,7 @@ import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
+import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { StrategicSignalInsight } from './StrategicSignalInsight';
 import { topAccountSignal } from './strategicSignals';
 import { isSyntheticAccountName } from './testDataFilter';
@@ -83,103 +83,79 @@ export function AccountsTopSegment() {
       animate="animate"
     >
       <motion.header variants={reducedMotion ? undefined : staggerChild}>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-            {t('topAccounts.heading', 'Account Ranking')}
-          </h1>
-          {!accounts.isLoading && !accounts.isError ? (
-            source === 'curated' ? (
-              <Badge tone="amber">
-                <Icon name="trophy" size={11} ariaHidden />
-                {t('topAccounts.badgeCurated', 'Curated — global top 10')}
-              </Badge>
-            ) : (
-              <Badge tone="gray">{t('topAccounts.badgeAuto', 'Auto-ranked by pipeline value')}</Badge>
-            )
-          ) : null}
-        </div>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {source === 'curated'
-            ? t('topAccounts.subtitleCurated', 'The global top 10, hand-picked and ordered by admins in Settings.')
-            : t('topAccounts.subtitleAuto', 'Highest-value accounts ranked by total pipeline and revenue.')}
-        </p>
+        <SegmentHeader
+          title={t('topAccounts.heading', 'Account Ranking')}
+          titleAccessory={
+            !accounts.isLoading && !accounts.isError ? (
+              source === 'curated' ? (
+                <Badge tone="amber">
+                  <Icon name="trophy" size={11} ariaHidden />
+                  {t('topAccounts.badgeCurated', 'Curated — global top 10')}
+                </Badge>
+              ) : (
+                <Badge tone="gray">{t('topAccounts.badgeAuto', 'Auto-ranked by pipeline value')}</Badge>
+              )
+            ) : null
+          }
+          subtitle={
+            source === 'curated'
+              ? t('topAccounts.subtitleCurated', 'The global top 10, hand-picked and ordered by admins in Settings.')
+              : t('topAccounts.subtitleAuto', 'Highest-value accounts ranked by total pipeline and revenue.')
+          }
+        />
       </motion.header>
 
       {/* Filters */}
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="flex flex-wrap items-center gap-3"
-      >
-        <div className="relative flex-1 min-w-[200px]">
-          <label htmlFor="top-accounts-search" className="sr-only">
-            {t('topAccounts.searchLabel', 'Search top accounts')}
-          </label>
-          <Icon
-            name="search"
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
-            ariaHidden
-          />
-          <input
-            id="top-accounts-search"
-            type="search"
-            placeholder={t('topAccounts.searchPlaceholder', 'Search top accounts...')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input w-full pl-9"
-          />
-        </div>
-        <label htmlFor="top-accounts-industry" className="sr-only">
-          {t('topAccounts.industryLabel', 'Filter top accounts by industry')}
-        </label>
-        <select
-          id="top-accounts-industry"
-          aria-label={t('topAccounts.industryLabel', 'Filter top accounts by industry')}
-          aria-describedby={industries.isError ? 'top-accounts-industry-error' : undefined}
-          value={industry}
-          onChange={(e) => setIndustry(e.target.value)}
-          className="input"
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        <FilterRow
+          ariaLabel={t('topAccounts.filtersAria', 'Top account filters')}
+          searchId="top-accounts-search"
+          searchLabel={t('topAccounts.searchLabel', 'Search top accounts')}
+          searchPlaceholder={t('topAccounts.searchPlaceholder', 'Search top accounts...')}
+          searchValue={search}
+          onSearchChange={setSearch}
+          onReset={() => {
+            setSearch('');
+            setIndustry('');
+          }}
+          resetLabel={t('topAccounts.resetFilters', 'Reset')}
+          showReset={Boolean(search || industry)}
         >
-          <option value="">
-            {industries.isError
-              ? t('topAccounts.industriesUnavailable', 'Industries unavailable')
-              : t('topAccounts.allIndustries', 'All industries')}
-          </option>
-          {(industries.data?.items ?? []).map((i: string) => (
-            <option key={i} value={i}>
-              {i}
+          <FilterSelect
+            id="top-accounts-industry"
+            ariaLabel={t('topAccounts.industryLabel', 'Filter top accounts by industry')}
+            ariaDescribedBy={industries.isError ? 'top-accounts-industry-error' : undefined}
+            value={industry}
+            onChange={setIndustry}
+          >
+            <option value="">
+              {industries.isError
+                ? t('topAccounts.industriesUnavailable', 'Industries unavailable')
+                : t('topAccounts.allIndustries', 'All industries')}
             </option>
-          ))}
-        </select>
-        {industries.isError ? (
-          <div
-            id="top-accounts-industry-error"
-            role="alert"
-            className="flex items-center gap-2 text-xs text-[var(--danger)]"
-          >
-            <span>{industryError ?? t('topAccounts.industryLoadError', 'Could not load industry filters.')}</span>
-            <button
-              type="button"
-              className="rounded-md px-2 py-1 font-semibold text-[var(--danger)] hover:bg-[var(--danger-tint)]"
-              onClick={() => void industries.refetch()}
+            {(industries.data?.items ?? []).map((i: string) => (
+              <option key={i} value={i}>
+                {i}
+              </option>
+            ))}
+          </FilterSelect>
+          {industries.isError ? (
+            <div
+              id="top-accounts-industry-error"
+              role="alert"
+              className="flex items-center gap-2 text-xs text-[var(--danger)]"
             >
-              {t('topAccounts.retry', 'Retry')}
-            </button>
-          </div>
-        ) : null}
-        {search || industry ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setSearch('');
-              setIndustry('');
-            }}
-          >
-            <Icon name="refresh" size={14} ariaHidden />
-            {t('topAccounts.resetFilters', 'Reset')}
-          </Button>
-        ) : null}
+              <span>{industryError ?? t('topAccounts.industryLoadError', 'Could not load industry filters.')}</span>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 font-semibold text-[var(--danger)] hover:bg-[var(--danger-tint)]"
+                onClick={() => void industries.refetch()}
+              >
+                {t('topAccounts.retry', 'Retry')}
+              </button>
+            </div>
+          ) : null}
+        </FilterRow>
       </motion.div>
 
       {!accounts.isError && items.length > 0 ? (
@@ -188,53 +164,43 @@ export function AccountsTopSegment() {
           className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]"
           aria-label={t('topAccounts.commandPanelLabel', 'Account ranking command panel')}
         >
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-                  {t('topAccounts.leaderEyebrow', 'Leaderboard signal')}
-                </p>
-                <h2 className="mt-1 truncate text-lg font-semibold text-[var(--fg-primary)]">
-                  {leader
-                    ? t('topAccounts.leaderTitle', '{{name}} is leading', { name: leader.name })
-                    : t('topAccounts.leaderFallback', 'No leader yet')}
-                </h2>
-                <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-                  {leader
-                    ? t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
-                        pipeline: formatMoney(leader.totalValue, 'EUR'),
-                        deals: leader.openDeals,
-                      })
-                    : t('topAccounts.leaderEmpty', 'Add opportunity value to create a ranking.')}
-                </p>
-              </div>
+          <InsightPanel
+            eyebrow={t('topAccounts.leaderEyebrow', 'Leaderboard signal')}
+            heading={
+              leader
+                ? t('topAccounts.leaderTitle', '{{name}} is leading', { name: leader.name })
+                : t('topAccounts.leaderFallback', 'No leader yet')
+            }
+            sub={
+              leader
+                ? t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
+                    pipeline: formatMoney(leader.totalValue, 'EUR'),
+                    deals: leader.openDeals,
+                  })
+                : t('topAccounts.leaderEmpty', 'Add opportunity value to create a ranking.')
+            }
+            aside={
               <Badge tone={source === 'curated' ? 'amber' : 'blue'}>
                 <Icon name={source === 'curated' ? 'trophy' : 'growth'} size={12} ariaHidden />
                 {source === 'curated'
                   ? t('topAccounts.sourceCuratedShort', 'Curated')
                   : t('topAccounts.sourceAutoShort', 'Auto')}
               </Badge>
+            }
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile label={t('topAccounts.statPipeline', 'Pipeline')} value={formatMoney(totalPipeline, 'EUR')} />
+              <StatTile label={t('topAccounts.statWon', 'Won')} value={formatMoney(wonPipeline, 'EUR')} />
+              <StatTile label={t('topAccounts.statOpenDeals', 'Open deals')} value={openDeals.toLocaleString()} />
+              <StatTile label={t('topAccounts.statContacts', 'Contacts')} value={contactCount.toLocaleString()} />
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label={t('topAccounts.statPipeline', 'Pipeline')} value={formatMoney(totalPipeline, 'EUR')} />
-              <StatCard label={t('topAccounts.statWon', 'Won')} value={formatMoney(wonPipeline, 'EUR')} />
-              <StatCard label={t('topAccounts.statOpenDeals', 'Open deals')} value={openDeals} />
-              <StatCard label={t('topAccounts.statContacts', 'Contacts')} value={contactCount} />
-            </div>
-          </div>
+          </InsightPanel>
 
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-                  {t('topAccounts.industryMixEyebrow', 'Industry mix')}
-                </p>
-                <h2 className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">
-                  {t('topAccounts.industryMixTitle', 'Pipeline by industry')}
-                </h2>
-              </div>
-              {industry ? <Badge tone="blue">{industry}</Badge> : null}
-            </div>
+          <InsightPanel
+            eyebrow={t('topAccounts.industryMixEyebrow', 'Industry mix')}
+            heading={t('topAccounts.industryMixTitle', 'Pipeline by industry')}
+            aside={industry ? <Badge tone="blue">{industry}</Badge> : null}
+          >
             <div className="space-y-2">
               {industryBreakdown.map((item) => (
                 <button
@@ -270,7 +236,7 @@ export function AccountsTopSegment() {
                 </button>
               ))}
             </div>
-          </div>
+          </InsightPanel>
         </motion.section>
       ) : null}
 
@@ -426,16 +392,5 @@ export function AccountsTopSegment() {
         </motion.div>
       )}
     </motion.div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-sm font-semibold text-[var(--fg-primary)]">{value}</div>
-    </div>
   );
 }

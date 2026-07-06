@@ -13,7 +13,8 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
-import { IntegrationMotionRail, SourceStat } from './AccountDashboardWidgets';
+import { IntegrationMotionRail } from './AccountDashboardWidgets';
+import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
   deriveAccount,
@@ -250,73 +251,76 @@ export function AccountsAllSegment() {
   };
 
   return (
-    <>
+    <div className="space-y-6">
       <motion.div
-        className="page-head motion-page-head"
         initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
         animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
         transition={springSoft}
       >
-        <div>
-          <h1 className="page-title gradient-text">{t('accounts.title', 'Accounts')}</h1>
-          <div className="page-sub">
-            {rows.length === 1
-              ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
-              : t('accounts.summary.companyCount_other', '{{count}} companies', {
-                  count: rows.length,
-                })}{' '}
-            · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
-            {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-              amount: formatMoneyMicros(totalPipeline, 'EUR'),
-            })}
-          </div>
-        </div>
-        <div className="page-actions">
-          {autopopulate.data ? (
-            <div className="account-sync-result">
-              {t('accounts.sync.result', '{{enriched}} enriched / {{cached}} cached', {
-                enriched: autopopulate.data.enriched,
-                cached: autopopulate.data.cached,
+        <SegmentHeader
+          title={t('accounts.title', 'Accounts')}
+          subtitle={
+            <>
+              {rows.length === 1
+                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
+                : t('accounts.summary.companyCount_other', '{{count}} companies', {
+                    count: rows.length,
+                  })}{' '}
+              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
+              {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
+                amount: formatMoneyMicros(totalPipeline, 'EUR'),
               })}
-            </div>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={autopopulate.isPending}
-            onClick={syncErpAccounts}
-            title={t(
-              'accounts.sync.buttonTitle',
-              'Sync top ERP sale.order customers into verified Polo PreSales accounts',
-            )}
-          >
-            {autopopulate.isPending ? (
-              <span
-                className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent"
-                aria-hidden
-              />
-            ) : (
-              <Icon name="download" size={14} />
-            )}
-            {autopopulate.isPending
-              ? t('accounts.sync.inProgress', 'Syncing...')
-              : t('accounts.sync.button', 'Sync ERP accounts')}
-          </button>
-          <SmartCompanyDialog
-            trigger={
-              <button type="button" className="btn btn-primary">
-                <Icon name="plus" size={14} />
-                {t('accounts.actions.newAccount', 'New account')}
+            </>
+          }
+          actions={
+            <>
+              {autopopulate.data ? (
+                <div className="account-sync-result">
+                  {t('accounts.sync.result', '{{enriched}} enriched / {{cached}} cached', {
+                    enriched: autopopulate.data.enriched,
+                    cached: autopopulate.data.cached,
+                  })}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={autopopulate.isPending}
+                onClick={syncErpAccounts}
+                title={t(
+                  'accounts.sync.buttonTitle',
+                  'Sync top ERP sale.order customers into verified Polo PreSales accounts',
+                )}
+              >
+                {autopopulate.isPending ? (
+                  <span
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent"
+                    aria-hidden
+                  />
+                ) : (
+                  <Icon name="download" size={14} />
+                )}
+                {autopopulate.isPending
+                  ? t('accounts.sync.inProgress', 'Syncing...')
+                  : t('accounts.sync.button', 'Sync ERP accounts')}
               </button>
-            }
-          />
-        </div>
+              <SmartCompanyDialog
+                trigger={
+                  <button type="button" className="btn btn-primary">
+                    <Icon name="plus" size={14} />
+                    {t('accounts.actions.newAccount', 'New account')}
+                  </button>
+                }
+              />
+            </>
+          }
+        />
       </motion.div>
 
       {autopopulate.isError ? (
         <div
           role="alert"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--danger)] bg-[var(--danger-tint)] px-4 py-3 text-sm"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--danger)] bg-[var(--danger-tint)] px-4 py-3 text-sm"
         >
           <div>
             <div className="font-semibold text-[var(--danger)]">
@@ -342,41 +346,41 @@ export function AccountsAllSegment() {
       ) : null}
 
       <section
-        className="account-dashboard-strip"
         aria-label={t('accounts.stats.regionLabel', 'Account source coverage')}
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
       >
-        <SourceStat
+        <StatTile
           label={t('accounts.stats.accounts.label', 'Accounts')}
           value={rows.length.toLocaleString()}
-          detail={t('accounts.stats.accounts.detail', 'portfolio')}
+          sublabel={t('accounts.stats.accounts.detail', 'portfolio')}
         />
-        <SourceStat
+        <StatTile
           label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          detail={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
+          sublabel={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
         />
-        <SourceStat
+        <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
           value={formatMoneyMicros(totalPipeline, 'EUR')}
-          detail={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
+          sublabel={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
         />
-        <SourceStat
+        <StatTile
           label={t('accounts.stats.coverage.label', 'Avg coverage')}
           value={`${avgCoverage}%`}
-          detail={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
+          sublabel={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
             logos: logoCoverage,
             tech: techAccounts,
           })}
         />
-        <SourceStat
+        <StatTile
           label={t('accounts.stats.enrichedProfiles.label', 'Enriched profiles')}
           value={enrichedAccounts.toLocaleString()}
-          detail={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
+          sublabel={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
         />
-        <SourceStat
+        <StatTile
           label={t('accounts.stats.sourcesHealthy.label', 'Sources healthy')}
           value={`${healthyProviders}/${providerCount}`}
-          detail={t('accounts.stats.sourcesHealthy.detail', 'API mesh')}
+          sublabel={t('accounts.stats.sourcesHealthy.detail', 'API mesh')}
         />
       </section>
       <IntegrationMotionRail
@@ -386,18 +390,18 @@ export function AccountsAllSegment() {
         }))}
       />
 
-      <section className="account-experience-panel" aria-label={t('accounts.experience.regionLabel', 'Portfolio cockpit')}>
-        <div className="account-experience-copy">
-          <p>{t('accounts.experience.eyebrow', 'Portfolio cockpit')}</p>
-          <h2>{t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}</h2>
-          <span>
-            {topMissingFields.length > 0
-              ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
-                  gaps: topMissingFields.map(([name, count]) => `${name} (${count})`).join(', '),
-                })
-              : t('accounts.experience.complete', 'No coverage gaps in the current view.')}
-          </span>
-        </div>
+      <InsightPanel
+        ariaLabel={t('accounts.experience.regionLabel', 'Portfolio cockpit')}
+        eyebrow={t('accounts.experience.eyebrow', 'Portfolio cockpit')}
+        heading={t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}
+        sub={
+          topMissingFields.length > 0
+            ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
+                gaps: topMissingFields.map(([name, count]) => `${name} (${count})`).join(', '),
+              })
+            : t('accounts.experience.complete', 'No coverage gaps in the current view.')
+        }
+      >
         <div className="account-health-bars">
           {healthDistribution.map((item) => {
             const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
@@ -414,106 +418,89 @@ export function AccountsAllSegment() {
             );
           })}
         </div>
-      </section>
+      </InsightPanel>
 
-      <motion.section
-        className="card account-filter-card"
-        aria-label={t('accounts.filters.regionLabel', 'Filters')}
+      <motion.div
+        className="space-y-3"
         initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.08 }}
       >
-        <div className="card-body account-filter-body">
-          <div className="account-segment-bar" role="group" aria-label={t('accounts.segments.label', 'Account segments')}>
-            {[
-              { key: 'all', label: t('accounts.segments.all', 'All'), count: segmentCounts.all },
-              { key: 'enriched', label: t('accounts.segments.enriched', 'Enriched'), count: segmentCounts.enriched },
-              { key: 'with_tech', label: t('accounts.segments.withTech', 'Tech stack'), count: segmentCounts.with_tech },
-              { key: 'needs_data', label: t('accounts.segments.needsData', 'Needs data'), count: segmentCounts.needs_data },
-              { key: 'watch', label: t('accounts.segments.watch', 'Watch'), count: segmentCounts.watch },
-            ].map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={segment === option.key}
-                className={segment === option.key ? 'is-active' : ''}
-                onClick={() => setSegment(option.key as AccountSegmentKey)}
-              >
-                <span>{option.label}</span>
-                <strong>{option.count}</strong>
-              </button>
-            ))}
-          </div>
-          <label className="account-filter" aria-label={t('accounts.filters.search.label', 'Search')}>
-            <Icon name="search" size={14} />
-            <input
-              type="search"
-              placeholder={t('accounts.filters.search.placeholder', 'Search by name or domain…')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </label>
-          <label
-            className="account-filter"
-            aria-label={t('accounts.filters.industry.label', 'Industry')}
-          >
-            <Icon name="briefcase" size={14} />
-            <select value={industry ?? ''} onChange={(e) => setIndustry(e.target.value || null)}>
-              <option value="">{t('accounts.filters.industry.all', 'All industries')}</option>
-              {industries.map((ind) => (
-                <option key={ind} value={ind}>
-                  {titleCase(ind)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label
-            className="account-filter"
-            aria-label={t('accounts.filters.technology.label', 'Technology')}
-          >
-            <Icon name="zap" size={14} />
-            <select value={technology ?? ''} onChange={(e) => setTechnology(e.target.value || null)}>
-              <option value="">{t('accounts.filters.technology.all', 'All technologies')}</option>
-              {technologyOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="account-filter" aria-label={t('accounts.filters.sort.label', 'Sort')}>
-            <Icon name="reports" size={14} />
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-              <option value="pipeline">
-                {t('accounts.filters.sort.pipeline', 'Sort: pipeline value')}
-              </option>
-              <option value="name">{t('accounts.filters.sort.name', 'Sort: name')}</option>
-              <option value="health">{t('accounts.filters.sort.health', 'Sort: health')}</option>
-              <option value="industry">
-                {t('accounts.filters.sort.industry', 'Sort: industry')}
-              </option>
-              <option value="coverage">
-                {t('accounts.filters.sort.coverage', 'Sort: coverage')}
-              </option>
-            </select>
-          </label>
-          {search || industry || technology || segment !== 'all' ? (
+        <div className="account-segment-bar" role="group" aria-label={t('accounts.segments.label', 'Account segments')}>
+          {[
+            { key: 'all', label: t('accounts.segments.all', 'All'), count: segmentCounts.all },
+            { key: 'enriched', label: t('accounts.segments.enriched', 'Enriched'), count: segmentCounts.enriched },
+            { key: 'with_tech', label: t('accounts.segments.withTech', 'Tech stack'), count: segmentCounts.with_tech },
+            { key: 'needs_data', label: t('accounts.segments.needsData', 'Needs data'), count: segmentCounts.needs_data },
+            { key: 'watch', label: t('accounts.segments.watch', 'Watch'), count: segmentCounts.watch },
+          ].map((option) => (
             <button
+              key={option.key}
               type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setSearch('');
-                setIndustry(null);
-                setTechnology(null);
-                setSegment('all');
-              }}
+              aria-pressed={segment === option.key}
+              className={segment === option.key ? 'is-active' : ''}
+              onClick={() => setSegment(option.key as AccountSegmentKey)}
             >
-              <Icon name="refresh" size={14} />
-              {t('accounts.filters.reset', 'Reset')}
+              <span>{option.label}</span>
+              <strong>{option.count}</strong>
             </button>
-          ) : null}
+          ))}
         </div>
-      </motion.section>
+        <FilterRow
+          ariaLabel={t('accounts.filters.regionLabel', 'Filters')}
+          searchId="all-accounts-search"
+          searchLabel={t('accounts.filters.search.label', 'Search')}
+          searchPlaceholder={t('accounts.filters.search.placeholder', 'Search by name or domain…')}
+          searchValue={search}
+          onSearchChange={setSearch}
+          onReset={() => {
+            setSearch('');
+            setIndustry(null);
+            setTechnology(null);
+            setSegment('all');
+          }}
+          resetLabel={t('accounts.filters.reset', 'Reset')}
+          showReset={Boolean(search || industry || technology || segment !== 'all')}
+        >
+          <FilterSelect
+            ariaLabel={t('accounts.filters.industry.label', 'Industry')}
+            value={industry ?? ''}
+            onChange={(value) => setIndustry(value || null)}
+          >
+            <option value="">{t('accounts.filters.industry.all', 'All industries')}</option>
+            {industries.map((ind) => (
+              <option key={ind} value={ind}>
+                {titleCase(ind)}
+              </option>
+            ))}
+          </FilterSelect>
+          <FilterSelect
+            ariaLabel={t('accounts.filters.technology.label', 'Technology')}
+            value={technology ?? ''}
+            onChange={(value) => setTechnology(value || null)}
+          >
+            <option value="">{t('accounts.filters.technology.all', 'All technologies')}</option>
+            {technologyOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FilterSelect>
+          <FilterSelect
+            ariaLabel={t('accounts.filters.sort.label', 'Sort')}
+            value={sort}
+            onChange={(value) => setSort(value as SortKey)}
+          >
+            <option value="pipeline">
+              {t('accounts.filters.sort.pipeline', 'Sort: pipeline value')}
+            </option>
+            <option value="name">{t('accounts.filters.sort.name', 'Sort: name')}</option>
+            <option value="health">{t('accounts.filters.sort.health', 'Sort: health')}</option>
+            <option value="industry">{t('accounts.filters.sort.industry', 'Sort: industry')}</option>
+            <option value="coverage">{t('accounts.filters.sort.coverage', 'Sort: coverage')}</option>
+          </FilterSelect>
+        </FilterRow>
+      </motion.div>
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -535,7 +522,7 @@ export function AccountsAllSegment() {
       {snapshotCapped ? (
         <p
           role="status"
-          className="mb-4 flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--fg-secondary)]"
+          className="flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--fg-secondary)]"
         >
           <Icon name="info" size={14} />
           {t(
@@ -585,6 +572,6 @@ export function AccountsAllSegment() {
           ) : null}
         </>
       )}
-    </>
+    </div>
   );
 }

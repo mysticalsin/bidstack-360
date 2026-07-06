@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { KeyAccountBadge } from '@/components/company/AccountTierBadges';
@@ -21,6 +20,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
+import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 
 import { StrategicSignalInsight } from './StrategicSignalInsight';
@@ -104,125 +104,93 @@ export function AccountsKeySegment() {
       animate="animate"
     >
       <motion.header variants={reducedMotion ? undefined : staggerChild}>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          {t('keyAccounts.title', 'Strategic Accounts')}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {t(
+        <SegmentHeader
+          title={t('keyAccounts.title', 'Strategic Accounts')}
+          subtitle={t(
             'keyAccounts.subtitle',
             'Regional strategic accounts owned for pipeline, coverage, and executive follow-through — distinct from the curated global Top 10.',
           )}
-        </p>
+        />
       </motion.header>
 
       {/* Filters */}
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="flex flex-wrap items-center gap-3"
-      >
-        <div className="relative flex-1 min-w-[200px]">
-          <label htmlFor="key-accounts-search" className="sr-only">
-            {t('keyAccounts.searchLabel', 'Search key accounts')}
-          </label>
-          <Icon
-            name="search"
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
-            ariaHidden
-          />
-          <input
-            id="key-accounts-search"
-            type="search"
-            placeholder={t('keyAccounts.searchPlaceholder', 'Search key accounts...')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input w-full pl-9"
-          />
-        </div>
-        <label htmlFor="key-accounts-industry" className="sr-only">
-          {t('keyAccounts.industryFilterLabel', 'Filter key accounts by industry')}
-        </label>
-        <select
-          id="key-accounts-industry"
-          aria-label={t('keyAccounts.industryFilterLabel', 'Filter key accounts by industry')}
-          aria-describedby={industries.isError ? 'key-accounts-industry-error' : undefined}
-          value={industry}
-          onChange={(e) => setIndustry(e.target.value)}
-          className="input"
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        <FilterRow
+          ariaLabel={t('keyAccounts.filtersAria', 'Key account filters')}
+          searchId="key-accounts-search"
+          searchLabel={t('keyAccounts.searchLabel', 'Search key accounts')}
+          searchPlaceholder={t('keyAccounts.searchPlaceholder', 'Search key accounts...')}
+          searchValue={search}
+          onSearchChange={setSearch}
+          onReset={() => {
+            setSearch('');
+            setIndustry('');
+          }}
+          resetLabel={t('keyAccounts.resetFilters', 'Reset')}
+          showReset={Boolean(search || industry)}
         >
-          <option value="">
-            {industries.isError
-              ? t('keyAccounts.industriesUnavailable', 'Industries unavailable')
-              : t('keyAccounts.allIndustries', 'All industries')}
-          </option>
-          {(industries.data?.items ?? []).map((i) => (
-            <option key={i} value={i}>
-              {i}
+          <FilterSelect
+            id="key-accounts-industry"
+            ariaLabel={t('keyAccounts.industryFilterLabel', 'Filter key accounts by industry')}
+            ariaDescribedBy={industries.isError ? 'key-accounts-industry-error' : undefined}
+            value={industry}
+            onChange={setIndustry}
+          >
+            <option value="">
+              {industries.isError
+                ? t('keyAccounts.industriesUnavailable', 'Industries unavailable')
+                : t('keyAccounts.allIndustries', 'All industries')}
             </option>
-          ))}
-        </select>
-        {industries.isError ? (
-          <div
-            id="key-accounts-industry-error"
-            role="alert"
-            className="flex items-center gap-2 text-xs text-[var(--danger)]"
-          >
-            <span>
-              {industryError ??
-                t('keyAccounts.industryFilterError', 'Could not load industry filters.')}
-            </span>
-            <button
-              type="button"
-              className="rounded-md px-2 py-1 font-semibold text-[var(--danger)] hover:bg-[var(--danger-tint)]"
-              onClick={() => void industries.refetch()}
+            {(industries.data?.items ?? []).map((i) => (
+              <option key={i} value={i}>
+                {i}
+              </option>
+            ))}
+          </FilterSelect>
+          {industries.isError ? (
+            <div
+              id="key-accounts-industry-error"
+              role="alert"
+              className="flex items-center gap-2 text-xs text-[var(--danger)]"
             >
-              {t('keyAccounts.retry', 'Retry')}
-            </button>
-          </div>
-        ) : null}
-        {search || industry ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setSearch('');
-              setIndustry('');
-            }}
-          >
-            <Icon name="refresh" size={14} ariaHidden />
-            {t('keyAccounts.resetFilters', 'Reset')}
-          </Button>
-        ) : null}
+              <span>
+                {industryError ??
+                  t('keyAccounts.industryFilterError', 'Could not load industry filters.')}
+              </span>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 font-semibold text-[var(--danger)] hover:bg-[var(--danger-tint)]"
+                onClick={() => void industries.refetch()}
+              >
+                {t('keyAccounts.retry', 'Retry')}
+              </button>
+            </div>
+          ) : null}
+        </FilterRow>
       </motion.div>
 
       {!accounts.isError && industryBreakdown.length > 0 ? (
-        <motion.section
-          variants={reducedMotion ? undefined : staggerChild}
-          className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]"
-          aria-label={t('keyAccounts.industrySignalLabel', 'Key account industry signal')}
-        >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-                {t('keyAccounts.industrySignalEyebrow', 'Industry signal')}
-              </p>
-              <h2 className="mt-1 truncate text-lg font-semibold text-[var(--fg-primary)]">
-                {leadingIndustry
-                  ? t('keyAccounts.industrySignalTitle', '{{industry}} leads the view', {
-                      industry: leadingIndustry.name,
-                    })
-                  : t('keyAccounts.industrySignalFallback', 'No industry signal')}
-              </h2>
-              <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-                {leadingIndustry
-                  ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
-                      count: leadingIndustry.count,
-                      pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
-                    })
-                  : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')}
-              </p>
-            </div>
-            <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <motion.div variants={reducedMotion ? undefined : staggerChild}>
+          <InsightPanel
+            ariaLabel={t('keyAccounts.industrySignalLabel', 'Key account industry signal')}
+            eyebrow={t('keyAccounts.industrySignalEyebrow', 'Industry signal')}
+            heading={
+              leadingIndustry
+                ? t('keyAccounts.industrySignalTitle', '{{industry}} leads the view', {
+                    industry: leadingIndustry.name,
+                  })
+                : t('keyAccounts.industrySignalFallback', 'No industry signal')
+            }
+            sub={
+              leadingIndustry
+                ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
+                    count: leadingIndustry.count,
+                    pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
+                  })
+                : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
+            }
+          >
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {industryBreakdown.map((item) => (
                 <button
                   key={item.name}
@@ -249,8 +217,8 @@ export function AccountsKeySegment() {
                 </button>
               ))}
             </div>
-          </div>
-        </motion.section>
+          </InsightPanel>
+        </motion.div>
       ) : null}
 
       {/* sr-only live region — announces filter result count to AT */}
@@ -280,14 +248,26 @@ export function AccountsKeySegment() {
             {t('keyAccounts.statsScope', 'On this page')}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label={t('keyAccounts.statKeyAccounts', 'Key accounts')} value={items.length} />
-            <StatCard
+            <StatTile
+              label={t('keyAccounts.statKeyAccounts', 'Key accounts')}
+              value={items.length.toLocaleString()}
+            />
+            <StatTile
               label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
               value={formatMoney(totalPipeline, 'EUR')}
             />
-            <StatCard label={t('keyAccounts.statOpenDeals', 'Open deals')} value={openDeals} />
-            <StatCard label={t('keyAccounts.statContacts', 'Contacts')} value={contactCount} />
-            <StatCard label={t('keyAccounts.statOpportunities', 'Opportunities')} value={opportunityCount} />
+            <StatTile
+              label={t('keyAccounts.statOpenDeals', 'Open deals')}
+              value={openDeals.toLocaleString()}
+            />
+            <StatTile
+              label={t('keyAccounts.statContacts', 'Contacts')}
+              value={contactCount.toLocaleString()}
+            />
+            <StatTile
+              label={t('keyAccounts.statOpportunities', 'Opportunities')}
+              value={opportunityCount.toLocaleString()}
+            />
           </div>
         </motion.section>
       ) : null}
@@ -410,16 +390,5 @@ export function AccountsKeySegment() {
         </>
       )}
     </motion.div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
-      <div className="text-xs font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {label}
-      </div>
-      <div className="mt-1 text-xl font-bold text-[var(--fg-primary)]">{value}</div>
-    </div>
   );
 }
