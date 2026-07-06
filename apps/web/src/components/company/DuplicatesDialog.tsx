@@ -4,7 +4,9 @@
 // an explicit "Keep this record" choice plus a confirm — never automatically.
 // Trigger buttons are intentionally NOT wired here; pages own their toolbars.
 
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -35,59 +37,87 @@ interface CompareCluster {
   records: CompareRecord[];
 }
 
-const REASON_LABEL: Record<string, string> = {
-  name: 'Same normalized name',
-  domain: 'Same domain',
-  email: 'Same email',
-  'name-account': 'Same name + account',
-};
+function reasonLabel(reason: string, t: TFunction): string {
+  switch (reason) {
+    case 'name':
+      return t('duplicates.reasonName', 'Same normalized name');
+    case 'domain':
+      return t('duplicates.reasonDomain', 'Same domain');
+    case 'email':
+      return t('duplicates.reasonEmail', 'Same email');
+    case 'name-account':
+      return t('duplicates.reasonNameAccount', 'Same name + account');
+    default:
+      return reason;
+  }
+}
 
-const COPY: Record<DuplicateEntity, { title: string; description: string; emptyTitle: string; emptyMessage: string }> = {
-  company: {
-    title: 'Duplicate accounts',
-    description:
-      'Two records for one client split the pipeline and double-count coverage. Pick the record to keep — its twin’s opportunities, contacts, tasks and notes move over, then the twin is archived.',
-    emptyTitle: 'Every account resolves cleanly',
-    emptyMessage:
-      'No two accounts share a normalized name or domain. Rescan after the next CSV import or HubSpot sync — that’s when twins slip in.',
-  },
-  contact: {
-    title: 'Duplicate contacts',
-    description:
+interface EntityCopy {
+  title: string;
+  description: string;
+  emptyTitle: string;
+  emptyMessage: string;
+}
+
+function entityCopy(entity: DuplicateEntity, t: TFunction): EntityCopy {
+  if (entity === 'company') {
+    return {
+      title: t('duplicates.companyTitle', 'Duplicate accounts'),
+      description: t(
+        'duplicates.companyDescription',
+        'Two records for one client split the pipeline and double-count coverage. Pick the record to keep — its twin’s opportunities, contacts, tasks and notes move over, then the twin is archived.',
+      ),
+      emptyTitle: t('duplicates.companyEmptyTitle', 'Every account resolves cleanly'),
+      emptyMessage: t(
+        'duplicates.companyEmptyMessage',
+        'No two accounts share a normalized name or domain. Rescan after the next CSV import or HubSpot sync — that’s when twins slip in.',
+      ),
+    };
+  }
+  return {
+    title: t('duplicates.contactTitle', 'Duplicate contacts'),
+    description: t(
+      'duplicates.contactDescription',
       'Two cards for one person scatter meeting history and stakeholder maps. Pick the card to keep — opportunity roles and meeting invites follow it, then the twin is archived.',
-    emptyTitle: 'Every contact is one person',
-    emptyMessage:
+    ),
+    emptyTitle: t('duplicates.contactEmptyTitle', 'Every contact is one person'),
+    emptyMessage: t(
+      'duplicates.contactEmptyMessage',
       'No two contacts share an email or a name at the same account. Rescan after the next badge-scan or CSV import.',
-  },
-};
+    ),
+  };
+}
 
-function companyToCompare(r: CompanyDuplicateRecord): CompareRecord {
+function companyToCompare(r: CompanyDuplicateRecord, t: TFunction): CompareRecord {
   return {
     id: r.id,
     title: r.name,
     fields: [
-      { label: 'Legal name', value: r.legalName ?? '—' },
-      { label: 'Domain', value: r.domain ?? r.website ?? '—' },
-      { label: 'Industry', value: r.industry ?? '—' },
-      { label: 'Country', value: r.countryCode ?? '—' },
-      { label: 'Contacts', value: String(r.contactCount) },
-      { label: 'Opportunities', value: String(r.opportunityCount) },
-      { label: 'Added', value: formatDate(r.createdAt) },
+      { label: t('duplicates.fieldLegalName', 'Legal name'), value: r.legalName ?? '—' },
+      { label: t('duplicates.fieldDomain', 'Domain'), value: r.domain ?? r.website ?? '—' },
+      { label: t('duplicates.fieldIndustry', 'Industry'), value: r.industry ?? '—' },
+      { label: t('duplicates.fieldCountry', 'Country'), value: r.countryCode ?? '—' },
+      { label: t('duplicates.fieldContacts', 'Contacts'), value: String(r.contactCount) },
+      { label: t('duplicates.fieldOpportunities', 'Opportunities'), value: String(r.opportunityCount) },
+      { label: t('duplicates.fieldAdded', 'Added'), value: formatDate(r.createdAt) },
     ],
   };
 }
 
-function contactToCompare(r: ContactDuplicateRecord): CompareRecord {
+function contactToCompare(r: ContactDuplicateRecord, t: TFunction): CompareRecord {
   return {
     id: r.id,
     title: r.name,
     fields: [
-      { label: 'Email', value: r.email ?? '—' },
-      { label: 'Role', value: r.role ?? '—' },
-      { label: 'Phone', value: r.phone ?? '—' },
-      { label: 'Account', value: r.companyName ?? r.customer },
-      { label: 'Opportunity roles', value: String(r.opportunityLinkCount) },
-      { label: 'Added', value: formatDate(r.createdAt) },
+      { label: t('duplicates.fieldEmail', 'Email'), value: r.email ?? '—' },
+      { label: t('duplicates.fieldRole', 'Role'), value: r.role ?? '—' },
+      { label: t('duplicates.fieldPhone', 'Phone'), value: r.phone ?? '—' },
+      { label: t('duplicates.fieldAccount', 'Account'), value: r.companyName ?? r.customer },
+      {
+        label: t('duplicates.fieldOpportunityRoles', 'Opportunity roles'),
+        value: String(r.opportunityLinkCount),
+      },
+      { label: t('duplicates.fieldAdded', 'Added'), value: formatDate(r.createdAt) },
     ],
   };
 }
@@ -99,36 +129,53 @@ interface DuplicatesDialogProps {
 }
 
 export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialogProps) {
+  const { t } = useTranslation('crm');
   const companyQuery = useCompanyDuplicates(open && entity === 'company');
   const contactQuery = useContactDuplicates(open && entity === 'contact');
   const merge = useMergeDuplicates();
   const [mergingKey, setMergingKey] = useState<string | null>(null);
 
+  const copy = entityCopy(entity, t);
   const active = entity === 'company' ? companyQuery : contactQuery;
   const clusters: CompareCluster[] =
     entity === 'company'
       ? (companyQuery.data?.clusters ?? []).map((c, i) => ({
           key: `company-${i}-${c.companies[0]?.id ?? ''}`,
           reasons: c.reasons,
-          records: c.companies.map(companyToCompare),
+          records: c.companies.map((r) => companyToCompare(r, t)),
         }))
       : (contactQuery.data?.clusters ?? []).map((c, i) => ({
           key: `contact-${i}-${c.contacts[0]?.id ?? ''}`,
           reasons: c.reasons,
-          records: c.contacts.map(contactToCompare),
+          records: c.contacts.map((r) => contactToCompare(r, t)),
         }));
   const truncated = active.data?.truncated ?? false;
 
   async function keepRecord(cluster: CompareCluster, survivor: CompareRecord) {
     const losers = cluster.records.filter((r) => r.id !== survivor.id);
+    const mergePhrase =
+      losers.length === 1
+        ? t('duplicates.confirmMergeOne', 'One duplicate merges into it. ')
+        : t('duplicates.confirmMergeMany', '{{count}} duplicates merge into it. ', {
+            count: losers.length,
+          });
+    const consequence =
+      entity === 'company'
+        ? t(
+            'duplicates.confirmConsequenceCompany',
+            'Their opportunities, contacts, tasks and notes move to the kept record; the duplicates are archived. There is no un-merge.',
+          )
+        : t(
+            'duplicates.confirmConsequenceContact',
+            'Their opportunity roles and meeting invites move to the kept card; the duplicates are archived. There is no un-merge.',
+          );
     const ok = await confirm({
-      title: `Keep “${survivor.title}”?`,
-      description:
-        `${losers.length === 1 ? 'One duplicate merges' : `${losers.length} duplicates merge`} into it. ` +
-        (entity === 'company'
-          ? 'Their opportunities, contacts, tasks and notes move to the kept record; the duplicates are archived. There is no un-merge.'
-          : 'Their opportunity roles and meeting invites move to the kept card; the duplicates are archived. There is no un-merge.'),
-      confirmLabel: losers.length === 1 ? 'Merge 1 record' : `Merge ${losers.length} records`,
+      title: t('duplicates.confirmTitle', 'Keep “{{name}}”?', { name: survivor.title }),
+      description: mergePhrase + consequence,
+      confirmLabel:
+        losers.length === 1
+          ? t('duplicates.confirmLabelOne', 'Merge 1 record')
+          : t('duplicates.confirmLabelMany', 'Merge {{count}} records', { count: losers.length }),
       destructive: true,
     });
     if (!ok) return;
@@ -139,8 +186,13 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
       }
       toast.success(
         losers.length === 1
-          ? `Merged 1 duplicate into “${survivor.title}”`
-          : `Merged ${losers.length} duplicates into “${survivor.title}”`,
+          ? t('duplicates.mergedToastOne', 'Merged 1 duplicate into “{{name}}”', {
+              name: survivor.title,
+            })
+          : t('duplicates.mergedToastMany', 'Merged {{count}} duplicates into “{{name}}”', {
+              count: losers.length,
+              name: survivor.title,
+            }),
       );
     } catch {
       // The hook already toasts the failing merge; stop the chain so the
@@ -152,35 +204,33 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        title={COPY[entity].title}
-        description={COPY[entity].description}
-        className="w-[min(820px,94vw)]"
-      >
+      <DialogContent title={copy.title} description={copy.description} className="w-[min(820px,94vw)]">
         {active.isPending ? (
           <LoadingSkeleton rows={3} />
         ) : active.isError ? (
           <ErrorState
-            title="The duplicate scan failed"
-            message="Nothing was merged. Retry the scan — it only reads records."
+            title={t('duplicates.scanFailedTitle', 'The duplicate scan failed')}
+            message={t(
+              'duplicates.scanFailedMessage',
+              'Nothing was merged. Retry the scan — it only reads records.',
+            )}
             action={
               <Button variant="secondary" size="sm" onClick={() => void active.refetch()}>
-                Scan again
+                {t('duplicates.scanAgain', 'Scan again')}
               </Button>
             }
           />
         ) : clusters.length === 0 ? (
-          <EmptyState
-            icon="checkCircle"
-            title={COPY[entity].emptyTitle}
-            message={COPY[entity].emptyMessage}
-          />
+          <EmptyState icon="checkCircle" title={copy.emptyTitle} message={copy.emptyMessage} />
         ) : (
           <div className="space-y-6">
             {truncated ? (
               <p className="flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--fg-secondary)]">
                 <Icon name="info" size={14} />
-                Scanned the first 1,000 records. Merge what’s here, then rescan for the rest.
+                {t(
+                  'duplicates.truncated',
+                  'Scanned the first 1,000 records. Merge what’s here, then rescan for the rest.',
+                )}
               </p>
             ) : null}
             {clusters.map((cluster) => (
@@ -207,6 +257,7 @@ interface ClusterSectionProps {
 }
 
 function ClusterSection({ cluster, merging, anyMerging, onKeep }: ClusterSectionProps) {
+  const { t } = useTranslation('crm');
   // Fields that differ across the cluster carry the signal; identical ones
   // recede. Compare per label so the eye lands on the divergence.
   const differing = new Set(
@@ -218,16 +269,21 @@ function ClusterSection({ cluster, merging, anyMerging, onKeep }: ClusterSection
       )
       .map((f) => f.label),
   );
+  const otherCount = cluster.records.length - 1;
   return (
-    <section aria-label={`Possible duplicates: ${cluster.records[0]?.title ?? ''}`}>
+    <section
+      aria-label={t('duplicates.clusterAria', 'Possible duplicates: {{name}}', {
+        name: cluster.records[0]?.title ?? '',
+      })}
+    >
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {cluster.reasons.map((reason) => (
           <Badge key={reason} tone="amber">
-            {REASON_LABEL[reason] ?? reason}
+            {reasonLabel(reason, t)}
           </Badge>
         ))}
         <span className="text-[11px] text-[var(--fg-tertiary)]">
-          {cluster.records.length} records
+          {t('duplicates.recordCount', '{{count}} records', { count: cluster.records.length })}
         </span>
       </div>
       <div className="overflow-x-auto pb-1">
@@ -262,11 +318,15 @@ function ClusterSection({ cluster, merging, anyMerging, onKeep }: ClusterSection
                 size="sm"
                 className="w-full"
                 disabled={anyMerging}
-                aria-label={`Keep ${record.title} and merge the other ${cluster.records.length - 1 === 1 ? 'record' : 'records'} into it`}
+                aria-label={t(
+                  'duplicates.keepAria',
+                  'Keep {{name}} and merge the other {{count}} into it',
+                  { name: record.title, count: otherCount },
+                )}
                 onClick={() => onKeep(record)}
               >
                 <Icon name={merging ? 'loader' : 'check'} size={14} />
-                {merging ? 'Merging…' : 'Keep this record'}
+                {merging ? t('duplicates.merging', 'Merging…') : t('duplicates.keepThisRecord', 'Keep this record')}
               </Button>
             </article>
           ))}

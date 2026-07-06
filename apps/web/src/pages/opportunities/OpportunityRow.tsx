@@ -179,7 +179,7 @@ export const Row = memo(function Row({
                   // no celebration for a lost bid.
                   if (nextStage?.isWon) {
                     fireConfetti();
-                    toast.success(`🎉 Won "${opp.name}"!`, { duration: 5000 });
+                    toast.success(`Won "${opp.name}"!`, { duration: 5000 });
                   }
                   // Announce every stage move to screen readers — this is
                   // the most consequential edit on the page and the live

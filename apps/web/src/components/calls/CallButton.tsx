@@ -19,15 +19,19 @@ import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/Button';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useStartCall, type CallProvider, type CallEntityType } from '@/hooks/useCalls';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PROVIDERS: { value: CallProvider; labelKey: string; labelDefault: string; icon: string }[] = [
-  { value: 'ZOOM', labelKey: 'callButton.providerZoom', labelDefault: 'Start Zoom', icon: '📹' },
-  { value: 'TEAMS', labelKey: 'callButton.providerTeams', labelDefault: 'Start Teams', icon: '💼' },
-  { value: 'GOOGLE_MEET', labelKey: 'callButton.providerGoogleMeet', labelDefault: 'Start Google Meet', icon: '🎥' },
-  { value: 'TWILIO_VOICE', labelKey: 'callButton.providerTwilio', labelDefault: 'Call via Twilio', icon: '📞' },
+// Icons come from the shared Lucide-style Icon set (house rule: one SVG family,
+// never emoji as UI icons). The set has no per-brand call glyph, so every
+// provider shares the `phone` mark — the text label carries provider identity.
+const PROVIDERS: { value: CallProvider; labelKey: string; labelDefault: string; icon: IconName }[] = [
+  { value: 'ZOOM', labelKey: 'callButton.providerZoom', labelDefault: 'Start Zoom', icon: 'phone' },
+  { value: 'TEAMS', labelKey: 'callButton.providerTeams', labelDefault: 'Start Teams', icon: 'phone' },
+  { value: 'GOOGLE_MEET', labelKey: 'callButton.providerGoogleMeet', labelDefault: 'Start Google Meet', icon: 'phone' },
+  { value: 'TWILIO_VOICE', labelKey: 'callButton.providerTwilio', labelDefault: 'Call via Twilio', icon: 'phone' },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -192,7 +196,7 @@ export function CallButton({
         aria-busy={isLoading}
         className="min-h-[44px] gap-2"
       >
-        <span aria-hidden>📞</span>
+        <Icon name="phone" size={16} />
         {isLoading ? t('callButton.starting', 'Starting…') : t('callButton.startCall', 'Start Call')}
         <span
           aria-hidden
@@ -227,9 +231,7 @@ export function CallButton({
                 isLoading && 'cursor-not-allowed opacity-50',
               )}
             >
-              <span aria-hidden className="text-base">
-                {p.icon}
-              </span>
+              <Icon name={p.icon} size={16} />
               <span>{t(p.labelKey, p.labelDefault)}</span>
             </button>
           ))}

@@ -13,7 +13,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SavedViewsBar } from './SavedViewsBar';
-import { prompt } from '@/components/ui/ConfirmDialog';
+import { confirm, prompt } from '@/components/ui/ConfirmDialog';
 import { useSavedViews } from '@/stores/savedViews';
 
 vi.mock('react-i18next', () => ({
@@ -35,6 +35,7 @@ vi.mock('@/components/ui/Toast', () => ({
 }));
 
 const promptMock = vi.mocked(prompt);
+const confirmMock = vi.mocked(confirm);
 
 /** Renders the router's current location so restore-by-navigation is observable. */
 function LocationProbe() {
@@ -46,6 +47,7 @@ beforeEach(() => {
   localStorage.clear();
   useSavedViews.setState({ views: {} });
   promptMock.mockReset();
+  confirmMock.mockReset();
 });
 
 afterEach(cleanup);
@@ -112,6 +114,54 @@ describe('SavedViewsBar', () => {
     // page's own restore hook must receive the exact serialized query.
     expect(onRestore).toHaveBeenCalledWith('?q=cfo&sort=influence.desc');
     expect(screen.getByTestId('loc').textContent).toBe('/contacts');
+  });
+
+  it('removes the view the picker has selected — not the most-recently-saved one', async () => {
+    // save() prepends, so the LAST-saved view is views[0]. A user who saved an
+    // older view first then a newer one, and wants to delete the older, must
+    // get the older one removed — deleting views[0] would silently drop the
+    // wrong (newer) view while the confirm dialog even named the older one.
+    useSavedViews.getState().save('opportunities', 'Q1 Renewals', '?q=q1'); // older → views[1]
+    useSavedViews.getState().save('opportunities', 'My Bids', '?q=bids'); // newer → views[0]
+    const older = useSavedViews
+      .getState()
+      .views.opportunities?.find((v) => v.name === 'Q1 Renewals');
+    expect(older).toBeDefined();
+    confirmMock.mockResolvedValue(true);
+
+    render(
+      <MemoryRouter initialEntries={['/opportunities']}>
+        <SavedViewsBar surface="opportunities" basePath="/opportunities" namePlaceholder="x" />
+      </MemoryRouter>,
+    );
+
+    // Pick the OLDER view in the recall dropdown, then remove.
+    fireEvent.change(screen.getByLabelText('Recall saved view'), {
+      target: { value: older!.id },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove selected saved view' }));
+
+    await waitFor(() => {
+      const remaining = useSavedViews.getState().views.opportunities ?? [];
+      // Only the newer view survives; the selected (older) one is gone.
+      expect(remaining.map((v) => v.name)).toEqual(['My Bids']);
+    });
+  });
+
+  it('disables Remove until a view is picked so it can never delete a stale views[0]', () => {
+    useSavedViews.getState().save('opportunities', 'Only view', '?q=x');
+
+    render(
+      <MemoryRouter initialEntries={['/opportunities']}>
+        <SavedViewsBar surface="opportunities" basePath="/opportunities" namePlaceholder="x" />
+      </MemoryRouter>,
+    );
+
+    // Nothing selected yet → the destructive control is inert.
+    expect(
+      (screen.getByRole('button', { name: 'Remove selected saved view' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 
   it('captures via getQuery on save so local-state filters are what gets bookmarked', async () => {

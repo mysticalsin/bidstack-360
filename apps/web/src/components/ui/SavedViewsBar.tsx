@@ -11,6 +11,7 @@
 //     page's filter state and `onRestore` to re-apply it — navigation alone
 //     can't restore filters that never touch the URL.
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -46,6 +47,9 @@ export function SavedViewsBar({
   const save = useSavedViews((s) => s.save);
   const remove = useSavedViews((s) => s.remove);
   const views = all[surface] ?? [];
+  // Track which view the recall picker has active so Remove targets THAT view
+  // rather than blindly deleting views[0] (the most-recently-saved one).
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const onSave = async () => {
     const name = await prompt({
@@ -70,13 +74,13 @@ export function SavedViewsBar({
       {views.length > 0 ? (
         <select
           aria-label={t('savedViewsBar.recallAriaLabel', 'Recall saved view')}
-          defaultValue=""
+          value={selectedId ?? ''}
           onChange={(e) => {
             const id = e.target.value;
+            setSelectedId(id || null);
             if (!id) return;
             const v = views.find((x) => x.id === id);
             if (v) restore(v.query);
-            e.target.value = '';
           }}
           className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)] pointer-coarse:min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
         >
@@ -98,8 +102,9 @@ export function SavedViewsBar({
       {views.length > 0 ? (
         <button
           type="button"
+          disabled={!selectedId}
           onClick={async () => {
-            const v = views[0];
+            const v = views.find((x) => x.id === selectedId);
             if (!v) return;
             const ok = await confirm({
               title: t('savedViewsBar.removeConfirmTitle', 'Remove saved view?'),
@@ -113,11 +118,12 @@ export function SavedViewsBar({
             });
             if (ok) {
               remove(surface, v.id);
+              setSelectedId(null);
             }
           }}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-          title={t('savedViewsBar.removeButtonTitle', 'Remove most-recent saved view')}
-          aria-label={t('savedViewsBar.removeButtonTitle', 'Remove most-recent saved view')}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--fg-tertiary)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+          title={t('savedViewsBar.removeButtonTitle', 'Remove selected saved view')}
+          aria-label={t('savedViewsBar.removeButtonTitle', 'Remove selected saved view')}
         >
           <Icon name="close" size={12} ariaHidden />
         </button>

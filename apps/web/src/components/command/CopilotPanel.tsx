@@ -21,6 +21,7 @@ import {
   useDraftEmail,
 } from '@/hooks/useAiAssistant';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
+import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 
 import {
@@ -32,6 +33,14 @@ import {
 import type { Item } from './commandPaletteUtils';
 
 export type CopilotKeyHandler = (e: KeyboardEvent<HTMLInputElement>) => boolean;
+
+/** The AI endpoints return HTTP 429 when an org trips a daily AI cap (session
+ *  count OR cost). That's a deterministic quota that resets at UTC midnight —
+ *  never a transient failure — so it must be classified by status code, not by
+ *  substring-matching the message (the session-cap message contains no "cap"). */
+function isDailyCapError(error: Error | null): boolean {
+  return error instanceof ApiError && error.status === 429;
+}
 
 interface CopilotPanelProps {
   /** The user's ask, already stripped of the '?'/'>' prefix. */
@@ -187,13 +196,17 @@ function CopilotStatusArea({
       ) : error ? (
         <div>
           <p className="text-xs text-[var(--danger)]" role="alert">
-            {error.message.includes('cap')
+            {isDailyCapError(error)
               ? t('copilot.errorCap', 'Daily AI budget spent — it resets tomorrow.')
               : t('copilot.errorGeneric', 'Copilot couldn’t read this record. Try again.')}
           </p>
-          <button type="button" onClick={onRetry} className={linkButtonClasses}>
-            {t('copilot.retry', 'Retry')}
-          </button>
+          {/* A daily cap is deterministic until it resets — retrying just fails
+              again with the same 429, so don't offer a doomed Retry. */}
+          {isDailyCapError(error) ? null : (
+            <button type="button" onClick={onRetry} className={linkButtonClasses}>
+              {t('copilot.retry', 'Retry')}
+            </button>
+          )}
         </div>
       ) : result ? (
         <div className="space-y-3">
