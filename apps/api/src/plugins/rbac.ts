@@ -20,6 +20,10 @@ declare module 'fastify' {
     requireRole: (...allowed: string[]) => (req: FastifyRequest) => Promise<void>;
     requirePermission: (permission: PermissionKey) => (req: FastifyRequest) => Promise<void>;
     requireHumanActor: (message?: string) => (req: FastifyRequest) => Promise<void>;
+    /** Non-throwing permission check for conditionally including sensitive fields
+     *  in a response (e.g. gate an admin-only field on an otherwise-readable
+     *  route). Mirrors requirePermission's decision but returns a boolean. */
+    hasPermission: (req: FastifyRequest, permission: PermissionKey) => Promise<boolean>;
   }
   // WHY: route config: { permission: '...' } is a convenience annotation used
   // by observability middleware to log which permission gate a route enforces.
@@ -72,6 +76,16 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       // in apps/api/src/plugins/auth.ts that ensures Clerk org-admins receive the
       // seeded "Admin" Role on first sign-in.
       throw req.server.httpErrors.forbidden(`Requires permission: ${permission}`);
+    },
+  );
+
+  server.decorate(
+    'hasPermission',
+    async (req: FastifyRequest, permission: PermissionKey): Promise<boolean> => {
+      if (req.auth.role === 'api') {
+        return apiKeyScopeSatisfiesPermission(req.auth.scopes, permission);
+      }
+      return userHasPermission(req.auth.orgId, req.auth.userId, permission);
     },
   );
 });

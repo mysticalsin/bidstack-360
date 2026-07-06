@@ -63,6 +63,13 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
+      // The human-readable summary (text) is safe for anyone with
+      // opportunities:read, but the raw audit-log `diff` (before/after field
+      // values) is admin-grade data the dedicated audit-log routes gate behind
+      // audit-log:read — so only include it in the timeline metadata for callers
+      // who hold that permission.
+      const canSeeAuditDiff = await server.hasPermission(req, 'audit-log:read');
+
       // Fetch all activity sources in parallel
       const [auditLogs, tasks, comments, activities] = await Promise.all([
         prisma.auditLog.findMany({
@@ -129,7 +136,9 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           text,
           actorName: log.user?.name ?? null,
           createdAt: log.at.toISOString(),
-          metadata: { action: log.action, diff: log.diff },
+          metadata: canSeeAuditDiff
+            ? { action: log.action, diff: log.diff }
+            : { action: log.action },
         });
       }
 

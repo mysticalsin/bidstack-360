@@ -358,4 +358,68 @@ describe('opportunity timeline', () => {
       await prisma.apiKey.deleteMany({ where: { id: readKey.id } });
     }
   });
+
+  // WHY: the human-readable summary is fine for opportunities:read, but the raw
+  // audit-log `diff` (before/after field values) is admin-grade data gated
+  // elsewhere behind audit-log:read. It must be stripped from the timeline
+  // metadata for callers who lack that permission, or the gate is cosmetic.
+  skipIfNoDb('omits the raw audit diff for opportunities:read but includes it for audit-log:read', async () => {
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `TLD-${randomUUID().slice(0, 8)}`,
+        customer: 'timeline-diff-test',
+        name: 'Timeline Diff Gate',
+        stage: 's1_lead',
+      },
+    });
+    createdIds.opportunities.push(opportunity.id);
+    const auditLog = await prisma.auditLog.create({
+      data: {
+        orgId,
+        action: 'opportunity.update',
+        targetType: 'opportunity',
+        targetId: opportunity.id,
+        diff: { name: { from: 'old', to: 'new' } },
+      },
+    });
+    createdIds.auditLogs.push(auditLog.id);
+
+    const mkKey = async (scopes: string[]) => {
+      const raw = `tld_${randomUUID()}`;
+      const rec = await prisma.apiKey.create({
+        data: {
+          orgId,
+          name: `timeline diff key ${scopes.join(',')}`,
+          hashedKey: createHash('sha256').update(raw).digest('hex'),
+          prefix: raw.slice(0, 8),
+          scopes,
+        },
+      });
+      return { raw, id: rec.id };
+    };
+    const readOnly = await mkKey(['opportunities:read']);
+    const auditor = await mkKey(['opportunities:read', 'audit-log:read']);
+    try {
+      const readRes = await server.inject({
+        method: 'GET',
+        url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+        headers: { 'x-api-key': readOnly.raw },
+      });
+      expect(readRes.statusCode).toBe(200);
+      const readItem = readRes.json().items.find((i: { kind: string }) => i.kind === 'audit');
+      expect(readItem).toBeTruthy();
+      expect(readItem.metadata.diff).toBeUndefined();
+
+      const auditRes = await server.inject({
+        method: 'GET',
+        url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+        headers: { 'x-api-key': auditor.raw },
+      });
+      const auditItem = auditRes.json().items.find((i: { kind: string }) => i.kind === 'audit');
+      expect(auditItem.metadata.diff).toEqual({ name: { from: 'old', to: 'new' } });
+    } finally {
+      await prisma.apiKey.deleteMany({ where: { id: { in: [readOnly.id, auditor.id] } } });
+    }
+  });
 });
