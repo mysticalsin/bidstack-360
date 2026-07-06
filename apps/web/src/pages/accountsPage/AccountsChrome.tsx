@@ -55,11 +55,22 @@ export function StatTile({
   sublabel?: string;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]">
+    <div
+      className={cn(
+        'group rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4',
+        // Machined feel: a hairline inner top-highlight over the ambient xs
+        // shadow, and a gentle GPU-safe lift on hover. Motion is transform/
+        // shadow only and disabled under prefers-reduced-motion.
+        'shadow-[inset_0_1px_0_rgba(255,255,255,0.05),var(--shadow-xs)]',
+        'transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]',
+        'hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),var(--shadow-sm)]',
+        'motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+      )}
+    >
       <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
         {label}
       </div>
-      <div className="mt-2 truncate text-xl font-bold leading-tight text-[var(--fg-primary)]">
+      <div className="mt-2 truncate text-xl font-bold leading-tight tabular-nums text-[var(--fg-primary)]">
         {value}
       </div>
       {sublabel ? (
@@ -93,7 +104,8 @@ export function InsightPanel({
     <section
       aria-label={ariaLabel}
       className={cn(
-        'rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]',
+        'rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4',
+        'shadow-[inset_0_1px_0_rgba(255,255,255,0.05),var(--shadow-xs)]',
         className,
       )}
     >
