@@ -30,6 +30,7 @@ interface WorkloadOwnerRow {
 }
 
 const DAY_MS = 86_400_000;
+const TODAY = new Date();
 
 describe('analytics workload route', () => {
   let server: FastifyInstance | null = null;
@@ -177,6 +178,18 @@ describe('analytics workload route', () => {
           ownerId: bobId,
         },
       }),
+      // Bob: one open task due TODAY (UTC). Overdue means the due day has fully
+      // passed, so a task due today must NOT count as overdue until tomorrow —
+      // a live timestamp comparison would mis-flag it for the whole current day.
+      prisma.task.create({
+        data: {
+          orgId,
+          title: 'Send today’s bid clarifications',
+          status: 'open',
+          assigneeId: bobId,
+          dueDate: new Date(Date.UTC(TODAY.getUTCFullYear(), TODAY.getUTCMonth(), TODAY.getUTCDate())),
+        },
+      }),
       // Other org: open bid owned by Charlie — must not leak into org A.
       prisma.opportunity.create({
         data: {
@@ -258,13 +271,26 @@ describe('analytics workload route', () => {
     });
 
     const bob = owners.find((o) => o.ownerId === bobId);
+    // Bob's one task is due today: it counts as open work but must NOT be
+    // overdue — the day hasn't ended. (Regression guard below pins the boundary.)
     expect(bob).toMatchObject({
       openBids: 1,
       weightedValueMicros: '5000000',
       closingWithin7Days: 0,
-      openTasks: 0,
+      openTasks: 1,
       overdueTasks: 0,
     });
+  });
+
+  skipIfNoSeed('a task due today is open but not overdue until the day ends', async (app) => {
+    // Overdue keys off the start-of-day UTC boundary, not a live timestamp. Under
+    // the previous `dueDate < now` logic Bob's today-due task read as overdue for
+    // essentially the whole day, telling the bid lead to reassign healthy work.
+    const owners = await fetchOwners(app);
+    const bob = owners.find((o) => o.ownerId === bobId);
+    expect(bob).toBeDefined();
+    expect(bob!.openTasks).toBe(1);
+    expect(bob!.overdueTasks).toBe(0);
   });
 
   skipIfNoSeed('lists zero-load members — free capacity is the signal', async (app) => {

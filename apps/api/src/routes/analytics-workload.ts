@@ -74,7 +74,14 @@ interface TaskAgg {
 
 /** Open (= not done) and overdue (= not done + past due) task counts per assignee. */
 async function aggregateTasks(orgId: string): Promise<TaskAgg> {
+  // Task.dueDate is a Postgres `date` (midnight UTC). Overdue means the due day
+  // has fully passed, so window on the UTC day boundary — NOT `now` — otherwise
+  // a task due *today* reads as overdue for the whole day. Matches the
+  // start-of-day convention in opportunities.ts, tasks.ts and crm/summary.ts.
   const now = new Date();
+  const startOfTodayUTC = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
   const [openRows, overdueRows] = await Promise.all([
     prisma.task.groupBy({
       by: ['assigneeId'],
@@ -83,7 +90,7 @@ async function aggregateTasks(orgId: string): Promise<TaskAgg> {
     }),
     prisma.task.groupBy({
       by: ['assigneeId'],
-      where: { orgId, deletedAt: null, status: { not: 'done' }, dueDate: { lt: now } },
+      where: { orgId, deletedAt: null, status: { not: 'done' }, dueDate: { lt: startOfTodayUTC } },
       _count: { _all: true },
     }),
   ]);

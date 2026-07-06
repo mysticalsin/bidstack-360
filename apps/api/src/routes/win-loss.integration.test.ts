@@ -108,11 +108,14 @@ describe('win/loss routes', () => {
       totalWon: number;
       totalLost: number;
       winRatePct: number | null;
+      truncated: boolean;
       quarters: { quarter: string; won: number; lost: number }[];
       reasons: { reason: string; won: number; lost: number }[];
       recent: { opportunityId: string; name: string; decidedAt: string }[];
     };
     expect(body.totalLost).toBeGreaterThanOrEqual(1);
+    // A handful of records is well under the 1 000 scan cap — nothing dropped.
+    expect(body.truncated).toBe(false);
     expect(body.winRatePct).not.toBeNull();
     // Quarter buckets must account for every closed record — the trend chart
     // is wrong if the buckets and the totals disagree.

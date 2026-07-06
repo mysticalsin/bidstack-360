@@ -64,6 +64,12 @@ const WinLossAnalysis = z.object({
   totalLost: z.number().int().nonnegative(),
   /** 0–100, one decimal; null when the range has no closed records. */
   winRatePct: z.number().nullable(),
+  /**
+   * true when the scan hit ANALYSIS_SCAN_CAP, i.e. older history was dropped
+   * from these aggregates. Mirrors the sibling duplicates scan's `truncated`
+   * so the UI can warn the retrospective understates a high-volume org.
+   */
+  truncated: z.boolean(),
   quarters: z.array(OutcomeCounts.extend({ quarter: z.string() })),
   reasons: z.array(OutcomeCounts.extend({ reason: WinLossReasonCode })),
   competitors: z.array(OutcomeCounts.extend({ competitor: z.string() })),
@@ -126,7 +132,7 @@ function serializeRecent(r: AnalysisScanRow): WinLossAnalysisBody['recent'][numb
   };
 }
 
-function aggregateAnalysis(rows: AnalysisScanRow[]): WinLossAnalysisBody {
+function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLossAnalysisBody {
   const quarters = new Map<string, { won: number; lost: number }>();
   const reasons = new Map<string, { won: number; lost: number }>();
   const competitors = new Map<string, { won: number; lost: number }>();
@@ -147,6 +153,7 @@ function aggregateAnalysis(rows: AnalysisScanRow[]): WinLossAnalysisBody {
     totalWon,
     totalLost,
     winRatePct: total === 0 ? null : Math.round((totalWon / total) * 1000) / 10,
+    truncated,
     // "2026-Q1" sorts lexically because the year is zero-padded to 4 digits.
     quarters: [...quarters.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
@@ -214,6 +221,12 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { from, to, ownerId } = req.query;
+      // PERF: this filters `{ orgId, createdAt gte/lte }` and sorts by createdAt,
+      // but WinLossRecord has no (orgId, createdAt) index (only
+      // (orgId, outcome, reason) and (orgId, opportunityId) — see
+      // packages/db/prisma/schema.prisma). Postgres can prefix on orgId only,
+      // then sorts every matching row before the take. Follow-up migration:
+      // add @@index([orgId, createdAt]) to match this query shape.
       const rows = await prisma.winLossRecord.findMany({
         where: {
           orgId: req.auth.orgId,
@@ -247,7 +260,7 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         },
       });
-      return aggregateAnalysis(rows);
+      return aggregateAnalysis(rows, rows.length === ANALYSIS_SCAN_CAP);
     },
   );
 
