@@ -514,6 +514,68 @@ describe('opportunities routes', () => {
       });
     }
   });
+
+  // Cursor pagination must survive ties on the (non-unique) sort column.
+  // WHY this matters: dueDate is a Postgres `date`, so several bids routinely
+  // share the exact same due date. A bare single-column cursor keyed on `id`
+  // over a non-unique `orderBy` lets Prisma permanently skip a tied row when
+  // the tie straddles a page boundary — silently hiding a live, due-soon bid
+  // from the "Due ≤ 7d" chip, the exact missed-deadline failure A1 prevents.
+  // The compound [{ dueDate }, { id }] orderBy makes the sort total so every
+  // tied row is walked exactly once. This test seeds a block of same-dueDate
+  // rows and pages through them at a boundary that lands mid-tie; it fails
+  // (missing IDs) without the tiebreaker.
+  skipIfNoDb('GET /api/opportunities paginates without dropping rows tied on dueDate', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    // Distinct customer so `search=` isolates exactly this test's fixtures;
+    // combined with dueWithinDays it forces the dueDate-ordered cursor path.
+    const customer = `TiePageCo-${suffix}`;
+    const sharedDue = new Date(Date.now() + 3 * 86_400_000);
+    const TOTAL = 5;
+
+    const created = await prisma.$transaction(
+      Array.from({ length: TOTAL }, (_unused, i) =>
+        prisma.opportunity.create({
+          data: {
+            orgId: orgId!,
+            code: `OP-TIE-${suffix}-${i}`,
+            customer,
+            name: `Tie fixture ${i}`,
+            stage: 's2_sent',
+            probability: 40,
+            // Identical dueDate across all rows → the boundary lands mid-tie.
+            dueDate: sharedDue,
+          },
+        }),
+      ),
+    );
+    const expectedIds = new Set(created.map((o) => o.id));
+
+    try {
+      const collected: string[] = [];
+      let cursor: string | null = null;
+      // limit=2 over 5 tied rows guarantees a page boundary inside the tie.
+      for (let guard = 0; guard < 10; guard++) {
+        const url =
+          `/api/opportunities?search=${encodeURIComponent(customer)}` +
+          `&dueWithinDays=7&limit=2` +
+          (cursor ? `&cursor=${cursor}` : '');
+        const res = await server.inject({ method: 'GET', url });
+        expect(res.statusCode).toBe(200);
+        const body = res.json<{ items: Array<{ id: string }>; nextCursor: string | null }>();
+        collected.push(...body.items.map((i) => i.id));
+        if (!body.nextCursor) break;
+        cursor = body.nextCursor;
+      }
+
+      // Every seeded row appears exactly once — none skipped, none duplicated.
+      const collectedForFixture = collected.filter((id) => expectedIds.has(id));
+      expect(new Set(collectedForFixture)).toEqual(expectedIds);
+      expect(collectedForFixture).toHaveLength(TOTAL);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { id: { in: [...expectedIds] } } });
+    }
+  });
 });
 
 describe('contacts + tasks + reports routes', () => {

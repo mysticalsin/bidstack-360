@@ -306,4 +306,63 @@ describe('service-desk routes', () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  // WHY: createdAt is not unique — cases created in the same millisecond (bulk
+  // seeding, or two racing creations) tie on the list's sort column. Ordering by
+  // createdAt ALONE leaves those ties in an unspecified heap order, which is not
+  // stable across the id-cursor + skip:1 keyset walk — a tie straddling a page
+  // boundary can be silently dropped from (or duplicated on) the next page.
+  // Support reps read this list as the full case queue, so a case that exists in
+  // the DB but never renders is a lost ticket.
+  //
+  // The regression guard is the compound orderBy's DETERMINISTIC total ordering:
+  // with `[{createdAt},{id}]` a createdAt tie group comes back in strict id-desc
+  // order; with the old bare `{createdAt}` sort it comes back in heap/insertion
+  // order (verified: not id-sorted), which is exactly the non-total ordering that
+  // lets the cursor drift. This assertion fails against the pre-fix route and
+  // passes against the fixed one, AND the two-page walk proves completeness.
+  skipIfNoDb('GET /api/service-cases orders createdAt ties by a total (id) key and pages them exactly once', async () => {
+    const tiedAt = new Date('2031-03-03T09:00:00.000Z');
+    const tag = `TIEBOUNDARY-${randomUUID()}`;
+    await prisma.serviceCase.createMany({
+      data: [0, 1, 2, 3, 4].map((i) => ({
+        orgId: orgId!,
+        number: `${tag}-${i}`,
+        subject: `${tag} case ${i}`,
+        priority: 'medium' as const,
+        status: 'new' as const,
+        source: 'web',
+        createdAt: tiedAt,
+      })),
+    });
+    const seeded = await prisma.serviceCase.findMany({
+      where: { orgId: orgId!, number: { startsWith: tag } },
+      select: { id: true },
+    });
+    for (const row of seeded) createdCaseIds.push(row.id);
+    const seededIdsDesc = seeded.map((r) => r.id).sort().reverse();
+
+    // Walk the whole tie group two-at-a-time through the id-cursor keyset.
+    const collected: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 5; i += 1) {
+      const url =
+        `/api/service-cases?search=${encodeURIComponent(tag)}&limit=2` +
+        (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+      const res = await server.inject({ method: 'GET', url });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { items: Array<{ id: string }>; nextCursor: string | null };
+      for (const row of body.items) collected.push(row.id);
+      cursor = body.nextCursor;
+      if (!cursor) break;
+    }
+
+    // Completeness: every tied row returned exactly once across the page walk.
+    expect(collected).toHaveLength(5);
+    expect(new Set(collected).size).toBe(5);
+    // Total ordering: the tie group is returned in strict id-desc order. A bare
+    // `{ createdAt: 'desc' }` sort returns heap order here (NOT id-sorted), so
+    // this fails without the compound (createdAt, id) tiebreaker.
+    expect(collected).toEqual(seededIdsDesc);
+  });
 });

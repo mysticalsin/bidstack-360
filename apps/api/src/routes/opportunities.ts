@@ -124,7 +124,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             // page cap could clip the single most-urgent bid off the
             // "Closing this week" strip / quick-filter chips, which is
             // exactly the missed-deadline failure mode A1 exists to prevent.
-            orderBy: dueDateFilter ? { dueDate: 'asc' } : { updatedAt: 'desc' },
+            // Compound `id` tiebreaker: `dueDate`/`updatedAt` are non-unique, so
+            // a bare single-column cursor silently drops rows when tied values
+            // straddle a page boundary (Prisma can't tell "already returned"
+            // from "not yet" among equal sort keys). The unique `id` makes the
+            // sort total, matching companies.ts/tasks.ts/activities.ts. Tiebreaker
+            // direction follows the primary sort so the cursor walks monotonically.
+            orderBy: dueDateFilter
+              ? [{ dueDate: 'asc' }, { id: 'asc' }]
+              : [{ updatedAt: 'desc' }, { id: 'desc' }],
             take: limit + 1,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
           });
