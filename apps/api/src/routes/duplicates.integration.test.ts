@@ -237,6 +237,53 @@ describe('duplicates routes', () => {
     expect(tombstonedLoser?.id).toBe(loser.id);
   });
 
+  skipIfNoDb(
+    'rejects merging a duplicate that is a multi-level ancestor of the survivor — no parentId cycle',
+    async () => {
+      // WHY: hierarchy A(dup) -> B -> C(survivor). Merging A into C reparents
+      // B (A's only child) onto C via repointCompanyRelations, but C still
+      // points up at B — minting a B<->C parentId cycle that later hangs
+      // GET /companies/:id/hierarchy for every tenant on the process. The old
+      // code only special-cased a DIRECT parent, so this two-level case slipped
+      // through. The merge must be rejected (409), leaving the chain intact.
+      const a = await createCompany(orgId!, `Orion Holdings ${suffix}`);
+      const b = await prisma.company.create({
+        data: { orgId: orgId!, name: `Orion Rail Div ${suffix}`, source: 'manual', parentId: a.id },
+        select: { id: true },
+      });
+      const c = await prisma.company.create({
+        data: {
+          orgId: orgId!,
+          name: `Orion Signalling ${suffix}`,
+          source: 'manual',
+          parentId: b.id,
+        },
+        select: { id: true },
+      });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/duplicates/merge',
+        payload: { entity: 'company', survivorId: c.id, duplicateId: a.id },
+      });
+      expect(res.statusCode).toBe(409);
+
+      // Nothing moved: A still live, B still under A, C still under B — and
+      // crucially B and C do NOT point at each other (no cycle was created).
+      const [afterA, afterB, afterC] = await Promise.all([
+        prisma.company.findUnique({
+          where: { id: a.id },
+          select: { deletedAt: true },
+        }),
+        prisma.company.findUnique({ where: { id: b.id }, select: { parentId: true } }),
+        prisma.company.findUnique({ where: { id: c.id }, select: { parentId: true } }),
+      ]);
+      expect(afterA?.deletedAt).toBeNull();
+      expect(afterB?.parentId).toBe(a.id);
+      expect(afterC?.parentId).toBe(b.id);
+    },
+  );
+
   skipIfNoDb('merge with a duplicate from another org 404s — no cross-tenant grafting', async () => {
     const survivor = await createCompany(orgId!, `Vanta Metro Works ${suffix}`);
     const foreign = await createCompany(foreignOrgId!, `Vanta Metro Works ${suffix}`);

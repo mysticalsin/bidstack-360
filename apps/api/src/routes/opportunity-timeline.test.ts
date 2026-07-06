@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 import { describe, expect, beforeAll, afterAll } from 'vitest';
 
 import { prisma } from '@bidstack/db';
@@ -274,5 +276,86 @@ describe('opportunity timeline', () => {
     const body = JSON.parse(res.body) as { items: Array<{ text: string }> };
     expect(body.items.some((i) => i.text.includes('FOREIGN-ORG'))).toBe(false);
     expect(body.items.some((i) => i.text.includes('OTHER-OPP'))).toBe(false);
+  });
+
+  // WHY: the timeline exposes audit-log diffs, comment bodies, and chatter for
+  // an opportunity, so it must gate on `opportunities:read` like every sibling
+  // read route (calendar-deadlines.ts, win-loss.ts). Without the preHandler any
+  // authenticated actor lacking the grant could read the deal's full history.
+  // An API key scoped to `write` only stands in for a caller without read.
+  skipIfNoDb('rejects a caller lacking opportunities:read with 403', async () => {
+    if (!orgId) throw new Error('isolated org missing');
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `TLR-${randomUUID().slice(0, 8)}`,
+        customer: 'timeline-rbac-test',
+        name: 'Timeline RBAC Guard',
+        stage: 's1_lead',
+      },
+    });
+    createdIds.opportunities.push(opportunity.id);
+
+    const rawKey = `tl_write_only_${randomUUID()}`;
+    const writeOnlyKey = await prisma.apiKey.create({
+      data: {
+        orgId,
+        name: 'timeline write-only key',
+        hashedKey: createHash('sha256').update(rawKey).digest('hex'),
+        prefix: rawKey.slice(0, 8),
+        scopes: ['write'],
+      },
+    });
+    try {
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+        headers: { 'x-api-key': rawKey },
+      });
+      // 403 (not 404): the permission gate runs in the preHandler, before the
+      // handler's existence check — an unauthorized caller must not even learn
+      // whether the opportunity exists.
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await prisma.apiKey.deleteMany({ where: { id: writeOnlyKey.id } });
+    }
+  });
+
+  // WHY: complements the 403 case — a caller that DOES hold `opportunities:read`
+  // reaches the handler and gets 200, proving the gate authorizes rather than
+  // blanket-denies. An API key scoped to the exact permission is the read grant.
+  skipIfNoDb('allows a caller with opportunities:read through with 200', async () => {
+    if (!orgId) throw new Error('isolated org missing');
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `TLP-${randomUUID().slice(0, 8)}`,
+        customer: 'timeline-rbac-test',
+        name: 'Timeline RBAC Permit',
+        stage: 's1_lead',
+      },
+    });
+    createdIds.opportunities.push(opportunity.id);
+
+    const rawKey = `tl_read_${randomUUID()}`;
+    const readKey = await prisma.apiKey.create({
+      data: {
+        orgId,
+        name: 'timeline read key',
+        hashedKey: createHash('sha256').update(rawKey).digest('hex'),
+        prefix: rawKey.slice(0, 8),
+        scopes: ['opportunities:read'],
+      },
+    });
+    try {
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+        headers: { 'x-api-key': rawKey },
+      });
+      expect(res.statusCode).toBe(200);
+    } finally {
+      await prisma.apiKey.deleteMany({ where: { id: readKey.id } });
+    }
   });
 });

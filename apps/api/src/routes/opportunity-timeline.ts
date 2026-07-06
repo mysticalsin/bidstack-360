@@ -31,6 +31,7 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
   server.get(
     '/opportunities/:id/timeline',
     {
+      preHandler: [server.requirePermission('opportunities:read')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) }),

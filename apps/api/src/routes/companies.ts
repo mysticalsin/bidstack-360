@@ -339,10 +339,16 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       // Build lookup map for O(1) ancestor resolution.
       const byId = new Map(allNodes.map((n) => [n.id, n]));
 
-      // Ancestors: follow parentId chain in-memory.
+      // Ancestors: follow parentId chain in-memory. A visited-set guards
+      // against a corrupt parentId cycle (parentId has no DB-level acyclicity
+      // constraint) that would otherwise spin this loop forever and hang the
+      // single Node event-loop thread for every tenant on the process.
       const ancestors: Array<{ id: string; name: string }> = [];
+      const seenAncestors = new Set<string>();
       let ancestorId: string | null = root.parentId;
       while (ancestorId) {
+        if (seenAncestors.has(ancestorId)) break; // cycle — stop, don't spin
+        seenAncestors.add(ancestorId);
         const ancestor = byId.get(ancestorId);
         if (!ancestor) break;
         ancestors.unshift({ id: ancestor.id, name: ancestor.name });
@@ -356,9 +362,16 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       }));
 
       // Build full tree recursively in-memory — zero additional DB calls.
+      // A visited-set skips any node already placed, so a corrupt parentId
+      // cycle can never recurse forever / blow the stack (each node has one
+      // parent, so a re-encounter is always a back-edge cycle, never a DAG).
+      const placed = new Set<string>();
       function buildTree(id: string, name: string, parentId: string | null): CompanyHierarchyNode {
+        placed.add(id);
         const kids = childrenByParent.get(id) ?? [];
-        const children = kids.map((k): CompanyHierarchyNode => buildTree(k.id, k.name, id));
+        const children = kids
+          .filter((k) => !placed.has(k.id))
+          .map((k): CompanyHierarchyNode => buildTree(k.id, k.name, id));
         return { id, name, parentId, children };
       }
       const tree = buildTree(root.id, root.name, root.parentId);

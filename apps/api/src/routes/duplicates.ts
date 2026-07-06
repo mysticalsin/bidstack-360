@@ -140,6 +140,38 @@ async function repointCompanyRelations(
   };
 }
 
+// A merge re-points every direct child of the loser onto the survivor
+// (repointCompanyRelations). If the loser is an ANCESTOR of the survivor —
+// however many levels up (A(loser) -> B -> C(survivor)) — the in-between node
+// (B) gets reparented under C while C still points up toward B, minting a
+// parentId cycle (B.parentId=C, C.parentId=B) that later hangs
+// GET /companies/:id/hierarchy. Walk the survivor's full ancestor chain and
+// reject before the transaction. A visited-set + depth bound keeps the walk
+// finite even if the parentId graph is already corrupt.
+const MAX_ANCESTOR_DEPTH = 1_000;
+async function duplicateIsSurvivorAncestor(
+  orgId: string,
+  survivorParentId: string | null,
+  duplicateId: string,
+): Promise<boolean> {
+  const visited = new Set<string>();
+  let ancestorId = survivorParentId;
+  let depth = 0;
+  while (ancestorId && depth < MAX_ANCESTOR_DEPTH) {
+    if (ancestorId === duplicateId) return true;
+    if (visited.has(ancestorId)) break; // pre-existing cycle — stop, don't spin
+    visited.add(ancestorId);
+    const parent = await prisma.company.findFirst({
+      where: { id: ancestorId, orgId, deletedAt: null },
+      select: { parentId: true },
+    });
+    if (!parent) break;
+    ancestorId = parent.parentId;
+    depth += 1;
+  }
+  return false;
+}
+
 async function mergeCompanyPair(
   server: FastifyInstance,
   auth: { orgId: string; userId: string },
@@ -160,17 +192,18 @@ async function mergeCompanyPair(
   if (!survivor || !duplicate) throw server.httpErrors.notFound('Company not found');
   const alreadyMerged = duplicate.deletedAt !== null;
 
+  // Reject ancestor-into-descendant merges (any depth) before touching data —
+  // they would create a parentId cycle. This subsumes the old direct-parent
+  // special case. The caller must merge from the top of the chain down (pick
+  // the higher-level company as the survivor).
+  if (await duplicateIsSurvivorAncestor(orgId, survivor.parentId, duplicateId)) {
+    throw server.httpErrors.conflict(
+      'Cannot merge: the duplicate is a parent of the survivor in the company hierarchy. ' +
+        'Merge from the top of the hierarchy down — pick the higher-level company as the survivor.',
+    );
+  }
+
   const repointed = await prisma.$transaction(async (tx) => {
-    if (survivor.parentId === duplicateId) {
-      // Survivor sat under the loser: hoist it to the loser's parent first,
-      // otherwise the blanket child re-point below would make it its own
-      // parent. Grandparent-equals-survivor degenerates to root (null).
-      const grandparent = duplicate.parentId === survivorId ? null : duplicate.parentId;
-      await tx.company.updateMany({
-        where: { id: survivorId, orgId },
-        data: { parentId: grandparent },
-      });
-    }
     const counts = await repointCompanyRelations(tx, orgId, survivorId, duplicateId);
     await tx.company.updateMany({
       where: { id: duplicateId, orgId, deletedAt: null },

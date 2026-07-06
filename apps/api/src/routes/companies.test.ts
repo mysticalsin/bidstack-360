@@ -153,6 +153,43 @@ describe('companies routes', () => {
   );
 
   skipIfNoDb(
+    'hierarchy endpoint terminates on a pre-existing parentId cycle instead of hanging',
+    async () => {
+      // WHY: parentId has no DB-level acyclicity constraint, so a corrupt
+      // A<->B cycle is representable. Without a visited-set guard the ancestor
+      // while-loop spins forever (and buildTree stack-overflows), blocking the
+      // single Node event-loop thread for every tenant on the process. The
+      // endpoint must return instead of hanging.
+      const suffix = randomUUID().slice(0, 8);
+      const a = await prisma.company.create({
+        data: { orgId: orgId!, name: `Cycle A ${suffix}` },
+        select: { id: true },
+      });
+      const b = await prisma.company.create({
+        data: { orgId: orgId!, name: `Cycle B ${suffix}`, parentId: a.id },
+        select: { id: true },
+      });
+      // Close the loop: A points back at B.
+      await prisma.company.update({ where: { id: a.id }, data: { parentId: b.id } });
+      createdCompanyIds.push(a.id, b.id);
+
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${a.id}/hierarchy`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{
+        ancestors: Array<{ id: string }>;
+        tree: { children: unknown[] };
+      }>();
+      // The ancestor walk broke at the cycle rather than accumulating forever.
+      expect(body.ancestors.length).toBeLessThanOrEqual(2);
+      // buildTree placed each node at most once — no runaway recursion.
+      expect(Array.isArray(body.tree.children)).toBe(true);
+    },
+  );
+
+  skipIfNoDb(
     'cursor pagination covers every row across pages — no gap, no overlap',
     async () => {
       // WHY: nextCursor must be the id of the LAST row the client actually
