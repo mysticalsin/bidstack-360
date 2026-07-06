@@ -3359,7 +3359,7 @@
   },
   "sectorView": {
     "title": "行业视图",
-    "subtitle": "按行业展示 Amaris 的业务分布——来自 ABC 的客户、国家和 FTE 数量。",
+    "subtitle": "按行业展示 Mantu 的业务分布——来自 ABC 的客户、国家和 FTE 数量。",
     "errorTitle": "无法加载行业视图",
     "errorMessage": "行业接口未响应。",
     "emptyTitle": "暂无行业数据",

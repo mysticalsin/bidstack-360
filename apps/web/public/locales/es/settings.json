@@ -360,7 +360,7 @@
     "errorMessage": "El endpoint no respondió.",
     "retry": "Reintentar",
     "heading": "Cuentas Top 10 globales",
-    "subtitle": "Seleccione y ordene manualmente hasta {{count}} cuentas para el Top 10 global de Amaris. Esto es independiente de las Cuentas clave (cuentas estratégicas regionales marcadas por empresa). Guardar una lista vacía hace que la página de Cuentas principales vuelva a la clasificación automática por valor de pipeline.",
+    "subtitle": "Seleccione y ordene manualmente hasta {{count}} cuentas para el Top 10 global de Mantu. Esto es independiente de las Cuentas clave (cuentas estratégicas regionales marcadas por empresa). Guardar una lista vacía hace que la página de Cuentas principales vuelva a la clasificación automática por valor de pipeline.",
     "empty": "Aún no hay cuentas seleccionadas: busque a continuación para crear la lista. La página de Cuentas principales se clasifica actualmente de forma automática por valor de pipeline.",
     "listAriaLabel": "Cuentas principales seleccionadas, en orden de clasificación",
     "moveUpLabel": "Mover {{name}} a la posición {{rank}}",

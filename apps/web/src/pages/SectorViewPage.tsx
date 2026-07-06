@@ -1,5 +1,5 @@
 /**
- * SectorViewPage - Amaris presence by industry sector globally (A3).
+ * SectorViewPage - Mantu presence by industry sector globally (A3).
  * Source: ABC sector classification mirrored on company records. Sparse data
  * raises a quality banner instead of hiding the view.
  */

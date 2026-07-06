@@ -3371,7 +3371,7 @@
   },
   "sectorView": {
     "title": "Sector view",
-    "subtitle": "Where Amaris is active by industry — accounts, countries, and FTE volume from ABC.",
+    "subtitle": "Where Mantu is active by industry — accounts, countries, and FTE volume from ABC.",
     "errorTitle": "Could not load the sector view",
     "errorMessage": "The sector endpoint did not respond.",
     "emptyTitle": "No sector data yet",

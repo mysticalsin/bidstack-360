@@ -3414,7 +3414,7 @@
   },
   "sectorView": {
     "title": "Vue par secteur",
-    "subtitle": "Où Amaris est actif par secteur — comptes, pays et volume d'ETP issus d'ABC.",
+    "subtitle": "Où Mantu est actif par secteur — comptes, pays et volume d'ETP issus d'ABC.",
     "errorTitle": "Impossible de charger la vue par secteur",
     "errorMessage": "Le point de terminaison du secteur n'a pas répondu.",
     "emptyTitle": "Pas encore de données de secteur",

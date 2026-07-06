@@ -1,4 +1,4 @@
-// Sector / Industry view — Amaris presence by industry sector globally.
+// Sector / Industry view — Mantu presence by industry sector globally.
 // Source: ABC sector classification as mirrored on company records (industry,
 // country_code, employee_count). Sparse classification does NOT hide the view;
 // it raises a data-quality warning instead (managers still need it to prep

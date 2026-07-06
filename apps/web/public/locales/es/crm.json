@@ -3392,7 +3392,7 @@
   },
   "sectorView": {
     "title": "Vista por sector",
-    "subtitle": "Dónde Amaris está activa por industria: cuentas, países y volumen de FTE desde ABC.",
+    "subtitle": "Dónde Mantu está activa por industria: cuentas, países y volumen de FTE desde ABC.",
     "errorTitle": "No se pudo cargar la vista por sector",
     "errorMessage": "El endpoint de sector no respondió.",
     "emptyTitle": "Aún no hay datos de sector",

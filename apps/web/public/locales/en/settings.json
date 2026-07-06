@@ -296,7 +296,7 @@
     "errorMessage": "Endpoint did not respond.",
     "retry": "Retry",
     "heading": "Global Top 10 accounts",
-    "subtitle": "Hand-pick and order up to {{count}} accounts for the Amaris global Top 10. This is separate from Key Accounts (regional strategic accounts flagged per company). Saving an empty list reverts the Top Accounts page to the automatic pipeline-value ranking.",
+    "subtitle": "Hand-pick and order up to {{count}} accounts for the Mantu global Top 10. This is separate from Key Accounts (regional strategic accounts flagged per company). Saving an empty list reverts the Top Accounts page to the automatic pipeline-value ranking.",
     "empty": "No curated accounts yet — search below to build the list. The Top Accounts page is currently auto-ranked by pipeline value.",
     "listAriaLabel": "Curated top accounts, in rank order",
     "moveUpLabel": "Move {{name}} up to rank {{rank}}",

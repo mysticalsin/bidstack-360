@@ -357,7 +357,7 @@
     "errorMessage": "L'endpoint non ha risposto.",
     "retry": "Riprova",
     "heading": "Account Top 10 globali",
-    "subtitle": "Seleziona e ordina manualmente fino a {{count}} account per la Top 10 globale di Amaris. Questo è distinto dagli Account chiave (account strategici regionali contrassegnati per azienda). Salvare un elenco vuoto ripristina la classificazione automatica per valore di pipeline nella pagina degli account principali.",
+    "subtitle": "Seleziona e ordina manualmente fino a {{count}} account per la Top 10 globale di Mantu. Questo è distinto dagli Account chiave (account strategici regionali contrassegnati per azienda). Salvare un elenco vuoto ripristina la classificazione automatica per valore di pipeline nella pagina degli account principali.",
     "empty": "Nessun account selezionato ancora — cerca qui sotto per creare l'elenco. La pagina degli account principali è attualmente ordinata automaticamente per valore di pipeline.",
     "listAriaLabel": "Account principali selezionati, in ordine di classifica",
     "moveUpLabel": "Sposta {{name}} al posto {{rank}}",

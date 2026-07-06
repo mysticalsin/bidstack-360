@@ -3359,7 +3359,7 @@
   },
   "sectorView": {
     "title": "Vista per settore",
-    "subtitle": "Dove Amaris è attiva per settore — account, paesi e volume FTE da ABC.",
+    "subtitle": "Dove Mantu è attiva per settore — account, paesi e volume FTE da ABC.",
     "errorTitle": "Impossibile caricare la vista per settore",
     "errorMessage": "L'endpoint del settore non ha risposto.",
     "emptyTitle": "Nessun dato di settore ancora",

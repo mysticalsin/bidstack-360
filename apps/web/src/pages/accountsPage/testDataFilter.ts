@@ -10,9 +10,15 @@ const SYNTHETIC_PATTERNS: RegExp[] = [
   /^SCOPE-/i,
   /^E2E\b/i,
   /^Audit Company\b/i,
+  /^KAMDraft-/i,
+  /^ConvertCorp-/i,
   /^(AP)?approve-(gate|proposal)/i,
-  /\baccount QQ$/i,
+  /\baccount (QQ|ZZ)$/i,
   /^Test /i,
+  // Lowercase hyphen-slug fixtures (bid-workspace-test, timeline-test). Kept
+  // case-sensitive + slug-shaped so real Title-Case names ("Acme Test Corp")
+  // are never hidden.
+  /^[a-z0-9-]+-test$/,
 ];
 
 export function isSyntheticAccountName(name: string | null | undefined): boolean {

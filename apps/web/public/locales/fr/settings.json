@@ -357,7 +357,7 @@
     "errorMessage": "Le point de terminaison n'a pas répondu.",
     "retry": "Réessayer",
     "heading": "Comptes Top 10 mondiaux",
-    "subtitle": "Sélectionnez et classez manuellement jusqu'à {{count}} comptes pour le Top 10 mondial d'Amaris. Ceci est distinct des Comptes clés (comptes stratégiques régionaux marqués par entreprise). Enregistrer une liste vide rétablit le classement automatique par valeur de pipeline sur la page des comptes principaux.",
+    "subtitle": "Sélectionnez et classez manuellement jusqu'à {{count}} comptes pour le Top 10 mondial d'Mantu. Ceci est distinct des Comptes clés (comptes stratégiques régionaux marqués par entreprise). Enregistrer une liste vide rétablit le classement automatique par valeur de pipeline sur la page des comptes principaux.",
     "empty": "Aucun compte sélectionné pour l'instant — recherchez ci-dessous pour constituer la liste. La page des comptes principaux est actuellement classée automatiquement par valeur de pipeline.",
     "listAriaLabel": "Comptes principaux sélectionnés, par ordre de classement",
     "moveUpLabel": "Déplacer {{name}} au rang {{rank}}",

@@ -3359,7 +3359,7 @@
   },
   "sectorView": {
     "title": "Visão por setor",
-    "subtitle": "Onde a Amaris atua por setor — contas, países e volume de FTE do ABC.",
+    "subtitle": "Onde a Mantu atua por setor — contas, países e volume de FTE do ABC.",
     "errorTitle": "Não foi possível carregar a visão por setor",
     "errorMessage": "O endpoint de setor não respondeu.",
     "emptyTitle": "Ainda não há dados de setor",

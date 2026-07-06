@@ -14,6 +14,7 @@ import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
 import { IntegrationMotionRail, SourceStat } from './AccountDashboardWidgets';
+import { isSyntheticAccountName } from './testDataFilter';
 import {
   deriveAccount,
   segmentMatches,
@@ -45,7 +46,12 @@ export function AccountsAllSegment() {
 
   const allRows = useMemo(() => {
     if (!dashboard.data) return [];
-    return dashboard.data.companies.map((company) => deriveAccount(company, dashboard.data!.deals));
+    // Hide synthetic E2E/test-fixture accounts (SCOPE-*, KAMDraft-*, E2E …) from
+    // this customer-facing view, matching the Key/Top segments. A polluted demo
+    // org should not surface test residue; fresh orgs seed none.
+    return dashboard.data.companies
+      .filter((company) => !isSyntheticAccountName(company.name))
+      .map((company) => deriveAccount(company, dashboard.data!.deals));
   }, [dashboard.data]);
 
   const rows = useMemo(() => {
