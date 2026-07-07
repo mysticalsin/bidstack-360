@@ -56,7 +56,7 @@ import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
 import { sectorViewRoutes } from './routes/sector-view.js';
 import { infosearchRoutes } from './routes/infosearch.js';
-import { sillageIntentRoutes } from './routes/sillage-intent.js';
+import { sillageSignalsRoutes } from './routes/sillage-signals.js';
 import { crossSellRoutes } from './routes/cross-sell.js';
 import { contractAgreementRoutes } from './routes/contract-agreements.js';
 import { winLossRoutes } from './routes/win-loss.js';
@@ -161,7 +161,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
   await server.register(sectorViewRoutes, { prefix: '/api/v1' });
   await server.register(infosearchRoutes, { prefix: '/api/v1' });
-  await server.register(sillageIntentRoutes, { prefix: '/api/v1' });
+  await server.register(sillageSignalsRoutes, { prefix: '/api/v1' });
   await server.register(crossSellRoutes, { prefix: '/api/v1' });
   await server.register(contractAgreementRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });

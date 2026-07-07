@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-07-07 BUG: `rowsFromUnknown` envelope-unwrap recursed into `undefined` forever
+
+- **What went wrong:** Writing `sillage-signals.ts`'s envelope-unwrap helper (`rowsFromUnknown`, adapted from the same pattern already in `company-seamless-enrichment.ts`), a malformed vendor payload with none of the checked envelope keys (`signals`/`data`/`results`/`items`) caused `rowsFromUnknown(root[key])` to be called with `root[key] === undefined` on every iteration. Since `record(undefined)` returns `{}`, the recursive call re-enters with the exact same `undefined` argument every time — infinite recursion, RangeError: Maximum call stack size exceeded. Caught by the "coerces malformed REST JSON" test: the stack overflow was silently swallowed by the caller's outer try/catch and surfaced as a wrong result (`source: null` instead of `'rest'`) rather than a crash, which made it non-obvious from the stack trace alone.
+- **Root cause:** No guard on whether the key actually exists before recursing — `rowsFromUnknown(root[key])` was called unconditionally instead of only when `root[key] !== undefined`. The pre-existing copy of this pattern in `company-seamless-enrichment.ts` has the identical latent bug, masked there because its only caller wraps the MCP path in `.catch(() => null)` and no test exercises a keyless malformed MCP payload.
+- **Prevention rule:** Any recursive "find array of rows inside envelope" helper MUST skip (`continue`, don't recurse) when the candidate key is `undefined` — never recurse into a value that can't distinguish itself from the base case's default. Add a malformed/keyless-object test case for every such helper, not just malformed-array or wrong-type cases.
+- **Files affected:** `apps/api/src/providers/sillage-signals.ts` (fixed before commit). Latent, NOT fixed (out of scope — different file, no failing test forced it): `apps/api/src/providers/company-seamless-enrichment.ts`'s `rowsFromUnknown`.
+
+---
+
 ### 2026-06-29 INFRA: `sed -i` with slashes-in-pattern corrupted all 7 CI workflow files
 
 - **What went wrong:** SHA-pinning GitHub Actions with `sed -i "/uses: ${path}@${tag}.../ s|...|...|"` where `${path}` contained `/` (e.g. `actions/checkout`). The `/` terminated the sed address regex early, so sed mis-parsed the command ("extra characters after command", "unknown option to s") and wrote mangled fragments (`heckout@v4([[:space:]]|$)/ s|...`) into every workflow. Caught immediately (the verify grep showed corruption + the harness flagged the files as modified).

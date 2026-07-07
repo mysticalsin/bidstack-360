@@ -155,33 +155,43 @@ the starting point):
 
 ---
 
-## 7. Connect Sillage (API + MCP, for intent)
+## 7. Connect Sillage (API + MCP — buying-intent signals)
 
-The Sillage intent connector is wired and **activates from env** — no code change to
-turn on. It calls Sillage **MCP-first, REST-fallback**, and fails open (a Sillage
-outage never breaks a request).
+Sillage (getsillage.com) is a **GTM buying-intent signals** platform: give it a
+target **account** (company name + domain) and it returns buying signals — hiring
+moves, champion job-changes, competitor engagement, funding, social/news — with a
+priority score. The connector is wired and **activates from env**; it calls Sillage
+**MCP-first, REST-fallback**, and fails open (a Sillage outage never breaks a
+request).
 
 Set these (Key Vault → Container App env for `api`):
 
 ```
 SILLAGE_API_KEY=            # REST bearer key
-SILLAGE_API_BASE_URL=       # optional; defaults to the built-in base URL
+SILLAGE_API_BASE_URL=       # optional; defaults to https://api.getsillage.com
 SILLAGE_MCP_URL=            # Sillage MCP server endpoint
 SILLAGE_MCP_BEARER_TOKEN=   # optional; if the MCP endpoint needs auth
 SILLAGE_MCP_TIMEOUT_MS=     # optional; request timeout
-SILLAGE_MCP_INTENT_TOOL=    # optional; defaults to 'detect_intent'
+SILLAGE_MCP_SIGNALS_TOOL=   # optional; defaults to 'account_signals'
 ```
 
 - Configure **either** the REST key **or** the MCP URL (or both — MCP is tried
-  first). With neither set, the connector reports "disabled" and returns a null
-  intent; nothing breaks.
-- Endpoint: `POST /api/sillage/detect-intent` (org-scoped, RBAC-gated) →
-  `{ intent, confidence, source: 'mcp'|'rest'|null, error? }`.
-- It shows up in **Settings → Integrations** (connectors catalog) with a health
-  badge derived from which vars are set.
-- Consumers to wire next (product choice, not built yet): the ⌘K copilot, workflow
-  automation triggers, or lead-routing — call `detectSillageIntent()` from any of
-  them.
+  first). With neither set, the connector is "disabled" and returns no signals;
+  nothing breaks.
+- Endpoint: `POST /api/v1/sillage/account-signals` (org-scoped, RBAC-gated), body
+  `{ companyName?, domain? }` → `{ signals: Trigger[], intentScore, source }`.
+- Output is shaped as the app's existing **`Trigger`** type, so Sillage signals
+  drop straight into the account/opportunity **"Buying triggers"** card
+  (`opportunityDetail/IntelCards.tsx`). Sillage categories map to trigger kinds
+  (hiring→hiring, champion move→executive_move, competitor→deal_activity,
+  funding→funding, social/news→press).
+- Shows up in **Settings → Integrations** with a health badge from the env.
+- **Exact REST path + auth header are config-driven placeholders** (Sillage has no
+  public API docs yet) — one const in `providers/sillage-signals.ts` to update once
+  you have the real contract. The MCP tool name is the `SILLAGE_MCP_SIGNALS_TOOL`
+  env var.
+- Natural consumer to wire next: feed the returned signals into the account intel /
+  buying-triggers ingestion so they surface on the account + opportunity views.
 
 ---
 

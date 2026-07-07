@@ -77,10 +77,10 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
   const sillageStatus: CrmConnector['status'] =
     process.env.SILLAGE_MCP_URL || process.env.SILLAGE_API_KEY ? 'healthy' : 'disabled';
   const sillageMessage = process.env.SILLAGE_MCP_URL
-    ? 'Sillage MCP intent detection enabled.'
+    ? 'Sillage MCP buying-intent signals enabled.'
     : credentialMessage(
         'SILLAGE_API_KEY',
-        'Sillage REST intent detection enabled.',
+        'Sillage REST buying-intent signals enabled.',
         'Set SILLAGE_API_KEY or SILLAGE_MCP_URL to enable',
       );
   const apolloMcpConfigured = Boolean(process.env.APOLLO_MCP_URL && process.env.APOLLO_MCP_BEARER_TOKEN);
@@ -176,7 +176,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
     },
     {
       id: 'sillage',
-      name: 'Sillage Intent',
+      name: 'Sillage Buying Signals',
       // 'ai' is the closest fit in the shared CrmConnector category enum
       // (no separate 'intelligence' category exists) — matches how other
       // AI-signal connectors in this catalog would be classified.
@@ -184,11 +184,11 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       kind: 'credentialed_api',
       status: sillageStatus,
       requiresCredential: true,
-      sourceUrl: 'https://sillage.ai/',
-      docsUrl: 'https://docs.sillage.ai/',
+      sourceUrl: 'https://getsillage.com/',
+      docsUrl: 'https://getsillage.com/',
       lastCheckedAt,
       message: sillageMessage,
-      capabilities: ['Intent detection'],
+      capabilities: ['Buying-intent signals', 'Account triggers'],
     },
     {
       id: 'sam-gov',
