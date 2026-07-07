@@ -195,6 +195,17 @@ export const envSchema = z.object({
   SEAMLESS_MCP_SEARCH_COMPANIES_TOOL: z.string().min(1).optional().or(z.literal('')),
   SEAMLESS_API_KEY: z.string().min(1).optional().or(z.literal('')),
   SEAMLESS_API_BASE_URL: z.string().url().optional().or(z.literal('')),
+  // Sillage intent detection. Platform-level credentials (one Sillage config per
+  // deployment, not per-org BYO) — same trust class as Seamless/Apollo. MCP is
+  // preferred when SILLAGE_MCP_URL is set; REST is the fallback when only
+  // SILLAGE_API_KEY is set. Both optional — unset means the provider fails open
+  // to { intent: null, source: null, error }.
+  SILLAGE_API_KEY: z.string().min(1).optional().or(z.literal('')),
+  SILLAGE_API_BASE_URL: z.string().url().optional().or(z.literal('')),
+  SILLAGE_MCP_URL: z.string().url().optional().or(z.literal('')),
+  SILLAGE_MCP_BEARER_TOKEN: z.string().min(1).optional().or(z.literal('')),
+  SILLAGE_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  SILLAGE_MCP_INTENT_TOOL: z.string().min(1).optional().or(z.literal('')),
   // Optional vendor-neutral technology-intelligence MCP. Use for BuiltWith,
   // Wappalyzer, or a private tech-source gateway only after that MCP is configured.
   TECH_STACK_MCP_URL: z.string().url().optional().or(z.literal('')),

@@ -70,6 +70,19 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
     process.env[envName] ? 'healthy' : 'disabled';
   const credentialMessage = (envName: string, enabled: string, disabled: string) =>
     process.env[envName] ? enabled : `${disabled} (${envName} not set)`;
+  // Sillage: healthy if either transport has credentials (MCP URL or REST
+  // key) — mirrors the Apollo "either lane is enough" health rule, but
+  // without a "partial" state since Sillage MCP has no separate bearer-token
+  // requirement to be half-configured on.
+  const sillageStatus: CrmConnector['status'] =
+    process.env.SILLAGE_MCP_URL || process.env.SILLAGE_API_KEY ? 'healthy' : 'disabled';
+  const sillageMessage = process.env.SILLAGE_MCP_URL
+    ? 'Sillage MCP intent detection enabled.'
+    : credentialMessage(
+        'SILLAGE_API_KEY',
+        'Sillage REST intent detection enabled.',
+        'Set SILLAGE_API_KEY or SILLAGE_MCP_URL to enable',
+      );
   const apolloMcpConfigured = Boolean(process.env.APOLLO_MCP_URL && process.env.APOLLO_MCP_BEARER_TOKEN);
   const apolloMcpPartial = Boolean(process.env.APOLLO_MCP_URL || process.env.APOLLO_MCP_BEARER_TOKEN);
   const apolloStatus: CrmConnector['status'] =
@@ -160,6 +173,22 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
         'news and funding signals with public-news cross-check',
         'opt-in leadership title signals without emails or phone numbers',
       ],
+    },
+    {
+      id: 'sillage',
+      name: 'Sillage Intent',
+      // 'ai' is the closest fit in the shared CrmConnector category enum
+      // (no separate 'intelligence' category exists) — matches how other
+      // AI-signal connectors in this catalog would be classified.
+      category: 'ai',
+      kind: 'credentialed_api',
+      status: sillageStatus,
+      requiresCredential: true,
+      sourceUrl: 'https://sillage.ai/',
+      docsUrl: 'https://docs.sillage.ai/',
+      lastCheckedAt,
+      message: sillageMessage,
+      capabilities: ['Intent detection'],
     },
     {
       id: 'sam-gov',
