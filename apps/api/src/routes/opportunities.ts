@@ -23,6 +23,7 @@ import {
   getAccessScope,
   scopeCacheTag,
 } from '../lib/access-scope.js';
+import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
 import { resolveCompanyIdByName } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
@@ -264,7 +265,20 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, definitionId: true, value: true },
         take: 100,
       });
-      return { ...serializeOpportunityFull(opp), customFieldValues };
+      const full = serializeOpportunityFull(opp);
+      // Live buying-intent augmentation: merges Sillage signals into
+      // intel.triggers on read, gated on SILLAGE_* env so this is a zero-cost
+      // no-op until an operator configures it (see lib/sillage-intel-augment.ts).
+      // This query doesn't load the company relation (only owner/territory/
+      // pipelineStage above), so we pass companyName only — Sillage accepts a
+      // company name alone, and adding a join just for a domain isn't worth it.
+      const intel = sillageIsConfigured()
+        ? ((await augmentTriggersWithSillage(full.intel, {
+            companyName: opp.customer,
+            logger: req.log,
+          })) as OpportunityFull['intel'])
+        : full.intel;
+      return { ...full, intel, customFieldValues };
     },
   );
 
