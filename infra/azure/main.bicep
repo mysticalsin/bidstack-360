@@ -52,7 +52,7 @@ param pgAdminPassword string
 @secure()
 @minLength(64)
 @maxLength(64)
-@description('64-char hex AES-256-GCM key (openssl rand -hex 32); encrypts per-org Dust + OAuth secrets at rest. REQUIRED in prod.')
+@description('64-character hex AES-256-GCM key generated with openssl rand -hex 32; encrypts per-org Dust + OAuth secrets at rest. REQUIRED in prod.')
 param integrationTokenKey string
 
 @secure()
@@ -417,16 +417,41 @@ var secretMap = {
   'sentry-dsn': sentryDsn
 }
 
+// The loop iterable MUST be start-of-deployment calculable, so iterate the
+// static secret NAMES — several secretMap values derive from runtime state
+// (pg FQDN, redis.listKeys()). The per-item body IS evaluated at deploy time,
+// so looking the value up there (secretMap[name]) is allowed; feeding the whole
+// map to items() as the for-expression is not (BCP178).
+var secretNames = [
+  'database-url-api'
+  'database-url-worker'
+  'database-url-mcp'
+  'database-url-direct'
+  'redis-url'
+  'integration-token-key'
+  'pii-encryption-master-key'
+  'job-signing-secret'
+  'migrate-backup-proof'
+  'clerk-secret-key'
+  's3-access-key-id'
+  's3-secret-access-key'
+  'sentry-dsn'
+]
+
 resource kvSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = [
-  for item in items(secretMap): {
+  for name in secretNames: {
     parent: kv
-    name: item.key
-    properties: { value: item.value }
+    name: name
+    properties: { value: secretMap[name] }
   }
 ]
 
 // ── Container Apps Environment — VNet-injected + zone-redundant ────────────────
-resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
+// API version pinned to the preview line that carries managed OpenTelemetry:
+// `appInsightsConfiguration` + `openTelemetryConfiguration` below only exist on
+// 2024-10-02-preview onward. On the stable 2024-03-01 they compile as warnings
+// and ARM silently drops them, so env-level traces/logs export would no-op.
+resource env 'Microsoft.App/managedEnvironments@2024-10-02-preview' = {
   name: envName
   location: location
   properties: {
@@ -445,13 +470,12 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
         sharedKey: law.listKeys().primarySharedKey
       }
     }
-    appInsightsConfiguration: { connectionString: appInsights.properties.ConnectionString } // VALIDATE
+    appInsightsConfiguration: { connectionString: appInsights.properties.ConnectionString }
     openTelemetryConfiguration: {
       tracesConfiguration: { destinations: ['appInsights'] }
       logsConfiguration: { destinations: ['appInsights'] }
     }
   }
-  dependsOn: [vnet]
 }
 
 // VALIDATE: Container Apps Key Vault secret refs with a user-assigned identity
@@ -657,9 +681,9 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ]
       }
+      terminationGracePeriodSeconds: 150 // > WORKER_SHUTDOWN_TIMEOUT_MS so drains complete
     }
   }
-  terminationGracePeriodSeconds: 150 // > WORKER_SHUTDOWN_TIMEOUT_MS so drains complete
   dependsOn: [migrateJob, redisPeDns, kvPeDns]
 }
 

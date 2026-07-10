@@ -1,11 +1,19 @@
-# Azure deploy — ⚠️ UNVALIDATED DRAFT
+# Azure deploy — ⚠️ COMPILES CLEAN, NOT YET WHAT-IF'D
 
-> **Do not deploy this as-is.** These files (`main.bicep`, `deploy.workflow.yml.draft`)
-> were authored from the validated `docker-compose.prod.yml` topology but have
-> **not** been run through `az bicep build`, `az deployment group what-if`, or a
-> real subscription. They are a reviewed starting point, not production IaC.
-> Treat every API version, property name, and secret reference as suspect until
-> validated against the checklist below.
+> **Status (2026-07-10):** `main.bicep` now passes `bicep build` with **zero
+> errors and zero warnings** (compiled with Bicep 0.44.1) and passes the repo
+> policy gate `node scripts/verify-azure-infra-policy.mjs`. Fixes applied during
+> that first compile: a `BCP178` runtime-value-in-for-expression on the Key Vault
+> secret loop, a misplaced `terminationGracePeriodSeconds` on the worker app, and
+> the managed-environment API version bumped to `2024-10-02-preview` so the
+> `appInsightsConfiguration` / `openTelemetryConfiguration` blocks are actually
+> honored (they silently no-op on `2024-03-01`).
+>
+> **Still required before deploy:** it has **not** been run through
+> `az deployment group what-if` against a real subscription. API versions and
+> property *values* compile, but only a `what-if` against live Azure confirms
+> quotas, regional availability, and cross-resource wiring. Do that
+> (§ checklist below) before the first real deploy.
 
 The **validated, works-today** path is `docker-compose.prod.yml` at the repo
 root — it provisions Postgres (pgvector) + Redis, runs the one-shot `migrate`

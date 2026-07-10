@@ -14,7 +14,7 @@ Companion docs: `docs/AZURE_FOUNDATION.md` (architecture rationale), `infra/azur
 | --- | --- | --- |
 | Monorepo build (`pnpm -r build`) | ✅ Passes clean (api, web, worker, mcp-server, packages) | none |
 | Container images (`api`, `worker`, `mcp-server`, `web`, `migrate`) | ✅ Multi-stage targets in the root `Dockerfile` | build + push to ACR per release |
-| Azure IaC (`infra/azure/main.bicep`) | ⚠️ Full stack **drafted but UNVALIDATED** — its own README says "do not deploy as-is"; never run through `az bicep build`/`what-if`/a real subscription | validate: `az bicep build` + `what-if` on a real RG, fix what breaks, then deploy |
+| Azure IaC (`infra/azure/main.bicep`) | ✅ Full stack; **compiles clean** (`bicep build`, 0 errors/0 warnings) + passes `scripts/verify-azure-infra-policy.mjs`. ⚠️ Not yet `what-if`'d against a live subscription | run `az deployment group what-if` on a real RG (confirms quotas/region/wiring), then deploy |
 | Health probes | ✅ `/livez`, `/readyz` (api), `/health` (worker, mcp) | wire to Container App probes |
 | DB migrations | ✅ Run as a Container Apps Job before revisions roll | run + gate each release |
 | **Durable storage on Azure** | ⚠️ **GAP — code only supports `local` and `s3`, no native Azure Blob** | see §1 — pick S3-compatible layer *or* add a Blob adapter |
@@ -22,9 +22,10 @@ Companion docs: `docs/AZURE_FOUNDATION.md` (architecture rationale), `infra/azur
 | Sillage intent connector | ✅ Wired, env-activated (see §7) | set `SILLAGE_*` env to turn on |
 | Real-data bootstrap | ✅ `pnpm db:seed:prod` (org + system roles, zero fixtures) + purge script for demo data | follow `docs/PRODUCTION_DATA_BOOTSTRAP.md` |
 
-**Bottom line:** the app builds; the Azure IaC covers the full topology but is an
-**unvalidated draft** — budget one validation pass (`az bicep build` + `what-if`)
-before trusting it. The one code change required before a *pure-Azure* production
+**Bottom line:** the app builds; the Azure IaC covers the full topology, now
+**compiles clean** (`bicep build`) and passes the repo policy gate — one
+validation step remains: `az deployment group what-if` against a live
+subscription. The one code change required before a *pure-Azure* production
 deploy is durable storage (§1). Everything else is provisioning + secrets + config.
 
 ---
