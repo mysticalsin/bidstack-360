@@ -58,13 +58,17 @@ export type ContactDetail = z.infer<typeof ContactDetail>;
 
 export type ContactPatch = z.infer<typeof ContactPatch>;
 
+// Bounds MUST mirror `Contact`/`ContactCreate` (customer/name/role .max(255),
+// phone .max(50)). Omitting them let an over-length PATCH bypass validation and
+// commit a value the 200:Contact response schema then can't serialize — a 500
+// that also poisoned every subsequent read of that contact and the org list.
 export const ContactPatch = z
   .object({
-    customer: z.string().min(1).optional(),
-    name: z.string().min(1).optional(),
-    role: z.string().nullable().optional(),
+    customer: z.string().min(1).max(255).optional(),
+    name: z.string().min(1).max(255).optional(),
+    role: z.string().max(255).nullable().optional(),
     email: z.string().email().nullable().optional(),
-    phone: z.string().nullable().optional(),
+    phone: z.string().max(50).nullable().optional(),
     influence: z.number().int().min(1).max(5).nullable().optional(),
     sentiment: Sentiment.nullable().optional(),
     customFieldValues: z.array(CustomFieldValueInput).optional(),
