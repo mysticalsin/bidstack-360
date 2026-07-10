@@ -18,6 +18,8 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 **Kept by design:** onboarding sample-data templates (tagged isSample + purge endpoint — the one legit sample writer for real orgs); DEMO_MODE demo orgs (env-gated, mutually exclusive with Clerk).
 
+**Addendum (same day):** Clerk `organization.created` webhook shipped — svix-verified `/webhooks/clerk` bootstraps the Org + system roles the moment the org exists in Clerk (name sync on `updated`; `deleted` retains data by design). `db:seed:prod` demoted to no-webhook fallback; CLERK_WEBHOOK_SECRET now consumed (was dead config). 15 tests incl. live-DB integration. Org onboarding = fully automatic.
+
 **Operator:** run the purge with --apply when ready (dry-run output reviewed first; backup before), then seed:prod against the production DB.
 
 
