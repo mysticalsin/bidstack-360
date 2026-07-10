@@ -33,6 +33,9 @@ const prisma = new PrismaClient();
 
 async function main() {
   const { values } = parseArgs({
+    // pnpm forwards the `--` separator itself, which makes parseArgs treat
+    // everything after it as positionals — strip the separator tokens.
+    args: process.argv.slice(2).filter((a) => a !== '--'),
     options: {
       'clerk-org': { type: 'string' },
       name: { type: 'string' },

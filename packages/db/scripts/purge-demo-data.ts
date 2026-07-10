@@ -190,6 +190,9 @@ async function purgeSynthetic(orgRef: string, apply: boolean): Promise<void> {
 
 async function main() {
   const { values } = parseArgs({
+    // pnpm forwards the `--` separator itself, which makes parseArgs treat
+    // everything after it as positionals — strip the separator tokens.
+    args: process.argv.slice(2).filter((a) => a !== '--'),
     options: {
       'seed-org': { type: 'boolean', default: false },
       'demo-orgs': { type: 'boolean', default: false },
