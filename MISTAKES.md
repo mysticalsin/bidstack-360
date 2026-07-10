@@ -3329,3 +3329,17 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **Root cause:** Deleted a binary asset without first checking git-tracked status. Untracked files are invisible to git and unrecoverable once removed.
 - **Prevention rule:** Before `rm`-ing any asset/binary during a rebrand or refactor, run `git ls-files <file>`. If UNTRACKED, move it to the scratchpad instead of deleting (recoverable); only `git rm` tracked files. Recovery here worked only by luck — the sibling `logo-clear.webp` was tracked, so I reconstructed the PNG from it via a headless-Chrome canvas export.
 - **Files affected:** apps/web/public/logo-clear.png
+
+### 2026-07-09 BUG: soft-delete middleware silently breaks upsert-revival call sites
+
+- **What went wrong:** `POST /users/:id/roles` re-grant returned 409 (P2002 -> error-handler conflict) instead of clearing the tombstone. The route's `userRole.upsert` predated the soft-delete middleware (5220948a), which scopes upsert `where` to `deletedAt: null` ON PURPOSE — a tombstoned row must not be silently revived — so the upsert missed the tombstone, took the create branch, and hit the compound PK.
+- **Root cause:** middleware semantics changed under an existing call site; the route was written to the OLD contract ("upsert clears soft-delete") and no test ran at the middleware's introduction that exercised re-grant-after-revoke... it did exist (users.roles integration) but was left red on the branch instead of being triaged.
+- **Prevention rule:** ALWAYS grep for `upsert(` on soft-delete models when a query middleware changes matching semantics; every revival flow must use the documented explicit `where.deletedAt` bypass. NEVER leave a red integration test standing on a branch — triage it to a cause the same session it first fails.
+- **Files affected:** apps/api/src/routes/users.ts, packages/db/src/middleware/soft-delete.ts (unchanged — semantics correct), apps/api/src/routes/users.roles.integration.test.ts
+
+### 2026-07-09 TESTING: fixture dates pinned to near-future wall-clock rot into failures
+
+- **What went wrong:** company.service test pinned `cacheExpiresAt: 2026-07-07` (written 2026-07-06); on 2026-07-09 the row read as expired and `result.cached` dropped to 0.
+- **Root cause:** function under test takes no `now` injection, fixture used absolute dates.
+- **Prevention rule:** CHECK every new test fixture date — if the code under test reads the real clock, fixture dates MUST be relative (`Date.now() +/- offset`), never absolute.
+- **Files affected:** apps/api/src/services/crm/company.service.test.ts

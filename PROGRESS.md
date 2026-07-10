@@ -4,6 +4,21 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-09 — Azure/Sillage freshness verify + brand 10x (mark redesign, outlined wordmark)
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** ultracode + forge — 1 verify workflow (16 agents, 3 audits x adversarial verify, 13/13 CONFIRMED) + 3 Sonnet implementer agents + code-review agent. 8 commits.
+
+**Azure go-live freshness (cheat sheet refreshed from verified audit):** every boot-critical claim in `docs/AZURE_GO_LIVE_CHEATSHEET.md` re-verified against code (storage guard, PII/token keys, job signing, tenant-scope guard, Clerk/demo exclusion, ports, bicep resources, health endpoints). One MAJOR drift fixed: doc said IaC "complete" while `infra/azure/README.md` brands it UNVALIDATED DRAFT — doc now honest. Nuances added: DEMO_MODE exempts storage guard, worker needs S3_REGION, ~333 env keys.
+
+**Sillage connector hardened for real deployments** (5 confirmed majors closed, +3 review minors): MCP protocol-version negotiation (was pinned -> real servers 400), spec-correct SSE parsing (multi-data-line join + JSON-RPC id match), session reuse via config-keyed client cache (3 round trips -> 1 warm; fixes the 1.5s augment race that negative-cached [] for 300s and silently emptied Buying-triggers), no negative-cache on timeout/error, real Test-now probe (lane + latency, not credential presence), `SILLAGE_REST_SIGNALS_PATH` env (vendor REST contract still unpublished — pure config at go-live), leading-slash normalization, code-only JSON-RPC errors fail loud, concurrent-404 double-reset guard. 14 new tests.
+
+**Brand 10x:** mark redesigned — play-triangle counter now fills the P bowl (candidate matrix rendered via resvg at 16-96px, C-sharp variant chosen; old counter collapsed at rail size). Wordmark outlined from Inter 4.1 TTFs via opentype.js (app never loaded Inter — SVG <text> rendered per-OS; email/OG broke). ALL derivatives regenerated from single source: web icons, real favicon.ico (was 67-byte blank), apple-touch (was never git-tracked — *.png ignore swallowed it, CI 404), PWA PNGs (still had the PRE-redesign mark), marketing component + OG card (headline de-CRM'd: "The bid cockpit built for winning teams."), chrome-extension icons (manifest referenced non-existent PNGs). Last user-facing BidStack strings retired (2 e2e region assertions, webhook placeholder x6 locales, onboarding tour regex); index.html got description/OG meta + brand theme-color; stale clerk.bidstack.dev preconnect dropped.
+
+**Latent bug fixed (standing branch failure):** role re-grant 409 — the users.ts upsert predated the soft-delete middleware which deliberately scopes upsert to live rows; revive now explicit via the documented where.deletedAt bypass. Plus calendar-bomb test defused (cacheExpiresAt pinned to 2026-07-07 rotted on 2026-07-09).
+
+**Deferred (operator):** production domain decision (marketing still bidstack.dev everywhere), Bicep validation on a real subscription, real Sillage credentials for a live probe.
+
+
 ## 2026-07-06 (pm) — Whole-app enterprise audit + account harmonization + StatTile polish
 
 **Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode — 2 audit workflows (this-session then whole-app, both verify-first read-only) + 2 fixer swarms + account-harmonization build→verify. ~10 commits.
