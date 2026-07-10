@@ -18,6 +18,7 @@ import type { McpAuthCtx } from '../auth.js';
 
 let dbReachable = false;
 let orgId = '';
+let primaryOrgId = '';
 let companyId = '';
 let otherCompanyId = '';
 let otherOrgId = '';
@@ -36,12 +37,15 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const seedOrg = await prisma.org.findFirst({ where: { clerkOrg: 'org_seed_mantu' } });
-  if (!seedOrg) {
-    dbReachable = false;
-    return;
-  }
-  orgId = seedOrg.id;
+  // Hermetic: create a dedicated throwaway org instead of anchoring to the
+  // shared org_seed_mantu fixture. Depending on shared seed data made these
+  // tests fail the moment the seed org was purged (they are supposed to prove
+  // org-binding, so they must own their tenants).
+  const primary = await prisma.org.create({
+    data: { clerkOrg: `org_kamtool_primary_${Math.random().toString(36).slice(2, 10)}`, name: 'KAMTool Primary' },
+  });
+  primaryOrgId = primary.id;
+  orgId = primary.id;
   const company = await prisma.company.create({
     data: { orgId, name: `KAMTool-${Math.random().toString(36).slice(2, 10)}`, source: 'manual', kamStatus: 'active' },
   });
@@ -62,6 +66,8 @@ afterAll(async () => {
     if (sessionIds.length) await prisma.kamSession.deleteMany({ where: { id: { in: sessionIds } } });
     if (otherOrgId) await prisma.org.deleteMany({ where: { id: otherOrgId } });
     if (companyId) await prisma.company.deleteMany({ where: { id: companyId } });
+    // Cascade-cleans the primary org's company/sessions/initiatives too.
+    if (primaryOrgId) await prisma.org.deleteMany({ where: { id: primaryOrgId } });
   } catch {
     /* ignore */
   }
