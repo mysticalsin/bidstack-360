@@ -130,3 +130,7 @@ packages/db/prisma/schema.prisma.pulled
 
 # QA swarm artifacts (session-generated)
 .qa-artifacts/
+
+# Brand raster assets under public/ are source, not QA screenshots
+!apps/web/public/*.png
+!apps/chrome-extension/src/icons/*.png
