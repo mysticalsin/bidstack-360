@@ -76,6 +76,7 @@ export default tseslint.config(
       'handoff/**',
       '.tmp/**', // extracted prototype zips kept for cross-referencing only
       '.audit-screens/**',
+      '.qa-artifacts/**', // QA swarm scripts/output — workflow-runtime globals, not product code
       '.codex/**',
       '.claude/worktrees/**', // ephemeral agent worktrees, not source
       'BIDCRM-design/**', // nested sibling project — not part of this repo
