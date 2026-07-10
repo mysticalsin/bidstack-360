@@ -193,6 +193,8 @@ export default tseslint.config(
       'packages/db/src/seed.ts',
       'packages/db/src/seed.rbac.ts',
       'packages/db/src/seed-demo.ts',
+      'packages/db/src/seed-prod.ts',
+      'packages/db/scripts/purge-demo-data.ts',
     ],
     rules: {
       'no-console': 'off',

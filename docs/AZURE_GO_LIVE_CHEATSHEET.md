@@ -20,6 +20,7 @@ Companion docs: `docs/AZURE_FOUNDATION.md` (architecture rationale), `infra/azur
 | **Durable storage on Azure** | ⚠️ **GAP — code only supports `local` and `s3`, no native Azure Blob** | see §1 — pick S3-compatible layer *or* add a Blob adapter |
 | PII + integration encryption | ✅ Enforced in prod (fails boot if keys missing) | generate + store the two 64-hex keys (§4) |
 | Sillage intent connector | ✅ Wired, env-activated (see §7) | set `SILLAGE_*` env to turn on |
+| Real-data bootstrap | ✅ `pnpm db:seed:prod` (org + system roles, zero fixtures) + purge script for demo data | follow `docs/PRODUCTION_DATA_BOOTSTRAP.md` |
 
 **Bottom line:** the app builds; the Azure IaC covers the full topology but is an
 **unvalidated draft** — budget one validation pass (`az bicep build` + `what-if`)
@@ -224,5 +225,6 @@ SILLAGE_MCP_SIGNALS_TOOL=     # optional; defaults to 'account_signals'
 - Turn on **Rolling Releases / canary** at Front Door for safer deploys.
 - Add the deferred **tenant-scope-guard** enforce-mode extension and a DB-level
   `parentId` acyclicity constraint (both tracked in `PROGRESS.md`).
-- Purge the polluted dev/demo DB test-fixture accounts before a customer demo (the
-  UI filter hides them; the data is still there).
+- Purge the polluted dev/demo DB test-fixture accounts before a customer demo:
+  `pnpm db:purge:demo -- --seed-org --demo-orgs --test-orgs` (dry-run; add
+  `--apply` to delete). Full real-data flow: `docs/PRODUCTION_DATA_BOOTSTRAP.md`.

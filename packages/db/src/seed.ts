@@ -47,6 +47,19 @@ const SEED_ORG_CLERK = 'org_seed_mantu';
 const SEED_ORG_NAME = 'Mantu (seed)';
 
 async function main() {
+  // Guard: this seed creates PROTOTYPE FIXTURES (demo users, companies,
+  // opportunities). It must never run against a production database — the
+  // production bootstrap is seed-prod.ts (system rows only, no fixtures).
+  if (process.env.NODE_ENV === 'production' && process.env.BIDSTACK_ALLOW_FIXTURE_SEED !== 'true') {
+    console.error(
+      'Refusing to run the FIXTURE seed with NODE_ENV=production. ' +
+        'Use `pnpm db:seed:prod` for production bootstrap (system rows only). ' +
+        'If you really want fixtures in this database, set BIDSTACK_ALLOW_FIXTURE_SEED=true.',
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   console.log('🌱 Seeding BidStack 360°…');
 
   const org = await prisma.org.upsert({

@@ -95,6 +95,8 @@
     "db:migrate:deploy:selftest": "node scripts/run-safe-migrate-deploy.mjs --selftest",
     "db:seed": "pnpm --filter @bidstack/db seed",
     "db:seed:demo": "pnpm --filter @bidstack/db seed:demo",
+    "db:seed:prod": "pnpm --filter @bidstack/db seed:prod",
+    "db:purge:demo": "pnpm --filter @bidstack/db purge:demo",
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",
     "webhooks:encrypt-secrets": "tsx scripts/encrypt-webhook-secrets.ts --dry-run",

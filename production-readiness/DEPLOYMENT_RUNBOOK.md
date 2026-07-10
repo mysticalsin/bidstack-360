@@ -71,7 +71,7 @@ Source of truth for the _required_ set is `docker-compose.prod.yml` (every `${VA
 - **PII at rest:** `PII_FIELD_ENCRYPTION` (default OFF - set `true`), `PII_ENCRYPTION_MASTER_KEY`, storage-encryption evidence, and `User.email` at-rest decision evidence (see `PRODUCTION_READINESS_REPORT.md` Gate 5/13; run `scripts/encrypt-existing-pii.ts`, then `pnpm deploy:evidence:pii` against the release DB). **REQUIRES ACCESS** (prod secret store + DB access + platform/security decision).
 - **Metrics scrape auth:** `METRICS_BEARER_TOKEN` (without it `/metrics` returns 404; with it, 401 on bad token)
 - **Proxy trust / rate-limit correctness:** `TRUSTED_PROXIES`
-- **Webhook verification:** `CLERK_WEBHOOK_SECRET`, `DUST_WEBHOOK_SECRET`; outbound webhook signing secrets use `INTEGRATION_TOKEN_KEY` and must have `BIDSTACK_WEBHOOK_SECRET_PLAINTEXT_FALLBACK=false` for release evidence.
+- **Webhook verification:** `DUST_WEBHOOK_SECRET`; outbound webhook signing secrets use `INTEGRATION_TOKEN_KEY` and must have `BIDSTACK_WEBHOOK_SECRET_PLAINTEXT_FALLBACK=false` for release evidence. (`CLERK_WEBHOOK_SECRET` is declared in env but NO Clerk webhook handler exists yet — org registration is done by `pnpm db:seed:prod`, not a webhook; don't treat the secret as required.)
 - **Job signing:** `JOB_SIGNING_SECRET` / `BIDSTACK_JOB_SIGNING_SECRET`
 - **Backups:** `BACKUP_S3_BUCKET`, `BACKUP_S3_REGION`, `BACKUP_S3_PREFIX`, `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET`, `BACKUP_ENCRYPT_KEY`
 - Feature integrations (Apollo/Seamless/Tech-Intel/Microsoft/Google/Slack/Zoom/Twilio/Deepgram/Odoo/Salesforce/HubSpot/DocuSign), SSO (`SSO_ALLOWED_EMAIL_DOMAINS`), push (`VAPID_*`) — enable per feature scope.
@@ -168,6 +168,13 @@ docker compose -f docker-compose.prod.yml logs -f migrate   # confirm "exited (0
 Run the `migrate` image as a **Container Apps Job to completion** before rolling app revisions. Mount or inject the backup proof JSON at the path named by `BIDSTACK_MIGRATE_BACKUP_PROOF` before starting the job. Do not bake migrate into app startup. **REQUIRES ACCESS** (Azure subscription, ACR, job trigger).
 
 > Never hand-run Prisma or hand-edit `prisma/migrations/` (generated). Use the migrate target / `pnpm db:migrate:deploy`.
+
+**After first migrate on a fresh database:** register the Clerk organization +
+system roles with `pnpm db:seed:prod -- --clerk-org <org_...> --name "<Org>"` —
+without it every sign-in 404s ("Organization not registered") and, once the org
+exists, every permission gate 403s until roles are seeded. System rows only,
+idempotent, zero fixtures. Full real-data flow: `docs/PRODUCTION_DATA_BOOTSTRAP.md`.
+Never run plain `pnpm db:seed` against production (fixture workspace).
 
 ---
 
