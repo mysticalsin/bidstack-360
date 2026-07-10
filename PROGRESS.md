@@ -4,6 +4,23 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-10 — Real-data readiness: prod bootstrap, demo purge, revival-upsert sweep
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** ultracode — 15-agent audit (3 lenses x adversarial verify, 12/12 CONFIRMED) + Sonnet implementer + inline fixes. 5 commits.
+
+**The plug-and-play gap, closed:** a fresh production DB was NOT usable — no Clerk webhook, no runtime org provisioning (auth 404s "Organization not registered"), and without per-org role seeds even the org admin was 403'd everywhere. NEW `pnpm db:seed:prod --clerk-org <id> --name <org>`: Org row + system roles/permissions ONLY, idempotent, refuses reserved dev/demo identifiers. Flow: migrate:deploy -> seed:prod -> Clerk sign-in (JIT users + auto admin grant) -> CSV/HubSpot/integrations import. Documented in NEW `docs/PRODUCTION_DATA_BOOTSTRAP.md` + runbook + cheat sheet.
+
+**Test/demo data, removable + guarded:** NEW `pnpm db:purge:demo` (dry-run default) removes the org_seed_mantu fixture workspace, demo_org_* orgs, leftover org_<label>_t<hex> integration-test orgs, and synthetic E2E companies in kept orgs — verified live against the dev DB (dozens of leftover test orgs enumerated). Fixture seed now REFUSES NODE_ENV=production (it auto-runs from prisma migrate dev/reset — silent prod pollution risk). bootstrap-production.sh step 3 told operators to run the fixture seed "for lookup tables" — corrected to seed:prod with an explicit warning. CLERK_WEBHOOK_SECRET demoted in the runbook (declared, consumed by nothing).
+
+**Revival-upsert sweep (soft-delete middleware class, 3 more fixed):** ensureAdminRoleGrant (prod Clerk path — revoked-then-re-promoted admin failed sign-in), stub-auth user+grant, org-settings locale. Same explicit where.deletedAt bypass as the users.ts fix; regression test asserts revive-before-upsert ordering.
+
+**Zero-data UX (audit verdict: app already demos cleanly on an empty org — GettingStarted swap, StateMessages trio everywhere, guarded [0]s):** 3 cosmetic fixes — Accounts All first-run empty state (create CTA + CSV link, 6 locales), KAM error state no longer masquerades as "No key accounts yet", intel freshness ribbon stops naming never-queried sources.
+
+**Kept by design:** onboarding sample-data templates (tagged isSample + purge endpoint — the one legit sample writer for real orgs); DEMO_MODE demo orgs (env-gated, mutually exclusive with Clerk).
+
+**Operator:** run the purge with --apply when ready (dry-run output reviewed first; backup before), then seed:prod against the production DB.
+
+
 ## 2026-07-09 — Azure/Sillage freshness verify + brand 10x (mark redesign, outlined wordmark)
 
 **Branch:** `feat/rebrand-polo-presales` · **Mode:** ultracode + forge — 1 verify workflow (16 agents, 3 audits x adversarial verify, 13/13 CONFIRMED) + 3 Sonnet implementer agents + code-review agent. 8 commits.
