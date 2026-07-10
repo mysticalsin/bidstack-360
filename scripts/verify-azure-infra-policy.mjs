@@ -109,9 +109,13 @@ function validateAzureInfraPolicy(source) {
     check(
       'integration-token-container-secret',
       'Container Apps reference the integration-token-key Key Vault secret',
-      /name:\s*'integration-token-key'\s*,\s*keyVaultUrl:\s*'\$\{kvUri\}secrets\/integration-token-key'\s*,\s*identity:\s*managedIdentityId/.test(
-        source,
-      ),
+      // The bicep builds the secret ref through the kvSecret(name, miId, vaultUri)
+      // helper, which expands to exactly the inline literal below. Accept either
+      // shape so the gate tracks the refactored source instead of drifting from it.
+      /kvSecret\(\s*'integration-token-key'\s*,\s*managedIdentityId\s*,\s*kvUri\s*\)/.test(source) ||
+        /name:\s*'integration-token-key'\s*,\s*keyVaultUrl:\s*'\$\{kvUri\}secrets\/integration-token-key'\s*,\s*identity:\s*managedIdentityId/.test(
+          source,
+        ),
     ),
     check(
       'integration-token-env-secret-ref',
@@ -143,7 +147,7 @@ var secretMap = {
 }
 
 var commonSecrets = [
-  { name: 'integration-token-key', keyVaultUrl: '\${kvUri}secrets/integration-token-key', identity: managedIdentityId }
+  kvSecret('integration-token-key', managedIdentityId, kvUri)
 ]
 
 var sharedEnv = [
