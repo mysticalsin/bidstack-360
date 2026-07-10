@@ -66,6 +66,7 @@ import { orgSettingsRoutes } from './routes/org-settings.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { territoryRoutes } from './routes/territories.js';
 import { accountIntelRoutes } from './routes/account-intel.js';
+import { webhooksClerkRoutes } from './routes/webhooks-clerk.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 import { workflowRoutes } from './routes/workflows.js';
 // Sprint 1 — Krayin import
@@ -211,6 +212,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
+  await server.register(webhooksClerkRoutes, { prefix: '/webhooks' });
   await server.register(territoryRoutes, { prefix: '/api/v1' });
   await server.register(accountIntelRoutes, { prefix: '/api/v1' });
   await server.register(opportunityTimelineRoutes, { prefix: '/api/v1' });

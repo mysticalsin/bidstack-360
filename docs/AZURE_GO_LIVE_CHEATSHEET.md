@@ -93,6 +93,7 @@ user-assigned managed identity (never inline in the app spec):
 | `PII_ENCRYPTION_MASTER_KEY` | `openssl rand -hex 32` (64 hex chars — field-level PII encryption) |
 | `BIDSTACK_JOB_SIGNING_SECRET` | `openssl rand -hex 32` (signs queue jobs; api + worker refuse prod boot without it) |
 | `CLERK_SECRET_KEY` + `VITE_CLERK_PUBLISHABLE_KEY` | Clerk production instance (auth) |
+| `CLERK_WEBHOOK_SECRET` | Clerk Dashboard → Webhooks → endpoint `https://<api>/webhooks/clerk` (organization events) — automatic org bootstrap; fallback is `pnpm db:seed:prod` |
 | `S3_*` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | object-storage credentials (until azure-blob lands) |
 | Optional connectors | `SILLAGE_*` (§7), `ERP_MCP_URL`, `LMS_360L_*`, Dust, Apollo, Seamless, etc. |
 

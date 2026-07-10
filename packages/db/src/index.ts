@@ -179,3 +179,8 @@ export {
 // runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
 export { seedOrgData } from './seed-org-data.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
+
+// System RBAC seeding (roles + permission manifest, NO fixture data) — shared
+// by the seed CLIs and the Clerk organization.created webhook so a brand-new
+// production org is usable the moment it exists.
+export { seedRolesAndPermissions } from './seed.rbac.js';

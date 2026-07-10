@@ -8,27 +8,31 @@ holding real production data. Companion to `docs/AZURE_GO_LIVE_CHEATSHEET.md`
 
 ## 1. The plug-and-play sequence (fresh production database)
 
+**Fully automatic path (recommended):** wire the Clerk webhook once and new
+organizations bootstrap themselves the moment they're created in Clerk.
+
+1. Clerk Dashboard → Webhooks → Add endpoint: `https://<api-domain>/webhooks/clerk`,
+   subscribe to the **organization** events, copy the signing secret into
+   `CLERK_WEBHOOK_SECRET` (Key Vault → api Container App).
+2. `pnpm db:migrate:deploy` (the Azure migrate Job runs exactly this — never seeds).
+3. Create the organization in Clerk → the webhook creates the Org row + seeds
+   system roles/permissions (`organization.created`; name edits sync via
+   `organization.updated`; `organization.deleted` deliberately deletes NOTHING).
+4. Sign in — users JIT-provision; Clerk org-admins get the Admin role automatically.
+5. Load real data (Settings → Data import): CSV wizard (companies / contacts /
+   leads / opportunities), HubSpot migration, or integrations.
+
+**Manual fallback (no webhook configured, or org created before the webhook):**
+
 ```bash
-# 1. Schema (the Azure migrate Job runs exactly this — never seeds anything)
-pnpm db:migrate:deploy
-
-# 2. Register your Clerk organization + system roles. System rows ONLY — no fixtures.
 pnpm db:seed:prod -- --clerk-org org_2abc... --name "Mantu"
-
-# 3. Sign in through the app with a Clerk member of that organization.
-#    Users are JIT-provisioned; Clerk org-admins get the Admin role automatically.
-
-# 4. Load real data (Settings → Data import):
-#    CSV wizard (companies / contacts / leads / opportunities), or the HubSpot
-#    migration, or integrations (Gmail / Microsoft / Slack / …).
 ```
 
-Why step 2 is mandatory: there is **no Clerk webhook and no runtime org
-auto-provisioning**. Until the Org row exists, every sign-in gets
-`404 Organization not registered` (`apps/api/src/plugins/auth.ts`); until the
-org's system roles are seeded, the JIT admin grant skips itself and every
-permission gate returns 403. `db:seed:prod` is idempotent — safe to re-run.
-(`CLERK_WEBHOOK_SECRET` in the env schema is currently consumed by nothing.)
+Why one of the two is mandatory: there is no other org provisioning. Until the
+Org row exists, every sign-in gets `404 Organization not registered`
+(`apps/api/src/plugins/auth.ts`); until the org's system roles are seeded, the
+JIT admin grant skips itself and every permission gate returns 403. Both paths
+create identical rows and are idempotent — safe to re-run/redeliver.
 
 Everything else about a brand-new org is automatic: locale/currency defaults are
 code-level, pipeline stages are enum-backed (stage table rows auto-create
