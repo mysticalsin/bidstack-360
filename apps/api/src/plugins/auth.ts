@@ -215,6 +215,14 @@ async function resolveStubRoleOverride(
     );
   }
 
+  // Revive tombstoned rows before each upsert: the soft-delete middleware
+  // scopes upsert to live rows, so a soft-deleted stub user/grant would send
+  // the upsert down the create branch and P2002 on the unique key. The
+  // explicit where.deletedAt filter is the middleware's documented bypass.
+  await prisma.user.updateMany({
+    where: { email: override.email, deletedAt: { not: null } },
+    data: { deletedAt: null },
+  });
   const user = await prisma.user.upsert({
     where: { email: override.email },
     create: {
@@ -236,6 +244,10 @@ async function resolveStubRoleOverride(
   await prisma.$transaction([
     prisma.userRole.deleteMany({
       where: { userId: user.id, orgId, roleId: { not: role.id } },
+    }),
+    prisma.userRole.updateMany({
+      where: { userId: user.id, roleId: role.id, orgId, deletedAt: { not: null } },
+      data: { deletedAt: null },
     }),
     prisma.userRole.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },

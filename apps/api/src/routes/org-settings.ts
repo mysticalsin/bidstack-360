@@ -85,6 +85,13 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
         ...parseLocaleSettings(existing),
         ...req.body,
       });
+      // Revive a tombstoned settings row first — the soft-delete middleware
+      // scopes upsert to live rows, so upserting over a soft-deleted row
+      // would take the create branch and P2002 on the orgId unique.
+      await prisma.orgSettings.updateMany({
+        where: { orgId: req.auth.orgId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
       await prisma.orgSettings.upsert({
         where: { orgId: req.auth.orgId },
         create: {
