@@ -206,6 +206,17 @@ export function validateZoomWebhook(
  */
 export function zoomUrlValidationResponse(plainToken: string): Record<string, string> {
   const secret = process.env.ZOOM_SECRET_TOKEN ?? '';
+  // Prevent this endpoint from being abused as an HMAC signing oracle. It returns
+  // HMAC(secret, plainToken); the webhook signature is HMAC(secret, `v0:<ts>:<body>`)
+  // under the SAME key with no domain separation — so an attacker who controls
+  // plainToken could obtain a valid signature for a forged webhook body. A genuine
+  // Zoom url_validation token is an opaque value with no ':'; reject anything that
+  // could form the `v0:<ts>:<body>` message so the oracle cannot be exploited.
+  if (!plainToken || plainToken.includes(':')) {
+    const err = new Error('Invalid Zoom url_validation plainToken') as Error & { statusCode?: number };
+    err.statusCode = 400;
+    throw err;
+  }
   const encryptedToken = createHmac('sha256', secret).update(plainToken).digest('hex');
   return { plainToken, encryptedToken };
 }
