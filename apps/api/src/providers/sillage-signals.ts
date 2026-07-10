@@ -259,7 +259,11 @@ async function fetchSillageRestSignals({
   target: SillageAccountTarget;
   fetchImpl: FetchLike;
 }): Promise<unknown> {
-  const res = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}${restSignalsPath}`, {
+  // Normalize the operator-supplied path: without the leading slash the
+  // concatenation would mutate the HOST ("api.getsillage.comv1/...") and the
+  // connector would silently fail-open on a one-character env typo.
+  const path = restSignalsPath.startsWith('/') ? restSignalsPath : `/${restSignalsPath}`;
+  const res = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}${path}`, {
     method: 'POST',
     redirect: 'error',
     signal: AbortSignal.timeout(TIMEOUT_MS),

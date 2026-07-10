@@ -47,6 +47,10 @@ export class SillageMcpClient {
   constructor(private readonly options: SillageMcpClientOptions) {}
 
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    // Ensure the handshake ran BEFORE snapshotting the session, so the
+    // snapshot is the session the request below actually rides on.
+    await this.initialize();
+    const sessionUsed = this.sessionId;
     try {
       return await this.callToolOnce(name, args);
     } catch (err) {
@@ -54,7 +58,10 @@ export class SillageMcpClient {
       // Server-side session expiry on a long-lived cached client: drop the
       // dead session, re-initialize once, retry once. Anything after that is
       // a real failure and propagates to the provider's fallback logic.
-      this.reset();
+      // Reset only if nobody got there first: a concurrent caller racing the
+      // same dead session would otherwise clobber the fresh handshake (and
+      // its just-captured session id) that the first 404 already started.
+      if (this.sessionId === sessionUsed) this.reset();
       return this.callToolOnce(name, args);
     }
   }
@@ -123,8 +130,17 @@ export class SillageMcpClient {
     const id = this.nextId++;
     const response = await this.postJsonRpc({ jsonrpc: '2.0', id, method, params }, { expectId: id });
     const envelope = record(response);
-    const error = record(envelope.error);
-    if (error.message) throw new Error(String(error.message));
+    if (envelope.error !== undefined) {
+      // Presence of `error` is the failure signal per JSON-RPC; a server that
+      // omits/empties `message` must still fail loudly, not read as an empty
+      // success (which downstream maps to "quiet account" with source: mcp).
+      const error = record(envelope.error);
+      const message =
+        typeof error.message === 'string' && error.message
+          ? error.message
+          : `sillage-mcp JSON-RPC error${typeof error.code === 'number' ? ` ${error.code}` : ''}`;
+      throw new Error(message);
+    }
     return envelope.result;
   }
 

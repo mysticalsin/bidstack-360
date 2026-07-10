@@ -227,12 +227,32 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!role) throw server.httpErrors.badRequest('Role not found in this org');
 
       await prisma.$transaction(async (tx) => {
-        await tx.userRole.upsert({
-          where: { userId_roleId: { userId: user.id, roleId: role.id } },
-          // Re-grant: clear any prior soft-delete. orgId stays pinned to caller.
-          update: { deletedAt: null, orgId: req.auth.orgId },
-          create: { userId: user.id, roleId: role.id, orgId: req.auth.orgId },
+        // Re-grant must revive a tombstoned assignment, but the soft-delete
+        // middleware deliberately scopes upsert to LIVE rows (a hidden
+        // tombstone must never be revived by accident), so a plain upsert
+        // here takes the create branch and 409s on the primary key. The
+        // revive is therefore explicit — where.deletedAt is the middleware's
+        // documented bypass for deliberate restores.
+        const revived = await tx.userRole.updateMany({
+          where: {
+            userId: user.id,
+            roleId: role.id,
+            orgId: req.auth.orgId,
+            deletedAt: { not: null },
+          },
+          data: { deletedAt: null },
         });
+        if (revived.count === 0) {
+          const live = await tx.userRole.findFirst({
+            where: { userId: user.id, roleId: role.id, orgId: req.auth.orgId, deletedAt: null },
+            select: { userId: true },
+          });
+          if (!live) {
+            await tx.userRole.create({
+              data: { userId: user.id, roleId: role.id, orgId: req.auth.orgId },
+            });
+          }
+        }
         await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,

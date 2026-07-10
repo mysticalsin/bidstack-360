@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { fetchSillageAccountSignals, probeSillageConnectivity } from './sillage-signals.js';
+import { SillageMcpClient } from './sillage-mcp-client.js';
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -335,6 +336,92 @@ describe('fetchSillageAccountSignals', () => {
     });
 
     expect(requestedPath).toBe('/custom/path');
+  });
+
+  it('normalizes a REST path override missing its leading slash', async () => {
+    // Without normalization the concatenation mutates the HOST
+    // ("api.sillage.examplecustom/path") and a one-character env typo would
+    // silently kill the connector.
+    let requestedUrl: string | undefined;
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
+      requestedUrl = String(url);
+      return jsonResponse({ signals: [] });
+    }) as unknown as typeof fetch;
+
+    await fetchSillageAccountSignals({
+      companyName: 'Slashless Co',
+      mcpUrl: undefined,
+      apiKey: 'k',
+      baseUrl: 'https://api.sillage.example',
+      restSignalsPath: 'custom/path',
+      fetchImpl,
+    });
+
+    expect(requestedUrl).toBe('https://api.sillage.example/custom/path');
+  });
+
+  it('treats a JSON-RPC error without a message as a failure, not an empty success', async () => {
+    // JSON-RPC failure is signalled by the PRESENCE of `error`; a server that
+    // omits `message` must not be mapped to a quiet source:'mcp' account.
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string };
+      if (body.method === 'initialize') return jsonResponse({ result: {} });
+      if (body.method === 'notifications/initialized') return jsonResponse({}, { status: 202 });
+      return jsonResponse({ error: { code: -32000 } });
+    }) as unknown as typeof fetch;
+
+    const warn = vi.fn();
+    const result = await fetchSillageAccountSignals({
+      companyName: 'Errorless Error Co',
+      mcpUrl: 'https://sillage.example/mcp-bare-error',
+      fetchImpl,
+      logger: { warn },
+    });
+
+    expect(result.source).not.toBe('mcp');
+    expect(result.signals).toEqual([]);
+    expect(result.error).toBeTruthy();
+    // The synthesized message (with the JSON-RPC code) must reach the log —
+    // the provider-level error string is a config summary, not the cause.
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.stringContaining('-32000') }),
+      expect.any(String),
+    );
+  });
+});
+
+describe('SillageMcpClient concurrent session expiry', () => {
+  it('lets only the first 404 reset the session so racing callers share one re-handshake', async () => {
+    // Two in-flight calls hit the same expired session. Without the
+    // reset-if-unchanged guard, the second 404 clears the first caller's
+    // fresh in-flight handshake and a third initialize fires.
+    let initializeCount = 0;
+    let toolsCallCount = 0;
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string };
+      if (body.method === 'initialize') {
+        initializeCount += 1;
+        return jsonResponse(
+          { result: {} },
+          { headers: { 'Mcp-Session-Id': `s${initializeCount}` } },
+        );
+      }
+      if (body.method === 'notifications/initialized') return jsonResponse({}, { status: 202 });
+      toolsCallCount += 1;
+      if (toolsCallCount <= 2) return new Response('session expired', { status: 404 });
+      return jsonResponse({ result: { structuredContent: { signals: [] } } });
+    }) as unknown as typeof fetch;
+
+    const client = new SillageMcpClient({
+      url: 'https://sillage.example/mcp-race',
+      timeoutMs: 5_000,
+      fetchImpl,
+    });
+
+    await Promise.all([client.callTool('account_signals', {}), client.callTool('account_signals', {})]);
+
+    expect(initializeCount).toBe(2);
+    expect(toolsCallCount).toBe(4);
   });
 });
 
