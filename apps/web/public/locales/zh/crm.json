@@ -2538,7 +2538,7 @@
     "subtitle": "请使用生产环境的 HTTPS 端点。Polo PreSales 使用 HMAC-SHA256 对每次投递进行签名。",
     "closeAriaLabel": "关闭",
     "endpointUrlLabel": "端点 URL",
-    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
     "endpointUrlHelp": "必须使用 HTTPS。localhost、私有 IP 和内部主机名将被拒绝。",
     "eventsLabel": "事件",
     "eventsHelp": "仅选择接收方实际处理的事件。",

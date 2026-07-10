@@ -104,7 +104,7 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
   await expect(kpiGrid, 'account metrics region must mount').toBeVisible();
 
   await expect(
-    page.getByRole('region', { name: /bidstack command center/i }),
+    page.getByRole('region', { name: /polo presales command center/i }),
     'command center must render the presales next-action layer',
   ).toBeVisible();
 

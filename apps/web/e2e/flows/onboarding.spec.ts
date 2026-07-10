@@ -22,7 +22,7 @@ test.describe('Onboarding flow', () => {
     const tourElement = page
       .getByRole('dialog', { name: /welcome|tour|getting started/i })
       .or(page.locator('[data-testid="product-tour"]'))
-      .or(page.getByText(/welcome to bidstack|let's get started|quick tour/i).first());
+      .or(page.getByText(/welcome to polo presales|let's get started|quick tour/i).first());
 
     const visible = await tourElement.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!visible) {

@@ -2538,7 +2538,7 @@
     "subtitle": "Use um endpoint HTTPS de produção. O Polo PreSales assina cada entrega com HMAC-SHA256.",
     "closeAriaLabel": "Fechar",
     "endpointUrlLabel": "URL do endpoint",
-    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
     "endpointUrlHelp": "HTTPS é obrigatório. Localhost, IPs privados e nomes de host internos são rejeitados.",
     "eventsLabel": "Eventos",
     "eventsHelp": "Escolha apenas os eventos que o seu receptor realmente trata.",

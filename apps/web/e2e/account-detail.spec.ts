@@ -70,7 +70,7 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
     await expect(page.getByText(company.domain, { exact: false })).toBeVisible();
   }
 
-  await expect(page.getByRole('region', { name: 'BidStack command center' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Polo PreSales command center' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Portfolio pipeline by stage' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Account opportunities' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Account signal coverage' })).toBeVisible();

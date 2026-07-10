@@ -107,7 +107,7 @@ export function CreateWebhookDialog({
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder={t(
                   'createWebhook.endpointUrlPlaceholder',
-                  'https://your-app.com/webhooks/bidstack',
+                  'https://your-app.com/webhooks/polo',
                 )}
                 required
                 autoFocus
