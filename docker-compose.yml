@@ -38,7 +38,21 @@ services:
     environment:
       NODE_ENV: development
       DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack
-    command: ["sh", "-c", "pnpm --filter @bidstack/db migrate:deploy && pnpm --filter @bidstack/db seed"]
+    # Deploy-only. The migrate image is intentionally schema-only (Prisma CLI +
+    # schema + migrations — no `tsx`/`pnpm`/app source), so it CANNOT run the
+    # tsx-based `db seed`; the old `&& pnpm ... seed` command failed at runtime and
+    # left this one-shot non-zero, blocking every app service (depends_on:
+    # service_completed_successfully). Seeding is a host/dev step: run
+    # `pnpm db:seed` against DATABASE_URL once the DB is up (see README/DEV docs).
+    command:
+      [
+        'node',
+        'scripts/run-safe-migrate-deploy.mjs',
+        '--prisma-bin',
+        './packages/db/node_modules/.bin/prisma',
+        '--schema',
+        'packages/db/prisma/schema.prisma',
+      ]
 
   api:
     build:

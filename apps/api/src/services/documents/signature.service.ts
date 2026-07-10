@@ -266,19 +266,26 @@ export async function handleDocuSignWebhook(
   payload: DocuSignWebhookPayload,
 ): Promise<void> {
   const env = getEnv();
-  if (env.DOCUSIGN_WEBHOOK_HMAC_KEY) {
-    if (!signatureHeader) {
-      badRequest('Missing X-DocuSign-Signature-1 header');
-    }
-    const expected = createHmac('sha256', env.DOCUSIGN_WEBHOOK_HMAC_KEY)
-      .update(rawBody)
-      .digest('base64');
-    // Timing-safe comparison to prevent timing attacks
-    const actual = Buffer.from(signatureHeader, 'base64');
-    const expected_buf = Buffer.from(expected, 'base64');
-    if (actual.length !== expected_buf.length || !timingSafeEqual(actual, expected_buf)) {
-      badRequest('DocuSign webhook HMAC verification failed');
-    }
+  // Fail CLOSED. This is a public, unauthenticated endpoint that flips signing
+  // status and appends to the non-repudiable audit trail, so HMAC verification is
+  // MANDATORY — it must never be conditional on the secret being present. An unset
+  // key is a misconfiguration (503), not a licence to trust an unsigned body. This
+  // mirrors the Dust/Clerk webhooks, which also fail closed when their secret is
+  // absent instead of silently accepting spoofed events.
+  if (!env.DOCUSIGN_WEBHOOK_HMAC_KEY) {
+    throw credentialError('DocuSign webhook secret (DOCUSIGN_WEBHOOK_HMAC_KEY) is not configured');
+  }
+  if (!signatureHeader) {
+    badRequest('Missing X-DocuSign-Signature-1 header');
+  }
+  const expected = createHmac('sha256', env.DOCUSIGN_WEBHOOK_HMAC_KEY)
+    .update(rawBody)
+    .digest('base64');
+  // Timing-safe comparison to prevent timing attacks
+  const actual = Buffer.from(signatureHeader, 'base64');
+  const expected_buf = Buffer.from(expected, 'base64');
+  if (actual.length !== expected_buf.length || !timingSafeEqual(actual, expected_buf)) {
+    badRequest('DocuSign webhook HMAC verification failed');
   }
 
   const envelopeId = payload.envelopeId;

@@ -31,7 +31,13 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
   // reads (list / entity-tags / AI suggest) behind tags:read and every mutation
   // (create / update / delete / apply / remove) behind tags:write.
   server.addHook('preHandler', (req) => {
-    const isRead = req.method === 'GET' || req.url.includes('/tags/suggest');
+    // Gate on the MATCHED route pattern, never the raw URL. `req.url.includes('/tags/suggest')`
+    // would classify a mutating request as a read when an attacker appends
+    // `?x=/tags/suggest` to the query string (a tags:write bypass). routeOptions.url is
+    // the registered pattern (prefix-qualified, no query string), so an `endsWith`
+    // suffix match is immune to query-string spoofing.
+    const routeUrl = req.routeOptions?.url ?? '';
+    const isRead = req.method === 'GET' || routeUrl.endsWith('/tags/suggest');
     return server.requirePermission(isRead ? 'tags:read' : 'tags:write')(req);
   });
 
