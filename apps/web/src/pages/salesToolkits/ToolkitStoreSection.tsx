@@ -1,7 +1,7 @@
 /**
  * ToolkitStoreSection — the stored sales-toolkit collateral (decks/templates/
  * battle-cards). Org-scoped CRUD via useSalesToolkitStore. Normally kept in
- * SharePoint; stored here so it's managed in BidStack + readable by the MCP.
+ * SharePoint; stored here so it's managed in Polo PreSales + readable by the MCP.
  */
 import { useMemo, useState } from 'react';
 
@@ -39,7 +39,14 @@ interface DraftState {
   sectorTags: string;
   url: string;
 }
-const EMPTY_DRAFT: DraftState = { id: null, title: '', description: '', category: 'deck', sectorTags: '', url: '' };
+const EMPTY_DRAFT: DraftState = {
+  id: null,
+  title: '',
+  description: '',
+  category: 'deck',
+  sectorTags: '',
+  url: '',
+};
 
 export function ToolkitStoreSection() {
   const [category, setCategory] = useState<string>('');
@@ -54,12 +61,16 @@ export function ToolkitStoreSection() {
     importSp.mutate(undefined, {
       onSuccess: (r) =>
         r.configured
-          ? toast.success(`Imported ${r.imported} toolkit${r.imported === 1 ? '' : 's'} from SharePoint`)
-          : toast.info('SharePoint isn’t connected yet — add the connector credentials to enable import.'),
+          ? toast.success(
+              `Imported ${r.imported} toolkit${r.imported === 1 ? '' : 's'} from SharePoint`,
+            )
+          : toast.info(
+              'SharePoint isn’t connected yet — add the connector credentials to enable import.',
+            ),
       onError: () => toast.error('SharePoint import failed'),
     });
 
-  const items = store.data?.items ?? [];
+  const items = useMemo(() => store.data?.items ?? [], [store.data?.items]);
   const counts = useMemo(() => {
     const map = new Map<string, number>();
     for (const it of items) map.set(it.category, (map.get(it.category) ?? 0) + 1);
@@ -134,11 +145,15 @@ export function ToolkitStoreSection() {
       {draft ? (
         <div className="grid grid-cols-1 gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4 lg:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">Title *</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              Title *
+            </span>
             <Input value={draft.title} onChange={(e) => set('title', e.target.value)} autoFocus />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">Category</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              Category
+            </span>
             <select
               value={draft.category}
               onChange={(e) => set('category', e.target.value)}
@@ -152,11 +167,20 @@ export function ToolkitStoreSection() {
             </select>
           </label>
           <label className="block lg:col-span-2">
-            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">Link (SharePoint / external)</span>
-            <Input value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" type="url" />
+            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              Link (SharePoint / external)
+            </span>
+            <Input
+              value={draft.url}
+              onChange={(e) => set('url', e.target.value)}
+              placeholder="https://…"
+              type="url"
+            />
           </label>
           <label className="block lg:col-span-2">
-            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">Sector tags (comma-separated)</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              Sector tags (comma-separated)
+            </span>
             <Input
               value={draft.sectorTags}
               onChange={(e) => set('sectorTags', e.target.value)}
@@ -164,7 +188,9 @@ export function ToolkitStoreSection() {
             />
           </label>
           <label className="block lg:col-span-2">
-            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">Description</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              Description
+            </span>
             <Input value={draft.description} onChange={(e) => set('description', e.target.value)} />
           </label>
           <div className="flex justify-end gap-2 lg:col-span-2">
@@ -179,7 +205,11 @@ export function ToolkitStoreSection() {
       ) : null}
 
       {counts.size > 0 ? (
-        <div className="flex flex-wrap gap-2 border-b border-[var(--border-subtle)] p-3" role="group" aria-label="Filter by category">
+        <div
+          className="flex flex-wrap gap-2 border-b border-[var(--border-subtle)] p-3"
+          role="group"
+          aria-label="Filter by category"
+        >
           <FilterChip label="All" active={category === ''} onClick={() => setCategory('')} />
           {CATEGORIES.filter((c) => counts.has(c.value)).map((c) => (
             <FilterChip
@@ -196,7 +226,10 @@ export function ToolkitStoreSection() {
         {store.isLoading ? (
           <LoadingSkeleton rows={4} />
         ) : store.isError ? (
-          <ErrorState title="Couldn't load toolkits" message={store.error?.message ?? 'Try again shortly.'} />
+          <ErrorState
+            title="Couldn't load toolkits"
+            message={store.error?.message ?? 'Try again shortly.'}
+          />
         ) : items.length === 0 ? (
           <EmptyState
             title="No stored toolkits yet"
@@ -217,7 +250,9 @@ export function ToolkitStoreSection() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{t.title}</h3>
                 {t.description ? (
-                  <p className="mt-1 line-clamp-3 flex-1 text-xs text-[var(--fg-tertiary)]">{t.description}</p>
+                  <p className="mt-1 line-clamp-3 flex-1 text-xs text-[var(--fg-tertiary)]">
+                    {t.description}
+                  </p>
                 ) : (
                   <div className="flex-1" />
                 )}
@@ -264,7 +299,15 @@ export function ToolkitStoreSection() {
   );
 }
 
-function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"

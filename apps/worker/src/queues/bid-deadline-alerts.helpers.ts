@@ -82,3 +82,37 @@ export function dueInLabel(daysUntil: number): string {
   if (daysUntil === 1) return 'in 1 day';
   return `in ${daysUntil} days`;
 }
+
+/**
+ * True once the deadline has actually passed (daysUntil negative). Distinct
+ * from `nearestCrossedThreshold` returning null, which also covers "further
+ * out than the widest 7d window" — callers that need to tell "not yet due"
+ * apart from "already missed" use this.
+ */
+export function isOverdue(daysUntil: number): boolean {
+  return daysUntil < 0;
+}
+
+/**
+ * Dedupe threshold marker for the overdue alert — a single once-ever bucket,
+ * distinct from the real DEADLINE_THRESHOLD_DAYS values (7/3/1) so its
+ * deadlineDedupeUrl never collides with an on-time alert's key. WHY once-ever
+ * (not a daily re-nudge like task-kam-alerts' staleness/task-due alerts): a
+ * missed deadline is one fact worth flagging with high signal; repeating
+ * "still overdue" every day for a bid that's been late for weeks is the exact
+ * alert-fatigue failure this cluster's dedupe design exists to prevent. If the
+ * dueDate is later rescheduled forward, the opp falls back into the ordinary
+ * 7/3/1 buckets under its own (different) dedupe keys.
+ */
+export const OVERDUE_DEDUPE_THRESHOLD = 0;
+
+/**
+ * Human label for an ALREADY-missed deadline. Distinct from `dueInLabel`
+ * (which collapses any daysUntil <= 0 to 'today' — correct for the on-time
+ * 7/3/1 buckets, but wrong once truly overdue: 'today' implies the deadline
+ * hasn't passed yet). `daysOverdue` is the positive day count past the
+ * deadline (i.e. `-daysUntil`).
+ */
+export function overdueByLabel(daysOverdue: number): string {
+  return daysOverdue === 1 ? 'overdue by 1 day' : `overdue by ${daysOverdue} days`;
+}

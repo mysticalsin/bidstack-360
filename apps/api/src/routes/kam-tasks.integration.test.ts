@@ -4,17 +4,24 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId = '';
 let companyId = '';
 let otherInitiativeId = '';
+let restoreAuth: (() => void) | undefined;
 const createdInitiativeIds: string[] = [];
 const createdCompanyIds: string[] = [];
 const createdOrgIds: string[] = [];
@@ -38,12 +45,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const seedOrg = await prisma.org.findFirst({ where: { clerkOrg: 'org_seed_mantu' } });
-  if (!seedOrg) {
-    dbReachable = false;
-    return;
-  }
-  orgId = seedOrg.id;
+  const org = await createIsolatedOrg('kam-tasks');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const company = await prisma.company.create({
     data: { orgId, name: `KAMTask-${randomUUID().slice(0, 8)}`, source: 'manual' },
   });
@@ -81,31 +85,38 @@ afterAll(async () => {
   } catch {
     /* ignore */
   }
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) throw new Error(`[skip] ${name} — dev DB / seed org not reachable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable);
 
 describe('KAM tasks + per-account to-do', () => {
-  t('creates a task under an initiative (accountId denormalized) and bumps lastActivityAt', async () => {
-    const initId = await newInitiative(companyId);
-    const before = (await server.inject({ method: 'GET', url: `/api/v1/kam/initiatives/${initId}` })).json()
-      .lastActivityAt as string;
-    const res = await server.inject({
-      method: 'POST',
-      url: `/api/v1/kam/initiatives/${initId}/tasks`,
-      payload: { title: 'Call the sponsor', type: 'prospection' },
-    });
-    expect(res.statusCode).toBe(201);
-    expect(res.json()).toMatchObject({ initiativeId: initId, accountId: companyId, status: 'open' });
-    const after = (await server.inject({ method: 'GET', url: `/api/v1/kam/initiatives/${initId}` })).json()
-      .lastActivityAt as string;
-    expect(new Date(after).getTime()).toBeGreaterThanOrEqual(new Date(before).getTime());
-  });
+  t(
+    'creates a task under an initiative (accountId denormalized) and bumps lastActivityAt',
+    async () => {
+      const initId = await newInitiative(companyId);
+      const before = (
+        await server.inject({ method: 'GET', url: `/api/v1/kam/initiatives/${initId}` })
+      ).json().lastActivityAt as string;
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/v1/kam/initiatives/${initId}/tasks`,
+        payload: { title: 'Call the sponsor', type: 'prospection' },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json()).toMatchObject({
+        initiativeId: initId,
+        accountId: companyId,
+        status: 'open',
+      });
+      const after = (
+        await server.inject({ method: 'GET', url: `/api/v1/kam/initiatives/${initId}` })
+      ).json().lastActivityAt as string;
+      expect(new Date(after).getTime()).toBeGreaterThanOrEqual(new Date(before).getTime());
+    },
+  );
 
   t('surfaces open tasks in the per-account to-do and moves them out on done', async () => {
     const initId = await newInitiative(companyId);
@@ -116,7 +127,10 @@ describe('KAM tasks + per-account to-do', () => {
     });
     const taskId = created.json().id as string;
 
-    const todo1 = await server.inject({ method: 'GET', url: `/api/v1/kam/accounts/${companyId}/todos` });
+    const todo1 = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/accounts/${companyId}/todos`,
+    });
     expect(todo1.statusCode).toBe(200);
     expect(todo1.json().items.some((i: { id: string }) => i.id === taskId)).toBe(true);
 
@@ -128,7 +142,10 @@ describe('KAM tasks + per-account to-do', () => {
     expect(patch.statusCode).toBe(200);
     expect(patch.json().status).toBe('done');
 
-    const todo2 = await server.inject({ method: 'GET', url: `/api/v1/kam/accounts/${companyId}/todos` });
+    const todo2 = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/accounts/${companyId}/todos`,
+    });
     expect(todo2.json().items.some((i: { id: string }) => i.id === taskId)).toBe(false);
     expect(todo2.json().doneCount).toBeGreaterThanOrEqual(1);
   });
@@ -143,7 +160,10 @@ describe('KAM tasks + per-account to-do', () => {
         payload: { title: `task ${i}` },
       });
     }
-    const todo = await server.inject({ method: 'GET', url: `/api/v1/kam/accounts/${companyId}/todos` });
+    const todo = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/accounts/${companyId}/todos`,
+    });
     const body = todo.json();
     expect(body.staleInitiativeIds).toContain(staleInit);
     expect(body.overloadedInitiativeIds).toContain(loadedInit);
@@ -166,8 +186,13 @@ describe('KAM tasks + per-account to-do', () => {
       payload: { title: 'temp' },
     });
     const taskId = created.json().id as string;
-    expect((await server.inject({ method: 'DELETE', url: `/api/v1/kam/tasks/${taskId}` })).statusCode).toBe(204);
-    const todo = await server.inject({ method: 'GET', url: `/api/v1/kam/accounts/${companyId}/todos` });
+    expect(
+      (await server.inject({ method: 'DELETE', url: `/api/v1/kam/tasks/${taskId}` })).statusCode,
+    ).toBe(204);
+    const todo = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/accounts/${companyId}/todos`,
+    });
     expect(todo.json().items.some((i: { id: string }) => i.id === taskId)).toBe(false);
   });
 });

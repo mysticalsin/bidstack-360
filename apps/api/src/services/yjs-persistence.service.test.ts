@@ -27,6 +27,7 @@ import * as Y from 'yjs';
 const mockPrisma = {
   yjsDocument: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
@@ -235,6 +236,28 @@ describe('Multi-tenant isolation', () => {
     expect(callArg.where.orgId_entityType_entityId_fieldKey.orgId).toBe('org-B');
     expect(callArg.where.orgId_entityType_entityId_fieldKey.entityId).toBe('opp-123');
   });
+
+  it('compactDoc scopes the read AND the CAS write to the requesting orgId, and no-ops on a cross-org id', async () => {
+    // WHY: compaction decrypts, merges, and overwrites a doc's snapshot — a
+    // ydocId resolved under the wrong org must never touch another tenant's
+    // collaborative document. findFirst (not findUnique-by-id) enforces this
+    // at the read; the CAS updateMany/deleteMany carry orgId too so even a
+    // racing write can't cross the boundary.
+    mockPrisma.yjsDocument.findFirst.mockResolvedValue(null);
+
+    const { compactDoc } = await import('./yjs-persistence.service.js');
+    await compactDoc('ydoc-999', 'org-B');
+
+    expect(mockPrisma.yjsDocument.findFirst).toHaveBeenCalledOnce();
+    const callArg = mockPrisma.yjsDocument.findFirst.mock.calls[0]?.[0] as
+      | { where: { id: string; orgId: string } }
+      | undefined;
+    expect(callArg).toBeDefined();
+    if (!callArg) throw new Error('Expected yjsDocument.findFirst to receive an argument');
+    expect(callArg.where).toEqual({ id: 'ydoc-999', orgId: 'org-B' });
+    // No doc found under org-B's scope → compaction is a clean no-op, no CAS attempted.
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Suite 4: Encryption round-trip ──────────────────────────────────────────
@@ -338,9 +361,10 @@ describe('Compaction', () => {
     doc2.getText('notes').insert(doc2.getText('notes').length, 'Update two\n');
     const upd2 = Y.encodeStateAsUpdate(doc2, Y.encodeStateVector(doc1));
 
-    // Mock: findUnique returns a doc with two pending updates (unencrypted for test).
-    // `version` drives the compare-and-swap added to prevent lost updates.
-    mockPrisma.yjsDocument.findUnique.mockResolvedValue({
+    // Mock: findFirst (org-scoped) returns a doc with two pending updates
+    // (unencrypted for test). `version` drives the compare-and-swap added to
+    // prevent lost updates.
+    mockPrisma.yjsDocument.findFirst.mockResolvedValue({
       id: 'ydoc-001',
       orgId: 'org-A',
       ydocBinary: Buffer.from(baseSnap),
@@ -375,7 +399,7 @@ describe('Compaction', () => {
     );
 
     const { compactDoc } = await import('./yjs-persistence.service.js');
-    await compactDoc('ydoc-001');
+    await compactDoc('ydoc-001', 'org-A');
 
     // The snapshot was updated via the version-gated CAS.
     expect(mockPrisma.yjsDocument.updateMany).toHaveBeenCalledOnce();
@@ -398,7 +422,7 @@ describe('Compaction', () => {
     // so the edits are not lost — they compact on the next pass.
     const base = new Y.Doc();
     const baseSnap = Y.encodeStateAsUpdate(base);
-    mockPrisma.yjsDocument.findUnique.mockResolvedValue({
+    mockPrisma.yjsDocument.findFirst.mockResolvedValue({
       id: 'ydoc-001',
       orgId: 'org-A',
       ydocBinary: Buffer.from(baseSnap),
@@ -412,7 +436,7 @@ describe('Compaction', () => {
     mockPrisma.yjsDocument.updateMany.mockResolvedValue({ count: 0 });
 
     const { compactDoc } = await import('./yjs-persistence.service.js');
-    await compactDoc('ydoc-001');
+    await compactDoc('ydoc-001', 'org-A');
 
     expect(mockPrisma.yjsUpdate.deleteMany).not.toHaveBeenCalled();
   });

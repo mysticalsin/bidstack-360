@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useTheme } from '@/lib/theme';
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
+import { AccentPicker } from '@/components/AccentPicker';
 
 // Sticky top nav. Scroll-aware: solid background once the viewport has scrolled
 // past the hero. Includes the dark-mode toggle so visitors who prefer a single
@@ -48,19 +50,15 @@ export function NavBar() {
       <div className="mkt-container flex items-center gap-4 py-3">
         <Link
           to="/"
-          aria-label="BidStack 360° home"
-          className="link-inline flex items-center gap-2 font-semibold text-[15px] text-[color:var(--fg-primary)]"
+          aria-label="Polo PreSales home"
+          className="link-inline flex items-center"
         >
-          <span
-            aria-hidden="true"
-            className="grid h-8 w-8 place-items-center rounded-[9px] text-white font-bold text-sm"
-            style={{ background: 'var(--brand-gradient)' }}
-          >
-            B
-          </span>
-          <span>
-            BidStack <span className="text-[color:var(--brand-primary)]">360°</span>
-          </span>
+          <PoloPreSalesLogo
+            variant="full"
+            title=""
+            tone={theme === 'dark' ? 'inverse' : 'default'}
+            className="h-7 w-auto"
+          />
         </Link>
 
         <nav
@@ -74,7 +72,7 @@ export function NavBar() {
             Pricing
           </NavLink>
           <a href="/#why" className={linkClass(false)}>
-            Why BidStack
+            Why Polo PreSales
           </a>
           <a href="/#ai" className={linkClass(false)}>
             AI
@@ -82,6 +80,8 @@ export function NavBar() {
         </nav>
 
         <div className="flex-1" />
+
+        <AccentPicker />
 
         <button
           type="button"
@@ -105,20 +105,20 @@ export function NavBar() {
 
         <a
           href="https://app.bidstack.dev/sign-in"
-          className="link-inline hidden md:inline-flex items-center text-sm font-medium text-[color:var(--fg-secondary)] hover:text-[color:var(--fg-primary)] px-2"
+          className="link-inline hidden! md:inline-flex! items-center text-sm font-medium text-[color:var(--fg-secondary)] hover:text-[color:var(--fg-primary)] px-2"
         >
           Sign in
         </a>
         <a
           href="https://app.bidstack.dev/sign-up"
-          className="mkt-btn mkt-btn-primary hidden md:inline-flex"
+          className="mkt-btn mkt-btn-primary hidden! md:inline-flex!"
         >
           Start free
         </a>
 
         <button
           type="button"
-          className="mkt-btn mkt-btn-ghost h-11 w-11 p-0 md:hidden"
+          className="mkt-btn mkt-btn-ghost h-11 w-11 p-0 md:hidden!"
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={mobileOpen}
           aria-controls="mobile-menu"
@@ -152,7 +152,7 @@ export function NavBar() {
               Pricing
             </Link>
             <a href="/#why" onClick={() => setMobileOpen(false)} className="link-inline py-3 text-[color:var(--fg-primary)] font-medium">
-              Why BidStack
+              Why Polo PreSales
             </a>
             <a href="/#ai" onClick={() => setMobileOpen(false)} className="link-inline py-3 text-[color:var(--fg-primary)] font-medium">
               AI

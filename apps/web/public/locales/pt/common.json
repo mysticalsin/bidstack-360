@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "BidStack",
+    "name": "Polo PreSales",
     "tagline": "Mantu · Pré-venda e propostas",
     "guest": "Visitante",
     "notSignedIn": "Não autenticado"
@@ -144,7 +144,7 @@
     "message": "As alterações serão sincronizadas quando você voltar a ficar online."
   },
   "page": {
-    "titleSuffix": "BidStack 360°"
+    "titleSuffix": "Polo PreSales"
   },
   "routeAnnouncer": {
     "nowOn": "Agora em {{title}}"

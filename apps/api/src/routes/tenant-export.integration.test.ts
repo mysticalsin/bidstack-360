@@ -1,6 +1,6 @@
 // Integration tests for the GDPR Art. 20 tenant export routes.
 // Pattern: users.roles.integration.test.ts — buildServer + inject against the
-// seed org (org_seed_mantu); role switching via the x-bidstack-e2e-role header.
+// isolated org; role switching via the x-bidstack-e2e-role header.
 //
 // WHY these assertions matter:
 //   - an org-admin must be able to REQUEST an export (Art. 20 right);
@@ -9,15 +9,22 @@
 //     cross-tenant export — the core multi-tenancy invariant of this product);
 //   - a second request while one is in flight must NOT start a second
 //     full-tenant scan (single-flight) — it returns the existing pending one.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 let previousStubRoleHeader: string | undefined;
 const createdExportIds: string[] = [];
 
@@ -31,9 +38,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('tenant-export');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   // Start from a clean slate so single-flight assertions are deterministic.
   await prisma.tenantExport.deleteMany({ where: { orgId } });
   server = await buildServer();
@@ -44,7 +51,9 @@ afterAll(async () => {
   if (orgId) {
     await prisma.tenantExport.deleteMany({ where: { orgId } });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
   if (previousStubRoleHeader === undefined) {
     delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
@@ -53,11 +62,7 @@ afterAll(async () => {
   }
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('tenant export routes (GDPR Art. 20)', () => {
   t('admin can request an export → 201 + a pending TenantExport row', async () => {
@@ -140,5 +145,65 @@ describe('tenant export routes (GDPR Art. 20)', () => {
     const otherOrgId = '00000000-0000-4000-8000-000000000000';
     const res = await server.inject({ method: 'GET', url: `/api/v1/orgs/${otherOrgId}/exports` });
     expect(res.statusCode).toBe(403);
+  });
+
+  // WHY: createdAt is not unique — under bulk creation (or two exports requested
+  // in the same millisecond) rows tie on the list's keyset column. Ordering by
+  // createdAt ALONE leaves the ties in an unspecified heap order, which is not
+  // stable across the id-cursor + skip:1 keyset walk — a tie straddling a page
+  // boundary can be silently dropped from the next page. An org-admin auditing
+  // their export history would then see an incomplete list (a compliance gap).
+  //
+  // The regression guard is the compound orderBy's DETERMINISTIC total ordering:
+  // with `[{createdAt},{id}]` the tie group comes back in strict id-desc order;
+  // with the old bare `{createdAt}` sort it comes back in heap/insertion order
+  // (verified: not id-sorted). This assertion fails against the pre-fix route and
+  // passes against the fixed one, AND the two-page walk proves completeness.
+  t('orders createdAt ties by a total (id) key and pages them exactly once', async () => {
+    // Reset to a clean slate so the list holds exactly the tied rows and the
+    // boundary is deterministic (this route has no filter to isolate on).
+    await prisma.tenantExport.deleteMany({ where: { orgId: orgId! } });
+    const user = await prisma.user.findFirst({
+      where: { orgId: orgId! },
+      select: { id: true },
+    });
+    expect(user).not.toBeNull();
+    const tiedAt = new Date('2031-04-04T10:00:00.000Z');
+    await prisma.tenantExport.createMany({
+      data: [0, 1, 2, 3, 4].map(() => ({
+        orgId: orgId!,
+        requestedById: user!.id,
+        status: 'pending' as const,
+        createdAt: tiedAt,
+      })),
+    });
+    const seeded = await prisma.tenantExport.findMany({
+      where: { orgId: orgId!, deletedAt: null },
+      select: { id: true },
+    });
+    const seededIdsDesc = seeded.map((r) => r.id).sort().reverse();
+
+    // Walk the whole tie group two-at-a-time through the id-cursor keyset.
+    const collected: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 5; i += 1) {
+      const url =
+        `/api/v1/orgs/${orgId}/exports?limit=2` +
+        (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+      const res = await server.inject({ method: 'GET', url });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { items: Array<{ id: string }>; nextCursor: string | null };
+      for (const row of body.items) collected.push(row.id);
+      cursor = body.nextCursor;
+      if (!cursor) break;
+    }
+
+    // Completeness: every tied row returned exactly once across the page walk.
+    expect(collected).toHaveLength(5);
+    expect(new Set(collected).size).toBe(5);
+    // Total ordering: the tie group is returned in strict id-desc order. A bare
+    // `{ createdAt: 'desc' }` sort returns heap order here (NOT id-sorted), so
+    // this fails without the compound (createdAt, id) tiebreaker.
+    expect(collected).toEqual(seededIdsDesc);
   });
 });

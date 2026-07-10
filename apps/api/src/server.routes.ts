@@ -8,6 +8,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 
+import { getEnv } from './env.js';
 import { realtimeRoutes } from './routes/realtime.js';
 import { auditLogsRoutes } from './routes/audit-logs.js';
 import { collaborationRoutes } from './routes/collaboration.js';
@@ -48,11 +49,14 @@ import { reportsRoutes } from './routes/reports.js';
 // Analytics report builder (custom reports + dashboards + entity field metadata)
 import { analyticsReportsRoutes } from './routes/analytics-reports.js';
 import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
+// Team workload / capacity view (per-owner open-bid + task aggregates)
+import { analyticsWorkloadRoutes } from './routes/analytics-workload.js';
 import { configFeaturesRoutes } from './routes/config-features.js';
 import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
 import { sectorViewRoutes } from './routes/sector-view.js';
 import { infosearchRoutes } from './routes/infosearch.js';
+import { sillageSignalsRoutes } from './routes/sillage-signals.js';
 import { crossSellRoutes } from './routes/cross-sell.js';
 import { contractAgreementRoutes } from './routes/contract-agreements.js';
 import { winLossRoutes } from './routes/win-loss.js';
@@ -62,6 +66,7 @@ import { orgSettingsRoutes } from './routes/org-settings.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { territoryRoutes } from './routes/territories.js';
 import { accountIntelRoutes } from './routes/account-intel.js';
+import { webhooksClerkRoutes } from './routes/webhooks-clerk.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 import { workflowRoutes } from './routes/workflows.js';
 // Sprint 1 — Krayin import
@@ -73,6 +78,7 @@ import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
+import { duplicatesRoutes } from './routes/duplicates.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
 import { roleRoutes } from './routes/roles.js';
 // M7 — access groups (admin-managed data-scoping groups)
@@ -90,6 +96,7 @@ import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
 import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
 import { calendarRoutes } from './routes/calendar.js';
+import { calendarDeadlineRoutes } from './routes/calendar-deadlines.js';
 import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
 // Wave 4 — AI assistant
@@ -149,11 +156,13 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // radix tree keeps the legacy static /reports/{pipeline,...} routes winning.
   await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
+  await server.register(analyticsWorkloadRoutes, { prefix: '/api/v1' });
   await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
   await server.register(serumRoutes, { prefix: '/api/v1' });
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
   await server.register(sectorViewRoutes, { prefix: '/api/v1' });
   await server.register(infosearchRoutes, { prefix: '/api/v1' });
+  await server.register(sillageSignalsRoutes, { prefix: '/api/v1' });
   await server.register(crossSellRoutes, { prefix: '/api/v1' });
   await server.register(contractAgreementRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });
@@ -184,19 +193,26 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(dustCredentialsRoutes, { prefix: '/api/v1/integrations' });
   await server.register(agentProviderCredentialsRoutes, { prefix: '/api/v1/integrations' });
   await server.register(dataProviderCredentialsRoutes, { prefix: '/api/v1/integrations' });
-  await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
+  // ERP_ENABLED gates the whole ERP MCP surface off by default: v0.1 shares ONE
+  // global ERP connection across every org in the deployment (see
+  // routes/erp-integration.ts header), so it must stay opt-in until a
+  // per-org connection model ships.
+  if (getEnv().ERP_ENABLED === 'true') {
+    await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
 
-  // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
-  server.get('/api/v1/integrations/odoo/*', async (req, reply) => {
-    const target = req.url.replace('/odoo/', '/erp/');
-    return reply.redirect(target, 307);
-  });
-  server.post('/api/v1/integrations/odoo/*', async (req, reply) => {
-    const target = req.url.replace('/odoo/', '/erp/');
-    return reply.redirect(target, 307);
-  });
+    // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
+    server.get('/api/v1/integrations/odoo/*', async (req, reply) => {
+      const target = req.url.replace('/odoo/', '/erp/');
+      return reply.redirect(target, 307);
+    });
+    server.post('/api/v1/integrations/odoo/*', async (req, reply) => {
+      const target = req.url.replace('/odoo/', '/erp/');
+      return reply.redirect(target, 307);
+    });
+  }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
+  await server.register(webhooksClerkRoutes, { prefix: '/webhooks' });
   await server.register(territoryRoutes, { prefix: '/api/v1' });
   await server.register(accountIntelRoutes, { prefix: '/api/v1' });
   await server.register(opportunityTimelineRoutes, { prefix: '/api/v1' });
@@ -216,6 +232,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(duplicatesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
   await server.register(roleRoutes, { prefix: '/api/v1' });
   await server.register(userGroupRoutes, { prefix: '/api/v1' });
@@ -234,6 +251,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(exchangeRatesRoutes, { prefix: '/api/v1' });
   // Wave 3 — calendar + booking
   await server.register(calendarRoutes, { prefix: '/api/v1' });
+  await server.register(calendarDeadlineRoutes, { prefix: '/api/v1' });
   // Public booking routes skip auth middleware — register without /api/v1 prefix
   // so /book/:slug resolves cleanly for the public page
   await server.register(bookingsRoutes, { prefix: '/api/v1' });

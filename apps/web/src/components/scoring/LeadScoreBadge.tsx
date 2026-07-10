@@ -4,8 +4,8 @@
  * WCAG 2.2 AA compliance:
  *   - Score displayed as text, NOT color alone (Rule: not color alone).
  *   - Badge includes aria-label with full description.
- *   - Color bands: red (0-39) / amber (40-59) / green (60-100).
- *   - All color combinations verified ≥ 4.5:1 contrast on dark mode.
+ *   - Color bands: risk (0-39) / watch (40-59) / healthy (60-100) — mapping
+ *     and theme-token pairs live in scoreTone.ts (shared with the opp badge).
  *
  * Hover popover: shows top 3 SHAP factors with plain-English labels.
  * Keyboard accessible: popover triggers on focus.
@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
 import { useLeadScore } from '@/hooks/usePredictiveScore';
+import { SCORE_TONE_CLASSES, leadScoreTone } from '@/components/scoring/scoreTone';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -26,21 +27,6 @@ interface LeadScoreBadgeProps {
   /** If score is already loaded by parent, pass it to avoid duplicate fetches. */
   prefetched?: { score: number; factors: ScoreFactor[] };
   size?: 'sm' | 'md';
-}
-
-// ─── Score-to-color mapping ───────────────────────────────────────────────
-
-function scoreColorClasses(score: number): string {
-  if (score >= 60) {
-    // Green — 4.6:1 ratio on white bg (dark text), dark-mode inverted
-    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
-  }
-  if (score >= 40) {
-    // Amber — 4.7:1 ratio
-    return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-  }
-  // Red — 5.1:1 ratio
-  return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
 }
 
 function scoreLabel(score: number, t: TFunction): string {
@@ -66,7 +52,7 @@ function ScoreSkeleton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const h = size === 'sm' ? 'h-5 w-12' : 'h-6 w-16';
   return (
     <span
-      className={`inline-block rounded-full animate-pulse bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] ${h}`}
+      className={`inline-block rounded-full animate-pulse bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] ${h}`}
       aria-label={t('leadScoreBadge.loading', 'Loading score...')}
       aria-busy="true"
     />
@@ -84,21 +70,15 @@ function FactorList({ factors }: { factors: ScoreFactor[] }) {
           <span
             className={[
               'inline-block h-2 w-2 rounded-full flex-shrink-0',
-              f.contribution > 0
-                ? 'bg-emerald-500 dark:bg-emerald-400'
-                : 'bg-red-500 dark:bg-red-400',
+              f.contribution > 0 ? 'bg-[var(--success)]' : 'bg-[var(--danger)]',
             ].join(' ')}
             aria-hidden="true"
           />
-          <span className="text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
-            {featureLabel(f.feature)}
-          </span>
+          <span className="text-[var(--fg-secondary)]">{featureLabel(f.feature)}</span>
           <span
             className={[
               'ml-auto font-mono tabular-nums',
-              f.contribution > 0
-                ? 'text-emerald-700 dark:text-emerald-300'
-                : 'text-red-700 dark:text-red-300',
+              f.contribution > 0 ? 'text-[var(--success-fg)]' : 'text-[var(--fg-error)]',
             ].join(' ')}
           >
             {f.contribution > 0 ? '+' : ''}
@@ -124,7 +104,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
   if (isLoading) return <ScoreSkeleton size={size} />;
   if (isError || score === undefined) return null;
 
-  const colorClasses = scoreColorClasses(score);
+  const colorClasses = SCORE_TONE_CLASSES[leadScoreTone(score)];
   const label = scoreLabel(score, t);
   const padding = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs';
 
@@ -147,7 +127,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
         className={[
           'inline-flex items-center gap-1 rounded-full font-semibold cursor-pointer',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
-          'focus-visible:ring-[var(--color-primary-500)]',
+          'focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-[var(--surface-card)]',
           'min-w-[44px] min-h-[44px] justify-center',
           // Collapse to badge size visually but keep touch target
           'relative',
@@ -169,15 +149,14 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
           className={[
             'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50',
             'w-60 rounded-lg border p-3 shadow-lg',
-            'bg-[var(--color-surface)] border-[var(--color-border)]',
-            'dark:bg-[var(--color-surface-elevated)] dark:border-[var(--color-border-dark)]',
+            'bg-[var(--surface-raised)] border-[var(--border-default)]',
           ].join(' ')}
         >
-          <p className="text-xs font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] mb-2">
+          <p className="text-xs font-semibold text-[var(--fg-primary)] mb-2">
             {t('leadScoreBadge.popoverHeading', 'Top scoring factors')}
           </p>
           <FactorList factors={factors} />
-          <p className="mt-2 text-[10px] text-[var(--color-neutral-500)]">
+          <p className="mt-2 text-[10px] text-[var(--fg-muted)]">
             {t('leadScoreBadge.popoverFooter', 'Score {{score}}/100 · ML model', { score })}
           </p>
         </div>

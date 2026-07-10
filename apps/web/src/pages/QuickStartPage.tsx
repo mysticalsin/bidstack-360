@@ -62,7 +62,7 @@ export function QuickStartPage() {
       label: t('quickStart.items.firstLead.label', 'Add your first lead'),
       description: t(
         'quickStart.items.firstLead.description',
-        'Capture inbound interest and let BidStack score it automatically.',
+        'Capture inbound interest and let Polo PreSales score it automatically.',
       ),
       action: () => navigate('/leads/new'),
     },

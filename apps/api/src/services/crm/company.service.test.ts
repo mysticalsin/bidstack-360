@@ -118,7 +118,7 @@ describe('autopopulateCompanies', () => {
           {
             customer: 'Cached Account',
             valueMicros: 10_000_000n,
-            updatedAt: new Date('2026-06-07T00:00:00.000Z'),
+            updatedAt: new Date(Date.now() - 24 * 3600 * 1000),
           },
         ]),
       },
@@ -143,8 +143,11 @@ describe('autopopulateCompanies', () => {
             logoSource: 'favicon',
             confidenceBps: 8200,
             sourceAttribution: [],
-            cacheExpiresAt: new Date('2026-07-07T00:00:00.000Z'),
-            updatedAt: new Date('2026-06-07T00:00:00.000Z'),
+            // Relative to the real clock: autopopulateCompanies takes no `now`
+            // injection, so a fixed expiry date would rot into "stale" once the
+            // wall clock passes it (it did — that is exactly what this guards).
+            cacheExpiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+            updatedAt: new Date(Date.now() - 24 * 3600 * 1000),
           },
         ]),
       },

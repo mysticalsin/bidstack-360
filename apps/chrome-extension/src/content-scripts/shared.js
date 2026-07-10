@@ -1,5 +1,5 @@
 /**
- * Shared helpers for BidStack content scripts.
+ * Shared helpers for Polo PreSales content scripts.
  * Content scripts send messages to the background service worker which holds
  * credentials — content scripts themselves never store or transmit the API key.
  */
@@ -28,20 +28,20 @@ export function sendToBackground(type, payload = {}) {
 }
 
 /**
- * Create the "Add to BidStack" button element.
+ * Create the "Add to Polo PreSales" button element.
  * @param {function(): void} onClick
  * @returns {HTMLButtonElement}
  */
 export function createAddToBidStackButton(onClick) {
   const btn = document.createElement('button');
   btn.className = 'bidstack-inject-btn';
-  btn.setAttribute('aria-label', 'Add to BidStack CRM');
-  btn.title = 'Add to BidStack CRM';
+  btn.setAttribute('aria-label', 'Add to Polo PreSales CRM');
+  btn.title = 'Add to Polo PreSales CRM';
   btn.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
     </svg>
-    <span>Add to BidStack</span>
+    <span>Add to Polo PreSales</span>
   `;
   btn.addEventListener('click', (e) => {
     e.stopPropagation();

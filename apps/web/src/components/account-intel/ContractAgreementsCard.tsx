@@ -108,7 +108,7 @@ function fieldSource(
     source ?? {
       source: 'manual',
       label: 'Manual',
-      hint: `Manually maintained in BidStack CRM. Saved ${agreement.updatedAt.slice(0, 10)}.`,
+      hint: `Manually maintained in Polo PreSales CRM. Saved ${agreement.updatedAt.slice(0, 10)}.`,
       confidence: 1,
       sourceFileId: null,
       sourceFileName: null,

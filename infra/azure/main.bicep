@@ -56,9 +56,19 @@ param pgAdminPassword string
 param integrationTokenKey string
 
 @secure()
+@minLength(64)
+@maxLength(64)
+@description('64-char hex AES-256-GCM root key (openssl rand -hex 32); enables Contact/Lead/User PII encryption at rest. REQUIRED for real-data prod.')
+param piiEncryptionMasterKey string
+
+@secure()
 @minLength(32)
 @description('HMAC secret shared by api (signs/enqueues) and worker (verifies) for enrichment jobs. REQUIRED — api AND worker refuse to boot without it.')
 param jobSigningSecret string
+
+@secure()
+@description('Pre-migrate backup proof JSON (schemaVersion 1; see scripts/run-safe-migrate-deploy.mjs), produced fresh by the deploy pipeline right before the migrate job runs and verified against DATABASE_URL. Same contract as docker-compose.prod.yml BIDSTACK_MIGRATE_BACKUP_PROOF. REQUIRED — the migrate image refuses `prisma migrate deploy` in a production-like environment without it.')
+param migrateBackupProofJson string
 
 @secure()
 @description('Clerk secret key (sk_live_...).')
@@ -398,7 +408,9 @@ var secretMap = {
   'database-url-direct': databaseUrlDirect
   'redis-url': redisUrl
   'integration-token-key': integrationTokenKey
+  'pii-encryption-master-key': piiEncryptionMasterKey
   'job-signing-secret': jobSigningSecret
+  'migrate-backup-proof': migrateBackupProofJson
   'clerk-secret-key': clerkSecretKey
   's3-access-key-id': s3AccessKeyId
   's3-secret-access-key': s3SecretAccessKey
@@ -454,6 +466,7 @@ func kvSecret(secretName string, miId string, vaultUri string) object => {
 var commonSecrets = [
   kvSecret('redis-url', managedIdentityId, kvUri)
   kvSecret('integration-token-key', managedIdentityId, kvUri)
+  kvSecret('pii-encryption-master-key', managedIdentityId, kvUri)
   kvSecret('job-signing-secret', managedIdentityId, kvUri)
   kvSecret('clerk-secret-key', managedIdentityId, kvUri)
   kvSecret('s3-access-key-id', managedIdentityId, kvUri)
@@ -469,6 +482,8 @@ var sharedEnv = [
   { name: 'NODE_ENV', value: 'production' }
   { name: 'REDIS_URL', secretRef: 'redis-url' }
   { name: 'INTEGRATION_TOKEN_KEY', secretRef: 'integration-token-key' }
+  { name: 'PII_FIELD_ENCRYPTION', value: 'true' }
+  { name: 'PII_ENCRYPTION_MASTER_KEY', secretRef: 'pii-encryption-master-key' }
   { name: 'BIDSTACK_JOB_SIGNING_SECRET', secretRef: 'job-signing-secret' }
   { name: 'STORAGE_DRIVER', value: 's3' }
   { name: 'S3_BUCKET', value: s3Bucket }
@@ -496,10 +511,25 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
       replicaTimeout: 600
       replicaRetryLimit: 1
       manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
-      secrets: [kvSecret('database-url-direct', managedIdentityId, kvUri)]
+      secrets: [
+        kvSecret('database-url-direct', managedIdentityId, kvUri)
+        kvSecret('migrate-backup-proof', managedIdentityId, kvUri)
+      ]
       registries: registries
     }
     template: {
+      // VALIDATE: ACA "secret volume" shape (storageType: 'Secret' + per-file
+      // `path`) — mounts the migrate-backup-proof KV secret as a real file so
+      // run-safe-migrate-deploy.mjs can `readFileSync` it, mirroring
+      // docker-compose.prod.yml's bind-mounted BIDSTACK_MIGRATE_BACKUP_PROOF
+      // file (same fixed in-container path, same env var, same JSON contract).
+      volumes: [
+        {
+          name: 'migrate-backup-proof-vol'
+          storageType: 'Secret'
+          secrets: [{ secretRef: 'migrate-backup-proof', path: 'migrate-backup-proof.json' }]
+        }
+      ]
       containers: [
         {
           name: 'migrate'
@@ -507,8 +537,13 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
             { name: 'NODE_ENV', value: 'production' }
+            { name: 'BIDSTACK_DEPLOY_ENV', value: 'production' }
             { name: 'DATABASE_URL', secretRef: 'database-url-direct' } // direct :5432, no pooler
+            // Fixed in-container path the secret volume below mounts the proof
+            // file at — same value docker-compose.prod.yml uses.
+            { name: 'BIDSTACK_MIGRATE_BACKUP_PROOF', value: '/run/bidstack/migrate-backup-proof.json' }
           ]
+          volumeMounts: [{ volumeName: 'migrate-backup-proof-vol', mountPath: '/run/bidstack' }]
         }
       ]
     }
@@ -641,6 +676,8 @@ resource mcpApp 'Microsoft.App/containerApps@2024-03-01' = {
       secrets: [
         kvSecret('database-url-mcp', managedIdentityId, kvUri)
         kvSecret('redis-url', managedIdentityId, kvUri)
+        kvSecret('integration-token-key', managedIdentityId, kvUri)
+        kvSecret('pii-encryption-master-key', managedIdentityId, kvUri)
       ]
       registries: registries
     }
@@ -654,6 +691,9 @@ resource mcpApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'NODE_ENV', value: 'production' }
             { name: 'DATABASE_URL', secretRef: 'database-url-mcp' }
             { name: 'REDIS_URL', secretRef: 'redis-url' }
+            { name: 'INTEGRATION_TOKEN_KEY', secretRef: 'integration-token-key' }
+            { name: 'PII_FIELD_ENCRYPTION', value: 'true' }
+            { name: 'PII_ENCRYPTION_MASTER_KEY', secretRef: 'pii-encryption-master-key' }
             { name: 'PORT_MCP', value: '4001' }
             { name: 'MCP_HEALTH_PORT', value: '4003' }
           ]

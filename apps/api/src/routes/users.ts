@@ -2,12 +2,9 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import {
-  AssignedRoleList,
-  AssignRoleInput,
-  CapabilityManifest,
-} from '@bidstack/shared';
+import { AssignedRoleList, AssignRoleInput, CapabilityManifest } from '@bidstack/shared';
 
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { getUserPermissions } from '../services/rbac.service.js';
 
 const OrgUser = z.object({
@@ -20,8 +17,8 @@ const OrgUser = z.object({
 
 const IdParam = z.object({ id: z.string().uuid() });
 
-function isAdminRole(legacyRole: string, roleNames: string[]): boolean {
-  return legacyRole === 'admin' || roleNames.some((n) => n.toLowerCase() === 'admin');
+function hasDbAdminRole(roleNames: string[]): boolean {
+  return roleNames.some((n) => n.toLowerCase() === 'admin');
 }
 
 export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -56,11 +53,19 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
         legacyRole: req.auth.role,
         roles,
         permissions,
-        isAdmin: isAdminRole(req.auth.role, roles),
+        isAdmin: hasDbAdminRole(roles),
       };
     },
   );
 
+  // GET /users — the org roster (id/name/email/legacy role). Intentionally NOT
+  // gated on users:read: every owner/assignee picker in the product (useUsers →
+  // QuickStart, Forecasts owner filter, cross-sell, territory dialogs) reads
+  // it, and seeded personas like Sales, Account Executive, SDR and Customer
+  // Success hold no users:read grant — copying the sibling routes' users:read
+  // + admin preHandler here would 403 screens those roles are meant to see
+  // (same trap documented on GET /org-settings/locale). Role management below
+  // stays users:* + admin gated.
   server.get(
     '/users',
     {
@@ -111,7 +116,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     '/users/:id/role',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('users:write'),
+      preHandler: [server.requirePermission('users:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({ role: z.enum(['member', 'admin']) }),
@@ -123,13 +128,25 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId },
       });
       if (!user) throw server.httpErrors.notFound('User not found');
-      const updateResult = await prisma.user.updateMany({
-        where: { id: user.id, orgId: req.auth.orgId },
-        data: { role: req.body.role },
+      await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.user.updateMany({
+          where: { id: user.id, orgId: req.auth.orgId },
+          data: { role: req.body.role },
+        });
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('User not found');
+        }
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'user.legacy_role.update',
+            targetType: 'user',
+            targetId: user.id,
+            diff: { previousRole: user.role, newRole: req.body.role },
+          },
+        });
       });
-      if (updateResult.count === 0) {
-        throw server.httpErrors.notFound('User not found');
-      }
       const updated = await prisma.user.findFirstOrThrow({
         where: { id: user.id, orgId: req.auth.orgId },
       });
@@ -210,12 +227,32 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!role) throw server.httpErrors.badRequest('Role not found in this org');
 
       await prisma.$transaction(async (tx) => {
-        await tx.userRole.upsert({
-          where: { userId_roleId: { userId: user.id, roleId: role.id } },
-          // Re-grant: clear any prior soft-delete. orgId stays pinned to caller.
-          update: { deletedAt: null, orgId: req.auth.orgId },
-          create: { userId: user.id, roleId: role.id, orgId: req.auth.orgId },
+        // Re-grant must revive a tombstoned assignment, but the soft-delete
+        // middleware deliberately scopes upsert to LIVE rows (a hidden
+        // tombstone must never be revived by accident), so a plain upsert
+        // here takes the create branch and 409s on the primary key. The
+        // revive is therefore explicit — where.deletedAt is the middleware's
+        // documented bypass for deliberate restores.
+        const revived = await tx.userRole.updateMany({
+          where: {
+            userId: user.id,
+            roleId: role.id,
+            orgId: req.auth.orgId,
+            deletedAt: { not: null },
+          },
+          data: { deletedAt: null },
         });
+        if (revived.count === 0) {
+          const live = await tx.userRole.findFirst({
+            where: { userId: user.id, roleId: role.id, orgId: req.auth.orgId, deletedAt: null },
+            select: { userId: true },
+          });
+          if (!live) {
+            await tx.userRole.create({
+              data: { userId: user.id, roleId: role.id, orgId: req.auth.orgId },
+            });
+          }
+        }
         await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
@@ -227,6 +264,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         });
       });
+      invalidateRbacDecisionCache(req.auth.orgId, user.id);
 
       const rows = await prisma.userRole.findMany({
         where: {
@@ -283,6 +321,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           diff: { roleId: req.params.roleId },
         },
       });
+      invalidateRbacDecisionCache(req.auth.orgId, req.params.id);
       return reply.code(204).send(null);
     },
   );

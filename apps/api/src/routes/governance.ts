@@ -241,7 +241,7 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: 'governance_action',
           entityId: createdAction.id,
           url: `/accounts/${updated.accountKey}`,
-        }).catch(() => {});
+        }).catch((err) => req.log.warn({ err }, 'governance action assignment notification failed'));
       }
       return reply.code(201).send(serialize(updated));
     },
@@ -304,7 +304,7 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: 'governance_action',
           entityId: action.id,
           url: `/accounts/${updated.accountKey}`,
-        }).catch(() => {});
+        }).catch((err) => req.log.warn({ err }, 'governance action reassignment notification failed'));
       }
       return serialize(updated);
     },

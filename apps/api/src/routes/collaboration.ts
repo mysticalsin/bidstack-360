@@ -11,6 +11,7 @@ import {
 } from '@bidstack/shared';
 
 import { cacheKey } from '../lib/redis-cache.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { notifyUsers } from '../services/notification.service.js';
 
 // Best-effort deep link for a mention notification. Unknown target types get no
@@ -26,6 +27,24 @@ function commentTargetUrl(targetType: string, targetId: string): string | null {
   };
   const segment = route[targetType];
   return segment ? `/${segment}/${targetId}` : null;
+}
+
+// FK-graft guard (B3, kam-access.ts idiom): Comment.targetId is a polymorphic
+// reference with no @relation in schema.prisma, so the DB can't reject a
+// foreign id — this app-level check is the only tenant-integrity enforcement.
+// The shared tenantEntityBelongsToOrg helper covers every commentable type
+// except bid_score; inline that case rather than widening the shared helper
+// for one consumer (tags.helpers.ts precedent). Unknown target types fail
+// closed.
+async function commentTargetInOrg(
+  targetType: string,
+  targetId: string,
+  orgId: string,
+): Promise<boolean> {
+  if (targetType === 'bid_score') {
+    return (await prisma.bidScore.count({ where: { id: targetId, orgId, deletedAt: null } })) > 0;
+  }
+  return tenantEntityBelongsToOrg(targetType, targetId, orgId);
 }
 
 type MentionSummaryPayload = z.infer<typeof MentionSummary>;
@@ -74,6 +93,28 @@ async function cachedMentionSummary(orgId: string, userId: string): Promise<Ment
 }
 
 export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC (mirrors tags.ts): comments were previously ungated — any authenticated
+  // user, including a Read-Only viewer, could author org-visible comments and
+  // fire @mention notifications (privilege escalation within a tenant). Gate
+  // reads behind comments:read and comment authoring/mutation behind
+  // comments:write.
+  //
+  // Two POSTs are self-scoped participant actions, NOT comment authoring, and a
+  // blanket method===GET check would wrongly 403 a Read-Only user on them:
+  //   - POST /mentions/:id/read marks the caller's OWN mention read;
+  //   - POST /presence upserts the caller's OWN presence row.
+  // A Read-Only viewer can be @mentioned and must be able to dismiss it and
+  // appear present, so both require only comments:read (the grant every
+  // collaboration participant, including Read-Only, holds). DELETE /comments/:id
+  // stays under comments:write — it is author-scoped, and authoring implies write.
+  server.addHook('preHandler', (req) => {
+    const selfScopedParticipantWrite =
+      req.method === 'POST' &&
+      (req.url.includes('/presence') || /\/mentions\/[^/]+\/read(\?|$)/.test(req.url));
+    const needsReadOnly = req.method === 'GET' || selfScopedParticipantWrite;
+    return server.requirePermission(needsReadOnly ? 'comments:read' : 'comments:write')(req);
+  });
+
   // GET /api/comments
   server.get(
     '/comments',
@@ -127,6 +168,37 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      // Verify the polymorphic target exists in the caller's org before
+      // persisting. Without this, any org member could plant comments (and
+      // @mention notifications deep-linking) against another tenant's record
+      // ids. 404 for missing and cross-org alike so a probe can't confirm a
+      // foreign id exists.
+      if (!(await commentTargetInOrg(req.body.targetType, req.body.targetId, req.auth.orgId))) {
+        throw server.httpErrors.notFound('Comment target not found');
+      }
+
+      // FK-graft guard for the reply parent (same class as the targetId check
+      // above): Comment.parentId has no @relation / DB-level FK in
+      // schema.prisma, so the DB can't reject a foreign id. Re-validate that the
+      // parent is a live comment in the caller's org AND on the same target
+      // thread before grafting a reply onto it — otherwise an org-A member could
+      // plant a reply pointing at an org-B comment id. Same generic 404 as a
+      // missing target so a foreign id can't be probed for existence.
+      if (req.body.parentId) {
+        const parentInThread = await prisma.comment.count({
+          where: {
+            id: req.body.parentId,
+            orgId: req.auth.orgId,
+            targetType: req.body.targetType,
+            targetId: req.body.targetId,
+            deletedAt: null,
+          },
+        });
+        if (parentInThread === 0) {
+          throw server.httpErrors.notFound('Comment target not found');
+        }
+      }
+
       let mentionedUserIds: string[] = [];
       const created = await prisma.$transaction(async (tx) => {
         const comment = await tx.comment.create({

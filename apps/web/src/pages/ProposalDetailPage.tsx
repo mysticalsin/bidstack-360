@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import {
   ProposalStatusChip,
+  proposalStatusLabel,
+  PROPOSAL_STATUS_LABELS,
   type ProposalStatus,
 } from '@/components/rfp/shared/ProposalStatusChip';
+import { useHasPermission } from '@/hooks/useCapabilities';
 
 interface ProposalSection {
   id: string;
@@ -47,6 +51,7 @@ export function ProposalDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { t } = useTranslation('rfp');
+  const canWrite = useHasPermission('proposals:write');
   useDocumentTitle();
 
   const {
@@ -89,6 +94,40 @@ export function ProposalDetailPage() {
           body: { content },
         },
       );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
+  // Move the proposal through its lifecycle. The backend PATCH drives real
+  // side-effects (webhook fan-out on 'submitted', MemOS win/loss on won/lost),
+  // so this was the missing UI for an otherwise-complete flow.
+  const updateStatus = useMutation({
+    mutationFn: async (status: ProposalStatus) => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}`, { method: 'PATCH', body: { status } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
+  const deleteProposal = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('No proposal ID');
+      return api(`/api/v1/proposals/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] });
+      navigate('/proposals');
+    },
+  });
+
+  const updateDueDate = useMutation({
+    mutationFn: async (dueDate: string | null) => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}`, { method: 'PATCH', body: { dueDate } });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['proposal', id] });
@@ -163,8 +202,45 @@ export function ProposalDetailPage() {
   };
 
   const saveEdit = (sectionId: string) => {
-    updateSection.mutate({ sectionId, content: editContent });
-    setEditingSection(null);
+    // Close the editor only on success — closing eagerly discarded the typed
+    // content when the save failed (silent data loss). The mutation's own
+    // onSuccess (cache invalidation) still runs alongside this callback.
+    updateSection.mutate(
+      { sectionId, content: editContent },
+      { onSuccess: () => setEditingSection(null) },
+    );
+  };
+
+  const handleStatusChange = (next: ProposalStatus) => {
+    if (!proposal || next === proposal.status) return;
+    // Confirm terminal outcomes — they crystallize win/loss in MemOS + notify
+    // connected integrations via webhook fan-out, so they are not casual changes.
+    if (
+      (next === 'won' || next === 'lost') &&
+      !window.confirm(
+        t(
+          'proposalDetail.confirmTerminalStatus',
+          'Mark this proposal as "{{status}}"? This records the outcome and notifies connected integrations.',
+          { status: proposalStatusLabel(next) },
+        ),
+      )
+    ) {
+      return;
+    }
+    updateStatus.mutate(next);
+  };
+
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: t('proposalDetail.confirmDelete.title', 'Delete this proposal?'),
+      description: t(
+        'proposalDetail.confirmDelete.description',
+        'This permanently removes the proposal and all its sections. This cannot be undone.',
+      ),
+      confirmLabel: t('proposalDetail.confirmDelete.confirm', 'Delete'),
+      destructive: true,
+    });
+    if (ok) deleteProposal.mutate();
   };
 
   return (
@@ -180,7 +256,61 @@ export function ProposalDetailPage() {
               <Icon name="arrow" size={16} className="rotate-180" />
             </button>
             <h1 className="page-title">{proposal.name}</h1>
-            <ProposalStatusChip status={proposal.status} />
+            {canWrite ? (
+              <>
+                <label htmlFor="proposal-status" className="sr-only">
+                  {t('proposalDetail.statusLabel', 'Proposal status')}
+                </label>
+                <select
+                  id="proposal-status"
+                  value={proposal.status}
+                  disabled={updateStatus.isPending}
+                  onChange={(e) => handleStatusChange(e.target.value as ProposalStatus)}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-medium disabled:opacity-60"
+                >
+                  {(Object.keys(PROPOSAL_STATUS_LABELS) as ProposalStatus[]).map((s) => (
+                    <option key={s} value={s}>
+                      {proposalStatusLabel(s)}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <ProposalStatusChip status={proposal.status} />
+            )}
+            {canWrite && (
+              <label className="flex items-center gap-1">
+                <span className="sr-only">{t('proposalDetail.dueDateLabel', 'Due date')}</span>
+                <input
+                  type="date"
+                  value={proposal.dueDate ? proposal.dueDate.slice(0, 10) : ''}
+                  disabled={updateDueDate.isPending}
+                  onChange={(e) =>
+                    // The API schema requires YYYY-MM-DD (z.string().date()); the
+                    // native date input's value is already in that format, so
+                    // wrapping it in new Date().toISOString() (a full timestamp)
+                    // 400'd on every save.
+                    updateDueDate.mutate(e.target.value || null)
+                  }
+                  aria-label={t('proposalDetail.dueDateLabel', 'Due date')}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs disabled:opacity-60"
+                />
+              </label>
+            )}
+            {canWrite && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteProposal.isPending}
+                aria-label={t('proposalDetail.deleteAriaLabel', 'Delete proposal')}
+                className="ml-auto inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 disabled:opacity-60"
+              >
+                <Icon name="trash" size={13} />
+                {deleteProposal.isPending
+                  ? t('proposalDetail.deleting', 'Deleting…')
+                  : t('proposalDetail.deleteButton', 'Delete')}
+              </button>
+            )}
           </div>
           <p className="page-sub">
             {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}
@@ -190,6 +320,21 @@ export function ProposalDetailPage() {
                 })}`
               : ''}
           </p>
+          {updateStatus.isError && (
+            <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+              {t('proposalDetail.statusUpdateError', 'Could not update status. Please try again.')}
+            </p>
+          )}
+          {updateDueDate.isError && (
+            <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+              {t('proposalDetail.dueDateUpdateError', 'Could not update due date. Please try again.')}
+            </p>
+          )}
+          {deleteProposal.isError && (
+            <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+              {t('proposalDetail.deleteError', 'Could not delete the proposal. Please try again.')}
+            </p>
+          )}
         </div>
       </div>
 
@@ -261,6 +406,14 @@ export function ProposalDetailPage() {
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                 />
+                {updateSection.isError && (
+                  <p role="alert" className="text-xs text-[var(--danger)]">
+                    {t(
+                      'proposalDetail.sectionSaveError',
+                      'Could not save. Your changes are kept — try again.',
+                    )}
+                  </p>
+                )}
                 <div className="flex justify-end gap-2">
                   <Button variant="secondary" size="sm" onClick={() => setEditingSection(null)}>
                     {t('proposalDetail.cancel', 'Cancel')}

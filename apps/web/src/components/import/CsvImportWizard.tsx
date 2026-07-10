@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
@@ -22,6 +22,8 @@ const MAX_ROWS = 10_000;
 
 export function CsvImportWizard() {
   const { t } = useTranslation('crm');
+  const entityId = useId();
+  const dedupId = useId();
   const [step, setStep] = useState<Step>('upload');
   const [entity, setEntity] = useState<ImportEntity>('company');
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
@@ -110,10 +112,14 @@ export function CsvImportWizard() {
       {step === 'upload' && (
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
+            <label
+              htmlFor={entityId}
+              className="mb-1 block text-sm font-medium text-[var(--fg-primary)]"
+            >
               {t('csvImport.upload.entityLabel', 'What are you importing?')}
             </label>
             <select
+              id={entityId}
               className="input max-w-xs"
               value={entity}
               onChange={(e) => onEntityChange(e.target.value as ImportEntity)}
@@ -216,10 +222,14 @@ export function CsvImportWizard() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
+            <label
+              htmlFor={dedupId}
+              className="mb-1 block text-sm font-medium text-[var(--fg-primary)]"
+            >
               {t('csvImport.map.dedupLabel', 'If a record already exists')}
             </label>
             <select
+              id={dedupId}
               className="input max-w-xs"
               value={dedup}
               onChange={(e) => setDedup(e.target.value as Dedup)}

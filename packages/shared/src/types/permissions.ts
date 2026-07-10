@@ -1,4 +1,4 @@
-// Canonical permission keys for the BidStack RBAC system. Mirrors the
+// Canonical permission keys for the Polo PreSales RBAC system. Mirrors the
 // PERMISSION_SEEDS list in packages/db/src/seed.ts — keep both in sync.
 
 export const PERMISSION_KEYS = [
@@ -11,6 +11,8 @@ export const PERMISSION_KEYS = [
   'audit-log:read',
   'bid-scores:read',
   'bid-scores:write',
+  'comments:read',
+  'comments:write',
   'companies:read',
   'companies:write',
   'contacts:read',

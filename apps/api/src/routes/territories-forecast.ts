@@ -11,7 +11,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
-import { Forecast } from '@bidstack/shared';
+import { Forecast, sumMicros } from '@bidstack/shared';
 import { A2_TO_A3 } from '../lib/geo/iso-country-codes.js';
 
 export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -253,7 +253,13 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       }));
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
-      const totalValueMicros = items.reduce((s, i) => s + i.totalValueMicros, 0);
+      // Sum the source BigInt strings, not the already-Number()-converted
+      // per-country totals — a float reduce() over Numbers re-introduces the
+      // precision loss sumMicros exists to avoid (same class of bug fixed in
+      // accounts.helpers.ts / forecast.service.ts). This field is denominated
+      // in micros (matches the per-row Number(c.totalValueMicros) above), so
+      // convert once at the boundary — no unit division, unlike microsToUnits.
+      const totalValueMicros = Number(sumMicros(rows.map((r) => BigInt(r.totalValueMicros))));
       const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       const avgProbability =
         totalOpportunities > 0
@@ -379,7 +385,9 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         items,
         totals: {
           totalSegments: items.length,
-          totalValueMicros: items.reduce((s, i) => s + i.totalValueMicros, 0),
+          // Sum the source BigInt strings, not the already-Number()-converted
+          // per-segment totals — same float-precision fix as /territories/analytics above.
+          totalValueMicros: Number(sumMicros(rows.map((r) => BigInt(r.totalValueMicros)))),
           totalOpportunities,
           avgProbability:
             totalOpportunities > 0

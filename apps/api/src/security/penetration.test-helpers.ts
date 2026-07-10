@@ -10,12 +10,13 @@
  */
 
 import { createHmac, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, it } from 'vitest';
+import { afterAll, beforeAll } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
 
 import { buildServer } from '../server.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,13 +168,7 @@ export function makePentestContext() {
     if (ctx.dbReachable) await prisma.$disconnect();
   });
 
-  const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-    it(name, async () => {
-      if (!ctx.dbReachable || !ctx.seedOrgId) {
-        throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed missing`);
-      }
-      await fn();
-    });
+  const skipIfNoDb = makeSkipIfNoDb(() => ctx.dbReachable && !!ctx.seedOrgId);
 
   return { ctx, skipIfNoDb };
 }

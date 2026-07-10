@@ -5,13 +5,14 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PERMISSION_KEYS } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
-import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/StateMessages';
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import {
   useApiKeys,
@@ -22,7 +23,23 @@ import {
 } from '@/hooks/useApiKeys';
 import { formatDate, relativeTime } from '@/lib/format';
 
-const ALL_SCOPES: ApiKeyScope[] = ['read', 'write', 'mcp'];
+const MCP_SCOPES = ['mcp', 'read', 'write'] as const satisfies readonly ApiKeyScope[];
+const REST_READ_SCOPES = PERMISSION_KEYS.filter((scope) => scope.endsWith(':read'));
+const REST_WRITE_SCOPES = PERMISSION_KEYS.filter((scope) => scope.endsWith(':write'));
+const ALL_SCOPES: ApiKeyScope[] = [...MCP_SCOPES, ...PERMISSION_KEYS];
+
+function scopeLabel(scope: string): string {
+  if (scope === 'mcp') return 'MCP transport';
+  if (scope === 'read') return 'MCP read tools';
+  if (scope === 'write') return 'MCP write tools';
+  return scope;
+}
+
+function badgeTone(scope: string): BadgeTone {
+  if (scope === 'write' || scope.endsWith(':write')) return 'amber';
+  if (scope === 'mcp') return 'purple';
+  return 'gray';
+}
 
 export function ApiKeysSection() {
   const { t } = useTranslation('settings');
@@ -59,7 +76,11 @@ export function ApiKeysSection() {
         ),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('apiKeys.error.createFailed', 'Failed to create API key'));
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('apiKeys.error.createFailed', 'Failed to create API key'),
+      );
     }
   };
 
@@ -100,9 +121,9 @@ export function ApiKeysSection() {
 
   const items = list.data?.items ?? [];
 
-  const scopeHelp: Record<ApiKeyScope, string> = {
-    read: t('apiKeys.scopeHelp.read', 'Read-only access to all org data.'),
-    write: t('apiKeys.scopeHelp.write', 'Create / update / delete records.'),
+  const scopeHelp: Record<(typeof MCP_SCOPES)[number], string> = {
+    read: t('apiKeys.scopeHelp.read', 'MCP read-only tool access.'),
+    write: t('apiKeys.scopeHelp.write', 'MCP mutation tool access.'),
     mcp: t(
       'apiKeys.scopeHelp.mcp',
       'Enable MCP transport. Pair with read or write for tool permissions.',
@@ -145,23 +166,43 @@ export function ApiKeysSection() {
                   <legend className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                     {t('apiKeys.field.scopes', 'Scopes')}
                   </legend>
-                  <div className="space-y-2">
-                    {ALL_SCOPES.map((s) => (
-                      <label key={s} className="flex items-start gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name={`scope-${s}`}
-                          defaultChecked={s === 'read' || s === 'mcp'}
-                          className="mt-0.5 accent-[var(--brand-primary)]"
-                        />
-                        <span>
-                          <span className="font-medium text-[var(--fg-primary)]">{s}</span>
-                          <span className="ml-2 text-xs text-[var(--fg-tertiary)]">
-                            {scopeHelp[s]}
+                  <div className="max-h-72 space-y-3 overflow-y-auto rounded-md border border-[var(--border-subtle)] p-3">
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-[var(--fg-secondary)]">
+                        {t('apiKeys.scopeGroup.mcp', 'MCP')}
+                      </div>
+                      {/* Deliberately NO defaultChecked on any scope (here or
+                          in the REST ScopeGroups below): new keys start
+                          least-privilege. read+mcp used to be pre-ticked,
+                          which silently over-scoped every key created for
+                          REST-only callers — see ApiKeysSection.test.tsx,
+                          which pins the all-unchecked default. */}
+                      {MCP_SCOPES.map((s) => (
+                        <label key={s} className="flex items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            name={`scope-${s}`}
+                            className="mt-0.5 accent-[var(--brand-primary)]"
+                          />
+                          <span>
+                            <span className="font-medium text-[var(--fg-primary)]">
+                              {scopeLabel(s)}
+                            </span>
+                            <span className="ml-2 text-xs text-[var(--fg-tertiary)]">
+                              {scopeHelp[s]}
+                            </span>
                           </span>
-                        </span>
-                      </label>
-                    ))}
+                        </label>
+                      ))}
+                    </div>
+                    <ScopeGroup
+                      title={t('apiKeys.scopeGroup.restRead', 'REST read')}
+                      scopes={REST_READ_SCOPES}
+                    />
+                    <ScopeGroup
+                      title={t('apiKeys.scopeGroup.restWrite', 'REST write')}
+                      scopes={REST_WRITE_SCOPES}
+                    />
                   </div>
                 </fieldset>
                 {error ? (
@@ -221,6 +262,27 @@ export function ApiKeysSection() {
             </li>
           ))}
         </ul>
+      ) : list.isError ? (
+        <div className="p-5">
+          <ErrorState
+            title={t('apiKeys.loadError.title', "Couldn't load API keys")}
+            message={
+              list.error instanceof Error
+                ? list.error.message
+                : t('apiKeys.loadError.message', 'The server rejected the request.')
+            }
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void list.refetch()}
+              >
+                {t('apiKeys.loadError.retry', 'Retry')}
+              </Button>
+            }
+          />
+        </div>
       ) : items.length === 0 ? (
         <EmptyState
           title={t('apiKeys.empty.title', 'No API keys yet')}
@@ -239,7 +301,9 @@ export function ApiKeysSection() {
                   <code className="font-mono text-xs text-[var(--fg-tertiary)]">{k.prefix}…</code>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-                  <span>{t('apiKeys.createdAt', 'Created {{date}}', { date: formatDate(k.createdAt) })}</span>
+                  <span>
+                    {t('apiKeys.createdAt', 'Created {{date}}', { date: formatDate(k.createdAt) })}
+                  </span>
                   <span aria-hidden>·</span>
                   <span>
                     {k.lastUsedAt
@@ -250,7 +314,7 @@ export function ApiKeysSection() {
               </div>
               <div className="flex items-center gap-2">
                 {k.scopes.map((s) => (
-                  <Badge key={s} tone={s === 'write' ? 'amber' : s === 'mcp' ? 'purple' : 'gray'}>
+                  <Badge key={s} tone={badgeTone(s)}>
                     {s}
                   </Badge>
                 ))}
@@ -269,5 +333,25 @@ export function ApiKeysSection() {
         </ul>
       )}
     </Card>
+  );
+}
+
+function ScopeGroup({ title, scopes }: { title: string; scopes: readonly string[] }) {
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-semibold text-[var(--fg-secondary)]">{title}</div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {scopes.map((scope) => (
+          <label key={scope} className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name={`scope-${scope}`}
+              className="mt-0.5 accent-[var(--brand-primary)]"
+            />
+            <span className="font-mono text-xs text-[var(--fg-primary)]">{scope}</span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }

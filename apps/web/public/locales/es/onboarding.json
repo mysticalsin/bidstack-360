@@ -7,7 +7,7 @@
     "finish": "Finalizar",
     "stepOf": "Paso {{current}} de {{total}}",
     "welcome": {
-      "title": "Bienvenido a BidStack 360°",
+      "title": "Bienvenido a Polo PreSales",
       "body": "La plataforma Mantu para gestionar licitaciones y preventa. Completa el tour en menos de 2 minutos."
     },
     "pipeline": {
@@ -62,7 +62,7 @@
       }
     },
     "completed": "¡Inicio rápido completado!",
-    "completedBody": "Ya dominas lo esencial de BidStack 360°. Mucha suerte con tus licitaciones.",
+    "completedBody": "Ya dominas lo esencial de Polo PreSales. Mucha suerte con tus licitaciones.",
     "dismiss": "Ocultar",
     "tourButton": "Haz el recorrido del producto de 2 minutos",
     "items": {
@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Añade tu primer prospecto",
-        "description": "Captura el interés entrante y deja que BidStack lo puntúe automáticamente."
+        "description": "Captura el interés entrante y deja que Polo PreSales lo puntúe automáticamente."
       },
       "firstActivity": {
         "label": "Registra tu primera actividad",

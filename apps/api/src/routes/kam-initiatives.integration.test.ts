@@ -5,11 +5,17 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -17,6 +23,7 @@ let orgId = '';
 let companyId = '';
 let otherOrgId = '';
 let otherCompanyId = '';
+let restoreAuth: (() => void) | undefined;
 const createdInitiativeIds: string[] = [];
 const createdOpportunityIds: string[] = [];
 
@@ -28,12 +35,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const seedOrg = await prisma.org.findFirst({ where: { clerkOrg: 'org_seed_mantu' } });
-  if (!seedOrg) {
-    dbReachable = false;
-    return;
-  }
-  orgId = seedOrg.id;
+  const org = await createIsolatedOrg('kam-initiatives');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const company = await prisma.company.create({
     data: { orgId, name: `KAM-Test-${randomUUID().slice(0, 8)}`, source: 'manual' },
   });
@@ -71,14 +75,12 @@ afterAll(async () => {
   } catch {
     /* ignore */
   }
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) throw new Error(`[skip] ${name} — dev DB / seed org not reachable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable);
 
 async function createInitiative(extra: Record<string, unknown> = {}): Promise<string> {
   const res = await server.inject({
@@ -93,7 +95,11 @@ async function createInitiative(extra: Record<string, unknown> = {}): Promise<st
 }
 
 async function transition(id: string, body: Record<string, unknown>) {
-  return server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${id}/transition`, payload: body });
+  return server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${id}/transition`,
+    payload: body,
+  });
 }
 
 describe('KAM initiatives — state machine', () => {
@@ -101,7 +107,11 @@ describe('KAM initiatives — state machine', () => {
     const id = await createInitiative();
     const res = await server.inject({ method: 'GET', url: `/api/v1/kam/initiatives/${id}` });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ stage: 'initiative', companyId, convertedToOpportunityId: null });
+    expect(res.json()).toMatchObject({
+      stage: 'initiative',
+      companyId,
+      convertedToOpportunityId: null,
+    });
   });
 
   t('rejects an illegal stage skip (initiative → opportunity) with 409', async () => {
@@ -118,38 +128,51 @@ describe('KAM initiatives — state machine', () => {
     expect(ok.json().stage).toBe('dropped');
   });
 
-  t('advances initiative → lead → opportunity, minting an Opportunity + Handoff with companyId set', async () => {
-    const id = await createInitiative({ estimatedValueMicros: 250_000_000 });
-    expect((await transition(id, { toStage: 'lead' })).statusCode).toBe(200);
-    const opp = await transition(id, { toStage: 'opportunity', opportunityName: 'KAM Test Opp' });
-    expect(opp.statusCode).toBe(200);
-    const detail = opp.json();
-    expect(detail.stage).toBe('opportunity');
-    expect(detail.convertedToOpportunityId).toBeTruthy();
-    expect(detail.handoffId).toBeTruthy();
-    createdOpportunityIds.push(detail.convertedToOpportunityId);
+  t(
+    'advances initiative → lead → opportunity, minting an Opportunity + Handoff with companyId set',
+    async () => {
+      const id = await createInitiative({ estimatedValueMicros: 250_000_000 });
+      expect((await transition(id, { toStage: 'lead' })).statusCode).toBe(200);
+      const opp = await transition(id, { toStage: 'opportunity', opportunityName: 'KAM Test Opp' });
+      expect(opp.statusCode).toBe(200);
+      const detail = opp.json();
+      expect(detail.stage).toBe('opportunity');
+      expect(detail.convertedToOpportunityId).toBeTruthy();
+      expect(detail.handoffId).toBeTruthy();
+      createdOpportunityIds.push(detail.convertedToOpportunityId);
 
-    // M1: the minted Opportunity must carry the initiative's companyId + value.
-    const minted = await prisma.opportunity.findUnique({ where: { id: detail.convertedToOpportunityId } });
-    expect(minted?.companyId).toBe(companyId);
-    expect(minted?.valueMicros).toBe(BigInt(250_000_000));
-    // Handoff created, linked, draft, targeted at ABC OM.
-    const handoff = await prisma.kamHandoff.findUnique({ where: { initiativeId: id } });
-    expect(handoff).toMatchObject({ companyId, opportunityId: minted!.id, status: 'draft', targetSystem: 'abc_om' });
-  });
+      // M1: the minted Opportunity must carry the initiative's companyId + value.
+      const minted = await prisma.opportunity.findUnique({
+        where: { id: detail.convertedToOpportunityId },
+      });
+      expect(minted?.companyId).toBe(companyId);
+      expect(minted?.valueMicros).toBe(BigInt(250_000_000));
+      // Handoff created, linked, draft, targeted at ABC OM.
+      const handoff = await prisma.kamHandoff.findUnique({ where: { initiativeId: id } });
+      expect(handoff).toMatchObject({
+        companyId,
+        opportunityId: minted!.id,
+        status: 'draft',
+        targetSystem: 'abc_om',
+      });
+    },
+  );
 
-  t('opportunity is terminal — a further transition is 409 and mints no second opportunity (B2)', async () => {
-    const id = await createInitiative();
-    await transition(id, { toStage: 'lead' });
-    const first = await transition(id, { toStage: 'opportunity' });
-    expect(first.statusCode).toBe(200);
-    createdOpportunityIds.push(first.json().convertedToOpportunityId);
-    const before = await prisma.opportunity.count({ where: { orgId } });
-    const second = await transition(id, { toStage: 'opportunity' });
-    expect(second.statusCode).toBe(409);
-    const after = await prisma.opportunity.count({ where: { orgId } });
-    expect(after).toBe(before); // no duplicate mint
-  });
+  t(
+    'opportunity is terminal — a further transition is 409 and mints no second opportunity (B2)',
+    async () => {
+      const id = await createInitiative();
+      await transition(id, { toStage: 'lead' });
+      const first = await transition(id, { toStage: 'opportunity' });
+      expect(first.statusCode).toBe(200);
+      createdOpportunityIds.push(first.json().convertedToOpportunityId);
+      const before = await prisma.opportunity.count({ where: { orgId } });
+      const second = await transition(id, { toStage: 'opportunity' });
+      expect(second.statusCode).toBe(409);
+      const after = await prisma.opportunity.count({ where: { orgId } });
+      expect(after).toBe(before); // no duplicate mint
+    },
+  );
 
   t('rejects a cross-tenant company id (FK-graft) with 404 (B3)', async () => {
     const res = await server.inject({
@@ -162,7 +185,10 @@ describe('KAM initiatives — state machine', () => {
 
   t('lists initiatives for the account', async () => {
     await createInitiative();
-    const res = await server.inject({ method: 'GET', url: `/api/v1/kam/initiatives?companyId=${companyId}` });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/initiatives?companyId=${companyId}`,
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().items.length).toBeGreaterThanOrEqual(1);
   });

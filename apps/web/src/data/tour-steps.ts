@@ -19,7 +19,7 @@ export interface TourStep {
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to BidStack 360°',
+    title: 'Welcome to Polo PreSales',
     body: "Let's show you around in 2 minutes. You'll see how to manage leads, track deals, log activities, and build reports — all in one place.",
     placement: 'center',
     ctaLabel: "Let's go",
@@ -34,7 +34,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'add-lead',
     title: 'Add your first lead',
-    body: 'Capture inbound interest here. BidStack scores leads automatically and lets you qualify, convert, or disqualify them in one click.',
+    body: 'Capture inbound interest here. Polo PreSales scores leads automatically and lets you qualify, convert, or disqualify them in one click.',
     target: '[data-tour="leads-page-add"]',
     route: '/leads',
     placement: 'bottom',
@@ -50,7 +50,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'activity-timeline',
     title: 'Log calls, emails, notes',
-    body: 'Every interaction is captured on the contact timeline. BidStack surfaces the next best action so nothing falls through the cracks.',
+    body: 'Every interaction is captured on the contact timeline. Polo PreSales surfaces the next best action so nothing falls through the cracks.',
     target: '[data-tour="activity-timeline"]',
     route: '/contacts',
     placement: 'left',

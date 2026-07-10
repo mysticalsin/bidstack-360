@@ -1,10 +1,16 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 const {
   enqueueCrewRunMock,
@@ -35,6 +41,9 @@ let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let userId: string | null = null;
+let restoreAuth: (() => void) | undefined;
+let previousStubRoleHeader: string | undefined;
+const ADMIN_HEADERS = { 'x-bidstack-e2e-role': 'admin' };
 
 const createdCrewIds: string[] = [];
 const createdRunIds: string[] = [];
@@ -59,6 +68,8 @@ beforeEach(() => {
 });
 
 beforeAll(async () => {
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -67,8 +78,9 @@ beforeAll(async () => {
     return;
   }
 
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
+  const org = await createIsolatedOrg('crews');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const user = orgId
     ? await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' } })
     : null;
@@ -107,17 +119,18 @@ afterAll(async () => {
     if (createdOrgIds.length > 0) {
       await prisma.org.deleteMany({ where: { id: { in: createdOrgIds } } });
     }
+    restoreAuth?.();
+    if (orgId) await dropIsolatedOrg(orgId);
     await prisma.$disconnect();
+  }
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
   }
 }, 60_000);
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !userId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL, seed org, or seed user not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId && !!userId);
 
 async function createCrew(targetOrgId = orgId!, targetUserId: string | null = userId!) {
   const rows = await prisma.$queryRaw<{ id: string }[]>`
@@ -200,6 +213,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
     });
 
@@ -232,11 +246,14 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
     });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json<{ message: string }>().message).toContain(`SERUM runtime denied agent "${agentKey}"`);
+    expect(res.json<{ message: string }>().message).toContain(
+      `SERUM runtime denied agent "${agentKey}"`,
+    );
     expect(enqueueCrewRunMock).not.toHaveBeenCalled();
     expect(checkSerumAgentRuntimePolicyMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -251,18 +268,21 @@ describe('crew run controls', () => {
   skipIfNoDb('requires explicit approval before queueing a SERUM-governed crew run', async () => {
     enqueueCrewRunMock.mockClear();
     const { crewId, agentKey } = await createCrewWithAgent();
-    checkSerumAgentRuntimePolicyMock.mockImplementation(async (args: { approvalConfirmed: boolean }) => ({
-      allowed: args.approvalConfirmed,
-      status: args.approvalConfirmed ? 'allowed' : 'denied',
-      reason: args.approvalConfirmed
-        ? 'Agent run is allowed by the active SERUM policy.'
-        : 'Human approval confirmation is required before an agent run can start.',
-      activeConfigVersionId: randomUUID(),
-    }));
+    checkSerumAgentRuntimePolicyMock.mockImplementation(
+      async (args: { approvalConfirmed: boolean }) => ({
+        allowed: args.approvalConfirmed,
+        status: args.approvalConfirmed ? 'allowed' : 'denied',
+        reason: args.approvalConfirmed
+          ? 'Agent run is allowed by the active SERUM policy.'
+          : 'Human approval confirmation is required before an agent run can start.',
+        activeConfigVersionId: randomUUID(),
+      }),
+    );
 
     const blocked = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' } },
     });
     expect(blocked.statusCode).toBe(409);
@@ -271,6 +291,7 @@ describe('crew run controls', () => {
     const allowed = await server.inject({
       method: 'POST',
       url: `/api/v1/crews/${crewId}/run`,
+      headers: ADMIN_HEADERS,
       payload: { inputs: { rfp: 'RFP text' }, approvalConfirmed: true },
     });
     expect(allowed.statusCode).toBe(202);
@@ -296,6 +317,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/cancel`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(200);
@@ -314,6 +336,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/cancel`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(409);
@@ -329,6 +352,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/retry`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(202);
@@ -358,6 +382,7 @@ describe('crew run controls', () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/crew-runs/${runId}/cancel`,
+      headers: ADMIN_HEADERS,
     });
 
     expect(res.statusCode).toBe(404);

@@ -1,10 +1,12 @@
 # PII Field Encryption — Architecture & Runbook
 
-> Last updated: 2026-05-24. Owner: Platform Security.
+> Last updated: 2026-06-28. Owner: Platform Security.
 
 ## Overview
 
-BidStack 360° encrypts PII fields (email addresses and phone numbers) stored in the `contacts`, `leads`, and `users` database tables using AES-256-GCM with per-org HKDF-derived keys.
+BidStack 360° encrypts supported CRM/KAM PII fields stored in the `contacts`, `leads`, and `kam_consultants` database tables using AES-256-GCM with per-org HKDF-derived keys.
+
+`User.email` is intentionally not field-encrypted yet: the current schema has no `User.emailHash` column, and auth/assignment flows still rely on case-insensitive email semantics. Strict release evidence now requires an explicit storage-level-only decision plus storage-encryption proof. The release gate also requires an exact storage-level-only decision scope for remaining plaintext-at-field-level PII (`SmsMessage` numbers/body, `SmsConsent.phoneNumber`, `ActivityAttendee.email`, `CalendarEvent.attendees`, and `KamSession` transcript/attendees). If security chooses field encryption instead, add the generated hash/encryption migrations and certify the lookup path before release.
 
 Encryption is **opt-in** (default off) for backward compatibility. Operators enable it after running the one-shot migration script.
 
@@ -23,6 +25,7 @@ PII_ENCRYPTION_MASTER_KEY  (32-byte hex, stored in secret manager)
 ```
 
 Per-org key derivation means:
+
 - Rekeying one org does not affect others.
 - A compromised org key does not expose other orgs' PII.
 - Key rotation is scoped: generate a new master, re-derive, re-encrypt.
@@ -45,28 +48,31 @@ Equality lookup (find-by-email) without decryption uses a companion column:
 ```
 Contact.emailHash = HMAC-SHA256(plaintext_email, org_derived_key)
 Lead.emailHash    = HMAC-SHA256(plaintext_email, org_derived_key)
+KamConsultant.emailHash = HMAC-SHA256(plaintext_email, org_derived_key)
 ```
 
-The hash is keyed with the org-derived key (not a static salt) so it is not vulnerable to offline preimage attacks without the master key.
+Email hash input is trimmed and lowercased before hashing so encrypted lookups preserve the prior `citext`-style case-insensitive behavior. The hash is keyed with the org-derived key (not a static salt) so it is not vulnerable to offline preimage attacks without the master key.
 
 ### Prisma middleware
 
 `packages/db/src/middleware/pii-encryption.ts` intercepts:
+
 - **Writes** (`create`, `update`, `upsert`): encrypts plaintext values and computes hash columns.
 - **Reads** (`findUnique`, `findMany`, etc.): decrypts ciphertext envelopes transparently.
+- **Email equality filters**: rewrites `email` equality / `in` / `not` / `notIn` filters to `emailHash` for `Contact`, `Lead`, and `KamConsultant`.
 - **Decryption failures**: return masked values (`***@***.***` for email, `***-***-****` for phone) — never crash.
 
 The middleware is registered in `packages/db/src/index.ts` only when `PII_FIELD_ENCRYPTION=true`.
 
 ### PII field map
 
-| Model    | Encrypted fields              | Hash column  |
-|----------|-------------------------------|--------------|
-| Contact  | email, phone, mobilePhone     | emailHash    |
-| Lead     | email, phone                  | emailHash    |
-| User     | email                         | (none)       |
+| Model         | Encrypted fields | Hash column |
+| ------------- | ---------------- | ----------- |
+| Contact       | email, phone     | emailHash   |
+| Lead          | email, phone     | emailHash   |
+| KamConsultant | email            | emailHash   |
 
-**User.email note**: Auth lookup goes via `clerkUser` (external Clerk ID), not `email`, so encrypting `User.email` does not break authentication.
+**User.email note**: excluded until a generated `User.emailHash` migration and certified auth/assignment lookup path exist.
 
 ---
 
@@ -80,6 +86,9 @@ The middleware is registered in `packages/db/src/index.ts` only when `PII_FIELD_
    ```
 2. Store in your secret manager (AWS Secrets Manager, Azure Key Vault, Vault, etc.).
 3. Set `PII_ENCRYPTION_MASTER_KEY=<64-char-hex>` in the API and worker environment.
+4. Confirm release DB storage encryption and capture a reviewable control reference.
+5. Capture the `User.email` at-rest decision owner/reference. Current passing value is `storage-encryption-only`; any other choice blocks the release until a `User.emailHash` migration exists.
+6. Capture the remaining plaintext-PII at-rest decision owner/reference and exact accepted field scope. Current passing value is `storage-encryption-only`; any other choice blocks release until those fields are field-encrypted or the gate is updated with the new schema proof.
 
 ### Step-by-step
 
@@ -91,7 +100,7 @@ Step 2 — Run migration script (PII_FIELD_ENCRYPTION still OFF):
   tsx scripts/encrypt-existing-pii.ts             # apply
 
 Step 3 — Verify:
-  Check script output: "X rows encrypted, Y skipped".
+  Check script output for Contact, Lead, and KAM row counts: "X rows updated, Y skipped".
   Spot-check a row in psql:
     SELECT email FROM contacts LIMIT 1;
     -- should start with enc:v1:
@@ -101,8 +110,21 @@ Step 4 — Enable encryption:
   Deploy (rolling restart — zero downtime; middleware activates on startup).
 
 Step 5 — Confirm:
-  New contacts created via API should have enc:v1:... email in DB.
+  New contacts/leads/KAM consultants created via API should have enc:v1:... email in DB.
   API responses should return plaintext (middleware decrypts on read).
+
+Step 6 — Write release evidence:
+  BIDSTACK_STORAGE_ENCRYPTION_AT_REST=true \
+  BIDSTACK_STORAGE_ENCRYPTION_PROVIDER=<provider-or-control> \
+  BIDSTACK_STORAGE_ENCRYPTION_EVIDENCE=<ticket-or-control-ref> \
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION=storage-encryption-only \
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION_REF=<decision-ref> \
+  BIDSTACK_USER_EMAIL_AT_REST_DECISION_OWNER=<owner> \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION=storage-encryption-only \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_REF=<decision-ref> \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_DECISION_OWNER=<owner> \
+  BIDSTACK_PLAINTEXT_PII_AT_REST_ACCEPTED_FIELDS=SmsMessage.fromNumber,SmsMessage.toNumber,SmsMessage.body,SmsConsent.phoneNumber,ActivityAttendee.email,CalendarEvent.attendees,KamSession.transcriptText,KamSession.attendees \
+  pnpm deploy:evidence:pii
 ```
 
 ---
@@ -150,7 +172,7 @@ To erase a contact's PII without deleting the record (for audit trail integrity)
 
 ```sql
 UPDATE contacts
-SET email = NULL, phone = NULL, mobile_phone = NULL, email_hash = NULL
+SET email = NULL, phone = NULL, email_hash = NULL
 WHERE id = '<contact-id>' AND org_id = '<org-id>';
 ```
 
@@ -164,13 +186,13 @@ Archived rows with `deleted_at IS NOT NULL` remain encrypted at rest. A GDPR pur
 
 ## Security Properties
 
-| Property                          | Status |
-|-----------------------------------|--------|
-| Encryption at rest                | AES-256-GCM |
-| Key per org                       | HKDF-SHA256 |
-| Integrity verification            | GCM auth tag |
-| Searchable without decrypt        | HMAC-SHA256 hash column |
-| Decryption failure handling       | Masked value, no crash |
-| Auth unaffected by email encrypt  | Clerk ID is the auth key |
-| Script idempotent                 | `enc:v1:` prefix check |
-| Rollback available                | `decrypt-pii-rollback.ts` |
+| Property                         | Status                                |
+| -------------------------------- | ------------------------------------- |
+| Encryption at rest               | AES-256-GCM                           |
+| Key per org                      | HKDF-SHA256                           |
+| Integrity verification           | GCM auth tag                          |
+| Searchable without decrypt       | HMAC-SHA256 hash column               |
+| Decryption failure handling      | Masked value, no crash                |
+| Auth unaffected by email encrypt | User.email is not field-encrypted yet |
+| Script idempotent                | `enc:v1:` prefix check                |
+| Rollback available               | `decrypt-pii-rollback.ts`             |

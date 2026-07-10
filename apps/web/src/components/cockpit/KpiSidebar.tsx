@@ -32,7 +32,7 @@ export const KpiSidebar = memo(function KpiSidebar({
     <Card>
       <SectionHeader
         title={t('kpiSidebar.title', 'Platform status')}
-        caption={t('kpiSidebar.caption', 'Latest available BidStack metrics')}
+        caption={t('kpiSidebar.caption', 'Latest available Polo PreSales metrics')}
       />
       <div className="pulse-stack">
         <PulseRow

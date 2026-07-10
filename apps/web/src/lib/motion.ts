@@ -1,7 +1,7 @@
 // Apple-grade motion tokens. All animations across the app should reach for
 // these constants rather than inventing one-offs. The spring curves are
 // modeled after Apple's UIKit defaults (UISpringTimingParameters), tuned for
-// the perceptual densities we use in BidStack.
+// the perceptual densities we use in Polo PreSales.
 //
 // Naming follows Apple HIG: "snap" for buttons/affordances (≤200ms), "smooth"
 // for view transitions, "soft" for ambient/hero motion (cockpit reveal).

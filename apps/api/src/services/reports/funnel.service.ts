@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@bidstack/db';
-import { quarterStart } from '@bidstack/shared';
+import { microsToUnits, quarterStart } from '@bidstack/shared';
 
 export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number }>;
@@ -20,7 +20,11 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   const byStage = grouped.map((g) => ({
     stage: g.stage,
     count: g._count._all,
-    valueSum: Number(g._sum.valueMicros ?? 0) / 1_000_000,
+    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds the
+    // BigInt→Number conversion *before* dividing, so a per-stage aggregate past
+    // Number.MAX_SAFE_INTEGER micros (~$9.007B) silently corrupts. The shared
+    // helper keeps BigInt arithmetic through the whole/remainder split.
+    valueSum: microsToUnits(g._sum.valueMicros ?? 0),
   }));
 
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');

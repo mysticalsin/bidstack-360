@@ -6,6 +6,8 @@
  * where Puppeteer cannot launch.
  */
 
+import { existsSync } from 'node:fs';
+
 import type { FastifyError } from 'fastify';
 import pino from 'pino';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
@@ -15,6 +17,15 @@ import { prisma } from '@bidstack/db';
 import { pdfRenderFallbackTotal } from '../../routes/health.js';
 
 const log = pino({ name: 'service:document', level: process.env.LOG_LEVEL ?? 'info' });
+
+const COMMON_CHROMIUM_PATHS = [
+  '/usr/bin/chromium-browser',
+  '/usr/bin/chromium',
+  '/usr/bin/google-chrome-stable',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+] as const;
 
 export interface RenderInput {
   templateId: string;
@@ -55,6 +66,16 @@ function unprocessable(msg: string): never {
   const err = new Error(msg) as FastifyError;
   err.statusCode = 422;
   throw err;
+}
+
+export function resolvePuppeteerExecutablePath(
+  env: NodeJS.ProcessEnv = process.env,
+  fileExists: (path: string) => boolean = existsSync,
+): string | undefined {
+  const explicit = env.PUPPETEER_EXECUTABLE_PATH?.trim() || env.CHROME_BIN?.trim();
+  if (explicit) return explicit;
+
+  return COMMON_CHROMIUM_PATHS.find((candidate) => fileExists(candidate));
 }
 
 export async function renderTemplate({
@@ -108,8 +129,10 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
 
   try {
     const puppeteer = await import('puppeteer');
+    const executablePath = resolvePuppeteerExecutablePath();
     const browser = await puppeteer.default.launch({
       headless: true,
+      ...(executablePath ? { executablePath } : {}),
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
     });
 
@@ -131,7 +154,6 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     // Chromium unavailable or Puppeteer launch/render failed. The pdf-lib
     // fallback keeps signing usable, but the degraded output must not be
     // invisible: surface it so operators can spot a misconfigured image.
-    // (Provisioning Chromium is operator scope — we observe, not fix it here.)
     log.warn({ err }, 'puppeteer PDF render failed — falling back to pdf-lib basic renderer');
     pdfRenderFallbackTotal.inc();
     const pdf = await htmlToBasicPdf(html);
@@ -155,7 +177,7 @@ async function htmlToBasicPdf(html: string): Promise<Buffer> {
     drawWrappedLine({
       page,
       font: bold,
-      text: 'BidStack 360 signed document',
+      text: 'Polo PreSales signed document',
       x: PAGE_MARGIN,
       y,
       maxWidth: A4.width - PAGE_MARGIN * 2,

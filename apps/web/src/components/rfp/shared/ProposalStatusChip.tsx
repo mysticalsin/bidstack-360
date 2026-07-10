@@ -21,13 +21,17 @@ export type ProposalStatus = 'draft' | 'review' | 'approved' | 'submitted' | 'wo
 
 // Token tag palette only (light + dark safe) — mirrors the Hub's deliberate
 // choice. Never raw Tailwind palette classes here.
+// WHY --fg-inverted on won/lost: the solid --success/--danger fills flip to
+// light pastels in dark mode, where --fg-on-brand (always white) drops below
+// 2:1. --fg-inverted flips with the theme (white on the deep light-mode fills,
+// near-black on the pastel dark-mode fills) and stays ≥ 4.5:1 in both.
 export const PROPOSAL_STATUS_TONE: Record<ProposalStatus, string> = {
   draft: 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]',
   review: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
   approved: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
   submitted: 'bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]',
-  won: 'bg-[var(--success)] text-[var(--fg-on-brand)]',
-  lost: 'bg-[var(--danger)] text-[var(--fg-on-brand)]',
+  won: 'bg-[var(--success)] text-[var(--fg-inverted)]',
+  lost: 'bg-[var(--danger)] text-[var(--fg-inverted)]',
 };
 
 // Human labels — never show the raw enum to a user.

@@ -1,19 +1,28 @@
 // Integration tests for /api/search.
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 // Distinctive tokens that live in DIFFERENT fields, so the only way to find this
 // lead with a two-word query is the token-AND retrieval + multi-term scorer.
 const FIRST = 'Zphoenix';
 const COMPANY = 'Qmetricscorp';
 let leadId: string | null = null;
+const OPPORTUNITY_CUSTOMER = `SearchCustomer${Date.now()}`;
+let opportunityId: string | null = null;
 
 beforeAll(async () => {
   try {
@@ -23,9 +32,21 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
+  const org = await createIsolatedOrg('search');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   if (orgId) {
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `SEARCH-${Date.now()}`,
+        customer: OPPORTUNITY_CUSTOMER,
+        name: 'Search integration opportunity',
+        stage: 's1_lead',
+      },
+    });
+    opportunityId = opportunity.id;
+
     const lead = await prisma.lead.create({
       data: {
         orgId,
@@ -44,29 +65,33 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (leadId) await prisma.lead.deleteMany({ where: { id: leadId } });
+  if (opportunityId) await prisma.opportunity.deleteMany({ where: { id: opportunityId } });
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('search routes', () => {
   skipIfNoDb('GET /api/search finds opportunities by customer', async () => {
-    const res = await server.inject({ method: 'GET', url: '/api/search?q=MAHLE' });
+    if (!opportunityId) throw new Error('[skip] fixture opportunity not created');
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/search?q=${encodeURIComponent(OPPORTUNITY_CUSTOMER)}`,
+    });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json() as { items: Array<{ id: string; type: string }> };
     expect(Array.isArray(body.items)).toBe(true);
-    expect(body.items.some((r: { type: string }) => r.type === 'opportunity')).toBe(true);
+    expect(body.items.some((r) => r.type === 'opportunity' && r.id === opportunityId)).toBe(true);
   });
 
   skipIfNoDb('GET /api/search filters by types', async () => {
-    const res = await server.inject({ method: 'GET', url: '/api/search?q=MAHLE&types=opportunity' });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/search?q=${encodeURIComponent(OPPORTUNITY_CUSTOMER)}&types=opportunity`,
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.items.every((r: { type: string }) => r.type === 'opportunity')).toBe(true);

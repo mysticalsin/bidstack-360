@@ -17,23 +17,25 @@ export interface Role {
   permissions: Permission[];
 }
 
-export function useRoles() {
+export function useRoles(options: { enabled?: boolean } = {}) {
   return useQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: async () => {
       const data = await api<{ items: Role[] }>('/api/roles');
       return data.items;
     },
+    enabled: options.enabled ?? true,
   });
 }
 
-export function usePermissions() {
+export function usePermissions(options: { enabled?: boolean } = {}) {
   return useQuery<Permission[]>({
     queryKey: ['permissions'],
     queryFn: async () => {
       const data = await api<{ items: Permission[] }>('/api/permissions');
       return data.items;
     },
+    enabled: options.enabled ?? true,
   });
 }
 

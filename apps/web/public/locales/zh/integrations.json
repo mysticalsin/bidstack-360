@@ -1,6 +1,6 @@
 {
   "title": "集成",
-  "subtitle": "将 BidStack 连接到您的工具和服务",
+  "subtitle": "将 Polo PreSales 连接到您的工具和服务",
   "connected": "已连接",
   "disconnected": "已断开",
   "connect": "连接",
@@ -18,13 +18,13 @@
   },
   "gmail": {
     "name": "Gmail",
-    "description": "将您的 Gmail 邮件和活动与 BidStack 同步。",
+    "description": "将您的 Gmail 邮件和活动与 Polo PreSales 同步。",
     "permissionsRequired": "需要邮件读取权限",
     "connectViaGoogle": "通过 Google 连接"
   },
   "microsoft": {
     "name": "Microsoft 365",
-    "description": "将 Outlook、日历和 Teams 与 BidStack 同步。",
+    "description": "将 Outlook、日历和 Teams 与 Polo PreSales 同步。",
     "connectViaMicrosoft": "通过 Microsoft 连接"
   },
   "slack": {
@@ -36,7 +36,7 @@
   },
   "zapier": {
     "name": "Zapier",
-    "description": "通过 Zapier 将 BidStack 与数千个应用程序自动化连接。",
+    "description": "通过 Zapier 将 Polo PreSales 与数千个应用程序自动化连接。",
     "apiKey": "Zapier API 密钥",
     "viewZaps": "查看我的 Zap"
   },
@@ -157,7 +157,7 @@
     },
     "header": {
       "title": "连接器目录",
-      "caption": "BidStack 可访问的外部数据源。开放数据源无需密钥即可运行；授权数据源需要凭据。",
+      "caption": "Polo PreSales 可访问的外部数据源。开放数据源无需密钥即可运行；授权数据源需要凭据。",
       "sourcesBadge": "{{count}} 个数据源"
     },
     "error": {
@@ -213,7 +213,7 @@
     "notConfigured": {
       "set": "设置",
       "andOptionally": "并可选地设置",
-      "tail": "以连接 ERP MCP sidecar。在此之前，BidStack 使用本地已验证数据和已验证数据连接器。"
+      "tail": "以连接 ERP MCP sidecar。在此之前，Polo PreSales 使用本地已验证数据和已验证数据连接器。"
     },
     "stat": {
       "endpoint": "端点",
@@ -228,7 +228,7 @@
     },
     "kit": {
       "title": "ERP 投标操作工具包",
-      "subtitle": "为 BidStack 售前调整的合作伙伴、商机、报价、活动、文档和交接模式。",
+      "subtitle": "为 Polo PreSales 售前调整的合作伙伴、商机、报价、活动、文档和交接模式。",
       "badge": {
         "sidecar": "sidecar",
         "fixSidecar": "修复 sidecar",
@@ -237,11 +237,11 @@
     },
     "autocomplete": {
       "title": "合作伙伴自动补全",
-      "subtitle": "ERP 风格的法律实体查找，带 BidStack 回退。",
+      "subtitle": "ERP 风格的法律实体查找，带 Polo PreSales 回退。",
       "ariaLabel": "公司自动补全查询",
       "placeholder": "名称、域名、增值税号或 DUNS",
       "check": "检查",
-      "empty": "暂无公司建议。请添加 ERP MCP 凭据或在 BidStack 中验证此账户。"
+      "empty": "暂无公司建议。请添加 ERP MCP 凭据或在 Polo PreSales 中验证此账户。"
     },
     "item": {
       "vat": "增值税号 {{value}}",
@@ -259,7 +259,7 @@
       "mcp": {
         "title": "MCP 服务器",
         "eyebrow": "自定义工具",
-        "summary": "将 BidStack 注册为 Dust、Claude Desktop 或内部智能体的 MCP 服务器。"
+        "summary": "将 Polo PreSales 注册为 Dust、Claude Desktop 或内部智能体的 MCP 服务器。"
       },
       "rest": {
         "title": "REST API",

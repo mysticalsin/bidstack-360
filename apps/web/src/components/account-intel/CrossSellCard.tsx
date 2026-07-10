@@ -1,17 +1,17 @@
 /**
  * Cross-sell action log for the open account (A2). Structured, assignable
- * actions across countries/teams on a shared account — pre-sales owns it.
+ * actions across countries/teams on a shared account; pre-sales owns it.
  */
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { CrossSellStatusControls } from '@/components/account-intel/CrossSellStatusControls';
 import { SourceBadge } from '@/components/cockpit/SourceBadge';
-import { useIsAdmin } from '@/lib/auth';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useUsers } from '@/hooks/useUsers';
 import {
   useCreateCrossSellAction,
@@ -20,20 +20,10 @@ import {
 } from '@/hooks/useCrossSell';
 import type { CrossSellAction, GovernanceStatus } from '@bidstack/shared';
 
-const STATUS_TONE: Record<GovernanceStatus, 'gray' | 'amber' | 'jade'> = {
-  open: 'gray',
-  in_progress: 'amber',
-  done: 'jade',
-};
 const STATUS_LABEL: Record<GovernanceStatus, string> = {
   open: 'Open',
   in_progress: 'In progress',
   done: 'Done',
-};
-const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
-  open: 'in_progress',
-  in_progress: 'done',
-  done: 'open',
 };
 
 function dateOnly(value: string | null): string | null {
@@ -75,7 +65,7 @@ function ActionAuditBadges({ action }: { action: CrossSellAction }) {
 export function CrossSellCard({ accountKey }: { accountKey: string }) {
   const actions = useCrossSellActions({ accountKey });
   const patch = usePatchCrossSellAction();
-  const canWrite = useIsAdmin();
+  const canWrite = useHasPermission('accounts:write');
   const { t } = useTranslation('crm');
 
   const statusLabel = (status: GovernanceStatus): string => {
@@ -118,17 +108,22 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                   <div className="min-w-0">
                     <p className="text-sm text-[var(--fg-primary)]">{action.description}</p>
                     <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-                      {action.requestingUnit} → {action.assignedUnit}
-                      {action.assigneeName ? ` · ${action.assigneeName}` : ''}
-                      {action.dueDate ? ` · due ${action.dueDate.slice(0, 10)}` : ''}
+                      {action.requestingUnit} -&gt; {action.assignedUnit}
+                      {action.assigneeName ? ` - ${action.assigneeName}` : ''}
+                      {action.dueDate ? ` - due ${action.dueDate.slice(0, 10)}` : ''}
                     </p>
                     <ActionAuditBadges action={action} />
                   </div>
-                  <button
-                    type="button"
-                    disabled={!canWrite || patch.isPending}
-                    onClick={() => {
-                      const next = NEXT_STATUS[action.status];
+                  {/* One mutation object serves every row: scope pending state
+                      to the action being patched (same pattern as CrossSellPage)
+                      so other rows do not falsely read as updating. */}
+                  <CrossSellStatusControls
+                    action={action}
+                    canWrite={canWrite}
+                    isBusy={patch.isPending && patch.variables?.id === action.id}
+                    align="end"
+                    className="shrink-0"
+                    onStatusChange={(next) => {
                       patch.mutate(
                         { id: action.id, body: { status: next } },
                         {
@@ -146,15 +141,7 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                         },
                       );
                     }}
-                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
-                    aria-label={t('crossSell.advanceStatusLabel', 'Advance status of {{description}}', {
-                      description: action.description,
-                    })}
-                    title={canWrite ? t('crossSell.advanceStatusHint', 'Click to advance status') : undefined}
-                    data-testid={`cross-sell-${action.id}-status`}
-                  >
-                    <Badge tone={STATUS_TONE[action.status]}>{statusLabel(action.status)}</Badge>
-                  </button>
+                  />
                 </div>
               </li>
             ))}
@@ -184,7 +171,10 @@ function CreateAction({ accountKey }: { accountKey: string }) {
     event.preventDefault();
     if (!form.description.trim() || !form.requestingUnit.trim() || !form.assignedUnit.trim()) {
       toast.error(t('crossSell.toast.missingFieldsTitle', 'Missing fields'), {
-        description: t('crossSell.toast.missingFieldsBody', 'Description and both units are required.'),
+        description: t(
+          'crossSell.toast.missingFieldsBody',
+          'Description and both units are required.',
+        ),
       });
       return;
     }
@@ -202,10 +192,18 @@ function CreateAction({ accountKey }: { accountKey: string }) {
         onSuccess: () => {
           toast.success(t('crossSell.toast.logged', 'Cross-sell action logged'));
           setOpen(false);
-          setForm({ description: '', requestingUnit: '', assignedUnit: '', assigneeId: '', dueDate: '' });
+          setForm({
+            description: '',
+            requestingUnit: '',
+            assignedUnit: '',
+            assigneeId: '',
+            dueDate: '',
+          });
         },
         onError: (err: Error) =>
-          toast.error(t('crossSell.toast.saveError', 'Could not save'), { description: err.message }),
+          toast.error(t('crossSell.toast.saveError', 'Could not save'), {
+            description: err.message,
+          }),
       },
     );
   };
@@ -266,7 +264,9 @@ function CreateAction({ accountKey }: { accountKey: string }) {
       </div>
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? t('crossSell.form.saving', 'Saving…') : t('crossSell.form.save', 'Save')}
+          {create.isPending
+            ? t('crossSell.form.saving', 'Saving…')
+            : t('crossSell.form.save', 'Save')}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
           {t('crossSell.form.cancel', 'Cancel')}

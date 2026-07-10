@@ -17,6 +17,7 @@ import { prisma } from '@bidstack/db';
 import { MeetingNotesImportRequest, Note, NoteCreate, NotePatch } from '@bidstack/shared';
 
 import { buildServer } from '../server.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 describe('Note schemas', () => {
   it('Note rejects an empty title — title is the only inline-listable field', () => {
@@ -136,13 +137,7 @@ afterAll(async () => {
   }
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`Database not reachable: ${name}`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('notes routes (integration)', () => {
   const accountId = `test-account-${Date.now()}`;

@@ -1,4 +1,4 @@
-/* BidStack 360° — design tokens + Tailwind 4
+/* Polo PreSales — design tokens + Tailwind 4
    Source: src/tokens.css (prototype) + dark-mode peer + Apple HIG spacing.
    ============================================================ */
 
@@ -817,7 +817,7 @@ a {
 
 /* ============================================================
    Prototype component classes — ported from CRM_extracted/src/styles.css
-   plus BidStack 360° additions (account cards, open-issues, motion).
+   plus Polo PreSales additions (account cards, open-issues, motion).
    ============================================================ */
 
 /* ---------- Type utilities ---------- */
@@ -1129,18 +1129,26 @@ a {
   justify-content: center;
 }
 .sb-mark {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, var(--brand-primary), var(--brand-deep));
+  width: 34px;
+  height: 34px;
+  /* Three-stop brand gradient (indigo → violet → magenta) matching the mark's
+     own fill, on a squircle badge with a hairline top highlight + soft ambient
+     lift so it reads as a machined chip, not a flat swatch. */
+  background: linear-gradient(140deg, #3f16e8 0%, #7a1fd6 52%, #e4069f 100%);
   color: #fff;
-  border-radius: 9px;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.03em;
   flex-shrink: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 6px 16px -6px rgba(122, 31, 214, 0.55);
+}
+.sb-mark svg {
+  width: 22px;
+  height: 22px;
 }
 .sb-name {
   font-weight: 700;
@@ -1148,10 +1156,6 @@ a {
   color: var(--fg-primary);
   letter-spacing: 0;
   line-height: 1.1;
-}
-.sb-name .deg {
-  color: var(--brand-primary);
-  margin-left: 1px;
 }
 .sb-tag {
   font-size: 10.5px;
@@ -2327,10 +2331,14 @@ a {
 .kpi-grid.cols-6 {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
-@media (max-width: 1280px) {
+@media (max-width: 1560px) {
+  /* 6-across only on genuinely wide screens; laptops get 3 wide cards so the
+     number + inline sparkline never crowd each other. */
   .kpi-grid.cols-6 {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+@media (max-width: 1280px) {
   .kpi-grid.cols-4 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2902,7 +2910,7 @@ a {
   padding: 12px;
 }
 
-/* ---------- BidStack command center ---------- */
+/* ---------- Polo PreSales command center ---------- */
 .command-center {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.35fr);

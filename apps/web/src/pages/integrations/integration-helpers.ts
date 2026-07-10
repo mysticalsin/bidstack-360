@@ -76,7 +76,7 @@ export function getPathDetail(key: PathKey, guide: IntegrationSetupGuide): PathD
     return {
       ready: guide.dust.configured && guide.mcp.configured,
       description:
-        'Use REST to push knowledge into Dust data sources, then let Dust call BidStack through the public MCP endpoint.',
+        'Use REST to push knowledge into Dust data sources, then let Dust call Polo PreSales through the public MCP endpoint.',
       endpointLabel: 'Dust webhook receiver',
       endpoint: guide.dust.webhookReceiverUrl,
       snippetLabel: 'Dust MCP tool config',

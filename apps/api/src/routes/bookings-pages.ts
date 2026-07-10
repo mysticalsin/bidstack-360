@@ -80,7 +80,10 @@ export const bookingsPagesRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId } = req.auth;
 
       const page = await prisma.bookingPage.findFirst({
-        where: { id: req.params.id, orgId, deletedAt: null },
+        // Scope to the OWNER, not just the org: GET lists and POST stamp the
+        // page's userId, so without this any org member could edit a colleague's
+        // booking page (availability / redirectUrl -> phishing).
+        where: { id: req.params.id, orgId, userId: req.auth.userId, deletedAt: null },
         select: { id: true },
       });
       if (!page) throw server.httpErrors.notFound('Booking page not found');

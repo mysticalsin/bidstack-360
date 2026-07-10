@@ -12,6 +12,7 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
+import { createNotification } from '../services/notification.service.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -164,6 +165,27 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
         stageName: toStage?.name ?? nextStage,
         ownerId: updated.ownerId,
       });
+
+      // Notify the owner on a real stage change made by someone else — this is
+      // the actual kanban-move surface, so it's the primary place deadline-
+      // discipline stage-change alerts need to fire. Awaited (not void) so the
+      // write is durable before the response returns, but failure is swallowed
+      // so a notification hiccup can never fail an otherwise-successful move.
+      const stageChanged = opp.stage !== nextStage || opp.pipelineStageId !== updated.pipelineStageId;
+      if (stageChanged && updated.ownerId && updated.ownerId !== req.auth.userId) {
+        await createNotification({
+          orgId: req.auth.orgId,
+          userId: updated.ownerId,
+          type: 'stage_change',
+          title: `${updated.name} moved to ${toStage?.name ?? nextStage}`,
+          body: `${updated.customer} — now in ${toStage?.name ?? nextStage}`,
+          entityType: 'opportunity',
+          entityId: updated.id,
+          url: `/opportunities/${updated.id}`,
+        }).catch((err: unknown) => {
+          req.log.warn({ err, opportunityId: updated.id }, 'stage-change notification failed');
+        });
+      }
 
       return {
         id: updated.id,

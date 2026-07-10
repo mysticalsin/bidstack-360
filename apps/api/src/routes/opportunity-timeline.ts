@@ -3,10 +3,35 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+// Chatter Activity rows carry their human label in subject (calls/emails/
+// meetings) or description (notes). Fall back to a per-type synthesis so a
+// bare stage_change/field_edit row still reads as a sentence, never as "".
+function activityText(row: {
+  type: string;
+  subject: string | null;
+  description: string | null;
+  body: unknown;
+}): string {
+  if (row.subject) return row.subject;
+  if (row.description) {
+    return row.description.slice(0, 120) + (row.description.length > 120 ? '…' : '');
+  }
+  const body = row.body as Record<string, unknown> | null;
+  if (
+    row.type === 'stage_change' &&
+    typeof body?.from === 'string' &&
+    typeof body?.to === 'string'
+  ) {
+    return `Moved from ${body.from} to ${body.to}`;
+  }
+  return row.type.replace(/_/g, ' ');
+}
+
 export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/opportunities/:id/timeline',
     {
+      preHandler: [server.requirePermission('opportunities:read')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) }),
@@ -38,8 +63,15 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
+      // The human-readable summary (text) is safe for anyone with
+      // opportunities:read, but the raw audit-log `diff` (before/after field
+      // values) is admin-grade data the dedicated audit-log routes gate behind
+      // audit-log:read — so only include it in the timeline metadata for callers
+      // who hold that permission.
+      const canSeeAuditDiff = await server.hasPermission(req, 'audit-log:read');
+
       // Fetch all activity sources in parallel
-      const [auditLogs, tasks, comments] = await Promise.all([
+      const [auditLogs, tasks, comments, activities] = await Promise.all([
         prisma.auditLog.findMany({
           where: { orgId, targetType: 'opportunity', targetId: oppId },
           orderBy: { at: 'desc' },
@@ -57,6 +89,17 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           orderBy: { createdAt: 'desc' },
           take: limit,
           include: { author: { select: { name: true } } },
+        }),
+        // Chatter feed (Wave 4 Activity model): calls, emails, meetings, notes,
+        // stage events recorded as activities. orgId in the where is the
+        // cross-tenant guard — entityId alone would read foreign orgs' rows.
+        // Compound (occurredAt, id) desc ordering mirrors the activity feed's
+        // cursor pattern so ties at the same millisecond stay deterministic.
+        prisma.activity.findMany({
+          where: { orgId, entityType: 'opportunity', entityId: oppId, deletedAt: null },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          take: limit,
+          include: { owner: { select: { name: true } } },
         }),
       ]);
 
@@ -93,7 +136,9 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           text,
           actorName: log.user?.name ?? null,
           createdAt: log.at.toISOString(),
-          metadata: { action: log.action, diff: log.diff },
+          metadata: canSeeAuditDiff
+            ? { action: log.action, diff: log.diff }
+            : { action: log.action },
         });
       }
 
@@ -119,8 +164,35 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
         });
       }
 
-      // Sort descending by createdAt, cap at limit
-      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      for (const activity of activities) {
+        items.push({
+          // kind carries the Activity type verbatim ('call', 'email', 'note',
+          // 'meeting', 'stage_change', …) so the web timeline can pick a
+          // per-type icon without a second lookup.
+          id: `activity-${activity.id}`,
+          kind: activity.type,
+          text: activityText(activity),
+          // logActivity mirrors actorId into ownerId for user actors; owner is
+          // null for system/agent events, which render actor-less by design.
+          actorName: activity.owner?.name ?? null,
+          // occurredAt, not createdAt: backfilled/replayed events must sort by
+          // when they happened or the narrative reads out of order.
+          createdAt: activity.occurredAt.toISOString(),
+          metadata: {
+            source: 'activity',
+            status: activity.status,
+            actorType: activity.actorType,
+          },
+        });
+      }
+
+      // Sort descending by createdAt with the entry id as tiebreaker — same
+      // total-order idea as the activity feed's compound cursor: timestamp
+      // ties must not reshuffle between requests.
+      items.sort((a, b) => {
+        const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return diff !== 0 ? diff : b.id.localeCompare(a.id);
+      });
 
       return { items: items.slice(0, limit) };
     },

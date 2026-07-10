@@ -18,6 +18,7 @@
 
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import { prisma } from '@bidstack/db';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,9 @@ async function getGraphAccessToken(orgId: string, userId: string): Promise<strin
   });
 
   if (!token?.accessTokenEncrypted) {
-    throw new Error('Teams: No active Microsoft Graph token for this user. Connect Microsoft 365 first.');
+    throw new Error(
+      'Teams: No active Microsoft Graph token for this user. Connect Microsoft 365 first.',
+    );
   }
 
   return decryptToken(token.accessTokenEncrypted);
@@ -101,7 +104,10 @@ export async function createTeamsMeeting(params: CreateTeamsMeetingParams): Prom
     };
   }
 
-  const resp = await fetch('https://graph.microsoft.com/v1.0/me/onlineMeetings', {
+  const resp = await fetchWithTimeout('https://graph.microsoft.com/v1.0/me/onlineMeetings', {
+    provider: 'Microsoft Graph',
+    operation: 'teams.onlineMeetings.create',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -132,9 +138,12 @@ export async function getTeamsCallTranscript(
 ): Promise<TeamsTranscriptSegment[]> {
   const accessToken = await getGraphAccessToken(orgId, userId);
 
-  const resp = await fetch(
+  const resp = await fetchWithTimeout(
     `https://graph.microsoft.com/beta/communications/callRecords/${callId}/sessions`,
     {
+      provider: 'Microsoft Graph',
+      operation: 'teams.callRecords.sessions',
+      timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
       headers: { Authorization: `Bearer ${accessToken}` },
     },
   );

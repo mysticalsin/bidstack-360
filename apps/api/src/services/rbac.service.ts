@@ -18,7 +18,7 @@ import type { PermissionKey } from '@bidstack/shared';
 
 // ─── Canonical role names ────────────────────────────────────────────────────
 
-/** The 6 system roles defined in the BidStack spec and seeded at boot. */
+/** The 6 system roles defined in the Polo PreSales spec and seeded at boot. */
 export const SYSTEM_ROLES = {
   ADMIN: 'Admin',
   SALES_MANAGER: 'Sales Manager',

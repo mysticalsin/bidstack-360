@@ -88,7 +88,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
     {
       config: { public: true },
       schema: {
-        summary: 'Subscribe to a BidStack event (REST-hook)',
+        summary: 'Subscribe to a Polo PreSales event (REST-hook)',
         tags: ['zapier'],
         body: z.object({
           event: z.enum(ALLOWED_EVENTS),
@@ -147,7 +147,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
     {
       config: { public: true },
       schema: {
-        summary: 'Unsubscribe from a BidStack event (REST-hook)',
+        summary: 'Unsubscribe from a Polo PreSales event (REST-hook)',
         tags: ['zapier'],
         params: z.object({ id: z.string().uuid() }),
         response: {

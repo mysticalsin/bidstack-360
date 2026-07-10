@@ -20,6 +20,7 @@
 | KPI roll-ups (account / owner / country-VP / staleness) | Integration `kam-reports` 5/5 + live KPI strip rendered correct counts | PASS |
 | Prospection linked per account/owner (read from ABC) | `KamProspection` read-mirror; import skips cross-tenant rows; KPIs count it | PASS (live ABC sync = operator) |
 | Handoff interface to OM defined + tested (manual export ≥ floor) | `kam-handoffs` 4/4 (export builds ABC-OM payload, confirm records OM id + blocks re-export) | PASS |
+| Handoff export/confirm reachable in UI | KAM cockpit lists OM handoffs, downloads the ABC OM JSON payload, previews it, and requires the ABC reference before confirmation | PASS (added 2026-06-29) |
 | Works for a presales-owned AND a manager-owned account | `kamOwnerModel` (presales_driven / manager_driven) on Company; owner-agnostic throughout | PASS (model supports both) |
 
 **Aggregate automated evidence:** api KAM suite **72/72**, db **35/35**, mcp scope+handlers **24/24**, leads-convert parity **10/10** — all green this session.

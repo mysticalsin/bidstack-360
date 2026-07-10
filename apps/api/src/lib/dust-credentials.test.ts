@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   dustCredentialsFromConfigRow: vi.fn(),
   dustCredentialsFromEnv: vi.fn(),
   checkGateway: vi.fn(),
+  createSafeFetch: vi.fn(),
+  safeFetch: vi.fn(),
 }));
 
 vi.mock('@bidstack/db', () => ({
@@ -24,6 +26,7 @@ vi.mock('@bidstack/shared/server', () => ({
   dustCredentialsFromEnv: mocks.dustCredentialsFromEnv,
   resolveAgentId: vi.fn(),
   maskApiKey: vi.fn(),
+  createSafeFetch: mocks.createSafeFetch,
 }));
 
 import { getOrgDust } from './dust-credentials.js';
@@ -61,6 +64,10 @@ describe('API getOrgDust SERUM gateway guard', () => {
     mocks.queryRaw.mockResolvedValue([{ config: {}, credentials: {} }]);
     mocks.dustCredentialsFromConfigRow.mockReturnValue(creds);
     mocks.dustCredentialsFromEnv.mockReturnValue(null);
+    mocks.safeFetch.mockImplementation((input: string | URL, init?: RequestInit) =>
+      globalThis.fetch(input, init),
+    );
+    mocks.createSafeFetch.mockReturnValue(mocks.safeFetch);
     globalThis.fetch = vi.fn();
   });
 
@@ -85,6 +92,24 @@ describe('API getOrgDust SERUM gateway guard', () => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'https://dust.example/api/v1/w/workspace-1/assistant/agent_configurations/agent-1/runs',
       expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  // WHY: creds.baseUrl is org-admin-controlled and only string-checked at save
+  // time. If Dust traffic bypasses the DNS-rebind-safe fetch (createSafeFetch),
+  // a host that passed that check can later resolve or redirect to an internal/
+  // metadata address with the org's live API key attached (SSRF). The factory
+  // must inject the safe fetch into every client it builds.
+  it('routes Dust requests through the SSRF-safe fetch wrapper', async () => {
+    mockDustRunResponse();
+
+    const { client } = await getOrgDust(orgId, log);
+    await client?.runAgent('agent-1', 'hello');
+
+    expect(mocks.createSafeFetch).toHaveBeenCalled();
+    expect(mocks.safeFetch).toHaveBeenCalledWith(
+      'https://dust.example/api/v1/w/workspace-1/assistant/agent_configurations/agent-1/runs',
+      expect.objectContaining({ redirect: 'manual' }),
     );
   });
 

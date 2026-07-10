@@ -82,7 +82,9 @@ export async function startRfpRequirementExtract(
       p.data.orgId,
       'requirement_extract',
       err.message.slice(0, 2000),
-    ).catch(() => undefined);
+    ).catch((markErr) =>
+      log.warn({ err: markErr }, 'best-effort orchestration failure mark write failed'),
+    );
   });
 
   workers.push(worker);

@@ -6,7 +6,7 @@ import { Select } from './Select';
 
 describe('form primitives accessibility', () => {
   it('generates stable labeling and error references for inputs without an explicit id', () => {
-    render(<Input label="Workspace name" error="Required" readOnly defaultValue="BidStack" />);
+    render(<Input label="Workspace name" error="Required" readOnly defaultValue="Polo PreSales" />);
 
     const input = screen.getByRole('textbox', { name: 'Workspace name' });
     const error = screen.getByText('Required');

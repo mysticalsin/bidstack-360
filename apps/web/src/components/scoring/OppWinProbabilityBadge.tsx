@@ -7,10 +7,8 @@
  *   - Touch target min 44×44px.
  *   - Dark mode via CSS variables.
  *
- * Color bands:
- *   ≥70%  → green  (4.6:1 contrast)
- *   40-69% → amber (4.7:1)
- *   <40%  → red    (5.1:1)
+ * Color bands: risk (<40%) / watch (40-69%) / healthy (≥70%) — mapping and
+ * theme-token pairs live in scoreTone.ts (shared with LeadScoreBadge).
  */
 
 import { useState, useRef } from 'react';
@@ -18,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
 import { useOppScore } from '@/hooks/usePredictiveScore';
+import { SCORE_TONE_CLASSES, oppWinProbabilityTone } from '@/components/scoring/scoreTone';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -28,13 +27,6 @@ interface OppWinProbabilityBadgeProps {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-
-function probColorClasses(prob: number): string {
-  if (prob >= 70)
-    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
-  if (prob >= 40) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-  return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-}
 
 function probLabel(prob: number, t: TFunction): string {
   if (prob >= 70) return t('oppWinProbabilityBadge.labelLikely', 'Likely');
@@ -65,7 +57,7 @@ function ProbSkeleton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const h = size === 'sm' ? 'h-5 w-14' : 'h-6 w-18';
   return (
     <span
-      className={`inline-block rounded-full animate-pulse bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] ${h}`}
+      className={`inline-block rounded-full animate-pulse bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] ${h}`}
       aria-label={t('oppWinProbabilityBadge.loading', 'Loading probability...')}
       aria-busy="true"
     />
@@ -91,21 +83,20 @@ function FactorPopover({
       className={[
         'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50',
         'w-64 rounded-lg border p-3 shadow-lg',
-        'bg-[var(--color-surface)] border-[var(--color-border)]',
-        'dark:bg-[var(--color-surface-elevated)] dark:border-[var(--color-border-dark)]',
+        'bg-[var(--surface-raised)] border-[var(--border-default)]',
       ].join(' ')}
     >
-      <p className="text-xs font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] mb-1">
+      <p className="text-xs font-semibold text-[var(--fg-primary)] mb-1">
         {t('oppWinProbabilityBadge.popoverTitle', 'Win probability: {{prob}}%', { prob })}
       </p>
       {recommendation && (
-        <p className="text-xs text-[var(--color-neutral-600)] dark:text-[var(--color-neutral-400)] mb-2 leading-relaxed">
+        <p className="text-xs text-[var(--fg-secondary)] mb-2 leading-relaxed">
           {recommendation}
         </p>
       )}
       {top3.length > 0 && (
         <>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-neutral-500)] mb-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--fg-muted)] mb-1">
             {t('oppWinProbabilityBadge.keyFactors', 'Key factors')}
           </p>
           <ul className="space-y-1">
@@ -114,21 +105,17 @@ function FactorPopover({
                 <span
                   className={[
                     'inline-block h-2 w-2 rounded-full flex-shrink-0',
-                    f.contribution > 0
-                      ? 'bg-emerald-500 dark:bg-emerald-400'
-                      : 'bg-red-500 dark:bg-red-400',
+                    f.contribution > 0 ? 'bg-[var(--success)]' : 'bg-[var(--danger)]',
                   ].join(' ')}
                   aria-hidden="true"
                 />
-                <span className="text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)] flex-1">
+                <span className="text-[var(--fg-secondary)] flex-1">
                   {featureLabel(f.feature, t)}
                 </span>
                 <span
                   className={[
                     'ml-auto font-mono tabular-nums',
-                    f.contribution > 0
-                      ? 'text-emerald-700 dark:text-emerald-300'
-                      : 'text-red-700 dark:text-red-300',
+                    f.contribution > 0 ? 'text-[var(--success-fg)]' : 'text-[var(--fg-error)]',
                   ].join(' ')}
                 >
                   {f.contribution > 0 ? '+' : ''}
@@ -162,7 +149,7 @@ export function OppWinProbabilityBadge({
   if (isLoading) return <ProbSkeleton size={size} />;
   if (isError || prob === undefined) return null;
 
-  const colorClasses = probColorClasses(prob);
+  const colorClasses = SCORE_TONE_CLASSES[oppWinProbabilityTone(prob)];
   const label = probLabel(prob, t);
   const padding = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs';
 
@@ -186,7 +173,7 @@ export function OppWinProbabilityBadge({
         className={[
           'inline-flex items-center gap-1 rounded-full font-semibold cursor-pointer',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
-          'focus-visible:ring-[var(--color-primary-500)]',
+          'focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-[var(--surface-card)]',
           'min-w-[44px] min-h-[44px] justify-center',
           padding,
           colorClasses,

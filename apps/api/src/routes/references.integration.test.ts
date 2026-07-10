@@ -31,7 +31,11 @@ vi.mock('../queues/rfp-embed-reference.js', () => ({
   enqueueRfpEmbedReference: enqueueRfpEmbedReferenceMock,
 }));
 
-describe.skipIf(!process.env.DATABASE_URL)('references routes', () => {
+// WHY plain describe (not describe.skipIf(!DATABASE_URL)): skipIf marks the
+// whole suite "skipped" in vitest's report — a CI run without the env var set
+// would go green with zero references coverage. buildServer() below throws in
+// beforeAll when the DB is unreachable, which fails the suite loudly instead.
+describe('references routes', () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
   const createdReferenceIds: string[] = [];
   const foreignOrgIds: string[] = [];
@@ -181,6 +185,40 @@ describe.skipIf(!process.env.DATABASE_URL)('references routes', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  // WHY: z.string().url() alone accepts any scheme the URL constructor
+  // parses, including javascript: and data: — the client renders documentUrl
+  // as a clickable anchor with no further validation, so a non-http(s) scheme
+  // stored here becomes a client-side injection vector.
+  it('POST /api/v1/references rejects a javascript: documentUrl', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: { title: 'Valid title', documentUrl: 'javascript:alert(1)' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/references rejects a data: documentUrl', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: { title: 'Valid title', documentUrl: 'data:text/html,<script>alert(1)</script>' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/references accepts an https: documentUrl', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: { title: 'Valid title', documentUrl: 'https://example.com/case-study.pdf' },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    createdReferenceIds.push(body.id);
+    expect(body.documentUrl).toBe('https://example.com/case-study.pdf');
+  });
+
   // ── Embedding pipeline trigger ──────────────────────────────────────────────
   // Guards the wiring that feeds reference_embeddings (pgvector), which
   // rfp-story-match queries. Without this enqueue the table stays empty and
@@ -303,6 +341,24 @@ describe.skipIf(!process.env.DATABASE_URL)('references routes', () => {
     // Confirm the record was NOT soft-deleted in the foreign org
     const still = await prisma.reference.findUnique({ where: { id: foreignRef.id } });
     expect(still?.deletedAt).toBeNull();
+  });
+
+  it('PATCH /api/v1/references/:id rejects a javascript: documentUrl', async () => {
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: { title: `Patch URL guard ${randomUUID().slice(0, 8)}`, tags: [] },
+    });
+    expect(create.statusCode).toBe(201);
+    const { id } = create.json();
+    createdReferenceIds.push(id);
+
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/references/${id}`,
+      payload: { documentUrl: 'javascript:alert(1)' },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it('PATCH /api/v1/references/:id returns 404 for a foreign-org reference', async () => {

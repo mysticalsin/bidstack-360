@@ -55,8 +55,12 @@ export function useSignatureRequest(id: string) {
 export function useSendForSignature() {
   const qc = useQueryClient();
   return useMutation({
+    // WHY /api/v1/signatures/requests (not /api/signatures): the API only
+    // registers POST /signatures/requests under the /api/v1 prefix — the old
+    // path 404'd on every send, making this a dead flow with no way to
+    // surface the failure (see SendForSignatureModal's added onError).
     mutationFn: (body: SignatureRequestCreate) =>
-      api<SignatureRequest>('/api/signatures', { method: 'POST', body }),
+      api<SignatureRequest>('/api/v1/signatures/requests', { method: 'POST', body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [SIG_KEY] });
     },

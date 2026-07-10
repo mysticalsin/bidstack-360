@@ -91,6 +91,10 @@ export function CreateOpportunityDialog({
       industry: (fd.get('industry') as string) || null,
       logo: null,
       country: (fd.get('country') as string)?.toUpperCase() || null,
+      // OpportunityCreate requires territoryId (nullable, NOT optional); the
+      // dialog has no territory picker, so omitting the key made safeParse fail
+      // on a field with no rendered error — the submit looked like a no-op.
+      territoryId: null,
     };
 
     // Client-side validation against the canonical Zod schema. The server

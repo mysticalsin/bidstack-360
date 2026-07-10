@@ -3,11 +3,17 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -16,6 +22,7 @@ let companyId = '';
 let otherCompanyId = '';
 let otherOrgId = '';
 let initA = '';
+let restoreAuth: (() => void) | undefined;
 const initiativeIds: string[] = [];
 const opportunityIds: string[] = [];
 
@@ -27,22 +34,36 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const seedOrg = await prisma.org.findFirst({ where: { clerkOrg: 'org_seed_mantu' } });
-  if (!seedOrg) { dbReachable = false; return; }
-  orgId = seedOrg.id;
+  const org = await createIsolatedOrg('kam-reports');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const company = await prisma.company.create({
-    data: { orgId, name: `KAMRpt-${randomUUID().slice(0, 8)}`, source: 'manual', countryCode: 'ZZ', kamStatus: 'active' },
+    data: {
+      orgId,
+      name: `KAMRpt-${randomUUID().slice(0, 8)}`,
+      source: 'manual',
+      countryCode: 'ZZ',
+      kamStatus: 'active',
+    },
   });
   companyId = company.id;
-  const other = await prisma.org.create({ data: { clerkOrg: `org_kamrpt_${randomUUID().slice(0, 8)}`, name: 'KAMRpt Other' } });
+  const other = await prisma.org.create({
+    data: { clerkOrg: `org_kamrpt_${randomUUID().slice(0, 8)}`, name: 'KAMRpt Other' },
+  });
   otherOrgId = other.id;
-  otherCompanyId = (await prisma.company.create({ data: { orgId: other.id, name: 'oc', source: 'manual' } })).id;
+  otherCompanyId = (
+    await prisma.company.create({ data: { orgId: other.id, name: 'oc', source: 'manual' } })
+  ).id;
 
   server = await buildServer();
   await server.ready();
 
   const mk = async (): Promise<string> => {
-    const r = await server.inject({ method: 'POST', url: '/api/v1/kam/initiatives', payload: { companyId, title: `i-${randomUUID().slice(0, 5)}` } });
+    const r = await server.inject({
+      method: 'POST',
+      url: '/api/v1/kam/initiatives',
+      payload: { companyId, title: `i-${randomUUID().slice(0, 5)}` },
+    });
     const id = r.json().id as string;
     initiativeIds.push(id);
     return id;
@@ -50,41 +71,67 @@ beforeAll(async () => {
   initA = await mk(); // stays `initiative`, made stale below
   const initB = await mk();
   const initC = await mk();
-  await server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${initB}/transition`, payload: { toStage: 'lead' } });
-  await server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${initC}/transition`, payload: { toStage: 'lead' } });
-  const opp = await server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${initC}/transition`, payload: { toStage: 'opportunity' } });
+  await server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${initB}/transition`,
+    payload: { toStage: 'lead' },
+  });
+  await server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${initC}/transition`,
+    payload: { toStage: 'lead' },
+  });
+  const opp = await server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${initC}/transition`,
+    payload: { toStage: 'opportunity' },
+  });
   opportunityIds.push(opp.json().convertedToOpportunityId);
   // Tasks on B (lead): 1 open + 1 done.
-  const tk = await server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${initB}/tasks`, payload: { title: 'open task' } });
-  await server.inject({ method: 'POST', url: `/api/v1/kam/initiatives/${initB}/tasks`, payload: { title: 'done task' } });
+  const tk = await server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${initB}/tasks`,
+    payload: { title: 'open task' },
+  });
+  await server.inject({
+    method: 'POST',
+    url: `/api/v1/kam/initiatives/${initB}/tasks`,
+    payload: { title: 'done task' },
+  });
   await server.inject({ method: 'PATCH', url: `/api/v1/kam/tasks/${tk.json().id}`, payload: {} }); // no-op to ensure route ok
-  const tasks = await prisma.task.findMany({ where: { initiativeId: initB }, select: { id: true } });
+  const tasks = await prisma.task.findMany({
+    where: { initiativeId: initB },
+    select: { id: true },
+  });
   await prisma.task.update({ where: { id: tasks[1]!.id }, data: { status: 'done' } });
   // Make initA stale (30 days idle).
-  await prisma.kamInitiative.update({ where: { id: initA }, data: { lastActivityAt: new Date(Date.now() - 30 * 86400000) } });
-});
+  await prisma.kamInitiative.update({
+    where: { id: initA },
+    data: { lastActivityAt: new Date(Date.now() - 30 * 86400000) },
+  });
+}, 30_000);
 
 afterAll(async () => {
   if (server) await server.close();
   if (!dbReachable) return;
   try {
-    if (initiativeIds.length) await prisma.kamInitiative.deleteMany({ where: { id: { in: initiativeIds } } });
+    if (initiativeIds.length)
+      await prisma.kamInitiative.deleteMany({ where: { id: { in: initiativeIds } } });
     await prisma.kamInitiative.deleteMany({ where: { companyId } });
-    if (opportunityIds.length) await prisma.opportunity.deleteMany({ where: { id: { in: opportunityIds } } });
+    if (opportunityIds.length)
+      await prisma.opportunity.deleteMany({ where: { id: { in: opportunityIds } } });
     await prisma.kamProspection.deleteMany({ where: { companyId } });
     if (otherOrgId) await prisma.org.deleteMany({ where: { id: otherOrgId } });
     if (companyId) await prisma.company.deleteMany({ where: { id: companyId } });
   } catch {
     /* ignore */
   }
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) throw new Error(`[skip] ${name} — dev DB / seed org not reachable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable);
 
 describe('KAM KPI reports + prospection mirror', () => {
   t('prospection import stamps orgId, validates ownership, skips cross-tenant rows', async () => {
@@ -94,9 +141,24 @@ describe('KAM KPI reports + prospection mirror', () => {
       payload: {
         source: 'abc',
         rows: [
-          { externalId: 'ABC-1', companyId, actionType: 'call', occurredAt: new Date().toISOString() },
-          { externalId: 'ABC-2', companyId, actionType: 'email', occurredAt: new Date().toISOString() },
-          { externalId: 'ABC-3', companyId: otherCompanyId, actionType: 'call', occurredAt: new Date().toISOString() }, // cross-tenant → skipped
+          {
+            externalId: 'ABC-1',
+            companyId,
+            actionType: 'call',
+            occurredAt: new Date().toISOString(),
+          },
+          {
+            externalId: 'ABC-2',
+            companyId,
+            actionType: 'email',
+            occurredAt: new Date().toISOString(),
+          },
+          {
+            externalId: 'ABC-3',
+            companyId: otherCompanyId,
+            actionType: 'call',
+            occurredAt: new Date().toISOString(),
+          }, // cross-tenant → skipped
         ],
       },
     });
@@ -105,10 +167,18 @@ describe('KAM KPI reports + prospection mirror', () => {
   });
 
   t('per-account KPI aggregates stages, tasks, prospections, staleness', async () => {
-    const res = await server.inject({ method: 'GET', url: `/api/v1/kam/reports/account/${companyId}?staleDays=14` });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/kam/reports/account/${companyId}?staleDays=14`,
+    });
     expect(res.statusCode).toBe(200);
     const k = res.json();
-    expect(k.initiativesByStage).toMatchObject({ initiative: 1, lead: 1, opportunity: 1, dropped: 0 });
+    expect(k.initiativesByStage).toMatchObject({
+      initiative: 1,
+      lead: 1,
+      opportunity: 1,
+      dropped: 0,
+    });
     expect(k.openTasks).toBe(1);
     expect(k.doneTasks).toBe(1);
     expect(k.prospectionCount).toBe(2);
@@ -126,7 +196,10 @@ describe('KAM KPI reports + prospection mirror', () => {
   });
 
   t('staleness report flags the idle initiative', async () => {
-    const res = await server.inject({ method: 'GET', url: '/api/v1/kam/reports/stale?staleDays=14' });
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/v1/kam/reports/stale?staleDays=14',
+    });
     expect(res.statusCode).toBe(200);
     const found = res.json().items.find((i: { id: string }) => i.id === initA);
     expect(found).toBeTruthy();

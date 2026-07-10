@@ -78,7 +78,7 @@ describe('GET /api/v1/bid-workspaces/:workspaceId/rfp/:orchestrationId/stream', 
       },
     });
 
-    // Caller is the seed org — must not see a foreign orchestration.
+    // Caller is the isolated org — must not see a foreign orchestration.
     const res = await ctx.server.inject({
       method: 'GET',
       url: `/api/v1/bid-workspaces/${foreignOpp.id}/rfp/${foreignOrch.id}/stream`,

@@ -94,7 +94,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
         title={t('crm.meetingImport.dialogTitle', 'Import meeting notes')}
         description={t(
           'crm.meetingImport.dialogDescription',
-          'Paste raw notes once. BidStack turns them into structured records with source receipts.',
+          'Paste raw notes once. Polo PreSales turns them into structured records with source receipts.',
         )}
         className="meeting-import-dialog"
       >
@@ -103,7 +103,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
             {[
               t('crm.meetingImport.stepPaste', 'Paste notes'),
               t('crm.meetingImport.stepExtract', 'Extract signals'),
-              t('crm.meetingImport.stepSave', 'Save to BidStack'),
+              t('crm.meetingImport.stepSave', 'Save to Polo PreSales'),
             ].map((step, index) => (
               <motion.div
                 key={step}

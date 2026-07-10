@@ -14,9 +14,12 @@ import type {
 
 // ── Definitions ──────────────────────────────────────────────────────────
 
-export function useCustomFieldDefinitions(entityType: EntityType | undefined) {
+export function useCustomFieldDefinitions(
+  entityType: EntityType | undefined,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
-    enabled: !!entityType,
+    enabled: !!entityType && (options.enabled ?? true),
     queryKey: ['custom-field-definitions', entityType],
     queryFn: ({ signal }) =>
       api<CustomFieldDefinitionList>(`/api/custom-fields/definitions?entityType=${entityType}`, {

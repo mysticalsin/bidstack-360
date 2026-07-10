@@ -211,6 +211,11 @@
 
 .dashboard-kpi-card {
   min-height: 112px;
+  /* Lay each card out by its OWN width, not the viewport. At narrow column
+     counts (6-across on a laptop) the inline icon|number|signal row squeezed
+     the number cell until the big value overflowed into the signal column;
+     a container query keys the inline layout to real card width instead. */
+  container-type: inline-size;
 }
 
 .dashboard-kpi-link {
@@ -283,7 +288,10 @@
   transform-origin: bottom;
 }
 
-@media (min-width: 960px) {
+/* Only place the sparkline inline (to the right of the number) when the card
+   itself is wide enough to hold both without collision. Narrower cards keep
+   the stacked layout (signal on its own full-width row below). */
+@container (min-width: 232px) {
   .dashboard-kpi-link {
     grid-template-columns: 36px minmax(0, 1fr) minmax(58px, 72px);
     grid-template-areas: 'icon text signal';

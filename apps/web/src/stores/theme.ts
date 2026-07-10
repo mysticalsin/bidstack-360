@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import { reapplyAccent } from '@/lib/accent';
+
 type Theme = 'light' | 'dark';
 
 interface ThemeStore {
@@ -21,6 +23,8 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       } catch {
         /* ignore */
       }
+      // Light/dark carry different accent primaries — re-derive for the new theme.
+      reapplyAccent();
     }
     set({ theme });
   },

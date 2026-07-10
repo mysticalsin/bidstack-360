@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "暂无客户",
+      "body": "添加您的第一个客户，或在上方同步核心 ERP 客户——销售管道、账户健康度和技术信号将自动填充。",
+      "importCsv": "或从 CSV 导入客户",
       "filtered": "没有客户符合您的筛选条件"
     },
     "summary": {
@@ -390,7 +392,7 @@
     },
     "sync": {
       "result": "已丰富 {{enriched}} / 已缓存 {{cached}}",
-      "buttonTitle": "将 ERP sale.order 的主要客户同步到已验证的 BidStack 客户",
+      "buttonTitle": "将 ERP sale.order 的主要客户同步到已验证的 Polo PreSales 客户",
       "inProgress": "同步中…",
       "button": "同步 ERP 客户",
       "errorTitle": "ERP 客户同步失败",
@@ -2022,7 +2024,7 @@
     "errorBookingFailed": "预约失败",
     "notFoundTitle": "未找到预约页面",
     "notFoundBody": "此预约链接无效或已停止接受会议。",
-    "eyebrow": "BidStack 预约",
+    "eyebrow": "Polo PreSales 预约",
     "loadingTitle": "正在加载预约页面",
     "confirmedTitle": "预约已确认",
     "confirmedBody": "您已成功预约。确认邮件即将发送。",
@@ -2095,7 +2097,7 @@
   },
   "topAccounts": {
     "heading": "重点客户",
-    "badgeCurated": "精选 — Amaris 全球前 10",
+    "badgeCurated": "精选 — 全球前 10",
     "badgeAuto": "按管道价值自动排名",
     "subtitleCurated": "全球前 10，由管理员在设置中精选并排序。",
     "subtitleAuto": "按总管道和收入排名的高价值账户。",
@@ -2153,9 +2155,9 @@
   },
   "commandCenter": {
     "region": {
-      "ariaLabel": "BidStack 指挥中心"
+      "ariaLabel": "Polo PreSales 指挥中心"
     },
-    "kicker": "BidStack 指挥中心",
+    "kicker": "Polo PreSales 指挥中心",
     "actions": {
       "ariaLabel": "客户决策信号"
     },
@@ -2535,10 +2537,10 @@
     "adminOnlyBadge": "仅限管理员",
     "editTitle": "编辑 Webhook 订阅",
     "createTitle": "新建 Webhook 订阅",
-    "subtitle": "请使用生产环境的 HTTPS 端点。BidStack 使用 HMAC-SHA256 对每次投递进行签名。",
+    "subtitle": "请使用生产环境的 HTTPS 端点。Polo PreSales 使用 HMAC-SHA256 对每次投递进行签名。",
     "closeAriaLabel": "关闭",
     "endpointUrlLabel": "端点 URL",
-    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
     "endpointUrlHelp": "必须使用 HTTPS。localhost、私有 IP 和内部主机名将被拒绝。",
     "eventsLabel": "事件",
     "eventsHelp": "仅选择接收方实际处理的事件。",
@@ -2546,7 +2548,7 @@
     "clear": "清除",
     "securityContractTitle": "安全约定",
     "securityReturn2xx": "在 10 秒内返回 2xx 状态。",
-    "securityVerifyHeader": "验证 X-BidStack-Signature 标头。",
+    "securityVerifyHeader": "验证 X-Polo-Signature 标头。",
     "securityRejectOld": "拒绝超过 5 分钟的签名。",
     "securityAsync": "确认后异步处理繁重的工作。",
     "selectedEventsLabel": "已选事件",
@@ -2753,6 +2755,7 @@
   },
   "intelCards": {
     "dataFreshness": "情报更新于 {{date}} · 来源：Crunchbase、LinkedIn、欧盟注册处",
+    "noIntel": "暂无外部情报——尚未为该商机查询任何数据源。",
     "financial": {
       "title": "财务状况",
       "private": "未上市",
@@ -3359,7 +3362,7 @@
   },
   "sectorView": {
     "title": "行业视图",
-    "subtitle": "按行业展示 Amaris 的业务分布——来自 ABC 的客户、国家和 FTE 数量。",
+    "subtitle": "按行业展示 Mantu 的业务分布——来自 ABC 的客户、国家和 FTE 数量。",
     "errorTitle": "无法加载行业视图",
     "errorMessage": "行业接口未响应。",
     "emptyTitle": "暂无行业数据",
@@ -3424,8 +3427,8 @@
     "submit": "转化线索",
     "cancel": "取消"
   },
-  "bidStack360Logo": {
-    "title": "BidStack 360",
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
     "tagline": "招标管理平台"
   },
   "leadRow": {
@@ -3566,7 +3569,7 @@
   },
   "kpiSidebar": {
     "title": "平台状态",
-    "caption": "最新可用的 BidStack 指标",
+    "caption": "最新可用的 Polo PreSales 指标",
     "releaseScore": "发布评分",
     "providersHealthy": "健康的提供商",
     "queueBacklog": "队列积压",

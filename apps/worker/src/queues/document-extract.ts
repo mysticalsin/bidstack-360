@@ -447,7 +447,9 @@ export async function startDocumentExtract(
         where: { id: extractionId, orgId, documentId, deletedAt: null },
         data: { status: 'error', error: err.message.slice(0, 2000) },
       })
-      .catch(() => undefined);
+      .catch((updateErr) =>
+        log.warn({ err: updateErr }, 'best-effort documentExtraction status write failed'),
+      );
     if (parsed.data.bidDocumentId && parsed.data.documentVersionId) {
       prisma.documentVersion
         .updateMany({
@@ -463,13 +465,17 @@ export async function startDocumentExtract(
             metadata: { error: err.message.slice(0, 2000) },
           },
         })
-        .catch(() => undefined);
+        .catch((updateErr) =>
+          log.warn({ err: updateErr }, 'best-effort documentVersion failure status write failed'),
+        );
       prisma.bidDocument
         .updateMany({
           where: { id: parsed.data.bidDocumentId, orgId, deletedAt: null },
           data: { status: 'failed' },
         })
-        .catch(() => undefined);
+        .catch((updateErr) =>
+          log.warn({ err: updateErr }, 'best-effort bidDocument failure status write failed'),
+        );
     }
   });
 

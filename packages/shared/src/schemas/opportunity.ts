@@ -104,6 +104,10 @@ export const OpportunityPatch = Opportunity.partial().omit({
   pipelineStage: true,
 }).extend({
   customFieldValues: z.array(CustomFieldValueInput).optional(),
+  // Optimistic-concurrency token: clients echo the updatedAt they loaded and
+  // the API 409s when the row changed since — without it, concurrent
+  // pipeline edits are last-write-wins and silently drop each other's fields.
+  expectedUpdatedAt: z.string().datetime().optional(),
 });
 export type OpportunityPatch = z.infer<typeof OpportunityPatch>;
 
@@ -135,6 +139,12 @@ export const OpportunityFilter = z.object({
   search: z.string().max(100).optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+  // A1 (bid clock): power the "Due <= 7d" / "Overdue" list quick-filters and
+  // the dashboard "Closing this week" strip. Mutually exclusive in practice
+  // (the UI only ever sends one) but the route does not enforce that — both
+  // can be combined by a caller if that's ever useful.
+  dueWithinDays: z.coerce.number().int().min(0).max(365).optional(),
+  overdue: z.coerce.boolean().optional(),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 

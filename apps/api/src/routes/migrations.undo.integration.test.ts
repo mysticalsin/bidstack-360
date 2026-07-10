@@ -9,6 +9,7 @@
 //   - 404 for cross-org job (tenant isolation)
 //   - 404 for non-existent UUID
 //   - Only deletes own-org tagged rows (cross-org guard on deleteMany)
+//   - Undo is atomic — a failing delete mid-undo rolls back every delete
 
 import { randomUUID } from 'node:crypto';
 import { describe, expect } from 'vitest';
@@ -25,6 +26,17 @@ const {
   createMigrationCompany,
   createMigrationLead,
 } = makeMigrationsTestContext();
+
+// Fault injection for the atomicity test: when armed, Lead.deleteMany — the
+// last delete the undo route issues — fails, simulating a transient DB error
+// striking mid-undo. Registered once at module scope; inert while disarmed.
+let failLeadDeleteMany = false;
+prisma.$use(async (params, next) => {
+  if (failLeadDeleteMany && params.model === 'Lead' && params.action === 'deleteMany') {
+    throw new Error('Simulated mid-undo DB failure (Lead.deleteMany)');
+  }
+  return next(params);
+});
 
 describe('DELETE /api/v1/migrations/:id/undo', () => {
   skipIfNoDb('deletes tagged records and returns deletedCount', async () => {
@@ -136,7 +148,7 @@ describe('DELETE /api/v1/migrations/:id/undo', () => {
     });
     expect(res.statusCode).toBe(200);
 
-    // deletedCount should be 0 — no rows in seed org carry this tag.
+    // deletedCount should be 0 — no rows in the isolated org carry this tag.
     const body = res.json<{ deletedCount: number }>();
     expect(body.deletedCount).toBe(0);
 
@@ -146,5 +158,87 @@ describe('DELETE /api/v1/migrations/:id/undo', () => {
 
     // Clean up the foreign company (the org cascade won't fire until afterAll).
     await prisma.company.delete({ where: { id: foreignCompany.id } });
+  });
+
+  skipIfNoDb('rolls back every delete when a delete fails mid-undo (atomicity)', async () => {
+    const undoableUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const job = await createJob({ status: 'COMPLETE', undoableUntil });
+
+    const company = await createMigrationCompany(job.id);
+    const lead = await createMigrationLead(job.id);
+
+    // Opportunities/contacts carry no source column — the undo route finds
+    // them via the worker's 'migration.chunk.imported' audit trail, so seed
+    // both the rows and the audit entries that reference them.
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        orgId: ctx.seedOrgId!,
+        code: `MIG-${randomUUID().slice(0, 8)}`,
+        customer: 'Migration Test Corp',
+        name: 'Migration Undo Opp',
+        stage: 's1_lead',
+      },
+    });
+    const contact = await prisma.contact.create({
+      data: {
+        orgId: ctx.seedOrgId!,
+        customer: 'Migration Test Corp',
+        name: 'Migration Undo Contact',
+      },
+    });
+    const chunkLogs = await Promise.all([
+      prisma.auditLog.create({
+        data: {
+          orgId: ctx.seedOrgId!,
+          userId: ctx.seedUserId!,
+          action: 'migration.chunk.imported',
+          targetType: 'MigrationJob',
+          targetId: job.id,
+          diff: { entity: 'opportunity', createdIds: [opportunity.id] },
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          orgId: ctx.seedOrgId!,
+          userId: ctx.seedUserId!,
+          action: 'migration.chunk.imported',
+          targetType: 'MigrationJob',
+          targetId: job.id,
+          diff: { entity: 'contact', createdIds: [contact.id] },
+        },
+      }),
+    ]);
+
+    failLeadDeleteMany = true;
+    try {
+      const res = await ctx.server.inject({
+        method: 'DELETE',
+        url: `/api/v1/migrations/${job.id}/undo`,
+      });
+      expect(res.statusCode).toBe(500);
+    } finally {
+      failLeadDeleteMany = false;
+    }
+
+    // WHY: undo is a destructive bulk operation. If the lead delete (last in
+    // the sequence) fails after the opportunity/contact/company deletes ran,
+    // a non-atomic undo commits those earlier deletes — permanently destroying
+    // imported records while the job still reads COMPLETE. The transaction
+    // must roll back EVERYTHING so a failed undo leaves the import fully
+    // intact and safely retryable.
+    expect(await prisma.opportunity.findUnique({ where: { id: opportunity.id } })).not.toBeNull();
+    expect(await prisma.contact.findUnique({ where: { id: contact.id } })).not.toBeNull();
+    expect(await prisma.company.findUnique({ where: { id: company.id } })).not.toBeNull();
+    expect(await prisma.lead.findUnique({ where: { id: lead.id } })).not.toBeNull();
+
+    // Status must stay COMPLETE — a rolled-back undo that still flipped the
+    // job to FAILED would misreport the import as undone.
+    const jobRow = await prisma.migrationJob.findFirst({ where: { id: job.id } });
+    expect(jobRow?.status).toBe('COMPLETE');
+
+    // Clean up fixtures created outside the shared helpers.
+    await prisma.auditLog.deleteMany({ where: { id: { in: chunkLogs.map((l) => l.id) } } });
+    await prisma.opportunity.delete({ where: { id: opportunity.id } });
+    await prisma.contact.delete({ where: { id: contact.id } });
   });
 });

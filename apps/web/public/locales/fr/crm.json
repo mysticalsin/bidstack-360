@@ -465,6 +465,8 @@
     },
     "empty": {
       "title": "Aucun compte pour l'instant",
+      "body": "Ajoutez votre premier compte, ou synchronisez les principaux clients ERP ci-dessus — le pipeline, la santé du compte et les signaux technologiques se rempliront automatiquement.",
+      "importCsv": "Ou importez des comptes depuis un CSV",
       "filtered": "Aucun compte ne correspond à vos filtres"
     },
     "summary": {
@@ -475,7 +477,7 @@
     },
     "sync": {
       "result": "{{enriched}} enrichis / {{cached}} en cache",
-      "buttonTitle": "Synchroniser les principaux clients sale.order de l'ERP vers des comptes BidStack vérifiés",
+      "buttonTitle": "Synchroniser les principaux clients sale.order de l'ERP vers des comptes Polo PreSales vérifiés",
       "inProgress": "Synchronisation...",
       "button": "Synchroniser les comptes ERP",
       "errorTitle": "Échec de la synchronisation des comptes ERP",
@@ -2077,7 +2079,7 @@
     "errorBookingFailed": "Échec de la réservation",
     "notFoundTitle": "Page de réservation introuvable",
     "notFoundBody": "Ce lien de planification est invalide ou n'accepte plus de rendez-vous.",
-    "eyebrow": "Planification BidStack",
+    "eyebrow": "Planification Polo PreSales",
     "loadingTitle": "Chargement de la page de réservation",
     "confirmedTitle": "Réservation confirmée",
     "confirmedBody": "Votre réservation est faite. Un e-mail de confirmation arrive.",
@@ -2150,7 +2152,7 @@
   },
   "topAccounts": {
     "heading": "Comptes principaux",
-    "badgeCurated": "Sélection — top 10 mondial Amaris",
+    "badgeCurated": "Sélection — top 10 mondial",
     "badgeAuto": "Classé automatiquement par valeur du pipeline",
     "subtitleCurated": "Le top 10 mondial, sélectionné et classé par les administrateurs dans les Paramètres.",
     "subtitleAuto": "Comptes à plus forte valeur classés par pipeline total et chiffre d'affaires.",
@@ -2208,9 +2210,9 @@
   },
   "commandCenter": {
     "region": {
-      "ariaLabel": "Centre de commande BidStack"
+      "ariaLabel": "Centre de commande Polo PreSales"
     },
-    "kicker": "Centre de commande BidStack",
+    "kicker": "Centre de commande Polo PreSales",
     "actions": {
       "ariaLabel": "Signaux de décision du compte"
     },
@@ -2590,10 +2592,10 @@
     "adminOnlyBadge": "Administrateurs uniquement",
     "editTitle": "Modifier l'abonnement webhook",
     "createTitle": "Nouvel abonnement webhook",
-    "subtitle": "Utilisez un point de terminaison HTTPS de production. BidStack signe chaque envoi avec HMAC-SHA256.",
+    "subtitle": "Utilisez un point de terminaison HTTPS de production. Polo PreSales signe chaque envoi avec HMAC-SHA256.",
     "closeAriaLabel": "Fermer",
     "endpointUrlLabel": "URL du point de terminaison",
-    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
     "endpointUrlHelp": "HTTPS est obligatoire. Localhost, les IP privées et les noms d'hôtes internes sont rejetés.",
     "eventsLabel": "Événements",
     "eventsHelp": "Choisissez uniquement les événements que votre récepteur traite réellement.",
@@ -2601,7 +2603,7 @@
     "clear": "Effacer",
     "securityContractTitle": "Contrat de sécurité",
     "securityReturn2xx": "Renvoyez un statut 2xx en 10 secondes.",
-    "securityVerifyHeader": "Vérifiez l'en-tête X-BidStack-Signature.",
+    "securityVerifyHeader": "Vérifiez l'en-tête X-Polo-Signature.",
     "securityRejectOld": "Rejetez les signatures datant de plus de 5 minutes.",
     "securityAsync": "Traitez les tâches lourdes de manière asynchrone après l'accusé de réception.",
     "selectedEventsLabel": "Événements sélectionnés",
@@ -2808,6 +2810,7 @@
   },
   "intelCards": {
     "dataFreshness": "Veille actualisée {{date}} · Sources : Crunchbase, LinkedIn, registre de l'UE",
+    "noIntel": "Aucune donnée externe pour l'instant — les sources n'ont pas encore été interrogées pour cette opportunité.",
     "financial": {
       "title": "Santé financière",
       "private": "Privée",
@@ -3414,7 +3417,7 @@
   },
   "sectorView": {
     "title": "Vue par secteur",
-    "subtitle": "Où Amaris est actif par secteur — comptes, pays et volume d'ETP issus d'ABC.",
+    "subtitle": "Où Mantu est actif par secteur — comptes, pays et volume d'ETP issus d'ABC.",
     "errorTitle": "Impossible de charger la vue par secteur",
     "errorMessage": "Le point de terminaison du secteur n'a pas répondu.",
     "emptyTitle": "Pas encore de données de secteur",
@@ -3479,8 +3482,8 @@
     "submit": "Convertir le prospect",
     "cancel": "Annuler"
   },
-  "bidStack360Logo": {
-    "title": "BidStack 360",
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
     "tagline": "PLATEFORME DE PILOTAGE D'APPELS D'OFFRES"
   },
   "leadRow": {
@@ -3621,7 +3624,7 @@
   },
   "kpiSidebar": {
     "title": "État de la plateforme",
-    "caption": "Dernières métriques BidStack disponibles",
+    "caption": "Dernières métriques Polo PreSales disponibles",
     "releaseScore": "Score de version",
     "providersHealthy": "Fournisseurs en bonne santé",
     "queueBacklog": "File d'attente en attente",

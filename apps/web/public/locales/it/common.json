@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "BidStack",
+    "name": "Polo PreSales",
     "tagline": "Mantu · Prevendita e gare d'appalto",
     "guest": "Ospite",
     "notSignedIn": "Non connesso"
@@ -144,7 +144,7 @@
     "message": "Le modifiche verranno sincronizzate quando torni online."
   },
   "page": {
-    "titleSuffix": "BidStack 360°"
+    "titleSuffix": "Polo PreSales"
   },
   "routeAnnouncer": {
     "nowOn": "Ora su {{title}}"

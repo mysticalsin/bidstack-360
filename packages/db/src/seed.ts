@@ -47,6 +47,19 @@ const SEED_ORG_CLERK = 'org_seed_mantu';
 const SEED_ORG_NAME = 'Mantu (seed)';
 
 async function main() {
+  // Guard: this seed creates PROTOTYPE FIXTURES (demo users, companies,
+  // opportunities). It must never run against a production database — the
+  // production bootstrap is seed-prod.ts (system rows only, no fixtures).
+  if (process.env.NODE_ENV === 'production' && process.env.BIDSTACK_ALLOW_FIXTURE_SEED !== 'true') {
+    console.error(
+      'Refusing to run the FIXTURE seed with NODE_ENV=production. ' +
+        'Use `pnpm db:seed:prod` for production bootstrap (system rows only). ' +
+        'If you really want fixtures in this database, set BIDSTACK_ALLOW_FIXTURE_SEED=true.',
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   console.log('🌱 Seeding BidStack 360°…');
 
   const org = await prisma.org.upsert({
@@ -88,7 +101,7 @@ async function main() {
       { dayOfWeek: 6, startTime: '09:00', endTime: '17:00' },
     ];
 
-    await prisma.bookingPage.upsert({
+    const bookingPage = await prisma.bookingPage.upsert({
       where: { orgId_slug: { orgId: org.id, slug: 'test-slug' } },
       create: {
         orgId: org.id,
@@ -113,6 +126,13 @@ async function main() {
         availabilityRules,
         isActive: true,
         deletedAt: null,
+      },
+    });
+
+    await prisma.booking.deleteMany({
+      where: {
+        bookingPageId: bookingPage.id,
+        attendeeEmail: 'e2e@bidstack-test.example',
       },
     });
   }
@@ -353,16 +373,96 @@ async function main() {
     monthsAgo: number;
     country: string;
   }> = [
-    { code: 'OP-H01', customer: 'CI Financial', name: 'CI Financial — Cloud migration phase 1', stage: 'closed_won', value: 880_000, monthsAgo: 9, country: 'CA' },
-    { code: 'OP-H02', customer: 'CI Financial', name: 'CI Financial — Data platform pilot', stage: 'closed_won', value: 540_000, monthsAgo: 7, country: 'CA' },
-    { code: 'OP-H03', customer: 'CI Financial', name: 'CI Financial — Managed SOC RFP', stage: 'closed_lost', value: 1_200_000, monthsAgo: 6, country: 'CA' },
-    { code: 'OP-H04', customer: 'CI Financial', name: 'CI Financial — Endpoint security rollout', stage: 'closed_won', value: 720_000, monthsAgo: 4, country: 'CA' },
-    { code: 'OP-H05', customer: 'CI Financial', name: 'CI Financial — Zero Trust expansion', stage: 'closed_won', value: 1_350_000, monthsAgo: 2, country: 'CA' },
-    { code: 'OP-H06', customer: 'CI Financial', name: 'CI Financial — Legacy app retirement', stage: 'closed_lost', value: 300_000, monthsAgo: 1, country: 'CA' },
-    { code: 'OP-H07', customer: 'Rush University System for Health', name: 'Rush — EHR integration', stage: 'closed_won', value: 2_100_000, monthsAgo: 8, country: 'US' },
-    { code: 'OP-H08', customer: 'Rush University System for Health', name: 'Rush — Clinical analytics', stage: 'closed_won', value: 1_450_000, monthsAgo: 3, country: 'US' },
-    { code: 'OP-H09', customer: 'Mantu', name: 'Mantu — Internal tooling refresh', stage: 'closed_won', value: 410_000, monthsAgo: 5, country: 'FR' },
-    { code: 'OP-H10', customer: 'Mantu', name: 'Mantu — Workspace consolidation', stage: 'closed_lost', value: 260_000, monthsAgo: 2, country: 'FR' },
+    {
+      code: 'OP-H01',
+      customer: 'CI Financial',
+      name: 'CI Financial — Cloud migration phase 1',
+      stage: 'closed_won',
+      value: 880_000,
+      monthsAgo: 9,
+      country: 'CA',
+    },
+    {
+      code: 'OP-H02',
+      customer: 'CI Financial',
+      name: 'CI Financial — Data platform pilot',
+      stage: 'closed_won',
+      value: 540_000,
+      monthsAgo: 7,
+      country: 'CA',
+    },
+    {
+      code: 'OP-H03',
+      customer: 'CI Financial',
+      name: 'CI Financial — Managed SOC RFP',
+      stage: 'closed_lost',
+      value: 1_200_000,
+      monthsAgo: 6,
+      country: 'CA',
+    },
+    {
+      code: 'OP-H04',
+      customer: 'CI Financial',
+      name: 'CI Financial — Endpoint security rollout',
+      stage: 'closed_won',
+      value: 720_000,
+      monthsAgo: 4,
+      country: 'CA',
+    },
+    {
+      code: 'OP-H05',
+      customer: 'CI Financial',
+      name: 'CI Financial — Zero Trust expansion',
+      stage: 'closed_won',
+      value: 1_350_000,
+      monthsAgo: 2,
+      country: 'CA',
+    },
+    {
+      code: 'OP-H06',
+      customer: 'CI Financial',
+      name: 'CI Financial — Legacy app retirement',
+      stage: 'closed_lost',
+      value: 300_000,
+      monthsAgo: 1,
+      country: 'CA',
+    },
+    {
+      code: 'OP-H07',
+      customer: 'Rush University System for Health',
+      name: 'Rush — EHR integration',
+      stage: 'closed_won',
+      value: 2_100_000,
+      monthsAgo: 8,
+      country: 'US',
+    },
+    {
+      code: 'OP-H08',
+      customer: 'Rush University System for Health',
+      name: 'Rush — Clinical analytics',
+      stage: 'closed_won',
+      value: 1_450_000,
+      monthsAgo: 3,
+      country: 'US',
+    },
+    {
+      code: 'OP-H09',
+      customer: 'Mantu',
+      name: 'Mantu — Internal tooling refresh',
+      stage: 'closed_won',
+      value: 410_000,
+      monthsAgo: 5,
+      country: 'FR',
+    },
+    {
+      code: 'OP-H10',
+      customer: 'Mantu',
+      name: 'Mantu — Workspace consolidation',
+      stage: 'closed_lost',
+      value: 260_000,
+      monthsAgo: 2,
+      country: 'FR',
+    },
   ];
   for (const h of HISTORY) {
     const closedAt = new Date(Date.now() - h.monthsAgo * 30 * 86_400_000);
@@ -564,7 +664,11 @@ async function main() {
             status: 'in_progress',
             dueDate: new Date(Date.now() + 7 * 86_400_000),
           },
-          { orgId: org.id, description: 'Confirm Q3 staffing plan with resourcing.', status: 'open' },
+          {
+            orgId: org.id,
+            description: 'Confirm Q3 staffing plan with resourcing.',
+            status: 'open',
+          },
         ],
       },
     },

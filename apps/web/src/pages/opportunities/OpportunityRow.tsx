@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
 import { useConfetti } from '@/components/delight/useConfetti';
 import { Badge } from '@/components/ui/Badge';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { SavedFlash } from '@/components/ui/SavedFlash';
 import { toast } from '@/components/ui/Toast';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
@@ -178,7 +179,7 @@ export const Row = memo(function Row({
                   // no celebration for a lost bid.
                   if (nextStage?.isWon) {
                     fireConfetti();
-                    toast.success(`🎉 Won "${opp.name}"!`, { duration: 5000 });
+                    toast.success(`Won "${opp.name}"!`, { duration: 5000 });
                   }
                   // Announce every stage move to screen readers — this is
                   // the most consequential edit on the page and the live
@@ -256,28 +257,34 @@ export const Row = memo(function Row({
       </td>
 
       <td className="px-5 py-3">
-        <DateCell
-          value={opp.dueDate}
-          format={(v) => formatDate(v)}
-          isSaving={saving.dueDate}
-          onSave={(next) => {
-            startSave('dueDate');
-            patch.mutate(
-              { id: opp.id, patch: { dueDate: next } },
-              {
-                onSuccess: () => {
-                  endSave('dueDate');
-                  savedToast('Due date');
-                  flash('dueDate');
+        {/* Editable date stays on DateCell; DueDateChip adds the urgency
+            signal a bare date never carried — deadline slippage is the #1
+            preventable bid loss. */}
+        <div className="flex items-center gap-2">
+          <DateCell
+            value={opp.dueDate}
+            format={(v) => formatDate(v)}
+            isSaving={saving.dueDate}
+            onSave={(next) => {
+              startSave('dueDate');
+              patch.mutate(
+                { id: opp.id, patch: { dueDate: next } },
+                {
+                  onSuccess: () => {
+                    endSave('dueDate');
+                    savedToast('Due date');
+                    flash('dueDate');
+                  },
+                  onError: (err) => {
+                    endSave('dueDate');
+                    errorToast(err);
+                  },
                 },
-                onError: (err) => {
-                  endSave('dueDate');
-                  errorToast(err);
-                },
-              },
-            );
-          }}
-        />
+              );
+            }}
+          />
+          <DueDateChip dueDate={opp.dueDate} size="sm" />
+        </div>
         <SavedFlash trigger={saved.dueDate} />
       </td>
     </tr>

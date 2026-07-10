@@ -8,6 +8,19 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import { enqueueRfpEmbedReference } from '../queues/rfp-embed-reference.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+
+// z.string().url() alone accepts any scheme the URL constructor parses,
+// including javascript: and data: — a stored reference link with one of
+// those renders as a clickable anchor on the client (ReferencesPage) with no
+// further validation. Require http(s) at the schema boundary so a malicious
+// documentUrl can never reach storage in the first place.
+const documentUrlSchema = z
+  .string()
+  .url()
+  .refine((url) => /^https?:\/\//i.test(url), {
+    message: 'documentUrl must start with http:// or https://',
+  });
 
 // Build the text we embed for semantic retrieval: title + description +
 // industry + tags. Mirrors the worker's search_document embedding so Spotlight
@@ -109,13 +122,21 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
         valueMicros: z.number().int().min(0).max(1_000_000_000_000_000).optional(),
         contactName: z.string().max(255).optional(),
         contactEmail: z.string().email().optional(),
-        documentUrl: z.string().url().optional(),
+        documentUrl: documentUrlSchema.optional(),
         tags: z.array(z.string().max(50)).max(20).optional(),
       }),
     },
     handler: async (req, reply) => {
       const { orgId } = req.auth;
       const body = req.body;
+
+      // Multi-tenant guard: a reference may link a Company, but the FK comes
+      // straight from the request body. Without this check a caller could point
+      // companyId at ANOTHER org's company and leak its name/logo via the
+      // GET /references include. Mirror the proposals.ts opportunity check.
+      if (body.companyId && !(await tenantEntityBelongsToOrg('company', body.companyId, orgId))) {
+        return reply.notFound('Company not found');
+      }
 
       const ref = await prisma.reference.create({
         data: {
@@ -155,7 +176,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
         valueMicros: z.number().int().min(0).max(1_000_000_000_000_000).optional(),
         contactName: z.string().max(255).optional(),
         contactEmail: z.string().email().optional(),
-        documentUrl: z.string().url().optional(),
+        documentUrl: documentUrlSchema.optional(),
         tags: z.array(z.string().max(50)).max(20).optional(),
       }),
     },

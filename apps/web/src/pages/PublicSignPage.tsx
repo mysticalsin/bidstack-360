@@ -11,7 +11,7 @@
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, ChevronRight, Download, Pen, Type } from 'lucide-react';
+import { CheckCircle, ChevronRight, Download, Pen, Type, X } from 'lucide-react';
 import type { PublicSignatureRequest } from '@bidstack/shared';
 
 import { cn } from '@/lib/cn';
@@ -137,7 +137,7 @@ export function PublicSignPage() {
         href="#sign-main"
         className={cn(
           'sr-only focus:not-sr-only',
-          'fixed left-2 top-2 z-[9999] rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white',
+          'fixed left-2 top-2 z-[9999] rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-[var(--fg-on-brand)]',
           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         )}
       >
@@ -149,9 +149,9 @@ export function PublicSignPage() {
         {announcement}
       </div>
 
-      <div className="min-h-screen bg-[#fafafa] dark:bg-[#111111] print:bg-white">
+      <div className="min-h-screen bg-[var(--surface-page)] print:bg-white">
         {/* Header */}
-        <header className="border-b border-[var(--border-subtle)] bg-white dark:bg-[#1a1a1a] print:border-b-2 print:border-gray-200">
+        <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-card)] print:border-b-2 print:border-gray-200">
           <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
             <div className="flex items-center gap-2">
               {/* Logo mark — intentionally minimal for third-party trust */}
@@ -159,7 +159,7 @@ export function PublicSignPage() {
                 className="h-8 w-8 rounded-lg bg-[var(--brand-primary)] flex items-center justify-center"
                 aria-hidden
               >
-                <Pen size={14} className="text-white" />
+                <Pen size={14} className="text-[var(--fg-on-brand)]" />
               </div>
               <span className="text-sm font-semibold text-[var(--fg-primary)]">
                 {t('publicSign.brandSecureSignature', 'Secure Signature')}
@@ -251,9 +251,9 @@ function StepIndicator({ step }: { step: Step }) {
             className={cn(
               'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
               i < idx
-                ? 'bg-[var(--brand-primary)] text-white'
+                ? 'bg-[var(--brand-primary)] text-[var(--fg-on-brand)]'
                 : i === idx
-                  ? 'bg-[var(--brand-primary)] text-white ring-2 ring-[var(--brand-primary)] ring-offset-1'
+                  ? 'bg-[var(--brand-primary)] text-[var(--fg-on-brand)] ring-2 ring-[var(--brand-primary)] ring-offset-1'
                   : 'bg-[var(--border-subtle)] text-[var(--fg-muted)]',
             )}
             aria-current={i === idx ? 'step' : undefined}
@@ -313,8 +313,9 @@ function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
 
       {/* Document preview */}
       {data.documentPreviewUrl && (
+        // Chrome is theme-surface; the iframe document itself stays paper-white.
         <div
-          className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-white shadow-sm"
+          className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm"
           data-testid="document-viewer"
         >
           <p className="border-b border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--fg-secondary)]">
@@ -349,7 +350,7 @@ function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
         onClick={onContinue}
         className={cn(
           'w-full min-h-[44px] rounded-xl bg-[var(--brand-primary)] px-6 py-3',
-          'text-sm font-semibold text-white shadow-sm',
+          'text-sm font-semibold text-[var(--fg-on-brand)] shadow-sm',
           'hover:opacity-90 active:opacity-80 transition-opacity',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-2',
           'print:hidden',
@@ -418,7 +419,7 @@ function SignStep({
               'flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1',
               sigMode === mode
-                ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white'
+                ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-[var(--fg-on-brand)]'
                 : 'border-[var(--border-default)] text-[var(--fg-secondary)] hover:border-[var(--border-strong)]',
             )}
           >
@@ -449,7 +450,7 @@ function SignStep({
             maxLength={200}
             placeholder={t('publicSign.fullNamePlaceholder', 'Your full name')}
             className={cn(
-              'w-full min-h-[44px] rounded-lg border border-[var(--border-default)] bg-white dark:bg-[var(--surface-sunken)]',
+              'w-full min-h-[44px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)]',
               'px-3 py-2 text-2xl text-[var(--fg-primary)] placeholder:text-[var(--fg-muted)]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1',
               // cursive font for typed signature feel
@@ -496,7 +497,7 @@ function SignStep({
           onClick={onContinue}
           className={cn(
             'flex-[2] min-h-[44px] rounded-xl bg-[var(--brand-primary)] px-6 py-3',
-            'text-sm font-semibold text-white shadow-sm',
+            'text-sm font-semibold text-[var(--fg-on-brand)] shadow-sm',
             'hover:opacity-90 active:opacity-80 transition-opacity',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-2',
           )}
@@ -598,7 +599,7 @@ function SubmitStep({
             disabled={!acceptedTerms || isPending}
             className={cn(
               'flex-[2] min-h-[44px] rounded-xl bg-[var(--brand-primary)] px-6 py-3',
-              'text-sm font-semibold text-white shadow-sm',
+              'text-sm font-semibold text-[var(--fg-on-brand)] shadow-sm',
               'hover:opacity-90 active:opacity-80 transition-opacity',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-2',
@@ -629,8 +630,8 @@ function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderN
       aria-labelledby="confirm-heading"
       className="flex flex-col items-center gap-6 py-8 text-center"
     >
-      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
-        <CheckCircle size={40} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--success-surface)]">
+        <CheckCircle size={40} className="text-[var(--success-fg)]" aria-hidden />
       </div>
       <div>
         <h1 id="confirm-heading" className="text-2xl font-bold text-[var(--fg-primary)]">
@@ -675,15 +676,17 @@ function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderN
 function LoadingState() {
   const { t } = useTranslation('crm');
   return (
+    // Shared bs-shimmer sheen instead of the strobing pulse blocks.
     <div
-      className="space-y-4 animate-pulse"
+      className="space-y-4"
+      role="status"
       aria-label={t('publicSign.loadingAriaLabel', 'Loading document')}
       aria-live="polite"
     >
-      <div className="h-8 w-2/3 rounded-lg bg-[var(--border-subtle)]" />
-      <div className="h-4 w-1/2 rounded bg-[var(--border-subtle)]" />
-      <div className="h-64 w-full rounded-xl bg-[var(--border-subtle)]" />
-      <div className="h-12 w-full rounded-xl bg-[var(--border-subtle)]" />
+      <div className="bs-shimmer h-8 w-2/3 rounded-lg" aria-hidden />
+      <div className="bs-shimmer h-4 w-1/2" aria-hidden />
+      <div className="bs-shimmer h-64 w-full rounded-xl" aria-hidden />
+      <div className="bs-shimmer h-12 w-full rounded-xl" aria-hidden />
     </div>
   );
 }
@@ -710,10 +713,8 @@ function ErrorState({ error }: { error: unknown }) {
       role="alert"
       aria-live="assertive"
     >
-      <div className="h-16 w-16 rounded-full bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center">
-        <span className="text-3xl" aria-hidden>
-          ✕
-        </span>
+      <div className="h-16 w-16 rounded-full bg-[var(--error-surface)] flex items-center justify-center">
+        <X size={28} className="text-[var(--fg-error)]" aria-hidden />
       </div>
       <h1 className="text-xl font-bold text-[var(--fg-primary)]">
         {isExpired

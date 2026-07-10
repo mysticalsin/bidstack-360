@@ -231,7 +231,9 @@ export async function startRfpOrchestrator(
       p.data.rfpRequestId,
       'orchestrate',
       err.message.slice(0, 2000),
-    ).catch(() => undefined);
+    ).catch((markErr) =>
+      log.warn({ err: markErr }, 'best-effort orchestration failure mark write failed'),
+    );
   });
 
   workers.push(worker);

@@ -72,7 +72,7 @@ export function SecuritySection() {
           />
           <div className="p-5">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🪟</span>
+              <MicrosoftLogo />
               <div>
                 <div className="text-sm font-medium text-[var(--fg-primary)]">
                   {t('security.microsoftSso.connected', 'Microsoft account connected')}
@@ -91,6 +91,20 @@ export function SecuritySection() {
         </Card>
       )}
     </div>
+  );
+}
+
+// The official Microsoft four-square brand mark, matching the SVG used on the
+// login screen (login/Navbar.tsx) — a real logo instead of the 🪟 Windows
+// emoji, which is an OS glyph, not the Microsoft identity mark.
+function MicrosoftLogo() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 21 21" aria-hidden="true">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
   );
 }
 

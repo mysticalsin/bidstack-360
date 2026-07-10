@@ -1,12 +1,19 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 
 const TEST_COMPANY = 'Codex Verification Labs';
 const TEST_NORMALIZED = 'codex-verification-labs';
@@ -20,9 +27,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('crm-companies');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
 
   await prisma.companyEnrichment.deleteMany({
     where: { orgId, normalizedName: TEST_NORMALIZED },
@@ -30,7 +37,7 @@ beforeAll(async () => {
 
   server = await buildServer();
   await server.ready();
-});
+}, 30_000);
 
 afterAll(async () => {
   if (orgId) {
@@ -54,17 +61,13 @@ afterAll(async () => {
       },
     });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL or seed org not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('crm companies routes', () => {
   skipIfNoDb('GET /api/crm/companies/search returns items', async () => {
@@ -305,30 +308,33 @@ describe('crm companies routes', () => {
     ]);
   });
 
-  skipIfNoDb('POST /api/crm/companies/:id/technical-stack/refresh returns source statuses', async () => {
-    const res = await server.inject({
-      method: 'POST',
-      url: '/api/crm/companies/Mantu/technical-stack/refresh',
-    });
+  skipIfNoDb(
+    'POST /api/crm/companies/:id/technical-stack/refresh returns source statuses',
+    async () => {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/crm/companies/Mantu/technical-stack/refresh',
+      });
 
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.state.companyKey).toBe('mantu');
-    expect(body.providers.map((provider: { id: string }) => provider.id)).toEqual([
-      'apollo',
-      'seamless',
-      'tech_intel',
-      'open_data',
-    ]);
-    expect(body.providers).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'apollo', label: 'Apollo' }),
-        expect.objectContaining({ id: 'seamless', label: 'Seamless.AI' }),
-        expect.objectContaining({ id: 'tech_intel', label: 'Tech Intel MCP' }),
-        expect.objectContaining({ id: 'open_data', label: 'Open data' }),
-      ]),
-    );
-  });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.state.companyKey).toBe('mantu');
+      expect(body.providers.map((provider: { id: string }) => provider.id)).toEqual([
+        'apollo',
+        'seamless',
+        'tech_intel',
+        'open_data',
+      ]);
+      expect(body.providers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'apollo', label: 'Apollo' }),
+          expect.objectContaining({ id: 'seamless', label: 'Seamless.AI' }),
+          expect.objectContaining({ id: 'tech_intel', label: 'Tech Intel MCP' }),
+          expect.objectContaining({ id: 'open_data', label: 'Open data' }),
+        ]),
+      );
+    },
+  );
 
   skipIfNoDb('technical stack refresh names configured Tech Intel MCP sources', async () => {
     const previousSourceIds = process.env.TECH_STACK_MCP_SOURCE_IDS;

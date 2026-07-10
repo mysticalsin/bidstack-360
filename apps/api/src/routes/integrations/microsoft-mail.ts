@@ -25,6 +25,7 @@ import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import { getAccessToken } from '../../services/microsoft-graph-auth.service.js';
 import {
@@ -125,7 +126,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       if (error) {
         server.log.warn({ error }, 'Microsoft Mail OAuth denied');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=outlook_denied`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=outlook_denied`,
         );
       }
       if (!code || !state) {
@@ -146,9 +147,12 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         throw server.httpErrors.forbidden('Invalid OAuth state');
       }
 
-      const tokenRes = await fetch(
+      const tokenRes = await fetchWithTimeout(
         `https://login.microsoftonline.com/${tenant()}/oauth2/v2.0/token`,
         {
+          provider: 'Microsoft Graph',
+          operation: 'oauth.exchange',
+          timeoutMs: providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000),
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
@@ -165,7 +169,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         const body = await tokenRes.text();
         server.log.error({ status: tokenRes.status, body }, 'MS Graph token exchange failed');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=outlook_token_failed`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=outlook_token_failed`,
         );
       }
 
@@ -180,9 +184,12 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       let externalEmail: string | undefined;
       let graphMeEvidence: { mail?: string; userPrincipalName?: string } | null = null;
       try {
-        const meRes = await fetch(
+        const meRes = await fetchWithTimeout(
           'https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName',
           {
+            provider: 'Microsoft Graph',
+            operation: 'me.get',
+            timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
             headers: { Authorization: `Bearer ${tokens.access_token}` },
           },
         );
@@ -246,7 +253,9 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         );
 
         // Create Graph webhook subscription (best-effort — incremental poll fallback if it fails)
-        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(err => server.log.warn({ err }, 'Failed to create subscription in background'));
+        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(
+          (err) => server.log.warn({ err }, 'Failed to create subscription in background'),
+        );
       }
 
       server.log.info(
@@ -255,7 +264,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       );
 
       return reply.redirect(
-        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?connected=outlook`,
+        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&connected=outlook`,
       );
     },
   });

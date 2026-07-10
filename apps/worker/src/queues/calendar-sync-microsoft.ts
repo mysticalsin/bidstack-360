@@ -4,6 +4,11 @@ import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
 
+import {
+  claimCalendarPush,
+  recordCalendarPushClaim,
+  releaseCalendarPushClaim,
+} from './calendar-sync-claim.js';
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
@@ -14,6 +19,8 @@ export async function handleMicrosoftPush({
   event,
   operation,
   accessToken,
+  connection,
+  jobId,
   log,
 }: PushParams): Promise<void> {
   await assertSerumConnectorAllowed({
@@ -45,13 +52,27 @@ export async function handleMicrosoftPush({
   };
 
   if (operation === 'push') {
-    const res = await fetch(baseUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`MS Graph create failed: ${res.status}`);
-    const json = (await res.json()) as { id: string; '@odata.etag': string };
+    // Idempotency: the POST precedes the DB commit of externalId, so a BullMQ
+    // retry after a crash between them would create a duplicate provider event.
+    // Claim a per-job key BEFORE posting; a prior attempt that already created
+    // will have set it, so we skip the re-create (see calendar-sync-claim.ts).
+    if (!(await claimCalendarPush(connection, jobId, event.id, log))) return;
+    let json: { id: string; '@odata.etag': string };
+    try {
+      const res = await fetch(baseUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`MS Graph create failed: ${res.status}`);
+      json = (await res.json()) as { id: string; '@odata.etag': string };
+    } catch (err) {
+      // MS Graph never accepted — release the claim so a legitimate retry can re-create.
+      await releaseCalendarPushClaim(connection, jobId);
+      throw err;
+    }
+    // Record the external id in the claim BEFORE the DB write so a crash here still blocks a re-create.
+    await recordCalendarPushClaim(connection, jobId, { id: json.id, etag: json['@odata.etag'] });
     await prisma.calendarEvent.update({
       where: { id: event.id },
       data: {

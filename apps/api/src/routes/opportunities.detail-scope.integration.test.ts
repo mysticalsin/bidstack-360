@@ -2,16 +2,21 @@
 // Regression: list/count were scoped but GET /opportunities/:id was org-only, so
 // a country-restricted user could still open any opportunity by direct link/ID.
 //
-// The stub-auth identity is the seed org's (unrestricted) admin user with zero
+// The stub-auth identity is the isolated org's (unrestricted) admin user with zero
 // group memberships. We TRANSIENTLY add it to a fresh FR-only access group to
-// prove the gate, then restore (delete the membership + group + clear the scope
-// cache) so the shared seed user's visibility is unchanged for other suites.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+// prove the gate, then restore (delete the membership + group + clear the scope cache).
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 import { invalidateAccessScope } from '../lib/access-scope.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -20,6 +25,7 @@ let stubUserId: string | null = null;
 let groupId: string | null = null;
 let frOppId: string | null = null;
 let deOppId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const TAG = `detail-scope-${Date.now()}`;
 
 beforeAll(async () => {
@@ -30,9 +36,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('opportunity-detail-scope');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   const user = await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' } });
   stubUserId = user?.id ?? null;
   if (!stubUserId) return;
@@ -47,10 +53,26 @@ beforeAll(async () => {
   // Two opps owned by NOBODY (ownerId null) so the owner-visibility rule can't
   // leak the out-of-scope one: FR is in scope, DE is not.
   const fr = await prisma.opportunity.create({
-    data: { orgId, code: `${TAG}-FR`, customer: 'ScopeCo', name: 'FR deal', stage: 's1_lead', country: 'FR', ownerId: null },
+    data: {
+      orgId,
+      code: `${TAG}-FR`,
+      customer: 'ScopeCo',
+      name: 'FR deal',
+      stage: 's1_lead',
+      country: 'FR',
+      ownerId: null,
+    },
   });
   const de = await prisma.opportunity.create({
-    data: { orgId, code: `${TAG}-DE`, customer: 'ScopeCo', name: 'DE deal', stage: 's1_lead', country: 'DE', ownerId: null },
+    data: {
+      orgId,
+      code: `${TAG}-DE`,
+      customer: 'ScopeCo',
+      name: 'DE deal',
+      stage: 's1_lead',
+      country: 'DE',
+      ownerId: null,
+    },
   });
   frOppId = fr.id;
   deOppId = de.id;
@@ -74,16 +96,12 @@ afterAll(async () => {
     if (stubUserId) invalidateAccessScope(orgId, stubUserId);
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId || !stubUserId) {
-      throw new Error(`[skip] ${name} — DB/seed org/user unavailable`);
-    }
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId && !!stubUserId);
 
 describe('opportunity detail-by-id access scoping', () => {
   t('a country-scoped user CAN open an in-scope opportunity', async () => {
@@ -91,8 +109,11 @@ describe('opportunity detail-by-id access scoping', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  t('a country-scoped user CANNOT open an out-of-scope opportunity (404, not org-only leak)', async () => {
-    const res = await server.inject({ method: 'GET', url: `/api/opportunities/${deOppId}` });
-    expect(res.statusCode).toBe(404);
-  });
+  t(
+    'a country-scoped user CANNOT open an out-of-scope opportunity (404, not org-only leak)',
+    async () => {
+      const res = await server.inject({ method: 'GET', url: `/api/opportunities/${deOppId}` });
+      expect(res.statusCode).toBe(404);
+    },
+  );
 });

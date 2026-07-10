@@ -1,3 +1,4 @@
+import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,8 +136,18 @@ describe('worker connector SERUM egress gates', () => {
   it('blocks Google Calendar push before provider egress or event mutation when policy denies', async () => {
     checkConnector.mockResolvedValueOnce(deniedDecision('google_workspace', 'calendar.push'));
 
+    // The SERUM gate throws before the idempotency claim, so the stub is never touched.
+    const redisStub = { set: vi.fn(), get: vi.fn(), del: vi.fn() } as unknown as IORedis;
+
     await expect(
-      handleGooglePush({ event, operation: 'push', accessToken: 'token', log }),
+      handleGooglePush({
+        event,
+        operation: 'push',
+        accessToken: 'token',
+        connection: redisStub,
+        jobId: 'job-1',
+        log,
+      }),
     ).rejects.toThrow(/SERUM connector policy denied google_workspace calendar\.push/);
 
     expect(checkConnector).toHaveBeenCalledWith({

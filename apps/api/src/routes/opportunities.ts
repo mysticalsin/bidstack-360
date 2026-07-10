@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { prisma, type Prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
+import { createNotification } from '../services/notification.service.js';
 import {
   Opportunity,
   OpportunityFilter,
@@ -22,6 +23,7 @@ import {
   getAccessScope,
   scopeCacheTag,
 } from '../lib/access-scope.js';
+import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
 import { resolveCompanyIdByName } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
@@ -39,10 +41,28 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { pipelineStageId, stage, owner, industry, search, cursor, limit } = req.query;
+      const { pipelineStageId, stage, owner, industry, search, cursor, limit, dueWithinDays, overdue } =
+        req.query;
       // M7 access scoping: group-restricted users only see opportunities in
       // their countries (or that they own). See lib/access-scope.ts.
       const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      // A1 (bid clock): dueDate is a Postgres `date` (midnight UTC) — window on
+      // the UTC day boundary so "due within 7 days" agrees with the DueDateChip
+      // and bid-deadline-alerts worker regardless of the request's local zone.
+      // See apps/worker/src/queues/bid-deadline-alerts.helpers.ts's daysUntilDue.
+      const now = new Date();
+      const startOfTodayUTC = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      const dueDateFilter: Prisma.OpportunityWhereInput['dueDate'] | undefined =
+        dueWithinDays !== undefined
+          ? {
+              gte: startOfTodayUTC,
+              lte: new Date(startOfTodayUTC.getTime() + dueWithinDays * 86_400_000),
+            }
+          : overdue
+            ? { lt: startOfTodayUTC }
+            : undefined;
       return req.cache(
         async () => {
           const items = await prisma.opportunity.findMany({
@@ -54,6 +74,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 ...(stage ? { stage } : {}),
                 ...(industry ? { industry } : {}),
                 ...(owner ? { owner: { email: owner } } : {}),
+                ...(dueDateFilter ? { dueDate: dueDateFilter } : {}),
                 ...(search
                   ? {
                       OR: [
@@ -99,7 +120,20 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               },
               _count: { select: { tasks: true } },
             },
-            orderBy: { updatedAt: 'desc' },
+            // When a due-date window is requested, order by soonest-due-first
+            // (or oldest-overdue-first) instead of updatedAt — otherwise a
+            // page cap could clip the single most-urgent bid off the
+            // "Closing this week" strip / quick-filter chips, which is
+            // exactly the missed-deadline failure mode A1 exists to prevent.
+            // Compound `id` tiebreaker: `dueDate`/`updatedAt` are non-unique, so
+            // a bare single-column cursor silently drops rows when tied values
+            // straddle a page boundary (Prisma can't tell "already returned"
+            // from "not yet" among equal sort keys). The unique `id` makes the
+            // sort total, matching companies.ts/tasks.ts/activities.ts. Tiebreaker
+            // direction follows the primary sort so the cursor walks monotonically.
+            orderBy: dueDateFilter
+              ? [{ dueDate: 'asc' }, { id: 'asc' }]
+              : [{ updatedAt: 'desc' }, { id: 'desc' }],
             take: limit + 1,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
           });
@@ -216,19 +250,35 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
       // View counts are telemetry, not part of the read contract. Keep the
       // detail page fast; a failed counter bump must not turn a valid read into
-      // a 500.
-      void prisma.opportunity.updateMany({
-        where: { id: opp.id, orgId: req.auth.orgId },
-        data: { viewCount: { increment: 1 } },
-      }).catch((err: unknown) => {
-        req.log.warn({ err, opportunityId: opp.id }, 'Failed to update opportunity view count');
-      });
+      // a 500. Raw SQL (not prisma.opportunity.updateMany) deliberately, so it
+      // does not touch updated_at — Prisma's @updatedAt fires on every ORM
+      // update/updateMany regardless of the data payload, and a page view
+      // silently bumping updatedAt would invalidate every client's in-flight
+      // optimistic-concurrency token (expectedUpdatedAt) on a no-op read.
+      void prisma.$executeRaw`UPDATE opportunities SET view_count = view_count + 1 WHERE id = ${opp.id}::uuid AND org_id = ${req.auth.orgId}::uuid`.catch(
+        (err: unknown) => {
+          req.log.warn({ err, opportunityId: opp.id }, 'Failed to update opportunity view count');
+        },
+      );
       const customFieldValues = await prisma.customFieldValue.findMany({
         where: { orgId: req.auth.orgId, entityType: 'opportunity', entityId: opp.id },
         select: { id: true, definitionId: true, value: true },
         take: 100,
       });
-      return { ...serializeOpportunityFull(opp), customFieldValues };
+      const full = serializeOpportunityFull(opp);
+      // Live buying-intent augmentation: merges Sillage signals into
+      // intel.triggers on read, gated on SILLAGE_* env so this is a zero-cost
+      // no-op until an operator configures it (see lib/sillage-intel-augment.ts).
+      // This query doesn't load the company relation (only owner/territory/
+      // pipelineStage above), so we pass companyName only — Sillage accepts a
+      // company name alone, and adding a join just for a domain isn't worth it.
+      const intel = sillageIsConfigured()
+        ? ((await augmentTriggersWithSillage(full.intel, {
+            companyName: opp.customer,
+            logger: req.log,
+          })) as OpportunityFull['intel'])
+        : full.intel;
+      return { ...full, intel, customFieldValues };
     },
   );
 
@@ -248,6 +298,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!before) throw server.httpErrors.notFound('Opportunity not found');
+
+      // Optimistic-concurrency fail-fast: cheap check before the lookups below
+      // run. The transaction's CAS updateMany re-checks atomically, so this
+      // only shortcuts the common case — it does not replace the real guard.
+      if (
+        req.body.expectedUpdatedAt !== undefined &&
+        new Date(req.body.expectedUpdatedAt).getTime() !== before.updatedAt.getTime()
+      ) {
+        throw server.httpErrors.conflict(
+          'Opportunity was modified since you loaded it — reload and retry',
+        );
+      }
 
       // Update + audit atomic so a crash mid-mutation can't leave an opp
       // changed without a paper trail (Arch-4).
@@ -337,53 +399,84 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         );
       }
 
-      // CF upserts included in the same transaction so a CF failure rolls back
-      // the opportunity update — prevents partial-update / data corruption (P0 #5).
-      const cfOps = (req.body.customFieldValues ?? []).map(({ definitionId, value }) =>
-        prisma.customFieldValue.upsert({
-          where: {
-            orgId_entityType_entityId_definitionId: {
+      const dataPatch = {
+        ...(req.body.customer ? { customer: req.body.customer } : {}),
+        ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
+        ...(req.body.name ? { name: req.body.name } : {}),
+        ...(stageUpdate ? { stage: stageUpdate } : {}),
+        ...(req.body.pipelineStageId !== undefined
+          ? { pipelineStageId: req.body.pipelineStageId }
+          : {}),
+        ...(req.body.value !== undefined
+          ? { valueMicros: BigInt(Math.round(req.body.value * 1_000_000)) }
+          : {}),
+        ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
+        ...(req.body.dueDate !== undefined
+          ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+          : {}),
+        ...(req.body.industry !== undefined ? { industry: req.body.industry } : {}),
+        ...(req.body.logo !== undefined ? { logoUrl: req.body.logo } : {}),
+        ...(req.body.country !== undefined ? { country: req.body.country } : {}),
+        ...(territoryId !== undefined ? { territoryId } : {}),
+        ...(resolvedOwnerId !== undefined ? { ownerId: resolvedOwnerId } : {}),
+      };
+
+      // Update + audit atomic so a crash mid-mutation can't leave an opp
+      // changed without a paper trail (Arch-4). Interactive transaction (not
+      // the array form) so the CAS updateMany below can abort the whole write
+      // — including the audit log and CF upserts — on a lost race, instead of
+      // logging a change that never landed.
+      const txResult = await prisma.$transaction(async (tx) => {
+        if (req.body.expectedUpdatedAt !== undefined) {
+          const cas = await tx.opportunity.updateMany({
+            where: {
+              id: before.id,
               orgId: req.auth.orgId,
+              updatedAt: new Date(req.body.expectedUpdatedAt as string),
+            },
+            data: dataPatch,
+          });
+          if (cas.count === 0) return { conflict: true as const };
+        } else {
+          await tx.opportunity.update({ where: { id: before.id }, data: dataPatch });
+        }
+
+        // CF upserts included in the same transaction so a CF failure rolls back
+        // the opportunity update — prevents partial-update / data corruption (P0 #5).
+        for (const { definitionId, value } of req.body.customFieldValues ?? []) {
+          await tx.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'opportunity',
+                entityId: before.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
               entityType: 'opportunity',
               entityId: before.id,
-              definitionId,
+              value: value as Prisma.InputJsonValue,
             },
-          },
-          update: { value: value as Prisma.InputJsonValue },
-          create: {
-            orgId: req.auth.orgId,
-            definitionId,
-            entityType: 'opportunity',
-            entityId: before.id,
-            value: value as Prisma.InputJsonValue,
-          },
-        }),
-      );
+          });
+        }
 
-      const [updated] = await prisma.$transaction([
-        prisma.opportunity.update({
-          where: { id: before.id },
+        await tx.auditLog.create({
           data: {
-            ...(req.body.customer ? { customer: req.body.customer } : {}),
-            ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
-            ...(req.body.name ? { name: req.body.name } : {}),
-            ...(stageUpdate ? { stage: stageUpdate } : {}),
-            ...(req.body.pipelineStageId !== undefined
-              ? { pipelineStageId: req.body.pipelineStageId }
-              : {}),
-            ...(req.body.value !== undefined
-              ? { valueMicros: BigInt(Math.round(req.body.value * 1_000_000)) }
-              : {}),
-            ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
-            ...(req.body.dueDate !== undefined
-              ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
-              : {}),
-            ...(req.body.industry !== undefined ? { industry: req.body.industry } : {}),
-            ...(req.body.logo !== undefined ? { logoUrl: req.body.logo } : {}),
-            ...(req.body.country !== undefined ? { country: req.body.country } : {}),
-            ...(territoryId !== undefined ? { territoryId } : {}),
-            ...(resolvedOwnerId !== undefined ? { ownerId: resolvedOwnerId } : {}),
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'opportunity.update',
+            targetType: 'opportunity',
+            targetId: before.id,
+            diff: req.body as object,
           },
+        });
+
+        const updated = await tx.opportunity.findFirst({
+          where: { id: before.id },
           // BS-25: narrow owner select — see fix at /opportunities create.
           include: {
             owner: { select: { id: true, name: true, email: true } },
@@ -399,22 +492,40 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               },
             },
           },
-        }),
-        prisma.auditLog.create({
-          data: {
-            orgId: req.auth.orgId,
-            userId: req.auth.userId,
-            action: 'opportunity.update',
-            targetType: 'opportunity',
-            targetId: before.id,
-            diff: req.body as object,
-          },
-        }),
-        ...cfOps,
-      ]);
+        });
+        return { conflict: false as const, updated: updated! };
+      });
+
+      if (txResult.conflict) {
+        throw server.httpErrors.conflict(
+          'Opportunity was modified since you loaded it — reload and retry',
+        );
+      }
+      const updated = txResult.updated;
 
       // Fire-and-forget push to Dust on any field update.
       void pushOpportunityToDust(updated.id, req.auth.orgId);
+
+      // Notify the owner on a real stage change made by someone else — awaited
+      // (not void) so the write is durable before the response returns, but
+      // failure is swallowed so a notification hiccup can never fail an
+      // otherwise-successful PATCH (item 3c: deadline-discipline cluster).
+      const stageChanged =
+        updated.stage !== before.stage || updated.pipelineStageId !== before.pipelineStageId;
+      if (stageChanged && updated.ownerId && updated.ownerId !== req.auth.userId) {
+        await createNotification({
+          orgId: req.auth.orgId,
+          userId: updated.ownerId,
+          type: 'stage_change',
+          title: `${updated.name} moved to a new stage`,
+          body: `${updated.customer} — now in ${updated.pipelineStage?.name ?? updated.stage}`,
+          entityType: 'opportunity',
+          entityId: updated.id,
+          url: `/opportunities/${updated.id}`,
+        }).catch((err: unknown) => {
+          req.log.warn({ err, opportunityId: updated.id }, 'stage-change notification failed');
+        });
+      }
 
       return serializeOpportunity(updated);
     },

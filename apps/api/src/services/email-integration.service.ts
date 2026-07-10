@@ -30,6 +30,7 @@ import {
 import { sendViaGmail, pullGmail } from './email-integration.gmail.js';
 import { sendViaMsGraph, pullMsGraphMail } from './email-integration.graph.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
+import { reserveOutboundCommunication } from '../lib/outbound-communication-guard.js';
 
 // Re-export types so callers don't need to import from helpers directly
 export type {
@@ -69,11 +70,31 @@ export async function sendEmail(
     writeRequested: true,
   });
 
-  const accessToken = await getAccessToken(token, log);
+  const recipientCount = params.to.length + (params.cc?.length ?? 0) + (params.bcc?.length ?? 0);
+  const reservation = await reserveOutboundCommunication(
+    {
+      channel: 'email',
+      orgId: params.orgId,
+      userId: params.userId,
+      units: recipientCount,
+    },
+    log,
+  );
 
-  const { externalMessageId, threadId } = isGmail
-    ? await sendViaGmail(accessToken, params, pixelToken, log)
-    : await sendViaMsGraph(accessToken, params, pixelToken, log);
+  let providerAccepted = false;
+  let providerResult: { externalMessageId: string; threadId?: string };
+  try {
+    const accessToken = await getAccessToken(token, log);
+    providerResult = isGmail
+      ? await sendViaGmail(accessToken, params, pixelToken, log)
+      : await sendViaMsGraph(accessToken, params, pixelToken, log);
+    providerAccepted = true;
+  } catch (err) {
+    if (!providerAccepted) await reservation.rollback();
+    throw err;
+  }
+
+  const { externalMessageId, threadId } = providerResult;
 
   // Persist EmailMessage + tracking pixel in a transaction
   const message = await prisma.$transaction(async (tx) => {
@@ -116,11 +137,14 @@ export async function sendEmail(
 // ─── Pull emails ───────────────────────────────────────────────────────────────
 
 export async function pullEmails(params: PullEmailsParams, log: ServiceLogger): Promise<void> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: params.integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): prevents a
+  // cross-tenant integrationTokenId from resolving to another org's token —
+  // see MISTAKES.md cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: params.integrationTokenId, orgId: params.orgId },
   });
 
-  if (!token || token.orgId !== params.orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     log.warn({ tokenId: params.integrationTokenId }, 'Skipping pull: token inactive or not found');
     return;
   }

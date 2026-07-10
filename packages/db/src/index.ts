@@ -13,6 +13,10 @@ import { PrismaClient } from '../generated/client/index.js';
 import { makeAuditImmutabilityMiddleware } from './middleware/audit-immutability.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
 import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
+import {
+  getTenantScopeGuardMode,
+  makeTenantScopeGuardMiddleware,
+} from './middleware/tenant-scope-guard.js';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
@@ -45,6 +49,19 @@ function buildPrismaClient(): PrismaClient {
     client.$use(makePiiMiddleware());
   }
 
+  // WHY this runs BEFORE soft-delete: makeSoftDeleteMiddleware rewrites
+  // `findUnique` → `findFirst` in place before calling next, and findFirst is a
+  // GUARDED action while findUnique is report-only. Registered after
+  // soft-delete, the guard would see the rewritten action and escalate every
+  // legitimate fetch-by-unique-key on a soft-delete tenant model (including
+  // auth's `user.findUnique({ where: { clerkUser } })`) to a hard violation —
+  // an outage in enforce mode. Before soft-delete it classifies the caller's
+  // original action.
+  const tenantScopeGuardMode = getTenantScopeGuardMode();
+  if (tenantScopeGuardMode !== 'off') {
+    client.$use(makeTenantScopeGuardMiddleware({ mode: tenantScopeGuardMode }));
+  }
+
   // Soft delete middleware automatically filters out records where deletedAt is not null.
   // We apply this globally so developers don't have to constantly append `deletedAt: null`.
   client.$use(makeSoftDeleteMiddleware());
@@ -63,8 +80,7 @@ function buildPrismaClient(): PrismaClient {
   // backstop, by a DB-level trigger + REVOKE (see audit-immutability.ts). Leaving
   // the app-layer guard unconditional in test would force every suite onto a raw
   // SQL purge path for no added safety, so we skip registration only under Vitest.
-  const isTestRuntime =
-    process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+  const isTestRuntime = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
   if (!isTestRuntime) {
     client.$use(makeAuditImmutabilityMiddleware());
   }
@@ -163,3 +179,8 @@ export {
 // runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
 export { seedOrgData } from './seed-org-data.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
+
+// System RBAC seeding (roles + permission manifest, NO fixture data) — shared
+// by the seed CLIs and the Clerk organization.created webhook so a brand-new
+// production org is usable the moment it exists.
+export { seedRolesAndPermissions } from './seed.rbac.js';

@@ -86,8 +86,19 @@ export function DocumentPreviewIframe({
       aria-label={t('documentPreviewIframe.regionAriaLabelTitled', 'Document preview: {{title}}', { title })}
     >
       {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[var(--surface-sunken)]">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-default)] border-t-brand" />
+        // Document-shaped shimmer (title line + paragraph lines) from the
+        // shared bs-shimmer skeleton system — the preview "loads itself"
+        // instead of hiding behind a spinner.
+        <div
+          className="absolute inset-0 space-y-3 bg-[var(--surface-sunken)] p-6"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <span className="bs-shimmer block h-5 w-1/2" aria-hidden />
+          <span className="bs-shimmer block h-3 w-full" aria-hidden />
+          <span className="bs-shimmer block h-3 w-11/12" aria-hidden />
+          <span className="bs-shimmer block h-3 w-full" aria-hidden />
+          <span className="bs-shimmer block h-3 w-2/3" aria-hidden />
           <span className="sr-only">{t('documentPreviewIframe.loading', 'Loading document…')}</span>
         </div>
       )}

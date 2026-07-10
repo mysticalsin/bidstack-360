@@ -1,5 +1,5 @@
 /**
- * Outlook Web content script — injects "Add to BidStack" into email reading pane.
+ * Outlook Web content script — injects "Add to Polo PreSales" into email reading pane.
  *
  * Outlook renders via React and changes selectors across product versions.
  * We use a data-attribute guard to avoid double-injection.
@@ -39,9 +39,9 @@ async function handleAddToBidStack() {
       source: ctx.source,
       notes: `From Outlook subject: ${ctx.subject}`,
     });
-    showToast(`Lead "${lead.name}" added to BidStack`, 'success');
+    showToast(`Lead "${lead.name}" added to Polo PreSales`, 'success');
   } catch (err) {
-    showToast(`BidStack: ${err.message}`, 'error');
+    showToast(`Polo PreSales: ${err.message}`, 'error');
   }
 }
 

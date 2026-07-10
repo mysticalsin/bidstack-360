@@ -20,7 +20,21 @@ import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
+
+// Defense in depth: the API now rejects non-http(s) documentUrl values on
+// write, but existing rows (or a future write path) could still carry a
+// javascript:/data: URL — rendering it as a clickable <a href> would execute
+// it. Only render the link when the scheme is verifiably http(s).
+export function isSafeHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export function ReferencesPage() {
   const { t } = useTranslation('crm');
@@ -28,6 +42,9 @@ export function ReferencesPage() {
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState('');
   const [tag, setTag] = useState('');
+  // References writes are gated server-side behind accounts:write — hide the
+  // write controls for users who lack it (they previously 403'd on click).
+  const canWrite = useHasPermission('accounts:write');
 
   const industries = useAccountIndustries();
   const references = useReferences({
@@ -35,6 +52,10 @@ export function ReferencesPage() {
     industry: industry || undefined,
     tag: tag || undefined,
   });
+  // Unfiltered source for the tag dropdown — deriving tag options from the
+  // tag/search-filtered `references` collapsed the list to the active selection,
+  // trapping the user. Mirrors the independent industry-filter source.
+  const allReferencesForTags = useReferences({});
   const useRef = useUseReference();
   const createRef = useCreateReference();
   const deleteRef = useDeleteReference();
@@ -70,8 +91,11 @@ export function ReferencesPage() {
     });
   };
 
-  // Collect all unique tags for the filter
-  const allTags = Array.from(new Set(items.flatMap((r) => r.tags))).sort();
+  // Collect all unique tags for the filter from the UNFILTERED source so the
+  // dropdown always offers every tag, regardless of the active tag/search.
+  const allTags = Array.from(
+    new Set((allReferencesForTags.data?.items ?? []).flatMap((r) => r.tags)),
+  ).sort();
 
   return (
     <motion.div
@@ -95,7 +119,11 @@ export function ReferencesPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>{t('references.newButton', 'New reference')}</Button>
+        {canWrite && (
+          <Button onClick={() => setShowCreate(true)}>
+            {t('references.newButton', 'New reference')}
+          </Button>
+        )}
       </motion.header>
 
       {/* Filters */}
@@ -214,6 +242,21 @@ export function ReferencesPage() {
                     </p>
                   )}
 
+                  {ref.documentUrl && isSafeHttpUrl(ref.documentUrl) ? (
+                    <a
+                      href={ref.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center rounded text-xs font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                    >
+                      {t('references.viewDocument', 'View document')}
+                    </a>
+                  ) : ref.documentUrl ? (
+                    <span className="mt-2 inline-flex items-center text-xs text-[var(--fg-tertiary)]">
+                      {t('references.unsafeDocumentUrl', 'Document link unavailable')}
+                    </span>
+                  ) : null}
+
                   {ref.tags.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {ref.tags.map((t) => (
@@ -238,6 +281,7 @@ export function ReferencesPage() {
                         </span>
                       )}
                     </div>
+                    {canWrite && (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -261,6 +305,7 @@ export function ReferencesPage() {
                           : t('references.useReference', 'Use reference')}
                       </Button>
                     </div>
+                    )}
                   </div>
                 </div>
               </Card>

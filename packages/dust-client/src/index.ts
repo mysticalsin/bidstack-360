@@ -12,12 +12,22 @@
 import pino from 'pino';
 import { z } from 'zod';
 
+export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
 export interface DustClientOptions {
   apiKey: string;
   workspaceId: string;
   baseUrl?: string;
   timeoutMs?: number;
   logger?: pino.Logger;
+  /**
+   * Outbound fetch implementation. baseUrl is org-admin-controlled, so server
+   * callers MUST inject an SSRF-safe fetch (createSafeFetch from
+   * '@bidstack/shared/server') that re-resolves DNS before every request —
+   * the save-time string check alone doesn't survive DNS rebinding. Defaults
+   * to the global fetch for tests and non-server contexts.
+   */
+  fetchImpl?: FetchLike;
 }
 
 const DUST_DEFAULT_BASE = 'https://dust.tt/api';
@@ -79,6 +89,7 @@ export class DustClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly log: pino.Logger;
+  private readonly fetchImpl: FetchLike;
 
   constructor(opts: DustClientOptions) {
     if (!opts.apiKey) throw new Error('DustClient: apiKey required');
@@ -88,6 +99,7 @@ export class DustClient {
     this.baseUrl = opts.baseUrl ?? DUST_DEFAULT_BASE;
     this.timeoutMs = opts.timeoutMs ?? 10_000;
     this.log = opts.logger ?? pino({ name: 'dust-client' });
+    this.fetchImpl = opts.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
   async listDocuments(dataSourceId: string): Promise<DustDocument[]> {
@@ -181,13 +193,17 @@ export class DustClient {
     }
 
     try {
-      const res = await fetch(url, {
+      const res = await this.fetchImpl(url, {
         method,
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        // Never auto-follow: 'follow' would replay the bearer token to an
+        // arbitrary Location target and skip the injected SSRF-safe fetch's
+        // per-request DNS gate (createSafeFetch rejects 'follow' outright).
+        redirect: 'manual',
         signal: ctl.signal,
       });
 
@@ -199,6 +215,18 @@ export class DustClient {
         this.log.warn({ status: res.status, wait, attempt }, 'dust retry');
         await sleep(wait, ctl.signal);
         return this.request<T>(method, path, body, attempt + 1, externalSignal);
+      }
+
+      // Refuse redirects instead of following them — a redirecting "Dust" host
+      // is either misconfigured or trying to bounce the credentialed request
+      // somewhere the DNS gate never validated.
+      if (res.status >= 300 && res.status < 400) {
+        this.log.error({ status: res.status, path }, 'dust redirect refused');
+        throw new DustError(
+          `Dust ${method} ${path} responded with a redirect (${res.status})`,
+          res.status,
+          null,
+        );
       }
 
       const text = await res.text();

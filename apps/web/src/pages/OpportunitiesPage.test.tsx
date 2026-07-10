@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -135,7 +135,10 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByText('OP-0001')).toBeTruthy();
   });
 
-  it('renders an empty state when no opportunities exist', () => {
+  // A1 (bid clock): the "Due ≤ 7d" quick filter must actually reach the API
+  // request, not just toggle its own pressed state — a filter chip that looks
+  // active but queries the unfiltered list silently hides overdue risk.
+  it('wires the "Due ≤ 7d" chip to the dueWithinDays list param', () => {
     mockOpportunities({
       data: { items: [], nextCursor: null },
       isLoading: false,
@@ -145,7 +148,52 @@ describe('OpportunitiesPage', () => {
 
     renderWithProviders(<OpportunitiesPage />);
 
-    expect(screen.getByText('No opportunities yet')).toBeTruthy();
-    expect(screen.getByText('Create your first opportunity to start tracking bids.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Due ≤ 7d', pressed: false }));
+
+    const lastCall = vi.mocked(useOpportunities).mock.calls.at(-1)?.[0];
+    expect(lastCall).toMatchObject({ dueWithinDays: 7 });
+    expect(lastCall).not.toHaveProperty('overdue');
+  });
+
+  it('wires the "Overdue" chip to the overdue list param and clears it on a second click', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    const overdueChip = () => screen.getByRole('button', { name: 'Overdue' });
+    fireEvent.click(overdueChip());
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({ overdue: true });
+
+    // Toggling the same chip again clears the filter — same UX contract as
+    // the existing stage-filter chips.
+    fireEvent.click(overdueChip());
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('overdue');
+  });
+
+  // WHY: the zero-state is a bid team's first impression of the list — it must
+  // pitch the two real ways an opportunity is born (convert a lead / log an
+  // RFP) and offer a working escape hatch into the CSV importer, not a
+  // generic "no data" shrug that dead-ends the user.
+  it('renders the bid-specific empty state when no opportunities exist', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    expect(screen.getByText('No open bids yet')).toBeTruthy();
+    expect(screen.getByText(/Convert a qualified lead or log the RFP/)).toBeTruthy();
+    // Secondary path must land on the real CSV import wizard in Settings.
+    expect(
+      screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href'),
+    ).toBe('/settings?tab=data-import');
   });
 });

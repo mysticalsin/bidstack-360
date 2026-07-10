@@ -16,6 +16,7 @@
 import {
   createCipheriv,
   createDecipheriv,
+  createHmac,
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
@@ -25,6 +26,8 @@ const KEY_LENGTH_BYTES = 32;
 const IV_LENGTH_BYTES = 12; // GCM standard — 96-bit nonces
 const TAG_LENGTH_BYTES = 16;
 const VERSION = 0x01; // bump if we ever change algorithm/layout
+const WEBHOOK_SIGNING_SECRET_PREFIX = 'whsec_';
+const WEBHOOK_SIGNING_SECRET_HASH_PURPOSE = 'webhook-signing-secret-lookup-v1';
 
 function decodeMasterKey(raw: string): Buffer {
   const trimmed = raw.trim();
@@ -113,6 +116,75 @@ export function decryptSecretOrPlaintext(value: string, key?: Buffer): string {
   try {
     return decryptSecret(value, key);
   } catch {
+    return value;
+  }
+}
+
+function isProductionLikeRuntime(): boolean {
+  const nodeEnv = String(process.env.NODE_ENV ?? '')
+    .trim()
+    .toLowerCase();
+  const deployEnv = String(process.env.BIDSTACK_DEPLOY_ENV ?? '')
+    .trim()
+    .toLowerCase();
+  return nodeEnv === 'production' || deployEnv === 'production' || deployEnv === 'staging';
+}
+
+function allowsLegacyWebhookPlaintext(): boolean {
+  const raw = process.env.BIDSTACK_WEBHOOK_SECRET_PLAINTEXT_FALLBACK;
+  if (raw !== undefined) {
+    return ['1', 'true', 'yes', 'y'].includes(raw.trim().toLowerCase());
+  }
+  return !isProductionLikeRuntime();
+}
+
+export function isLegacyWebhookSigningSecret(value: string): boolean {
+  return typeof value === 'string' && value.startsWith(WEBHOOK_SIGNING_SECRET_PREFIX);
+}
+
+/**
+ * Deterministic keyed lookup hash for webhook signing secrets.
+ *
+ * Secret ciphertext uses a random IV, so equality lookup must not query the
+ * encrypted `secret` column. This HMAC gives inbound webhook receivers a stable
+ * DB lookup without storing or logging the raw signing secret.
+ */
+export function hashWebhookSigningSecret(secret: string, key?: Buffer): string {
+  if (typeof secret !== 'string' || secret.length === 0) {
+    throw new Error('hashWebhookSigningSecret requires a non-empty string secret');
+  }
+  const masterKey = key ?? getIntegrationTokenKey();
+  return createHmac('sha256', masterKey)
+    .update(WEBHOOK_SIGNING_SECRET_HASH_PURPOSE)
+    .update('\0')
+    .update(secret, 'utf8')
+    .digest('hex');
+}
+
+/**
+ * Decrypt an outbound webhook signing secret and fail closed for malformed data.
+ * Historical plaintext `whsec_` rows can be read only outside production-like
+ * runtimes, or when an operator explicitly enables the one-time fallback while
+ * running the backfill. Do not use this for other secret columns.
+ */
+export function decryptWebhookSigningSecret(value: string, key?: Buffer): string {
+  try {
+    return decryptSecret(value, key);
+  } catch (error) {
+    if (!isLegacyWebhookSigningSecret(value)) {
+      throw new Error(
+        `Webhook signing secret is not decryptable and is not a legacy ${WEBHOOK_SIGNING_SECRET_PREFIX} secret.`,
+        { cause: error },
+      );
+    }
+
+    if (!allowsLegacyWebhookPlaintext()) {
+      throw new Error(
+        'Legacy plaintext webhook signing secrets are disabled; run scripts/encrypt-webhook-secrets.ts before delivery.',
+        { cause: error },
+      );
+    }
+
     return value;
   }
 }

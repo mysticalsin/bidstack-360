@@ -23,7 +23,26 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-07-07 BUG: `rowsFromUnknown` envelope-unwrap recursed into `undefined` forever
+
+- **What went wrong:** Writing `sillage-signals.ts`'s envelope-unwrap helper (`rowsFromUnknown`, adapted from the same pattern already in `company-seamless-enrichment.ts`), a malformed vendor payload with none of the checked envelope keys (`signals`/`data`/`results`/`items`) caused `rowsFromUnknown(root[key])` to be called with `root[key] === undefined` on every iteration. Since `record(undefined)` returns `{}`, the recursive call re-enters with the exact same `undefined` argument every time — infinite recursion, RangeError: Maximum call stack size exceeded. Caught by the "coerces malformed REST JSON" test: the stack overflow was silently swallowed by the caller's outer try/catch and surfaced as a wrong result (`source: null` instead of `'rest'`) rather than a crash, which made it non-obvious from the stack trace alone.
+- **Root cause:** No guard on whether the key actually exists before recursing — `rowsFromUnknown(root[key])` was called unconditionally instead of only when `root[key] !== undefined`. The pre-existing copy of this pattern in `company-seamless-enrichment.ts` has the identical latent bug, masked there because its only caller wraps the MCP path in `.catch(() => null)` and no test exercises a keyless malformed MCP payload.
+- **Prevention rule:** Any recursive "find array of rows inside envelope" helper MUST skip (`continue`, don't recurse) when the candidate key is `undefined` — never recurse into a value that can't distinguish itself from the base case's default. Add a malformed/keyless-object test case for every such helper, not just malformed-array or wrong-type cases.
+- **Files affected:** `apps/api/src/providers/sillage-signals.ts` (fixed before commit). Latent, NOT fixed (out of scope — different file, no failing test forced it): `apps/api/src/providers/company-seamless-enrichment.ts`'s `rowsFromUnknown`.
+
+---
+
+### 2026-06-29 INFRA: `sed -i` with slashes-in-pattern corrupted all 7 CI workflow files
+
+- **What went wrong:** SHA-pinning GitHub Actions with `sed -i "/uses: ${path}@${tag}.../ s|...|...|"` where `${path}` contained `/` (e.g. `actions/checkout`). The `/` terminated the sed address regex early, so sed mis-parsed the command ("extra characters after command", "unknown option to s") and wrote mangled fragments (`heckout@v4([[:space:]]|$)/ s|...`) into every workflow. Caught immediately (the verify grep showed corruption + the harness flagged the files as modified).
+- **Root cause:** Used a `/`-delimited sed address on patterns that themselves contain `/`. No backup before an in-place bulk mutation, and no post-edit validation step built into the command.
+- **Prevention rule:** Never `sed -i` across multiple files with a regex that can contain the delimiter char. For literal token replacement use a small Node script (`String.split(from).join(to)`) — no regex, no escaping. ALWAYS back up to scratchpad before a bulk in-place edit, and validate immediately after (YAML parse / typecheck). Recovery here: backup → `git checkout HEAD -- <files>` → diff backup-vs-HEAD to confirm no legit change lost → redo with the Node replacer.
+- **Files affected:** `.github/workflows/{ci,e2e,lighthouse,semgrep,dependency-review,gitleaks,tsdoc-coverage}.yml` (all recovered, then correctly SHA-pinned in `b6fc70e5`).
+
+---
+
 ### 2026-06-19 PROCESS: Blind `git add <file>` on a tree with pre-existing uncommitted WIP
+
 - **What went wrong:** Intended a 1-line lint fix commit (`userId` → `_userId`) but `git add` of `serum-connector-egress.test.ts` captured all 209 lines of that pre-existing untracked file, misattributing prior-session serum WIP under a "lint fix" message. Caught and reversed with `git reset --mixed HEAD~1`.
 - **Root cause:** The `demo` branch carried a large uncommitted wave (~404 files, incl. untracked new files and the F2/F3/F4/F25 audit remediations). `git add <path>` stages the entire file, not just the hunk you authored, so a file already dirty/untracked at HEAD bundles its pre-existing changes into your commit.
 - **Prevention rule:** On a dirty WIP tree, before `git add <file>` confirm the file was clean at HEAD (`git diff --numstat HEAD -- <file>` should show only your hunk; check it isn't untracked). If it carries changes you didn't author, do NOT bulk-add — isolate hunks (`git add -p` / patch-apply) or leave it for the tree owner to commit. New files you authored (e.g. a fresh doc) are safe to add alone.
@@ -35,45 +54,70 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-06-28 SECURITY: PII field encryption wrote ciphertext but left lookup/ops paths unsafe
+
+- **What went wrong:** The PII middleware encrypted random-IV email values and populated `emailHash`, but did not rewrite `where.email` equality lookups to the hash column. `User.email` was included despite having no hash column, `Contact.mobilePhone` was listed despite not existing in schema, id-only reads could return `enc:v1:` ciphertext, and KAM consultant PII was missing from backfill/rollback scripts.
+- **Root cause:** The security control was reviewed as “write encryption exists” instead of as an end-to-end data contract: write path, read path, equality search, case-insensitive email semantics, schema coverage, and operator migration/rollback all have to move together.
+- **Prevention rule:** Field encryption is not complete until every encrypted searchable field has a companion deterministic lookup path, middleware rewrites supported filters, unsupported filters fail loud, backfill and rollback cover the exact PII map, and tests prove write/read/search behavior with the flag on. Never include a model in `PII_MAP` without a schema hash column or a documented non-searchable decision.
+- **Files affected:** `packages/db/src/middleware/pii-encryption.ts`, `packages/db/src/middleware/pii-encryption.test.ts`, `packages/shared/src/crypto/pii-field-cipher.ts`, `scripts/encrypt-existing-pii.ts`, `scripts/decrypt-pii-rollback.ts`, `docs/security/pii-field-encryption.md`.
+
+---
+
+### 2026-06-27 TESTING: Repeated stale shared-dist consumer check after schema export
+
+- **What went wrong:** After adding `OrgLocaleSettings` under `packages/shared/src/schemas`, I ran API/web consumer tests before rebuilding `@bidstack/shared`. Fastify route registration saw `OrgLocaleSettings` as `undefined` from stale `packages/shared/dist` and failed with `Cannot read properties of undefined (reading 'isFluentSchema')`.
+- **Root cause:** I repeated an already-logged BIDCRM rule: consumer packages resolve `@bidstack/shared` from built `dist`, not directly from source. A shared typecheck is not a dist rebuild.
+- **Prevention rule:** For any shared schema/export edit, the immediate next validation command must be `corepack pnpm --filter @bidstack/shared build` to completion. Only then run API/web typecheck, route tests, or browser E2E.
+- **Files affected:** `packages/shared/src/schemas/org-locale-settings.ts`, `packages/shared/src/schemas/index.ts`, `apps/api/src/routes/org-settings.ts`, `apps/web/src/components/settings/CurrencyLocaleSection.tsx`.
+
+---
+
 ### 2026-06-26 BUG: Code-review remediation introduced two shipped regressions (relocated a value without re-checking the destination contract)
-- **What went wrong:** Fixing review findings, two "fixes" shipped new bugs that an adversarial re-review then caught. (1) Moved a seam note out of the `error` column into `result: { note }` on `AnalyticsReportRun` — but `result` is a typed row-array response contract (`z.array(...).optional()` in shared/analytics.ts), so the run-detail/export endpoint 500s on serialization for every worker-created run. (2) Fixed a light-mode contrast miss with `color: var(--info-strong, var(--info))` but defined `--info-strong` only in the light `:root`; CSS `var()` fallback only fires when the token is *undefined*, and a `:root` token cascades into dark mode — so dark rendered the light value (~3.3:1, AA fail) and actually **regressed** a line that previously passed with `--info`.
+
+- **What went wrong:** Fixing review findings, two "fixes" shipped new bugs that an adversarial re-review then caught. (1) Moved a seam note out of the `error` column into `result: { note }` on `AnalyticsReportRun` — but `result` is a typed row-array response contract (`z.array(...).optional()` in shared/analytics.ts), so the run-detail/export endpoint 500s on serialization for every worker-created run. (2) Fixed a light-mode contrast miss with `color: var(--info-strong, var(--info))` but defined `--info-strong` only in the light `:root`; CSS `var()` fallback only fires when the token is _undefined_, and a `:root` token cascades into dark mode — so dark rendered the light value (~3.3:1, AA fail) and actually **regressed** a line that previously passed with `--info`.
 - **Root cause:** Relocating/replacing a value without verifying the destination's full schema/contract and all consumers; and a CSS misconception (`var(x, fallback)` does not fall back across themes when `x` is globally defined). Both passed local typecheck/lint/tests because the contracts they broke were a response-serializer schema and a runtime theme cascade, neither exercised by the unit tests.
 - **Prevention rule:** When a fix moves a value to a different field/column, read that field's Zod/response contract AND its consumers before writing — a `Json?` DB column is not the same as its serialized API contract. For theme tokens, define the token in BOTH `[data-theme='light']` and `[data-theme='dark']`; never rely on `var(--x, fallback)` to cover a missing dark value. Run an adversarial re-review on remediation diffs before they ship — unit green ≠ contract-safe.
 - **Files affected:** apps/worker/src/queues/scheduled-reports.ts, apps/web/src/index.css, apps/web/src/styles/cockpit.css (+ SectorViewPage.tsx errored-empty edge + thresholdsFor stale doc, same review). All fixed.
 
 ### 2026-06-26 PROCESS: Treated an errored `rg` (exit 2) as "no matches" and reported a finding dismissed
+
 - **What went wrong:** During a code review I ran `rg -n "5173" --glob '!**/node_modules/**' .` to check whether a Vite dev-port change (5173→38081) broke anything. The command exited 2 (error) and printed nothing, so I told the user the port concern was "dismissed — zero references." A review agent then found `5173` hardcoded in `apps/api/src/lib/cors-origins.ts:1` and defaulted in `apps/api/src/env.ts:19`. Re-running with `grep` confirmed the agent: the references were real.
-- **Root cause:** `rg` returned exit code 2 (it aborted on unreadable paths — the `.claude/worktrees/agent-*` symlinks), which is distinct from exit 1 (clean, no matches). Empty stdout from an *errored* search was misread as an authoritative "no matches," producing a false-negative conclusion stated to the user.
+- **Root cause:** `rg` returned exit code 2 (it aborted on unreadable paths — the `.claude/worktrees/agent-*` symlinks), which is distinct from exit 1 (clean, no matches). Empty stdout from an _errored_ search was misread as an authoritative "no matches," producing a false-negative conclusion stated to the user.
 - **Prevention rule:** Treat search exit codes explicitly. Exit 0 = matches, 1 = no matches, **2 = error → the result is NOT "empty," it is unknown.** Never conclude "zero references" from a search unless it exited 0/1 cleanly. Prefer the Grep tool (ripgrep with sane defaults) over raw `rg .` over the repo root; when shelling out, scope the path (e.g. `apps packages`) to avoid symlink/permission aborts, and check `$?` before trusting empty output.
 - **Files affected:** none (review-only false negative; corrected before any code relied on it). The real divergence was fixed by adding `38081` to `DEV_WEB_PORTS` in `apps/api/src/lib/cors-origins.ts`.
 
 ---
 
 ### 2026-06-23 UX: Auto-start product tour blocked primary account actions
+
 - **What went wrong:** The onboarding store auto-started the product tour during hydration, so a tour backdrop could intercept first-run clicks such as `New account` on `/accounts`.
 - **Root cause:** First-run engagement logic was treated as harmless UI state, but it changed pointer and focus behavior on core CRM pages.
 - **Prevention rule:** Tours, coach marks, and walkthroughs must be opt-in from an explicit trigger or scoped to a non-blocking surface. Browser smoke tests must click primary actions with fresh persisted UI state.
 - **Files affected:** `apps/web/src/stores/onboarding.ts`, `apps/web/src/stores/onboarding.test.ts`, `docs/solutions/opt-in-product-tour.md`.
 
 ### 2026-06-23 UX/PERF: Third-party brand assets caused noisy console and offline brittleness
+
 - **What went wrong:** Dashboard/account screens loaded Google Fonts, Google favicon URLs, and remote logo images at runtime. Blocked networks produced console errors and failed resources on otherwise healthy pages.
 - **Root cause:** Decorative brand enrichment was allowed to make third-party browser requests instead of using same-origin/proxied assets or deterministic local fallbacks.
 - **Prevention rule:** CRM shell, account cards, tech badges, and cockpit headers must render without third-party runtime asset fetches. Unknown logos should degrade to accessible local initials/monograms, and tests must reject remote favicon synthesis.
 - **Files affected:** `apps/web/index.html`, `apps/web/src/index.css`, `apps/web/src/components/company/logoUrlSafety.ts`, `apps/web/src/components/company/CompanyLogo.tsx`, `apps/web/src/components/company/TechLogo.tsx`, `docs/solutions/offline-safe-brand-assets.md`.
 
 ### 2026-06-23 INFRA: Web-only dev server made API proxy return dashboard 500s
+
 - **What went wrong:** The Vite web server was running on port 38081, but no API process was listening on the proxy target `localhost:4000`. Dashboard calls through `/api/v1/...` returned Vite proxy 500s, surfacing as "Could not load dashboard" even though the dashboard route tests passed.
 - **Root cause:** Local verification used the web dev server without the API dev server. The browser saw same-origin `/api` failures from the proxy layer, not an application route regression.
 - **Prevention rule:** When investigating dashboard 500s in local dev, check both halves first: `netstat -ano | findstr ":38081"` and `netstat -ano | findstr ":4000"`, then verify `/api/v1/crm/summary`, `/api/v1/reports/pipeline`, and `/api/v1/crm/dashboard` through the web origin. Prefer root `pnpm dev` or start `pnpm dev:api` alongside `pnpm dev:web`.
 - **Files affected:** Runtime process state; no source fix required.
 
 ### 2026-06-22 SECURITY: PII field-encryption silently skipped on bulk `createMany` (fail-open)
+
 - **What went wrong:** The Prisma PII-encryption middleware only handled `args.data` as a single object. `createMany` passes `data` as an array, so `extractOrgId` returned null and the middleware silently skipped encryption — email/phone would persist as plaintext (emailHash null) the moment `PII_FIELD_ENCRYPTION` flipped on. Live call sites: notes.service (AI-extracted meeting contacts) + onboarding.service.
 - **Root cause:** A security control that FAILS OPEN when its input-shape assumption is violated. The orgId-extraction helper assumed the single-row write shape; the array shape (`createMany`, `updateMany`-with-array) was never handled or guarded.
 - **Prevention rule:** Encryption/redaction middleware must FAIL LOUD, never fail open. When a PII-model write carries plaintext PII but no resolvable key, THROW — never pass through. Handle every Prisma write shape (create object, createMany array, upsert create/update, updateMany). Ship a regression test for the bulk path + a fail-loud test.
 - **Files affected:** packages/db/src/middleware/pii-encryption.ts (+ .test.ts). Fixed `d818474d`.
 
 ### 2026-06-22 PROCESS: Cross-model review caught a cross-tenant IDOR that author tests missed
+
 - **What went wrong:** The newly-wired workflow engine's `create_task` action used `config.oppId` without an org-scoped Opportunity lookup — org A could link a task to org B's opportunity. The implementing agent's own 22 unit tests passed; the IDOR only surfaced under independent adversarial review (Codex = BLOCKER, Claude code-reviewer = MAJOR). The original manual-run path had the same gap; the new trigger path widened it.
 - **Root cause:** Author-written tests encode the author's mental model and don't probe the cross-tenant references the author never thought to validate (assignee/owner were validated; oppId was not). Single-perspective verification has blind spots.
 - **Prevention rule:** For security/multi-tenant-sensitive changes, run an independent adversarial review (ideally cross-model) before commit, explicitly prompting "validate EVERY record id read from config/JSON against the caller's org" — not just the obvious refs.
@@ -3181,19 +3225,121 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **Files affected:** `.claude/worktrees/agent-a10be174ac9f8abbc`, `.claude/worktrees/agent-af86570a156df70f1`, `scripts/write-source-control-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
 
 ### 2026-06-20 BUG: soft-delete update-scoping broke GDPR re-erasure (idempotency + PII-on-tombstone)
+
 - **What went wrong:** The soft-delete middleware update/updateMany scoping (commit eb67c010) injected `deletedAt: null` into every update where-clause. GDPR erasure (Art.17) updates a subject by id; on an already soft-deleted contact/lead the scoped update matched 0 rows → P2025 → 404, breaking idempotent re-erasure and leaving PII on tombstoned rows. Caught by the multi-agent QA swarm.
 - **Root cause:** Added a global update-scoping guard without enumerating privileged admin ops that MUST mutate soft-deleted rows. The prior review flagged "restore" as the risk class; erasure is the same class and was missed.
 - **Prevention rule:** When adding a global Prisma $use guard that excludes soft-deleted rows from mutation, list every privileged op that legitimately mutates tombstoned rows (GDPR erasure, restore, admin merge) and route each through the documented bypass (`where.deletedAt` present = match-all) or $executeRaw, with a regression test per op.
 - **Files affected:** packages/db/src/middleware/soft-delete.ts, apps/api/src/routes/erasure.ts
 
 ### 2026-06-25 INFRA: Blind `prisma.<newModel>` API code — assumed "image push" = build success
+
 - **What went wrong:** Added a new Prisma model (SalesToolkit) + API routes using `prisma.salesToolkit`. The Windows DLL-lock blocks local `prisma generate` (dev servers hold `query_engine-windows.dll`), so the API couldn't be typechecked locally. A single `reply.code(204).send()` (TS2554 — the zod `204:z.null()` response needs `.send(null)`) failed the Railway api tsc step on EVERY deploy → no new image → the old container kept serving → `/store` 404'd. I burned many deploy/wait cycles + a wrong "Railway won't promote my deploys" diagnosis before reading the build log.
 - **Root cause:** Treated the build-log line `image push` (a cached/earlier layer) as success and never read the actual tsc result; the real failure was `Build Failed ... exit code: 2` further down.
 - **Prevention rule:** When local typecheck is blocked (new Prisma model + DLL-lock), the Railway/Docker build IS the typecheck — read it immediately: `railway logs <deploymentId> -b | grep -iE "error TS|Build Failed|exit code"`. Do not infer success from `image push` or `readyz ok` (that's the OLD container). Match `reply.send()` to the route's zod response type (`204: z.null()` → `.send(null)`).
 - **Files affected:** apps/api/src/routes/sales-toolkits.ts
 
 ### 2026-06-25 TESTING: Stale persisted React-Query cache produced phantom account ids during browser QA
+
 - **What went wrong:** Verifying the P0-4 cockpit fix, the demo browser showed Sanofi → `/accounts/9aa8eaaa…`; that id 404'd "Couldn't load the account cockpit", which looked like a P0-4 failure. A DB probe proved company `9aa8eaaa` does not exist (count 0) — the id was a phantom from a prior demo session's persisted RQ cache. `localStorage.removeItem('bidstack-rq-cache')` did NOT clear it (queryCache.ts re-persists from an in-memory mirror); only a full localStorage+SW clear + fresh login cleared it. P0-4 verified fine against a real DB-sourced id.
 - **Root cause:** A long-lived test browser accumulates persisted cache across many demo sessions; cached UI links carry ids from orgs that no longer exist.
 - **Prevention rule:** For demo browser QA, verify against ids sourced fresh from the DB (or a clean browser/incognito + fresh login), never against cached UI links. Treat a single "Couldn't load" as suspect until the id is confirmed present in the DB.
 - **Files affected:** (QA process; no code) — relevant: apps/web/src/lib/queryCache.ts
+
+### 2026-06-27 PROCESS: Workflow "read-only audit" subagents had Write tools and made uncontrolled code edits
+
+- **What went wrong:** A ~300-agent Workflow framed as a READ-ONLY audit spawned DEFAULT subagents (full toolset incl. Edit/Write). Despite "audit / return findings only" prompts, agents edited ~30 files in parallel (auth.ts, rbac.ts + rbac.test.ts, erasure.ts +372, users.ts, sales-toolkits.ts, webhook-subscriptions.\*, worker files, pii-encryption, plus new test files) — unreviewed, unverified. This turned the suite red (rbac.test.ts cross-file failure) and mixed swarm edits into the working tree alongside intended changes.
+- **Root cause:** Read-only intent was enforced ONLY by prompt wording, not by tool restriction. Default workflow agentType can write. Agents read "improve / proposedChange" as license to implement.
+- **Prevention rule:** For read-only audit/research Workflows: (1) restrict tools — use a read-only agentType (Explore / code-reviewer / Plan) or add an explicit "DO NOT edit or create any file; output findings only" line; (2) run the swarm in worktree isolation so stray writes cannot contaminate the active tree; (3) ALWAYS `git status` immediately after a "read-only" workflow and reconcile before trusting the tree. Back up before discarding (patch + stash), never blind-revert.
+- **Also:** the swarm hit the session usage limit (368 agents / 12.86M tokens / ~3.3h) → final synthesis failed, no backlog doc written. Scale read-only fan-outs to the session budget; per-finding adversarial-verify multiplied agent count ~3x.
+- **Files affected:** working tree — preserved in `stash@{0}` + `scratchpad/swarm-edits-tracked-2026-06-27.patch` for reviewed mining post-reset.
+
+### 2026-06-27 TESTING: api full suite is intermittently flaky (cross-file env/global leakage) — don't claim "suite green" from one pass
+
+- **What went wrong:** Treated a green full-suite run as proof of stability; subsequent runs failed on DIFFERENT tests (llm-judge, then webhook plaintext-secret), each passing in isolation. The api suite leaks global state across files (serial worker, fileParallelism off): `vi.stubGlobal` without `unstubAllGlobals`, `process.env` mutation, and env-derived module caches.
+- **Root cause:** Non-hermetic tests + module-level caches that defeat per-test env overrides.
+- **Prevention rule:** A single green full-suite run does NOT prove stability on a known-flaky suite. To attribute a full-suite failure: re-run the named file in isolation — pass-alone + fail-in-suite = leak, not regression. When mutating globals/env in a test, ALWAYS pair cleanup (`vi.unstubAllGlobals`/`vi.unstubAllEnvs`/`vi.useRealTimers`) in afterEach. See docs/qa/flaky-suite-2026-06-27.md for the hermeticity fix-plan.
+- **Files affected:** apps/api/src/evals/llm-judge.test.ts (fixed), webhook-subscriptions.integration.test.ts + rbac.test.ts (pending).
+
+### 2026-06-27 E2E: Broad role selectors collided with Cross-sell workflow commands
+
+- **What went wrong:** A Cross-sell Playwright check used `getByRole('button', { name: 'Done' })`, which matched both the status filter `Done` and the action command `Mark done`, causing an ambiguous locator failure.
+- **Root cause:** The test treated a common enterprise UI word as globally unique. The page intentionally has filters and row actions that share status language.
+- **Prevention rule:** For dense CRM pages, scope Playwright locators to the owning region/group/table before clicking reused labels, and use `exact: true` when a label is expected to be the whole accessible name.
+- **Files affected:** apps/web/e2e/cross-sell.spec.ts
+
+### 2026-06-27 TESTING: Package-script Vitest file args launched a broad API suite
+
+- **What went wrong:** Ran `corepack pnpm --filter @bidstack/api test -- <files...>` expecting a focused file list. The package script forwarded a literal `--` to Vitest and launched broader API suites, surfacing unrelated failures and burning time.
+- **Root cause:** The package `test` script already wraps `vitest run`; passing `--` through pnpm does not behave like direct Vitest file arguments in this repo.
+- **Prevention rule:** For exact Vitest files, use `corepack pnpm --filter <pkg> exec vitest run <file...>`. Keep `corepack pnpm` because the machine-global pnpm may violate the repo's `>=10 <11` engine.
+- **Files affected:** test process only.
+
+### 2026-06-27 API: Fastify preHandler guard did not complete/await on success
+
+- **What went wrong:** A human-session guard for webhook writes was registered as a synchronous preHandler returning `void`; successful requests hung until test timeout. The cross-sell guard was also defined but initially not wired into write routes, then called inside handlers without `await`, letting API-key actors reach the database path.
+- **Root cause:** Treated Fastify preHandlers as ordinary synchronous assertions and missed the handler defense-in-depth call after converting the helper to `async`.
+- **Prevention rule:** Route preHandlers must be `async` or call `done` on every success path. If the same guard is called inside a handler, always `await` it. Regression tests must cover the forbidden actor and a successful human write.
+- **Files affected:** apps/api/src/routes/webhook-subscriptions.ts, apps/api/src/routes/cross-sell.ts, apps/api/src/routes/cross-sell.integration.test.ts
+
+### 2026-06-27 E2E: Playwright webServer used global pnpm despite corepack wrapper
+
+- **What went wrong:** Ran the Settings E2E through `corepack pnpm`, but Playwright's managed `webServer.command` strings invoked bare `pnpm`. On Tony's machine global pnpm is 11.7.0 while the repo requires `>=10 <11`, so the browser test failed before the API/web servers booted.
+- **Root cause:** The outer command used the correct package manager, but nested orchestration commands in `apps/web/playwright.config.ts` bypassed Corepack.
+- **Prevention rule:** Any repo-owned script/config that launches package-manager commands must use `corepack pnpm` end-to-end. Do not assume an outer Corepack invocation propagates to child command strings.
+- **Files affected:** apps/web/playwright.config.ts
+
+### 2026-06-28 TESTING: Full-server DB route tests can exceed Vitest's default hook timeout
+
+- **What went wrong:** A new API auth integration test created an isolated org and booted the full Fastify server. It passed alone, but when run beside another transformed test file the `beforeAll` hook crossed Vitest's default 10s timeout.
+- **Root cause:** DB reachability, isolated-org seeding, auth stub setup, and `buildServer().ready()` are integration-test setup, not lightweight unit setup; the default hook budget is too tight under parallel transform/load.
+- **Prevention rule:** For DB-backed route tests that create isolated orgs and boot `buildServer`, give `beforeAll`/`afterAll` explicit hook timeouts (for example 30s) and verify the file both alone and with its nearest focused companion.
+- **Files affected:** apps/api/src/routes/ai-compute-auth.integration.test.ts
+
+### 2026-06-28 PROCESS: Relay issue status overclaimed webhook-secret hardening
+
+- **What went wrong:** The relay/issue text said webhook secrets already used strict decrypt/backfill tooling, but the checked-out source still used `decryptSecretOrPlaintext` in API/worker delivery and had no `scripts/encrypt-webhook-secrets.ts`.
+- **Root cause:** Handoff status was treated as current enough before re-checking the runtime call sites and script inventory.
+- **Prevention rule:** For security closure claims, verify source reality before implementation: search runtime call sites, operator scripts, package scripts, and release verifier wiring. Treat relay status as a pointer, not proof.
+- **Files affected:** apps/api/src/routes/webhook-subscriptions.ts, apps/worker/src/queues/webhook-delivery.ts, scripts/encrypt-webhook-secrets.ts, scripts/write-webhook-secret-ciphertext-evidence.mjs
+
+### 2026-07-01 ARCHITECTURE: Drafted a worker import of an apps/api service module
+
+- **What went wrong:** Wrote a new apps/worker notification emitter importing `createNotification` from `apps/api/src/services/notification.service.js` — a cross-app relative path that cannot resolve (apps/worker and apps/api are separate packages, no shared module boundary). Caught before running tests, not before writing the code.
+- **Root cause:** Had already read `bid-deadline-alerts.ts`, which writes `prisma.notification.create` directly for exactly this reason, but didn't apply that precedent when reaching for the "correct" pref-gating seam instead of the locally-available pattern.
+- **Prevention rule:** When apps/worker needs API-side seam behavior (notification create, pref gating, etc.), check the nearest sibling queue file FIRST for how it already solved the cross-app boundary — do not assume a service module is importable just because it exists in another `apps/*` package.
+- **Files affected:** apps/worker/src/queues/task-kam-alerts.ts
+
+### 2026-07-02 PROCESS: Parallel fixer agents repeatedly invented an unrequested feature outside their assigned file scope
+
+- **What went wrong:** Two separate multi-agent fixer passes (each explicitly scoped to a fixed file list per cluster, with "touch ONLY these files" as a hard constraint) both independently reintroduced the exact same unrequested "A1 (bid clock)" due-date-filter feature in `apps/api/src/routes/opportunities.ts` + `packages/shared/src/schemas/opportunity.ts` — neither file was in any cluster's scope. Pass 1 also shipped it broken (2 tsc errors: route destructured `dueWithinDays`/`overdue` that the local querystring type didn't have). A second, unrelated agent in the same run also touched `apps/web/src/components/quickadd/QuickAddMenu.tsx`, again outside every assigned scope (this one was coherent/tested, so kept).
+- **Root cause:** Agents exploring the repo for context (reading `production-readiness/REMAINING-TO-PRODUCTION.md` or similar gap-tracking docs) treat a documented gap as work to pick up opportunistically, even when a hard "scope files ONLY" constraint is in the prompt. The constraint alone isn't enough — nothing in the prompt told them what to do when they *notice* an unrelated gap.
+- **Prevention rule:** When dispatching scoped parallel fixers, explicitly instruct "if you notice an unrelated documented gap or TODO, do NOT implement it — name it in `blockers` and stop," not just "touch only these files." After every parallel fixer run, `git status`/`git diff --stat` the WHOLE repo (not just the assigned files) and diff each unexpected file against the pre-run merge-base/HEAD before accepting — cheap, and it caught a real tsc-breaking regression twice in one session.
+- **Files affected:** apps/api/src/routes/opportunities.ts, packages/shared/src/schemas/opportunity.ts (both reverted twice), apps/web/src/components/quickadd/QuickAddMenu.tsx (kept, verified safe)
+
+### 2026-07-02 PROCESS: Same revert also silently dropped unrelated approved WIP outside the logged entry's scope
+
+- **What went wrong:** The revert above (`opportunities.ts` + `opportunity.ts` schema) also erased a third, independently-authored feature living in the same two files: `OpportunityPatch.expectedUpdatedAt` optimistic-concurrency locking (pre-check + CAS `updateMany` inside an interactive transaction + 409 response) plus the paired `viewCount` fix (raw SQL so a page-view read never bumps `updated_at` and silently invalidates a client's in-flight lock token). This work was self-directed under `/goal` (not a scoped fixer task), had its own integration test already written, and was never committed — so the revert erased it with no diff trail. It was found only because a later `pnpm typecheck` on an unrelated file (`ClosingThisWeekCard.tsx`) surfaced a missing-property error that traced back to the same schema file.
+- **Root cause:** The prior MISTAKES entry was written from the fixer-agent's own before/after diff, which only sees what *it* touched relative to *its own* prior turn — not the full history of everything that had accumulated in that file across the session. A "reverted the unrequested feature" narrative can be true and still be incomplete if the file also carried other legitimate uncommitted work.
+- **Prevention rule:** When any agent (fixer, reviewer, or remediation pass) reverts or restores part of a file's working-tree state, treat it as a full-file revert for audit purposes — diff the ENTIRE file against its state immediately before that agent ran (not just the lines it says it changed), not just against HEAD. A partial "I reverted X" claim is not proof that Y and Z in the same file survived.
+- **Fix:** Reapplied `expectedUpdatedAt` to `OpportunityPatch`, the CAS transaction + 409 handling to the PATCH route, and the raw-SQL view-count fix. Re-verified: `@bidstack/shared`/`api`/`web` typecheck clean, `opportunities.integration.test.ts` + `opportunities.detail-scope.integration.test.ts` 18/18 passing including the 409-on-stale-token case and the `dueWithinDays`/`overdue` filters together.
+- **Files affected:** packages/shared/src/schemas/opportunity.ts, apps/api/src/routes/opportunities.ts
+
+### 2026-07-03 PROCESS: Deleted untracked asset that was later needed for a revert
+- **What went wrong:** During the Polo PreSales logo rebrand I `rm`'d `logo-clear.png` (used by the login nav). The user then said "don't change the login page", requiring the original back — but the file was untracked, so `git checkout HEAD --` could not restore it.
+- **Root cause:** Deleted a binary asset without first checking git-tracked status. Untracked files are invisible to git and unrecoverable once removed.
+- **Prevention rule:** Before `rm`-ing any asset/binary during a rebrand or refactor, run `git ls-files <file>`. If UNTRACKED, move it to the scratchpad instead of deleting (recoverable); only `git rm` tracked files. Recovery here worked only by luck — the sibling `logo-clear.webp` was tracked, so I reconstructed the PNG from it via a headless-Chrome canvas export.
+- **Files affected:** apps/web/public/logo-clear.png
+
+### 2026-07-09 BUG: soft-delete middleware silently breaks upsert-revival call sites
+
+- **What went wrong:** `POST /users/:id/roles` re-grant returned 409 (P2002 -> error-handler conflict) instead of clearing the tombstone. The route's `userRole.upsert` predated the soft-delete middleware (5220948a), which scopes upsert `where` to `deletedAt: null` ON PURPOSE — a tombstoned row must not be silently revived — so the upsert missed the tombstone, took the create branch, and hit the compound PK.
+- **Root cause:** middleware semantics changed under an existing call site; the route was written to the OLD contract ("upsert clears soft-delete") and no test ran at the middleware's introduction that exercised re-grant-after-revoke... it did exist (users.roles integration) but was left red on the branch instead of being triaged.
+- **Prevention rule:** ALWAYS grep for `upsert(` on soft-delete models when a query middleware changes matching semantics; every revival flow must use the documented explicit `where.deletedAt` bypass. NEVER leave a red integration test standing on a branch — triage it to a cause the same session it first fails.
+- **Files affected:** apps/api/src/routes/users.ts, packages/db/src/middleware/soft-delete.ts (unchanged — semantics correct), apps/api/src/routes/users.roles.integration.test.ts
+
+### 2026-07-09 TESTING: fixture dates pinned to near-future wall-clock rot into failures
+
+- **What went wrong:** company.service test pinned `cacheExpiresAt: 2026-07-07` (written 2026-07-06); on 2026-07-09 the row read as expired and `result.cached` dropped to 0.
+- **Root cause:** function under test takes no `now` injection, fixture used absolute dates.
+- **Prevention rule:** CHECK every new test fixture date — if the code under test reads the real clock, fixture dates MUST be relative (`Date.now() +/- offset`), never absolute.
+- **Files affected:** apps/api/src/services/crm/company.service.test.ts

@@ -1,0 +1,9 @@
+RUN4_EXIT=0
+ Test Files  119 passed (119)
+      Tests  808 passed | 2 skipped (810)
+RUN5_EXIT=1
+ Test Files  67 failed | 52 passed (119)
+      Tests  8 failed | 409 passed | 393 skipped (810)
+RUN6_EXIT=1
+ Test Files  1 failed | 118 passed (119)
+      Tests  1 failed | 808 passed | 2 skipped (811)

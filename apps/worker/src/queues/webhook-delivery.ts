@@ -8,8 +8,10 @@
  * callers enqueue one job per matching active subscription.
  *
  * Signature format (matches /docs/api/webhooks.md):
- *   X-BidStack-Signature: t=<unix-seconds>,v1=<hmac-sha256-hex>
+ *   X-Polo-Signature: t=<unix-seconds>,v1=<hmac-sha256-hex>
  *   where the HMAC covers the string `${t}.${rawJsonBody}`.
+ *   The legacy X-BidStack-Signature header carries the same value during the
+ *   rebrand deprecation window so existing receivers keep verifying.
  *
  * Retry schedule (configured in queue-config.ts WEBHOOK_DELIVERY):
  *   attempt 1: immediate
@@ -22,14 +24,17 @@
  */
 
 import { createHash, createHmac, randomUUID } from 'node:crypto';
-import { Queue, Worker, type Job } from 'bullmq';
+import { Queue, UnrecoverableError, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { WEBHOOK_DELIVERY, assertSafeWebhookUrl } from '@bidstack/shared';
-import { decryptSecretOrPlaintext } from '@bidstack/shared/server-crypto';
+import {
+  decryptWebhookSigningSecret,
+  isLegacyWebhookSigningSecret,
+} from '@bidstack/shared/server-crypto';
 
 import { createResearchFetch } from '../lib/safe-research-fetch.js';
 import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
@@ -140,8 +145,10 @@ async function deliver(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Polo-Signature': signature,
+          // Legacy header kept during the rebrand deprecation window.
           'X-BidStack-Signature': signature,
-          'User-Agent': 'BidStack-Webhooks/1.0',
+          'User-Agent': 'PoloPreSales-Webhooks/1.0',
         },
         body,
         signal: controller.signal,
@@ -232,12 +239,26 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     return;
   }
 
-  const result = await deliver(
-    sub.url,
-    decryptSecretOrPlaintext(sub.secret),
-    body,
-    stableTSeconds,
-  );
+  let result: Awaited<ReturnType<typeof deliver>>;
+  // Set only when decryptWebhookSigningSecret throws. Both of its failure causes
+  // (legacy plaintext disabled in prod, or a wrong INTEGRATION_TOKEN_KEY /
+  // corrupted blob) are deterministic and can never succeed on retry, so BullMQ
+  // must not burn the full 5-attempt/~1.5h retry schedule on them.
+  let unrecoverableDecryptError: string | null = null;
+  try {
+    result = await deliver(sub.url, decryptWebhookSigningSecret(sub.secret), body, stableTSeconds);
+  } catch (err) {
+    unrecoverableDecryptError = isLegacyWebhookSigningSecret(sub.secret)
+      ? 'Stored webhook signing secret is legacy plaintext and the fallback is disabled; run the webhook secret encryption backfill (scripts/encrypt-webhook-secrets.ts).'
+      : 'Stored webhook signing secret is not decryptable — key mismatch or corrupted secret; the encryption backfill will not fix this.';
+    log.warn({ subscriptionId, event, err }, unrecoverableDecryptError);
+    result = {
+      statusCode: null,
+      durationMs: 0,
+      success: false,
+      error: unrecoverableDecryptError,
+    };
+  }
 
   log.info(
     {
@@ -290,6 +311,12 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
         { subscriptionId, failureCount: newFailureCount },
         'webhook subscription auto-disabled after repeated failures',
       );
+    }
+
+    // A decrypt failure is deterministic — retrying can never succeed — so tell
+    // BullMQ to fail the job outright instead of scheduling a retry.
+    if (unrecoverableDecryptError) {
+      throw new UnrecoverableError(unrecoverableDecryptError);
     }
 
     // Throw so BullMQ schedules a retry (up to WEBHOOK_DELIVERY.defaultJobOptions.attempts).

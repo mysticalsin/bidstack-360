@@ -1,6 +1,6 @@
 import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
@@ -11,9 +11,15 @@ vi.mock('@bidstack/db', () => ({
 }));
 
 import { prisma } from '@bidstack/db';
+import {
+  clearRbacDecisionCacheForTest,
+  invalidateRbacDecisionCache,
+} from '../lib/rbac-decision-cache.js';
 import { rbacPlugin } from './rbac.js';
 
 const userRoleCount = vi.mocked(prisma.userRole.count);
+const originalNodeEnv = process.env.NODE_ENV;
+const originalLegacyScopeFlag = process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES;
 
 async function buildRbacTestServer(auth: {
   orgId: string;
@@ -36,6 +42,11 @@ async function buildRbacTestServer(auth: {
 
   server.get('/role', { preHandler: server.requireRole('manager') }, async () => ({ ok: true }));
   server.get(
+    '/human',
+    { preHandler: server.requireHumanActor('Human route requires a user session') },
+    async () => ({ ok: true }),
+  );
+  server.get(
     '/permission',
     { preHandler: server.requirePermission('settings:write') },
     async () => ({ ok: true }),
@@ -53,9 +64,28 @@ async function buildRbacTestServer(auth: {
 describe('rbac plugin', () => {
   beforeEach(() => {
     userRoleCount.mockReset();
+    clearRbacDecisionCacheForTest();
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalLegacyScopeFlag === undefined) {
+      delete process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES;
+    } else {
+      process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES = originalLegacyScopeFlag;
+    }
   });
 
-  it('allows a legacy role match without a database lookup', async () => {
+  afterEach(() => {
+    process.env.NODE_ENV = 'test';
+    clearRbacDecisionCacheForTest();
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalLegacyScopeFlag === undefined) {
+      delete process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES;
+    } else {
+      process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES = originalLegacyScopeFlag;
+    }
+  });
+
+  it('rejects a legacy role claim without a database role grant', async () => {
+    userRoleCount.mockResolvedValueOnce(0);
     const server = await buildRbacTestServer({
       orgId: 'org-1',
       userId: 'user-1',
@@ -64,8 +94,18 @@ describe('rbac plugin', () => {
 
     const res = await server.inject({ method: 'GET', url: '/role' });
 
-    expect(res.statusCode).toBe(200);
-    expect(userRoleCount).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+    expect(userRoleCount).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        user: { orgId: 'org-1', deletedAt: null },
+        role: {
+          orgId: 'org-1',
+          OR: [{ name: { equals: 'manager', mode: 'insensitive' } }],
+          deletedAt: null,
+        },
+      },
+    });
     await server.close();
   });
 
@@ -86,7 +126,7 @@ describe('rbac plugin', () => {
         user: { orgId: 'org-1', deletedAt: null },
         role: {
           orgId: 'org-1',
-          name: { in: ['manager'] },
+          OR: [{ name: { equals: 'manager', mode: 'insensitive' } }],
           deletedAt: null,
         },
       },
@@ -105,6 +145,51 @@ describe('rbac plugin', () => {
     const res = await server.inject({ method: 'GET', url: '/role' });
 
     expect(res.statusCode).toBe(403);
+    await server.close();
+  });
+
+  it('rejects API keys at role gates without querying user-role rows', async () => {
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['read', 'write'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/role' });
+
+    expect(res.statusCode).toBe(403);
+    expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('allows a human session through human-only gates without querying user-role rows', async () => {
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/human' });
+
+    expect(res.statusCode).toBe(200);
+    expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('rejects API keys at human-only gates without querying user-role rows', async () => {
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['settings:write'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/human' });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json<{ message: string }>().message).toContain('user session');
+    expect(userRoleCount).not.toHaveBeenCalled();
     await server.close();
   });
 
@@ -134,6 +219,59 @@ describe('rbac plugin', () => {
         },
       },
     });
+    await server.close();
+  });
+
+  it('caches permission decisions across requests for the same user/org/permission', async () => {
+    userRoleCount.mockResolvedValue(1);
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const first = await server.inject({ method: 'GET', url: '/permission' });
+    const second = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(userRoleCount).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('invalidates cached permission denies when a user role changes', async () => {
+    userRoleCount.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const denied = await server.inject({ method: 'GET', url: '/permission' });
+    invalidateRbacDecisionCache('org-1', 'user-1');
+    const allowed = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(denied.statusCode).toBe(403);
+    expect(allowed.statusCode).toBe(200);
+    expect(userRoleCount).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
+  it('invalidates cached permission grants when an org role changes', async () => {
+    userRoleCount.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'user-1',
+      role: 'viewer',
+    });
+
+    const allowed = await server.inject({ method: 'GET', url: '/permission' });
+    invalidateRbacDecisionCache('org-1');
+    const denied = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(allowed.statusCode).toBe(200);
+    expect(denied.statusCode).toBe(403);
+    expect(userRoleCount).toHaveBeenCalledTimes(2);
     await server.close();
   });
 
@@ -196,6 +334,58 @@ describe('rbac plugin', () => {
     });
 
     const res = await server.inject({ method: 'GET', url: '/read-permission' });
+
+    expect(res.statusCode).toBe(200);
+    expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('allows API keys through exact permission scopes', async () => {
+    process.env.NODE_ENV = 'production';
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['settings:write'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(res.statusCode).toBe(200);
+    expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('rejects broad API key write scopes in production REST permission gates', async () => {
+    process.env.NODE_ENV = 'production';
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['read', 'write'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json<{ message: string }>().message).toContain(
+      'Requires API key scope: settings:write',
+    );
+    expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('allows legacy broad API key scopes in production only when explicitly enabled', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.BIDSTACK_ALLOW_LEGACY_API_KEY_SCOPES = 'true';
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['write'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/permission' });
 
     expect(res.statusCode).toBe(200);
     expect(userRoleCount).not.toHaveBeenCalled();

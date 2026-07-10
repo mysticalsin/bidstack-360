@@ -7,7 +7,7 @@
  *  - groups:read         — list private channels (channel picker)
  *  - im:write            — open direct message channels
  *  - users:read          — resolve user details for DM routing
- *  - users:read.email    — match BidStack users to Slack users by email
+ *  - users:read.email    — match Polo PreSales users to Slack users by email
  *
  * WHY groups:read over channels:read only: private channels are visible in
  * the picker so admins can route sensitive deal alerts to private channels.
@@ -34,6 +34,7 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import {
   SLACK_AUTH_URL,
@@ -117,7 +118,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (error) {
         server.log.warn({ error }, 'Slack OAuth denied by user');
-        return reply.redirect(`${redirectBase}/settings/integrations?error=slack_denied`);
+        return reply.redirect(`${redirectBase}/settings?tab=integrations&error=slack_denied`);
       }
       if (!code || !state) {
         throw server.httpErrors.badRequest('Missing code or state');
@@ -150,7 +151,10 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
         redirect_uri: redirectUri(),
       });
 
-      const tokenRes = await fetch(SLACK_TOKEN_URL, {
+      const tokenRes = await fetchWithTimeout(SLACK_TOKEN_URL, {
+        provider: 'Slack',
+        operation: 'oauth.exchange',
+        timeoutMs: providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000),
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString(),
@@ -158,7 +162,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (!tokenRes.ok) {
         server.log.error({ status: tokenRes.status }, 'Slack token exchange HTTP error');
-        return reply.redirect(`${redirectBase}/settings/integrations?error=slack_token_failed`);
+        return reply.redirect(`${redirectBase}/settings?tab=integrations&error=slack_token_failed`);
       }
 
       const tokens = (await tokenRes.json()) as {
@@ -173,7 +177,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (!tokens.ok || !tokens.access_token) {
         server.log.error({ slackError: tokens.error }, 'Slack token exchange failed');
-        return reply.redirect(`${redirectBase}/settings/integrations?error=slack_token_failed`);
+        return reply.redirect(`${redirectBase}/settings?tab=integrations&error=slack_token_failed`);
       }
 
       // Persist the bot token
@@ -262,7 +266,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       server.log.info({ orgId, userId, team: tokens.team?.name }, 'Slack workspace connected');
-      return reply.redirect(`${redirectBase}/settings/integrations?connected=slack`);
+      return reply.redirect(`${redirectBase}/settings?tab=integrations&connected=slack`);
     },
   });
 
@@ -347,7 +351,10 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
         if (token) {
           const { decryptToken: _dec } = await import('@bidstack/shared/token-crypto');
           const botToken = _dec(token.accessTokenEncrypted);
-          await fetch('https://slack.com/api/auth.revoke', {
+          await fetchWithTimeout('https://slack.com/api/auth.revoke', {
+            provider: 'Slack',
+            operation: 'auth.revoke',
+            timeoutMs: providerTimeoutMs('SLACK_HTTP_TIMEOUT_MS', 10_000),
             method: 'POST',
             headers: {
               Authorization: `Bearer ${botToken}`,

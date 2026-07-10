@@ -3,9 +3,9 @@ import { LegalLayout } from '@/components/LegalLayout';
 
 export function TermsPage() {
   useSeo({
-    title: 'Terms of Service — BidStack 360°',
+    title: 'Terms of Service — Polo PreSales',
     description:
-      'BidStack 360° standard SaaS Terms of Service. Acceptance, account terms, payment, data ownership, IP, termination, liability, and governing law.',
+      'Polo PreSales standard SaaS Terms of Service. Acceptance, account terms, payment, data ownership, IP, termination, liability, and governing law.',
     canonical: 'https://bidstack.dev/legal/terms',
   });
 
@@ -16,8 +16,8 @@ export function TermsPage() {
       intro={
         <p>
           These Terms of Service (the &ldquo;Terms&rdquo;) govern your access to and use of the
-          services provided by <strong>[COMPANY NAME]</strong> (&ldquo;BidStack&rdquo;,
-          &ldquo;we&rdquo;, &ldquo;us&rdquo;), including the BidStack 360° platform and any related
+          services provided by <strong>[COMPANY NAME]</strong> (&ldquo;Polo PreSales&rdquo;,
+          &ldquo;we&rdquo;, &ldquo;us&rdquo;), including the Polo PreSales platform and any related
           websites, APIs, and applications (the &ldquo;Services&rdquo;). By accessing or using the
           Services, you agree to be bound by these Terms.
         </p>
@@ -79,7 +79,7 @@ export function TermsPage() {
       <h3>4.1 Your data</h3>
       <p>
         You own all data, content, and information that you submit to, store in, or transmit
-        through the Services (&ldquo;Customer Data&rdquo;). You grant BidStack a limited,
+        through the Services (&ldquo;Customer Data&rdquo;). You grant Polo PreSales a limited,
         non-exclusive, worldwide license to host, process, and display Customer Data solely for
         the purpose of providing and improving the Services to you.
       </p>
@@ -100,7 +100,7 @@ export function TermsPage() {
       <h2>5. Intellectual property</h2>
       <p>
         The Services and all underlying software, designs, trademarks, and content (other than
-        Customer Data) are the exclusive property of BidStack and its licensors. Nothing in these
+        Customer Data) are the exclusive property of Polo PreSales and its licensors. Nothing in these
         Terms transfers any of those rights to you. You may not copy, modify, reverse-engineer, or
         create derivative works of the Services except as expressly permitted by law.
       </p>
@@ -149,22 +149,22 @@ export function TermsPage() {
       <p>
         The Services are provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without
         warranties of any kind, express or implied. To the maximum extent permitted by law,
-        BidStack disclaims all warranties including merchantability, fitness for a particular
+        Polo PreSales disclaims all warranties including merchantability, fitness for a particular
         purpose, non-infringement, and any warranties arising from course of dealing or trade
         usage.
       </p>
       <h3>8.2 Limitation of liability</h3>
       <p>
-        To the maximum extent permitted by law, BidStack&apos;s total aggregate liability arising
+        To the maximum extent permitted by law, Polo PreSales&apos;s total aggregate liability arising
         out of or in connection with these Terms or your use of the Services shall not exceed the
         greater of (a) the amount you paid us in the 12 months immediately preceding the event
-        giving rise to the liability, or (b) one hundred euros (€100). In no event will BidStack
+        giving rise to the liability, or (b) one hundred euros (€100). In no event will Polo PreSales
         be liable for any indirect, incidental, consequential, or punitive damages.
       </p>
 
       <h2>9. Indemnification</h2>
       <p>
-        You agree to indemnify and hold harmless BidStack, its officers, directors, employees,
+        You agree to indemnify and hold harmless Polo PreSales, its officers, directors, employees,
         and agents from any claim, demand, loss, liability, or expense (including reasonable
         attorneys&apos; fees) arising out of (a) your breach of these Terms, (b) your violation
         of applicable law, or (c) your Customer Data infringing the rights of a third party.
@@ -175,7 +175,7 @@ export function TermsPage() {
         These Terms are governed by the laws of <strong>[JURISDICTION]</strong>, without regard to
         its conflict-of-laws principles. The courts of <strong>[JURISDICTION]</strong> have
         exclusive jurisdiction to hear any dispute arising out of or in connection with these
-        Terms, except that BidStack may seek injunctive relief in any court of competent
+        Terms, except that Polo PreSales may seek injunctive relief in any court of competent
         jurisdiction to protect its intellectual property.
       </p>
       <p>

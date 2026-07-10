@@ -7,7 +7,7 @@ sidebar:
 
 # Authentication
 
-BidStack 360° supports two authentication mechanisms. Choose the one that fits your integration pattern.
+Polo PreSales supports two authentication mechanisms. Choose the one that fits your integration pattern.
 
 ## API Key Authentication
 
@@ -15,7 +15,7 @@ API keys are long-lived credentials suitable for server-to-server integrations, 
 
 ### Generating a Key
 
-1. Open **Settings → API Keys** in the BidStack web app.
+1. Open **Settings → API Keys** in the Polo PreSales web app.
 2. Click **New API Key**, give it a descriptive name (e.g. `netsuite-sync`), and select the required scopes.
 3. Copy the key immediately — it is shown only once.
 
@@ -50,7 +50,7 @@ Delete the old key in **Settings → API Keys** and create a new one. Deletion t
 
 ## Bearer JWT (Clerk Session Tokens)
 
-If your integration runs in a browser context where the user is already signed in to BidStack, use the Clerk session token.
+If your integration runs in a browser context where the user is already signed in to Polo PreSales, use the Clerk session token.
 
 ### Obtaining a Token
 

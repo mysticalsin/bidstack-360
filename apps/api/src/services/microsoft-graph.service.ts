@@ -16,6 +16,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma, EmailProvider } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
 import { getAccessToken, GRAPH_BASE, type ServiceLogger } from './microsoft-graph-auth.service.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Email send ────────────────────────────────────────────────────────────────
@@ -65,11 +66,14 @@ export async function sendEmail(
   params: GraphSendEmailParams,
   log: ServiceLogger,
 ): Promise<{ messageId: string }> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: params.integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): prevents a
+  // forged/cross-tenant tokenId from resolving to another org's token row —
+  // see MISTAKES.md cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: params.integrationTokenId, orgId: params.orgId },
   });
 
-  if (!token || token.orgId !== params.orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     throw new Error('Integration token not found or not active');
   }
 
@@ -106,7 +110,10 @@ export async function sendEmail(
     saveToSentItems: true,
   };
 
-  const res = await fetch(`${GRAPH_BASE}/me/sendMail`, {
+  const res = await fetchWithTimeout(`${GRAPH_BASE}/me/sendMail`, {
+    provider: 'Microsoft Graph',
+    operation: 'mail.send',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -211,11 +218,13 @@ export async function pullIncrementalSync(
   }: { orgId: string; userId: string; integrationTokenId: string },
   log: ServiceLogger,
 ): Promise<{ persisted: number }> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: integrationTokenId },
+  // WHY findFirst + orgId in where: see sendEmail() above — never resolve an
+  // IntegrationToken by bare id across tenants.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: integrationTokenId, orgId },
   });
 
-  if (!token || token.orgId !== orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     log.warn({ integrationTokenId }, 'Skipping Graph pull: token inactive');
     return { persisted: 0 };
   }
@@ -267,7 +276,10 @@ async function fetchDeltaPage(
   accountEmail: string,
   log: ServiceLogger,
 ): Promise<{ persisted: number }> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
+    provider: 'Microsoft Graph',
+    operation: 'mail.delta',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

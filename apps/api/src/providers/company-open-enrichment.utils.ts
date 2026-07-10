@@ -27,7 +27,7 @@ export async function fetchJson<T>(
     headers.set('Accept', 'application/json');
     headers.set(
       'User-Agent',
-      process.env.BIDSTACK_USER_AGENT ?? 'BidStack360/0.1 (local development)',
+      process.env.BIDSTACK_USER_AGENT ?? 'PoloPreSales/0.1 (local development)',
     );
     const res = await fetchImpl(input, { headers, signal: controller.signal });
     if (!res.ok) throw new Error(`${label} returned HTTP ${res.status}`);

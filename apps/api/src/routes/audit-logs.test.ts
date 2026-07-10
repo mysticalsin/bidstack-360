@@ -6,22 +6,32 @@
 // round-tripping through Zod, and (c) the action substring filter actually
 // hitting the index. Mocking Prisma would only verify our mock.
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let primaryOrgId = '';
 let foreignOrgId = '';
+let restoreAuth: (() => void) | undefined;
 const seededIds: bigint[] = [];
 const require = createRequire(import.meta.url);
 
 type XlsxModule = {
-  read(buffer: Buffer, opts: { type: 'buffer' }): {
+  read(
+    buffer: Buffer,
+    opts: { type: 'buffer' },
+  ): {
     SheetNames: string[];
     Sheets: Record<string, unknown>;
   };
@@ -38,21 +48,19 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  server = await buildServer();
-  await server.ready();
-
-  const seedOrg = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  if (!seedOrg) throw new Error('seed org missing — run pnpm db:seed');
-  primaryOrgId = seedOrg.id;
+  const org = await createIsolatedOrg('audit-logs');
+  primaryOrgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   // Create a foreign org so we can prove tenant isolation. We tag it with a
-  // throwaway clerkOrg so seed reruns won't collide.
-  const foreign = await prisma.org.upsert({
-    where: { clerkOrg: 'org_audit_test_foreign' },
-    update: {},
-    create: { clerkOrg: 'org_audit_test_foreign', name: 'Audit Test Foreign' },
+  // throwaway clerkOrg so back-to-back runs cannot collide.
+  const foreign = await prisma.org.create({
+    data: { clerkOrg: `org_audit_test_foreign_${Date.now()}`, name: 'Audit Test Foreign' },
   });
   foreignOrgId = foreign.id;
+
+  server = await buildServer();
+  await server.ready();
 });
 
 afterAll(async () => {
@@ -61,8 +69,10 @@ afterAll(async () => {
   if (seededIds.length > 0) {
     await prisma.auditLog.deleteMany({ where: { id: { in: seededIds } } });
   }
-  await prisma.org.delete({ where: { clerkOrg: 'org_audit_test_foreign' } }).catch(() => undefined);
+  if (foreignOrgId) await prisma.org.delete({ where: { id: foreignOrgId } }).catch(() => undefined);
   if (server) await server.close();
+  restoreAuth?.();
+  if (primaryOrgId) await dropIsolatedOrg(primaryOrgId);
   await prisma.$disconnect();
 });
 
@@ -85,13 +95,7 @@ async function seedAudit(
   return row;
 }
 
-const skipIfNoDb = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('GET /api/audit-logs', () => {
   skipIfNoDb('isolates rows by orgId — foreign org rows are never returned', async () => {
@@ -185,7 +189,7 @@ describe('GET /api/audit-logs', () => {
     expect(res.headers['content-type']).toContain(
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    expect(res.headers['content-disposition']).toContain('bidstack-audit-log-');
+    expect(res.headers['content-disposition']).toContain('polo-presales-audit-log-');
 
     const xlsx = require('@e965/xlsx') as XlsxModule;
     const workbook = xlsx.read(Buffer.from(res.rawPayload), { type: 'buffer' });
@@ -221,7 +225,7 @@ describe('GET /api/audit-logs', () => {
     expect(actions).not.toContain('audit.export.test.foreign');
 
     const exportedTargetIds = auditRows.slice(1).map((row) => String(row[10] ?? ''));
-    expect(exportedTargetIds).toContain("'=HYPERLINK(\"https://evil.example\")");
+    expect(exportedTargetIds).toContain('\'=HYPERLINK("https://evil.example")');
 
     const exportAudit = await prisma.auditLog.findFirst({
       where: {
@@ -243,34 +247,43 @@ describe('GET /api/audit-logs', () => {
     }
   });
 
-  skipIfNoDb('marks Excel metadata truncated when matching rows exceed export limit inside a batch', async () => {
-    const marker = `audit-export-truncated-${Date.now()}`;
-    await seedAudit(primaryOrgId, 'audit.export.truncated.1', null, { marker, requestId: 'req-1' });
-    await seedAudit(primaryOrgId, 'audit.export.truncated.2', null, { marker, requestId: 'req-2' });
+  skipIfNoDb(
+    'marks Excel metadata truncated when matching rows exceed export limit inside a batch',
+    async () => {
+      const marker = `audit-export-truncated-${Date.now()}`;
+      await seedAudit(primaryOrgId, 'audit.export.truncated.1', null, {
+        marker,
+        requestId: 'req-1',
+      });
+      await seedAudit(primaryOrgId, 'audit.export.truncated.2', null, {
+        marker,
+        requestId: 'req-2',
+      });
 
-    const res = await server.inject({
-      method: 'GET',
-      url: `/api/audit-logs/export.xlsx?q=${encodeURIComponent(marker)}&limit=1`,
-    });
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/audit-logs/export.xlsx?q=${encodeURIComponent(marker)}&limit=1`,
+      });
 
-    expect(res.statusCode).toBe(200);
+      expect(res.statusCode).toBe(200);
 
-    const xlsx = require('@e965/xlsx') as XlsxModule;
-    const workbook = xlsx.read(Buffer.from(res.rawPayload), { type: 'buffer' });
-    const metadataRows = xlsx.utils.sheet_to_json(workbook.Sheets['Export Metadata'], {
-      header: 1,
-    });
-    expect(metadataRows).toContainEqual(['Exported rows', 1]);
-    expect(metadataRows).toContainEqual(['Truncated by limit', 'yes']);
+      const xlsx = require('@e965/xlsx') as XlsxModule;
+      const workbook = xlsx.read(Buffer.from(res.rawPayload), { type: 'buffer' });
+      const metadataRows = xlsx.utils.sheet_to_json(workbook.Sheets['Export Metadata'], {
+        header: 1,
+      });
+      expect(metadataRows).toContainEqual(['Exported rows', 1]);
+      expect(metadataRows).toContainEqual(['Truncated by limit', 'yes']);
 
-    const exportAudit = await prisma.auditLog.findFirst({
-      where: {
-        orgId: primaryOrgId,
-        action: 'audit_log.export.xlsx',
-        diff: { path: ['filters', 'q'], equals: marker },
-      },
-      orderBy: { id: 'desc' },
-    });
-    if (exportAudit) seededIds.push(exportAudit.id);
-  });
+      const exportAudit = await prisma.auditLog.findFirst({
+        where: {
+          orgId: primaryOrgId,
+          action: 'audit_log.export.xlsx',
+          diff: { path: ['filters', 'q'], equals: marker },
+        },
+        orderBy: { id: 'desc' },
+      });
+      if (exportAudit) seededIds.push(exportAudit.id);
+    },
+  );
 });

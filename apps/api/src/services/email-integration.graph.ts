@@ -12,6 +12,7 @@ import {
   type SendEmailParams,
   type ServiceLogger,
 } from './email-integration.helpers.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
 
 // ─── Send via MS Graph ─────────────────────────────────────────────────────────
 
@@ -48,7 +49,10 @@ export async function sendViaMsGraph(
     saveToSentItems: true,
   };
 
-  const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+  const res = await fetchWithTimeout('https://graph.microsoft.com/v1.0/me/sendMail', {
+    provider: 'Microsoft Graph',
+    operation: 'mail.send',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -83,7 +87,10 @@ export async function pullMsGraphMail(
     deltaLink ??
     'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$top=50&$select=id,conversationId,from,toRecipients,subject,receivedDateTime,sentDateTime,body,isDraft';
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
+    provider: 'Microsoft Graph',
+    operation: 'mail.delta',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
@@ -106,7 +113,10 @@ export async function pullMsGraphMail(
     '@odata.deltaLink'?: string;
   };
 
-  const token = await prisma.integrationToken.findUnique({ where: { id: tokenId } });
+  // WHY findFirst + orgId in where (not findUnique by bare id): tokenId alone
+  // must never resolve a cross-tenant IntegrationToken row — see MISTAKES.md
+  // cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId } });
 
   for (const msg of (data.value ?? []).slice(0, 30)) {
     try {

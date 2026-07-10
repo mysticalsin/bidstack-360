@@ -189,10 +189,10 @@ export function SmsComposerModal({
 
   const charCountColor =
     remaining <= 0
-      ? 'text-red-600 dark:text-red-400'
+      ? 'text-[var(--fg-error)]'
       : remaining <= 20
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-[var(--color-text-muted)]';
+        ? 'text-[var(--warning-fg)]'
+        : 'text-[var(--fg-muted)]';
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
@@ -200,18 +200,18 @@ export function SmsComposerModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         title={t('smsComposer.title', 'Send SMS')}
-        className="w-full max-w-md bg-[var(--color-surface)] rounded-2xl p-6 shadow-xl"
+        className="w-full max-w-md bg-[var(--surface-card)] rounded-2xl p-6 shadow-xl"
         aria-labelledby="sms-composer-title"
         aria-describedby="sms-composer-desc"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 id="sms-composer-title" className="text-lg font-semibold text-[var(--color-text)]">
+            <h2 id="sms-composer-title" className="text-lg font-semibold text-[var(--fg-primary)]">
               {t('smsComposer.title', 'Send SMS')}
             </h2>
             {recipientName && (
-              <p id="sms-composer-desc" className="text-sm text-[var(--color-text-muted)] mt-0.5">
+              <p id="sms-composer-desc" className="text-sm text-[var(--fg-muted)] mt-0.5">
                 {t('smsComposer.recipientLabel', 'To: {{name}}', { name: recipientName })}
               </p>
             )}
@@ -222,7 +222,7 @@ export function SmsComposerModal({
         {consent.checked && consent.optedOut && (
           <div
             role="alert"
-            className="mb-4 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+            className="mb-4 rounded-lg border border-[var(--danger)]/35 bg-[var(--danger-tint)] px-4 py-3 text-sm text-[var(--fg-error)]"
           >
             <strong>{t('smsComposer.optedOutLabel', 'Opted out:')}</strong>{' '}
             {t(
@@ -236,10 +236,10 @@ export function SmsComposerModal({
         <div className="mb-4">
           <label
             htmlFor={phoneId}
-            className="block text-sm font-medium text-[var(--color-text)] mb-1.5"
+            className="block text-sm font-medium text-[var(--fg-primary)] mb-1.5"
           >
             {t('smsComposer.phoneLabel', 'To (E.164 format)')}
-            <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+            <span className="text-[var(--danger)] ml-0.5" aria-hidden="true">*</span>
           </label>
           <input
             id={phoneId}
@@ -253,19 +253,19 @@ export function SmsComposerModal({
             disabled={isSending || isSuccess}
             className={cn(
               'w-full min-h-[44px] rounded-lg border px-3 py-2 text-sm',
-              'bg-[var(--color-surface-raised)] text-[var(--color-text)]',
-              'border-[var(--color-border)]',
-              'focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1',
-              'hover:border-[var(--color-primary-subtle)]',
+              'bg-[var(--surface-input)] text-[var(--fg-primary)]',
+              'border-[var(--border-default)]',
+              'focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] focus:ring-offset-1 focus:ring-offset-[var(--surface-card)]',
+              'hover:border-[var(--border-strong)]',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               'transition-colors duration-150',
               phone.length > 0 && !isValidE164(phone)
-                ? 'border-red-500 focus:ring-red-500'
+                ? 'border-[var(--danger)] focus:ring-[var(--danger)]'
                 : '',
             )}
           />
           {phone.length > 0 && !isValidE164(phone) && (
-            <p id={`${phoneId}-error`} className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
+            <p id={`${phoneId}-error`} className="mt-1 text-xs text-[var(--fg-error)]" role="alert">
               {t('smsComposer.phoneFormatHint', 'Use E.164 format: +12025550100')}
             </p>
           )}
@@ -276,10 +276,10 @@ export function SmsComposerModal({
           <div className="flex items-center justify-between mb-1.5">
             <label
               htmlFor={bodyId}
-              className="text-sm font-medium text-[var(--color-text)]"
+              className="text-sm font-medium text-[var(--fg-primary)]"
             >
               {t('smsComposer.messageLabel', 'Message')}
-              <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+              <span className="text-[var(--danger)] ml-0.5" aria-hidden="true">*</span>
             </label>
             <span
               id={charCountId}
@@ -310,10 +310,10 @@ export function SmsComposerModal({
             placeholder={t('smsComposer.messagePlaceholder', 'Type your message…')}
             className={cn(
               'w-full resize-y rounded-lg border px-3 py-2 text-sm',
-              'bg-[var(--color-surface-raised)] text-[var(--color-text)]',
-              'border-[var(--color-border)]',
-              'focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1',
-              'hover:border-[var(--color-primary-subtle)]',
+              'bg-[var(--surface-input)] text-[var(--fg-primary)]',
+              'border-[var(--border-default)]',
+              'focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] focus:ring-offset-1 focus:ring-offset-[var(--surface-card)]',
+              'hover:border-[var(--border-strong)]',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               'transition-colors duration-150',
               'min-h-[100px]',
@@ -323,7 +323,7 @@ export function SmsComposerModal({
 
         {/* Segment preview */}
         {segments > 1 && (
-          <p className="text-xs text-[var(--color-text-muted)] mb-3">
+          <p className="text-xs text-[var(--fg-muted)] mb-3">
             {t(
               'smsComposer.segmentPreview',
               'This message will be sent as {{count}} segments (billed per segment by Twilio).',
@@ -337,7 +337,7 @@ export function SmsComposerModal({
           <div
             id="sms-error"
             role="alert"
-            className="mb-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+            className="mb-3 rounded-lg border border-[var(--danger)]/35 bg-[var(--danger-tint)] px-3 py-2 text-sm text-[var(--fg-error)]"
           >
             {errorMessage}
           </div>
@@ -347,7 +347,7 @@ export function SmsComposerModal({
         {isSuccess && (
           <div
             role="status"
-            className="mb-3 rounded-lg border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30 px-3 py-2 text-sm text-green-700 dark:text-green-300"
+            className="mb-3 rounded-lg border border-[var(--btn-success-border)] bg-[var(--success-tint)] px-3 py-2 text-sm text-[var(--success-fg)]"
           >
             {t('smsComposer.successMessage', 'SMS sent successfully!')}
           </div>
@@ -363,18 +363,13 @@ export function SmsComposerModal({
           >
             {t('smsComposer.cancel', 'Cancel')}
           </Button>
+          {/* Default primary variant — Button owns the brand bg/hover/focus/disabled
+              treatment in both themes; only the touch-target floor is local. */}
           <Button
             onClick={() => void handleSend()}
             disabled={!canSend}
             aria-busy={isSending}
-            className={cn(
-              'min-h-[44px] min-w-[100px]',
-              'bg-[var(--color-primary)] text-white',
-              'hover:bg-[var(--color-primary-hover)]',
-              'focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2',
-              'disabled:opacity-50 disabled:cursor-not-allowed',
-              'transition-all duration-150',
-            )}
+            className="min-h-[44px] min-w-[100px]"
           >
             {isSending ? (
               <span className="flex items-center gap-2">

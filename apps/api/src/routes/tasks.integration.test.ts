@@ -1,16 +1,23 @@
 // Integration tests for /api/tasks/*.
 // Covers CRUD, status transitions, and assignee resolution.
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let seedUserEmail: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const createdTaskIds: string[] = [];
 
 beforeAll(async () => {
@@ -21,9 +28,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('tasks');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   const user = await prisma.user.findFirst({
     where: { orgId },
@@ -42,16 +49,12 @@ afterAll(async () => {
     await prisma.task.deleteMany({ where: { id } });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed org missing`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('tasks routes', () => {
   skipIfNoDb('GET /api/tasks returns seeded tasks', async () => {

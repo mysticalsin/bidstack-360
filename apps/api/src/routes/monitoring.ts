@@ -33,7 +33,7 @@ const QUEUE_DEPTH_WARN = Number(process.env.MONITOR_QUEUE_DEPTH_WARN ?? 100);
 const QUEUE_DEPTH_CRIT = Number(process.env.MONITOR_QUEUE_DEPTH_CRIT ?? 500);
 const EMBED_FAIL_RATE_CRIT = Number(process.env.MONITOR_EMBED_FAIL_RATE ?? 10);
 
-/** All BullMQ queue names known to BidStack 360°. */
+/** All BullMQ queue names known to Polo PreSales. */
 const ALL_QUEUE_NAMES = [
   // Core CRM / enrichment
   'company.enrich-apollo',

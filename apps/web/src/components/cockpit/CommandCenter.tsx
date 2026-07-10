@@ -86,7 +86,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     <motion.section
       className="command-center"
       role="region"
-      aria-label={t('commandCenter.region.ariaLabel', 'BidStack command center')}
+      aria-label={t('commandCenter.region.ariaLabel', 'Polo PreSales command center')}
       initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
       animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       transition={springSoft}
@@ -99,7 +99,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
         </div>
         <div className="command-center-kicker">
           <Icon name="sparkle" size={14} />
-          <span>{t('commandCenter.kicker', 'BidStack command center')}</span>
+          <span>{t('commandCenter.kicker', 'Polo PreSales command center')}</span>
         </div>
         <h2>{cockpit.company.name}</h2>
         <p>{nextMove}</p>

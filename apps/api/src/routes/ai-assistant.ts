@@ -1,8 +1,10 @@
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Logger as PinoLogger } from 'pino';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import type { PermissionKey } from '@bidstack/shared';
 
 import {
   analyzeDealSentiment,
@@ -45,10 +47,31 @@ function aiLog(reqLog: unknown): PinoLogger {
 }
 
 export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
+  const requireHumanAiActor = server.requireHumanActor(
+    'AI assistant requests require a user session',
+  );
+
+  async function requireAiPermission(req: FastifyRequest, permission: PermissionKey) {
+    await server.requirePermission(permission)(req);
+  }
+
+  async function requireEmailDraftPermissions(req: FastifyRequest): Promise<void> {
+    const body = req.body as z.infer<typeof EmailDraftBody>;
+    const permissions = new Set<PermissionKey>();
+
+    if (body.dealId) permissions.add('opportunities:read');
+    if (body.contactId || permissions.size === 0) permissions.add('contacts:read');
+
+    for (const permission of permissions) {
+      await requireAiPermission(req, permission);
+    }
+  }
+
   server.post(
     '/ai-assistant/email-draft',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' }, permission: 'contacts:read' },
+      preHandler: [requireHumanAiActor, requireEmailDraftPermissions],
       schema: { body: EmailDraftBody },
     },
     async (req) =>
@@ -65,7 +88,8 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ai-assistant/deal-sentiment',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' }, permission: 'opportunities:read' },
+      preHandler: [requireHumanAiActor, (req) => requireAiPermission(req, 'opportunities:read')],
       schema: { body: DealSentimentBody },
     },
     async (req) =>
@@ -82,7 +106,8 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ai-assistant/meeting-prep',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' }, permission: 'activities:read' },
+      preHandler: [requireHumanAiActor, (req) => requireAiPermission(req, 'activities:read')],
       schema: { body: MeetingPrepBody },
     },
     async (req) =>
@@ -99,7 +124,8 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ai-assistant/enrich-contact',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' }, permission: 'contacts:read' },
+      preHandler: [requireHumanAiActor, (req) => requireAiPermission(req, 'contacts:read')],
       schema: { body: ContactEnrichBody },
     },
     async (req) =>
@@ -116,7 +142,8 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ai-assistant/account-intel',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' }, permission: 'accounts:read' },
+      preHandler: [requireHumanAiActor, (req) => requireAiPermission(req, 'accounts:read')],
       schema: { body: AccountIntelBody },
     },
     async (req) =>
@@ -133,6 +160,7 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ai-assistant/sessions/:sessionId/feedback',
     {
+      preHandler: [requireHumanAiActor],
       schema: {
         params: z.object({ sessionId: z.string().uuid() }),
         body: FeedbackBody,
@@ -140,7 +168,7 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const session = await prisma.aiAssistantSession.findFirst({
-        where: { id: req.params.sessionId, orgId: req.auth.orgId },
+        where: { id: req.params.sessionId, orgId: req.auth.orgId, userId: req.auth.userId },
         select: { id: true },
       });
 

@@ -1,5 +1,5 @@
 /**
- * BidStack popup script.
+ * Polo PreSales popup script.
  *
  * All API calls are proxied through the background service worker so this
  * script never touches credentials directly.

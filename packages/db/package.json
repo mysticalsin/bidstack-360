@@ -21,6 +21,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed.ts",
     "seed:demo": "tsx src/seed-demo.ts",
+    "seed:prod": "tsx src/seed-prod.ts",
+    "purge:demo": "tsx scripts/purge-demo-data.ts",
     "reset": "prisma migrate reset --force",
     "studio": "prisma studio",
     "build": "tsc -p tsconfig.json",
@@ -39,7 +41,7 @@
     "dotenv-flow": "^4.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.0.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

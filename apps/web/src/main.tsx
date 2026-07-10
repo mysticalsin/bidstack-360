@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 
 import { ApiError } from '@/lib/api';
+import { initAccent } from '@/lib/accent';
 import { AuthProvider } from '@/lib/auth';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { logVitalsToConsole, reportWebVitals } from '@/lib/web-vitals';
@@ -17,6 +18,10 @@ import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 initSentry();
+
+// Apply the persisted brand accent before first paint (theme is already set by
+// the pre-paint script in index.html). Default accent is a no-op.
+initAccent();
 
 // Boot the Web Vitals observer once at app load. In dev/preview we log each
 // metric to the console; in production this is where you'd send the metric

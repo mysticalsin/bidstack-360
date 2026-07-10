@@ -62,6 +62,9 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'dollar',
     items: [
       { to: '/forecasts', label: 'Forecasts', labelKey: 'nav.forecasts', icon: 'growth' },
+      // 'reports' is otherwise unused in the rail, so the collapsed icon-only
+      // mode keeps Win/Loss distinguishable from Forecasts ('growth').
+      { to: '/win-loss', label: 'Win/Loss Review', labelKey: 'nav.winLoss', icon: 'reports' },
       { to: '/sales-toolkits', label: 'Sales Toolkits', labelKey: 'nav.salesToolkits', icon: 'book' },
     ],
   },
@@ -72,9 +75,13 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'building',
     items: [
       { to: '/accounts', label: 'Accounts', labelKey: 'nav.accounts', icon: 'building' },
-      { to: '/kam', label: 'Key Account Mgmt', labelKey: 'nav.kam', icon: 'target' },
-      { to: '/key-accounts', label: 'Key Accounts', labelKey: 'nav.keyAccounts', icon: 'star' },
-      { to: '/top-accounts', label: 'Top Accounts', labelKey: 'nav.topAccounts', icon: 'trophy' },
+      // "KAM Initiatives", not "Key Account Mgmt": the old label sat one row
+      // above "Key Accounts" (an unrelated leaderboard) and read as the same
+      // feature — the label itself must disambiguate the initiative workflow.
+      { to: '/kam', label: 'KAM Initiatives', labelKey: 'nav.kam', icon: 'target' },
+      // Key Accounts + Top Accounts are now the Key/Top views of /accounts
+      // (?view=key|top) — reachable from the in-page switcher and ⌘K, so they
+      // are no longer standalone rail doors.
       { to: '/companies', label: 'Companies', labelKey: 'nav.companies', icon: 'list' },
       { to: '/sector-view', label: 'Sector View', labelKey: 'nav.sectorView', icon: 'globe' },
       { to: '/cross-sell', label: 'Cross-sell', labelKey: 'nav.crossSell', icon: 'git-branch' },
@@ -117,12 +124,18 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'tasks',
     items: [
       { to: '/tasks', label: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
+      { to: '/workload', label: 'Team Workload', labelKey: 'nav.workload', icon: 'contacts' },
       { to: '/calendar', label: 'Calendar', labelKey: 'nav.calendar', icon: 'clock' },
       // Calls now live in context on the Opportunity detail (Calls tab). The
       // /calls route stays (global list, reachable via the command palette) but
       // is no longer a separate rail door.
       { to: '/workflows', label: 'Workflows', labelKey: 'nav.workflows', icon: 'git-branch' },
-      { to: '/custom-objects', label: 'Custom Objects', labelKey: 'nav.customObjects', icon: 'sliders' },
+      {
+        to: '/settings/custom-objects',
+        label: 'Custom Objects',
+        labelKey: 'nav.customObjects',
+        icon: 'sliders',
+      },
       { to: '/intake', label: 'Document Intake', labelKey: 'nav.intake', icon: 'download' },
       // Reports + dashboards live under one Insights surface (Analytics): the
       // page hosts the dashboard switcher, "Manage dashboards", and links to

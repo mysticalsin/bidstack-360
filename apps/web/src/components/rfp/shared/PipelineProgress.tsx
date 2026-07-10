@@ -44,10 +44,10 @@ export function PipelineProgress({ currentStage }: PipelineProgressProps) {
                   className={[
                     'h-7 w-7 rounded-full border-2 flex items-center justify-center text-xs font-semibold transition-colors',
                     isDone
-                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white'
+                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-[var(--fg-on-brand)]'
                       : isActive
                         ? isFailed
-                          ? 'border-red-500 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                          ? 'border-[var(--danger)] bg-[var(--danger-tint)] text-[var(--fg-error)]'
                           : 'border-[var(--brand-primary)] bg-[var(--surface-card)] text-[var(--brand-primary)]'
                         : 'border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--fg-tertiary)]',
                   ].join(' ')}

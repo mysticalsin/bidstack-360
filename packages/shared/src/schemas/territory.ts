@@ -68,3 +68,38 @@ export const Forecast = z.object({
   updatedAt: z.string().datetime(),
 });
 export type Forecast = z.infer<typeof Forecast>;
+
+// ─── Pipeline-weighted forecast projection (Salesforce/Clari model) ──────────
+// Derived from OPEN opportunities (value × stage win-probability), bucketed by
+// close-date quarter and owner. Money is EUR micros on the wire (formatted at
+// the edge); weighted values may be fractional, so no `.int()` constraint.
+
+export const ForecastProjectionOwner = z.object({
+  // Null when the opportunity has no owner (rolled up as "Unassigned").
+  ownerId: z.string().uuid().nullable(),
+  ownerName: z.string(),
+  openMicros: z.number().nonnegative(),
+  weightedMicros: z.number().nonnegative(),
+  wonMicros: z.number().nonnegative(),
+});
+export type ForecastProjectionOwner = z.infer<typeof ForecastProjectionOwner>;
+
+export const ForecastProjectionPeriod = z.object({
+  period: z.string().min(1), // "2026-Q2"
+  label: z.string().min(1), // "Q2 2026"
+  openMicros: z.number().nonnegative(),
+  weightedMicros: z.number().nonnegative(),
+  wonMicros: z.number().nonnegative(),
+  // Manual commit forecast for this period, when a rep has set one — the
+  // override that takes precedence over the derived baseline. Null = none.
+  manualCommitMicros: z.number().nonnegative().nullable(),
+  byOwner: z.array(ForecastProjectionOwner),
+});
+export type ForecastProjectionPeriod = z.infer<typeof ForecastProjectionPeriod>;
+
+export const ForecastProjection = z.object({
+  currency: z.string().length(3),
+  generatedAt: z.string().datetime(),
+  periods: z.array(ForecastProjectionPeriod),
+});
+export type ForecastProjection = z.infer<typeof ForecastProjection>;

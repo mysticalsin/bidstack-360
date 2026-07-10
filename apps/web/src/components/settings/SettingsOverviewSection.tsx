@@ -33,26 +33,33 @@ interface OverviewTileModel {
 export function SettingsOverviewSection({ onNavigate }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
-  const users = useUsers();
-  const roles = useRoles();
-  const tags = useTags();
-  const templates = useEmailTemplates();
-  const customFields = useCustomFieldDefinitions('company');
-  const leadRot = useLeadRotConfig();
-  const pipelineStages = usePipelineStages();
-  const apiKeys = useApiKeys();
+  const users = useUsers({ enabled: isAdmin });
+  const roles = useRoles({ enabled: isAdmin });
+  const tags = useTags(undefined, { enabled: isAdmin });
+  const templates = useEmailTemplates({ enabled: isAdmin });
+  const customFields = useCustomFieldDefinitions('company', { enabled: isAdmin });
+  const leadRot = useLeadRotConfig({ enabled: isAdmin });
+  const pipelineStages = usePipelineStages({ enabled: isAdmin });
+  const apiKeys = useApiKeys({ enabled: isAdmin });
   const webhooks = useWebhookSubscriptions({ enabled: isAdmin });
 
   const tiles: OverviewTileModel[] = [
     {
-      title: t('settingsOverview.tileWorkspaceTitle', 'Workspace governance'),
-      detail: t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
-        users: formatCount(users.data?.length),
-        roles: formatCount(roles.data?.length),
-      }),
-      tone: users.isError || roles.isError ? 'tomato' : 'jade',
-      icon: 'building' as const,
-      section: 'workspace' as const,
+      title: isAdmin
+        ? t('settingsOverview.tileWorkspaceTitle', 'Workspace governance')
+        : t('settingsOverview.tilePersonalTitle', 'Personal settings'),
+      detail: isAdmin
+        ? t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
+            users: formatCount(users.data?.length),
+            roles: formatCount(roles.data?.length),
+          })
+        : t(
+            'settingsOverview.tilePersonalDetail',
+            'Profile, security, notifications, appearance, and language',
+          ),
+      tone: isAdmin && (users.isError || roles.isError) ? 'tomato' : 'jade',
+      icon: isAdmin ? ('building' as const) : ('shield' as const),
+      section: isAdmin ? ('workspace' as const) : ('security' as const),
       adminOnly: false,
     },
     {
@@ -132,13 +139,13 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
               {t(
                 'settingsOverview.heroTitle',
-                'Configure BidStack once. Make every team move the same way.',
+                'Configure Polo PreSales once. Make every team move the same way.',
               )}
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
               {t(
                 'settingsOverview.heroSubtitle',
-                'Settings now surfaces the working controls that affect BidStack across the app: workspace membership, roles, currencies, pipeline stages, lead recovery rules, tags, email templates, custom fields, API keys, and webhooks.',
+                'Settings now surfaces the working controls that affect Polo PreSales across the app: workspace membership, roles, currencies, pipeline stages, lead recovery rules, tags, email templates, custom fields, API keys, and webhooks.',
               )}
             </p>
           </div>

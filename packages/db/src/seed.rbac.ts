@@ -42,20 +42,36 @@ const PERMISSION_SEEDS = [
   permission('accounts:write', 'Manage accounts', 'Create and update account records.'),
   permission('activities:read', 'Read activities', 'View CRM activity timelines.'),
   permission('activities:write', 'Manage activities', 'Create and update CRM activities.'),
+  permission('agents:read', 'Read agents', 'View agent and crew configuration.'),
+  permission('agents:write', 'Run agents', 'Create, update, run, cancel, and retry AI crews.'),
   permission('audit-log:read', 'Read audit log', 'View security, admin, and data audit history.'),
   permission('bid-scores:read', 'Read bid scores', 'View bid/no-bid scoring and rationale.'),
   permission('bid-scores:write', 'Manage bid scores', 'Create and update bid/no-bid scoring.'),
+  permission('comments:read', 'Read comments', 'View collaboration comments and @mentions on records.'),
+  permission(
+    'comments:write',
+    'Manage comments',
+    'Author, reply to, and delete collaboration comments (fires @mention notifications).',
+  ),
   permission('companies:read', 'Read companies', 'View company records.'),
   permission('companies:write', 'Manage companies', 'Create and update company records.'),
   permission('contacts:read', 'Read contacts', 'View contact records.'),
   permission('contacts:write', 'Manage contacts', 'Create and update contact records.'),
-  permission('customFields:read', 'Read custom fields', 'View custom field definitions and values.'),
+  permission(
+    'customFields:read',
+    'Read custom fields',
+    'View custom field definitions and values.',
+  ),
   permission(
     'customFields:write',
     'Manage custom fields',
     'Define custom fields and set their values on records.',
   ),
-  permission('customObjects:read', 'Read custom objects', 'View custom object definitions and records.'),
+  permission(
+    'customObjects:read',
+    'Read custom objects',
+    'View custom object definitions and records.',
+  ),
   permission(
     'customObjects:write',
     'Manage custom objects',
@@ -122,12 +138,15 @@ const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 
-const ROLE_SEEDS = [
+// Exported (like ALL_PERMISSION_KEYS above) so sibling tests can pin specific
+// roles' grants against the seed data instead of re-deriving them.
+export const ROLE_SEEDS = [
   role('Admin', 'Full tenant administrator with all permissions.', ALL_PERMISSION_KEYS),
   role('Sales', 'Owns leads, accounts, contacts, opportunities, and sales activity.', [
     ...readKeys(
       'accounts',
       'activities',
+      'comments',
       'companies',
       'contacts',
       'kam',
@@ -138,7 +157,18 @@ const ROLE_SEEDS = [
       'tags',
       'tasks',
     ),
-    ...writeKeys('accounts', 'activities', 'contacts', 'kam', 'leads', 'opportunities', 'tags', 'tasks'),
+    ...writeKeys(
+      'accounts',
+      'activities',
+      'comments',
+      'contacts',
+      'integrations',
+      'kam',
+      'leads',
+      'opportunities',
+      'tags',
+      'tasks',
+    ),
   ]),
   role(
     'Presales',
@@ -148,6 +178,7 @@ const ROLE_SEEDS = [
         'accounts',
         'activities',
         'bid-scores',
+        'comments',
         'companies',
         'contacts',
         'documents',
@@ -159,7 +190,17 @@ const ROLE_SEEDS = [
         'tags',
         'tasks',
       ),
-      ...writeKeys('activities', 'bid-scores', 'documents', 'files', 'kam', 'proposals', 'tags', 'tasks'),
+      ...writeKeys(
+        'activities',
+        'bid-scores',
+        'comments',
+        'documents',
+        'files',
+        'kam',
+        'proposals',
+        'tags',
+        'tasks',
+      ),
     ],
   ),
   // Quote-to-cash modules were removed with the sales/invoicing vertical;
@@ -172,6 +213,7 @@ const ROLE_SEEDS = [
     ...writeKeys(
       'activities',
       'bid-scores',
+      'comments',
       'kam',
       'leads',
       'opportunities',
@@ -191,6 +233,7 @@ const ROLE_SEEDS = [
     ...readKeys(
       'accounts',
       'activities',
+      'comments',
       'companies',
       'contacts',
       'reports',
@@ -198,7 +241,7 @@ const ROLE_SEEDS = [
       'tags',
       'tasks',
     ),
-    ...writeKeys('activities', 'service-desk', 'tags', 'tasks'),
+    ...writeKeys('activities', 'comments', 'service-desk', 'tags', 'tasks'),
   ]),
   role(
     'Read-only',
@@ -219,7 +262,9 @@ const ROLE_SEEDS = [
       ...writeKeys(
         'accounts',
         'activities',
+        'comments',
         'contacts',
+        'integrations',
         'kam',
         'leads',
         'opportunities',
@@ -238,6 +283,7 @@ const ROLE_SEEDS = [
       ...readKeys(
         'accounts',
         'activities',
+        'comments',
         'companies',
         'contacts',
         'kam',
@@ -251,7 +297,9 @@ const ROLE_SEEDS = [
       ...writeKeys(
         'accounts',
         'activities',
+        'comments',
         'contacts',
+        'integrations',
         'kam',
         'leads',
         'opportunities',
@@ -262,8 +310,17 @@ const ROLE_SEEDS = [
     ],
   ),
   role('SDR', 'Inbound/outbound lead development; limited to leads and early-stage pipeline.', [
-    ...readKeys('accounts', 'activities', 'companies', 'contacts', 'leads', 'tags', 'tasks'),
-    ...writeKeys('activities', 'contacts', 'leads', 'tags', 'tasks'),
+    ...readKeys(
+      'accounts',
+      'activities',
+      'comments',
+      'companies',
+      'contacts',
+      'leads',
+      'tags',
+      'tasks',
+    ),
+    ...writeKeys('activities', 'comments', 'contacts', 'integrations', 'leads', 'tags', 'tasks'),
   ]),
   role(
     'Customer Success',
@@ -272,6 +329,7 @@ const ROLE_SEEDS = [
       ...readKeys(
         'accounts',
         'activities',
+        'comments',
         'companies',
         'contacts',
         'kam',
@@ -281,7 +339,16 @@ const ROLE_SEEDS = [
         'tags',
         'tasks',
       ),
-      ...writeKeys('accounts', 'activities', 'contacts', 'service-desk', 'tags', 'tasks'),
+      ...writeKeys(
+        'accounts',
+        'activities',
+        'comments',
+        'contacts',
+        'integrations',
+        'service-desk',
+        'tags',
+        'tasks',
+      ),
     ],
   ),
   role(

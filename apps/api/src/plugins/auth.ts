@@ -15,6 +15,7 @@ import fp from 'fastify-plugin';
 import { prisma } from '@bidstack/db';
 
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { writeAuthAudit } from './auth-audit.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
 import { isDemoMode, resolveDemoAuth } from './demo-auth.js';
@@ -47,8 +48,7 @@ const STUB_ROLE_HEADER = 'x-bidstack-e2e-role';
 // reachable in prod (stub auth itself only runs when CLERK_SECRET_KEY is absent
 // and NODE_ENV is development/test).
 const STUB_ORG_HEADER = 'x-bidstack-e2e-org';
-export const SSO_DOMAIN_REJECTED_MESSAGE =
-  'Sign-in domain is not permitted for this organization.';
+export const SSO_DOMAIN_REJECTED_MESSAGE = 'Sign-in domain is not permitted for this organization.';
 
 // --- Verified-session cache (scale fix) -------------------------------------
 //
@@ -95,12 +95,9 @@ interface VerifiedClaims {
 function authCacheKey(claims: VerifiedClaims): string {
   return createHash('sha256')
     .update(
-      [
-        claims.clerkUserId,
-        claims.sessionId ?? '',
-        claims.clerkOrgId,
-        claims.orgRole ?? '',
-      ].join('|'),
+      [claims.clerkUserId, claims.sessionId ?? '', claims.clerkOrgId, claims.orgRole ?? ''].join(
+        '|',
+      ),
     )
     .digest('hex');
 }
@@ -218,6 +215,14 @@ async function resolveStubRoleOverride(
     );
   }
 
+  // Revive tombstoned rows before each upsert: the soft-delete middleware
+  // scopes upsert to live rows, so a soft-deleted stub user/grant would send
+  // the upsert down the create branch and P2002 on the unique key. The
+  // explicit where.deletedAt filter is the middleware's documented bypass.
+  await prisma.user.updateMany({
+    where: { email: override.email, deletedAt: { not: null } },
+    data: { deletedAt: null },
+  });
   const user = await prisma.user.upsert({
     where: { email: override.email },
     create: {
@@ -240,12 +245,17 @@ async function resolveStubRoleOverride(
     prisma.userRole.deleteMany({
       where: { userId: user.id, orgId, roleId: { not: role.id } },
     }),
+    prisma.userRole.updateMany({
+      where: { userId: user.id, roleId: role.id, orgId, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    }),
     prisma.userRole.upsert({
       where: { userId_roleId: { userId: user.id, roleId: role.id } },
       create: { orgId, userId: user.id, roleId: role.id },
       update: { orgId, deletedAt: null },
     }),
   ]);
+  invalidateRbacDecisionCache(orgId, user.id);
 
   return {
     orgId,
@@ -396,9 +406,7 @@ async function resolveClerkAuthFromDb(
           existingOrgId: existingEmail.orgId,
         },
       });
-      throw req.server.httpErrors.forbidden(
-        'Email is already registered in another organization',
-      );
+      throw req.server.httpErrors.forbidden('Email is already registered in another organization');
     }
   }
 
@@ -655,7 +663,6 @@ const plugin: FastifyPluginAsync = fp(
       } else {
         req.auth = await resolveStubAuth(req);
       }
-
     });
   },
   { name: 'auth' },

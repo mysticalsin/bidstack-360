@@ -11,9 +11,10 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
+import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
@@ -34,7 +35,14 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { Row } from './opportunities/OpportunityRow';
 import { OpportunitiesTableHead } from './opportunities/OpportunitiesTableHead';
-import { OppBulkBar, OppKpiBar, OppPageHeader, OppStageChips } from './opportunities/OppToolbar';
+import {
+  OppBulkBar,
+  OppDueChips,
+  OppKpiBar,
+  OppPageHeader,
+  OppStageChips,
+  type DueQuickFilter,
+} from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
 
 export function OpportunitiesPage() {
@@ -56,8 +64,20 @@ export function OpportunitiesPage() {
     setSearchParams(params, { replace: true });
   };
 
-  // Cursor pagination — reset to page 1 whenever the search/stage filter changes.
-  const pager = useCursorPagination(`${search}|${stageFilter}`);
+  // A1 (bid clock) quick filters — "due" is independent of stage, so both can
+  // be active together (e.g. "S2 Sent, overdue").
+  const dueParam = searchParams.get('due');
+  const dueFilter: DueQuickFilter = dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
+  const setDueFilter = (next: DueQuickFilter) => {
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('due', next);
+    else params.delete('due');
+    params.delete('search');
+    setSearchParams(params, { replace: true });
+  };
+
+  // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
+  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -69,6 +89,8 @@ export function OpportunitiesPage() {
           ? { stage: stageFilter }
           : {}
       : {}),
+    ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
+    ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
@@ -281,10 +303,17 @@ export function OpportunitiesPage() {
     const stamp = new Date().toISOString().slice(0, 10);
     setIsExporting(true);
     try {
-      await downloadFromApi('/api/opportunities/export', `bidstack-opportunities-${stamp}.csv`, {
-        querystring: {
-          pipelineStageId: stageFilter ?? undefined,
-        },
+      await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
+        // Mirror the list query's stage branching: a configured stage is a UUID
+        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
+        // legacy enum as pipelineStageId 400s the export.
+        querystring: stageFilter
+          ? isPipelineStageIdUuid(stageFilter)
+            ? { pipelineStageId: stageFilter }
+            : isLegacyOpportunityStage(stageFilter)
+              ? { stage: stageFilter }
+              : {}
+          : {},
       });
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
@@ -354,6 +383,7 @@ export function OpportunitiesPage() {
       <OppPageHeader
         search={search}
         stageFilter={stageFilter}
+        stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
@@ -362,13 +392,30 @@ export function OpportunitiesPage() {
         onExportCsv={() => void exportCsv()}
       />
 
-      {!search && (
-        <OppStageChips
-          stageFilter={stageFilter}
-          stageOptions={stageOptions}
-          onSetStageFilter={setStageFilter}
-        />
-      )}
+      {/* Chips hide while a search is active (existing behavior); the saved-views
+          bar stays mounted so a preset that includes a search remains recallable. */}
+      <div className="flex flex-wrap items-center gap-3">
+        {!search && (
+          <>
+            <OppStageChips
+              stageFilter={stageFilter}
+              stageOptions={stageOptions}
+              onSetStageFilter={setStageFilter}
+            />
+            <OppDueChips dueFilter={dueFilter} onSetDueFilter={setDueFilter} />
+          </>
+        )}
+        <div className="ml-auto">
+          <SavedViewsBar
+            surface="opportunities"
+            basePath="/opportunities"
+            namePlaceholder={t(
+              'opportunities.savedViews.placeholder',
+              'e.g. "Submitted — due within 7 days"',
+            )}
+          />
+        </div>
+      </div>
 
       {/* Industry visibility — the bids we're working on, split by sector. */}
       <OppIndustryBreakdown />
@@ -396,12 +443,18 @@ export function OpportunitiesPage() {
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
-            title={t('opportunities.empty.title', 'No opportunities yet')}
+            icon="target"
+            title={t('opportunities.empty.headline', 'No open bids yet')}
             message={t(
-              'opportunities.empty.message',
-              'Create your first opportunity to start tracking bids.',
+              'opportunities.empty.body',
+              "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
             )}
             action={<CreateOpportunityDialog />}
+            secondary={
+              <EmptyStateLink to="/settings?tab=data-import">
+                {t('opportunities.empty.importCsv', 'Or import your deal book (CSV)')}
+              </EmptyStateLink>
+            }
           />
         ) : (
           <div className="overflow-x-auto">

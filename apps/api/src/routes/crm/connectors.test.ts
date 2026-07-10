@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../../server.js';
+import { makeSkipIfNoDb } from '../../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -31,13 +32,7 @@ afterAll(async () => {
   await prisma.$disconnect().catch(() => undefined);
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    // DB not reachable in this environment — silently pass rather than throwing,
-    // which would register as a test failure (not a skip).
-    if (!dbReachable) return;
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('crm connectors routes', () => {
   skipIfNoDb('GET /api/crm/connectors exposes real provider modes', async () => {

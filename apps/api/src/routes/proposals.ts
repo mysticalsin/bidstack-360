@@ -146,7 +146,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
                COUNT(*)::int   AS cnt,
                COALESCE(SUM(o.value_micros), 0)::text AS val
         FROM proposals p
-        LEFT JOIN opportunities o ON o.id = p.opportunity_id
+        LEFT JOIN opportunities o ON o.id = p.opportunity_id AND o.org_id = p.org_id
         WHERE p.org_id = ${orgId}::uuid AND p.deleted_at IS NULL
         GROUP BY p.status, p.owner_id
       `;

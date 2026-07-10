@@ -61,6 +61,10 @@ function rowsFromUnknown(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value.map(record).filter((row) => Object.keys(row).length > 0);
   const root = record(value);
   for (const key of ['data', 'companies', 'results', 'items', 'records']) {
+    // Skip absent keys: recursing on `undefined` re-enters with the same base
+    // value forever (record(undefined) === {}), a stack overflow on any payload
+    // missing every envelope key. (MISTAKES 2026-07-07.)
+    if (root[key] === undefined) continue;
     const rows = rowsFromUnknown(root[key]);
     if (rows.length > 0) return rows;
   }

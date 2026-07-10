@@ -8,7 +8,7 @@ export function PricingPage() {
   const [annual, setAnnual] = useState(true);
 
   useSeo({
-    title: 'Pricing — BidStack 360°',
+    title: 'Pricing — Polo PreSales',
     description:
       'Simple, transparent pricing. Start free forever, scale to Pro at €39/user/month, or talk to us about Enterprise.',
     canonical: 'https://bidstack.dev/pricing',

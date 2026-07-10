@@ -1,5 +1,5 @@
 /**
- * LinkedIn content script — injects "Add to BidStack" on profile pages.
+ * LinkedIn content script — injects "Add to Polo PreSales" on profile pages.
  *
  * Target: /in/* profile pages and /company/* pages.
  * Extracts: name, title, company, profile URL.
@@ -40,9 +40,9 @@ async function handleAddToBidStack() {
       linkedinUrl: ctx.profileUrl,
       source: ctx.source,
     });
-    showToast(`"${lead.name}" added to BidStack`, 'success');
+    showToast(`"${lead.name}" added to Polo PreSales`, 'success');
   } catch (err) {
-    showToast(`BidStack: ${err.message}`, 'error');
+    showToast(`Polo PreSales: ${err.message}`, 'error');
   }
 }
 

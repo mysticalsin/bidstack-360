@@ -2,17 +2,27 @@
 
 import { createHash } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
+let previousStubRoleHeader: string | undefined;
 
 beforeAll(async () => {
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -20,24 +30,26 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
+  const iso = await createIsolatedOrg('accounts');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   server = await buildServer();
   await server.ready();
-});
+}, 30_000);
 
 afterAll(async () => {
   if (server) await server.close();
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
+  }
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('accounts routes', () => {
   skipIfNoDb('GET /api/accounts/key returns key accounts', async () => {
@@ -61,16 +73,25 @@ describe('accounts routes', () => {
   skipIfNoDb('GET /api/accounts/top returns ranked accounts', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/accounts/top?limit=10' });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json() as {
+      source: 'auto' | 'curated';
+      items: Array<{ totalValue: number; topAccountRank: number }>;
+    };
     expect(Array.isArray(body.items)).toBe(true);
     if (body.items.length > 1) {
-      // Verify descending sort by totalValue
-      expect(body.items[0].totalValue).toBeGreaterThanOrEqual(body.items[1].totalValue);
+      if (body.source === 'curated') {
+        expect(body.items[0].topAccountRank).toBeLessThanOrEqual(body.items[1].topAccountRank);
+      } else {
+        expect(body.items[0].totalValue).toBeGreaterThanOrEqual(body.items[1].totalValue);
+      }
     }
   });
 
   skipIfNoDb('GET /api/accounts/top supports search filter', async () => {
-    const res = await server.inject({ method: 'GET', url: '/api/accounts/top?search=Mantu&limit=5' });
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/accounts/top?search=Mantu&limit=5',
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     // May be empty if no Mantu company in seed; just verify 200
@@ -86,15 +107,18 @@ describe('accounts routes', () => {
 
   skipIfNoDb('PATCH /api/companies/:id/tier updates tier', async () => {
     if (!orgId) {
-      console.warn('[skip] no seed org');
+      console.warn('[skip] no isolated org');
       return;
     }
+    // Pick a NON-key company so PATCH→key is a real standard→key transition;
+    // keyAccountSince is only stamped on that transition (accounts.ts), so
+    // promoting an already-key company would leave it null and falsely fail.
     const company = await prisma.company.findFirst({
-      where: { orgId, deletedAt: null },
+      where: { orgId, deletedAt: null, tier: { not: 'key' } },
       orderBy: { createdAt: 'asc' },
     });
     if (!company) {
-      console.warn('[skip] no companies to tier');
+      console.warn('[skip] no non-key companies to tier');
       return;
     }
 
@@ -133,7 +157,7 @@ describe('top accounts curation', () => {
   // must restore the auto leaderboard — that is the whole M5 contract.
   skipIfNoDb('PUT /api/accounts/top-list then GET returns curated order', async () => {
     if (!orgId) {
-      console.warn('[skip] no seed org');
+      console.warn('[skip] no isolated org');
       return;
     }
     const companies = await prisma.company.findMany({
@@ -189,33 +213,46 @@ describe('top accounts curation', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  skipIfNoDb('PUT /api/accounts/top-list without accounts:write is 403', async () => {
-    if (!orgId) {
-      console.warn('[skip] no seed org');
-      return;
-    }
-    // A read-only API key exercises the requirePermission('accounts:write')
-    // gate without admin claims — curation must stay admin-only.
-    const rawKey = `itest_readonly_${Date.now()}`;
-    const apiKey = await prisma.apiKey.create({
-      data: {
-        orgId,
-        name: 'integration-test read-only key',
-        hashedKey: createHash('sha256').update(rawKey).digest('hex'),
-        prefix: rawKey.slice(0, 8),
-        scopes: ['read'],
-      },
+  skipIfNoDb('PUT /api/accounts/top-list without settings:write is 403', async () => {
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/api/accounts/top-list',
+      headers: { 'x-bidstack-e2e-role': 'manager' },
+      payload: { companyIds: [] },
     });
-    try {
-      const res = await server.inject({
-        method: 'PUT',
-        url: '/api/accounts/top-list',
-        headers: { 'x-api-key': rawKey },
-        payload: { companyIds: [] },
-      });
-      expect(res.statusCode).toBe(403);
-    } finally {
-      await prisma.apiKey.delete({ where: { id: apiKey.id } });
-    }
+    expect(res.statusCode).toBe(403);
   });
+
+  skipIfNoDb(
+    'PUT /api/accounts/top-list rejects API keys even with settings write scope',
+    async () => {
+      if (!orgId) {
+        console.warn('[skip] no isolated org');
+        return;
+      }
+      // API keys can carry broad read/write scopes, but global curation still
+      // requires a human DB-backed admin for audit integrity.
+      const rawKey = `itest_settings_${Date.now()}`;
+      const apiKey = await prisma.apiKey.create({
+        data: {
+          orgId,
+          name: 'integration-test settings key',
+          hashedKey: createHash('sha256').update(rawKey).digest('hex'),
+          prefix: rawKey.slice(0, 8),
+          scopes: ['read', 'write'],
+        },
+      });
+      try {
+        const res = await server.inject({
+          method: 'PUT',
+          url: '/api/accounts/top-list',
+          headers: { 'x-api-key': rawKey },
+          payload: { companyIds: [] },
+        });
+        expect(res.statusCode).toBe(403);
+      } finally {
+        await prisma.apiKey.delete({ where: { id: apiKey.id } });
+      }
+    },
+  );
 });

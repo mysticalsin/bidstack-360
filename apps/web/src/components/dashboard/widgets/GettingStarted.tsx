@@ -41,7 +41,7 @@ export function GettingStarted() {
       title: t('orgDashboard.gettingStarted.opportunityTitle', 'Open your first opportunity'),
       body: t(
         'orgDashboard.gettingStarted.opportunityBody',
-        'Log the bid you are pursuing. BidStack tracks its stage, value, and win probability from qualification to signature.',
+        'Log the bid you are pursuing. Polo PreSales tracks its stage, value, and win probability from qualification to signature.',
       ),
       cta: t('orgDashboard.gettingStarted.opportunityCta', 'Open an opportunity'),
       to: '/opportunities',

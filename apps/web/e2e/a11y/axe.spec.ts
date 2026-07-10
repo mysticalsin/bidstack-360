@@ -21,7 +21,9 @@ const ROUTES = [
   { name: 'leads-list', path: '/leads' },
   { name: 'contacts-list', path: '/contacts' },
   { name: 'companies-list', path: '/accounts' },
-  { name: 'reports', path: '/reports' },
+  // /reports now redirects to /analytics (legacy canned-stats page removed);
+  // scan the canonical Insights surface directly.
+  { name: 'analytics', path: '/analytics' },
   { name: 'integrations', path: '/integrations' },
   { name: 'settings', path: '/settings' },
   { name: 'audit-log', path: '/audit-log' },

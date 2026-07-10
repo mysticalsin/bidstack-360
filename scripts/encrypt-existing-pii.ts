@@ -2,9 +2,9 @@
  * One-shot PII encryption migration script.
  *
  * WHY: When PII_FIELD_ENCRYPTION is first enabled, existing rows in Contact,
- * Lead, and User still contain plaintext values. This script encrypts them
- * in-place and populates the `emailHash` columns so equality lookups continue
- * to work after the switch.
+ * Lead, and KamConsultant still contain plaintext values. This script encrypts
+ * them in-place and populates the `emailHash` columns so equality lookups
+ * continue to work after the switch.
  *
  * EXECUTION ORDER (critical — do NOT reverse):
  *   1. Set PII_ENCRYPTION_MASTER_KEY in the environment (generate: openssl rand -hex 32)
@@ -12,7 +12,8 @@
  *   3. Verify row counts match (script prints before/after stats)
  *   4. Set PII_FIELD_ENCRYPTION=true and deploy the new API build
  *
- * IDEMPOTENT: rows already starting with `enc:v1:` are skipped.
+ * IDEMPOTENT: rows already starting with `enc:v1:` are not re-encrypted; their
+ * canonical emailHash is repaired if needed.
  * CHUNKED: processes 1000 rows at a time to avoid long transactions.
  *
  * Usage:
@@ -22,6 +23,7 @@
 
 import { PrismaClient } from '../packages/db/generated/client/index.js';
 import {
+  decryptPiiField,
   encryptPiiField,
   hashPiiField,
   isEncrypted,
@@ -29,6 +31,7 @@ import {
 
 const CHUNK_SIZE = 1000;
 const DRY_RUN = process.argv.includes('--dry-run');
+const EMAIL_DECRYPTION_MASK = '***@***.***';
 
 const prisma = new PrismaClient({
   log: ['warn', 'error'],
@@ -36,12 +39,57 @@ const prisma = new PrismaClient({
 
 interface Stats {
   processed: number;
-  encrypted: number;
+  updated: number;
   skipped: number;
 }
 
+interface EmailHashRow {
+  id: string;
+  orgId: string;
+  email: string | null;
+  emailHash: string | null;
+}
+
+function applyEmailEncryptionUpdates(
+  modelName: string,
+  row: EmailHashRow,
+  updates: Record<string, unknown>,
+): boolean {
+  if (!row.email) {
+    if (row.emailHash !== null) {
+      updates.emailHash = null;
+      return true;
+    }
+    return false;
+  }
+
+  const plainEmail = isEncrypted(row.email)
+    ? decryptPiiField(row.email, row.orgId, 'email')
+    : row.email;
+
+  if (plainEmail === EMAIL_DECRYPTION_MASK) {
+    throw new Error(
+      `Unable to decrypt ${modelName} ${row.id}; check PII_ENCRYPTION_MASTER_KEY before continuing.`,
+    );
+  }
+
+  let changed = false;
+  if (!isEncrypted(row.email)) {
+    updates.email = encryptPiiField(row.email, row.orgId);
+    changed = true;
+  }
+
+  const canonicalHash = hashPiiField(plainEmail, row.orgId);
+  if (row.emailHash !== canonicalHash) {
+    updates.emailHash = canonicalHash;
+    changed = true;
+  }
+
+  return changed;
+}
+
 async function processContacts(): Promise<Stats> {
-  const stats: Stats = { processed: 0, encrypted: 0, skipped: 0 };
+  const stats: Stats = { processed: 0, updated: 0, skipped: 0 };
   let cursor: string | undefined;
 
   // eslint-disable-next-line no-constant-condition
@@ -50,7 +98,7 @@ async function processContacts(): Promise<Stats> {
       take: CHUNK_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
-      select: { id: true, orgId: true, email: true, phone: true },
+      select: { id: true, orgId: true, email: true, emailHash: true, phone: true },
     });
 
     if (rows.length === 0) break;
@@ -61,9 +109,7 @@ async function processContacts(): Promise<Stats> {
       const updates: Record<string, unknown> = {};
       let needsUpdate = false;
 
-      if (typeof row.email === 'string' && row.email.length > 0 && !isEncrypted(row.email)) {
-        updates.email = encryptPiiField(row.email, row.orgId);
-        updates.emailHash = hashPiiField(row.email, row.orgId);
+      if (applyEmailEncryptionUpdates('Contact', row, updates)) {
         needsUpdate = true;
       }
 
@@ -73,7 +119,7 @@ async function processContacts(): Promise<Stats> {
       }
 
       if (needsUpdate) {
-        stats.encrypted++;
+        stats.updated++;
         if (!DRY_RUN) {
           await prisma.contact.update({ where: { id: row.id }, data: updates });
         }
@@ -83,7 +129,7 @@ async function processContacts(): Promise<Stats> {
     }
 
     process.stdout.write(
-      `\r  contacts: ${stats.processed} processed, ${stats.encrypted} encrypted, ${stats.skipped} skipped`,
+      `\r  contacts: ${stats.processed} processed, ${stats.updated} updated, ${stats.skipped} skipped`,
     );
   }
 
@@ -92,7 +138,7 @@ async function processContacts(): Promise<Stats> {
 }
 
 async function processLeads(): Promise<Stats> {
-  const stats: Stats = { processed: 0, encrypted: 0, skipped: 0 };
+  const stats: Stats = { processed: 0, updated: 0, skipped: 0 };
   let cursor: string | undefined;
 
   // eslint-disable-next-line no-constant-condition
@@ -101,7 +147,7 @@ async function processLeads(): Promise<Stats> {
       take: CHUNK_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
-      select: { id: true, orgId: true, email: true, phone: true },
+      select: { id: true, orgId: true, email: true, emailHash: true, phone: true },
     });
 
     if (rows.length === 0) break;
@@ -112,9 +158,7 @@ async function processLeads(): Promise<Stats> {
       const updates: Record<string, unknown> = {};
       let needsUpdate = false;
 
-      if (typeof row.email === 'string' && row.email.length > 0 && !isEncrypted(row.email)) {
-        updates.email = encryptPiiField(row.email, row.orgId);
-        updates.emailHash = hashPiiField(row.email, row.orgId);
+      if (applyEmailEncryptionUpdates('Lead', row, updates)) {
         needsUpdate = true;
       }
 
@@ -124,7 +168,7 @@ async function processLeads(): Promise<Stats> {
       }
 
       if (needsUpdate) {
-        stats.encrypted++;
+        stats.updated++;
         if (!DRY_RUN) {
           await prisma.lead.update({ where: { id: row.id }, data: updates });
         }
@@ -134,7 +178,7 @@ async function processLeads(): Promise<Stats> {
     }
 
     process.stdout.write(
-      `\r  leads: ${stats.processed} processed, ${stats.encrypted} encrypted, ${stats.skipped} skipped`,
+      `\r  leads: ${stats.processed} processed, ${stats.updated} updated, ${stats.skipped} skipped`,
     );
   }
 
@@ -142,17 +186,17 @@ async function processLeads(): Promise<Stats> {
   return stats;
 }
 
-async function processUsers(): Promise<Stats> {
-  const stats: Stats = { processed: 0, encrypted: 0, skipped: 0 };
+async function processKamConsultants(): Promise<Stats> {
+  const stats: Stats = { processed: 0, updated: 0, skipped: 0 };
   let cursor: string | undefined;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const rows = await prisma.user.findMany({
+    const rows = await prisma.kamConsultant.findMany({
       take: CHUNK_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
-      select: { id: true, orgId: true, email: true },
+      select: { id: true, orgId: true, email: true, emailHash: true },
     });
 
     if (rows.length === 0) break;
@@ -161,12 +205,13 @@ async function processUsers(): Promise<Stats> {
     for (const row of rows) {
       stats.processed++;
 
-      if (typeof row.email === 'string' && row.email.length > 0 && !isEncrypted(row.email)) {
-        stats.encrypted++;
+      const updates: Record<string, unknown> = {};
+      if (applyEmailEncryptionUpdates('KamConsultant', row, updates)) {
+        stats.updated++;
         if (!DRY_RUN) {
-          await prisma.user.update({
+          await prisma.kamConsultant.update({
             where: { id: row.id },
-            data: { email: encryptPiiField(row.email, row.orgId) },
+            data: updates,
           });
         }
       } else {
@@ -175,7 +220,7 @@ async function processUsers(): Promise<Stats> {
     }
 
     process.stdout.write(
-      `\r  users: ${stats.processed} processed, ${stats.encrypted} encrypted, ${stats.skipped} skipped`,
+      `\r  kam_consultants: ${stats.processed} processed, ${stats.updated} updated, ${stats.skipped} skipped`,
     );
   }
 
@@ -189,9 +234,7 @@ async function main(): Promise<void> {
   }
 
   if (!process.env.PII_ENCRYPTION_MASTER_KEY) {
-    process.stderr.write(
-      'ERROR: PII_ENCRYPTION_MASTER_KEY is not set. Aborting.\n',
-    );
+    process.stderr.write('ERROR: PII_ENCRYPTION_MASTER_KEY is not set. Aborting.\n');
     process.exit(1);
   }
 
@@ -204,34 +247,25 @@ async function main(): Promise<void> {
   process.stdout.write('Processing Lead table...\n');
   const leadStats = await processLeads();
 
-  process.stdout.write('Processing User table...\n');
-  const userStats = await processUsers();
+  process.stdout.write('Processing KamConsultant table...\n');
+  const kamConsultantStats = await processKamConsultants();
 
   process.stdout.write('\n=== Summary ===\n');
   process.stdout.write(
-    `Contact: ${contactStats.encrypted} encrypted, ${contactStats.skipped} skipped\n`,
+    `Contact: ${contactStats.updated} updated, ${contactStats.skipped} skipped\n`,
   );
+  process.stdout.write(`Lead:    ${leadStats.updated} updated, ${leadStats.skipped} skipped\n`);
   process.stdout.write(
-    `Lead:    ${leadStats.encrypted} encrypted, ${leadStats.skipped} skipped\n`,
-  );
-  process.stdout.write(
-    `User:    ${userStats.encrypted} encrypted, ${userStats.skipped} skipped\n`,
+    `KAM:     ${kamConsultantStats.updated} updated, ${kamConsultantStats.skipped} skipped\n`,
   );
 
-  const totalEncrypted =
-    contactStats.encrypted + leadStats.encrypted + userStats.encrypted;
-  process.stdout.write(
-    `\nTotal rows encrypted: ${totalEncrypted}\n`,
-  );
+  const totalUpdated = contactStats.updated + leadStats.updated + kamConsultantStats.updated;
+  process.stdout.write(`\nTotal rows updated: ${totalUpdated}\n`);
 
   if (DRY_RUN) {
-    process.stdout.write(
-      '\n[DRY RUN COMPLETE] Re-run without --dry-run to apply changes.\n',
-    );
+    process.stdout.write('\n[DRY RUN COMPLETE] Re-run without --dry-run to apply changes.\n');
   } else {
-    process.stdout.write(
-      '\nMigration complete. You may now set PII_FIELD_ENCRYPTION=true.\n',
-    );
+    process.stdout.write('\nMigration complete. You may now set PII_FIELD_ENCRYPTION=true.\n');
   }
 }
 

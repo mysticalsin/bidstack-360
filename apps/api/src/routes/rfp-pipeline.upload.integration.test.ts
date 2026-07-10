@@ -40,8 +40,8 @@ describe('POST /api/v1/opportunities/:opportunityId/rfp/upload', () => {
       payload: { fileAttachmentId: randomUUID() },
     });
 
-    // The stub auth session is scoped to org_seed_mantu. The foreign opp lives
-    // in a different org — the route's findFirst(where: { id, orgId }) returns
+    // The stub auth session is scoped to this file's isolated org. The foreign
+    // opp lives in a different org — the route's findFirst(where: { id, orgId }) returns
     // null → 404. No data must be written under the foreign org.
     expect(res.statusCode).toBe(404);
 
@@ -59,7 +59,7 @@ describe('POST /api/v1/opportunities/:opportunityId/rfp/upload', () => {
   skipIfNoDb('404 if opportunity not found for orgId', async () => {
     const res = await ctx.server.inject({
       method: 'POST',
-      // A random UUID that doesn't exist in the seed org.
+      // A random UUID that doesn't exist in the isolated org.
       url: `/api/v1/opportunities/${randomUUID()}/rfp/upload`,
       payload: { fileAttachmentId: randomUUID() },
     });

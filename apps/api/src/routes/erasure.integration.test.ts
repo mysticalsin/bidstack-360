@@ -1,6 +1,6 @@
 // Integration tests for the GDPR Art. 17 (right to erasure) route.
 // Pattern: tenant-export.integration.test.ts — buildServer + inject against the
-// seed org (org_seed_mantu); role switching via the x-bidstack-e2e-role header.
+// isolated org; role switching via the x-bidstack-e2e-role header.
 //
 // WHY these assertions matter:
 //   - an org-admin must be able to ERASE a data subject (Art. 17 right), the
@@ -14,15 +14,22 @@
 //     retried compliance request never half-fails.
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 let previousStubRoleHeader: string | undefined;
 
 // Subjects created per-test and cleaned up in afterAll. Hard-deleted (these are
@@ -40,9 +47,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const iso = await createIsolatedOrg('erasure');
+  orgId = iso.orgId;
+  restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
   server = await buildServer();
   await server.ready();
 });
@@ -65,7 +72,9 @@ afterAll(async () => {
       },
     });
   }
+  restoreAuth?.();
   if (server) await server.close();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
   if (previousStubRoleHeader === undefined) {
     delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
@@ -74,11 +83,7 @@ afterAll(async () => {
   }
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 // Unique email per seed — Contact/Lead carry an org-unique email constraint, so
 // reused fixtures would collide across cases.

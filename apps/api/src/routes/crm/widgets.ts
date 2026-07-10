@@ -18,6 +18,11 @@ export const crmWidgetRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/crm/widgets',
     {
+      // WHY settings:write: persistWidgets writes the org-wide dashboard layout
+      // (scoped by orgId, not per-user), so an unguarded PATCH let any role —
+      // including a read-only user or read-scoped API key — rewrite every user's
+      // dashboard. Org-wide config mutation belongs behind settings:write.
+      preHandler: server.requirePermission('settings:write'),
       schema: {
         body: WidgetsPatchBody,
         response: { 200: DashboardWidgetsResponse },

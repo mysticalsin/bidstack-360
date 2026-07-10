@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
@@ -5,7 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { SendForSignatureModal } from '@/components/signatures/SendForSignatureModal';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalls } from '@/hooks/useCalls';
 import { api } from '@/lib/api';
@@ -36,7 +39,10 @@ interface OpportunityTabsProps {
     power: 'decision' | 'champion' | 'influencer' | 'gatekeeper' | 'approver';
   }>;
   documents?: Array<{ id: string; name: string; kind: string; bytes: number | null }>;
-  timeline?: Array<{ at: string; kind: string; text: string }>;
+  // The Activity tab body — the page injects the timeline component
+  // (pages/opportunityDetail/TimelinePanel) so this container stays dumb about
+  // how the deal narrative is fetched and rendered.
+  activityContent?: ReactNode;
 }
 
 export function OpportunityTabs({
@@ -44,7 +50,7 @@ export function OpportunityTabs({
   customer,
   intelDecisionUnit = [],
   documents = [],
-  timeline = [],
+  activityContent = null,
 }: OpportunityTabsProps) {
   const { t } = useTranslation('crm');
   return (
@@ -77,9 +83,7 @@ export function OpportunityTabs({
       <TabsContent value="calls">
         <CallsPanel oppId={oppId} />
       </TabsContent>
-      <TabsContent value="activity">
-        <ActivityPanel timeline={timeline} />
-      </TabsContent>
+      <TabsContent value="activity">{activityContent}</TabsContent>
     </Tabs>
   );
 }
@@ -209,9 +213,13 @@ function DecisionUnitPanel({
               </Badge>
               <div
                 className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]"
-                aria-label={t('opportunityTabs.influenceAriaLabel', 'Influence {{value}} out of 5', {
-                  value: r.influence,
-                })}
+                aria-label={t(
+                  'opportunityTabs.influenceAriaLabel',
+                  'Influence {{value}} out of 5',
+                  {
+                    value: r.influence,
+                  },
+                )}
               >
                 {r.influence}/5
               </div>
@@ -358,72 +366,77 @@ function DocumentsPanel({
   documents: NonNullable<OpportunityTabsProps['documents']>;
 }) {
   const { t } = useTranslation('crm');
-  if (documents.length === 0)
+  const [sendOpen, setSendOpen] = useState(false);
+  const primaryDocumentId = documents[0]?.id;
+  const hasDocument = documents.length > 0;
+  // A signature request needs a Document id, not a DocumentTemplate id — with
+  // no document uploaded there is nothing to send, so the trigger is disabled
+  // rather than opening a modal that could only send a broken fallback id.
+  const sendAction = hasDocument ? (
+    <Button variant="secondary" size="sm" onClick={() => setSendOpen(true)}>
+      <Icon name="mail" size={13} />
+      {t('opportunityTabs.sendForSignatureButton', 'Send for Signature')}
+    </Button>
+  ) : (
+    <Button
+      variant="secondary"
+      size="sm"
+      disabled
+      title={t(
+        'opportunityTabs.sendForSignatureDisabledTitle',
+        'Upload a document before sending it for signature',
+      )}
+    >
+      <Icon name="mail" size={13} />
+      {t('opportunityTabs.sendForSignatureButton', 'Send for Signature')}
+    </Button>
+  );
+
+  if (!hasDocument)
     return (
       <EmptyState
         title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
-        message={t('opportunityTabs.documentsEmptyMessage', 'Upload an RFP, SoW, or proposal draft.')}
-      />
-    );
-  return (
-    <Card>
-      <SectionHeader
-        title={t('opportunityTabs.documentsTitle', 'Documents')}
-        caption={t('opportunityTabs.documentsCount', '{{count}} files', {
-          count: documents.length,
-        })}
-      />
-      <ul className="divide-y divide-[var(--border-subtle)]">
-        {documents.map((d) => (
-          <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-[var(--fg-primary)] truncate">{d.name}</div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                {d.kind} ·{' '}
-                {d.bytes
-                  ? `${(d.bytes / 1024).toFixed(1)} KB`
-                  : t('opportunityTabs.documentUnknownSize', 'unknown size')}
-              </div>
-            </div>
-            <Badge tone="gray">{d.kind}</Badge>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-function ActivityPanel({ timeline }: { timeline: NonNullable<OpportunityTabsProps['timeline']> }) {
-  const { t } = useTranslation('crm');
-  if (timeline.length === 0)
-    return (
-      <EmptyState
-        title={t('opportunityTabs.activityEmptyTitle', 'No activity yet')}
         message={t(
-          'opportunityTabs.activityEmptyMessage',
-          'Stage moves, Dust webhooks, and notes will appear here.',
+          'opportunityTabs.documentsEmptyMessage',
+          'Upload an RFP, SoW, or proposal draft.',
         )}
+        action={sendAction}
       />
     );
   return (
-    <Card>
-      <SectionHeader title={t('opportunityTabs.activityTitle', 'Activity')} />
-      <ol className="px-5 py-4 space-y-3">
-        {timeline.map((e, i) => (
-          <li key={i} className="flex items-start gap-3">
-            <div
-              className="mt-1.5 h-2 w-2 rounded-full bg-[var(--brand-primary)] shrink-0"
-              aria-hidden
-            />
-            <div className="min-w-0">
-              <div className="text-sm text-[var(--fg-primary)]">{e.text}</div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                {e.kind} · {formatDate(e.at)}
+    <>
+      <Card>
+        <SectionHeader
+          title={t('opportunityTabs.documentsTitle', 'Documents')}
+          caption={t('opportunityTabs.documentsCount', '{{count}} files', {
+            count: documents.length,
+          })}
+          action={sendAction}
+        />
+        <ul className="divide-y divide-[var(--border-subtle)]">
+          {documents.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
+                  {d.name}
+                </div>
+                <div className="text-xs text-[var(--fg-tertiary)]">
+                  {d.kind} ·{' '}
+                  {d.bytes
+                    ? `${(d.bytes / 1024).toFixed(1)} KB`
+                    : t('opportunityTabs.documentUnknownSize', 'unknown size')}
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Card>
+              <Badge tone="gray">{d.kind}</Badge>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <SendForSignatureModal
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        documentId={primaryDocumentId}
+      />
+    </>
   );
 }

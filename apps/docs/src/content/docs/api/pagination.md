@@ -7,7 +7,7 @@ sidebar:
 
 # Pagination
 
-All list endpoints in the BidStack API use **cursor-based pagination**. This approach is stable when records are inserted or deleted between pages — unlike offset/limit pagination which can skip or repeat rows.
+All list endpoints in the Polo PreSales API use **cursor-based pagination**. This approach is stable when records are inserted or deleted between pages — unlike offset/limit pagination which can skip or repeat rows.
 
 ## Request Parameters
 

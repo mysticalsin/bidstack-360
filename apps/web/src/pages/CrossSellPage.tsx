@@ -1,19 +1,21 @@
 /**
- * Cross-sell action log — org-wide view (A2). Pre-sales tracks cross-country /
- * cross-team actions on shared accounts here; the per-account slice also shows
- * on each account cockpit (CrossSellCard).
+ * Cross-sell action log - org-wide operating view (A2).
+ * Pre-sales tracks cross-country / cross-team actions on shared accounts here;
+ * the per-account slice also shows in each account cockpit (CrossSellCard).
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CrossSellStatusControls } from '@/components/account-intel/CrossSellStatusControls';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCrossSellActions, usePatchCrossSellAction } from '@/hooks/useCrossSell';
-import type { GovernanceStatus } from '@bidstack/shared';
+import type { CrossSellAction, GovernanceStatus } from '@bidstack/shared';
 
 const STATUSES: { key: GovernanceStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -21,31 +23,94 @@ const STATUSES: { key: GovernanceStatus | 'all'; label: string }[] = [
   { key: 'in_progress', label: 'In progress' },
   { key: 'done', label: 'Done' },
 ];
+
 const STATUS_FILTER_I18N_KEY: Record<GovernanceStatus | 'all', string> = {
   all: 'crossSell.filterAll',
   open: 'crossSell.filterOpen',
   in_progress: 'crossSell.filterInProgress',
   done: 'crossSell.filterDone',
 };
-const STATUS_TONE: Record<GovernanceStatus, 'gray' | 'amber' | 'jade'> = {
-  open: 'gray',
-  in_progress: 'amber',
-  done: 'jade',
-};
-const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
-  open: 'in_progress',
-  in_progress: 'done',
-  done: 'open',
-};
+
+function dateOnly(value: string | null): string | null {
+  return value ? value.slice(0, 10) : null;
+}
+
+function isOverdue(action: CrossSellAction, today: string): boolean {
+  const due = dateOnly(action.dueDate);
+  return Boolean(due && due < today && action.status !== 'done');
+}
+
+function dueLabel(action: CrossSellAction, today: string): string {
+  const due = dateOnly(action.dueDate);
+  if (!due) return 'No due date';
+  if (action.status === 'done') return `Closed ${due}`;
+  if (due < today) return `Overdue ${due}`;
+  if (due === today) return 'Due today';
+  return `Due ${due}`;
+}
+
+function sortByDueDate(a: CrossSellAction, b: CrossSellAction): number {
+  return (dateOnly(a.dueDate) ?? '9999-12-31').localeCompare(dateOnly(b.dueDate) ?? '9999-12-31');
+}
 
 export default function CrossSellPage() {
   const { t } = useTranslation('crm');
   const [status, setStatus] = useState<GovernanceStatus | 'all'>('all');
   const actions = useCrossSellActions(status === 'all' ? {} : { status });
+  // KPI summary must reflect the whole org regardless of the table's status
+  // filter — computing it from the filtered slice showed misleading zeros (e.g.
+  // selecting "Done" made Active/Overdue/Unassigned all read 0). React Query
+  // dedupes this with `actions` when status === 'all'.
+  const allActions = useCrossSellActions({});
   const patch = usePatchCrossSellAction();
-  // Mirror the backend gate (PATCH /api/cross-sell requires 'accounts:write')
-  // so sales / pre-sales — not just admins — can advance an action's status.
   const canWrite = useHasPermission('accounts:write');
+  const today = new Date().toISOString().slice(0, 10);
+
+  const items = useMemo(() => actions.data?.items ?? [], [actions.data?.items]);
+  const summaryItems = useMemo(() => allActions.data?.items ?? [], [allActions.data?.items]);
+  const summary = useMemo(() => {
+    const active = summaryItems.filter((a) => a.status !== 'done');
+    const overdue = active.filter((a) => isOverdue(a, today));
+    const unassigned = active.filter((a) => !a.assigneeId);
+    const readyToStart = active.filter((a) => a.status === 'open');
+    const inMotion = active.filter((a) => a.status === 'in_progress');
+    const nextDue = [...active].sort(sortByDueDate).find((a) => a.dueDate);
+    return {
+      activeCount: active.length,
+      overdueCount: overdue.length,
+      unassignedCount: unassigned.length,
+      readyToStartCount: readyToStart.length,
+      inMotionCount: inMotion.length,
+      nextDue,
+    };
+  }, [summaryItems, today]);
+
+  const statusLabel = (value: GovernanceStatus): string => {
+    switch (value) {
+      case 'open':
+        return t('crossSell.status.open', 'Open');
+      case 'in_progress':
+        return t('crossSell.status.inProgress', 'In progress');
+      case 'done':
+        return t('crossSell.status.done', 'Done');
+      default:
+        return value;
+    }
+  };
+
+  const changeActionStatus = (action: CrossSellAction, next: GovernanceStatus) => {
+    patch.mutate(
+      { id: action.id, body: { status: next } },
+      {
+        onSuccess: () =>
+          toast.success(t('crossSell.statusAdvanced', 'Status advanced'), {
+            description: statusLabel(next),
+          }),
+        onError: (err: Error) =>
+          toast.error(t('crossSell.updateFailed', 'Update failed'), { description: err.message }),
+      },
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -61,7 +126,125 @@ export default function CrossSellPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label={t('crossSell.filterGroupLabel', 'Filter by status')}>
+      <div className="grid gap-3 md:grid-cols-4">
+        <Card className="px-4 py-3">
+          <p className="text-xs font-medium text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiActive', 'Active')}
+          </p>
+          <p
+            className="mt-1 text-2xl font-semibold text-[var(--fg-primary)]"
+            data-testid="cross-sell-active-count"
+          >
+            {summary.activeCount}
+          </p>
+          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiActiveHint', 'Open or in progress')}
+          </p>
+        </Card>
+        <Card className="px-4 py-3">
+          <p className="text-xs font-medium text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiOverdue', 'Overdue')}
+          </p>
+          <p
+            className="mt-1 text-2xl font-semibold text-[var(--fg-primary)]"
+            data-testid="cross-sell-overdue-count"
+          >
+            {summary.overdueCount}
+          </p>
+          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiOverdueHint', 'Needs owner attention')}
+          </p>
+        </Card>
+        <Card className="px-4 py-3">
+          <p className="text-xs font-medium text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiUnassigned', 'Unassigned')}
+          </p>
+          <p
+            className="mt-1 text-2xl font-semibold text-[var(--fg-primary)]"
+            data-testid="cross-sell-unassigned-count"
+          >
+            {summary.unassignedCount}
+          </p>
+          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiUnassignedHint', 'No assignee yet')}
+          </p>
+        </Card>
+        <Card className="px-4 py-3">
+          <p className="text-xs font-medium text-[var(--fg-tertiary)]">
+            {t('crossSell.kpiNextDue', 'Next due')}
+          </p>
+          <p
+            className="mt-1 truncate text-sm font-semibold text-[var(--fg-primary)]"
+            data-testid="cross-sell-next-due"
+          >
+            {summary.nextDue
+              ? dateOnly(summary.nextDue.dueDate)
+              : t('crossSell.noDatedAction', 'No dated action')}
+          </p>
+          <p className="mt-1 truncate text-xs text-[var(--fg-tertiary)]">
+            {summary.nextDue?.description ?? t('crossSell.allClear', 'No dated active action')}
+          </p>
+        </Card>
+      </div>
+
+      <Card
+        className="px-4 py-3"
+        role="region"
+        aria-label={t('crossSell.commandQueueLabel', 'Cross-sell command queue')}
+      >
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] md:items-center">
+          <div>
+            <p className="text-sm font-semibold text-[var(--fg-primary)]">
+              {t('crossSell.commandQueueTitle', 'Command queue')}
+            </p>
+            <p className="mt-1 max-w-[52ch] text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'crossSell.commandQueueBody',
+                'Prioritize owner gaps, open starts, and in-flight commitments before status review.',
+              )}
+            </p>
+          </div>
+          <div className="rounded-md border border-[var(--border)] px-3 py-2">
+            <p className="text-xl font-semibold text-[var(--fg-primary)]">
+              {summary.unassignedCount}
+            </p>
+            <p className="text-xs font-medium text-[var(--fg-secondary)]">
+              {t('crossSell.queueNeedsOwner', 'Needs owner')}
+            </p>
+            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+              {t('crossSell.queueNeedsOwnerHint', 'Assign before route stalls')}
+            </p>
+          </div>
+          <div className="rounded-md border border-[var(--border)] px-3 py-2">
+            <p className="text-xl font-semibold text-[var(--fg-primary)]">
+              {summary.readyToStartCount}
+            </p>
+            <p className="text-xs font-medium text-[var(--fg-secondary)]">
+              {t('crossSell.queueReadyToStart', 'Ready to start')}
+            </p>
+            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+              {t('crossSell.queueReadyHint', 'Open actions waiting on a first move')}
+            </p>
+          </div>
+          <div className="rounded-md border border-[var(--border)] px-3 py-2">
+            <p className="text-xl font-semibold text-[var(--fg-primary)]">
+              {summary.inMotionCount}
+            </p>
+            <p className="text-xs font-medium text-[var(--fg-secondary)]">
+              {t('crossSell.queueInMotion', 'In motion')}
+            </p>
+            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+              {t('crossSell.queueInMotionHint', 'Actions already underway')}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <div
+        className="flex flex-wrap gap-2"
+        role="group"
+        aria-label={t('crossSell.filterGroupLabel', 'Filter by status')}
+      >
         {STATUSES.map((s) => (
           <button
             key={s.key}
@@ -86,81 +269,97 @@ export default function CrossSellPage() {
           title={t('crossSell.errorTitle', 'Could not load cross-sell actions')}
           message={actions.error?.message ?? t('crossSell.errorMessage', 'Try again shortly.')}
         />
-      ) : (actions.data?.items.length ?? 0) === 0 ? (
-        <EmptyState
-          title={t('crossSell.emptyTitle', 'No cross-sell actions')}
-          message={t(
-            'crossSell.emptyMessage',
-            "Log cross-team actions from any account's cockpit — they appear here for the whole org.",
-          )}
-        />
+      ) : items.length === 0 ? (
+        status !== 'all' ? (
+          <EmptyState
+            title={t('crossSell.emptyFilteredTitle', 'No {{status}} cross-sell actions', {
+              status: statusLabel(status).toLowerCase(),
+            })}
+            message={t(
+              'crossSell.emptyFilteredMessage',
+              'No actions match this filter. Clear it to see every cross-sell action.',
+            )}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => setStatus('all')}>
+                {t('crossSell.showAll', 'Show all')}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('crossSell.emptyTitle', 'No cross-sell actions')}
+            message={t(
+              'crossSell.emptyMessage',
+              "Log cross-team actions from any account's cockpit. They appear here for the whole org.",
+            )}
+          />
+        )
       ) : (
-        <Card>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
-                <th className="px-4 py-2 font-medium">{t('crossSell.colAccount', 'Account')}</th>
-                <th className="px-4 py-2 font-medium">{t('crossSell.colAction', 'Action')}</th>
-                <th className="px-4 py-2 font-medium">{t('crossSell.colRoute', 'Route')}</th>
-                <th className="px-4 py-2 font-medium">{t('crossSell.colAssignee', 'Assignee')}</th>
-                <th className="px-4 py-2 font-medium">{t('crossSell.colDue', 'Due')}</th>
-                <th className="px-4 py-2 text-right font-medium">{t('crossSell.colStatus', 'Status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {actions.data!.items.map((a) => (
-                <tr key={a.id} className="border-b border-[var(--border)]">
-                  <td className="px-4 py-2.5">
-                    <Link
-                      to={`/accounts/${encodeURIComponent(a.accountKey)}`}
-                      className="text-[var(--brand-primary)] hover:underline"
-                    >
-                      {a.accountKey}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5 text-[var(--fg-secondary)]">
-                    <span className="line-clamp-2" title={a.description}>
-                      {a.description}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-[var(--fg-tertiary)]">
-                    {a.requestingUnit} → {a.assignedUnit}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-[var(--fg-tertiary)]">
-                    {a.assigneeName ?? '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-[var(--fg-tertiary)]">
-                    {a.dueDate ? a.dueDate.slice(0, 10) : '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button
-                      type="button"
-                      disabled={!canWrite || patch.isPending}
-                      aria-busy={patch.isPending && patch.variables?.id === a.id}
-                      onClick={() =>
-                        patch.mutate(
-                          { id: a.id, body: { status: NEXT_STATUS[a.status] } },
-                          { onError: (err: Error) => toast.error(t('crossSell.updateFailed', 'Update failed'), { description: err.message }) },
-                        )
-                      }
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
-                      aria-label={t('crossSell.advanceStatusAria', 'Advance status of {{description}}', {
-                        description: a.description,
-                      })}
-                    >
-                      {/* Per-row pending label so a slow PATCH shows WHICH row is
-                          updating instead of the whole table looking frozen. */}
-                      <Badge tone={STATUS_TONE[a.status]}>
-                        {patch.isPending && patch.variables?.id === a.id
-                          ? t('crossSell.updating', 'updating…')
-                          : a.status.replace('_', ' ')}
-                      </Badge>
-                    </button>
-                  </td>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
+                  <th className="px-4 py-2 font-medium">{t('crossSell.colAccount', 'Account')}</th>
+                  <th className="px-4 py-2 font-medium">{t('crossSell.colAction', 'Action')}</th>
+                  <th className="px-4 py-2 font-medium">{t('crossSell.colRoute', 'Route')}</th>
+                  <th className="px-4 py-2 font-medium">{t('crossSell.colOwner', 'Owner')}</th>
+                  <th className="px-4 py-2 font-medium">{t('crossSell.colDue', 'Due')}</th>
+                  <th className="px-4 py-2 text-right font-medium">
+                    {t('crossSell.colNextMove', 'Next move')}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((action) => {
+                  const overdue = isOverdue(action, today);
+                  const busy = patch.isPending && patch.variables?.id === action.id;
+                  return (
+                    <tr key={action.id} className="border-b border-[var(--border)] last:border-b-0">
+                      <td className="px-4 py-3 align-top">
+                        <Link
+                          to={`/accounts/${encodeURIComponent(action.accountKey)}`}
+                          className="font-medium text-[var(--brand-primary)] hover:underline"
+                        >
+                          {action.accountKey}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 align-top text-[var(--fg-secondary)]">
+                        <span className="line-clamp-2" title={action.description}>
+                          {action.description}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <span className="text-xs text-[var(--fg-tertiary)]">
+                          {action.requestingUnit} -&gt; {action.assignedUnit}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-top text-xs text-[var(--fg-tertiary)]">
+                        {action.assigneeName ?? t('crossSell.unassigned', 'Unassigned')}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <Badge
+                          tone={overdue ? 'tomato' : action.status === 'done' ? 'jade' : 'gray'}
+                        >
+                          {dueLabel(action, today)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right align-top">
+                        <CrossSellStatusControls
+                          action={action}
+                          canWrite={canWrite}
+                          isBusy={busy}
+                          disabled={patch.isPending && !busy}
+                          align="end"
+                          onStatusChange={(next) => changeActionStatus(action, next)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
     </div>

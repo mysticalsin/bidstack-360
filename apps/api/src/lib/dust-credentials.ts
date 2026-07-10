@@ -11,6 +11,7 @@ import {
   checkSerumDustMcpGatewayRuntimePolicy,
 } from '@bidstack/db/serum-runtime-policy';
 import {
+  createSafeFetch,
   dustCredentialsFromConfigRow,
   dustCredentialsFromEnv,
   type DustCredentials,
@@ -154,6 +155,10 @@ export async function getOrgDust(
       apiKey: creds.apiKey,
       workspaceId: creds.workspaceId,
       baseUrl: creds.baseUrl,
+      // baseUrl is org-admin-controlled and only string-checked at save time;
+      // the safe fetch re-resolves DNS per request so a rebinding host can't
+      // steer the credentialed call to an internal/metadata address.
+      fetchImpl: createSafeFetch(),
       logger: log,
       orgId,
       environment: runtime.environment ?? defaultSerumConfigEnvironment(),

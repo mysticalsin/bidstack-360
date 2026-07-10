@@ -1,0 +1,91 @@
+name: Supply Chain — IaC + dependency scan
+
+# Two scanners close the gap left by the other security workflows (semgrep =
+# app SAST, dependency-review + `pnpm audit` = dep CVEs, gitleaks = secrets):
+#   1. Checkov — infra-as-code misconfig (Dockerfiles, docker-compose, bicep).
+#   2. Trivy fs — second-opinion dependency CVE + secret + misconfig scan from a
+#      different vuln DB.
+#
+# Both are SOFT (advisory): findings go to the Security tab + PR annotations but
+# do NOT block merges, because the baselines (e.g. infra/azure/main.bicep is a
+# draft, base-image CVEs) have not been triaged. Flip Checkov `soft_fail: false`
+# / Trivy `exit-code: '1'` to make them hard gates once baselined.
+#
+# NOTE: the built-container OS-CVE scan (scanning the actual deploy image) runs
+# via `pnpm deploy:evidence:container` (scripts/run-container-vulnerability-scan
+# .mjs) in the release/CD pipeline — it needs a built image, so it belongs in CD,
+# not this PR workflow.
+
+on:
+  push:
+    branches: [main, demo, 'release/**']
+  pull_request:
+    branches: [main, demo]
+
+permissions:
+  contents: read
+  security-events: write # upload SARIF to the Security tab
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iac-scan:
+    name: IaC misconfiguration scan (Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Dependabot PRs don't change infra; skip to save minutes.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Checkov (Dockerfiles, docker-compose, Azure bicep)
+        uses: bridgecrewio/checkov-action@063da70420ab562cb31f661b374a76b6a42ed6b5 # v12.3108.0
+        with:
+          directory: .
+          framework: dockerfile,docker_compose,bicep
+          skip_path: node_modules
+          quiet: true
+          soft_fail: true # advisory until the baseline is triaged — see header
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+
+      - name: Upload Checkov SARIF to the Security tab
+        if: always()
+        # Don't let a SARIF-path/format hiccup fail the job — the scan itself is
+        # the gate; this step is best-effort reporting.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: checkov.sarif
+          category: checkov-iac
+
+  vuln-scan:
+    name: Dependency + secret scan (Trivy fs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Trivy filesystem scan (vuln + secret + misconfig)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: node_modules,dist,build
+          format: sarif
+          output: trivy.sarif
+          exit-code: '0' # advisory — report, don't block (see header)
+
+      - name: Upload Trivy SARIF to the Security tab
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-fs

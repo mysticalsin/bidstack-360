@@ -3,9 +3,9 @@ import { LegalLayout } from '@/components/LegalLayout';
 
 export function PrivacyPage() {
   useSeo({
-    title: 'Privacy Policy — BidStack 360°',
+    title: 'Privacy Policy — Polo PreSales',
     description:
-      'How BidStack collects, processes, and protects your personal data. GDPR-aware: controller info, lawful basis, sub-processors, subject rights, DPO contact.',
+      'How Polo PreSales collects, processes, and protects your personal data. GDPR-aware: controller info, lawful basis, sub-processors, subject rights, DPO contact.',
     canonical: 'https://bidstack.dev/legal/privacy',
   });
 
@@ -15,16 +15,16 @@ export function PrivacyPage() {
       updated="[EFFECTIVE DATE]"
       intro={
         <p>
-          This Privacy Policy explains how <strong>[COMPANY NAME]</strong> (&ldquo;BidStack&rdquo;,
+          This Privacy Policy explains how <strong>[COMPANY NAME]</strong> (&ldquo;Polo PreSales&rdquo;,
           &ldquo;we&rdquo;) collects, uses, and protects your personal data when you use the
-          BidStack 360° platform and related services. We are committed to GDPR, the UK Data
+          Polo PreSales platform and related services. We are committed to GDPR, the UK Data
           Protection Act 2018, and equivalent regimes worldwide.
         </p>
       }
     >
       <h2>1. Data controller</h2>
       <p>
-        The data controller for personal data collected via this website and the BidStack 360°
+        The data controller for personal data collected via this website and the Polo PreSales
         platform is <strong>[COMPANY NAME]</strong>, registered at <strong>[REGISTERED ADDRESS]</strong>.
         You can reach our Data Protection Officer at{' '}
         <a href="mailto:dpo@bidstack.dev">dpo@bidstack.dev</a>.

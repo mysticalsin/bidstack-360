@@ -34,6 +34,8 @@ import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
 // Bid-deadline alerts (7/3/1 days) + scheduled analytics reports — repeatable scans
 import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
+// Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
+import { startTaskKamAlerts } from './queues/task-kam-alerts.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -155,6 +157,8 @@ await Promise.all([
   // Bid-deadline alerts + scheduled analytics reports (repeatable, org-scoped scans)
   startBidDeadlineAlerts(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
+  // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
+  startTaskKamAlerts(connection, log, workers, queues),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),
   startRfpOrchestrationReaper(connection, log, workers, queues),
@@ -191,7 +195,7 @@ for (const worker of workers) {
 const queueDepthCollector = startQueueDepthCollector(queues, log);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
+  'Polo PreSales worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);

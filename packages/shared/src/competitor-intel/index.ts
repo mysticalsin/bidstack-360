@@ -343,7 +343,7 @@ async function fetchOneDocument(
   }
 }
 
-const RESEARCH_UA = process.env.COMPETITOR_RESEARCH_UA ?? 'BidStack360-Research contact@example.com';
+const RESEARCH_UA = process.env.COMPETITOR_RESEARCH_UA ?? 'PoloPreSales-Research contact@example.com';
 
 /**
  * Fetch candidate public pages, SSRF-guarded. Returns only documents we actually

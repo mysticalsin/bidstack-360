@@ -30,10 +30,19 @@ import { pingRedis } from '../redis.js';
 
 // ── Health schemas ──────────────────────────────────────────────────────────
 
+const ReleaseSchema = z.object({
+  commit: z.string().nullable(),
+  branch: z.string().nullable(),
+});
+
 const CoreHealthSchema = z.object({
   ok: z.boolean(),
   db: z.boolean(),
   redis: z.boolean(),
+  // Optional: release metadata (commit SHA + branch) is gated behind the same
+  // bearer token /metrics requires — see releaseMetadataForCaller. An
+  // unauthenticated caller gets a response with the key omitted entirely.
+  release: ReleaseSchema.optional(),
 });
 
 const ReadinessSchema = CoreHealthSchema.extend({
@@ -203,7 +212,9 @@ export function metricsAccessAllowed(
 
 // ── Health probe helpers ────────────────────────────────────────────────────
 
-async function probeCoreHealth(): Promise<z.infer<typeof CoreHealthSchema>> {
+async function probeCoreHealth(
+  headers: FastifyRequest['headers'],
+): Promise<z.infer<typeof CoreHealthSchema>> {
   let db: boolean;
   try {
     const t0 = Date.now();
@@ -216,7 +227,7 @@ async function probeCoreHealth(): Promise<z.infer<typeof CoreHealthSchema>> {
 
   const redisOk = await pingRedis();
 
-  return { ok: db && redisOk, db, redis: redisOk };
+  return { ok: db && redisOk, db, redis: redisOk, release: releaseMetadataForCaller(headers) };
 }
 
 export function storageConfigReady(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -229,6 +240,35 @@ export function storageConfigReady(env: NodeJS.ProcessEnv = process.env): boolea
   return env.NODE_ENV !== 'production' || env.DEMO_MODE === 'true';
 }
 
+function releaseMetadata(env: NodeJS.ProcessEnv = process.env): z.infer<typeof ReleaseSchema> {
+  return {
+    commit:
+      env.BIDSTACK_RELEASE_COMMIT?.trim() ||
+      env.GIT_COMMIT?.trim() ||
+      env.GIT_SHA?.trim() ||
+      null,
+    branch:
+      env.BIDSTACK_RELEASE_BRANCH?.trim() ||
+      env.GIT_BRANCH?.trim() ||
+      env.VERCEL_GIT_COMMIT_REF?.trim() ||
+      null,
+  };
+}
+
+/**
+ * Release metadata (commit SHA + branch) leaks deployment details to anyone
+ * who can reach /livez, /health, or /readyz — none of which require auth.
+ * Gate it behind the same bearer token /metrics requires so only an operator
+ * with METRICS_BEARER_TOKEN can see it; everyone else gets the key omitted.
+ * Liveness/readiness booleans are unaffected either way.
+ */
+function releaseMetadataForCaller(
+  headers: FastifyRequest['headers'],
+  env: NodeJS.ProcessEnv = process.env,
+): z.infer<typeof ReleaseSchema> | undefined {
+  return metricsAccessAllowed(headers, env) ? releaseMetadata(env) : undefined;
+}
+
 // ── Route plugin ────────────────────────────────────────────────────────────
 
 export const healthRoute: FastifyPluginAsyncZod = async (server) => {
@@ -237,9 +277,16 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
     '/livez',
     {
       config: { public: true },
-      schema: { response: { 200: z.object({ ok: z.literal(true) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            ok: z.literal(true),
+            release: CoreHealthSchema.shape.release,
+          }),
+        },
+      },
     },
-    async () => ({ ok: true as const }),
+    async (req) => ({ ok: true as const, release: releaseMetadataForCaller(req.headers) }),
   );
 
   // Readiness — checks DB + Redis + storage are operational.
@@ -254,8 +301,8 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
         },
       },
     },
-    async (_req, reply) => {
-      const core = await probeCoreHealth();
+    async (req, reply) => {
+      const core = await probeCoreHealth(req.headers);
       const storage = storageConfigReady();
       const body = { ...core, ok: core.ok && storage, storage };
       if (!body.ok) reply.code(503);
@@ -270,7 +317,7 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
       config: { public: true },
       schema: { response: { 200: CoreHealthSchema } },
     },
-    async () => probeCoreHealth(),
+    async (req) => probeCoreHealth(req.headers),
   );
 
   // Prometheus metrics exposition. This stays outside user auth so Prometheus

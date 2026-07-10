@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
-import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Reveal } from '@/components/motion/Reveal';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
@@ -18,7 +17,9 @@ import { useCurrencyStore } from '@/stores/currency';
 import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
+import { OrgCommandHero } from './widgets/OrgCommandHero';
 import { InsightsBar } from './widgets/InsightsBar';
+import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { PipelineCard } from './widgets/PipelineCard';
 import { PipelineByStageMini } from './widgets/PipelineByStageMini';
 import { AlertCard } from './widgets/AlertCard';
@@ -226,37 +227,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
       </motion.div>
 
-      {/* Source stat strip with animated metrics */}
-      <section
-        className="account-dashboard-strip"
-        aria-label={t('orgDashboard.metricsAriaLabel', 'Workspace metrics')}
-      >
-        <SourceStat
-          label={t('orgDashboard.statAccountsLabel', 'Accounts')}
-          value={String(s?.companies ?? 0)}
-          detail={t('orgDashboard.statAccountsDetail', 'portfolio')}
-        />
-        <SourceStat
-          label={t('orgDashboard.statContactsLabel', 'Contacts')}
-          value={String(s?.contacts ?? 0)}
-          detail={t('orgDashboard.statContactsDetail', 'people')}
-        />
-        <SourceStat
-          label={t('orgDashboard.statOpenDealsLabel', 'Open Deals')}
-          value={String(s?.openOpportunities ?? 0)}
-          detail={t('orgDashboard.statOpenDealsDetail', 'pipeline')}
-        />
-        <SourceStat
-          label={t('orgDashboard.statPipelineLabel', 'Pipeline')}
-          value={formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency)}
-          detail={t('orgDashboard.statPipelineDetail', 'weighted')}
-        />
-        <SourceStat
-          label={t('orgDashboard.statOverdueLabel', 'Overdue')}
-          value={String(s?.overdueTasks ?? 0)}
-          detail={t('orgDashboard.statOverdueDetail', 'tasks')}
-        />
-      </section>
+      {/* Cinematic hero band — ports the account cockpit's command-center
+          language to portfolio level (replaces the old flat stat strip). */}
+      {s && <OrgCommandHero summary={s} />}
 
       {/* Main cockpit grid */}
       <section
@@ -276,6 +249,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
               newLeads={s?.leads ?? 0}
               pipelineValue={s?.pipelineValue ?? 0}
             />
+          </Reveal>
+
+          <Reveal delay={0.07}>
+            <ClosingThisWeekCard />
           </Reveal>
 
           <Reveal delay={0.08}>
@@ -348,18 +325,3 @@ export const OrgDashboard = memo(function OrgDashboard() {
     </div>
   );
 });
-
-// ─── SourceStat ───────────────────────────────────────────────────────────────
-// Tiny metric tile used only in the strip above — too small to warrant its own file.
-
-function SourceStat({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="account-source-stat">
-      <span>{label}</span>
-      <strong>
-        <AnimatedMetric value={value} />
-      </strong>
-      <small>{detail}</small>
-    </div>
-  );
-}

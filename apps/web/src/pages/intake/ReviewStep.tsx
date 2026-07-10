@@ -55,8 +55,24 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
       </div>
 
       {intel.isLoading ? (
-        <div className="h-32 flex items-center justify-center text-xs text-[var(--fg-tertiary)]">
-          {t('reviewStep.loading', 'Loading…')}
+        // Shimmer blocks shaped like the two extracted-data groups — shared
+        // bs-shimmer system, not a bare "Loading…" string.
+        <div
+          className="space-y-4"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label={t('reviewStep.loading', 'Loading…')}
+        >
+          {Array.from({ length: 2 }).map((_, g) => (
+            <div key={g} className="space-y-2" aria-hidden>
+              <span className="bs-shimmer block h-4 w-28" />
+              <div className="flex flex-wrap gap-2">
+                <span className="bs-shimmer h-6 w-24 rounded-full" />
+                <span className="bs-shimmer h-6 w-32 rounded-full" />
+                <span className="bs-shimmer h-6 w-20 rounded-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <>
@@ -127,7 +143,7 @@ function ExtractedGroup({
                 aria-label={t('reviewStep.removeAria', 'Remove {{name}}', { name: item.name })}
                 onClick={() => onDelete(item.id, item.name)}
                 disabled={isDeleting}
-                className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+                className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
               >
                 <Icon name="trash" size={14} />
               </button>
@@ -145,7 +161,9 @@ function ConfidenceBadge({ bps }: { bps: number }) {
   const pct = Math.round(bps / 100);
   let color = 'text-[var(--fg-tertiary)] bg-[var(--surface-sunken)]';
   if (bps >= 8000) color = 'text-[var(--success)] bg-[var(--success-tint)]';
-  else if (bps >= 6000) color = 'text-[var(--info)] bg-[var(--info-tint)]';
+  // --info-strong, not --info: plain info is 3.9:1 on the light tint — below
+  // AA for this 10px badge text; info-strong is the tint-safe variant (≈5.2:1).
+  else if (bps >= 6000) color = 'text-[var(--info-strong)] bg-[var(--info-tint)]';
   else if (bps >= 4000) color = 'text-[var(--warning)] bg-[var(--warning-tint)]';
   return (
     <span

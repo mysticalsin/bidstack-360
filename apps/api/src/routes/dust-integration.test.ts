@@ -1,12 +1,19 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 
 const previousDustEnv = {
   apiKey: process.env.DUST_API_KEY,
@@ -23,9 +30,9 @@ beforeAll(async () => {
     return;
   }
 
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('dust-integration');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
 
   delete process.env.DUST_API_KEY;
   delete process.env.DUST_WORKSPACE_ID;
@@ -54,16 +61,12 @@ afterAll(async () => {
 
   restoreDustEnv();
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
-const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) {
-      throw new Error(`[skip] ${name} - DATABASE_URL or seed org not reachable`);
-    }
-    await fn();
-  });
+const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('dust integration routes', () => {
   skipIfNoDb('GET /api/integrations/dust/status is honest in local stub mode', async () => {
@@ -87,6 +90,11 @@ describe('dust integration routes', () => {
     const body = res.json();
     expect(body.mcp.publicUrl).toMatch(/\/mcp$/);
     expect(body.rest.authHeader).toBe('x-api-key: <BIDSTACK_API_KEY>');
+    expect(body.rest.recommendedScopes).toEqual([
+      'opportunities:read',
+      'contacts:read',
+      'tasks:read',
+    ]);
     expect(body.webhooks.receiverUrl).toMatch(/\/api\/webhooks\/dust$/);
     expect(body.mcp.readScopes).toEqual(['mcp', 'read']);
     expect(body.mcp.writeScopes).toEqual(['mcp', 'write']);

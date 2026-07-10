@@ -132,7 +132,7 @@ export function PublicBookingPage() {
       <section className="mx-auto max-w-3xl space-y-6">
         <header className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6 shadow-[var(--shadow-sm)]">
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            {t('publicBooking.eyebrow', 'BidStack scheduling')}
+            {t('publicBooking.eyebrow', 'Polo PreSales scheduling')}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--fg-primary)]">
             {loading ? t('publicBooking.loadingTitle', 'Loading booking page') : availability?.name}

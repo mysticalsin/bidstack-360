@@ -5,11 +5,13 @@ import { useSearchParams } from 'react-router-dom';
 import { ContactCsvImportDialog } from '@/components/contact/ContactCsvImportDialog';
 import { ContactDialog } from '@/components/contact/ContactDialog';
 import { ContactQuickLook } from '@/components/contact/ContactQuickLook';
+import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
 import { Button } from '@/components/ui/Button';
 import { BulkActionBar } from '@/components/ui/BulkActionBar';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { toast } from '@/components/ui/Toast';
 import {
   useContacts,
@@ -36,6 +38,7 @@ export function ContactsPage() {
   // idle tick rather than on every keystroke.
   const deferredSearch = useDeferredValue(search);
   const [editTarget, setEditTarget] = useState<Contact | null>(null);
+  const [showDuplicates, setShowDuplicates] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   // Reset to page 1 whenever the result set changes (new search or sort).
   const pager = useCursorPagination(`${deferredSearch}|${searchParams.get('sort') ?? ''}`);
@@ -93,6 +96,29 @@ export function ContactsPage() {
     state: sortState,
     onChange: setSortState,
   });
+
+  // Saved views. Search lives in component state (deferred, never in the URL),
+  // so serialize it explicitly on save and re-apply it on recall; sort already
+  // rides the URL and round-trips through the query string.
+  const buildViewQuery = () => {
+    const p = new URLSearchParams();
+    if (search.trim()) p.set('q', search.trim());
+    const sortParam = searchParams.get('sort');
+    if (sortParam) p.set('sort', sortParam);
+    const qs = p.toString();
+    return qs ? `?${qs}` : '';
+  };
+  const restoreView = (query: string) => {
+    const p = new URLSearchParams(query);
+    setSearch(p.get('q') ?? '');
+    const next = new URLSearchParams(searchParams);
+    const sortParam = p.get('sort');
+    // parseSortParam re-validates on read, so a stale sort key degrades to
+    // "unsorted" rather than throwing.
+    if (sortParam) next.set('sort', sortParam);
+    else next.delete('sort');
+    setSearchParams(next, { replace: true });
+  };
 
   // Bulk selection state. Keyed by contact id; toggling header checkbox
   // flips every visible row.
@@ -237,7 +263,7 @@ export function ContactsPage() {
       { key: 'createdAt', label: t('contacts.column.createdAt', 'Created at') },
     ]);
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`bidstack-contacts-${stamp}`, csv);
+    downloadCsv(`polo-presales-contacts-${stamp}`, csv);
     toast.success(
       t('contacts.toast.exportedCount', 'Exported {{count}} contacts', { count: rows.length }),
     );
@@ -333,6 +359,15 @@ export function ContactsPage() {
             <Icon name="download" size={14} />
             {t('contacts.actions.exportCsv.label', 'Export CSV')}
           </LiquidGlassButton>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setShowDuplicates(true)}
+            aria-label={t('contacts.actions.findDuplicates.aria', 'Find and merge duplicate contacts')}
+          >
+            <Icon name="copy" size={14} />
+            {t('contacts.actions.findDuplicates.label', 'Find duplicates')}
+          </Button>
           <ContactDialog
             trigger={
               <Button
@@ -347,6 +382,8 @@ export function ContactsPage() {
           />
         </div>
       </header>
+
+      <DuplicatesDialog entity="contact" open={showDuplicates} onOpenChange={setShowDuplicates} />
 
       {/* Bulk-action toolbar — only mounted when the user has a selection.
           Sits above the table so it doesn't displace any row. */}
@@ -379,6 +416,16 @@ export function ContactsPage() {
             </button>
           ) : null}
         </div>
+        <SavedViewsBar
+          surface="contacts"
+          basePath="/contacts"
+          namePlaceholder={t(
+            'contacts.savedViews.placeholder',
+            'e.g. "Economic buyers by influence"',
+          )}
+          getQuery={buildViewQuery}
+          onRestore={restoreView}
+        />
       </div>
 
       {/* aria-live region + data table — extracted to ContactTable for size. */}

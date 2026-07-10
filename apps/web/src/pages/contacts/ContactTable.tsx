@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
-import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import type { useDeleteContact, useUpdateContact } from '@/hooks/useContacts';
 import type { Contact, Sentiment } from '@bidstack/shared';
 
@@ -145,10 +145,11 @@ export function ContactTable({
           />
         ) : items.length === 0 ? (
           <EmptyState
+            icon={search ? 'search' : 'contacts'}
             title={
               search
                 ? t('contactTable.emptyFilteredTitle', 'No matches')
-                : t('contactTable.emptyTitle', 'No contacts yet')
+                : t('contactTable.emptyHeadline', 'Nobody in the buying group yet')
             }
             message={
               search
@@ -156,8 +157,8 @@ export function ContactTable({
                     search,
                   })
                 : t(
-                    'contactTable.emptyMessage',
-                    'Add the first decision-maker to start mapping the buying group.',
+                    'contactTable.emptyBody',
+                    'Bids are won by people. Add the evaluators, gatekeepers, and champions behind your deals — influence and sentiment mapping starts with the first name.',
                   )
             }
             action={
@@ -173,6 +174,13 @@ export function ContactTable({
                     </Button>
                   }
                 />
+              )
+            }
+            secondary={
+              search ? null : (
+                <EmptyStateLink to="/settings?tab=data-import">
+                  {t('contactTable.importCsv', 'Or import contacts from CSV')}
+                </EmptyStateLink>
               )
             }
           />

@@ -5,6 +5,7 @@
 // keeps accounts.ts within the file-size budget and the aggregation testable.
 
 import { prisma } from '@bidstack/db';
+import { microsToUnits } from '@bidstack/shared';
 
 export interface AccountStats {
   totalValue: number;
@@ -72,12 +73,16 @@ export async function fetchAccountStats(
   for (const row of totals) {
     if (!row.companyId) continue;
     const s = statsFor(row.companyId);
-    s.totalValue = Number(row._sum.valueMicros ?? 0) / 1_000_000;
+    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds
+    // the BigInt→Number conversion before dividing, corrupting totals past
+    // ~$9.007B. Postgres already summed exactly via groupBy; don't reintroduce
+    // float error converting the result.
+    s.totalValue = microsToUnits(row._sum.valueMicros ?? 0);
     s.opportunityCount = row._count._all;
   }
   for (const row of won) {
     if (!row.companyId) continue;
-    statsFor(row.companyId).wonValue = Number(row._sum.valueMicros ?? 0) / 1_000_000;
+    statsFor(row.companyId).wonValue = microsToUnits(row._sum.valueMicros ?? 0);
   }
   for (const row of open) {
     if (!row.companyId) continue;

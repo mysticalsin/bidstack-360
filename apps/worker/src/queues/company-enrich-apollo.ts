@@ -337,8 +337,8 @@ function buildApolloStrategicIntel({
       ? `Apollo synced ${summaryParts.join(', ')}.`
       : 'Apollo synced company profile; no strategic signals returned yet.',
     limitations: [
-      'Apollo account intelligence follows the connected Apollo plan and tool limits; credit-sensitive enrichment is opt-in in BidStack.',
-      'Emails and phone numbers are intentionally excluded from BidStack Apollo account intelligence.',
+      'Apollo account intelligence follows the connected Apollo plan and tool limits; credit-sensitive enrichment is opt-in in Polo PreSales.',
+      'Emails and phone numbers are intentionally excluded from Polo PreSales Apollo account intelligence.',
     ],
     signals,
   };

@@ -7,13 +7,23 @@
 import fp from 'fastify-plugin';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
-import { prisma } from '@bidstack/db';
 import type { PermissionKey } from '@bidstack/shared';
+
+import {
+  apiKeyScopeSatisfiesPermission,
+  allowLegacyRestApiKeyScopes,
+} from '../lib/api-key-scopes.js';
+import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     requireRole: (...allowed: string[]) => (req: FastifyRequest) => Promise<void>;
     requirePermission: (permission: PermissionKey) => (req: FastifyRequest) => Promise<void>;
+    requireHumanActor: (message?: string) => (req: FastifyRequest) => Promise<void>;
+    /** Non-throwing permission check for conditionally including sensitive fields
+     *  in a response (e.g. gate an admin-only field on an otherwise-readable
+     *  route). Mirrors requirePermission's decision but returns a boolean. */
+    hasPermission: (req: FastifyRequest, permission: PermissionKey) => Promise<boolean>;
   }
   // WHY: route config: { permission: '...' } is a convenience annotation used
   // by observability middleware to log which permission gate a route enforces.
@@ -24,22 +34,22 @@ declare module 'fastify' {
 }
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
-  server.decorate('requireRole', (...allowed: string[]) => async (req: FastifyRequest) => {
-    if (allowed.includes(req.auth.role)) return;
-
-    const assignedRoleCount = await prisma.userRole.count({
-      where: {
-        userId: req.auth.userId,
-        user: { orgId: req.auth.orgId, deletedAt: null },
-        role: {
-          orgId: req.auth.orgId,
-          name: { in: allowed },
-          deletedAt: null,
-        },
+  server.decorate(
+    'requireHumanActor',
+    (message = 'Requires a user session') =>
+      async (req: FastifyRequest) => {
+        if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
+          throw req.server.httpErrors.forbidden(message);
+        }
       },
-    });
+  );
 
-    if (assignedRoleCount === 0) {
+  server.decorate('requireRole', (...allowed: string[]) => async (req: FastifyRequest) => {
+    if (req.auth.role === 'api') {
+      throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
+    }
+    const allowedByDb = await userHasAnyRole(req.auth.orgId, req.auth.userId, allowed);
+    if (!allowedByDb) {
       throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
     }
   });
@@ -48,28 +58,16 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     'requirePermission',
     (permission: PermissionKey) => async (req: FastifyRequest) => {
       if (req.auth.role === 'api') {
-        const requiredScope = permission.endsWith(':write') ? 'write' : 'read';
-        if (req.auth.scopes.includes(requiredScope)) return;
-        throw req.server.httpErrors.forbidden(`Requires API key scope: ${requiredScope}`);
+        if (apiKeyScopeSatisfiesPermission(req.auth.scopes, permission)) return;
+        const legacyDetail = allowLegacyRestApiKeyScopes()
+          ? ` or legacy ${permission.endsWith(':write') ? 'write' : 'read'}`
+          : '';
+        throw req.server.httpErrors.forbidden(
+          `Requires API key scope: ${permission}${legacyDetail}`,
+        );
       }
 
-      const assignedPermissionCount = await prisma.userRole.count({
-        where: {
-          userId: req.auth.userId,
-          user: { orgId: req.auth.orgId, deletedAt: null },
-          role: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            permissions: {
-              some: {
-                permission: { key: permission },
-              },
-            },
-          },
-        },
-      });
-
-      if (assignedPermissionCount > 0) return;
+      if (await userHasPermission(req.auth.orgId, req.auth.userId, permission)) return;
 
       // No claim-based fallback. The previous code allowed `req.auth.role === 'admin'`
       // through unconditionally, which bypassed every granular check whenever the
@@ -78,6 +76,16 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       // in apps/api/src/plugins/auth.ts that ensures Clerk org-admins receive the
       // seeded "Admin" Role on first sign-in.
       throw req.server.httpErrors.forbidden(`Requires permission: ${permission}`);
+    },
+  );
+
+  server.decorate(
+    'hasPermission',
+    async (req: FastifyRequest, permission: PermissionKey): Promise<boolean> => {
+      if (req.auth.role === 'api') {
+        return apiKeyScopeSatisfiesPermission(req.auth.scopes, permission);
+      }
+      return userHasPermission(req.auth.orgId, req.auth.userId, permission);
     },
   );
 });

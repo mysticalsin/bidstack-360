@@ -1,5 +1,5 @@
 /**
- * SectorViewPage - Amaris presence by industry sector globally (A3).
+ * SectorViewPage - Mantu presence by industry sector globally (A3).
  * Source: ABC sector classification mirrored on company records. Sparse data
  * raises a quality banner instead of hiding the view.
  */
@@ -19,7 +19,7 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
@@ -40,6 +40,12 @@ export default function SectorViewPage() {
   const sectors = view.data?.sectors ?? [];
   const selectedSector =
     sectors.find((sector) => sector.sector === selectedSectorName) ?? sectors[0] ?? null;
+  // The "Largest sector" tile must reflect the sector with the most accounts —
+  // independent of which sector the user has selected in the radar list.
+  const largestSector = sectors.reduce<(typeof sectors)[number] | null>(
+    (max, sector) => (!max || sector.accountCount > max.accountCount ? sector : max),
+    null,
+  );
   const selectedSectorSignal = selectedSector ? sectorCoverageSignal(selectedSector) : null;
   const filteredAccounts = selectedSector
     ? country
@@ -182,11 +188,11 @@ export default function SectorViewPage() {
             <SectorMetric
               icon="contacts"
               label={t('sectorView.metricLeaders', 'Largest sector')}
-              value={selectedSector?.sector ?? '-'}
+              value={largestSector?.sector ?? '-'}
               detail={
-                selectedSector
+                largestSector
                   ? t('sectorView.metricLeaderDetail', '{{count}} accounts', {
-                      count: selectedSector.accountCount,
+                      count: largestSector.accountCount,
                     })
                   : '-'
               }
@@ -410,6 +416,11 @@ function SectorMetric({
 
 function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const { t } = useTranslation('crm');
+  // Use the currency-aware formatter so this figure tracks the user's selected
+  // display currency like every other money surface — the module-level
+  // formatMoneyMicros hardcoded EUR and diverged from Territories/Opportunities
+  // showing the same segment data in the chosen currency.
+  const { formatMoneyMicros } = useFormatMoney();
   if (items.length === 0) {
     return (
       <EmptyState
@@ -429,7 +440,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatMoneyMicros(seg.totalValueMicros, 'EUR'),
+                value: formatMoneyMicros(seg.totalValueMicros),
               })}
             </span>
           </div>

@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "Nessun account ancora",
+      "body": "Aggiungi il tuo primo account o sincronizza i principali clienti ERP qui sopra — pipeline, salute dell'account e segnali tecnologici si popoleranno automaticamente.",
+      "importCsv": "Oppure importa gli account da CSV",
       "filtered": "Nessun account corrisponde ai tuoi filtri"
     },
     "summary": {
@@ -390,7 +392,7 @@
     },
     "sync": {
       "result": "{{enriched}} arricchiti / {{cached}} in cache",
-      "buttonTitle": "Sincronizza i principali clienti sale.order dell'ERP negli account BidStack verificati",
+      "buttonTitle": "Sincronizza i principali clienti sale.order dell'ERP negli account Polo PreSales verificati",
       "inProgress": "Sincronizzazione...",
       "button": "Sincronizza account ERP",
       "errorTitle": "Sincronizzazione degli account ERP non riuscita",
@@ -2022,7 +2024,7 @@
     "errorBookingFailed": "Prenotazione non riuscita",
     "notFoundTitle": "Pagina di prenotazione non trovata",
     "notFoundBody": "Questo link di pianificazione non è valido o non accetta più riunioni.",
-    "eyebrow": "Pianificazione BidStack",
+    "eyebrow": "Pianificazione Polo PreSales",
     "loadingTitle": "Caricamento della pagina di prenotazione",
     "confirmedTitle": "Prenotazione confermata",
     "confirmedBody": "La prenotazione è fatta. Un'email di conferma è in arrivo.",
@@ -2095,7 +2097,7 @@
   },
   "topAccounts": {
     "heading": "Account principali",
-    "badgeCurated": "Selezionati — top 10 globale Amaris",
+    "badgeCurated": "Selezionati — top 10 globale",
     "badgeAuto": "Classificato automaticamente per valore della pipeline",
     "subtitleCurated": "La top 10 globale, selezionata e ordinata dagli amministratori nelle Impostazioni.",
     "subtitleAuto": "Account di maggior valore classificati per pipeline totale e ricavi.",
@@ -2153,9 +2155,9 @@
   },
   "commandCenter": {
     "region": {
-      "ariaLabel": "Centro di comando BidStack"
+      "ariaLabel": "Centro di comando Polo PreSales"
     },
-    "kicker": "Centro di comando BidStack",
+    "kicker": "Centro di comando Polo PreSales",
     "actions": {
       "ariaLabel": "Segnali decisionali dell'account"
     },
@@ -2535,10 +2537,10 @@
     "adminOnlyBadge": "Solo amministratori",
     "editTitle": "Modifica iscrizione webhook",
     "createTitle": "Nuova iscrizione webhook",
-    "subtitle": "Usa un endpoint HTTPS di produzione. BidStack firma ogni consegna con HMAC-SHA256.",
+    "subtitle": "Usa un endpoint HTTPS di produzione. Polo PreSales firma ogni consegna con HMAC-SHA256.",
     "closeAriaLabel": "Chiudi",
     "endpointUrlLabel": "URL dell'endpoint",
-    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
     "endpointUrlHelp": "HTTPS è obbligatorio. Localhost, IP privati e nomi host interni vengono rifiutati.",
     "eventsLabel": "Eventi",
     "eventsHelp": "Seleziona solo gli eventi che il tuo ricevitore gestisce realmente.",
@@ -2546,7 +2548,7 @@
     "clear": "Cancella",
     "securityContractTitle": "Contratto di sicurezza",
     "securityReturn2xx": "Restituisci uno stato 2xx entro 10 secondi.",
-    "securityVerifyHeader": "Verifica l'intestazione X-BidStack-Signature.",
+    "securityVerifyHeader": "Verifica l'intestazione X-Polo-Signature.",
     "securityRejectOld": "Rifiuta le firme più vecchie di 5 minuti.",
     "securityAsync": "Elabora il lavoro pesante in modo asincrono dopo la conferma.",
     "selectedEventsLabel": "Eventi selezionati",
@@ -2753,6 +2755,7 @@
   },
   "intelCards": {
     "dataFreshness": "Intelligence aggiornata {{date}} · Fonti: Crunchbase, LinkedIn, registro UE",
+    "noIntel": "Nessun dato esterno per ora — le fonti non sono ancora state interrogate per questa opportunità.",
     "financial": {
       "title": "Salute finanziaria",
       "private": "Privata",
@@ -3359,7 +3362,7 @@
   },
   "sectorView": {
     "title": "Vista per settore",
-    "subtitle": "Dove Amaris è attiva per settore — account, paesi e volume FTE da ABC.",
+    "subtitle": "Dove Mantu è attiva per settore — account, paesi e volume FTE da ABC.",
     "errorTitle": "Impossibile caricare la vista per settore",
     "errorMessage": "L'endpoint del settore non ha risposto.",
     "emptyTitle": "Nessun dato di settore ancora",
@@ -3424,8 +3427,8 @@
     "submit": "Converti lead",
     "cancel": "Annulla"
   },
-  "bidStack360Logo": {
-    "title": "BidStack 360",
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
     "tagline": "PIATTAFORMA DI PILOTAGGIO GARE"
   },
   "leadRow": {
@@ -3566,7 +3569,7 @@
   },
   "kpiSidebar": {
     "title": "Stato della piattaforma",
-    "caption": "Ultime metriche BidStack disponibili",
+    "caption": "Ultime metriche Polo PreSales disponibili",
     "releaseScore": "Punteggio di rilascio",
     "providersHealthy": "Provider integri",
     "queueBacklog": "Arretrato della coda",

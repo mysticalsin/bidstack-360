@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 
 const GMAIL_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -122,7 +123,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       if (error) {
         server.log.warn({ error }, 'Gmail OAuth denied by user');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=gmail_denied`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=gmail_denied`,
         );
       }
       if (!code || !state) {
@@ -146,7 +147,10 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       // Exchange auth code for access + refresh tokens
-      const tokenRes = await fetch(GMAIL_TOKEN_URL, {
+      const tokenRes = await fetchWithTimeout(GMAIL_TOKEN_URL, {
+        provider: 'Gmail',
+        operation: 'oauth.exchange',
+        timeoutMs: providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000),
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -162,7 +166,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         const body = await tokenRes.text();
         server.log.error({ status: tokenRes.status, body }, 'Gmail token exchange failed');
         return reply.redirect(
-          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?error=gmail_token_failed`,
+          `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=gmail_token_failed`,
         );
       }
 
@@ -176,11 +180,21 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       // Fetch the user's Gmail address for display
       let externalEmail: string | undefined;
-      let gmailProfileEvidence: { emailAddress?: string; messagesTotal?: number; threadsTotal?: number } | null = null;
+      let gmailProfileEvidence: {
+        emailAddress?: string;
+        messagesTotal?: number;
+        threadsTotal?: number;
+      } | null = null;
       try {
-        const profileRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        });
+        const profileRes = await fetchWithTimeout(
+          'https://www.googleapis.com/oauth2/v1/userinfo?alt=json',
+          {
+            provider: 'Gmail',
+            operation: 'oauth.userinfo',
+            timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          },
+        );
         if (profileRes.ok) {
           const profile = (await profileRes.json()) as { email?: string };
           externalEmail = profile.email;
@@ -190,9 +204,15 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       try {
-        const gmailProfileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        });
+        const gmailProfileRes = await fetchWithTimeout(
+          'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+          {
+            provider: 'Gmail',
+            operation: 'profile.get',
+            timeoutMs: providerTimeoutMs('GMAIL_HTTP_TIMEOUT_MS', 15_000),
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          },
+        );
         if (gmailProfileRes.ok) {
           gmailProfileEvidence = (await gmailProfileRes.json()) as {
             emailAddress?: string;
@@ -247,7 +267,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       );
 
       return reply.redirect(
-        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?connected=gmail`,
+        `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&connected=gmail`,
       );
     },
   });

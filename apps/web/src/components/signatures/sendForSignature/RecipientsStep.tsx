@@ -6,7 +6,7 @@ import { type Recipient, FieldLabel, inputClass } from './signatureModalShared';
 interface Props {
   recipients: Recipient[];
   onChangeRecipients: (r: Recipient[]) => void;
-  onBack: () => void;
+  onBack?: () => void;
   onNext: () => void;
 }
 
@@ -31,7 +31,11 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3" role="list" aria-label={t('recipientsStep.listAriaLabel', 'Recipients')}>
+      <div
+        className="flex flex-col gap-3"
+        role="list"
+        aria-label={t('recipientsStep.listAriaLabel', 'Recipients')}
+      >
         {recipients.map((r, i) => (
           <div
             key={i}
@@ -67,7 +71,9 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
               />
             </div>
             <div>
-              <FieldLabel htmlFor={`recip-role-${i}`}>{t('recipientsStep.roleLabel', 'Role')}</FieldLabel>
+              <FieldLabel htmlFor={`recip-role-${i}`}>
+                {t('recipientsStep.roleLabel', 'Role')}
+              </FieldLabel>
               <select
                 id={`recip-role-${i}`}
                 value={r.role}
@@ -82,7 +88,11 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
               <button
                 type="button"
                 onClick={() => removeRecipient(i)}
-                aria-label={t('recipientsStep.removeRecipientAriaLabel', 'Remove recipient {{recipient}}', { recipient: r.name || i + 1 })}
+                aria-label={t(
+                  'recipientsStep.removeRecipientAriaLabel',
+                  'Remove recipient {{recipient}}',
+                  { recipient: r.name || i + 1 },
+                )}
                 disabled={recipients.length === 1}
                 className={cn(
                   'min-h-[44px] min-w-[44px] rounded-lg border border-[var(--border-default)]',
@@ -112,18 +122,20 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
         {t('recipientsStep.addRecipient', '+ Add recipient')}
       </button>
 
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className={cn(
-            'min-h-[44px] rounded-lg border border-[var(--border-default)] px-4 text-sm text-[var(--fg-secondary)]',
-            'hover:bg-[var(--surface-sunken)] transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1',
-          )}
-        >
-          {t('recipientsStep.back', 'Back')}
-        </button>
+      <div className={cn('flex', onBack ? 'justify-between' : 'justify-end')}>
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className={cn(
+              'min-h-[44px] rounded-lg border border-[var(--border-default)] px-4 text-sm text-[var(--fg-secondary)]',
+              'hover:bg-[var(--surface-sunken)] transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1',
+            )}
+          >
+            {t('recipientsStep.back', 'Back')}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onNext}

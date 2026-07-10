@@ -21,6 +21,7 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   assignment: 'target',
   bid_override: 'shield',
   stage_change: 'growth',
+  task_due: 'clock',
   system: 'info',
 };
 
@@ -127,8 +128,24 @@ export function NotificationsBell() {
                   {t('topbarNotifications.errorMessage', 'Could not load notifications')}
                 </div>
               ) : notifications.isLoading ? (
-                <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
-                  {t('topbarNotifications.loading', 'Loading…')}
+                // Shimmer rows shaped like real notification items (icon dot +
+                // two text lines) — matches the app-wide bs-shimmer skeleton
+                // system instead of a bare "Loading…" string.
+                <div
+                  aria-busy="true"
+                  aria-live="polite"
+                  aria-label={t('topbarNotifications.loading', 'Loading…')}
+                  className="flex flex-col gap-0.5"
+                >
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-3 px-3 py-2.5" aria-hidden>
+                      <span className="bs-shimmer mt-0.5 h-6 w-6 shrink-0 rounded-full" />
+                      <span className="flex-1 space-y-1.5">
+                        <span className="bs-shimmer block h-3 w-3/4" />
+                        <span className="bs-shimmer block h-2.5 w-1/2" />
+                      </span>
+                    </div>
+                  ))}
                 </div>
               ) : items.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">

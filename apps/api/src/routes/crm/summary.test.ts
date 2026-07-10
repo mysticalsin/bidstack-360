@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../../server.js';
+import { makeSkipIfNoDb } from '../../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -24,13 +25,7 @@ afterAll(async () => {
   if (dbReachable) await prisma.$disconnect();
 });
 
-const failIfNoDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbReachable) {
-      throw new Error(`[skip] ${name} - DATABASE_URL not reachable`);
-    }
-    await fn();
-  });
+const failIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('crm summary routes', () => {
   failIfNoDb('GET /api/crm/summary returns bounded activity and counts', async () => {

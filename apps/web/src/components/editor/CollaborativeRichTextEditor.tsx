@@ -28,16 +28,22 @@ import type { RemoteCursor, ConnectionState } from '@/lib/yjs-client';
 
 // ─── Cursor colours pool ──────────────────────────────────────────────────
 // Deterministic colour per user so it stays stable across reconnects.
+// These are literal hex on purpose: a collaborator's colour travels over the
+// wire and must render identically for every client in either theme, so it
+// cannot be a theme token. Each hue sits in the luminance band where WHITE
+// label text is ≥ 4.5:1 AND the caret keeps ≥ 3:1 against both the white and
+// the near-black editor surface (the previous 500-weight pool failed the
+// white-label check on 6 of 8 hues).
 
 const CURSOR_COLORS = [
-  '#6366f1', // indigo
-  '#ec4899', // pink
-  '#f59e0b', // amber
-  '#10b981', // emerald
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#ef4444', // red
-  '#14b8a6', // teal
+  '#4f46e5', // indigo — white 6.3:1
+  '#db2777', // pink — white 4.6:1
+  '#b45309', // amber — white 5.0:1
+  '#047857', // emerald — white 5.5:1
+  '#2563eb', // blue — white 5.2:1
+  '#7c3aed', // violet — white 5.7:1
+  '#dc2626', // red — white 4.8:1
+  '#0f766e', // teal — white 5.5:1
 ];
 
 function colorForUser(userId: string): string {
@@ -81,10 +87,7 @@ export function CollaborativeRichTextEditor({
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
 
-  const localColor = useMemo(
-    () => colorForUser(userId ?? userName),
-    [userId, userName],
-  );
+  const localColor = useMemo(() => colorForUser(userId ?? userName), [userId, userName]);
 
   const { yText, ydoc, connectionState, remoteCursors, setCursor } = useYjsField({
     ...yjsOptions,
@@ -107,8 +110,8 @@ export function CollaborativeRichTextEditor({
         user: { name: userName, color: localColor },
       }),
     ];
-  // Remote cursors change frequently; we only rebuild extensions when ydoc changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Remote cursors change frequently; we only rebuild extensions when ydoc changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ydoc, userName, localColor]);
 
   const editor = useEditor({
@@ -142,32 +145,28 @@ export function CollaborativeRichTextEditor({
       const names = remoteCursors.map((c) => c.name).join(', ');
       setLiveRegionText(
         remoteCursors.length === 1
-          ? t('collaborativeRichTextEditor.editingAnnouncementOne', '{{names}} is editing', { names })
-          : t('collaborativeRichTextEditor.editingAnnouncementOther', '{{names}} are editing', { names }),
+          ? t('collaborativeRichTextEditor.editingAnnouncementOne', '{{names}} is editing', {
+              names,
+            })
+          : t('collaborativeRichTextEditor.editingAnnouncementOther', '{{names}} are editing', {
+              names,
+            }),
       );
     }, 2_000);
 
     return () => {
       if (announcementTimer.current) clearTimeout(announcementTimer.current);
     };
-  }, [remoteCursors]);
+  }, [remoteCursors, t]);
 
   // ─── Connection status badge ───────────────────────────────────────────
 
   const statusLabel = statusBadgeLabel(connectionState, t);
 
   return (
-    <div
-      className={`collaborative-editor relative ${className}`}
-      data-connection={connectionState}
-    >
+    <div className={`collaborative-editor relative ${className}`} data-connection={connectionState}>
       {/* Screen-reader live region for cursor announcements. */}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveRegionText}
       </div>
 
@@ -191,20 +190,34 @@ export function CollaborativeRichTextEditor({
       <div
         className={[
           'prose prose-sm dark:prose-invert max-w-none',
-          'border border-[var(--border)] rounded-md p-3',
+          'border border-[var(--border-default)] rounded-md p-3',
           'focus-within:ring-2 focus-within:ring-[var(--ring)] focus-within:ring-offset-1',
-          'bg-[var(--surface)] text-[var(--text-primary)]',
+          'bg-[var(--surface-card)] text-[var(--text-primary)]',
           readOnly ? 'opacity-60 pointer-events-none' : '',
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        {!yText && (
-          // Placeholder shown while Y.Doc is loading.
-          <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
-            {placeholder ?? t('collaborativeRichTextEditor.loading', 'Loading…')}
-          </p>
-        )}
+        {!yText &&
+          // Shown while Y.Doc is loading: the caller's placeholder text if
+          // provided, otherwise shimmer text lines from the shared skeleton
+          // system (never a bare "Loading…" string).
+          (placeholder ? (
+            <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
+              {placeholder}
+            </p>
+          ) : (
+            <div
+              className="space-y-2"
+              aria-busy="true"
+              aria-live="polite"
+              aria-label={t('collaborativeRichTextEditor.loading', 'Loading…')}
+            >
+              <span className="bs-shimmer block h-3 w-3/4" aria-hidden />
+              <span className="bs-shimmer block h-3 w-full" aria-hidden />
+              <span className="bs-shimmer block h-3 w-2/3" aria-hidden />
+            </div>
+          ))}
         {yText && <EditorContent editor={editor} />}
       </div>
 
@@ -216,13 +229,7 @@ export function CollaborativeRichTextEditor({
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
-function CursorBadge({
-  cursor,
-  reducedMotion,
-}: {
-  cursor: RemoteCursor;
-  reducedMotion: boolean;
-}) {
+function CursorBadge({ cursor, reducedMotion }: { cursor: RemoteCursor; reducedMotion: boolean }) {
   return (
     <span
       className={[
@@ -235,27 +242,20 @@ function CursorBadge({
       style={{ backgroundColor: cursor.color }}
       title={cursor.name}
     >
-      <span
-        className="block w-1.5 h-1.5 rounded-full bg-white opacity-80"
-        aria-hidden="true"
-      />
+      <span className="block w-1.5 h-1.5 rounded-full bg-white opacity-80" aria-hidden="true" />
       {cursor.name}
     </span>
   );
 }
 
-function ConnectionBadge({
-  label,
-  state,
-}: {
-  label: string;
-  state: ConnectionState;
-}) {
+function ConnectionBadge({ label, state }: { label: string; state: ConnectionState }) {
+  // Theme tokens only — the semantic fg tokens already flip per theme, so no
+  // dark: mirrors (and no raw palette classes that ignore data-theme).
   const colors: Record<ConnectionState, string> = {
-    connected: 'text-emerald-600 dark:text-emerald-400',
-    connecting: 'text-amber-500 dark:text-amber-400',
+    connected: 'text-[var(--success-fg)]',
+    connecting: 'text-[var(--warning-fg)]',
     disconnected: 'text-[var(--text-muted)]',
-    error: 'text-red-500 dark:text-red-400',
+    error: 'text-[var(--fg-error)]',
   };
 
   return (
@@ -269,10 +269,14 @@ function ConnectionBadge({
 
 function statusBadgeLabel(state: ConnectionState, t: TFunction): string {
   switch (state) {
-    case 'connected': return t('collaborativeRichTextEditor.statusLive', 'Live');
-    case 'connecting': return t('collaborativeRichTextEditor.statusConnecting', 'Connecting…');
-    case 'disconnected': return t('collaborativeRichTextEditor.statusOffline', 'Offline');
-    case 'error': return t('collaborativeRichTextEditor.statusError', 'Error');
+    case 'connected':
+      return t('collaborativeRichTextEditor.statusLive', 'Live');
+    case 'connecting':
+      return t('collaborativeRichTextEditor.statusConnecting', 'Connecting…');
+    case 'disconnected':
+      return t('collaborativeRichTextEditor.statusOffline', 'Offline');
+    case 'error':
+      return t('collaborativeRichTextEditor.statusError', 'Error');
   }
 }
 
@@ -290,8 +294,12 @@ function createAwarenessShim(cursors: RemoteCursor[]) {
 
   return {
     getStates: () => states,
-    on: () => { /* no-op: updates come via re-render */ },
-    off: () => { /* no-op */ },
+    on: () => {
+      /* no-op: updates come via re-render */
+    },
+    off: () => {
+      /* no-op */
+    },
   };
 }
 

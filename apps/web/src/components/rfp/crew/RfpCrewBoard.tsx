@@ -250,8 +250,10 @@ function OversightRow({
     <div
       ref={setNodeRef}
       className={cn(
-        'grid gap-3 rounded-xl border border-amber-300/50 bg-amber-50/40 p-2 dark:border-amber-800/40 dark:bg-amber-950/10 sm:grid-cols-2',
-        isOver && 'ring-2 ring-amber-400',
+        // Amber = supervision. --warning/--warning-tint resolve per theme, so
+        // no dark: mirrors needed; the /alpha keeps it a wash, not an alert.
+        'grid gap-3 rounded-xl border border-[var(--warning)]/30 bg-[var(--warning-tint)]/60 p-2 sm:grid-cols-2',
+        isOver && 'ring-2 ring-[var(--warning)]',
       )}
     >
       {members.map((m) => (

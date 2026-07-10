@@ -1,4 +1,4 @@
-// Lucide-style inline SVG set, ported from the BidStack 360° design prototype.
+// Lucide-style inline SVG set, ported from the Polo PreSales design prototype.
 // Stroke-based icons inherit currentColor — wraps a fixed viewBox for crispness
 // at any size. Limit to icons actually used in the shell; add more as needed.
 

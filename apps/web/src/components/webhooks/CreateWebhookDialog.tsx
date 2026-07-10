@@ -76,7 +76,7 @@ export function CreateWebhookDialog({
             <p className="mt-1 text-xs text-[var(--fg-secondary)]">
               {t(
                 'createWebhook.subtitle',
-                'Use a production HTTPS endpoint. BidStack signs every delivery with HMAC-SHA256.',
+                'Use a production HTTPS endpoint. Polo PreSales signs every delivery with HMAC-SHA256.',
               )}
             </p>
           </div>
@@ -107,7 +107,7 @@ export function CreateWebhookDialog({
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder={t(
                   'createWebhook.endpointUrlPlaceholder',
-                  'https://your-app.com/webhooks/bidstack',
+                  'https://your-app.com/webhooks/polo',
                 )}
                 required
                 autoFocus
@@ -212,7 +212,7 @@ export function CreateWebhookDialog({
               <ul className="mt-3 space-y-2 text-xs leading-5 text-[var(--fg-secondary)]">
                 <li>{t('createWebhook.securityReturn2xx', 'Return a 2xx status within 10 seconds.')}</li>
                 <li>
-                  {t('createWebhook.securityVerifyHeader', 'Verify the X-BidStack-Signature header.')}
+                  {t('createWebhook.securityVerifyHeader', 'Verify the X-Polo-Signature header.')}
                 </li>
                 <li>
                   {t('createWebhook.securityRejectOld', 'Reject signatures older than 5 minutes.')}

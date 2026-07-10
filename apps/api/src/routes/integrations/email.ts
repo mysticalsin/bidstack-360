@@ -15,7 +15,11 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
 
   // POST /email/send
+  // WHY integrations:write: sending mail from the org's connected mailbox is a
+  // privileged outbound action — a read-only role or a read-scoped API key must
+  // not be able to send (impersonation/abuse). Mirrors the SMS send gate.
   app.post('/email/send', {
+    preHandler: server.requirePermission('integrations:write'),
     schema: {
       body: SendEmailRequest,
       response: {
@@ -126,6 +130,16 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
 
       const tokens = await prisma.integrationToken.findMany({
         where: { orgId, userId, deletedAt: null },
+        // Defense-in-depth: never load the *Encrypted token columns into memory
+        // for a status read — select only the non-secret fields the view uses.
+        select: {
+          provider: true,
+          status: true,
+          externalAccountEmail: true,
+          lastSyncedAt: true,
+          errorMessage: true,
+          scope: true,
+        },
         take: 100,
       });
 

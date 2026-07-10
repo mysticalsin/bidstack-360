@@ -23,6 +23,10 @@ const fixture: GoldenFixture = {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  // vi.stubGlobal('fetch', ...) is NOT undone by restoreAllMocks — without this
+  // the mocked fetch leaks into later test files (serial worker, fileParallelism
+  // off), causing cross-file flakiness in the full suite.
+  vi.unstubAllGlobals();
   for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
     if (value === undefined) {
       delete process.env[key];

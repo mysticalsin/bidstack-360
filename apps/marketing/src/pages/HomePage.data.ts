@@ -43,13 +43,13 @@ export const FEATURES = [
 export const TESTIMONIALS = [
   {
     quote:
-      'We retired three tools — CRM, proposal builder, and a homegrown bid tracker — and consolidated on BidStack. Win rate is up 12 points.',
+      'We retired three tools — CRM, proposal builder, and a homegrown bid tracker — and consolidated on Polo PreSales. Win rate is up 12 points.',
     name: 'Pierre Laurent',
     role: 'Sales Director, Amaris',
   },
   {
     quote:
-      'Drafting a proposal used to take a week. With BidStack and the Dust co-pilots, my team turns RFPs around in two days.',
+      'Drafting a proposal used to take a week. With Polo PreSales and the Dust co-pilots, my team turns RFPs around in two days.',
     name: 'Sophie Chen',
     role: 'RFP Manager, LittleBig',
   },
@@ -109,7 +109,7 @@ export function useJsonLd() {
       {
         '@context': 'https://schema.org',
         '@type': 'Organization',
-        name: 'BidStack',
+        name: 'Polo PreSales',
         url: 'https://bidstack.dev',
         logo: 'https://bidstack.dev/og/logo.png',
         sameAs: ['https://twitter.com/bidstack', 'https://www.linkedin.com/company/bidstack'],
@@ -117,7 +117,7 @@ export function useJsonLd() {
       {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'BidStack 360°',
+        name: 'Polo PreSales',
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         offers: {

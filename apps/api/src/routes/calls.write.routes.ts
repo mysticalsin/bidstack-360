@@ -34,6 +34,10 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/calls/quick-start',
     {
+      // Creates a callSession + spends real money (Zoom/Teams/Meet/Twilio).
+      // Entity ownership is checked in the handler, but the write itself was
+      // ungated — a read-only role/key could incur provider cost.
+      preHandler: [app.requirePermission('activities:write')],
       schema: {
         description: 'Start an instant video/voice call for a CRM entity',
         tags: ['calls'],
@@ -146,6 +150,8 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/calls/schedule',
     {
+      // Same as quick-start: creates a callSession + provider cost; gate it.
+      preHandler: [app.requirePermission('activities:write')],
       schema: {
         description: 'Schedule a video call for a CRM entity with attendees',
         tags: ['calls'],

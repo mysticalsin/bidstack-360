@@ -35,6 +35,9 @@ Required scopes:
 - `read` for read-only tools.
 - `write` for mutation tools.
 
+These are MCP tool-class scopes. Production REST routes use exact permission
+scopes instead, for example `opportunities:read` or `integrations:write`.
+
 Missing, revoked, or malformed keys return `401`. Keys without the required tool scope return `403`.
 
 ## Tool Scopes
@@ -71,6 +74,16 @@ curl -s http://localhost:4001/mcp \
 ```
 
 Read-only keys should be tested by minting a key with `["mcp","read"]` and confirming write tools return `403`.
+
+## Release Evidence
+
+Before onboarding real data, run:
+
+```bash
+pnpm deploy:evidence:mcp
+```
+
+The command requires a non-local `BIDSTACK_MCP_CONNECTIVITY_TARGET`, a bearer token with `mcp` plus the needed tool-class scope, and deployed `BIDSTACK_RELEASE_COMMIT` / `BIDSTACK_RELEASE_BRANCH` values that match source-control evidence. It checks discovery, health, release identity, session initialize, `tools/list`, and one read-only `tools/call`. The default smoke is `crm_search_companies` with a no-match query and `limit:1`, so the release artifact proves execution without persisting customer records. The artifact must contain only release identity, tool names, status, result-shape counts, and privacy flags; raw arguments and raw tool output are release-gate failures.
 
 ## Registering with Dust
 

@@ -9,13 +9,15 @@
  * Run `scripts/encrypt-existing-pii.ts` BEFORE flipping the flag.
  *
  * PII field map (write-side fields encrypted; read-side fields decrypted):
- *   Contact : email, phone, mobilePhone
- *   Lead    : email, phone
- *   User    : email — NOTE: auth lookup uses clerkUser (external ID), not email,
- *             so encrypting User.email does NOT break authentication.
+ *   Contact       : email, phone
+ *   Lead          : email, phone
+ *   KamConsultant : email
  *
  * Hash columns (for equality search without decryption):
- *   Contact.emailHash, Lead.emailHash
+ *   Contact.emailHash, Lead.emailHash, KamConsultant.emailHash
+ *
+ * User.email is intentionally excluded until the schema has a generated
+ * User.emailHash migration and every auth/assignment lookup is hash-aware.
  */
 
 import {
@@ -55,7 +57,6 @@ const PII_MAP: Record<string, ModelPiiConfig> = {
     fields: [
       { name: 'email', type: 'email' },
       { name: 'phone', type: 'phone' },
-      { name: 'mobilePhone', type: 'phone' },
     ],
     hashField: { source: 'email', hashColumn: 'emailHash' },
   },
@@ -65,10 +66,6 @@ const PII_MAP: Record<string, ModelPiiConfig> = {
       { name: 'phone', type: 'phone' },
     ],
     hashField: { source: 'email', hashColumn: 'emailHash' },
-  },
-  user: {
-    fields: [{ name: 'email', type: 'email' }],
-    // No hash column for User — auth lookup goes via clerkUser, not email
   },
   // KAM consultant email is encrypted + hashed like Contact/Lead. NOTE:
   // KamSession.transcriptText and KamSession.attendees[] are intentionally NOT
@@ -101,29 +98,14 @@ function encryptPayload(
 
   for (const { name } of config.fields) {
     const val = result[name];
+    if (config.hashField?.source === name && (val === null || val === '')) {
+      result[config.hashField.hashColumn] = null;
+    }
     if (typeof val === 'string' && val.length > 0 && !isEncrypted(val)) {
-      result[name] = encryptPiiField(val, orgId);
-    }
-    // Track raw value for hashing before we overwrite
-    if (config.hashField?.source === name && typeof val === 'string' && val.length > 0) {
-      result[config.hashField.hashColumn] = hashPiiField(
-        isEncrypted(val) ? val : val, // plaintext before encryption
-        orgId,
-      );
-    }
-  }
-
-  // Re-compute hash AFTER we have the plaintext value (before encryption)
-  if (config.hashField) {
-    const { source, hashColumn } = config.hashField;
-    const originalValue = data[source];
-    if (typeof originalValue === 'string' && originalValue.length > 0) {
-      const plain = isEncrypted(originalValue)
-        ? originalValue // already encrypted — cannot re-hash; skip
-        : originalValue;
-      if (!isEncrypted(plain)) {
-        result[hashColumn] = hashPiiField(plain, orgId);
+      if (config.hashField?.source === name) {
+        result[config.hashField.hashColumn] = hashPiiField(val, orgId);
       }
+      result[name] = encryptPiiField(val, orgId);
     }
   }
 
@@ -169,33 +151,88 @@ function encryptWritePayload(
   return data;
 }
 
+/**
+ * Resolves the orgId of the row targeted by a unique `where`, or null when it
+ * cannot be determined. Injectable so tests can stub the DB lookup.
+ */
+type RowOrgIdResolver = (modelName: string, where: unknown) => Promise<string | null>;
+
+/**
+ * Default resolver: read the target row's own orgId through the shared client.
+ *
+ * WHY: the codebase's sanctioned multi-tenancy pattern is an org-scoped fetch
+ * to verify ownership, then `update({ where: { id }, data })` — the update
+ * itself carries no orgId in data OR where (tenant-scope-guard classifies
+ * `update` as report-only for exactly this shape). Failing loud on it would
+ * turn every contact/lead edit that touches email/phone into a hard error the
+ * moment PII_FIELD_ENCRYPTION flips on. The row is the authoritative record of
+ * which org's key seals its fields — the same rule decryptRecord applies on
+ * the read side — so consult the row instead of the args.
+ *
+ * The import is lazy because index.ts registers this middleware (a static
+ * import would be circular). Going through the shared client re-enters the
+ * middleware chain, which is safe: a `select: { orgId }` read carries no PII
+ * to encrypt, decrypt, or hash-rewrite, and soft-delete scoping means a
+ * tombstoned row resolves to null → the write still fails loud. NOTE: the
+ * probe runs outside any interactive transaction the update is in; orgId is
+ * immutable and set at insert, so any committed row answers correctly. A row
+ * created inside the SAME open transaction must keep carrying orgId in its
+ * update args, exactly as before this fallback existed.
+ */
+async function lookupRowOrgId(modelName: string, where: unknown): Promise<string | null> {
+  if (!where || typeof where !== 'object') return null;
+  const { prisma } = await import('../index.js');
+  const delegateName = modelName.charAt(0).toLowerCase() + modelName.slice(1);
+  const delegate = (
+    prisma as unknown as Record<
+      string,
+      | { findUnique(args: { where: unknown; select: { orgId: boolean } }): Promise<unknown> }
+      | undefined
+    >
+  )[delegateName];
+  if (!delegate) return null;
+  const row = (await delegate.findUnique({ where, select: { orgId: true } })) as {
+    orgId?: unknown;
+  } | null;
+  return typeof row?.orgId === 'string' ? row.orgId : null;
+}
+
 // ----- Read-side helpers ----------------------------------------------------
 
 function decryptRecord(
   model: string,
   record: Record<string, unknown>,
-  orgId: string,
+  orgId: string | null,
 ): Record<string, unknown> {
   const config = PII_MAP[model.toLowerCase()];
   if (!config) return record;
 
   const result = { ...record };
+  // Prefer the row's OWN orgId over the query-extracted one: the query value
+  // can name a different org than the row (e.g. harvested from an unrelated
+  // where branch), and decrypting with the wrong org's key does not fail — it
+  // silently returns mask strings. The row itself is the authoritative record
+  // of which org's key sealed its fields.
+  const rowOrgId = typeof result.orgId === 'string' ? result.orgId : null;
+  const recordOrgId = rowOrgId ?? orgId;
 
   for (const { name, type } of config.fields) {
     const val = result[name];
     if (typeof val === 'string' && isEncrypted(val)) {
-      result[name] = decryptPiiField(val, orgId, type);
+      if (!recordOrgId) {
+        throw new Error(
+          `[pii-encryption] Refusing to return encrypted ${model}.${name} without orgId for decryption. ` +
+            'Include orgId in the where clause or selected row.',
+        );
+      }
+      result[name] = decryptPiiField(val, recordOrgId, type);
     }
   }
 
   return result;
 }
 
-function decryptResult(
-  model: string,
-  result: unknown,
-  orgId: string,
-): unknown {
+function decryptResult(model: string, result: unknown, orgId: string | null): unknown {
   if (!result) return result;
 
   if (Array.isArray(result)) {
@@ -213,6 +250,134 @@ function decryptResult(
   return result;
 }
 
+// ----- Search-side helpers --------------------------------------------------
+
+function rewriteEmailFiltersForHash(
+  model: string,
+  args: Record<string, unknown> | undefined,
+): void {
+  const config = PII_MAP[model.toLowerCase()];
+  if (!config?.hashField || !args) return;
+
+  const where = args.where;
+  if (!where || typeof where !== 'object' || Array.isArray(where)) return;
+
+  args.where = rewriteWhereObject(
+    model,
+    where as Record<string, unknown>,
+    extractOrgId(args),
+    config.hashField,
+  );
+}
+
+function rewriteWhereObject(
+  model: string,
+  where: Record<string, unknown>,
+  inheritedOrgId: string | null,
+  hashField: { source: string; hashColumn: string },
+): Record<string, unknown> {
+  const result = { ...where };
+  const orgId = typeof result.orgId === 'string' ? result.orgId : inheritedOrgId;
+
+  for (const key of ['AND', 'OR', 'NOT']) {
+    if (key in result) {
+      result[key] = rewriteLogicalFilter(model, result[key], orgId, hashField);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(result, hashField.source)) {
+    if (Object.prototype.hasOwnProperty.call(result, hashField.hashColumn)) {
+      throw new Error(
+        `[pii-encryption] Refusing to query ${model} with both ${hashField.source} and ${hashField.hashColumn}.`,
+      );
+    }
+    if (!orgId) {
+      throw new Error(
+        `[pii-encryption] Refusing to query encrypted ${model}.${hashField.source} without orgId. ` +
+          `Query by ${hashField.hashColumn} directly or include orgId.`,
+      );
+    }
+    result[hashField.hashColumn] = rewriteEmailFilterValue(model, result[hashField.source], orgId);
+    delete result[hashField.source];
+  }
+
+  return result;
+}
+
+function rewriteLogicalFilter(
+  model: string,
+  value: unknown,
+  inheritedOrgId: string | null,
+  hashField: { source: string; hashColumn: string },
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      item && typeof item === 'object' && !Array.isArray(item)
+        ? rewriteWhereObject(model, item as Record<string, unknown>, inheritedOrgId, hashField)
+        : item,
+    );
+  }
+
+  if (value && typeof value === 'object') {
+    return rewriteWhereObject(model, value as Record<string, unknown>, inheritedOrgId, hashField);
+  }
+
+  return value;
+}
+
+function rewriteEmailFilterValue(model: string, value: unknown, orgId: string): unknown {
+  if (typeof value === 'string') return hashPiiField(value, orgId);
+  if (value === null) return null;
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`[pii-encryption] Unsupported ${model}.email filter for encrypted lookup.`);
+  }
+
+  const filter = value as Record<string, unknown>;
+  const supported = new Set(['equals', 'in', 'not', 'notIn', 'mode']);
+  const unsupported = Object.keys(filter).filter((key) => !supported.has(key));
+  if (unsupported.length > 0) {
+    throw new Error(
+      `[pii-encryption] Unsupported ${model}.email encrypted lookup operator(s): ${unsupported.join(
+        ', ',
+      )}. Use equality/in filters so the emailHash index can be used.`,
+    );
+  }
+
+  const result: Record<string, unknown> = {};
+  if (Object.prototype.hasOwnProperty.call(filter, 'equals')) {
+    result.equals = rewriteEmailFilterScalar(model, filter.equals, orgId);
+  }
+  if (Object.prototype.hasOwnProperty.call(filter, 'in')) {
+    result.in = rewriteEmailFilterArray(model, filter.in, orgId);
+  }
+  if (Object.prototype.hasOwnProperty.call(filter, 'notIn')) {
+    result.notIn = rewriteEmailFilterArray(model, filter.notIn, orgId);
+  }
+  if (Object.prototype.hasOwnProperty.call(filter, 'not')) {
+    result.not = rewriteEmailFilterScalar(model, filter.not, orgId);
+  }
+
+  return result;
+}
+
+function rewriteEmailFilterScalar(model: string, value: unknown, orgId: string): string | null {
+  if (typeof value === 'string') return hashPiiField(value, orgId);
+  if (value === null) return null;
+  throw new Error(`[pii-encryption] Unsupported ${model}.email encrypted lookup scalar.`);
+}
+
+function rewriteEmailFilterArray(
+  model: string,
+  value: unknown,
+  orgId: string,
+): Array<string | null> {
+  if (!Array.isArray(value)) {
+    throw new Error(`[pii-encryption] Unsupported ${model}.email encrypted lookup array.`);
+  }
+  return value.map((item) => rewriteEmailFilterScalar(model, item, orgId));
+}
+
 // ----- Middleware factory ----------------------------------------------------
 
 /**
@@ -227,13 +392,17 @@ function decryptResult(
  * - makePiiMiddleware() for legacy $use()
  * - makePiiExtension() for the modern $extends() query extension
  */
-export function makePiiMiddleware(): Prisma.Middleware {
+export function makePiiMiddleware(
+  resolveRowOrgId: RowOrgIdResolver = lookupRowOrgId,
+): Prisma.Middleware {
   return async (params, next) => {
     if (!isPiiEncryptionEnabled()) return next(params);
     if (!params.model) return next(params);
 
     const model = params.model.toLowerCase();
     if (!PII_MAP[model]) return next(params);
+
+    rewriteEmailFiltersForHash(model, params.args as Record<string, unknown> | undefined);
 
     // ----- Write path -------------------------------------------------------
     const writeMutations = ['create', 'update', 'upsert', 'createMany', 'updateMany'];
@@ -268,25 +437,44 @@ export function makePiiMiddleware(): Prisma.Middleware {
           params.args.data = encryptWritePayload(model, record, orgId, 'createMany');
         }
       } else if (params.args?.data) {
-        const orgId = extractOrgId(params.args);
-        params.args.data = encryptWritePayload(
-          model,
-          params.args.data as Record<string, unknown>,
-          orgId,
-          params.action,
-        );
+        const data = params.args.data as Record<string, unknown>;
+        let orgId = extractOrgId(params.args);
+        // Single-row update on the repo's sanctioned pattern (org-scoped fetch,
+        // then `update({ where: { id }, data })`) carries no orgId anywhere in
+        // its args. Resolve it from the target row itself — but only when the
+        // payload actually holds plaintext PII, so non-PII updates never pay
+        // for a DB probe. A null resolution still fails loud in
+        // encryptWritePayload below: silent plaintext is never an option.
+        if (!orgId && params.action === 'update' && hasPlaintextPii(model, data)) {
+          orgId = await resolveRowOrgId(params.model, params.args.where);
+        }
+        params.args.data = encryptWritePayload(model, data, orgId, params.action);
       }
     }
 
     const result = await next(params);
 
     // ----- Read path --------------------------------------------------------
-    const readActions = ['findUnique', 'findFirst', 'findMany', 'findUniqueOrThrow', 'findFirstOrThrow'];
-    if (readActions.includes(params.action) && result) {
+    // create/update/upsert are decrypted too: Prisma returns the written row,
+    // whose PII fields the write path above rewrote to ciphertext envelopes.
+    // Without this, the caller that just supplied 'foo@bar.com' gets 'enc:v1:…'
+    // back in the same response (API/MCP serialize write results directly),
+    // violating the runbook's plaintext-response contract
+    // (docs/security/pii-field-encryption.md). createMany/updateMany return
+    // only { count } — nothing to decrypt.
+    const decryptActions = [
+      'findUnique',
+      'findFirst',
+      'findMany',
+      'findUniqueOrThrow',
+      'findFirstOrThrow',
+      'create',
+      'update',
+      'upsert',
+    ];
+    if (decryptActions.includes(params.action) && result) {
       const orgId = extractOrgId(params.args);
-      if (orgId) {
-        return decryptResult(model, result, orgId);
-      }
+      return decryptResult(model, result, orgId);
     }
 
     return result;
@@ -312,5 +500,28 @@ function extractOrgId(args: Record<string, unknown> | undefined): string | null 
   const where = args.where as Record<string, unknown> | undefined;
   if (typeof where?.orgId === 'string') return where.orgId;
 
+  const nestedOrgIds = new Set<string>();
+  collectOrgIds(where, nestedOrgIds);
+  if (nestedOrgIds.size === 1) return [...nestedOrgIds][0]!;
+
   return null;
+}
+
+function collectOrgIds(value: unknown, orgIds: Set<string>): void {
+  if (!value || typeof value !== 'object') return;
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectOrgIds(item, orgIds);
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.orgId === 'string') orgIds.add(record.orgId);
+
+  // NOT is deliberately excluded: an orgId inside a NOT branch names the org
+  // the results are NOT from, so using it as decryption context would apply
+  // the wrong org's key (which silently yields mask strings, not an error).
+  for (const key of ['AND', 'OR']) {
+    collectOrgIds(record[key], orgIds);
+  }
 }

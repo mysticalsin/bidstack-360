@@ -1,5 +1,5 @@
 /**
- * Thin fetch wrapper used by the service worker to call the BidStack REST API.
+ * Thin fetch wrapper used by the service worker to call the Polo PreSales REST API.
  * All API credentials are held exclusively inside the service worker context.
  */
 
@@ -29,7 +29,7 @@ export class BidStackAPI {
         const json = await resp.json();
         msg = json.message ?? json.error ?? msg;
       } catch { /* ignore parse errors */ }
-      throw new Error(`BidStack API ${resp.status}: ${msg}`);
+      throw new Error(`Polo PreSales API ${resp.status}: ${msg}`);
     }
 
     const text = await resp.text();

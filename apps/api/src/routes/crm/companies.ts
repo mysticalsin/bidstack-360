@@ -29,6 +29,7 @@ import { resolveDataProviderApiKey } from '../../lib/data-provider-credentials.j
 import {
   queueApolloEnrichment,
   upsertVerifiedCompanyEnrichment,
+  type RouteLog,
 } from '../../services/crm/enrichment.service.js';
 import { techStackMcpSourceConfigsFromEnv } from '../../providers/company-tech-stack-mcp.js';
 import { autopopulateCompanies } from '../../services/crm/company.service.js';
@@ -277,6 +278,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
           apolloJobId,
           refreshedStack: refreshed.company.technicalStack ?? [],
           refreshedSources: refreshed.company.sourceAttribution,
+          log: req.log,
           nowIso,
         }),
       };
@@ -661,12 +663,14 @@ async function buildTechnicalStackRefreshProviders({
   apolloJobId,
   refreshedStack,
   refreshedSources,
+  log,
   nowIso,
 }: {
   orgId: string;
   apolloJobId: string | null;
   refreshedStack: TechnicalStackCategoryType[];
   refreshedSources: Array<{ source: string }>;
+  log: RouteLog;
   nowIso: string;
 }): Promise<TechnicalStackRefreshProviderType[]> {
   const apolloMcpConfigured = Boolean(
@@ -680,8 +684,10 @@ async function buildTechnicalStackRefreshProviders({
   const apolloTransport = apolloMcpConfigured ? 'mcp' : 'api';
   const seamlessMcpConfigured = Boolean(process.env.SEAMLESS_MCP_URL);
   const seamlessApiConfigured = Boolean(
-    (await resolveDataProviderApiKey(orgId, 'seamless').catch(() => null)) ??
-      process.env.SEAMLESS_API_KEY,
+    (await resolveDataProviderApiKey(orgId, 'seamless').catch((err) => {
+      log.warn({ err, orgId }, 'seamless api key resolution failed');
+      return null;
+    })) ?? process.env.SEAMLESS_API_KEY,
   );
   const seamlessConfigured = seamlessMcpConfigured || seamlessApiConfigured;
   const seamlessTransport = seamlessMcpConfigured ? 'mcp' : 'api';

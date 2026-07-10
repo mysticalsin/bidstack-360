@@ -119,6 +119,7 @@ paths = [
   '''(^|/)apps/api/src/security/penetration\.test\.ts$''',
   '''(^|/)apps/api/src/plugins/auth\.test\.ts$''',
   '''(^|/)apps/api/src/routes/webhooks\.integration\.test\.ts$''',
+  '''(^|/)packages/db/src/pii-field-encryption\.integration\.test\.ts$''',
   '''\.md$''',
 ]
 # Common documentation strings that look like keys but aren't.

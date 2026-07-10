@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "No accounts yet",
+      "body": "Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.",
+      "importCsv": "Or import accounts from CSV",
       "filtered": "No accounts match your filters"
     },
     "summary": {
@@ -390,7 +392,7 @@
     },
     "sync": {
       "result": "{{enriched}} enriched / {{cached}} cached",
-      "buttonTitle": "Sync top ERP sale.order customers into verified BidStack accounts",
+      "buttonTitle": "Sync top ERP sale.order customers into verified Polo PreSales accounts",
       "inProgress": "Syncing...",
       "button": "Sync ERP accounts",
       "errorTitle": "ERP account sync failed",
@@ -2023,7 +2025,7 @@
     "errorBookingFailed": "Booking failed",
     "notFoundTitle": "Booking page not found",
     "notFoundBody": "This scheduling link is invalid or no longer accepting meetings.",
-    "eyebrow": "BidStack scheduling",
+    "eyebrow": "Polo PreSales scheduling",
     "loadingTitle": "Loading booking page",
     "confirmedTitle": "Booking confirmed",
     "confirmedBody": "You're booked. A confirmation email is on its way.",
@@ -2061,6 +2063,9 @@
     "exportCsv": "Export CSV",
     "stageFilterGroupLabel": "Filter opportunities by stage",
     "stageAll": "All",
+    "dueFilterGroupLabel": "Filter opportunities by due date",
+    "dueWithin7": "Due ≤ 7d",
+    "dueOverdue": "Overdue",
     "bulkActionsLabel": "Bulk actions",
     "selectedCount": "{{count}} selected",
     "moveSelectionLabel": "Move selection to stage",
@@ -2102,7 +2107,7 @@
   },
   "topAccounts": {
     "heading": "Top accounts",
-    "badgeCurated": "Curated — Amaris global top 10",
+    "badgeCurated": "Curated — global top 10",
     "badgeAuto": "Auto-ranked by pipeline value",
     "subtitleCurated": "The global top 10, hand-picked and ordered by admins in Settings.",
     "subtitleAuto": "Highest-value accounts ranked by total pipeline and revenue.",
@@ -2160,9 +2165,9 @@
   },
   "commandCenter": {
     "region": {
-      "ariaLabel": "BidStack command center"
+      "ariaLabel": "Polo PreSales command center"
     },
-    "kicker": "BidStack command center",
+    "kicker": "Polo PreSales command center",
     "actions": {
       "ariaLabel": "Account decision signals"
     },
@@ -2542,10 +2547,10 @@
     "adminOnlyBadge": "Admin only",
     "editTitle": "Edit webhook subscription",
     "createTitle": "New webhook subscription",
-    "subtitle": "Use a production HTTPS endpoint. BidStack signs every delivery with HMAC-SHA256.",
+    "subtitle": "Use a production HTTPS endpoint. Polo PreSales signs every delivery with HMAC-SHA256.",
     "closeAriaLabel": "Close",
     "endpointUrlLabel": "Endpoint URL",
-    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
     "endpointUrlHelp": "HTTPS is required. Localhost, private IPs, and internal hostnames are rejected.",
     "eventsLabel": "Events",
     "eventsHelp": "Choose only the events your receiver actually handles.",
@@ -2553,7 +2558,7 @@
     "clear": "Clear",
     "securityContractTitle": "Security contract",
     "securityReturn2xx": "Return a 2xx status within 10 seconds.",
-    "securityVerifyHeader": "Verify the X-BidStack-Signature header.",
+    "securityVerifyHeader": "Verify the X-Polo-Signature header.",
     "securityRejectOld": "Reject signatures older than 5 minutes.",
     "securityAsync": "Process heavy work asynchronously after acknowledging.",
     "selectedEventsLabel": "Selected events",
@@ -2762,6 +2767,7 @@
   },
   "intelCards": {
     "dataFreshness": "Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register",
+    "noIntel": "No external intel yet — sources have not been queried for this opportunity.",
     "financial": {
       "title": "Financial health",
       "private": "Private",
@@ -3368,7 +3374,7 @@
   },
   "sectorView": {
     "title": "Sector view",
-    "subtitle": "Where Amaris is active by industry — accounts, countries, and FTE volume from ABC.",
+    "subtitle": "Where Mantu is active by industry — accounts, countries, and FTE volume from ABC.",
     "errorTitle": "Could not load the sector view",
     "errorMessage": "The sector endpoint did not respond.",
     "emptyTitle": "No sector data yet",
@@ -3433,8 +3439,8 @@
     "submit": "Convert lead",
     "cancel": "Cancel"
   },
-  "bidStack360Logo": {
-    "title": "BidStack 360",
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
     "tagline": "BID PILOTING PLATFORM"
   },
   "leadRow": {
@@ -3575,7 +3581,7 @@
   },
   "kpiSidebar": {
     "title": "Platform status",
-    "caption": "Latest available BidStack metrics",
+    "caption": "Latest available Polo PreSales metrics",
     "releaseScore": "Release score",
     "providersHealthy": "Providers healthy",
     "queueBacklog": "Queue backlog",
@@ -3903,5 +3909,20 @@
     "queueEmptyDetail": "Queue monitor rows have not been recorded yet for this org.",
     "backendSignalsEyebrow": "Backend signals",
     "backendSignalsTitle": "Signal availability"
+  },
+  "dueDateChip": {
+    "noDate": "No date",
+    "overdueBy": "{{count}}d overdue",
+    "dueToday": "Due today",
+    "daysLeft": "{{count}}d left",
+    "ariaLabel": "Due {{date}}",
+    "ariaLabelNoDate": "No due date set"
+  },
+  "closingThisWeek": {
+    "heading": "Closing this week",
+    "viewAll": "View all",
+    "errorMessage": "Couldn't load bids closing this week.",
+    "retry": "Retry",
+    "empty": "No bids closing this week."
   }
 }

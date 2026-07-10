@@ -120,3 +120,17 @@ apps/web/e2e/responsive/*-snapshots/
 screenshot-*.cjs
 scratch-*.js
 .vercel
+
+# Machine-specific tool shims (hardcoded local paths)
+walteur-kit/bin/
+
+# Prisma schema scratch copies (use git history instead)
+packages/db/prisma/schema.prisma.backup
+packages/db/prisma/schema.prisma.pulled
+
+# QA swarm artifacts (session-generated)
+.qa-artifacts/
+
+# Brand raster assets under public/ are source, not QA screenshots
+!apps/web/public/*.png
+!apps/chrome-extension/src/icons/*.png

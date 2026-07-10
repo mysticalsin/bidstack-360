@@ -42,8 +42,11 @@ export function useSaveComplianceRow(opportunityId: string | null) {
   return useMutation({
     mutationFn: ({ rowId, answerDraft }: { rowId: string; answerDraft: string }) =>
       api(`/api/v1/bid-workspaces/${opportunityId}/matrix/${rowId}`, {
+        // Pass a plain object — api() JSON.stringifies the body itself. Passing a
+        // pre-stringified string double-encoded it, so the PATCH sent a JSON
+        // string literal the Zod object schema rejected → answers never saved.
         method: 'PATCH',
-        body: JSON.stringify({ answerDraft }),
+        body: { answerDraft },
       }),
     onSuccess: () => {
       // Invalidate the compliance cache so the panel reflects the saved answer.

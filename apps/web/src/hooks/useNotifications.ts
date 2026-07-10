@@ -7,6 +7,7 @@ export type NotificationType =
   | 'assignment'
   | 'bid_override'
   | 'stage_change'
+  | 'task_due'
   | 'system';
 
 export interface AppNotification {

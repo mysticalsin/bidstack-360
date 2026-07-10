@@ -32,6 +32,56 @@ describe('analytics-engine compile', () => {
     expect(values[0]).toBe(ORG);
   });
 
+  it('a user-supplied orgId/org_id filter can never override the injected tenant scope, on every entity', () => {
+    // WHY: compileAnalyticsQuery is the highest-blast-radius raw-SQL surface
+    // in the app — it's guard-exempt (packages/db's tenant-scope-guard only
+    // intercepts Prisma model calls, not $queryRaw) and turns user-authored
+    // query JSON directly into SQL. Its ONLY tenant boundary is that org_id
+    // is injected as a literal, parameterized, always-first WHERE clause
+    // (see compileAnalyticsQuery) and 'orgId'/'org_id' is never present in
+    // any entity's field allowlist. This test proves both halves hold for
+    // every entity: a request body naming the field 'orgId' (attempting to
+    // smuggle a second org_id condition, e.g. to OR across tenants) is
+    // rejected outright, and the compiled SQL still carries exactly one
+    // org-scoping predicate bound to the caller's own org.
+    const entities: AnalyticsQuery['entity'][] = [
+      'lead',
+      'opportunity',
+      'contact',
+      'company',
+      'task',
+      'activity',
+      'goal',
+    ];
+    for (const entity of entities) {
+      expect(() =>
+        compile({
+          entity,
+          filters: {
+            logic: 'OR',
+            conditions: [{ field: 'orgId', operator: 'eq', value: 'attacker-org' }],
+          },
+        }),
+      ).toThrow(AnalyticsQueryError);
+      expect(() =>
+        compile({
+          entity,
+          filters: {
+            logic: 'OR',
+            conditions: [{ field: 'org_id', operator: 'eq', value: 'attacker-org' }],
+          },
+        }),
+      ).toThrow(AnalyticsQueryError);
+
+      // With no attempted override, exactly one org_id predicate is compiled,
+      // bound to the caller's own org — never the attacker-supplied value.
+      const { text, values } = compile({ entity });
+      expect(text.match(/org_id = \$1::uuid/g)).toHaveLength(1);
+      expect(values[0]).toBe(ORG);
+      expect(values).not.toContain('attacker-org');
+    }
+  });
+
   it('rejects filter fields outside the allowlist (no identifier injection)', () => {
     const query: AnalyticsQuery = {
       entity: 'task',

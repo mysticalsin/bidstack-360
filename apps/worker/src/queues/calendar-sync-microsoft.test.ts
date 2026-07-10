@@ -1,3 +1,4 @@
+import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,6 +59,20 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/** Minimal in-memory IORedis stub for the per-job push idempotency claim. */
+function makeFakeRedis(): IORedis {
+  const store = new Map<string, string>();
+  return {
+    set: (key: string, val: string, _ex?: string, _ttl?: number, nx?: string) => {
+      if (nx === 'NX' && store.has(key)) return null;
+      store.set(key, val);
+      return 'OK';
+    },
+    get: (key: string) => store.get(key) ?? null,
+    del: (key: string) => (store.delete(key) ? 1 : 0),
+  } as unknown as IORedis;
+}
+
 beforeEach(() => {
   checkConnector.mockResolvedValue({
     configType: 'connectors',
@@ -92,7 +107,14 @@ describe('Microsoft Graph calendar connector SERUM gate', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
-      handleMicrosoftPush({ event, operation: 'push', accessToken: 'token', log }),
+      handleMicrosoftPush({
+        event,
+        operation: 'push',
+        accessToken: 'token',
+        connection: makeFakeRedis(),
+        jobId: 'job-1',
+        log,
+      }),
     ).rejects.toThrow(/SERUM connector policy denied microsoft_graph/);
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -103,7 +125,14 @@ describe('Microsoft Graph calendar connector SERUM gate', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'ms-1', '@odata.etag': 'etag-1' }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await handleMicrosoftPush({ event, operation: 'push', accessToken: 'token', log });
+    await handleMicrosoftPush({
+      event,
+      operation: 'push',
+      accessToken: 'token',
+      connection: makeFakeRedis(),
+      jobId: 'job-1',
+      log,
+    });
 
     expect(checkConnector).toHaveBeenCalledWith({
       orgId,

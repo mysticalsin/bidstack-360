@@ -96,7 +96,7 @@ export function ModulesSection() {
             <Icon name="warning" size={16} className="mt-0.5 shrink-0 text-[var(--warning)]" ariaHidden />
             <p className="text-xs text-[var(--fg-tertiary)]">
               AppFlowy is a separate platform with its own login and data store — collaborative content lives outside
-              BidStack&apos;s tenancy. Self-hosting AppFlowy carries AGPL-3.0 obligations. Confirm with legal/PO before
+              Polo PreSales&apos;s tenancy. Self-hosting AppFlowy carries AGPL-3.0 obligations. Confirm with legal/PO before
               enabling. SSO between Clerk and AppFlowy is a separate setup. See docs/solutions/appflowy-workspace.md.
             </p>
           </div>

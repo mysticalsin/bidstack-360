@@ -21,6 +21,7 @@
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import { prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,9 @@ async function getGoogleAccessToken(orgId: string, userId: string): Promise<stri
  * Returns the Calendar event including `hangoutLink` (the Meet URL) and
  * `conferenceData.entryPoints` for phone dial-in details.
  */
-export async function createGoogleMeetEvent(params: CreateGoogleMeetParams): Promise<GoogleMeetEvent> {
+export async function createGoogleMeetEvent(
+  params: CreateGoogleMeetParams,
+): Promise<GoogleMeetEvent> {
   const accessToken = await getGoogleAccessToken(params.orgId, params.userId);
 
   const now = new Date();
@@ -107,9 +110,12 @@ export async function createGoogleMeetEvent(params: CreateGoogleMeetParams): Pro
     body.sendUpdates = 'all';
   }
 
-  const resp = await fetch(
+  const resp = await fetchWithTimeout(
     'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
     {
+      provider: 'Google Calendar',
+      operation: 'events.create',
+      timeoutMs: providerTimeoutMs('GOOGLE_HTTP_TIMEOUT_MS', 15_000),
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -146,9 +152,12 @@ export async function deleteGoogleMeetEvent(
 ): Promise<void> {
   const accessToken = await getGoogleAccessToken(orgId, userId);
 
-  const resp = await fetch(
+  const resp = await fetchWithTimeout(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}?sendUpdates=all`,
     {
+      provider: 'Google Calendar',
+      operation: 'events.delete',
+      timeoutMs: providerTimeoutMs('GOOGLE_HTTP_TIMEOUT_MS', 15_000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
     },

@@ -10,7 +10,7 @@ name: Dependency Review
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, demo]
 
 permissions:
   contents: read
@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
         with:
           # Fail the PR if any added dependency carries an open CVE at this
           # severity or worse. "moderate" or "low" CVEs are noted in the PR

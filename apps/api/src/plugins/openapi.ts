@@ -32,15 +32,15 @@ const openapiPluginImpl: FastifyPluginAsync = async (server) => {
     openapi: {
       openapi: '3.0.3',
       info: {
-        title: 'BidStack 360° API',
+        title: 'Polo PreSales API',
         description:
-          'REST API for BidStack 360° — the pre-sales bid piloting platform for Mantu Group. ' +
+          'REST API for Polo PreSales — the pre-sales bid piloting platform for Mantu Group. ' +
           'All routes under `/api/v1/` require authentication. ' +
           'Pass either a Clerk JWT (`Authorization: Bearer <token>`) or an ' +
           'API key (`x-api-key: <key>`).',
         version: '1.0.0',
         contact: {
-          name: 'BidStack Platform Team',
+          name: 'Polo PreSales Platform Team',
           email: 'platform@mantu.com',
         },
         license: {

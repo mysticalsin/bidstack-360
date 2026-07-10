@@ -21,6 +21,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -143,14 +144,20 @@ export async function initiateVoiceCall(
     RecordingChannels: 'dual',
   });
 
-  const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`, {
-    method: 'POST',
-    headers: {
-      Authorization: twilioAuthHeader(),
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const resp = await fetchWithTimeout(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
+    {
+      provider: 'Twilio',
+      operation: 'calls.create',
+      timeoutMs: providerTimeoutMs('TWILIO_HTTP_TIMEOUT_MS', 15_000),
+      method: 'POST',
+      headers: {
+        Authorization: twilioAuthHeader(),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
     },
-    body: formData.toString(),
-  });
+  );
 
   if (!resp.ok) {
     const text = await resp.text();
@@ -243,31 +250,29 @@ async function readBodyWithCap(resp: Response, maxBytes: number): Promise<Buffer
  *  - The body is streamed and aborted the moment it crosses the byte cap.
  */
 export async function downloadTwilioRecording(recordingUrl: string): Promise<Buffer> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), RECORDING_DOWNLOAD_TIMEOUT_MS);
+  const resp = await fetchWithTimeout(`${recordingUrl}.mp3`, {
+    provider: 'Twilio',
+    operation: 'recordings.download',
+    timeoutMs: providerTimeoutMs(
+      'TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS',
+      RECORDING_DOWNLOAD_TIMEOUT_MS,
+    ),
+    headers: { Authorization: twilioAuthHeader() },
+  });
 
-  try {
-    const resp = await fetch(`${recordingUrl}.mp3`, {
-      headers: { Authorization: twilioAuthHeader() },
-      signal: controller.signal,
-    });
-
-    if (!resp.ok) {
-      throw new Error(`Twilio downloadRecording failed (${resp.status}): ${recordingUrl}`);
-    }
-
-    // Cheap early-out: trust a declared Content-Length to reject obvious giants
-    // before streaming a single byte. A lying/absent header is still caught by
-    // the streaming cap below.
-    const declaredLength = Number(resp.headers.get('content-length'));
-    if (Number.isFinite(declaredLength) && declaredLength > RECORDING_MAX_BYTES) {
-      throw new Error(
-        `Twilio recording too large: ${declaredLength} bytes (max ${RECORDING_MAX_BYTES})`,
-      );
-    }
-
-    return await readBodyWithCap(resp, RECORDING_MAX_BYTES);
-  } finally {
-    clearTimeout(timeoutId);
+  if (!resp.ok) {
+    throw new Error(`Twilio downloadRecording failed (${resp.status}): ${recordingUrl}`);
   }
+
+  // Cheap early-out: trust a declared Content-Length to reject obvious giants
+  // before streaming a single byte. A lying/absent header is still caught by
+  // the streaming cap below.
+  const declaredLength = Number(resp.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > RECORDING_MAX_BYTES) {
+    throw new Error(
+      `Twilio recording too large: ${declaredLength} bytes (max ${RECORDING_MAX_BYTES})`,
+    );
+  }
+
+  return await readBodyWithCap(resp, RECORDING_MAX_BYTES);
 }

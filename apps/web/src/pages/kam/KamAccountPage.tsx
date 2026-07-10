@@ -10,14 +10,25 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useKamAccounts } from '@/hooks/useKamAccounts';
 
-import { KamAccountHero, KamAccountSwitcher, KamDesignateDialog, KamZeroState } from './kamAccountControls';
-import { KamDraftReview, KamInitiativeBoard, KamKpiStrip, KamTodoCard } from './kamPanels';
+import {
+  KamAccountHero,
+  KamAccountSwitcher,
+  KamDesignateDialog,
+  KamZeroState,
+} from './kamAccountControls';
+import {
+  KamDraftReview,
+  KamHandoffCard,
+  KamInitiativeBoard,
+  KamKpiStrip,
+  KamTodoCard,
+} from './kamPanels';
 
 export default function KamAccountPage() {
-  const { data, isLoading } = useKamAccounts();
+  const { data, isLoading, isError, error, refetch } = useKamAccounts();
   const accounts = data?.items ?? [];
   const [companyId, setCompanyId] = useState('');
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -44,6 +55,16 @@ export default function KamAccountPage() {
 
       {isLoading ? (
         <LoadingSkeleton rows={4} />
+      ) : isError ? (
+        <ErrorState
+          title="Couldn't load key accounts"
+          message={error instanceof Error ? error.message : 'The key accounts endpoint did not respond.'}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+              Retry
+            </Button>
+          }
+        />
       ) : accounts.length === 0 ? (
         <KamZeroState onDesignate={() => setDesignateOpen(true)} />
       ) : active ? (
@@ -56,6 +77,7 @@ export default function KamAccountPage() {
             </div>
             <div className="space-y-4">
               <KamDraftReview companyId={active.id} />
+              <KamHandoffCard companyId={active.id} />
               <KamTodoCard companyId={active.id} />
             </div>
           </div>
@@ -70,7 +92,11 @@ export default function KamAccountPage() {
         onSelect={setCompanyId}
         onDesignate={() => setDesignateOpen(true)}
       />
-      <KamDesignateDialog open={designateOpen} onOpenChange={setDesignateOpen} onDesignated={(id) => setCompanyId(id)} />
+      <KamDesignateDialog
+        open={designateOpen}
+        onOpenChange={setDesignateOpen}
+        onDesignated={(id) => setCompanyId(id)}
+      />
     </div>
   );
 }

@@ -10,6 +10,8 @@
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { runWithOAuthRefreshLock } from '../lib/oauth-refresh-lock.js';
 
 export type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
@@ -49,28 +51,53 @@ export function webhookBaseUrl(): string {
 
 export type TokenRow = {
   id: string;
+  orgId: string;
   accessTokenEncrypted: string;
   refreshTokenEncrypted: string | null;
   expiresAt: Date | null;
 };
+
+function tokenExpiresSoon(expiresAt: Date | null): boolean {
+  return expiresAt ? expiresAt.getTime() < Date.now() + 60_000 : false;
+}
 
 /**
  * Returns a live access token for the given token record, refreshing
  * via the OAuth refresh_token grant if the token is within 60 s of expiry.
  */
 export async function getAccessToken(row: TokenRow, log: ServiceLogger): Promise<string> {
-  const isExpired = row.expiresAt ? row.expiresAt.getTime() < Date.now() + 60_000 : false;
-
-  if (!isExpired) {
+  if (!tokenExpiresSoon(row.expiresAt)) {
     return decryptToken(row.accessTokenEncrypted);
   }
 
-  if (!row.refreshTokenEncrypted) {
-    throw new Error('MS Graph token expired and no refresh token is stored');
-  }
+  return runWithOAuthRefreshLock({
+    tokenId: row.id,
+    log,
+    getFreshValue: () => getFreshMsGraphAccessToken(row.id, row.orgId),
+    refresh: async () => {
+      if (!row.refreshTokenEncrypted) {
+        throw new Error('MS Graph token expired and no refresh token is stored');
+      }
 
-  const refreshToken = decryptToken(row.refreshTokenEncrypted);
-  return refreshMsGraphToken(row.id, refreshToken, log);
+      const refreshToken = decryptToken(row.refreshTokenEncrypted);
+      return refreshMsGraphToken(row.id, refreshToken, log);
+    },
+  });
+}
+
+// WHY findFirst + orgId (not findUnique by bare id): IntegrationToken rows are
+// tenant-scoped — resolving by id alone would let a cross-tenant tokenId
+// decrypt another org's Graph access token. See MISTAKES.md.
+async function getFreshMsGraphAccessToken(
+  tokenId: string,
+  orgId: string,
+): Promise<string | null> {
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: tokenId, orgId },
+    select: { accessTokenEncrypted: true, expiresAt: true, status: true },
+  });
+  if (!token || token.status !== 'active' || tokenExpiresSoon(token.expiresAt)) return null;
+  return decryptToken(token.accessTokenEncrypted);
 }
 
 async function refreshMsGraphToken(
@@ -78,7 +105,10 @@ async function refreshMsGraphToken(
   refreshToken: string,
   log: ServiceLogger,
 ): Promise<string> {
-  const res = await fetch(`${TOKEN_ENDPOINT_BASE}/${tenant()}/oauth2/v2.0/token`, {
+  const res = await fetchWithTimeout(`${TOKEN_ENDPOINT_BASE}/${tenant()}/oauth2/v2.0/token`, {
+    provider: 'Microsoft Graph',
+    operation: 'oauth.refresh',
+    timeoutMs: providerTimeoutMs('OAUTH_HTTP_TIMEOUT_MS', 15_000),
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

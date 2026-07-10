@@ -36,7 +36,6 @@ import {
   CrossSellPage,
   KamAccountPage,
   WorkspacePage,
-  KeyAccountsPage,
   LeadDetailPage,
   LeadsPage,
   LoginPage,
@@ -46,7 +45,6 @@ import {
   PipelinePage,
   QuickStartPage,
   ReportsListPage,
-  ReportsPage,
   ReportBuilderPage,
   SearchPage,
   SerumMissionControlPage,
@@ -56,7 +54,8 @@ import {
   TaskDetailPage,
   TasksPage,
   TerritoriesPage,
-  TopAccountsPage,
+  WinLossPage,
+  WorkloadPage,
   PublicSignPage,
   PublicBookingPage,
 } from './lazyPages';
@@ -187,14 +186,9 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
-          <Route
-            path="/key-accounts"
-            element={
-              <RequireAuth>
-                <KeyAccountsPage />
-              </RequireAuth>
-            }
-          />
+          {/* Key/Top accounts consolidated into /accounts?view= — keep the old
+              paths alive as redirects so bookmarks and the command palette resolve. */}
+          <Route path="/key-accounts" element={<Navigate to="/accounts?view=key" replace />} />
           <Route
             path="/kam"
             element={
@@ -211,14 +205,7 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
-          <Route
-            path="/top-accounts"
-            element={
-              <RequireAuth>
-                <TopAccountsPage />
-              </RequireAuth>
-            }
-          />
+          <Route path="/top-accounts" element={<Navigate to="/accounts?view=top" replace />} />
 
           {/* ── Leads ───────────────────────────────────────────────────── */}
           <Route
@@ -288,6 +275,14 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="/win-loss"
+            element={
+              <RequireAuth>
+                <WinLossPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/sector-view"
             element={
               <RequireAuth>
@@ -322,6 +317,14 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="/workload"
+            element={
+              <RequireAuth>
+                <WorkloadPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/tasks/:id"
             element={
               <RequireAuth>
@@ -347,14 +350,9 @@ export function AppRoutes() {
           />
 
           {/* ── Reporting & Analytics ────────────────────────────────────── */}
-          <Route
-            path="/reports"
-            element={
-              <RequireAuth>
-                <ReportsPage />
-              </RequireAuth>
-            }
-          />
+          {/* Legacy canned-stats page folded into /analytics — same redirect
+              treatment as /integrations, /webhooks, /audit-log, /rfp-response. */}
+          <Route path="/reports" element={<Navigate to="/analytics" replace />} />
           <Route
             path="/reports/list"
             element={
@@ -417,13 +415,13 @@ export function AppRoutes() {
           />
 
           {/* ── Custom Objects ───────────────────────────────────────────── */}
+          {/* /custom-objects has no :objectKey, so CustomObjectListPage (a
+              per-object record list keyed off /o/:objectKey) renders its
+              "Custom object '' not found" 404. The object-definition admin lives
+              under /settings/custom-objects — send the bare path there. */}
           <Route
             path="/custom-objects"
-            element={
-              <RequireAuth>
-                <CustomObjectListPage />
-              </RequireAuth>
-            }
+            element={<Navigate to="/settings/custom-objects" replace />}
           />
           <Route
             path="/custom-objects/new"

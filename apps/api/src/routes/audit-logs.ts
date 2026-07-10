@@ -150,7 +150,7 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
         )
         .header(
           'Content-Disposition',
-          `attachment; filename*=UTF-8''${encodeURIComponent(`bidstack-audit-log-${stamp}.xlsx`)}`,
+          `attachment; filename*=UTF-8''${encodeURIComponent(`polo-presales-audit-log-${stamp}.xlsx`)}`,
         )
         .header('Cache-Control', 'private, no-store')
         .send(workbook);

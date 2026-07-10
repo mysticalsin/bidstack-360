@@ -8,6 +8,8 @@ import type { FastifyRequest } from 'fastify';
 
 import { prisma } from '@bidstack/db';
 
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
+
 /**
  * Maps a Clerk org role string to the internal role name used throughout the
  * application. Throws a typed sentinel string so the caller can detect and
@@ -55,10 +57,20 @@ export async function ensureAdminRoleGrant(
     );
     return;
   }
+  // Revive a tombstoned grant FIRST: the soft-delete middleware scopes
+  // upsert to live rows (deliberate — tombstones must not silently revive),
+  // so without this a previously-revoked admin re-promoted in Clerk would
+  // P2002 on the composite PK at sign-in. The explicit where.deletedAt is
+  // the middleware's documented bypass for deliberate restores.
+  await prisma.userRole.updateMany({
+    where: { userId, roleId: adminRole.id, orgId, deletedAt: { not: null } },
+    data: { deletedAt: null },
+  });
   // upsert on the composite PK so concurrent sign-ins don't race
   await prisma.userRole.upsert({
     where: { userId_roleId: { userId, roleId: adminRole.id } },
     create: { userId, roleId: adminRole.id, orgId },
     update: { deletedAt: null },
   });
+  invalidateRbacDecisionCache(orgId, userId);
 }

@@ -1,12 +1,17 @@
 {
-  "name": "BidStack 360°",
-  "short_name": "BidStack",
+  "name": "Polo PreSales",
+  "short_name": "Polo",
   "description": "Pre-sales bid piloting platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#030508",
-  "theme_color": "#2C4BFF",
+  "theme_color": "#3F16E8",
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
@@ -15,6 +20,11 @@
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
       "type": "image/png"
     }
   ]

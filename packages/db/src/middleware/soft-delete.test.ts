@@ -98,6 +98,58 @@ describe('soft delete middleware', () => {
     expect(params.args.where).toEqual({ id: 'x', deletedAt: { not: null } });
   });
 
+  it('scopes upsert to live rows so a tombstoned row cannot be silently revived', async () => {
+    const middleware = makeSoftDeleteMiddleware();
+    const params = {
+      model: 'Opportunity',
+      action: 'upsert',
+      args: {
+        where: { orgId_code: { orgId: 'org-1', code: 'OPP-001' } },
+        create: { orgId: 'org-1', code: 'OPP-001', name: 'Fresh deal' },
+        update: { name: 'Fresh deal' },
+      },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    // WHY: upsert matches its target by unique key at the DB level, so a
+    // soft-deleted Opportunity still reserving (orgId, code) would take the
+    // update branch — mutating a hidden row while the caller believes it
+    // created a new one (dust-sync logs `opportunity.created.dust` off
+    // `created: !existing`, corrupting the audit trail). Scoped, the tombstone
+    // no longer matches and upsert fails loud on the unique constraint.
+    expect(params.args.where).toEqual({
+      orgId_code: { orgId: 'org-1', code: 'OPP-001' },
+      deletedAt: null,
+    });
+  });
+
+  it('lets an explicit deletedAt filter bypass upsert scoping (erasure/restore/merge)', async () => {
+    const middleware = makeSoftDeleteMiddleware();
+    const params = {
+      model: 'Opportunity',
+      action: 'upsert',
+      args: {
+        where: {
+          orgId_code: { orgId: 'org-1', code: 'OPP-001' },
+          deletedAt: { not: null },
+        },
+        create: { orgId: 'org-1', code: 'OPP-001', name: 'Restored deal' },
+        update: { deletedAt: null },
+      },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    // WHY: privileged ops MUST keep mutating tombstoned rows (GDPR re-erasure
+    // broke once when scoping ignored this — MISTAKES 2026-06-20). An explicit
+    // where.deletedAt is the documented match-all bypass and must pass through.
+    expect(params.args.where).toEqual({
+      orgId_code: { orgId: 'org-1', code: 'OPP-001' },
+      deletedAt: { not: null },
+    });
+  });
+
   it('does not scope delete — hard delete stays the teardown/admin path', async () => {
     const middleware = makeSoftDeleteMiddleware();
     const params = {

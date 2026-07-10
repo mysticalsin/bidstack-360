@@ -1,5 +1,5 @@
 /**
- * crm.base.ts — Base attribution and company enrichment schemas for BidStack CRM.
+ * crm.base.ts — Base attribution and company enrichment schemas for Polo PreSales CRM.
  *
  * Leaf file — no internal imports.
  * Extracted from crm.ts (BS-R1 file-size refactor).

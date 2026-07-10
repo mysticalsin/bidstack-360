@@ -187,27 +187,27 @@ model Org {
   userGroupMembers UserGroupMember[]
 
   // Wave A — pre-sales governance surfaces
-  crossSellActions    CrossSellAction[]
-  governanceMeetings  GovernanceMeeting[]
-  governanceActions   GovernanceAction[]
-  projectReferences   ProjectReference[]
-  contractAgreements  ContractAgreement[]
-  winLossRecords      WinLossRecord[]
-  notifications       Notification[]
-  notificationPrefs   NotificationPref[]
-  serumConfigVersions          SerumConfigVersion[]
+  crossSellActions              CrossSellAction[]
+  governanceMeetings            GovernanceMeeting[]
+  governanceActions             GovernanceAction[]
+  projectReferences             ProjectReference[]
+  contractAgreements            ContractAgreement[]
+  winLossRecords                WinLossRecord[]
+  notifications                 Notification[]
+  notificationPrefs             NotificationPref[]
+  serumConfigVersions           SerumConfigVersion[]
   serumConnectorConnectionTests SerumConnectorConnectionTest[]
 
   // KAM (Key Account Management) front layer
-  kamConsultants    KamConsultant[]
-  kamSessions       KamSession[]
-  kamInitiatives    KamInitiative[]
-  kamSessionDrafts  KamSessionDraft[]
-  kamHandoffs       KamHandoff[]
-  kamProspections   KamProspection[]
+  kamConsultants   KamConsultant[]
+  kamSessions      KamSession[]
+  kamInitiatives   KamInitiative[]
+  kamSessionDrafts KamSessionDraft[]
+  kamHandoffs      KamHandoff[]
+  kamProspections  KamProspection[]
 
   // Sales toolkits — stored collateral (decks/templates/battle-cards), SharePoint-sourced or manual
-  salesToolkits     SalesToolkit[]
+  salesToolkits SalesToolkit[]
 
   @@index([deletedAt])
   @@map("orgs")
@@ -327,35 +327,35 @@ enum AccountTier {
 }
 
 model Company {
-  id                String      @id @default(uuid()) @db.Uuid
-  orgId             String      @map("org_id") @db.Uuid
+  id                String           @id @default(uuid()) @db.Uuid
+  orgId             String           @map("org_id") @db.Uuid
   name              String
-  legalName         String?     @map("legal_name")
+  legalName         String?          @map("legal_name")
   domain            String?
   industry          String?
-  employeeCount     Int?        @map("employee_count")
-  countryCode       String?     @map("country_code") @db.VarChar(2)
-  address           Json?       @default("{}")
-  billingEmail      String?     @map("billing_email") @db.Citext
-  taxId             String?     @map("tax_id")
-  logoUrl           String?     @map("logo_url")
+  employeeCount     Int?             @map("employee_count")
+  countryCode       String?          @map("country_code") @db.VarChar(2)
+  address           Json?            @default("{}")
+  billingEmail      String?          @map("billing_email") @db.Citext
+  taxId             String?          @map("tax_id")
+  logoUrl           String?          @map("logo_url")
   website           String?
-  source            String      @default("manual")
-  confidence        Float       @default(1.0)
-  enrichedAt        DateTime?   @map("enriched_at") @db.Timestamptz(6)
-  tier              AccountTier @default(standard) @map("tier")
-  keyAccountSince   DateTime?   @map("key_account_since") @db.Timestamptz(6)
-  keyAccountOwnerId String?     @map("key_account_owner_id") @db.Uuid
-  keyAccountNotes   String?     @map("key_account_notes")
+  source            String           @default("manual")
+  confidence        Float            @default(1.0)
+  enrichedAt        DateTime?        @map("enriched_at") @db.Timestamptz(6)
+  tier              AccountTier      @default(standard) @map("tier")
+  keyAccountSince   DateTime?        @map("key_account_since") @db.Timestamptz(6)
+  keyAccountOwnerId String?          @map("key_account_owner_id") @db.Uuid
+  keyAccountNotes   String?          @map("key_account_notes")
   // KAM front layer — account lifecycle status, operating model
   // (Spain=presales_driven, CH=manager_driven), and the director sponsor.
   kamStatus         KamAccountStatus @default(identified) @map("kam_status")
   kamOwnerModel     KamOwnerModel?   @map("kam_owner_model")
   directorSponsorId String?          @map("director_sponsor_id") @db.Uuid
-  topAccountRank    Int?        @map("top_account_rank")
-  parentId          String?     @map("parent_id") @db.Uuid
-  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  topAccountRank    Int?             @map("top_account_rank")
+  parentId          String?          @map("parent_id") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org           Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   parent        Company?         @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
@@ -380,13 +380,13 @@ model Company {
   expansionOpportunities ExpansionOpportunity[]
 
   // KAM front layer (all FK to this Company as the canonical KAM account)
-  kamConsultants    KamConsultant[]
-  kamSessions       KamSession[]
-  kamInitiatives    KamInitiative[]
-  kamSessionDrafts  KamSessionDraft[]
-  kamHandoffs       KamHandoff[]
-  kamProspections   KamProspection[]
-  kamTasks          Task[]            @relation("CompanyKamTasks")
+  kamConsultants   KamConsultant[]
+  kamSessions      KamSession[]
+  kamInitiatives   KamInitiative[]
+  kamSessionDrafts KamSessionDraft[]
+  kamHandoffs      KamHandoff[]
+  kamProspections  KamProspection[]
+  kamTasks         Task[]            @relation("CompanyKamTasks")
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -642,21 +642,21 @@ enum TaskStatus {
 }
 
 model Task {
-  id         String     @id @default(uuid()) @db.Uuid
-  orgId      String     @map("org_id") @db.Uuid
-  oppId      String?    @map("opp_id") @db.Uuid
-  title      String
-  dueDate    DateTime?  @map("due_date") @db.Date
-  status     TaskStatus @default(open)
-  assigneeId String?    @map("assignee_id") @db.Uuid
+  id           String     @id @default(uuid()) @db.Uuid
+  orgId        String     @map("org_id") @db.Uuid
+  oppId        String?    @map("opp_id") @db.Uuid
+  title        String
+  dueDate      DateTime?  @map("due_date") @db.Date
+  status       TaskStatus @default(open)
+  assigneeId   String?    @map("assignee_id") @db.Uuid
   // KAM front layer — Initiative-scoped tasks (the per-account to-do list OM
   // lacks). accountId denormalizes the owning Company for the per-account
   // roll-up without an initiative join. `type` = prospection | follow_up |
   // proposal_prep | internal | other.
-  initiativeId String?  @map("initiative_id") @db.Uuid
-  accountId    String?  @map("account_id") @db.Uuid
+  initiativeId String?    @map("initiative_id") @db.Uuid
+  accountId    String?    @map("account_id") @db.Uuid
   type         String?
-  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
   org         Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity?   @relation(fields: [oppId], references: [id], onDelete: Cascade)
@@ -771,6 +771,7 @@ model WebhookSubscription {
   orgId          String    @map("org_id") @db.Uuid
   url            String
   secret         String
+  secretHash     String?   @map("secret_hash") @db.VarChar(64)
   events         String[]
   active         Boolean   @default(true)
   failureCount   Int       @default(0) @map("failure_count")
@@ -786,6 +787,7 @@ model WebhookSubscription {
   // P1 #25: fanOutWebhookEvent queries WHERE orgId=? AND active=true AND deletedAt IS NULL
   // on every domain event — full table scan without this compound index.
   @@index([orgId, active, deletedAt], map: "webhook_subs_org_active_idx")
+  @@index([secretHash, active, deletedAt, createdAt(sort: Desc)], map: "webhook_subs_secret_hash_active_idx")
   @@index([deletedAt])
   @@map("webhook_subscriptions")
 }
@@ -3892,8 +3894,8 @@ model CallSession {
   /// SCHEDULED | LIVE | COMPLETED | FAILED
   status String @default("SCHEDULED") @db.VarChar(32)
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   /// Soft-delete tombstone. Heavy PII (transcripts, recordings, participant
   /// emails) — required so GDPR erasure can tombstone rows instead of leaving
   /// them undeletable.

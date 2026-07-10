@@ -12,11 +12,14 @@ import { createLogger } from '../lib/logger.js';
 const log = createLogger({ name: 'notification' });
 
 // Notification types a user can switch off in Settings. assignment/bid_override/
-// system are operationally important and always delivered. taskDueSoon +
-// emailDigest gate features that don't emit in-app notifications (yet).
-const GATED_BY_PREF: Partial<Record<NotificationType, 'mentionPush' | 'dealStageChange'>> = {
+// system are operationally important and always delivered. emailDigest gates a
+// feature that doesn't emit in-app notifications (yet).
+const GATED_BY_PREF: Partial<
+  Record<NotificationType, 'mentionPush' | 'dealStageChange' | 'taskDueSoon'>
+> = {
   mention: 'mentionPush',
   stage_change: 'dealStageChange',
+  task_due: 'taskDueSoon',
 };
 
 export interface CreateNotificationInput {

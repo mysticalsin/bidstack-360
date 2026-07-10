@@ -6,7 +6,9 @@ import type { FastifyError, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
 
+import { isProviderTimeoutError } from '../lib/fetch-timeout.js';
 import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-client-abort.js';
+import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { captureSentryServerError } from './sentry.js';
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
@@ -66,6 +68,31 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
         statusCode: 400,
         error: 'Bad Request',
         message: 'Database query validation failed.',
+      });
+    }
+
+    if (isProviderTimeoutError(err)) {
+      req.log.warn(
+        {
+          provider: err.provider,
+          operation: err.operation,
+          timeoutMs: err.timeoutMs,
+        },
+        'provider request timed out',
+      );
+      return reply.status(504).send({
+        statusCode: 504,
+        error: 'Gateway Timeout',
+        message: err.message,
+      });
+    }
+
+    if (isOAuthRefreshLockError(err)) {
+      req.log.warn({ code: err.code }, 'OAuth refresh lock unavailable');
+      return reply.status(503).send({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: err.message,
       });
     }
 

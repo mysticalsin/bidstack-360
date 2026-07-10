@@ -16,6 +16,7 @@ import {
   webhookBaseUrl,
   type ServiceLogger,
 } from './microsoft-graph-auth.service.js';
+import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 
@@ -34,11 +35,14 @@ export async function createSubscription(
   { integrationTokenId, orgId }: { integrationTokenId: string; orgId: string },
   log: ServiceLogger,
 ): Promise<string | null> {
-  const token = await prisma.integrationToken.findUnique({
-    where: { id: integrationTokenId },
+  // WHY findFirst + orgId in where (not findUnique by bare id): prevents a
+  // cross-tenant integrationTokenId from resolving to another org's token —
+  // see MISTAKES.md cross-tenant OAuth token disclosure finding.
+  const token = await prisma.integrationToken.findFirst({
+    where: { id: integrationTokenId, orgId },
   });
 
-  if (!token || token.orgId !== orgId || token.status !== 'active') {
+  if (!token || token.status !== 'active') {
     log.warn({ integrationTokenId }, 'Cannot create subscription: token not active');
     return null;
   }
@@ -48,7 +52,10 @@ export async function createSubscription(
   const expiresAt = new Date(Date.now() + SUB_MAX_MS);
   const notificationUrl = `${webhookBaseUrl()}/api/v1/integrations/microsoft/webhook`;
 
-  const res = await fetch(`${GRAPH_BASE}/subscriptions`, {
+  const res = await fetchWithTimeout(`${GRAPH_BASE}/subscriptions`, {
+    provider: 'Microsoft Graph',
+    operation: 'subscriptions.create',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -107,7 +114,10 @@ export async function renewSubscription(subscriptionId: string, log: ServiceLogg
   const accessToken = await getAccessToken(sub.integrationToken, log);
   const newExpiry = new Date(Date.now() + SUB_MAX_MS);
 
-  const res = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+  const res = await fetchWithTimeout(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+    provider: 'Microsoft Graph',
+    operation: 'subscriptions.renew',
+    timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -150,7 +160,10 @@ export async function deleteSubscription(
   log: ServiceLogger,
 ): Promise<void> {
   try {
-    const res = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+    const res = await fetchWithTimeout(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+      provider: 'Microsoft Graph',
+      operation: 'subscriptions.delete',
+      timeoutMs: providerTimeoutMs('MICROSOFT_GRAPH_HTTP_TIMEOUT_MS', 15_000),
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
     });

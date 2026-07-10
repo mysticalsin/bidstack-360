@@ -18,7 +18,7 @@ import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 /**
  * Sprint 1 — tenant-ownership for the taggable surface. The shared
  * `tenantEntityBelongsToOrg` helper covers most types but not the two
- * BidStack-specific ones we tag (`bid_opportunity`, `activity`). Inline
+ * Polo PreSales-specific ones we tag (`bid_opportunity`, `activity`). Inline
  * the extra cases here rather than expanding the shared helper for a
  * narrow consumer. Returns a plain boolean — handlers do the throw so
  * fastify's request-scoped httpErrors typing stays clean.

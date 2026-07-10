@@ -30,6 +30,7 @@ interface UsersPageParams {
   cursor?: string;
   /** Route caps at 200; default 100 matches the API default. */
   limit?: number;
+  enabled?: boolean;
 }
 
 function usersPath(params: UsersPageParams): string {
@@ -51,9 +52,11 @@ function usersPath(params: UsersPageParams): string {
 // fix needs a backend `?search=` endpoint. See useUsersPage for the paginated
 // Team list view.
 export function useUsers(params: UsersPageParams = {}) {
+  const { enabled = true, ...queryParams } = params;
   return useQuery({
-    queryKey: ['users', params],
-    queryFn: ({ signal }) => api<UsersPage>(usersPath(params), { signal }),
+    queryKey: ['users', queryParams],
+    queryFn: ({ signal }) => api<UsersPage>(usersPath(queryParams), { signal }),
+    enabled,
     select: (data) => data.items,
   });
 }
@@ -62,9 +65,11 @@ export function useUsers(params: UsersPageParams = {}) {
 // page through every member at a large tenant instead of capping at 100.
 // Returns the raw { items, nextCursor } so the page can drive a CursorPager.
 export function useUsersPage(params: UsersPageParams = {}) {
+  const { enabled = true, ...queryParams } = params;
   return useQuery<UsersPage>({
-    queryKey: ['users', 'page', params],
-    queryFn: ({ signal }) => api<UsersPage>(usersPath(params), { signal }),
+    queryKey: ['users', 'page', queryParams],
+    queryFn: ({ signal }) => api<UsersPage>(usersPath(queryParams), { signal }),
+    enabled,
   });
 }
 

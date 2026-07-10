@@ -173,7 +173,7 @@ async function runReviewAgent(opts: {
 
   const userMessage = buildAgentUserMessage({
     template:
-      'You are {{ROLE}} in the BidStack RFP response crew. {{INSTRUCTION}} ' +
+      'You are {{ROLE}} in the Polo PreSales RFP response crew. {{INSTRUCTION}} ' +
       'Return concise markdown with: Critical risks, Required owner actions, Missing information, and Go-forward recommendation. ' +
       'Do not approve the bid; humans approve gates.',
     trusted: { ROLE: agent.role, INSTRUCTION: agent.instruction, PROPOSAL_ID: proposalId },
@@ -292,7 +292,9 @@ async function processJob(
       orgId,
       'legal_scan',
       'Document is NDA-restricted; AI review blocked',
-    ).catch(() => undefined);
+    ).catch((err) =>
+      log.warn({ err }, 'best-effort orchestration failure mark write failed (nda block)'),
+    );
     return;
   }
 
@@ -421,7 +423,9 @@ export async function startRfpLegalScan(
         orgId,
         'legal_scan',
         (err as Error).message?.slice(0, 2000) ?? 'unknown error',
-      ).catch(() => undefined);
+      ).catch((markErr) =>
+        log.warn({ err: markErr }, 'best-effort orchestration failure mark write failed'),
+      );
     }
   });
 

@@ -57,7 +57,13 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
             : {}),
         },
         include: { owner: { select: { name: true } } },
-        orderBy: { createdAt: 'desc' },
+        // Compound (createdAt, id) tiebreaker: createdAt is not unique, so a
+        // bare single-column sort leaves ties in an unspecified heap order that
+        // is not stable across the id-cursor + skip:1 keyset walk — a tie
+        // straddling a page boundary can be dropped (or duplicated) on the next
+        // page. The unique id secondary sort makes the ordering total and the
+        // keyset deterministic. Matches the convention in companies.ts/tasks.ts.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });

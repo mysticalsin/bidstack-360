@@ -1,15 +1,22 @@
 // Integration tests for the comitology / governance log (A4) and the Spotlight
 // Ref receiving end (A5) + opportunity filter rules (M6).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 import { ingestProjectReference } from '../services/project-reference.service.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
+import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
+let restoreAuth: (() => void) | null = null;
 const ACCOUNT = 'governance-test-account';
 
 beforeAll(async () => {
@@ -20,9 +27,9 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-  orgId = org?.id ?? null;
-  if (!orgId) return;
+  const org = await createIsolatedOrg('governance');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   server = await buildServer();
   await server.ready();
 });
@@ -34,19 +41,23 @@ afterAll(async () => {
     await prisma.auditLog.deleteMany({
       where: {
         orgId,
-        action: { in: ['governance_meeting.create', 'project_reference.validate', 'org_settings.opportunity_filters.update'] },
+        action: {
+          in: [
+            'governance_meeting.create',
+            'project_reference.validate',
+            'org_settings.opportunity_filters.update',
+          ],
+        },
       },
     });
   }
   if (server) await server.close();
+  if (restoreAuth) restoreAuth();
+  if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
 });
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable || !orgId) throw new Error(`[skip] ${name} — DB/seed org unavailable`);
-    await fn();
-  });
+const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('governance meetings', () => {
   t('create with nested actions, then advance an action status', async () => {
@@ -115,7 +126,10 @@ describe('project references (Spotlight Ref receiving end)', () => {
 
 describe('opportunity filter rules (M6)', () => {
   t('defaults to empty rules, then persists an update', async () => {
-    const get = await server.inject({ method: 'GET', url: '/api/org-settings/opportunity-filters' });
+    const get = await server.inject({
+      method: 'GET',
+      url: '/api/org-settings/opportunity-filters',
+    });
     expect(get.statusCode).toBe(200);
 
     const put = await server.inject({

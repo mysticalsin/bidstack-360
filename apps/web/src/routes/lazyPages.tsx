@@ -47,9 +47,6 @@ export const ContactsPage = lazy(() =>
 export const ContactDetailPage = lazy(() =>
   import('@/pages/ContactDetailPage').then((m) => ({ default: m.ContactDetailPage })),
 );
-export const KeyAccountsPage = lazy(() =>
-  import('@/pages/KeyAccountsPage').then((m) => ({ default: m.KeyAccountsPage })),
-);
 export const LeadsPage = lazy(() =>
   import('@/pages/LeadsPage').then((m) => ({ default: m.LeadsPage })),
 );
@@ -58,9 +55,6 @@ export const LeadDetailPage = lazy(() =>
 );
 export const NewLeadPage = lazy(() =>
   import('@/pages/NewLeadPage').then((m) => ({ default: m.NewLeadPage })),
-);
-export const TopAccountsPage = lazy(() =>
-  import('@/pages/TopAccountsPage').then((m) => ({ default: m.TopAccountsPage })),
 );
 
 // ─── Opportunities & Pipeline ─────────────────────────────────────────────────
@@ -77,6 +71,8 @@ export const PipelinePage = lazy(() =>
 export const ForecastsPage = lazy(() =>
   import('@/pages/ForecastsPage').then((m) => ({ default: m.ForecastsPage })),
 );
+// Default export — no .then() reshaping needed.
+export const WinLossPage = lazy(() => import('@/pages/WinLossPage'));
 export const SalesToolkitsPage = lazy(() => import('@/pages/SalesToolkitsPage'));
 export const SectorViewPage = lazy(() => import('@/pages/SectorViewPage'));
 export const CrossSellPage = lazy(() => import('@/pages/CrossSellPage'));
@@ -104,9 +100,6 @@ export const ReferencesPage = lazy(() =>
 export const RfpPipelinePage = lazy(() =>
   import('@/pages/RfpPipelinePage').then((m) => ({ default: m.RfpPipelinePage })),
 );
-export const RfpResponseHubPage = lazy(() =>
-  import('@/pages/RfpResponseHubPage').then((m) => ({ default: m.RfpResponseHubPage })),
-);
 export const AgentStudioPage = lazy(() =>
   import('@/pages/AgentStudioPage').then((m) => ({ default: m.AgentStudioPage })),
 );
@@ -124,6 +117,8 @@ export const TaskDetailPage = lazy(() =>
 export const TasksPage = lazy(() =>
   import('@/pages/TasksPage').then((m) => ({ default: m.TasksPage })),
 );
+// Default export — no .then() reshaping needed.
+export const WorkloadPage = lazy(() => import('@/pages/WorkloadPage'));
 
 // ─── Reporting & Analytics ────────────────────────────────────────────────────
 
@@ -137,9 +132,6 @@ export const DashboardsListPage = lazy(() =>
 );
 export const ReportsListPage = lazy(() =>
   import('@/pages/ReportsListPage').then((m) => ({ default: m.ReportsListPage })),
-);
-export const ReportsPage = lazy(() =>
-  import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 );
 export const ReportBuilderPage = lazy(() =>
   import('@/pages/ReportBuilderPage').then((m) => ({ default: m.ReportBuilderPage })),

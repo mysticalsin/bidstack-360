@@ -90,7 +90,10 @@ export async function upsertVerifiedCompanyEnrichment({
   const seamlessApiKey =
     process.env.NODE_ENV === 'test'
       ? null
-      : ((await resolveDataProviderApiKey(orgId, 'seamless').catch(() => null)) ??
+      : ((await resolveDataProviderApiKey(orgId, 'seamless').catch((err) => {
+          log.warn({ err, orgId }, 'seamless api key resolution failed');
+          return null;
+        })) ??
         process.env.SEAMLESS_API_KEY ??
         null);
   const seamlessProfile = seamlessMcpUrl || seamlessApiKey
@@ -149,7 +152,7 @@ export async function upsertVerifiedCompanyEnrichment({
     ...(openProfile?.logoUrl ? [] : favicon.sourceAttribution),
     attribution({
       source: isMantu ? 'official_website' : 'verified_data_source',
-      label: isMantu ? 'Mantu official website' : 'BidStack verified data cache',
+      label: isMantu ? 'Mantu official website' : 'Polo PreSales verified data cache',
       sourceUrl: website,
       confidence: isMantu ? 0.99 : 0.72,
     }),

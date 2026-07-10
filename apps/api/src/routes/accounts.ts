@@ -11,11 +11,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import { TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
 
 import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
-import {
-  applyCompanyScope,
-  countryVariantsForScope,
-  getAccessScope,
-} from '../lib/access-scope.js';
+import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 
 const KeyAccountResponse = z.object({
   id: z.string().uuid(),
@@ -68,21 +64,24 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       const { search, industry, ownerId, limit, cursor } = req.query;
       const scope = await getAccessScope(orgId, userId);
 
-      const where = applyCompanyScope({
-        orgId,
-        tier: 'key' as const,
-        deletedAt: null,
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' as const } },
-                { domain: { contains: search, mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
-        ...(industry ? { industry: { equals: industry, mode: 'insensitive' as const } } : {}),
-        ...(ownerId ? { keyAccountOwnerId: ownerId } : {}),
-      }, scope);
+      const where = applyCompanyScope(
+        {
+          orgId,
+          tier: 'key' as const,
+          deletedAt: null,
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: 'insensitive' as const } },
+                  { domain: { contains: search, mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+          ...(industry ? { industry: { equals: industry, mode: 'insensitive' as const } } : {}),
+          ...(ownerId ? { keyAccountOwnerId: ownerId } : {}),
+        },
+        scope,
+      );
 
       // Fetch one extra row to detect whether a next page exists.
       const companies = await prisma.company.findMany({
@@ -151,22 +150,23 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       });
       if (curatedCount > 0) {
         const curated = await prisma.company.findMany({
-          where: applyCompanyScope({
-            orgId,
-            deletedAt: null,
-            topAccountRank: { not: null },
-            ...(search
-              ? {
-                  OR: [
-                    { name: { contains: search, mode: 'insensitive' as const } },
-                    { domain: { contains: search, mode: 'insensitive' as const } },
-                  ],
-                }
-              : {}),
-            ...(industry
-              ? { industry: { equals: industry, mode: 'insensitive' as const } }
-              : {}),
-          }, scope),
+          where: applyCompanyScope(
+            {
+              orgId,
+              deletedAt: null,
+              topAccountRank: { not: null },
+              ...(search
+                ? {
+                    OR: [
+                      { name: { contains: search, mode: 'insensitive' as const } },
+                      { domain: { contains: search, mode: 'insensitive' as const } },
+                    ],
+                  }
+                : {}),
+              ...(industry ? { industry: { equals: industry, mode: 'insensitive' as const } } : {}),
+            },
+            scope,
+          ),
           orderBy: { topAccountRank: 'asc' },
           take: Math.min(limit, TOP_ACCOUNTS_MAX),
         });
@@ -332,7 +332,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
   // Body order = rank order (index 0 → rank 1). An empty list clears curation
   // and reverts /accounts/top to the auto leaderboard.
   app.put('/accounts/top-list', {
-    preHandler: server.requirePermission('accounts:write'),
+    preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
     schema: {
       body: TopAccountListUpdate,
       response: { 200: z.object({ companyIds: z.array(z.string().uuid()) }) },

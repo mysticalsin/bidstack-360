@@ -350,7 +350,7 @@ export function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
     sourceAttribution: [
       attribution({
         source: name === 'Mantu' ? 'official_website' : 'bidstack_seed',
-        label: name === 'Mantu' ? 'Mantu official website' : 'BidStack seed profile',
+        label: name === 'Mantu' ? 'Mantu official website' : 'Polo PreSales seed profile',
         sourceUrl: websiteFor(name),
         confidence: name === 'Mantu' ? 0.99 : 0.5,
       }),

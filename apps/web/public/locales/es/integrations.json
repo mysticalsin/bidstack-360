@@ -1,6 +1,6 @@
 {
   "title": "Integraciones",
-  "subtitle": "Conecta BidStack a tus herramientas y servicios",
+  "subtitle": "Conecta Polo PreSales a tus herramientas y servicios",
   "connected": "Conectado",
   "disconnected": "Desconectado",
   "connect": "Conectar",
@@ -18,12 +18,12 @@
   },
   "gmail": {
     "name": "Gmail",
-    "description": "Sincroniza tus correos y actividades de Gmail con BidStack.",
+    "description": "Sincroniza tus correos y actividades de Gmail con Polo PreSales.",
     "connectViaGoogle": "Conectar con Google"
   },
   "microsoft": {
     "name": "Microsoft 365",
-    "description": "Sincroniza Outlook, Calendar y Teams con BidStack.",
+    "description": "Sincroniza Outlook, Calendar y Teams con Polo PreSales.",
     "connectViaMicrosoft": "Conectar con Microsoft"
   },
   "slack": {
@@ -147,7 +147,7 @@
     },
     "header": {
       "title": "Catálogo de conectores",
-      "caption": "Fuentes de datos externas a las que BidStack puede acceder. Los feeds abiertos funcionan sin claves; los feeds con licencia necesitan credenciales.",
+      "caption": "Fuentes de datos externas a las que Polo PreSales puede acceder. Los feeds abiertos funcionan sin claves; los feeds con licencia necesitan credenciales.",
       "sourcesBadge": "{{count}} fuentes"
     },
     "error": {
@@ -203,7 +203,7 @@
     "notConfigured": {
       "set": "Configura",
       "andOptionally": "y opcionalmente",
-      "tail": "para alcanzar el sidecar ERP MCP. Hasta entonces, BidStack usa datos verificados locales y conectores de datos verificados."
+      "tail": "para alcanzar el sidecar ERP MCP. Hasta entonces, Polo PreSales usa datos verificados locales y conectores de datos verificados."
     },
     "stat": {
       "endpoint": "Endpoint",
@@ -218,7 +218,7 @@
     },
     "kit": {
       "title": "Kit operativo de licitación ERP",
-      "subtitle": "Patrones de socio, oportunidad, presupuesto, actividad, documento y traspaso adaptados para preventa de BidStack.",
+      "subtitle": "Patrones de socio, oportunidad, presupuesto, actividad, documento y traspaso adaptados para preventa de Polo PreSales.",
       "badge": {
         "sidecar": "sidecar",
         "fixSidecar": "corregir sidecar",
@@ -227,11 +227,11 @@
     },
     "autocomplete": {
       "title": "Autocompletar socio",
-      "subtitle": "Búsqueda de entidad legal estilo ERP con respaldo de BidStack.",
+      "subtitle": "Búsqueda de entidad legal estilo ERP con respaldo de Polo PreSales.",
       "ariaLabel": "Consulta de autocompletar empresa",
       "placeholder": "Nombre, dominio, NIF/IVA o DUNS",
       "check": "Comprobar",
-      "empty": "Aún no hay sugerencias de empresas. Añade credenciales de ERP MCP o verifica esta cuenta en BidStack."
+      "empty": "Aún no hay sugerencias de empresas. Añade credenciales de ERP MCP o verifica esta cuenta en Polo PreSales."
     },
     "item": {
       "vat": "NIF/IVA {{value}}",
@@ -249,7 +249,7 @@
       "mcp": {
         "title": "Servidor MCP",
         "eyebrow": "Herramientas personalizadas",
-        "summary": "Registra BidStack como servidor MCP para Dust, Claude Desktop o agentes internos."
+        "summary": "Registra Polo PreSales como servidor MCP para Dust, Claude Desktop o agentes internos."
       },
       "rest": {
         "title": "API REST",

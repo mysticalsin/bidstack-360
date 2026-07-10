@@ -118,7 +118,7 @@ export function WebhooksSection() {
           title={t('webhooks.readinessSignedTitle', 'Signed by default')}
           body={t(
             'webhooks.readinessSignedBody',
-            'Every delivery includes X-BidStack-Signature with a timestamped HMAC.',
+            'Every delivery includes X-Polo-Signature with a timestamped HMAC.',
           )}
           status={t('webhooks.readinessStatusRequired', 'Required')}
           tone="jade"
@@ -409,7 +409,7 @@ function SubscriptionRow({
       title: t('webhooks.deleteConfirmTitle', 'Delete webhook subscription?'),
       description: t(
         'webhooks.deleteConfirmDescription',
-        'The endpoint will stop receiving BidStack events immediately. Delivery history is retained.',
+        'The endpoint will stop receiving Polo PreSales events immediately. Delivery history is retained.',
       ),
       confirmLabel: t('webhooks.deleteConfirmLabel', 'Delete'),
       destructive: true,

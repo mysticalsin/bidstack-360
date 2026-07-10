@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { api } from '@/lib/api';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
@@ -15,6 +19,7 @@ import {
   InlineEditText,
 } from '@/components/opportunity/InlineEdit';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
+import { PresenceAvatars } from '@/components/presence/PresenceAvatars';
 import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
@@ -24,7 +29,6 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
-import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
@@ -39,6 +43,7 @@ import {
   NewsCard,
 } from './opportunityDetail/IntelCards';
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
+import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 
 export function OpportunityDetailPage() {
   const { t } = useTranslation('crm');
@@ -58,9 +63,34 @@ export function OpportunityDetailPage() {
   const { data, isLoading, isError, error } = useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
-  const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!id) return;
+    const ok = await confirm({
+      title: t('opportunityDetail.confirmDelete.title', 'Delete this opportunity?'),
+      description: t(
+        'opportunityDetail.confirmDelete.description',
+        'This cannot be undone from the UI — the audit log records the delete.',
+      ),
+      confirmLabel: t('opportunityDetail.confirmDelete.confirm', 'Delete'),
+      destructive: true,
+    });
+    if (!ok) return;
+    setIsDeleting(true);
+    try {
+      await api(`/api/opportunities/${id}`, { method: 'DELETE' });
+      void qc.invalidateQueries({ queryKey: ['opportunities'] });
+      toast.success(t('opportunityDetail.toast.deleted', 'Opportunity deleted'));
+      nav('/opportunities');
+    } catch {
+      toast.error(t('opportunityDetail.toast.deleteFailed', 'Failed to delete opportunity'));
+      setIsDeleting(false);
+    }
+  };
 
   // Register contextual commands for this page in the global Cmd+K palette.
   // WHY: Twenty's command menu surfaces page-specific actions; we adapt the
@@ -114,12 +144,6 @@ export function OpportunityDetailPage() {
     );
   }
 
-  const timelineItems =
-    timeline.data?.items.map((t: { createdAt: string; kind: string; text: string }) => ({
-      at: t.createdAt,
-      kind: t.kind,
-      text: t.text,
-    })) ?? [];
   const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
   const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
   const isOutcomeLocked = isWon || isLost;
@@ -141,27 +165,31 @@ export function OpportunityDetailPage() {
         className="border-none bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-sunken-alpha)] shadow-2xl"
       >
         <header>
-          <nav
-            aria-label={t('opportunityDetail.breadcrumbAriaLabel', 'Breadcrumb')}
-            className="text-xs text-[var(--fg-tertiary)] mb-4"
-          >
-            <ol className="flex items-center gap-2">
-              <li>
-                <Link
-                  to="/opportunities"
-                  className="hover:text-[var(--brand-primary)] transition-colors"
-                >
-                  {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
-                </Link>
-              </li>
-              <li aria-hidden="true" className="opacity-30">
-                /
-              </li>
-              <li aria-current="page" className="font-mono">
-                {data.code}
-              </li>
-            </ol>
-          </nav>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <nav
+              aria-label={t('opportunityDetail.breadcrumbAriaLabel', 'Breadcrumb')}
+              className="text-xs text-[var(--fg-tertiary)]"
+            >
+              <ol className="flex items-center gap-2">
+                <li>
+                  <Link
+                    to="/opportunities"
+                    className="hover:text-[var(--brand-primary)] transition-colors"
+                  >
+                    {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
+                  </Link>
+                </li>
+                <li aria-hidden="true" className="opacity-30">
+                  /
+                </li>
+                <li aria-current="page" className="font-mono">
+                  {data.code}
+                </li>
+              </ol>
+            </nav>
+            {/* A3 — who else is looking at this bid right now. */}
+            <PresenceAvatars entityType="opportunity" entityId={data.id} />
+          </div>
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="min-w-0 flex-1">
               <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
@@ -247,6 +275,18 @@ export function OpportunityDetailPage() {
                 >
                   {t('opportunityDetail.askDustButton', 'Ask Dust')}
                 </MagneticButton>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full text-[var(--danger)]"
+                  disabled={isDeleting}
+                  onClick={handleDelete}
+                >
+                  <Icon name="trash" size={13} className="mr-1" />
+                  {isDeleting
+                    ? t('opportunityDetail.deleting', 'Deleting…')
+                    : t('opportunityDetail.deleteButton', 'Delete')}
+                </Button>
               </div>
               <div
                 className="flex flex-wrap items-center gap-2"
@@ -329,7 +369,7 @@ export function OpportunityDetailPage() {
                     <span>{t('opportunityDetail.likely', 'likely')}</span>
                   </span>
                   <span className="opacity-30">·</span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-2">
                     <Icon name="clock" size={12} />
                     <InlineEditDate
                       value={data.dueDate}
@@ -337,6 +377,7 @@ export function OpportunityDetailPage() {
                       label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
                       display={(v) => formatDate(v)}
                     />
+                    <DueDateChip dueDate={data.dueDate} size="lg" />
                   </span>
                 </div>
               </div>
@@ -352,7 +393,7 @@ export function OpportunityDetailPage() {
         onOpenChange={setBriefOpen}
       />
 
-      <DataFreshnessRibbon refreshedAt={intel.refreshedAt} />
+      <DataFreshnessRibbon intel={intel} />
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <FinancialHealthCard intel={intel} />
@@ -373,7 +414,7 @@ export function OpportunityDetailPage() {
         customer={data.customer}
         intelDecisionUnit={intel.decisionUnit ?? []}
         documents={data.documents}
-        timeline={timelineItems}
+        activityContent={<TimelinePanel oppId={data.id} />}
       />
 
       <CustomFieldValuesSection entityType="opportunity" entityId={id!} />

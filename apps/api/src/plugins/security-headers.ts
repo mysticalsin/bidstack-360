@@ -1,10 +1,10 @@
 /**
  * Security headers plugin — supplemental hardening on top of @fastify/helmet.
  *
- * WHY: @fastify/helmet covers most OWASP headers but omits Permissions-Policy
- * (removed in helmet v7/fastify-helmet v12) and Cross-Origin-Opener-Policy
- * needs explicit wiring for SPA deployments. This plugin provides a single,
- * auditable place for all custom header overrides.
+ * WHY: @fastify/helmet covers most OWASP headers, but CSP and
+ * Permissions-Policy live here as the single auditable source of truth. Keeping
+ * a second CSP in server.ts drifted silently because this onSend hook overwrote
+ * Helmet's value.
  *
  * Header rationale (per OWASP Secure Headers Project):
  *
@@ -26,8 +26,25 @@ import fp from 'fastify-plugin';
 
 // Adjust these origins for your deployment.
 const BIDSTACK_DOMAINS = ['https://*.bidstack.io'];
+const CONNECT_SRC = [
+  "'self'",
+  'wss:',
+  ...BIDSTACK_DOMAINS,
+  'https://api.clerk.com',
+  'https://*.clerk.accounts.dev',
+  'https://dust.tt',
+  'https://*.dust.tt',
+  'https://*.sentry.io',
+  'https://api.apollo.io',
+  'https://api.zoom.us',
+  'https://zoom.us',
+  'https://api.deepgram.com',
+  'https://graph.microsoft.com',
+  'https://www.googleapis.com',
+  'https://api.twilio.com',
+];
 
-const CSP_DIRECTIVES = (isDev: boolean): string => {
+export const buildContentSecurityPolicy = (isDev: boolean): string => {
   const parts: string[] = [
     "default-src 'self'",
     // WHY 'unsafe-inline' in dev: Vite injects inline scripts for HMR.
@@ -41,7 +58,7 @@ const CSP_DIRECTIVES = (isDev: boolean): string => {
     // data: for inline images (charts, thumbnails). https: for third-party embeds.
     "img-src 'self' data: https:",
     // wss: for real-time WebSocket connections.
-    `connect-src 'self' wss: ${BIDSTACK_DOMAINS.join(' ')} https://api.clerk.com https://*.clerk.accounts.dev https://dust.tt https://*.dust.tt https://*.sentry.io`,
+    `connect-src ${CONNECT_SRC.join(' ')}`,
     "object-src 'none'",
     "frame-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
     "frame-ancestors 'none'",
@@ -65,7 +82,7 @@ export const securityHeadersPlugin: FastifyPluginAsync = fp(
 
     server.addHook('onSend', async (_req, reply) => {
       // Content-Security-Policy
-      reply.header('Content-Security-Policy', CSP_DIRECTIVES(isDev));
+      reply.header('Content-Security-Policy', buildContentSecurityPolicy(isDev));
 
       // HSTS — production only (dev uses HTTP)
       if (isProd) {

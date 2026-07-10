@@ -144,8 +144,19 @@ export function EmailTemplatesSection() {
           aria-label={t('emailTemplates.listAria', 'Email templates')}
         >
           {isLoading ? (
-            <li className="px-3 py-4 text-sm text-[var(--fg-secondary)]">
-              {t('emailTemplates.loading', 'Loading…')}
+            // Shimmer rows shaped like template list rows (name + subject) —
+            // shared bs-shimmer system, not a bare "Loading…" string.
+            <li
+              aria-busy="true"
+              aria-live="polite"
+              aria-label={t('emailTemplates.loading', 'Loading…')}
+            >
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-1.5 px-3 py-2" aria-hidden>
+                  <span className="bs-shimmer h-3.5 w-2/3" />
+                  <span className="bs-shimmer h-3 w-5/6" />
+                </div>
+              ))}
             </li>
           ) : templates.length === 0 ? (
             <li className="px-3 py-6">

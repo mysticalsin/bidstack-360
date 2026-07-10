@@ -1,6 +1,7 @@
-// Cross-sell action log (A2) — structured cross-country/cross-team actions on
+// Cross-sell action log (A2): structured cross-country/cross-team actions on
 // shared accounts. Pre-sales owns it; assignable + status-tracked.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
@@ -12,10 +13,21 @@ import {
   CrossSellActionPatch,
 } from '@bidstack/shared';
 
+import { canReadAccount } from '../lib/account-access.js';
+import { getAccessScope, type AccessScope } from '../lib/access-scope.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { createNotification } from '../services/notification.service.js';
 
 const IdParam = z.object({ id: z.string().uuid() });
+
+// GET /cross-sell-actions response page size (also the fast-path `take` for a
+// single-account or unrestricted-scope query).
+const PAGE_SIZE = 200;
+// Batch size for the scope-restricted cursor scan below.
+const SCAN_BATCH_SIZE = 500;
+// Hard cap on rows scanned while paging for a scope-restricted caller, so a
+// deep scan can't turn into an unbounded table walk.
+const SCAN_CAP = 5000;
 
 interface DbRow {
   id: string;
@@ -75,61 +87,170 @@ async function assertAssignee(orgId: string, assigneeId: string | null | undefin
 }
 
 export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
+  async function assertAccountVisible(
+    req: FastifyRequest,
+    accountKey: string,
+    scope?: AccessScope,
+  ): Promise<void> {
+    const access = await canReadAccount({
+      orgId: req.auth.orgId,
+      userId: req.auth.userId,
+      accountId: accountKey,
+      accountName: accountKey,
+      scope,
+      prismaClient: prisma,
+    });
+    if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+  }
+
+  // Memoizes canReadAccount by accountKey for the lifetime of one request:
+  // most rows on a page share the same handful of accountKeys (often the
+  // caller's own account), so this collapses N per-row DB round-trips down to
+  // one per distinct accountKey.
+  async function filterVisibleRows(
+    req: FastifyRequest,
+    rows: DbRow[],
+    scope: AccessScope,
+    visibilityCache: Map<string, boolean>,
+  ): Promise<DbRow[]> {
+    if (scope.unrestricted) return rows;
+
+    const visible: DbRow[] = [];
+    for (const row of rows) {
+      let allowed = visibilityCache.get(row.accountKey);
+      if (allowed === undefined) {
+        const access = await canReadAccount({
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          accountId: row.accountKey,
+          accountName: row.accountKey,
+          scope,
+          prismaClient: prisma,
+        });
+        allowed = access.allowed;
+        visibilityCache.set(row.accountKey, allowed);
+      }
+      if (allowed) visible.push(row);
+    }
+    return visible;
+  }
+
+  async function assertHumanWriteActor(req: FastifyRequest): Promise<void> {
+    if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
+      throw server.httpErrors.forbidden('Cross-sell action writes require a user session');
+    }
+  }
+
   server.get(
     '/cross-sell-actions',
-    { schema: { querystring: CrossSellActionFilter, response: { 200: CrossSellActionPage } } },
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('accounts:read')],
+      schema: { querystring: CrossSellActionFilter, response: { 200: CrossSellActionPage } },
+    },
     async (req) => {
-      const rows = await prisma.crossSellAction.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          deletedAt: null,
-          ...(req.query.accountKey ? { accountKey: normalizeName(req.query.accountKey) } : {}),
-          ...(req.query.status ? { status: req.query.status } : {}),
-        },
-        select: ASSIGNEE_SELECT,
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
-      return { items: rows.map(serialize) };
+      const accountKey = req.query.accountKey ? normalizeName(req.query.accountKey) : null;
+      if (accountKey) await assertAccountVisible(req, accountKey);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const visibilityCache = new Map<string, boolean>();
+      const where = {
+        orgId: req.auth.orgId,
+        deletedAt: null,
+        ...(accountKey ? { accountKey } : {}),
+        ...(req.query.status ? { status: req.query.status } : {}),
+      };
+
+      // Fast path: a single already-visibility-checked account, or an
+      // unrestricted caller — the original fixed newest-N window is correct
+      // because there's nothing to page past (single account) or nothing to
+      // filter out (unrestricted).
+      if (accountKey || scope.unrestricted) {
+        const rows = await prisma.crossSellAction.findMany({
+          where,
+          select: ASSIGNEE_SELECT,
+          orderBy: { createdAt: 'desc' },
+          take: accountKey ? PAGE_SIZE : 1000,
+        });
+        const visibleRows = await filterVisibleRows(req, rows, scope, visibilityCache);
+        return { items: visibleRows.slice(0, PAGE_SIZE).map(serialize) };
+      }
+
+      // Scope-restricted, org-wide listing: a fixed newest-1000 window filtered
+      // afterward can leave a restricted user with an empty/incomplete list if
+      // their visible accounts sort older than the newest 1000 org-wide rows.
+      // Page through candidates newest-first until a full page of visible rows
+      // is collected or the scan cap is hit.
+      const visibleRows: DbRow[] = [];
+      let cursorId: string | null = null;
+      let scanned = 0;
+      for (;;) {
+        const batch: DbRow[] = await prisma.crossSellAction.findMany({
+          where,
+          select: ASSIGNEE_SELECT,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: SCAN_BATCH_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        });
+        if (batch.length === 0) break;
+        scanned += batch.length;
+        visibleRows.push(...(await filterVisibleRows(req, batch, scope, visibilityCache)));
+        cursorId = batch[batch.length - 1]!.id;
+        if (visibleRows.length >= PAGE_SIZE || batch.length < SCAN_BATCH_SIZE || scanned >= SCAN_CAP) {
+          break;
+        }
+      }
+      if (scanned >= SCAN_CAP && visibleRows.length < PAGE_SIZE) {
+        req.log.warn(
+          { orgId: req.auth.orgId, userId: req.auth.userId, scanned, visibleCount: visibleRows.length },
+          'cross-sell-actions: hit scan cap before collecting a full page of visible rows for a scope-restricted caller',
+        );
+      }
+      return { items: visibleRows.slice(0, PAGE_SIZE).map(serialize) };
     },
   );
 
   server.post(
     '/cross-sell-actions',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), assertHumanWriteActor],
       schema: { body: CrossSellActionCreate, response: { 201: CrossSellAction } },
     },
     async (req, reply) => {
+      await assertHumanWriteActor(req);
+      const accountKey = normalizeName(req.body.accountKey);
+      await assertAccountVisible(req, accountKey);
       try {
         await assertAssignee(req.auth.orgId, req.body.assigneeId);
       } catch {
         throw server.httpErrors.badRequest('Assignee is not a member of this org');
       }
-      const created = await prisma.crossSellAction.create({
-        data: {
-          orgId: req.auth.orgId,
-          accountKey: normalizeName(req.body.accountKey),
-          description: req.body.description,
-          requestingUnit: req.body.requestingUnit,
-          assignedUnit: req.body.assignedUnit,
-          assigneeId: req.body.assigneeId ?? null,
-          dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
-          status: req.body.status,
-          notes: req.body.notes ?? null,
-          createdById: req.auth.userId,
-        },
-        select: ASSIGNEE_SELECT,
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'cross_sell_action.create',
-          targetType: 'cross_sell_action',
-          targetId: created.id,
-          diff: { accountKey: created.accountKey, assignedUnit: created.assignedUnit },
-        },
+      const created = await prisma.$transaction(async (tx) => {
+        const action = await tx.crossSellAction.create({
+          data: {
+            orgId: req.auth.orgId,
+            accountKey,
+            description: req.body.description,
+            requestingUnit: req.body.requestingUnit,
+            assignedUnit: req.body.assignedUnit,
+            assigneeId: req.body.assigneeId ?? null,
+            dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+            status: req.body.status,
+            notes: req.body.notes ?? null,
+            createdById: req.auth.userId,
+          },
+          select: ASSIGNEE_SELECT,
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'cross_sell_action.create',
+            targetType: 'cross_sell_action',
+            targetId: action.id,
+            diff: { accountKey: action.accountKey, assignedUnit: action.assignedUnit },
+          },
+        });
+        return action;
       });
       // Tell the assignee they own a new cross-sell action (best-effort).
       if (created.assigneeId && created.assigneeId !== req.auth.userId) {
@@ -142,7 +263,7 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: 'cross_sell_action',
           entityId: created.id,
           url: `/accounts/${created.accountKey}`,
-        }).catch(() => {});
+        }).catch((err) => req.log.warn({ err }, 'cross-sell action assignment notification failed'));
       }
       return reply.code(201).send(serialize(created));
     },
@@ -151,15 +272,17 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/cross-sell-actions/:id',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), assertHumanWriteActor],
       schema: { params: IdParam, body: CrossSellActionPatch, response: { 200: CrossSellAction } },
     },
     async (req) => {
+      await assertHumanWriteActor(req);
       const existing = await prisma.crossSellAction.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, assigneeId: true },
+        select: { id: true, accountKey: true, assigneeId: true },
       });
       if (!existing) throw server.httpErrors.notFound('Cross-sell action not found');
+      await assertAccountVisible(req, existing.accountKey);
       if (req.body.assigneeId !== undefined) {
         try {
           await assertAssignee(req.auth.orgId, req.body.assigneeId);
@@ -167,35 +290,38 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
           throw server.httpErrors.badRequest('Assignee is not a member of this org');
         }
       }
-      await prisma.crossSellAction.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
-        data: {
-          ...(req.body.description !== undefined ? { description: req.body.description } : {}),
-          ...(req.body.requestingUnit !== undefined
-            ? { requestingUnit: req.body.requestingUnit }
-            : {}),
-          ...(req.body.assignedUnit !== undefined ? { assignedUnit: req.body.assignedUnit } : {}),
-          ...(req.body.assigneeId !== undefined ? { assigneeId: req.body.assigneeId } : {}),
-          ...(req.body.dueDate !== undefined
-            ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
-            : {}),
-          ...(req.body.status !== undefined ? { status: req.body.status } : {}),
-          ...(req.body.notes !== undefined ? { notes: req.body.notes } : {}),
-        },
-      });
-      const updated = await prisma.crossSellAction.findFirstOrThrow({
-        where: { id: existing.id, orgId: req.auth.orgId },
-        select: ASSIGNEE_SELECT,
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'cross_sell_action.update',
-          targetType: 'cross_sell_action',
-          targetId: updated.id,
-          diff: req.body as object,
-        },
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.crossSellAction.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: {
+            ...(req.body.description !== undefined ? { description: req.body.description } : {}),
+            ...(req.body.requestingUnit !== undefined
+              ? { requestingUnit: req.body.requestingUnit }
+              : {}),
+            ...(req.body.assignedUnit !== undefined ? { assignedUnit: req.body.assignedUnit } : {}),
+            ...(req.body.assigneeId !== undefined ? { assigneeId: req.body.assigneeId } : {}),
+            ...(req.body.dueDate !== undefined
+              ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+              : {}),
+            ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+            ...(req.body.notes !== undefined ? { notes: req.body.notes } : {}),
+          },
+        });
+        const action = await tx.crossSellAction.findFirstOrThrow({
+          where: { id: existing.id, orgId: req.auth.orgId },
+          select: ASSIGNEE_SELECT,
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'cross_sell_action.update',
+            targetType: 'cross_sell_action',
+            targetId: action.id,
+            diff: req.body as object,
+          },
+        });
+        return action;
       });
       // Notify only on a real re-assignment to a different, non-actor user.
       if (
@@ -212,7 +338,7 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: 'cross_sell_action',
           entityId: updated.id,
           url: `/accounts/${updated.accountKey}`,
-        }).catch(() => {});
+        }).catch((err) => req.log.warn({ err }, 'cross-sell action reassignment notification failed'));
       }
       return serialize(updated);
     },
@@ -221,15 +347,17 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/cross-sell-actions/:id',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), assertHumanWriteActor],
       schema: { params: IdParam, response: { 204: z.null() } },
     },
     async (req, reply) => {
+      await assertHumanWriteActor(req);
       const existing = await prisma.crossSellAction.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, accountKey: true },
       });
       if (!existing) throw server.httpErrors.notFound('Cross-sell action not found');
+      await assertAccountVisible(req, existing.accountKey);
       await prisma.$transaction([
         prisma.crossSellAction.updateMany({
           where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },

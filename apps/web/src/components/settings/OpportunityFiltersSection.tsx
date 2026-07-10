@@ -68,7 +68,7 @@ function FilterForm({ initial }: { initial: OpportunityFilterRules }) {
         title={t('opportunityFilters.title', 'Opportunity filters')}
         caption={t(
           'opportunityFilters.caption',
-          'Which ABC opportunities flow into BidStack. Empty list = no filter on that dimension. These rules take effect once the ABC connector is connected — they are applied by the sync at ingestion, not retroactively.',
+          'Which ABC opportunities flow into Polo PreSales. Empty list = no filter on that dimension. These rules take effect once the ABC connector is connected — they are applied by the sync at ingestion, not retroactively.',
         )}
       />
       <div className="space-y-4 p-5">

@@ -12,13 +12,14 @@ import type {
 
 const KEY = 'email-templates';
 
-export function useEmailTemplates(opts: { includeArchived?: boolean } = {}) {
+export function useEmailTemplates(opts: { includeArchived?: boolean; enabled?: boolean } = {}) {
   return useQuery<EmailTemplateList>({
-    queryKey: [KEY, opts],
+    queryKey: [KEY, { includeArchived: opts.includeArchived ?? false }],
     queryFn: ({ signal }) => {
       const qs = opts.includeArchived ? '?includeArchived=true' : '';
       return api<EmailTemplateList>(`/api/email-templates${qs}`, { signal });
     },
+    enabled: opts.enabled ?? true,
   });
 }
 

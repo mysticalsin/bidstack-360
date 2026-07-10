@@ -3,9 +3,9 @@ import { LegalLayout } from '@/components/LegalLayout';
 
 export function SecurityPage() {
   useSeo({
-    title: 'Security — BidStack 360°',
+    title: 'Security — Polo PreSales',
     description:
-      'BidStack security overview. Encryption, SOC2-track posture, penetration testing, RBAC, audit logging, GDPR export, sub-processor list.',
+      'Polo PreSales security overview. Encryption, SOC2-track posture, penetration testing, RBAC, audit logging, GDPR export, sub-processor list.',
     canonical: 'https://bidstack.dev/legal/security',
   });
 
@@ -15,7 +15,7 @@ export function SecurityPage() {
       updated="[EFFECTIVE DATE]"
       intro={
         <p>
-          Security is a discipline at BidStack, not a checkbox. This page summarises the controls,
+          Security is a discipline at Polo PreSales, not a checkbox. This page summarises the controls,
           processes, and certifications that protect your data. We update it whenever we make a
           material change. For more detail or to request our security questionnaire, contact{' '}
           <a href="mailto:security@bidstack.dev">security@bidstack.dev</a>.

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
 import { useTaskSummary } from '@/hooks/useTasks';
 import { relativeTime } from '@/lib/format';
@@ -91,11 +92,11 @@ export function Sidebar() {
 
         <div className="sb-brand">
           <div className="sb-mark" aria-hidden>
-            B
+            <PoloPreSalesLogo variant="mark" tone="inverse" title="" className="h-5 w-5" />
           </div>
           <div>
             <div className="sb-name">
-              BidStack<span className="deg">°</span>
+              Polo PreSales
             </div>
             <div className="sb-tag">Mantu · Bid &amp; presales</div>
             {!collapsed && (

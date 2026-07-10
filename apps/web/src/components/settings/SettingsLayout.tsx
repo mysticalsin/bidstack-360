@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useIsAdmin } from '@/lib/auth';
@@ -39,7 +40,7 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    // Profile folds into Security; Language folds into Appearance — fewer,
+    // Profile folds into Security; Language folds into Appearance; fewer,
     // clearer personal tabs.
     label: 'Personal',
     items: [
@@ -75,11 +76,10 @@ const GROUPS: Group[] = [
 
 interface Props {
   active: SettingsSection;
-  onChange: (id: SettingsSection) => void;
   children: React.ReactNode;
 }
 
-export function SettingsLayout({ active, onChange, children }: Props) {
+export function SettingsLayout({ active, children }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -174,12 +174,10 @@ export function SettingsLayout({ active, onChange, children }: Props) {
                     .filter((item) => !item.admin || isAdmin)
                     .map((item) => (
                       <li key={item.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onChange(item.id);
-                            setMenuOpen(false);
-                          }}
+                        <Link
+                          to={`/settings?tab=${item.id}`}
+                          aria-current={active === item.id ? 'page' : undefined}
+                          onClick={() => setMenuOpen(false)}
                           className={cn(
                             'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
                             active === item.id
@@ -189,7 +187,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
                         >
                           <Icon name={item.icon} size={16} ariaHidden />
                           {itemLabel(item.id, item.label)}
-                        </button>
+                        </Link>
                       </li>
                     ))}
                 </ul>

@@ -20,6 +20,7 @@ import { prisma } from '@bidstack/db';
 import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
+import { createSafeFetch } from '@bidstack/shared/server';
 
 import { isPublicHostname } from '../lib/ssrf-guard.js';
 
@@ -121,6 +122,10 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
           workspaceId,
           baseUrl,
           timeoutMs: 10_000,
+          // The string check above can't stop a host that redirects or
+          // DNS-rebinds to internal space once we actually connect — the safe
+          // fetch re-resolves and gates every request.
+          fetchImpl: createSafeFetch(),
           logger: req.log.child({ kind: 'dust-validate' }) as unknown as PinoLogger,
         });
         await probe.listAgents('list');

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 
 // 5-column site footer. Renders as a single column on mobile and 5 across at md.
 // Legal column links use react-router; external links open in new tabs with
@@ -94,13 +95,13 @@ export function Footer() {
           <div className="flex items-center gap-2 text-sm text-[color:var(--fg-tertiary)]">
             <span
               aria-hidden="true"
-              className="grid h-6 w-6 place-items-center rounded-md text-white font-bold text-[11px]"
+              className="grid h-6 w-6 place-items-center rounded-md"
               style={{ background: 'var(--brand-gradient)' }}
             >
-              B
+              <PoloPreSalesLogo variant="mark" tone="inverse" title="" className="h-4 w-4" />
             </span>
             <span>
-              BidStack 360° &copy; {new Date().getFullYear()} BidStack, Inc. All rights reserved.
+              Polo PreSales &copy; {new Date().getFullYear()} Polo PreSales, Inc. All rights reserved.
             </span>
           </div>
           <div className="text-xs text-[color:var(--fg-muted)]">

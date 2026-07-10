@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { PermissionKey } from '@bidstack/shared';
 
 import { api } from '@/lib/api';
 
@@ -16,18 +17,19 @@ export interface ApiKeyCreated extends ApiKeySummary {
   secret: string;
 }
 
-export type ApiKeyScope = 'read' | 'write' | 'mcp';
+export type ApiKeyScope = PermissionKey | 'read' | 'write' | 'mcp';
 
 interface CreateInput {
   name: string;
   scopes: ApiKeyScope[];
 }
 
-export function useApiKeys() {
+export function useApiKeys(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['api-keys'],
     queryFn: ({ signal }) =>
       api<{ items: ApiKeySummary[] }>('/api/integrations/api-keys', { signal }),
+    enabled: options.enabled ?? true,
   });
 }
 

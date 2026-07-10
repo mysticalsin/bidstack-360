@@ -6,10 +6,14 @@ interface RequirementRowProps {
   requirement: Requirement;
 }
 
+// Theme-token chip pairs (light + dark safe), same system as
+// ProposalStatusChip: danger tint = red (critical), tomato tag = orange
+// (high), amber tag = yellow (medium), neutral sunken = low. Raw Tailwind
+// palette classes are banned here — they don't follow data-theme.
 const PRIORITY_STYLES: Record<Requirement['priority'], string> = {
-  critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  critical: 'bg-[var(--danger-tint)] text-[var(--fg-error)]',
+  high: 'bg-[var(--tag-tomato-bg)] text-[var(--tag-tomato-fg)]',
+  medium: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
   low: 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]',
 };
 

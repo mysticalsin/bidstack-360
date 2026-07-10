@@ -24,6 +24,8 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/calls',
     {
+      config: { permission: 'activities:read' },
+      preHandler: [app.requirePermission('activities:read')],
       schema: {
         description: 'List call sessions for a CRM entity',
         tags: ['calls'],
@@ -112,6 +114,8 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/calls/:id',
     {
+      config: { permission: 'activities:read' },
+      preHandler: [app.requirePermission('activities:read')],
       schema: {
         description: 'Get full call session detail including transcript and AI insights',
         tags: ['calls'],
@@ -193,6 +197,11 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/calls/:id/extract-insights',
     {
+      config: { permission: 'activities:write' },
+      preHandler: [
+        app.requireHumanActor('Call insight extraction requires a user session'),
+        app.requirePermission('activities:write'),
+      ],
       schema: {
         description: 'Re-trigger AI analysis on an existing call transcript',
         tags: ['calls'],

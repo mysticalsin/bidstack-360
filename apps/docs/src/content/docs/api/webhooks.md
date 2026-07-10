@@ -7,7 +7,7 @@ sidebar:
 
 # Webhooks
 
-BidStack can push real-time notifications to your server whenever domain events occur (lead created, deal stage changed, etc.). This page covers subscription management, payload format, signature verification, and retry behaviour.
+Polo PreSales can push real-time notifications to your server whenever domain events occur (lead created, deal stage changed, etc.). This page covers subscription management, payload format, signature verification, and retry behaviour.
 
 ## Creating a Subscription
 
@@ -17,7 +17,7 @@ x-api-key: bsk_live_xxx
 Content-Type: application/json
 
 {
-  "url": "https://your-server.example.com/webhooks/bidstack",
+  "url": "https://your-server.example.com/webhooks/polo-presales",
   "events": ["lead.created", "opportunity.stage_changed", "invoice.paid"],
   "active": true
 }
@@ -66,12 +66,14 @@ Every delivery is an HTTP POST with `Content-Type: application/json`:
 
 ## Signature Verification
 
-Every delivery includes an `X-BidStack-Signature` header. Verify it to confirm the request genuinely came from BidStack.
+Every delivery includes an `X-Polo-Signature` header. Verify it to confirm the request genuinely came from Polo PreSales.
+
+Deliveries also carry a legacy `X-BidStack-Signature` header with the identical value. It is deprecated and kept only so receivers built before the rebrand keep verifying — new integrations should read `X-Polo-Signature`.
 
 ### Header Format
 
 ```
-X-BidStack-Signature: t=1748000000,v1=3d7a5c2f...
+X-Polo-Signature: t=1748000000,v1=3d7a5c2f...
 ```
 
 - `t` — Unix timestamp (seconds) of the delivery attempt.
@@ -154,8 +156,8 @@ Acknowledge immediately and process asynchronously:
 
 ```ts
 // Express example
-app.post('/webhooks/bidstack', express.raw({ type: '*/*' }), (req, res) => {
-  if (!verifySignature(req.body, req.headers['x-bidstack-signature'], SECRET)) {
+app.post('/webhooks/polo-presales', express.raw({ type: '*/*' }), (req, res) => {
+  if (!verifySignature(req.body, req.headers['x-polo-signature'], SECRET)) {
     return res.sendStatus(401);
   }
   res.sendStatus(200); // acknowledge fast
@@ -165,7 +167,7 @@ app.post('/webhooks/bidstack', express.raw({ type: '*/*' }), (req, res) => {
 
 ## Retry Schedule
 
-BidStack retries failed deliveries with exponential backoff:
+Polo PreSales retries failed deliveries with exponential backoff:
 
 | Attempt | Delay after previous |
 | ------- | -------------------- |

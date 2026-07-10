@@ -72,15 +72,31 @@ export async function loadCompanyNameIndex(
   db: Prisma.TransactionClient,
   orgId: string,
 ): Promise<Map<string, string>> {
-  const companies = await db.company.findMany({
-    where: { orgId, deletedAt: null },
-    select: { id: true, name: true },
-  });
+  // Build the full normalizedName -> id index in BOUNDED pages. A single
+  // unbounded findMany here is both a 100k-scale memory hazard and — because
+  // every request runs under the query-guard (plugins/query-guard.ts) — gets
+  // rejected with a 400, which silently broke BOTH lead-convert and CSV import
+  // (each resolves a free-text customer -> Company through this index). Cursor
+  // pagination keeps every query <= PAGE (guard-safe: take <= 1000) while still
+  // producing the complete index callers depend on.
+  const PAGE = 1000;
   const index = new Map<string, string>();
-  for (const c of companies) {
-    const key = normalizeName(c.name);
-    // First match wins so re-runs are stable when two names normalize alike.
-    if (key && !index.has(key)) index.set(key, c.id);
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await db.company.findMany({
+      where: { orgId, deletedAt: null },
+      select: { id: true, name: true },
+      orderBy: { id: 'asc' },
+      take: PAGE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    for (const c of page) {
+      const key = normalizeName(c.name);
+      // First match wins so re-runs are stable when two names normalize alike.
+      if (key && !index.has(key)) index.set(key, c.id);
+    }
+    if (page.length < PAGE) break;
+    cursor = page[page.length - 1]!.id;
   }
   return index;
 }

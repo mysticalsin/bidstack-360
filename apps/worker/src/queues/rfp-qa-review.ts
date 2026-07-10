@@ -202,7 +202,9 @@ export async function startRfpQaReview(
         orgId,
         'qa_review',
         (err as Error).message?.slice(0, 2000) ?? 'unknown',
-      ).catch(() => undefined);
+      ).catch((markErr) =>
+        log.warn({ err: markErr }, 'best-effort orchestration failure mark write failed'),
+      );
     }
   });
 

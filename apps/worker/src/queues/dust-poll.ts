@@ -26,11 +26,83 @@ const JobData = z.object({
   orgId: z.string().uuid().optional(),
 });
 
-// Circuit breaker state
-let consecutiveFailures = 0;
+// Circuit breaker state — keyed per org. Module-level scalars here previously
+// let one tenant's broken Dust credentials open the circuit for EVERY org's
+// poll (cross-tenant blast radius); each org must trip and cool down alone.
 const CIRCUIT_THRESHOLD = 3;
 const CIRCUIT_COOLDOWN_MS = 10 * 60 * 1000; // 10 min
-let circuitOpenUntil = 0;
+// Bounds so the map can't grow forever at 100k+ orgs: stale streaks expire
+// after a TTL (swept at most once a minute) and a hard size cap evicts the
+// least-recently-touched org. Eviction fails safe — a forgotten circuit costs
+// one extra poll attempt, never a blocked tenant.
+const BREAKER_TTL_MS = CIRCUIT_COOLDOWN_MS * 2;
+const BREAKER_MAX_ORGS = 10_000;
+const BREAKER_SWEEP_INTERVAL_MS = 60 * 1000;
+
+interface OrgBreakerState {
+  consecutiveFailures: number;
+  circuitOpenUntil: number;
+  touchedAt: number;
+}
+
+const orgBreakers = new Map<string, OrgBreakerState>();
+let lastBreakerSweepAt = 0;
+
+function sweepStaleBreakers(now: number): void {
+  if (now - lastBreakerSweepAt < BREAKER_SWEEP_INTERVAL_MS) return;
+  lastBreakerSweepAt = now;
+  for (const [orgId, state] of orgBreakers) {
+    if (now >= state.circuitOpenUntil && now - state.touchedAt > BREAKER_TTL_MS) {
+      orgBreakers.delete(orgId);
+    }
+  }
+}
+
+/** True while orgId's OWN circuit is open — other orgs are never affected. */
+export function isDustCircuitOpen(orgId: string, now = Date.now()): boolean {
+  const state = orgBreakers.get(orgId);
+  return state !== undefined && now < state.circuitOpenUntil;
+}
+
+/** A successful poll fully resets that org's breaker (and frees its entry). */
+export function recordDustPollSuccess(orgId: string): void {
+  orgBreakers.delete(orgId);
+}
+
+/**
+ * Count a failed poll against orgId only. Returns the org's updated streak and
+ * whether this failure opened its circuit, so the caller can log it.
+ */
+export function recordDustPollFailure(
+  orgId: string,
+  now = Date.now(),
+): { consecutiveFailures: number; opened: boolean } {
+  sweepStaleBreakers(now);
+  const state = orgBreakers.get(orgId) ?? {
+    consecutiveFailures: 0,
+    circuitOpenUntil: 0,
+    touchedAt: now,
+  };
+  // Delete + re-insert so Map insertion order tracks recency for the size cap.
+  orgBreakers.delete(orgId);
+  state.consecutiveFailures++;
+  state.touchedAt = now;
+  const opened = state.consecutiveFailures >= CIRCUIT_THRESHOLD;
+  if (opened) state.circuitOpenUntil = now + CIRCUIT_COOLDOWN_MS;
+  orgBreakers.set(orgId, state);
+  while (orgBreakers.size > BREAKER_MAX_ORGS) {
+    const oldest = orgBreakers.keys().next().value;
+    if (oldest === undefined) break;
+    orgBreakers.delete(oldest);
+  }
+  return { consecutiveFailures: state.consecutiveFailures, opened };
+}
+
+/** Test-only: drop all breaker state so suites start from a clean slate. */
+export function resetDustCircuitBreakerForTest(): void {
+  orgBreakers.clear();
+  lastBreakerSweepAt = 0;
+}
 
 /**
  * Poll one org's OWN Dust workspace and ingest its documents into that org.
@@ -42,7 +114,7 @@ let circuitOpenUntil = 0;
  * metadata only routes a doc to the right entity type. Writes a stub sync_event
  * when the org has no Dust configured, so the integration UI still has feedback.
  */
-async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
+export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log.child({ orgId, kind: 'dust' }));
   const dataSourceId = creds?.dataSourceId;
   if (!dust || !dataSourceId) {
@@ -102,6 +174,29 @@ async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
   });
 }
 
+/**
+ * Run one org's poll behind that org's OWN circuit breaker. Extracted from the
+ * Worker closure (and exported, like pollOrgDust) so tests can prove one
+ * tenant's open circuit never gates another tenant's poll.
+ */
+export async function pollOrgDustWithBreaker(orgId: string, log: pino.Logger): Promise<void> {
+  if (isDustCircuitOpen(orgId)) {
+    log.warn({ orgId }, 'circuit open, skipping dust poll');
+    return;
+  }
+
+  try {
+    await pollOrgDust(orgId, log);
+    recordDustPollSuccess(orgId);
+  } catch (err) {
+    const { consecutiveFailures, opened } = recordDustPollFailure(orgId);
+    if (opened) {
+      log.error({ orgId, consecutiveFailures }, 'circuit opened');
+    }
+    throw err;
+  }
+}
+
 const FANOUT_JOB = 'dust.poll.fanout';
 const ORG_BATCH_SIZE = 200;
 
@@ -113,7 +208,7 @@ const ORG_BATCH_SIZE = 200;
  * bounded per-org jobs drained by the worker's concurrency + limiter, instead
  * of being serialised into one ever-growing job that overlaps the next tick.
  */
-async function fanoutOrgPolls(queue: Queue, log: pino.Logger): Promise<void> {
+export async function fanoutOrgPolls(queue: Queue, log: pino.Logger): Promise<void> {
   // Window bucket dedups per-org jobs across overlapping fanout runs (e.g. a
   // delayed tick + the next on-time tick), mirroring email-sync's fanout.
   const windowBucket = Math.floor(Date.now() / REPEAT_EVERY_MS);
@@ -191,23 +286,7 @@ export async function startDustPoller(
         return;
       }
 
-      // Circuit breaker check
-      if (Date.now() < circuitOpenUntil) {
-        log.warn({ orgId: data.orgId }, 'circuit open, skipping dust poll');
-        return;
-      }
-
-      try {
-        await pollOrgDust(data.orgId, log);
-        consecutiveFailures = 0;
-      } catch (err) {
-        consecutiveFailures++;
-        if (consecutiveFailures >= CIRCUIT_THRESHOLD) {
-          circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
-          log.error({ consecutiveFailures }, 'circuit opened');
-        }
-        throw err;
-      }
+      await pollOrgDustWithBreaker(data.orgId, log);
     },
     { connection, concurrency: 5, limiter: { max: 10, duration: 1_000 } },
   );

@@ -87,7 +87,8 @@ export function SendForSignatureModal({
   documentId,
 }: SendForSignatureModalProps) {
   const { t } = useTranslation('signatures');
-  const [step, setStep] = useState(0);
+  const initialStep = documentId ? 1 : 0;
+  const [step, setStep] = useState(initialStep);
   const [templateId, setTemplateId] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [recipients, setRecipients] = useState<Recipient[]>([
@@ -95,11 +96,15 @@ export function SendForSignatureModal({
   ]);
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const send = useSendForSignature();
 
   const handleSend = () => {
-    if (!documentId && !templateId) return;
+    // documentId is required by the API — a template alone has no document to
+    // sign, so bail rather than send a template id where a document id belongs.
+    if (!documentId) return;
+    setError(null);
     const signatureRecipients: SignatureRecipient[] = recipients.map(({ email, name, role }) => ({
       email,
       name,
@@ -107,7 +112,7 @@ export function SendForSignatureModal({
     }));
     send.mutate(
       {
-        documentId: documentId ?? templateId, // fallback — real API may differ
+        documentId,
         templateId: templateId || undefined,
         recipients: signatureRecipients,
         message: message || undefined,
@@ -116,17 +121,19 @@ export function SendForSignatureModal({
       },
       {
         onSuccess: () => setSent(true),
+        onError: (err: Error) => setError(err.message),
       },
     );
   };
 
   const reset = () => {
-    setStep(0);
+    setStep(initialStep);
     setTemplateId('');
     setVariables({});
     setRecipients([{ email: '', name: '', role: 'SIGNER' }]);
     setMessage('');
     setSent(false);
+    setError(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -175,6 +182,14 @@ export function SendForSignatureModal({
         ) : (
           <>
             <StepIndicator current={step} />
+            {error ? (
+              <p
+                role="alert"
+                className="mb-4 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]"
+              >
+                {error}
+              </p>
+            ) : null}
             {step === 0 && (
               <TemplateStep
                 selectedId={templateId}
@@ -191,7 +206,7 @@ export function SendForSignatureModal({
               <RecipientsStep
                 recipients={recipients}
                 onChangeRecipients={setRecipients}
-                onBack={() => setStep(0)}
+                onBack={documentId ? undefined : () => setStep(0)}
                 onNext={() => setStep(2)}
               />
             )}

@@ -196,7 +196,7 @@ export const FAQS: Array<{ q: string; a: string }> = [
     a: 'SSO (SAML 2.0 and OIDC) plus SCIM 2.0 user provisioning is included in Enterprise. Pro customers can use Google, Microsoft, and email OTP login.',
   },
   {
-    q: 'Where is BidStack hosted?',
+    q: 'Where is Polo PreSales hosted?',
     a: 'EU by default (AWS Frankfurt). Enterprise customers can pin US (Virginia) or UK (London) residency. See the Security page for the full sub-processor list.',
   },
   {

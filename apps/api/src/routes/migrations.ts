@@ -329,50 +329,55 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // Children first (FK order): opportunities/contacts reference companies.
       // Skip the delete entirely when there are no audit-tracked ids — Prisma
       // rejects an empty `{ in: [] }` as a validation error (-> 400).
-      const [opportunities, contacts] = await Promise.all([
-        oppIds.length
-          ? prisma.opportunity.deleteMany({ where: { orgId, id: { in: oppIds } } })
-          : Promise.resolve({ count: 0 }),
-        contactIds.length
-          ? prisma.contact.deleteMany({ where: { orgId, id: { in: contactIds } } })
-          : Promise.resolve({ count: 0 }),
-      ]);
-      const [companies, leads] = await Promise.all([
-        prisma.company.deleteMany({
+      // WHY one interactive transaction: undo is a destructive bulk operation.
+      // Without atomicity, a failure after the first deletes commit leaves a
+      // half-undone import — opportunities/contacts gone, companies/leads kept,
+      // job still reading COMPLETE — with no rollback and no clean retry.
+      // Deletes run sequentially (not Promise.all) — interactive transactions
+      // hold a single connection, and the order preserves FK safety.
+      const deletedCount = await prisma.$transaction(async (tx) => {
+        const opportunities = oppIds.length
+          ? await tx.opportunity.deleteMany({ where: { orgId, id: { in: oppIds } } })
+          : { count: 0 };
+        const contacts = contactIds.length
+          ? await tx.contact.deleteMany({ where: { orgId, id: { in: contactIds } } })
+          : { count: 0 };
+        const companies = await tx.company.deleteMany({
           where: {
             orgId,
             ...(companyIds.length
               ? { OR: [{ source: sourceTag }, { id: { in: companyIds } }] }
               : { source: sourceTag }),
           },
-        }),
-        prisma.lead.deleteMany({
+        });
+        const leads = await tx.lead.deleteMany({
           where: {
             orgId,
             ...(leadIds.length
               ? { OR: [{ source: sourceTag }, { id: { in: leadIds } }] }
               : { source: sourceTag }),
           },
-        }),
-      ]);
-      const deletedCount = companies.count + leads.count + contacts.count + opportunities.count;
+        });
+        const deleted = companies.count + leads.count + contacts.count + opportunities.count;
 
-      await prisma.migrationJob.update({
-        where: { id: req.params.id },
-        data: {
-          status: 'FAILED',
-          meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
-        },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'migration.undo',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-          diff: { deletedCount, sourceTag },
-        },
+        await tx.migrationJob.update({
+          where: { id: req.params.id },
+          data: {
+            status: 'FAILED',
+            meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'migration.undo',
+            targetType: 'MigrationJob',
+            targetId: job.id,
+            diff: { deletedCount: deleted, sourceTag },
+          },
+        });
+        return deleted;
       });
       return { message: `Undo complete — deleted ${deletedCount} records`, deletedCount };
     },

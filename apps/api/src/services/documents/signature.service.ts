@@ -622,7 +622,7 @@ function buildSignedDocumentHtml(params: {
   <img src="${signatureSrc}" alt="Signature" style="max-height:80px">
 </div>
 <p style="margin-top:24px;font-size:0.75rem;color:#666">
-  This document was signed via BidStack 360° INTERNAL provider. This is an
+  This document was signed via Polo PreSales INTERNAL provider. This is an
   internal approval signature, not a legally binding e-signature (DocuSign).
 </p>
 </body></html>`;

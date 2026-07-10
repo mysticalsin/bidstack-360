@@ -4,6 +4,128 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-07-10 — Real-data readiness: prod bootstrap, demo purge, revival-upsert sweep
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** ultracode — 15-agent audit (3 lenses x adversarial verify, 12/12 CONFIRMED) + Sonnet implementer + inline fixes. 5 commits.
+
+**The plug-and-play gap, closed:** a fresh production DB was NOT usable — no Clerk webhook, no runtime org provisioning (auth 404s "Organization not registered"), and without per-org role seeds even the org admin was 403'd everywhere. NEW `pnpm db:seed:prod --clerk-org <id> --name <org>`: Org row + system roles/permissions ONLY, idempotent, refuses reserved dev/demo identifiers. Flow: migrate:deploy -> seed:prod -> Clerk sign-in (JIT users + auto admin grant) -> CSV/HubSpot/integrations import. Documented in NEW `docs/PRODUCTION_DATA_BOOTSTRAP.md` + runbook + cheat sheet.
+
+**Test/demo data, removable + guarded:** NEW `pnpm db:purge:demo` (dry-run default) removes the org_seed_mantu fixture workspace, demo_org_* orgs, leftover org_<label>_t<hex> integration-test orgs, and synthetic E2E companies in kept orgs — verified live against the dev DB (dozens of leftover test orgs enumerated). Fixture seed now REFUSES NODE_ENV=production (it auto-runs from prisma migrate dev/reset — silent prod pollution risk). bootstrap-production.sh step 3 told operators to run the fixture seed "for lookup tables" — corrected to seed:prod with an explicit warning. CLERK_WEBHOOK_SECRET demoted in the runbook (declared, consumed by nothing).
+
+**Revival-upsert sweep (soft-delete middleware class, 3 more fixed):** ensureAdminRoleGrant (prod Clerk path — revoked-then-re-promoted admin failed sign-in), stub-auth user+grant, org-settings locale. Same explicit where.deletedAt bypass as the users.ts fix; regression test asserts revive-before-upsert ordering.
+
+**Zero-data UX (audit verdict: app already demos cleanly on an empty org — GettingStarted swap, StateMessages trio everywhere, guarded [0]s):** 3 cosmetic fixes — Accounts All first-run empty state (create CTA + CSV link, 6 locales), KAM error state no longer masquerades as "No key accounts yet", intel freshness ribbon stops naming never-queried sources.
+
+**Kept by design:** onboarding sample-data templates (tagged isSample + purge endpoint — the one legit sample writer for real orgs); DEMO_MODE demo orgs (env-gated, mutually exclusive with Clerk).
+
+**Addendum (same day):** Clerk `organization.created` webhook shipped — svix-verified `/webhooks/clerk` bootstraps the Org + system roles the moment the org exists in Clerk (name sync on `updated`; `deleted` retains data by design). `db:seed:prod` demoted to no-webhook fallback; CLERK_WEBHOOK_SECRET now consumed (was dead config). 15 tests incl. live-DB integration. Org onboarding = fully automatic.
+
+**Operator:** run the purge with --apply when ready (dry-run output reviewed first; backup before), then seed:prod against the production DB.
+
+
+## 2026-07-09 — Azure/Sillage freshness verify + brand 10x (mark redesign, outlined wordmark)
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** ultracode + forge — 1 verify workflow (16 agents, 3 audits x adversarial verify, 13/13 CONFIRMED) + 3 Sonnet implementer agents + code-review agent. 8 commits.
+
+**Azure go-live freshness (cheat sheet refreshed from verified audit):** every boot-critical claim in `docs/AZURE_GO_LIVE_CHEATSHEET.md` re-verified against code (storage guard, PII/token keys, job signing, tenant-scope guard, Clerk/demo exclusion, ports, bicep resources, health endpoints). One MAJOR drift fixed: doc said IaC "complete" while `infra/azure/README.md` brands it UNVALIDATED DRAFT — doc now honest. Nuances added: DEMO_MODE exempts storage guard, worker needs S3_REGION, ~333 env keys.
+
+**Sillage connector hardened for real deployments** (5 confirmed majors closed, +3 review minors): MCP protocol-version negotiation (was pinned -> real servers 400), spec-correct SSE parsing (multi-data-line join + JSON-RPC id match), session reuse via config-keyed client cache (3 round trips -> 1 warm; fixes the 1.5s augment race that negative-cached [] for 300s and silently emptied Buying-triggers), no negative-cache on timeout/error, real Test-now probe (lane + latency, not credential presence), `SILLAGE_REST_SIGNALS_PATH` env (vendor REST contract still unpublished — pure config at go-live), leading-slash normalization, code-only JSON-RPC errors fail loud, concurrent-404 double-reset guard. 14 new tests.
+
+**Brand 10x:** mark redesigned — play-triangle counter now fills the P bowl (candidate matrix rendered via resvg at 16-96px, C-sharp variant chosen; old counter collapsed at rail size). Wordmark outlined from Inter 4.1 TTFs via opentype.js (app never loaded Inter — SVG <text> rendered per-OS; email/OG broke). ALL derivatives regenerated from single source: web icons, real favicon.ico (was 67-byte blank), apple-touch (was never git-tracked — *.png ignore swallowed it, CI 404), PWA PNGs (still had the PRE-redesign mark), marketing component + OG card (headline de-CRM'd: "The bid cockpit built for winning teams."), chrome-extension icons (manifest referenced non-existent PNGs). Last user-facing BidStack strings retired (2 e2e region assertions, webhook placeholder x6 locales, onboarding tour regex); index.html got description/OG meta + brand theme-color; stale clerk.bidstack.dev preconnect dropped.
+
+**Latent bug fixed (standing branch failure):** role re-grant 409 — the users.ts upsert predated the soft-delete middleware which deliberately scopes upsert to live rows; revive now explicit via the documented where.deletedAt bypass. Plus calendar-bomb test defused (cacheExpiresAt pinned to 2026-07-07 rotted on 2026-07-09).
+
+**Deferred (operator):** production domain decision (marketing still bidstack.dev everywhere), Bicep validation on a real subscription, real Sillage credentials for a live probe.
+
+
+## 2026-07-06 (pm) — Whole-app enterprise audit + account harmonization + StatTile polish
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode — 2 audit workflows (this-session then whole-app, both verify-first read-only) + 2 fixer swarms + account-harmonization build→verify. ~10 commits.
+
+**Account-segment harmonization** (closed the first audit's last MAJOR): shared `AccountsChrome.tsx` primitives — SegmentHeader / StatTile / InsightPanel / FilterRow — applied across All/Key/Top so they read as one system. Purely presentational; money formatters + pagination preserved (StatTile typed `value: string` so no raw amount crosses the micros/float boundary — adversary-verified). Then a polish pass: machined inset-highlight + GPU-safe hover lift + tabular-nums.
+
+**Whole-app enterprise audit** (5 lenses — tenancy/IDOR, RBAC, money-integrity, resilience, input — across core production paths, not just this session): 8 confirmed (2 BLOCKER, 6 MAJOR), 3 MINOR, **0 refuted**. ALL fixed with red→green tests:
+- **BLOCKER** `POST /comments` had NO RBAC gate — a Read-Only user could write org-visible comments on any viewable record and fan out @mention notifications. Added `comments:read/write` PermissionKey + seed grants (3-source lockstep) + a plugin gate mirroring tags.ts; matrix synced; parentId FK-graft closed.
+- **BLOCKER** `GET /opportunities/export` bypassed M7 row-level access-scope — a group-restricted user could CSV-dump the full org pipeline. Now applies getAccessScope + applyOpportunityScope, plus compound cursor + BigInt-safe money.
+- **MAJOR** BigInt→Number precision loss in the pipeline funnel KPI (corrupts sums > ~$9B); WorldMap + Win/Loss hardcoded EUR (ignored display currency); single-column cursor row-drop on ties in opportunities list + export + service-desk + tenant-export.
+- **Sector View** currency bug (hardcoded EUR) fixed separately.
+
+**Consolidations — declined with reasoning** (not silent skips): Sector↔Territories (two different features sharing one already-shared map widget — merging degrades both for one nav door; fixed the currency bug it surfaced instead); Opportunities/Pipeline (already share the data hook + stage mutation via React Query — full page-merge is modest value, real risk).
+
+**Logo** (earlier same day): bold gradient "P" with a forward play-triangle counter, premium squircle badge; favicon + brand SVGs synced; legible hero + rail.
+
+**Verified:** typecheck 12/12 · lint clean · ~120 new/updated tests green across the two fixer swarms · browser-verified (harmonized accounts one system + money correct, logo hero+rail, Key KPI scope label, duplicates dialog). **Login left untouched per Tony's prior "don't change the login page".**
+
+**Deferred (flagged):** tenant-scope-guard middleware enforce-mode extension for update/delete/findUnique (MINOR — deferred by the fixer as too risky vs the documented GDPR-erasure/restore/admin-merge bypasses; needs a careful dedicated pass); proposal revision history (migration + live-DB handoff); polluted dev-DB purge (operator); DB-level `parentId` acyclicity constraint (app guards cover it).
+
+---
+
+## 2026-07-06 — Logo redesign + enterprise-readiness audit & fixes
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode — Fable red-team/plan + Sonnet execute; account-merge (recon→red-team→build→verify), enterprise audit (6-lens verify-first), audit fixers (7 clusters). 8 commits.
+
+**Logo (10x):** replaced the hand-drawn "P + 3 signal lines + 3 dots" mark (which garbled to "FP/EP" at 16-20px rail size) with one bold filled geometric **P whose counter is a forward play-triangle** ("pre-sales in motion") — legible at hero and rail, holds up mono/inverse. Rail badge → squircle chip with 3-stop gradient + hairline highlight + ambient lift. Favicon + brand SVGs synced. Verified both scales.
+
+**Account-surface consolidation:** Accounts / Key Accounts / Top Accounts → one `/accounts` with an All/Key/Top switcher (`?view=`), structural (verbatim segment bodies keep own hook/money-formatter/pagination), redirects preserve bookmarks, RouteAnnouncer reads `?view=` (a11y), nav 9→7 doors, KAM+Companies untouched. Red-team caught + I fixed a raw-NUL source byte + 44px tab target; money-unit trap confirmed clean. All 3 segments + redirects browser-verified.
+
+**Rebrand + demo hygiene:** last "Amaris" UI strings → "Mantu" (6 locales, eval fixtures kept); All-accounts now applies the synthetic-name filter (extended: KAMDraft-*/ConvertCorp-*/*-test) → 12 real companies instead of 28 with test junk.
+
+**Enterprise-readiness audit (6 lenses, adversarial verify):** 13 confirmed (4 distinct BLOCKER, 7 MAJOR), 1 refuted, 6 MINOR. ALL fixed with red→green tests:
+- **BLOCKER** duplicate-merge could create a `parentId` cycle (ancestor→descendant merge) and the hierarchy traversal had no cycle guard → infinite loop hanging the whole multi-tenant process. Reject-on-ancestor (409) + visited-set guards. *(bug was from this session's dedup code.)*
+- **BLOCKER** `/opportunities/:id/timeline` had no RBAC gate — added `opportunities:read`; then a follow-up gated the raw audit `diff` behind `audit-log:read` via a new reusable `server.hasPermission()`.
+- **BLOCKER** calendar-sync crons loaded every integration token deployment-wide, unbounded → cursor-paginated fan-out (take:200) + a 30-min sweep recovering stranded push idempotency claims.
+- **BLOCKER** Key-Accounts KPI strip summed only the current page but read as portfolio totals → honest "On this page" scope label.
+- **MAJOR** workload overdue used `now` not day-boundary; All-accounts silently showed a capped snapshot → visible cap indicator; copilot cap-error message; duplicates dialog i18n; emoji→Icon (Calls, MS SSO, win toast); saved-view delete-selected; win-loss truncation flag.
+
+**Verified:** typecheck 12/12 · lint clean · ~60 new/updated tests green (worker batch flake = known cross-file leakage, all pass isolated) · browser walk (new logo hero+rail, all 3 account segments + redirects, Key KPI scope label, duplicates dialog, copilot) zero console errors.
+
+**Deferred (flagged, not done):** the "3 design languages behind the account switcher" harmonization (segments are verbatim-different by design — a careful design pass); Sector↔Territories + Opportunities/Pipeline merges; proposal revision history (migration + live-DB handoff); polluted dev-DB purge (the filter is the non-destructive stopgap); a DB-level `parentId` acyclicity constraint (app-layer guards are the only protection today).
+
+---
+
+## 2026-07-05 (pm) — Finish-everything wave: features, live-bug fixes, anti-slop
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode, Fable plan/review + Sonnet swarm (6 builders; session limit hit mid-wave — 2 returned clean, 4 completed work + tests but died on final return, all salvaged).
+
+**Live bugs the user reported, fixed + browser-verified:**
+- **"Couldn't load opportunities"** — environmental (local API was down / port 4000 shadowed by a foreign FastAPI); on a healthy stack `/api/v1/opportunities` returns 200, zero console errors. No code defect. Documented dev-port setup: web 38081, api `PORT_API=4100`.
+- **Text overlapping** — the dashboard workspace-metric cards overflowed the big KPI number on top of the inline sparkline at laptop widths (1366/1440): the inline `icon|number|signal` layout switched on *viewport* ≥960px but the grid stayed 6-across until 1280px, so cramped ~160px cards collided. Fixed with a container query (stacks the sparkline when the card itself is narrow) + a 6→3 column breakpoint at 1560px. Verified overlap-free at 1366 and 1792.
+
+**Features shipped (all wired + live-verified):**
+- **⌘K AI Copilot** (GOAL Phase 5): sentence / leading-`?` switches the palette into Copilot running the existing ai-assistant actions (draft email, summarize intel, deal sentiment, meeting prep), each context-gated with disable hints. Additive — fuzzy/frecency/recents/a11y preserved.
+- **Saved views on all core lists** (was Tasks-only): generalized SavedViewsBar on Opportunities/Leads/Companies/Contacts, per-surface namespaced presets.
+- **Team Workload / capacity view** (`/analytics/workload` + `/workload`): per-owner live bids, weighted pipeline, overdue tasks, closing-≤7d, capacity flags (Over capacity/Stretched/Can take a bid), unassigned-bids row.
+- **Duplicate detect + merge** (`/duplicates/{companies,contacts}` + `/duplicates/merge`): normalized-name/domain/email clustering, survivor-choice FK re-point + soft-delete in one audited tx, Find-duplicates dialog on Companies/Contacts.
+- **Anti-slop dark-mode/token pass** (2 lanes, 22 files): every status/score chip + several pages moved off light-only / non-existent `--color-*` tokens (which rendered transparent in dark) to real `--fg-*/--surface-*/--border-*`; one coherent chip system.
+
+**Verified:** typecheck 12/12 · lint clean (one justified `react-hooks/refs` disable — callback reads refs only in an onSelect handler) · salvaged feature tests 46 green (29 web + 17 api) · live browser walk: dashboard overlap fixed, `gtd`→Dashboard fuzzy, Copilot actions, Workload table, Duplicates dialog, Companies/Contacts/Leads lists all clean, zero console errors.
+
+**Deferred + flagged (need Tony / migration / bigger refactor):** proposal revision history (needs a `ProposalRevision` migration + live-DB handoff); account-surface deep merge (Accounts/Key/Top/KAM = 4 doors — destructive product call, kept reversible); Sector View ↔ Territories merge; Opportunities/Pipeline single implementation; `?`-copilot-prefix collides with the global `?` help-drawer shortcut (minor); saved views are localStorage-backed (server SavedView API exists for cross-device/share as a follow-up); test-data junk names (KAMDraft-*, SCOPE-*) visible in the Companies list on the demo org.
+
+---
+
+## 2026-07-05 — "Best CRM" audit + fix + wow program (two-wave swarm)
+
+**Branch:** `feat/rebrand-polo-presales` · **Mode:** `/goal` ultracode, 42-agent Sonnet/Fable swarm (8-lens audit → adversarial verify → 13 fixers → 7 builders), 13 commits.
+
+**Audit (22 Sonnet agents, read-only, 0 stray writes):** 48 findings, 0 refuted by the adversarial verify pass — 16 defects (4 BLOCKER), 8 overlap/duplication surfaces, 6 rebrand leaks, 9 UX wow-gaps, 8 product gaps.
+
+**Wave 1 — fixes (6 commits, every fix red→green regression-proven):**
+- **Security:** comment FK-graft org verification (existence-safe 404s); Dust client injectable DNS-rebind-safe fetch (api+worker wiring); users-roster RBAC finding refuted with documented rationale + pinning test.
+- **api:** companies cursor off-by-one (1 row lost per page); activity timeline/feed compound (occurredAt,id) cursor + stable totals; migration undo in one $transaction.
+- **worker/db:** calendar push per-job Redis claim (Google+Microsoft); migration cursor+counter atomic; dust-poll breaker per-org; PII middleware update-by-id + decrypt-write-results; soft-delete upsert scoping (GDPR bypass preserved).
+- **web:** per-row cross-sell pending; PipelineCard/DueDateChip due-today parity; palette loading row (no "No matches" flash); API-key default scopes.
+- **Rebrand:** X-Polo-Signature dual-emitted with legacy X-BidStack-Signature (UI copy, 6 locales, public docs); PoloPreSales-* UAs; polo-presales- export filenames (9 paths). `api.bidstack.mantu.com` docs domain left for infra owner.
+- **Consolidation:** /reports → /analytics redirect + ReportsPage deleted; dead RfpResponseHubPage chunk deleted; /service-desk palette-exposed; /kam relabeled "KAM Initiatives".
+
+**Wave 2 — wow + product (7 commits):** cinematic org command-center hero (AnimatedNumber, focus sentence, signal band — no new endpoints); ⌘K fuzzy matching + frecency + match highlighting (35/35 palette tests); bespoke zero-states on the 5 core lists; 11 raw "Loading…" states → shimmer skeletons; calendar Deadlines lane (new org-scoped RBAC'd aggregate endpoint); /win-loss quarterly review page (nav+palette+prefetch); opportunity timeline merged with the Activity feed (cross-org leak tests).
+
+**Verified:** typecheck 12/12 projects · lint clean on every changed file · db 26/26, dust-client 5/5, worker 40/40 (isolated — batch flake = documented pre-existing cross-file leakage), api 49/49, web 108/108 · web build ✓ · live browser walk (dashboard hero, gtd→Dashboard fuzzy, calendar deadline chip deep-link, /win-loss, /reports redirect, timeline tab) with zero console errors.
+
+**Remaining roadmap (audit-confirmed, not yet built):** account-surface consolidation (Accounts/Key Accounts/Top Accounts/KAM = 4 doors), Sector View + Territories merge, /opportunities+/pipeline single implementation, palette AI copilot (GOAL Phase 5), multi-stage bid approval chains, duplicate detect/merge, team workload view, saved views beyond Tasks, proposal revision history, shared Table keyboard model extraction.
+
+---
+
 ## 2026-06-23 — Modules toggle + AppFlowy embed + KAM premium account UX
 
 Three follow-on features on `feat/prod-hardening-mantu`.

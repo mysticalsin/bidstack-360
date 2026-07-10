@@ -10,6 +10,7 @@ import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.j
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
+import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 import {
   type DustStatusPayload,
   type DustStatusCacheEntry,
@@ -39,7 +40,10 @@ async function listDustAgents(
   log: { warn: (a: object, msg?: string) => void },
 ): Promise<DustAgentStatus> {
   try {
-    const { client: dust } = await getOrgDust(orgId, log as unknown as Parameters<typeof getOrgDust>[1]);
+    const { client: dust } = await getOrgDust(
+      orgId,
+      log as unknown as Parameters<typeof getOrgDust>[1],
+    );
     if (!dust) return { agents: [], error: null };
     return { agents: await dust.listAgents(), error: null };
   } catch (err) {
@@ -213,6 +217,17 @@ export async function probeIntegrationEndpoint(
   const startedAt = Date.now();
 
   try {
+    // Close the DNS-rebind gap for PUBLIC hosts: assertProbeUrlAllowed is a
+    // string-only check, so resolve the host and reject if it points at an
+    // internal address. SKIP it for the dev-only localhost carve-out that
+    // assertProbeUrlAllowed deliberately permits (probing a local MCP server) —
+    // assertUrlResolvesPublic would otherwise hard-reject localhost/127.x.
+    const probeHostname = new URL(checkedUrl).hostname;
+    const isLocalDevProbe =
+      isLocalDevelopmentHostname(probeHostname) && process.env.NODE_ENV !== 'production';
+    if (!isLocalDevProbe) {
+      await assertUrlResolvesPublic(checkedUrl);
+    }
     const res = await fetch(checkedUrl, {
       method: 'GET',
       redirect: 'manual',
@@ -268,7 +283,7 @@ export function buildIntegrationSetupGuide() {
   const workspaceId = envString('DUST_WORKSPACE_ID');
   const dustMcpToolConfig = JSON.stringify(
     {
-      name: 'BidStack 360',
+      name: 'Polo PreSales',
       transport: 'streamable-http',
       url: mcpUrl,
       headers: { Authorization: 'Bearer <BIDSTACK_API_KEY>' },
@@ -297,7 +312,7 @@ export function buildIntegrationSetupGuide() {
     rest: {
       baseUrl: restBase,
       authHeader: 'x-api-key: <BIDSTACK_API_KEY>' as const,
-      recommendedScopes: ['read', 'write'],
+      recommendedScopes: ['opportunities:read', 'contacts:read', 'tasks:read'],
     },
     webhooks: {
       subscriptionsUrl: `${restBase}/webhook-subscriptions`,
