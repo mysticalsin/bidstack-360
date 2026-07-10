@@ -166,6 +166,54 @@ describe('augmentTriggersWithSillage', () => {
     expect(result).toBe(intel);
   });
 
+  it('(f) does not persist a negative cache on provider failure, so a later call retries the provider once the in-memory backoff clears', async () => {
+    process.env.SILLAGE_API_KEY = 'sk-test';
+    vi.useFakeTimers();
+    mocks.fetchSillageAccountSignals
+      .mockRejectedValueOnce(new Error('sillage unreachable'))
+      .mockResolvedValueOnce({
+        signals: [trigger({ id: 'recovered-1' })],
+        intentScore: 40,
+        source: 'rest',
+      });
+
+    const input = { companyName: 'Backoff Co', domain: 'backoff-co.example', logger: log };
+
+    await augmentTriggersWithSillage({}, input);
+    // A timeout/error must never be written to Redis as if it were a genuine
+    // "no signals" result -- that would pin the Buying-triggers card empty for
+    // the full 300s negative-cache TTL after one transient failure.
+    expect(mocks.redisSetex).not.toHaveBeenCalled();
+
+    // The in-memory failure backoff (30s) is a separate, short-lived throttle;
+    // once it clears, the next read must retry the provider instead of being
+    // stuck behind a persisted negative result.
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const second = (await augmentTriggersWithSillage({}, input)) as { triggers: Trigger[] };
+
+    expect(mocks.fetchSillageAccountSignals).toHaveBeenCalledTimes(2);
+    expect(second.triggers.map((t) => t.id)).toEqual(['recovered-1']);
+  });
+
+  it('(g) persists a genuine empty result to the cache, so a second call is served from cache, not the provider', async () => {
+    process.env.SILLAGE_API_KEY = 'sk-test';
+    mocks.fetchSillageAccountSignals.mockResolvedValue({ signals: [], intentScore: null, source: 'rest' });
+
+    const input = { companyName: 'Quiet Co', domain: 'quiet-co.example', logger: log };
+
+    const first = await augmentTriggersWithSillage({}, input);
+    expect(mocks.redisSetex).toHaveBeenCalledTimes(1);
+    // Negative-cache TTL (300s) -- distinct from the 3600s positive-result TTL.
+    expect(mocks.redisSetex.mock.calls[0]?.[1]).toBe(300);
+    expect(first).toEqual({}); // no signals to merge -- intel returned unchanged
+
+    const second = await augmentTriggersWithSillage({}, input);
+
+    expect(mocks.fetchSillageAccountSignals).toHaveBeenCalledTimes(1); // served from cache, not re-fetched
+    expect(second).toEqual({});
+  });
+
   it('(e) caps the merged list at 25 and sorts it by weight descending', async () => {
     process.env.SILLAGE_API_KEY = 'sk-test';
     const signals = Array.from({ length: 30 }, (_, i) =>

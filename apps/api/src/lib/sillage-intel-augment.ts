@@ -21,15 +21,22 @@ import { cacheGet, cacheKey, cacheSet } from './redis-cache.js';
 
 type AugmentLogger = Pick<PinoLogger, 'debug' | 'warn'>;
 
-// Positive results are cheap to keep around; a miss/empty result is cached for
-// a much shorter window so a newly-configured Sillage account (or a target that
-// just started producing signals) isn't hammered on every read but also isn't
-// stuck "empty" for an hour.
+// Positive results are cheap to keep around; a GENUINE empty result is cached
+// for a much shorter window so a newly-configured Sillage account (or a target
+// that just started producing signals) isn't hammered on every read but also
+// isn't stuck "empty" for an hour. A timeout or provider error is NOT cached —
+// caching it would pin the Buying-triggers card empty for the negative TTL
+// after one transient slow response, even though the direct route works.
 const POSITIVE_CACHE_TTL_SECONDS = 3_600;
 const NEGATIVE_CACHE_TTL_SECONDS = 300;
 // Bounded wait so a slow Sillage response never stalls the opportunity page —
 // on timeout we treat it exactly like "no signals yet" for this read.
 const FETCH_TIMEOUT_MS = 1_500;
+// In place of the (removed) negative cache for failures: after a timeout or
+// error we skip Sillage for this target for a short window, so a down Sillage
+// doesn't cost every read the full 1.5s race, yet recovers quickly.
+const FAILURE_BACKOFF_MS = 30_000;
+const failureBackoffUntil = new Map<string, number>();
 // Keeps the Buying triggers card scannable regardless of how many signals a
 // long-lived account has accumulated across both sources.
 const MAX_TRIGGERS = 25;
@@ -74,6 +81,14 @@ function dedupeTriggers(triggers: Trigger[]): Trigger[] {
   return result;
 }
 
+interface TimedFetchOutcome {
+  signals: Trigger[];
+  // True when the empty result is a timeout/rejection/provider error rather
+  // than a genuine "no signals for this account" — failures must never be
+  // cached as if the account were quiet.
+  failed: boolean;
+}
+
 /**
  * Race the Sillage call against a timeout. The underlying provider call is
  * caught internally (never left to reject) so losing the race never produces
@@ -82,18 +97,20 @@ function dedupeTriggers(triggers: Trigger[]): Trigger[] {
 async function fetchWithTimeout(
   input: { companyName?: string; domain?: string },
   logger: AugmentLogger | undefined,
-): Promise<Trigger[]> {
+): Promise<TimedFetchOutcome> {
   const safeFetch = fetchSillageAccountSignals(input).then(
-    (result) => result.signals,
-    (err: unknown) => {
+    // The provider fails open: an internal failure resolves with `error` set,
+    // which counts as failed here just like a rejection would.
+    (result): TimedFetchOutcome => ({ signals: result.signals, failed: result.error !== undefined }),
+    (err: unknown): TimedFetchOutcome => {
       logger?.warn({ err }, 'Sillage account-signals lookup threw; treating as no signals');
-      return [] as Trigger[];
+      return { signals: [], failed: true };
     },
   );
 
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<Trigger[]>((resolve) => {
-    timer = setTimeout(() => resolve([]), FETCH_TIMEOUT_MS);
+  const timeout = new Promise<TimedFetchOutcome>((resolve) => {
+    timer = setTimeout(() => resolve({ signals: [], failed: true }), FETCH_TIMEOUT_MS);
   });
 
   try {
@@ -104,8 +121,9 @@ async function fetchWithTimeout(
 }
 
 /** Read-through cache: cache hit skips the provider entirely; a miss fetches,
- * then caches the result (including empty) so repeat reads within the TTL
- * never re-hit Sillage. */
+ * then caches genuine results (including genuine empty) so repeat reads
+ * within the TTL never re-hit Sillage. Timeouts/errors are never cached —
+ * they only arm a short in-memory backoff for the target. */
 async function getSillageTriggers(
   input: { companyName?: string; domain?: string },
   targetKey: string,
@@ -115,7 +133,17 @@ async function getSillageTriggers(
   const { hit, data } = await cacheGet<Trigger[]>(key);
   if (hit && data) return data;
 
-  const signals = await fetchWithTimeout(input, logger);
+  const backoffUntil = failureBackoffUntil.get(targetKey);
+  if (backoffUntil !== undefined) {
+    if (Date.now() < backoffUntil) return [];
+    failureBackoffUntil.delete(targetKey); // expired — keep the map bounded
+  }
+
+  const { signals, failed } = await fetchWithTimeout(input, logger);
+  if (failed) {
+    failureBackoffUntil.set(targetKey, Date.now() + FAILURE_BACKOFF_MS);
+    return signals;
+  }
   const ttl = signals.length > 0 ? POSITIVE_CACHE_TTL_SECONDS : NEGATIVE_CACHE_TTL_SECONDS;
   await cacheSet(key, signals, ttl);
   return signals;

@@ -202,6 +202,10 @@ export const envSchema = z.object({
   // to { signals: [], intentScore: null, source: null, error }.
   SILLAGE_API_KEY: z.string().min(1).optional().or(z.literal('')),
   SILLAGE_API_BASE_URL: z.string().url().optional().or(z.literal('')),
+  // REST signals path is pure config: the '/v1/accounts/signals' default in the
+  // provider is a placeholder until Sillage publishes API docs — override here
+  // at go-live, zero code change.
+  SILLAGE_REST_SIGNALS_PATH: z.string().min(1).optional().or(z.literal('')),
   SILLAGE_MCP_URL: z.string().url().optional().or(z.literal('')),
   SILLAGE_MCP_BEARER_TOKEN: z.string().min(1).optional().or(z.literal('')),
   SILLAGE_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
