@@ -13,17 +13,18 @@ Companion docs: `docs/AZURE_FOUNDATION.md` (architecture rationale), `infra/azur
 | Area | State | Action |
 | --- | --- | --- |
 | Monorepo build (`pnpm -r build`) | ✅ Passes clean (api, web, worker, mcp-server, packages) | none |
-| Container images (`api`, `worker`, `mcp-server`, `web`, `migrate`) | ✅ Dockerfiles exist | build + push to ACR per release |
-| Azure IaC (`infra/azure/main.bicep`) | ✅ Full stack: VNet, Postgres Flexible, Redis, Key Vault, Container Apps, Front Door + WAF, migrate Job | `az bicep build` + `what-if`, then deploy |
+| Container images (`api`, `worker`, `mcp-server`, `web`, `migrate`) | ✅ Multi-stage targets in the root `Dockerfile` | build + push to ACR per release |
+| Azure IaC (`infra/azure/main.bicep`) | ⚠️ Full stack **drafted but UNVALIDATED** — its own README says "do not deploy as-is"; never run through `az bicep build`/`what-if`/a real subscription | validate: `az bicep build` + `what-if` on a real RG, fix what breaks, then deploy |
 | Health probes | ✅ `/livez`, `/readyz` (api), `/health` (worker, mcp) | wire to Container App probes |
 | DB migrations | ✅ Run as a Container Apps Job before revisions roll | run + gate each release |
 | **Durable storage on Azure** | ⚠️ **GAP — code only supports `local` and `s3`, no native Azure Blob** | see §1 — pick S3-compatible layer *or* add a Blob adapter |
 | PII + integration encryption | ✅ Enforced in prod (fails boot if keys missing) | generate + store the two 64-hex keys (§4) |
 | Sillage intent connector | ✅ Wired, env-activated (see §7) | set `SILLAGE_*` env to turn on |
 
-**Bottom line:** the app builds and the Azure IaC is complete. The one code change
-required before a *pure-Azure* production deploy is durable storage (§1). Everything
-else is provisioning + secrets + config.
+**Bottom line:** the app builds; the Azure IaC covers the full topology but is an
+**unvalidated draft** — budget one validation pass (`az bicep build` + `what-if`)
+before trusting it. The one code change required before a *pure-Azure* production
+deploy is durable storage (§1). Everything else is provisioning + secrets + config.
 
 ---
 
@@ -31,7 +32,9 @@ else is provisioning + secrets + config.
 
 `STORAGE_DRIVER` accepts only `local` (dev/demo) and `s3` today
 (`apps/api/src/env.ts`), and production boot **fails** unless `STORAGE_DRIVER=s3`
-with an `S3_BUCKET`. Azure Blob is not wired. Choose one:
+with an `S3_BUCKET` (the worker additionally requires `S3_REGION`). One carve-out:
+`DEMO_MODE=true` exempts the storage guard, so a demo-mode production deploy may
+run `local` storage. Azure Blob is not wired. Choose one:
 
 - **Fast path (recommended for first go-live):** put an **S3-compatible object
   layer** in front of Azure (or use any S3-compatible store on private networking)
@@ -42,7 +45,8 @@ with an `S3_BUCKET`. Azure Blob is not wired. Choose one:
      interface as the S3 driver, using `@azure/storage-blob` + the Container App's
      managed identity (no account keys).
   3. Matching reader in the worker (`apps/worker/src/…`) for RFP/OCR parse.
-  4. Update the prod guard in `env.ts` (~line 348) to accept `azure-blob`.
+  4. Update the prod guard in `env.ts` (~line 359, the `STORAGE_DRIVER` check) to
+     accept `azure-blob`.
   5. Verify the full **RFP upload → storage → worker parse** path (foundation
      checklist item).
 
@@ -121,7 +125,7 @@ Feature-gated (only if you enable them): `ERP_ENABLED=true` needs `ERP_MCP_URL`;
 `LMS_360L_ENABLED=true` needs `LMS_360L_BASE_URL` + `LMS_360L_API_KEY`;
 `SERUM_DEMO_MODE_ENABLED=true` is **rejected** in production.
 
-Full var list: `.env.example` (327 keys). Only the subset above is boot-critical.
+Full var list: `.env.example` (~333 keys). Only the subset above is boot-critical.
 
 ---
 
@@ -167,12 +171,13 @@ request).
 Set these (Key Vault → Container App env for `api`):
 
 ```
-SILLAGE_API_KEY=            # REST bearer key
-SILLAGE_API_BASE_URL=       # optional; defaults to https://api.getsillage.com
-SILLAGE_MCP_URL=            # Sillage MCP server endpoint
-SILLAGE_MCP_BEARER_TOKEN=   # optional; if the MCP endpoint needs auth
-SILLAGE_MCP_TIMEOUT_MS=     # optional; request timeout
-SILLAGE_MCP_SIGNALS_TOOL=   # optional; defaults to 'account_signals'
+SILLAGE_API_KEY=              # REST bearer key
+SILLAGE_API_BASE_URL=         # optional; defaults to https://api.getsillage.com
+SILLAGE_REST_SIGNALS_PATH=    # optional; REST endpoint path, defaults to /v1/accounts/signals
+SILLAGE_MCP_URL=              # Sillage MCP server endpoint
+SILLAGE_MCP_BEARER_TOKEN=     # optional; if the MCP endpoint needs auth
+SILLAGE_MCP_TIMEOUT_MS=       # optional; request timeout
+SILLAGE_MCP_SIGNALS_TOOL=     # optional; defaults to 'account_signals'
 ```
 
 - Configure **either** the REST key **or** the MCP URL (or both — MCP is tried
@@ -180,26 +185,41 @@ SILLAGE_MCP_SIGNALS_TOOL=   # optional; defaults to 'account_signals'
   nothing breaks.
 - Endpoint: `POST /api/v1/sillage/account-signals` (org-scoped, RBAC-gated), body
   `{ companyName?, domain? }` → `{ signals: Trigger[], intentScore, source }`.
-- Output is shaped as the app's existing **`Trigger`** type, so Sillage signals
-  drop straight into the account/opportunity **"Buying triggers"** card
-  (`opportunityDetail/IntelCards.tsx`). Sillage categories map to trigger kinds
-  (hiring→hiring, champion move→executive_move, competitor→deal_activity,
+- Output is shaped as the app's existing **`Trigger`** type, and Sillage signals
+  are **already wired into the opportunity "Buying triggers" card**
+  (`opportunityDetail/IntelCards.tsx`, merged server-side by
+  `lib/sillage-intel-augment.ts` behind a 1.5s fail-open race — a slow or down
+  Sillage never delays the opportunity read). Sillage categories map to trigger
+  kinds (hiring→hiring, champion move→executive_move, competitor→deal_activity,
   funding→funding, social/news→press).
-- Shows up in **Settings → Integrations** with a health badge from the env.
-- **Exact REST path + auth header are config-driven placeholders** (Sillage has no
-  public API docs yet) — one const in `providers/sillage-signals.ts` to update once
-  you have the real contract. The MCP tool name is the `SILLAGE_MCP_SIGNALS_TOOL`
-  env var.
-- Natural consumer to wire next: feed the returned signals into the account intel /
-  buying-triggers ingestion so they surface on the account + opportunity views.
+- The MCP client **negotiates the protocol version** at initialize and **reuses
+  the session** across lookups (one round trip per call after warm-up, re-inits
+  once on session expiry). SSE and JSON responses both handled.
+- Shows up in **Settings → Integrations** with a health badge, and the
+  **"Test now"** probe performs a REAL connectivity check (MCP initialize
+  round trip, or a REST call when only the API key is set) reporting lane +
+  latency — credential presence alone no longer reads as "healthy".
+- **The REST endpoint path + payload shape are a documented guess** (Sillage has
+  no public API docs yet): default `POST {base}/v1/accounts/signals`. When you get
+  the real contract, set `SILLAGE_REST_SIGNALS_PATH` (and `SILLAGE_API_BASE_URL`
+  if needed) — pure config, no code change. The MCP lane is spec-correct and is
+  the recommended integration path. The MCP tool name is the
+  `SILLAGE_MCP_SIGNALS_TOOL` env var.
 
 ---
 
 ## 8. Recommended follow-ups (not blockers)
 
+- **Validate the Bicep** on a real subscription (`az bicep build` + `what-if`) —
+  the IaC has never been exercised; treat API versions/property names as suspect
+  until it passes (its README says the same).
 - Land the native **azure-blob** storage driver (§1) so you're not carrying an
   S3-compat shim.
-- Wire Sillage intent into a concrete surface (copilot / workflow / routing).
+- **Decide the production domain.** The marketing site still points at
+  `bidstack.dev` everywhere (canonical/OG URLs, footer links, sign-in CTAs,
+  `hello@bidstack.dev`) — swap once the Polo PreSales domain exists.
+- Extend Sillage intent beyond the Buying-triggers card (copilot / workflow /
+  routing) if the signals prove valuable.
 - Add **CDN cache rules** + immutable asset headers on the web origin.
 - Turn on **Rolling Releases / canary** at Front Door for safer deploys.
 - Add the deferred **tenant-scope-guard** enforce-mode extension and a DB-level
