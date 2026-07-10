@@ -108,9 +108,15 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
   // collaboration participant, including Read-Only, holds). DELETE /comments/:id
   // stays under comments:write — it is author-scoped, and authoring implies write.
   server.addHook('preHandler', (req) => {
+    // Match on the MATCHED route pattern, never the raw URL. `req.url.includes('/presence')`
+    // would misclassify e.g. `POST /comments?x=/presence` as a self-scoped read and let
+    // a Read-Only member author comments (a comments:write bypass). routeOptions.url is
+    // the registered pattern (prefix-qualified, no query string), so an `endsWith` suffix
+    // match is immune to query-string spoofing.
+    const routeUrl = req.routeOptions?.url ?? '';
     const selfScopedParticipantWrite =
       req.method === 'POST' &&
-      (req.url.includes('/presence') || /\/mentions\/[^/]+\/read(\?|$)/.test(req.url));
+      (routeUrl.endsWith('/presence') || routeUrl.endsWith('/mentions/:id/read'));
     const needsReadOnly = req.method === 'GET' || selfScopedParticipantWrite;
     return server.requirePermission(needsReadOnly ? 'comments:read' : 'comments:write')(req);
   });
