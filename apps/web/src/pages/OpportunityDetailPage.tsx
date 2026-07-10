@@ -393,7 +393,7 @@ export function OpportunityDetailPage() {
         onOpenChange={setBriefOpen}
       />
 
-      <DataFreshnessRibbon refreshedAt={intel.refreshedAt} />
+      <DataFreshnessRibbon intel={intel} />
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <FinancialHealthCard intel={intel} />

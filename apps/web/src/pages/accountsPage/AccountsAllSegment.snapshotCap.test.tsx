@@ -205,4 +205,19 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
       screen.queryByText(/searches only the accounts loaded from your live dashboard/i),
     ).toBeNull();
   });
+
+  // A brand-new production org has zero companies and no filters applied — the
+  // dashboard endpoint still returns a (valid, empty) snapshot, not an error.
+  // That must read as a first-run empty state with a create CTA, not the
+  // filter-miss copy (which implies accounts exist but none matched).
+  it('shows a first-run empty state (not the filter-miss copy) when the org truly has zero accounts', () => {
+    setDashboard(0);
+    renderSegment();
+
+    expect(screen.getByText('No accounts yet')).toBeTruthy();
+    expect(screen.queryByText('No accounts match your filters')).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /import accounts from csv/i }),
+    ).toBeTruthy();
+  });
 });

@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "暂无客户",
+      "body": "添加您的第一个客户，或在上方同步核心 ERP 客户——销售管道、账户健康度和技术信号将自动填充。",
+      "importCsv": "或从 CSV 导入客户",
       "filtered": "没有客户符合您的筛选条件"
     },
     "summary": {
@@ -2753,6 +2755,7 @@
   },
   "intelCards": {
     "dataFreshness": "情报更新于 {{date}} · 来源：Crunchbase、LinkedIn、欧盟注册处",
+    "noIntel": "暂无外部情报——尚未为该商机查询任何数据源。",
     "financial": {
       "title": "财务状况",
       "private": "未上市",

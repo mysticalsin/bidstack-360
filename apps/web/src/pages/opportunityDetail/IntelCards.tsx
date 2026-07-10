@@ -21,9 +21,36 @@ function Row({ label, value }: { label: string; value: string }) {
 
 // ── cards ─────────────────────────────────────────────────────────────────────
 
-export function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
+export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
   const reduced = useReducedMotion();
   const { t } = useTranslation('crm');
+  // Nothing has ever been pulled for this opportunity — naming Crunchbase/
+  // LinkedIn/EU register here would claim sources that were never queried.
+  const hasIntel = Boolean(
+    intel.refreshedAt ||
+      intel.financial ||
+      intel.winPrediction ||
+      intel.hiring ||
+      intel.triggers?.length ||
+      intel.competitors?.length ||
+      intel.news?.length ||
+      intel.decisionUnit?.length,
+  );
+
+  if (!hasIntel) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
+        <span className="inline-block h-2 w-2 rounded-full bg-[var(--fg-tertiary)]" aria-hidden />
+        <span>
+          {t(
+            'intelCards.noIntel',
+            'No external intel yet — sources have not been queried for this opportunity.',
+          )}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
       <span
@@ -32,7 +59,7 @@ export function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
       />
       <span>
         {t('intelCards.dataFreshness', 'Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register', {
-          date: refreshedAt ? formatDate(refreshedAt) : '—',
+          date: intel.refreshedAt ? formatDate(intel.refreshedAt) : '—',
         })}
       </span>
     </div>

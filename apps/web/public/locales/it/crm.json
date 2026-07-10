@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "Nessun account ancora",
+      "body": "Aggiungi il tuo primo account o sincronizza i principali clienti ERP qui sopra — pipeline, salute dell'account e segnali tecnologici si popoleranno automaticamente.",
+      "importCsv": "Oppure importa gli account da CSV",
       "filtered": "Nessun account corrisponde ai tuoi filtri"
     },
     "summary": {
@@ -2753,6 +2755,7 @@
   },
   "intelCards": {
     "dataFreshness": "Intelligence aggiornata {{date}} · Fonti: Crunchbase, LinkedIn, registro UE",
+    "noIntel": "Nessun dato esterno per ora — le fonti non sono ancora state interrogate per questa opportunità.",
     "financial": {
       "title": "Salute finanziaria",
       "private": "Privata",

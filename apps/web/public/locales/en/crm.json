@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "No accounts yet",
+      "body": "Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.",
+      "importCsv": "Or import accounts from CSV",
       "filtered": "No accounts match your filters"
     },
     "summary": {
@@ -2765,6 +2767,7 @@
   },
   "intelCards": {
     "dataFreshness": "Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register",
+    "noIntel": "No external intel yet — sources have not been queried for this opportunity.",
     "financial": {
       "title": "Financial health",
       "private": "Private",

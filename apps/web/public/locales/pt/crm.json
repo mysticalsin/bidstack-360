@@ -380,6 +380,8 @@
     },
     "empty": {
       "title": "Ainda não há contas",
+      "body": "Adicione a sua primeira conta ou sincronize os principais clientes ERP acima — o pipeline, a integridade da conta e os sinais tecnológicos serão preenchidos automaticamente.",
+      "importCsv": "Ou importe contas de um CSV",
       "filtered": "Nenhuma conta corresponde aos seus filtros"
     },
     "summary": {
@@ -2753,6 +2755,7 @@
   },
   "intelCards": {
     "dataFreshness": "Inteligência atualizada {{date}} · Fontes: Crunchbase, LinkedIn, registro da UE",
+    "noIntel": "Ainda não há dados externos — as fontes ainda não foram consultadas para esta oportunidade.",
     "financial": {
       "title": "Saúde financeira",
       "private": "Privada",

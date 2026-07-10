@@ -10,7 +10,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useKamAccounts } from '@/hooks/useKamAccounts';
 
 import {
@@ -28,7 +28,7 @@ import {
 } from './kamPanels';
 
 export default function KamAccountPage() {
-  const { data, isLoading } = useKamAccounts();
+  const { data, isLoading, isError, error, refetch } = useKamAccounts();
   const accounts = data?.items ?? [];
   const [companyId, setCompanyId] = useState('');
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -55,6 +55,16 @@ export default function KamAccountPage() {
 
       {isLoading ? (
         <LoadingSkeleton rows={4} />
+      ) : isError ? (
+        <ErrorState
+          title="Couldn't load key accounts"
+          message={error instanceof Error ? error.message : 'The key accounts endpoint did not respond.'}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+              Retry
+            </Button>
+          }
+        />
       ) : accounts.length === 0 ? (
         <KamZeroState onDesignate={() => setDesignateOpen(true)} />
       ) : active ? (

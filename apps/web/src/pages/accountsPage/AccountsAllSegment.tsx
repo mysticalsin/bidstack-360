@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
@@ -232,6 +232,10 @@ export function AccountsAllSegment() {
   const loadedAccountCount = dashboard.data.companies.length;
   const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
   const filtersActive = Boolean(search || industry || technology || segment !== 'all');
+  // True first-run org state: no search/filter narrowing the view AND the
+  // underlying snapshot itself has zero rows. Distinct from "filters matched
+  // nothing" — that case keeps the existing filter-miss copy below.
+  const orgHasNoAccounts = !filtersActive && allRows.length === 0;
 
   const syncErpAccounts = () => {
     autopopulate.mutate(
@@ -534,17 +538,43 @@ export function AccountsAllSegment() {
       ) : null}
 
       {rows.length === 0 ? (
-        <EmptyState
-          title={t('accounts.empty.filtered', 'No accounts match your filters')}
-          message={
-            snapshotCapped && filtersActive
-              ? t(
-                  'accounts.empty.filteredCapped',
-                  'This view searches only the accounts loaded from your live dashboard. The account you’re after may exist outside it — try global search.',
-                )
-              : undefined
-          }
-        />
+        orgHasNoAccounts ? (
+          <EmptyState
+            icon="building"
+            title={t('accounts.empty.title', 'No accounts yet')}
+            message={t(
+              'accounts.empty.body',
+              'Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.',
+            )}
+            secondary={
+              <EmptyStateLink to="/settings?tab=data-import">
+                {t('accounts.empty.importCsv', 'Or import accounts from CSV')}
+              </EmptyStateLink>
+            }
+            action={
+              <SmartCompanyDialog
+                trigger={
+                  <button type="button" className="btn btn-primary">
+                    <Icon name="plus" size={14} />
+                    {t('accounts.actions.newAccount', 'New account')}
+                  </button>
+                }
+              />
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('accounts.empty.filtered', 'No accounts match your filters')}
+            message={
+              snapshotCapped && filtersActive
+                ? t(
+                    'accounts.empty.filteredCapped',
+                    'This view searches only the accounts loaded from your live dashboard. The account you’re after may exist outside it — try global search.',
+                  )
+                : undefined
+            }
+          />
+        )
       ) : (
         <>
           <motion.section
