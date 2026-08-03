@@ -77,7 +77,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
             exit="exit"
             className={cn(
               'relative w-full max-w-lg rounded-2xl border border-[var(--border-default)]',
-              'bg-[var(--surface-card)] dark:bg-[var(--surface-glass)] dark:backdrop-blur-xl',
+              'bg-[var(--surface-card)]',
               'shadow-[var(--shadow-lg)] p-6 max-h-[90vh] overflow-y-auto',
             )}
           >

@@ -9,6 +9,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import designLaw from './packages/eslint-rules/design-law.js';
 
 const noConsoleExceptError = {
   // CLAUDE.md hard floor #5: no console.log in shipped code.
@@ -149,6 +150,26 @@ export default tseslint.config(
   {
     files: ['apps/web/src/components/ui/**/*.{ts,tsx}'],
     rules: { 'react-refresh/only-export-components': 'off' },
+  },
+
+  // 6a. Design law (docs/adr/0002-design-tokens.md + fusion-validation
+  // Amendments 4/6). Scoped to apps/web/src only so other workspaces'
+  // `pnpm lint` is untouched. Rules live in packages/eslint-rules/ — flat
+  // config loads local rule files as inline plugin objects, no package
+  // publish needed. Escape hatch: an eslint-disable for these rules must
+  // cite an ADR in the comment (risk register #6).
+  {
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    plugins: {
+      'bidstack-design': designLaw,
+    },
+    rules: {
+      'bidstack-design/no-theme-variant-geometry': 'error',
+      'bidstack-design/no-foreign-token-vocabulary': 'error',
+      // warn (not error): pre-existing hex debt in login Hero/DemoSignIn and
+      // TerritoryPanels — upgrade once those migrate to tokens.
+      'bidstack-design/no-raw-hex-in-classname': 'warn',
+    },
   },
 
   // 6b. Marketing site (apps/marketing) — same React + browser config as

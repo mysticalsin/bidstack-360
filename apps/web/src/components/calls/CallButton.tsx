@@ -214,7 +214,6 @@ export function CallButton({
           aria-label={t('callButton.menuAriaLabel', 'Choose call provider')}
           className={cn(
             'absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] py-1 shadow-[var(--shadow-lg)]',
-            'dark:bg-[var(--surface-glass)] dark:backdrop-blur-xl dark:border-[var(--border-glow-strong)]',
           )}
         >
           {PROVIDERS.map((p) => (

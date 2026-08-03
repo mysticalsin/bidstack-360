@@ -302,7 +302,7 @@ function SoundTestChip({
       type="button"
       data-ui-sound-handled="true"
       onClick={() => playUiSound(kind, volume)}
-      className="inline-flex min-h-9 items-center gap-1.5 rounded-md dark:rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:bg-[var(--surface-glass)] dark:backdrop-blur-md"
+      className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
     >
       <Icon name="play" size={13} ariaHidden />
       {label}

@@ -97,7 +97,6 @@ export function KpiCard({
       transition={springSoft}
       className={cn(
         'rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)]',
-        'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md',
         'p-5 flex flex-col gap-2',
         className,
       )}

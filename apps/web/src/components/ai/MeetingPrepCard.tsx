@@ -27,7 +27,6 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
     <section
       className={cn(
         'rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4',
-        'dark:bg-[var(--surface-glass)] dark:border-[var(--border-glow-strong)] dark:backdrop-blur-xl',
       )}
       aria-label={t('meetingPrep.ariaLabel', 'AI Meeting Prep')}
     >

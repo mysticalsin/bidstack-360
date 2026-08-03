@@ -80,8 +80,6 @@ export function ChartContainer({
     <div
       className={cn(
         'relative rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)]',
-        'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md',
-        'dark:border-[var(--border-glow)]',
         className,
       )}
       role="region"
