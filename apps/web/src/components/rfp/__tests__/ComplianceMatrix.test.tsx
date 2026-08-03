@@ -111,7 +111,9 @@ function makeRow(overrides: Partial<ComplianceRowData> = {}): ComplianceRowData 
     response: overrides.response ?? null,
     status: overrides.status ?? 'pending',
     autoFilled: overrides.autoFilled ?? false,
-    aiConfidenceBps: overrides.aiConfidenceBps ?? 0,
+    // Null is the honest default: a fresh row has no assessment confidence.
+    aiConfidenceBps: overrides.aiConfidenceBps ?? null,
+    assessmentStatus: overrides.assessmentStatus ?? 'PENDING',
     ...overrides,
   };
 }

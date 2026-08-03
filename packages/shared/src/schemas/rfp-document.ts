@@ -58,6 +58,12 @@ export const ComplianceRowStatus = z.enum([
 ]);
 export type ComplianceRowStatus = z.infer<typeof ComplianceRowStatus>;
 
+// Fusion Phase 6 — "unknown stops meaning bad": ASSESSED = real AI result,
+// UNAVAILABLE = fallback ran (render "not assessed", never 0), PENDING = not
+// yet attempted. Mirrors the Prisma AssessmentStatus enum.
+export const AssessmentStatus = z.enum(['ASSESSED', 'UNAVAILABLE', 'PENDING']);
+export type AssessmentStatus = z.infer<typeof AssessmentStatus>;
+
 export const RfpRiskLevel = z.enum(['low', 'medium', 'high', 'critical']);
 export type RfpRiskLevel = z.infer<typeof RfpRiskLevel>;
 
@@ -150,7 +156,9 @@ export const Requirement = z.object({
   mandatory: z.boolean(),
   priority: RfpRiskLevel,
   status: RequirementStatus,
-  confidenceBps: z.number().int().min(0).max(10000),
+  // Nullable: null = no AI confidence exists (manual entry / unavailable).
+  confidenceBps: z.number().int().min(0).max(10000).nullable(),
+  assessmentStatus: AssessmentStatus,
   ownerId: z.string().uuid().nullable(),
   dueDate: z.string().date().nullable(),
   metadata: z.record(z.unknown()),
@@ -169,6 +177,9 @@ export const ComplianceMatrixRow = z.object({
   risk: RfpRiskLevel,
   responseStatus: z.string().min(1).max(100),
   answerDraft: z.string().nullable(),
+  // Confidence of the compliance-fill assessment; null until one produced it.
+  confidenceBps: z.number().int().min(0).max(10000).nullable(),
+  assessmentStatus: AssessmentStatus,
   evidence: z.array(z.record(z.unknown())),
   citations: z.array(z.record(z.unknown())),
   dueDate: z.string().date().nullable(),
@@ -249,7 +260,9 @@ export const RequirementCreateRequest = z.object({
   requirementType: z.string().min(1).max(100).default('general'),
   mandatory: z.boolean().default(false),
   priority: RfpRiskLevel.default('medium'),
-  confidenceBps: z.number().int().min(0).max(10000).default(0),
+  // Null by default: a hand-entered requirement has no AI confidence; the old
+  // default(0) rendered "0% confidence" on human-written rows.
+  confidenceBps: z.number().int().min(0).max(10000).nullable().default(null),
   ownerId: z.string().uuid().optional(),
   dueDate: z.string().date().optional(),
   metadata: z.record(z.unknown()).default({}),

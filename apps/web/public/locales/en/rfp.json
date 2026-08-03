@@ -80,7 +80,8 @@
     "edit": "Edit",
     "done": "Done",
     "emptyTitle": "No compliance data yet",
-    "emptyMessage": "Compliance rows will appear here after the compliance fill stage."
+    "emptyMessage": "Compliance rows will appear here after the compliance fill stage.",
+    "notAssessed": "Not assessed"
   },
   "approval": {
     "title": "Review & Approve",
@@ -216,7 +217,8 @@
   "requirementRow": {
     "pageRefAria": "Found on page {{page}}",
     "confidenceAria": "AI confidence: {{percent}}%",
-    "confidenceLabel": "{{percent}}% confidence"
+    "confidenceLabel": "{{percent}}% confidence",
+    "notAssessed": "Not assessed"
   },
   "adminRfp": {
     "eyebrow": "Admin",

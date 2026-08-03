@@ -191,7 +191,9 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
                 text: z.string(),
                 category: z.string(),
                 priority: z.string(),
-                aiConfidenceBps: z.number().int(),
+                // Null = no AI confidence exists (manual entry / unavailable);
+                // the UI renders "not assessed" instead of 0%.
+                aiConfidenceBps: z.number().int().nullable(),
                 pageRef: z.number().int().nullable(),
               }),
             ),

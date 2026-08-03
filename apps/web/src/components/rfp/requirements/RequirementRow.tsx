@@ -19,7 +19,10 @@ const PRIORITY_STYLES: Record<Requirement['priority'], string> = {
 
 export function RequirementRow({ requirement }: RequirementRowProps) {
   const { t } = useTranslation('rfp');
-  const confidencePct = Math.round(requirement.aiConfidenceBps / 100);
+  // Null = no AI confidence exists (manual entry / assessment unavailable) —
+  // render "not assessed" instead of a fake 0% (fusion Phase 6: unknown ≠ bad).
+  const confidencePct =
+    requirement.aiConfidenceBps === null ? null : Math.round(requirement.aiConfidenceBps / 100);
 
   return (
     <li className="flex flex-col gap-1.5 border-b border-[var(--border-subtle)] px-4 py-3 last:border-0">
@@ -44,18 +47,24 @@ export function RequirementRow({ requirement }: RequirementRowProps) {
             · p. {requirement.pageRef}
           </span>
         )}
-        <span
-          aria-label={t('requirementRow.confidenceAria', 'AI confidence: {{percent}}%', {
-            percent: confidencePct,
-          })}
-          title={t('requirementRow.confidenceAria', 'AI confidence: {{percent}}%', {
-            percent: confidencePct,
-          })}
-        >
-          · {t('requirementRow.confidenceLabel', '{{percent}}% confidence', {
-            percent: confidencePct,
-          })}
-        </span>
+        {confidencePct !== null ? (
+          <span
+            aria-label={t('requirementRow.confidenceAria', 'AI confidence: {{percent}}%', {
+              percent: confidencePct,
+            })}
+            title={t('requirementRow.confidenceAria', 'AI confidence: {{percent}}%', {
+              percent: confidencePct,
+            })}
+          >
+            · {t('requirementRow.confidenceLabel', '{{percent}}% confidence', {
+              percent: confidencePct,
+            })}
+          </span>
+        ) : (
+          <span className="italic">
+            · {t('requirementRow.notAssessed', 'Not assessed')}
+          </span>
+        )}
       </div>
     </li>
   );

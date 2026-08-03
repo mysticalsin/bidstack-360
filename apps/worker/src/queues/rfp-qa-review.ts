@@ -6,8 +6,10 @@
 // orchestration to awaiting_approval — the human approval gate takes over.
 //
 // WHY fail-open: a missing Dust agent or network failure must not block the
-// proposal from reaching a human reviewer. The fallback score (0) signals
-// to the approval UI that manual QA is required.
+// proposal from reaching a human reviewer. The fallback records a null score
+// with qaAssessmentStatus=UNAVAILABLE — never a fake 0 — so the approval UI
+// shows "not assessed" and analytics means are not dragged toward zero
+// (fusion Phase 6: unknown stops meaning bad).
 //
 // WHY concurrency 2: RFP_QA_REVIEW allows only 2 attempts (see queue-config).
 // The human gate immediately follows; a high concurrency would only risk
@@ -64,11 +66,21 @@ const QaResult = z.object({
 });
 type QaResult = z.infer<typeof QaResult>;
 
+// What the worker persists: a parsed LLM result (ASSESSED) or the fallback
+// (UNAVAILABLE, null score). Null is deliberate — 0 is a real QA score.
+interface QaAssessment {
+  scoreBps: number | null;
+  assessmentStatus: 'ASSESSED' | 'UNAVAILABLE';
+  issues: QaResult['issues'];
+}
+
 // ─── Deterministic fallback ─────────────────────────────────────────────────
 
-function fallbackQa(): QaResult {
+// Exported for the unknown-not-bad regression test (rfp-fallback-assessment.test.ts).
+export function fallbackQa(): QaAssessment {
   return {
-    scoreBps: 0,
+    scoreBps: null,
+    assessmentStatus: 'UNAVAILABLE',
     issues: [
       { severity: 'unknown', description: 'QA review unavailable — manual review required.' },
     ],
@@ -99,7 +111,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log);
   const qaAgentId =
     resolveAgentId(creds, 'qaReview', process.env.DUST_RFP_QA_AGENT_ID) ?? DEFAULT_QA_AGENT_ID;
-  let result: QaResult;
+  let result: QaAssessment;
 
   if (proposal.compiledContent) {
     const userMessage = buildAgentUserMessage({
@@ -111,7 +123,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       rfpContent: proposal.compiledContent.slice(0, MAX_PROPOSAL_CHARS),
     });
 
-    // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → zero-score fallback.
+    // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → UNAVAILABLE fallback.
     const completion = await runRfpCompletion({
       orgId,
       log,
@@ -128,7 +140,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     if (completion) {
       try {
         const p2 = QaResult.safeParse(JSON.parse(coerceJsonObject(completion.text)));
-        result = p2.success ? p2.data : fallbackQa();
+        result = p2.success ? { ...p2.data, assessmentStatus: 'ASSESSED' } : fallbackQa();
       } catch {
         result = fallbackQa();
       }
@@ -147,6 +159,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     where: { id: proposalId, orgId },
     data: {
       qaScoreBps: result.scoreBps,
+      qaAssessmentStatus: result.assessmentStatus,
       qaReviewedAt: new Date(),
       qaIssues: result.issues as unknown as Prisma.InputJsonValue,
     },
@@ -162,6 +175,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       orchestrationId,
       proposalId,
       scoreBps: result.scoreBps,
+      assessmentStatus: result.assessmentStatus,
       issueCount: result.issues.length,
     },
     'rfp-qa-review: complete',

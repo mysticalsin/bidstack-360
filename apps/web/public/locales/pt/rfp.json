@@ -89,7 +89,8 @@
   "requirementRow": {
     "pageRefAria": "Encontrado na página {{page}}",
     "confidenceAria": "Confiança da IA: {{percent}}%",
-    "confidenceLabel": "{{percent}}% de confiança"
+    "confidenceLabel": "{{percent}}% de confiança",
+    "notAssessed": "Não avaliado"
   },
   "adminRfp": {
     "eyebrow": "Administração",
@@ -101,5 +102,8 @@
     "ariaLabel": "Este conteúdo foi gerado com assistência de IA",
     "title": "Rascunho assistido por IA — revise antes de enviar",
     "label": "Rascunho assistido por IA"
+  },
+  "compliance": {
+    "notAssessed": "Não avaliado"
   }
 }

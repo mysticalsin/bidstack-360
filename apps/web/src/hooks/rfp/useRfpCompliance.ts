@@ -8,7 +8,9 @@ export interface ComplianceRow {
   response: string | null;
   status: 'pending' | 'compliant' | 'partial' | 'non_compliant';
   autoFilled: boolean;
-  aiConfidenceBps: number; // 0-10000
+  aiConfidenceBps: number | null; // 0-10000; null = no assessment confidence exists
+  // UNAVAILABLE = the AI fallback ran — render "not assessed", never 0%.
+  assessmentStatus: 'ASSESSED' | 'UNAVAILABLE' | 'PENDING';
 }
 
 interface ComplianceResult {

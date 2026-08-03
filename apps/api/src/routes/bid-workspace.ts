@@ -99,6 +99,11 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
   //   'NO'          → non_compliant
   //   'PARTIAL'     → partial
   //   other/default → pending
+  //
+  // aiConfidenceBps is the row's OWN assessment confidence (null until the
+  // fill worker produces one) — not the requirement's extraction confidence.
+  // assessmentStatus 'UNAVAILABLE' means the AI fallback ran; the UI renders
+  // "not assessed", never 0% (fusion Phase 6: unknown ≠ bad).
 
   server.get(
     '/bid-workspaces/:opportunityId/compliance',
@@ -115,7 +120,8 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
                 response: z.string().nullable(),
                 status: z.enum(['pending', 'compliant', 'partial', 'non_compliant']),
                 autoFilled: z.boolean(),
-                aiConfidenceBps: z.number().int().min(0).max(10000),
+                aiConfidenceBps: z.number().int().min(0).max(10000).nullable(),
+                assessmentStatus: z.enum(['ASSESSED', 'UNAVAILABLE', 'PENDING']),
               }),
             ),
             total: z.number().int(),
@@ -137,7 +143,9 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
           id: true,
           responseStatus: true,
           answerDraft: true,
-          requirement: { select: { text: true, confidenceBps: true } },
+          confidenceBps: true,
+          assessmentStatus: true,
+          requirement: { select: { text: true } },
         },
       });
 
@@ -156,7 +164,8 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
         // autoFilled = compliance-fill worker has assessed this row;
         // 'not_started' is the DB default before any AI processing.
         autoFilled: row.responseStatus !== 'not_started',
-        aiConfidenceBps: row.requirement.confidenceBps,
+        aiConfidenceBps: row.confidenceBps,
+        assessmentStatus: row.assessmentStatus,
       }));
 
       return {

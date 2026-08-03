@@ -240,7 +240,11 @@ describe('bid workspace routes', () => {
       expect(row1.response).toBeNull();
       expect(row1.status).toBe('pending');
       expect(row1.autoFilled).toBe(false);
-      expect(row1.aiConfidenceBps).toBe(8500);
+      // The row's own assessment confidence is null until the compliance-fill
+      // worker produces one — the requirement's 8500 extraction confidence is
+      // no longer surfaced here (fusion Phase 6: unknown ≠ bad).
+      expect(row1.aiConfidenceBps).toBeNull();
+      expect(row1.assessmentStatus).toBe('PENDING');
 
       // Save an answerDraft via PATCH
       const patch = await server.inject({

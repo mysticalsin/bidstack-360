@@ -86,6 +86,9 @@ export async function writeBidWorkspaceArtifacts({
             mandatory: req.mandatory,
             priority: req.priority,
             confidenceBps: req.confidenceBps,
+            // Extraction (Dust or deterministic) always produced this
+            // confidence, so the row is ASSESSED — not the PENDING default.
+            assessmentStatus: 'ASSESSED' as const,
             metadata: {
               extractionManaged: true,
               source: dustRunId ? 'dust_document_extract' : 'deterministic_document_extract',

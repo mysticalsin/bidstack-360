@@ -89,7 +89,8 @@
   "requirementRow": {
     "pageRefAria": "在第 {{page}} 页找到",
     "confidenceAria": "AI 置信度：{{percent}}%",
-    "confidenceLabel": "置信度 {{percent}}%"
+    "confidenceLabel": "置信度 {{percent}}%",
+    "notAssessed": "未评估"
   },
   "adminRfp": {
     "eyebrow": "管理员",
@@ -101,5 +102,8 @@
     "ariaLabel": "此内容由 AI 辅助生成",
     "title": "AI 辅助草稿 — 发送前请审阅",
     "label": "AI 辅助草稿"
+  },
+  "compliance": {
+    "notAssessed": "未评估"
   }
 }

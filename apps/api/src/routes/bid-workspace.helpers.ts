@@ -80,7 +80,8 @@ export function serializeRequirement(row: {
   mandatory: boolean;
   priority: string;
   status: string;
-  confidenceBps: number;
+  confidenceBps: number | null;
+  assessmentStatus: string;
   ownerId: string | null;
   dueDate: Date | null;
   metadata: unknown;
@@ -101,6 +102,7 @@ export function serializeRequirement(row: {
     priority: row.priority as z.infer<typeof Requirement>['priority'],
     status: row.status as z.infer<typeof Requirement>['status'],
     confidenceBps: row.confidenceBps,
+    assessmentStatus: row.assessmentStatus as z.infer<typeof Requirement>['assessmentStatus'],
     ownerId: row.ownerId,
     dueDate: dateOnly(row.dueDate),
     metadata: jsonRecord(row.metadata),
@@ -119,6 +121,8 @@ export function serializeMatrixRow(row: {
   risk: string;
   responseStatus: string;
   answerDraft: string | null;
+  confidenceBps: number | null;
+  assessmentStatus: string;
   evidence: unknown;
   citations: unknown;
   dueDate: Date | null;
@@ -137,6 +141,10 @@ export function serializeMatrixRow(row: {
     risk: row.risk as z.infer<typeof ComplianceMatrixRow>['risk'],
     responseStatus: row.responseStatus,
     answerDraft: row.answerDraft,
+    confidenceBps: row.confidenceBps,
+    assessmentStatus: row.assessmentStatus as z.infer<
+      typeof ComplianceMatrixRow
+    >['assessmentStatus'],
     evidence: jsonArray(row.evidence),
     citations: jsonArray(row.citations),
     dueDate: dateOnly(row.dueDate),

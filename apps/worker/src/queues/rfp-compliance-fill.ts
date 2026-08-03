@@ -45,13 +45,21 @@ const ComplianceResult = z.object({
 });
 type ComplianceResult = z.infer<typeof ComplianceResult>;
 
+// What the worker persists: a parsed LLM verdict (ASSESSED) or the fallback
+// (UNAVAILABLE). The fallback deliberately carries NO verdict and a null
+// confidence — the old PARTIAL/0 made "the AI never ran" indistinguishable
+// from "the AI found partial compliance" (fusion Phase 6: unknown ≠ bad).
+type ComplianceAssessment =
+  | { assessmentStatus: 'ASSESSED'; verdict: ComplianceResult }
+  | { assessmentStatus: 'UNAVAILABLE'; confidence: null };
+
 // ─── Deterministic fallback ─────────────────────────────────────────────────
 
-function fallbackCompliance(): ComplianceResult {
+// Exported for the unknown-not-bad regression test (rfp-fallback-assessment.test.ts).
+export function fallbackCompliance(): ComplianceAssessment {
   return {
-    status: 'PARTIAL',
-    justification: 'AI assessment unavailable. Please complete manually.',
-    confidence: 0,
+    assessmentStatus: 'UNAVAILABLE',
+    confidence: null,
   };
 }
 
@@ -82,7 +90,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   const complianceAgentId =
     resolveAgentId(creds, 'complianceFill', process.env.DUST_RFP_COMPLIANCE_AGENT_ID) ??
     DEFAULT_COMPLIANCE_AGENT_ID;
-  let result: ComplianceResult;
+  let result: ComplianceAssessment;
 
   const userMessage = buildAgentUserMessage({
     template:
@@ -96,7 +104,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     rfpContent: requirementText,
   });
 
-  // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → PARTIAL fallback.
+  // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → UNAVAILABLE fallback.
   const completion = await runRfpCompletion({
     orgId,
     log,
@@ -113,7 +121,9 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   if (completion) {
     try {
       const p2 = ComplianceResult.safeParse(JSON.parse(coerceJsonObject(completion.text)));
-      result = p2.success ? p2.data : fallbackCompliance();
+      result = p2.success
+        ? { assessmentStatus: 'ASSESSED', verdict: p2.data }
+        : fallbackCompliance();
     } catch {
       result = fallbackCompliance();
     }
@@ -121,19 +131,39 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     result = fallbackCompliance();
   }
 
-  // WHY responseStatus + answerDraft: ComplianceMatrixRow schema does not have
-  // a justification, dustRunId, or assessedAt column. responseStatus holds the
-  // compliance verdict; answerDraft holds the AI-generated justification text.
-  await prisma.complianceMatrixRow.update({
-    where: { id: matrixItemId },
-    data: {
-      responseStatus: result.status,
-      answerDraft: result.justification,
-    },
-  });
+  if (result.assessmentStatus === 'ASSESSED') {
+    // WHY responseStatus + answerDraft: responseStatus holds the compliance
+    // verdict; answerDraft holds the AI-generated justification text.
+    // confidenceBps is the assessment's own confidence (previously discarded).
+    await prisma.complianceMatrixRow.update({
+      where: { id: matrixItemId },
+      data: {
+        responseStatus: result.verdict.status,
+        answerDraft: result.verdict.justification,
+        confidenceBps: result.verdict.confidence ?? null,
+        assessmentStatus: 'ASSESSED',
+      },
+    });
+  } else {
+    // Fallback: record only that assessment could not run. Deliberately does
+    // NOT write a fake PARTIAL verdict or 0 confidence — the row keeps its
+    // prior responseStatus and the UI renders "not assessed".
+    await prisma.complianceMatrixRow.update({
+      where: { id: matrixItemId },
+      data: {
+        assessmentStatus: 'UNAVAILABLE',
+        confidenceBps: null,
+      },
+    });
+  }
 
   log.info(
-    { orgId, orchestrationId, matrixItemId, status: result.status },
+    {
+      orgId,
+      orchestrationId,
+      matrixItemId,
+      status: result.assessmentStatus === 'ASSESSED' ? result.verdict.status : 'UNAVAILABLE',
+    },
     'rfp-compliance-fill: complete',
   );
 }

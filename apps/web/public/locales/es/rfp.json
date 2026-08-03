@@ -89,7 +89,8 @@
   "requirementRow": {
     "pageRefAria": "Encontrado en la página {{page}}",
     "confidenceAria": "Confianza de la IA: {{percent}}%",
-    "confidenceLabel": "{{percent}}% de confianza"
+    "confidenceLabel": "{{percent}}% de confianza",
+    "notAssessed": "Sin evaluar"
   },
   "adminRfp": {
     "eyebrow": "Administración",
@@ -101,5 +102,8 @@
     "ariaLabel": "Este contenido se generó con asistencia de IA",
     "title": "Borrador asistido por IA: revíselo antes de enviar",
     "label": "Borrador asistido por IA"
+  },
+  "compliance": {
+    "notAssessed": "Sin evaluar"
   }
 }

@@ -15,7 +15,8 @@ export interface CrewEvidenceRequirement {
   mandatory: boolean;
   priority: string;
   status: string;
-  confidenceBps: number;
+  // Null = no AI confidence exists (manual entry / assessment unavailable).
+  confidenceBps: number | null;
 }
 
 export interface CrewEvidenceSnapshot {
@@ -73,10 +74,13 @@ export function buildCrewEvidenceInput(
     `Extracted requirements (${snapshot.requirements.length} total, ${requirements.length} included):`,
     ...requirements.map((req, index) => {
       const mandatory = req.mandatory ? 'mandatory' : 'optional';
-      const confidence = Math.round(req.confidenceBps / 100);
+      // Null confidence must read as "not assessed" in the agent prompt —
+      // coercing it to 0% would tell agents the requirement is untrustworthy.
+      const confidence =
+        req.confidenceBps === null ? 'not assessed' : `${Math.round(req.confidenceBps / 100)}%`;
       return [
         `${index + 1}. [REQ:${req.id}] [DOC:${req.bidDocumentId ?? 'unknown'}] [CHUNK:${req.sourceChunkId ?? 'unknown'}]`,
-        `Type: ${req.requirementType}; priority: ${req.priority}; ${mandatory}; status: ${req.status}; confidence: ${confidence}%.`,
+        `Type: ${req.requirementType}; priority: ${req.priority}; ${mandatory}; status: ${req.status}; confidence: ${confidence}.`,
         `Text: ${clipInline(req.text, MAX_REQUIREMENT_CHARS)}`,
       ].join('\n');
     }),

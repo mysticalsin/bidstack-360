@@ -7,7 +7,7 @@ export interface Requirement {
   text: string;
   category: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
-  aiConfidenceBps: number; // 0-10000
+  aiConfidenceBps: number | null; // 0-10000; null = no AI confidence exists
   pageRef: number | null;
 }
 

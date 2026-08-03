@@ -1099,6 +1099,9 @@ model Proposal {
   qaScoreBps      Int?      @map("qa_score_bps")
   qaReviewedAt    DateTime? @map("qa_reviewed_at") @db.Timestamptz(6)
   qaIssues        Json?     @map("qa_issues") // [{severity, description, suggestion}]
+  // UNAVAILABLE = QA fallback ran (no AI provider); qaScoreBps stays null
+  // rather than a fake 0. Fusion Phase 6.
+  qaAssessmentStatus AssessmentStatus @default(PENDING) @map("qa_assessment_status")
 
   org          Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity  Opportunity?      @relation(fields: [opportunityId], references: [id])
@@ -1443,6 +1446,18 @@ enum ComplianceRowStatus {
   @@map("compliance_row_status")
 }
 
+// Fusion Phase 6 — "unknown stops meaning bad". Distinguishes a real AI
+// assessment (ASSESSED) from a fallback that could not run (UNAVAILABLE)
+// and work not yet attempted (PENDING). UNAVAILABLE must never render as
+// a 0 score. Values are uppercase to match the worker/API wire literals.
+enum AssessmentStatus {
+  ASSESSED
+  UNAVAILABLE
+  PENDING
+
+  @@map("assessment_status")
+}
+
 enum RfpRiskLevel {
   low
   medium
@@ -1612,7 +1627,10 @@ model Requirement {
   mandatory         Boolean           @default(false)
   priority          RfpRiskLevel      @default(medium)
   status            RequirementStatus @default(suggested)
-  confidenceBps     Int               @default(0) @map("confidence_bps")
+  // Nullable: null = no AI confidence exists (manual entry / assessment
+  // unavailable). 0 is a real score, not a sentinel. Fusion Phase 6.
+  confidenceBps     Int?              @map("confidence_bps")
+  assessmentStatus  AssessmentStatus  @default(PENDING) @map("assessment_status")
   ownerId           String?           @map("owner_id") @db.Uuid
   dueDate           DateTime?         @map("due_date") @db.Date
   metadata          Json              @default("{}")
@@ -1648,6 +1666,10 @@ model ComplianceMatrixRow {
   risk           RfpRiskLevel        @default(medium)
   responseStatus String              @default("not_started") @map("response_status") @db.VarChar(100)
   answerDraft    String?             @map("answer_draft")
+  // Confidence of the compliance-fill assessment itself (was previously
+  // discarded by the worker). Null until an assessment produces one.
+  confidenceBps    Int?             @map("confidence_bps")
+  assessmentStatus AssessmentStatus @default(PENDING) @map("assessment_status")
   evidence       Json                @default("[]")
   citations      Json                @default("[]")
   dueDate        DateTime?           @map("due_date") @db.Date

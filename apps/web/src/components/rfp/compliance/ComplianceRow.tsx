@@ -87,7 +87,10 @@ function ComplianceEditorInner({
 export function ComplianceRow({ row, onSave, isSaving, style }: ComplianceRowProps) {
   const { t } = useTranslation('rfp');
   const [isEditing, setIsEditing] = useState(false);
-  const confidencePct = Math.round(row.aiConfidenceBps / 100);
+  // Null confidence = no assessment produced one — render "not assessed",
+  // never a fake 0% (fusion Phase 6: unknown ≠ bad).
+  const confidencePct =
+    row.aiConfidenceBps === null ? null : Math.round(row.aiConfidenceBps / 100);
 
   function handleDone(html: string) {
     onSave(row.id, html);
@@ -141,13 +144,22 @@ export function ComplianceRow({ row, onSave, isSaving, style }: ComplianceRowPro
           // visible when autoFilled=true; it is not behind a toggle.
           <div className="flex flex-col items-end gap-0.5">
             <AiDisclosureBadge />
-            <span
-              className="text-[10px] text-[var(--fg-tertiary)]"
-              aria-label={`AI confidence: ${confidencePct}%`}
-            >
-              {confidencePct}% confidence
-            </span>
+            {confidencePct !== null && (
+              <span
+                className="text-[10px] text-[var(--fg-tertiary)]"
+                aria-label={`AI confidence: ${confidencePct}%`}
+              >
+                {confidencePct}% confidence
+              </span>
+            )}
           </div>
+        )}
+        {row.assessmentStatus === 'UNAVAILABLE' && (
+          // The AI fallback ran without an assessment — say so plainly instead
+          // of implying a 0% score or a PARTIAL verdict.
+          <span className="text-[10px] italic text-[var(--fg-tertiary)]">
+            {t('compliance.notAssessed', 'Not assessed')}
+          </span>
         )}
         {/* Only show the Edit toggle when not actively editing (Done is inside the editor) */}
         {!isEditing && (
