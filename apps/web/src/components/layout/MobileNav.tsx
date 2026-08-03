@@ -86,7 +86,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
               Polo PreSales
             </span>
             <span className="text-[10px] text-[var(--fg-tertiary)] font-normal leading-tight">
-              Creator: Tony
+              Mantu · Bid &amp; presales
             </span>
           </div>
         </div>

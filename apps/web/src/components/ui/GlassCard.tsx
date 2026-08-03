@@ -45,7 +45,7 @@ export function GlassCard({
 
   return (
     <motion.div
-      className={cn('glass-card dark:card-shimmer', paddingMap[padding], glowMap[glow], className)}
+      className={cn('glass-card', paddingMap[padding], glowMap[glow], className)}
       whileHover={
         hoverable && !reduced
           ? { y: -3, transition: { type: 'spring', stiffness: 400, damping: 25 } }

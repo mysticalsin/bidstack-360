@@ -4,9 +4,11 @@ import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 
+// WHY: geometry and material are theme-invariant (ADR 0002). Dark mode changes
+// colour only, through the token values (--surface-card, --shadow-xs, borders),
+// never radius, blur, or glow.
 const CARD_BASE =
-  'rounded-xl dark:rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-[var(--shadow-xs)] ' +
-  'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md dark:shadow-[var(--shadow-xs)] dark:inner-glow';
+  'rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-[var(--shadow-xs)]';
 
 /** Static, non-interactive card. Use for content blocks the user reads. */
 export function Card({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
@@ -38,7 +40,7 @@ export const InteractiveCard = forwardRef<HTMLDivElement, InteractiveCardProps>(
         transition={springSnap}
         className={cn(
           CARD_BASE,
-          'cursor-pointer transition-colors hover:border-[var(--border-default)] hover:shadow-[var(--shadow-sm)] dark:hover:border-[var(--border-glow-strong)] dark:hover:shadow-[var(--shadow-sm)]',
+          'cursor-pointer transition-colors hover:border-[var(--border-default)] hover:shadow-[var(--shadow-sm)] dark:hover:border-[var(--border-glow-strong)]',
           showFocusRing &&
             'focus-within:ring-2 focus-within:ring-[var(--brand-primary)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-page)]',
           className,

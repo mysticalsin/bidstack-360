@@ -60,14 +60,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={describedBy}
             aria-errormessage={errorId}
             className={cn(
-              'w-full rounded-lg dark:rounded-xl border bg-[var(--surface-card)] text-[var(--fg-primary)] transition-colors',
+              'w-full rounded-lg border bg-[var(--surface-card)] text-[var(--fg-primary)] transition-colors',
               'placeholder:text-[var(--fg-tertiary)]',
               'hover:border-[var(--border-strong)] dark:hover:border-[var(--border-glow-strong)]',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-page)] dark:focus-visible:shadow-[0_0_12px_rgba(168,85,247,0.15)]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-page)]',
               'disabled:cursor-not-allowed disabled:opacity-60',
               'read-only:bg-[var(--surface-sunken)] read-only:focus-visible:ring-0',
               'pointer-coarse:min-h-[44px]',
-              'dark:bg-[var(--surface-glass)] dark:backdrop-blur-sm',
               size === 'sm' ? 'px-3 py-1 text-xs' : 'px-3 py-2 text-sm',
               // Priority: error > valid > default (error can't appear green)
               hasError

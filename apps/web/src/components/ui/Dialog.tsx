@@ -20,8 +20,10 @@ export const DialogContent = forwardRef<
       <RadixDialog.Content
         ref={ref}
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-[min(560px,92vw)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl dark:rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none ' +
-            'dark:bg-[var(--surface-glass)] dark:backdrop-blur-xl dark:border-[var(--border-glow-strong)] dark:shadow-[0_0_40px_rgba(94,106,210,0.12),0_0_0_1px_rgba(94,106,210,0.2)]',
+          // WHY: geometry and material are theme-invariant (ADR 0002); dark
+          // varies colour only (border token below), never radius/blur/glow.
+          'fixed left-1/2 top-1/2 z-50 w-[min(560px,92vw)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none ' +
+            'dark:border-[var(--border-glow-strong)]',
           className,
         )}
         {...(!hasDesc ? { 'aria-describedby': undefined } : {})}

@@ -584,14 +584,6 @@ a {
   animation: gradient-shift 5s ease infinite;
 }
 
-/* Glassmorphism card surface with subtle border */
-[data-theme='dark'] .card-glass {
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-default);
-}
-
 .glass-menu {
   background: var(--surface-glass);
   backdrop-filter: blur(16px);
@@ -602,29 +594,6 @@ a {
 
 [data-theme='dark'] .glass-menu {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
-}
-
-/* Card with elevated violet glow on hover */
-[data-theme='dark'] .card-hover-glow {
-  transition:
-    box-shadow 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-[data-theme='dark'] .card-hover-glow:hover {
-  box-shadow:
-    0 0 20px var(--border-glow),
-    0 0 0 1px var(--border-glow-strong);
-  border-color: var(--border-glow-strong);
-}
-
-/* Pill-shaped buttons and badges */
-[data-theme='dark'] .pill {
-  border-radius: 9999px;
-}
-
-/* Subtle inner glow for elevated surfaces */
-[data-theme='dark'] .inner-glow {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* ---------- Ambient animation keyframes — dark mode only ---------- */
@@ -737,15 +706,6 @@ a {
   }
 }
 
-@keyframes card-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
 @keyframes spin-slow {
   0% {
     transform: rotate(0deg);
@@ -774,28 +734,6 @@ a {
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
-/* Card shimmer overlay */
-[data-theme='dark'] .card-shimmer {
-  position: relative;
-  overflow: hidden;
-}
-[data-theme='dark'] .card-shimmer::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent 40%,
-    rgba(255, 255, 255, 0.04) 50%,
-    transparent 60%
-  );
-  background-size: 200% 100%;
-  animation: card-shimmer 6s ease-in-out infinite;
-  animation-delay: 2s;
-  pointer-events: none;
-}
-
 /* Slow spin utility */
 [data-theme='dark'] .spin-slow {
   animation: spin-slow 20s linear infinite;
@@ -809,7 +747,6 @@ a {
   [data-theme='dark'] .ambient-float-delay-2,
   [data-theme='dark'] .ambient-float-delay-3,
   [data-theme='dark'] .pulse-glow,
-  [data-theme='dark'] .card-shimmer::after,
   [data-theme='dark'] .spin-slow {
     animation: none !important;
   }
@@ -1385,22 +1322,12 @@ a {
   }
 }
 
-/* Dark-mode sidebar overrides — pill nav items, violet glow */
-[data-theme='dark'] .sb-item {
-  border-radius: 999px;
-  margin: 2px 4px;
-}
-[data-theme='dark'] .sb-item:hover {
-  background: rgba(168, 85, 247, 0.08);
-  color: var(--fg-primary);
-}
+/* Dark-mode sidebar overrides — colour only (ADR 0002): geometry (radius,
+   margin, active rail) is identical to light; hover falls back to the base
+   rule whose tokens resolve to dark values. */
 [data-theme='dark'] .sb-item[aria-current='page'] {
   background: var(--brand-primary-tint);
   color: var(--brand-primary);
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.12);
-}
-[data-theme='dark'] .sb-item[aria-current='page']::before {
-  display: none;
 }
 [data-theme='dark'] .sb-item[aria-current='page'] .sb-badge {
   background: var(--brand-primary);

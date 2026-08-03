@@ -116,7 +116,7 @@ export function Toaster() {
           <button
             type="button"
             onClick={dismissAll}
-            className="rounded-md dark:rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)] shadow-[var(--shadow-sm)] hover:text-[var(--fg-primary)] dark:bg-[var(--surface-glass)] dark:backdrop-blur-md"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)] shadow-[var(--shadow-sm)] hover:text-[var(--fg-primary)]"
           >
             {t('toast.clearAll', 'Clear all ({{count}})', { count: items.length })}
           </button>
@@ -168,7 +168,7 @@ function ToastCard({ item }: { item: ToastItem }) {
       animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
       exit={reduced ? { opacity: 0 } : { opacity: 0, x: 40, scale: 0.98 }}
       transition={springModal}
-      className="pointer-events-auto overflow-hidden rounded-xl dark:rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] dark:bg-[var(--surface-glass)] dark:backdrop-blur-xl dark:border-[var(--border-glow-strong)]"
+      className="pointer-events-auto overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] dark:border-[var(--border-glow-strong)]"
     >
       <div className="flex items-start gap-3 p-3 pl-4">
         <div

@@ -99,11 +99,6 @@ export function Sidebar() {
               Polo PreSales
             </div>
             <div className="sb-tag">Mantu · Bid &amp; presales</div>
-            {!collapsed && (
-              <div className="text-[9px] font-semibold text-[rgba(30,50,90,0.75)] dark:text-gray-400/60 tracking-wider uppercase mt-0.5">
-                Creator: Tony
-              </div>
-            )}
           </div>
         </div>
 
@@ -161,15 +156,7 @@ export function Sidebar() {
                 </span>
               </>
             ) : (
-              <a
-                href="https://www.linkedin.com/in/tonywalteur/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-                style={{ color: 'var(--fg-tertiary)', textDecoration: 'underline' }}
-              >
-                Created by Tony Walteur
-              </a>
+              <span style={{ color: 'var(--fg-tertiary)' }}>Dust not connected</span>
             )}
           </div>
         </div>
