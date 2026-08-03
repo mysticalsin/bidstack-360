@@ -1,0 +1,178 @@
+{
+  "$schema": "../schemas/buttons.schema.json",
+  "$meta": {
+    "version": "1.0.0",
+    "locale": "en-US",
+    "i18n_status": "ready",
+    "owner": "Design Curator (Agent #5)",
+    "rules": {
+      "max_words_default": 2,
+      "max_words_destructive_qualified": 3,
+      "case": "sentence",
+      "no_emoji": true,
+      "no_exclamation": true
+    },
+    "notes": "Source of truth for every button label in BidStack 360°. M9 wires an eslint rule that warns on raw <Button>Save</Button> strings and suggests <Button>{copy.buttons.actions.save}</Button>."
+  },
+
+  "actions": {
+    "save": "Save",
+    "save_changes": "Save changes",
+    "save_draft": "Save draft",
+    "save_and_continue": "Save and continue",
+    "update": "Update",
+    "apply": "Apply",
+    "submit": "Submit",
+    "send": "Send",
+    "send_email": "Send email",
+    "publish": "Publish",
+    "schedule": "Schedule",
+    "import": "Import",
+    "export": "Export",
+    "duplicate": "Duplicate",
+    "convert": "Convert",
+    "convert_to_opportunity": "Convert to opportunity",
+    "qualify": "Qualify",
+    "disqualify": "Disqualify",
+    "mark_won": "Mark won",
+    "mark_lost": "Mark lost",
+    "move_to_stage": "Move to stage",
+    "assign": "Assign",
+    "reassign": "Reassign",
+    "share": "Share",
+    "copy_link": "Copy link",
+    "download": "Download",
+    "upload": "Upload",
+    "refresh": "Refresh"
+  },
+
+  "creation": {
+    "new_lead": "New lead",
+    "new_opportunity": "New opportunity",
+    "new_contact": "New contact",
+    "new_account": "New account",
+    "new_task": "New task",
+    "new_note": "New note",
+    "new_report": "New report",
+    "new_view": "New view",
+    "new_workflow": "New workflow",
+    "add_a_lead": "Add a lead",
+    "add_a_contact": "Add a contact",
+    "add_a_task": "Add a task",
+    "add_a_note": "Add a note",
+    "add_a_member": "Add a member",
+    "add_a_field": "Add a field"
+  },
+
+  "navigation": {
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "continue": "Continue",
+    "close": "Close",
+    "open": "Open",
+    "view": "View",
+    "view_all": "View all",
+    "view_details": "View details",
+    "edit": "Edit",
+    "manage": "Manage",
+    "settings": "Settings",
+    "go_to_dashboard": "Go to dashboard"
+  },
+
+  "destructive": {
+    "delete": "Delete",
+    "delete_permanently": "Delete permanently",
+    "remove": "Remove",
+    "discard": "Discard",
+    "discard_changes": "Discard changes",
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "disconnect": "Disconnect",
+    "revoke": "Revoke",
+    "end_session": "End session",
+    "reset": "Reset",
+    "clear": "Clear",
+    "clear_all": "Clear all",
+    "clear_filters": "Clear filters"
+  },
+
+  "confirmation": {
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "got_it": "Got it",
+    "i_understand": "I understand",
+    "okay": "Okay",
+    "done": "Done"
+  },
+
+  "negative": {
+    "cancel": "Cancel",
+    "dismiss": "Dismiss",
+    "skip": "Skip",
+    "not_now": "Not now",
+    "ignore": "Ignore"
+  },
+
+  "recovery": {
+    "retry": "Retry",
+    "retry_now": "Retry now",
+    "reload": "Reload",
+    "try_again": "Try again",
+    "contact_support": "Contact support",
+    "report_issue": "Report issue",
+    "refresh_and_merge": "Refresh and merge",
+    "work_offline": "Work offline"
+  },
+
+  "auth": {
+    "sign_in": "Sign in",
+    "sign_up": "Sign up",
+    "sign_out": "Sign out",
+    "forgot_password": "Forgot password",
+    "reset_password": "Reset password",
+    "magic_link": "Send magic link",
+    "verify": "Verify"
+  },
+
+  "filters": {
+    "filter": "Filter",
+    "add_filter": "Add filter",
+    "apply_filters": "Apply filters",
+    "save_view": "Save view",
+    "saved_views": "Saved views",
+    "reset_view": "Reset view",
+    "sort": "Sort",
+    "group": "Group"
+  },
+
+  "selection": {
+    "select_all": "Select all",
+    "deselect_all": "Deselect all",
+    "select_none": "Select none",
+    "select": "Select",
+    "choose": "Choose",
+    "browse": "Browse"
+  },
+
+  "ai": {
+    "draft_with_dust": "Draft with Dust",
+    "summarize_with_dust": "Summarize with Dust",
+    "enrich_with_dust": "Enrich with Dust",
+    "prep_with_dust": "Prep with Dust",
+    "review_draft": "Review draft",
+    "accept_suggestion": "Accept",
+    "reject_suggestion": "Reject",
+    "regenerate": "Regenerate"
+  },
+
+  "integrations": {
+    "connect": "Connect",
+    "reconnect": "Reconnect",
+    "test_connection": "Test connection",
+    "authorize": "Authorize",
+    "browse_integrations": "Browse integrations",
+    "open_integrations": "Open integrations"
+  }
+}

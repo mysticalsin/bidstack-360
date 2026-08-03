@@ -1,0 +1,201 @@
+{
+  "$schema": "../schemas/empty-states.schema.json",
+  "$meta": {
+    "version": "1.0.0",
+    "locale": "en-US",
+    "i18n_status": "ready",
+    "owner": "Design Curator (Agent #5)",
+    "rules": {
+      "title_max_words": 8,
+      "body_max_words": 20,
+      "cta_label_max_words": 3
+    },
+    "notes": "Source of truth for the 30 M4 empty/loading/error state presets. M4 components import keys by name; M10 swaps en-US strings for ICU MessageFormat catalogs."
+  },
+
+  "no_leads_yet": {
+    "title": "No leads yet",
+    "body": "Add a lead manually or connect a source to start prospecting.",
+    "cta_primary": { "label": "Add a lead", "action": "/leads/new" },
+    "cta_secondary": { "label": "Connect a source", "action": "/integrations" }
+  },
+
+  "no_leads_match_filter": {
+    "title": "No leads match your filters",
+    "body": "Adjust the filters above or clear them to see all leads.",
+    "cta_primary": { "label": "Clear filters", "action": "filters.clear" }
+  },
+
+  "no_opportunities_yet": {
+    "title": "No opportunities yet",
+    "body": "Track your first bid to see pipeline metrics and forecasts here.",
+    "cta_primary": { "label": "New opportunity", "action": "/opportunities/new" },
+    "cta_secondary": { "label": "Import from CSV", "action": "/opportunities/import" }
+  },
+
+  "no_opportunities_in_stage": {
+    "title": "Nothing in this stage",
+    "body": "Drag an opportunity here or create a new one.",
+    "cta_primary": { "label": "New opportunity", "action": "/opportunities/new" }
+  },
+
+  "no_contacts": {
+    "title": "No contacts yet",
+    "body": "Add contacts to attach decision-makers to your accounts and opportunities.",
+    "cta_primary": { "label": "Add a contact", "action": "/contacts/new" },
+    "cta_secondary": { "label": "Import from CSV", "action": "/contacts/import" }
+  },
+
+  "no_companies": {
+    "title": "No accounts yet",
+    "body": "Add an account to start tracking opportunities, contacts, and activity.",
+    "cta_primary": { "label": "Add an account", "action": "/companies/new" }
+  },
+
+  "no_tasks": {
+    "title": "No tasks yet",
+    "body": "Capture follow-ups to keep deals moving and nothing slipping.",
+    "cta_primary": { "label": "Add a task", "action": "/tasks/new" }
+  },
+
+  "no_tasks_due_today": {
+    "title": "Nothing due today",
+    "body": "Inbox zero on today. Plan tomorrow or pull from this week.",
+    "cta_primary": { "label": "View this week", "action": "/tasks?range=week" }
+  },
+
+  "no_activity": {
+    "title": "No activity yet",
+    "body": "Emails, calls, meetings, and stage changes appear here as they happen.",
+    "cta_primary": { "label": "Log an activity", "action": "activity.log" }
+  },
+
+  "no_notes": {
+    "title": "No notes yet",
+    "body": "Capture a meeting summary or context. Notes appear chronologically here.",
+    "cta_primary": { "label": "Add a note", "action": "note.new" }
+  },
+
+  "no_files": {
+    "title": "No files yet",
+    "body": "Upload RFPs, proposals, and supporting documents to keep them in one place.",
+    "cta_primary": { "label": "Upload a file", "action": "file.upload" }
+  },
+
+  "no_search_results": {
+    "title": "No results",
+    "body": "We couldn't find anything matching your search. Try different keywords.",
+    "cta_primary": { "label": "Clear search", "action": "search.clear" }
+  },
+
+  "no_reports": {
+    "title": "No reports yet",
+    "body": "Build a report to track pipeline, conversion, or team performance.",
+    "cta_primary": { "label": "New report", "action": "/reports/new" }
+  },
+
+  "no_team_members": {
+    "title": "No team members yet",
+    "body": "Invite teammates to collaborate on accounts, opportunities, and bids.",
+    "cta_primary": { "label": "Invite a member", "action": "/settings/team/invite" }
+  },
+
+  "no_integrations": {
+    "title": "No integrations connected",
+    "body": "Connect email, calendar, or messaging to bring activity into BidStack.",
+    "cta_primary": { "label": "Browse integrations", "action": "/integrations" }
+  },
+
+  "no_notifications": {
+    "title": "No new notifications",
+    "body": "You're all caught up. Updates appear here as they happen.",
+    "cta_primary": null
+  },
+
+  "no_unread_messages": {
+    "title": "Inbox zero",
+    "body": "No unread messages. We'll show new ones here as they arrive.",
+    "cta_primary": null
+  },
+
+  "no_audits": {
+    "title": "No audit entries",
+    "body": "Workspace changes will appear here as they happen.",
+    "cta_primary": null
+  },
+
+  "no_data_permission_denied": {
+    "title": "You don't have access",
+    "body": "Your role doesn't include permission for this view. Ask the owner or an Admin.",
+    "cta_primary": { "label": "Go to dashboard", "action": "/" }
+  },
+
+  "error_network": {
+    "title": "Lost connection to the server",
+    "body": "Your changes are saved locally. We'll retry in 30 seconds.",
+    "cta_primary": { "label": "Retry now", "action": "refetch" },
+    "cta_secondary": { "label": "Work offline", "action": "banner.dismiss" }
+  },
+
+  "error_server": {
+    "title": "Server error",
+    "body": "We've logged it. Try again in a minute. Reference: {error_id}.",
+    "cta_primary": { "label": "Retry", "action": "refetch" },
+    "cta_secondary": { "label": "Contact support", "action": "support.email" }
+  },
+
+  "error_validation": {
+    "title": "Some fields need attention",
+    "body": "Review the highlighted fields below and resubmit when ready.",
+    "cta_primary": { "label": "Review fields", "action": "scroll.first_error" }
+  },
+
+  "error_rate_limited": {
+    "title": "Rate limit hit",
+    "body": "You've made too many requests. Resume in {retry_after} seconds.",
+    "cta_primary": { "label": "Wait", "action": "noop" }
+  },
+
+  "error_maintenance": {
+    "title": "Scheduled maintenance",
+    "body": "BidStack is being updated. Expected back by {eta}.",
+    "cta_primary": { "label": "Check status", "action": "https://status.bidstack.com" }
+  },
+
+  "loading_full_page": {
+    "title": "Loading…",
+    "body": null,
+    "cta_primary": null
+  },
+
+  "loading_card": {
+    "title": null,
+    "body": null,
+    "cta_primary": null
+  },
+
+  "loading_table": {
+    "title": null,
+    "body": null,
+    "cta_primary": null
+  },
+
+  "loading_detail": {
+    "title": null,
+    "body": null,
+    "cta_primary": null
+  },
+
+  "onboarding_first_deal": {
+    "title": "Track your first bid",
+    "body": "Add an opportunity to unlock pipeline metrics, forecasts, and stage tracking.",
+    "cta_primary": { "label": "New opportunity", "action": "/opportunities/new" },
+    "cta_secondary": { "label": "Take a tour", "action": "tour.start" }
+  },
+
+  "success_empty_inbox_zero": {
+    "title": "Inbox zero — nice work",
+    "body": "Nothing to action right now. We'll show new items here as they arrive.",
+    "cta_primary": null
+  }
+}
