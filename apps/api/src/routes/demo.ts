@@ -5,11 +5,16 @@
  * `POST /demo/session` is the passwordless sign-in: an email in, a signed demo
  * Bearer token out (the SPA then sends it as `Authorization: Bearer`). Tightly
  * rate-limited because each new email provisions + seeds a fresh org.
+ *
+ * The route is public, but an `Authorization: Bearer demo_…` header is still
+ * read when present: it is the resume proof that lets a returning visitor back
+ * into their OWN workspace. Without it an already-claimed email is refused
+ * (409) rather than taken over — SEC-1.
  */
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { isDemoMode, provisionDemoSession } from '../plugins/demo-auth.js';
+import { DEMO_EMAIL_CLAIMED, isDemoMode, provisionDemoSession } from '../plugins/demo-auth.js';
 
 const SessionBody = z.object({
   email: z.string().email().max(200),
@@ -44,12 +49,23 @@ export const demoRoutes: FastifyPluginAsync = async (server) => {
     },
     async (req, reply) => {
       const { email, name } = req.body as z.infer<typeof SessionBody>;
+      const header = req.headers.authorization ?? '';
+      const resumeProof = header.startsWith('Bearer ') ? header.slice(7) : null;
       try {
-        return await provisionDemoSession(email, name);
+        return await provisionDemoSession(email, name, resumeProof);
       } catch (err) {
-        if ((err as Error).message === 'DEMO_AT_CAPACITY') {
+        const message = (err as Error).message;
+        if (message === 'DEMO_AT_CAPACITY') {
           return reply.serviceUnavailable(
             'The demo is at capacity right now — please try again shortly.',
+          );
+        }
+        if (message === DEMO_EMAIL_CLAIMED) {
+          // Deliberately generic + non-confirming: this is the only response an
+          // email-guessing attacker sees, so it must not become an oracle for
+          // "this address has a demo workspace".
+          return reply.conflict(
+            'That email cannot start a new demo workspace right now — try another address.',
           );
         }
         throw err;

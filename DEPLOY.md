@@ -62,6 +62,7 @@ tenant. Stale demo orgs auto-reap after `DEMO_ORG_TTL_HOURS`.
 | `PUBLIC_BASE_URL`             | `https://<your>.vercel.app`          | **CORS allowlist** — set after Part B, then redeploy api                                           |
 | `DEMO_MODE`                   | `true`                               | arms the public passwordless door                                                                  |
 | `DEMO_SESSION_SECRET`         | _(generate: `openssl rand -hex 32`)_ | signs demo session tokens                                                                          |
+| `DEMO_PUBLIC_DEPLOYMENT_ACK`  | `true`                               | **required** with `DEMO_MODE=true` + `NODE_ENV=production` — the api refuses to boot without it    |
 | `BIDSTACK_JOB_SIGNING_SECRET` | _(generate: `openssl rand -hex 32`)_ | **same value on api + worker** — signs Apollo enrich jobs                                          |
 | `APOLLO_API_KEY`              | _(your Apollo key)_                  | optional; enables **live** enrichment (employee count, revenue)                                    |
 | `DEMO_AUTO_ENRICH`            | `false`                              | set `true` to auto-refresh each visitor's accounts from Apollo (uses Apollo credits)               |

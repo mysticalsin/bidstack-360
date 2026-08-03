@@ -12,6 +12,12 @@
  * tokens (HMAC-SHA256), matching the app's existing `Authorization: Bearer`
  * model — there is no cookie layer to hang an httpOnly session on. Stale demo
  * orgs are reaped lazily on each new sign-in (no cron needed).
+ *
+ * SEC-1: an email is a guess, not a credential. Re-entering an ALREADY
+ * provisioned workspace therefore requires a resume proof — a demo token this
+ * server signed for that exact visitor. Without it the request is refused
+ * (DEMO_EMAIL_CLAIMED) instead of being handed an admin session for someone
+ * else's workspace and their uploaded documents.
  */
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 
@@ -55,8 +61,12 @@ export function signDemoToken(userId: string, orgId: string): string {
   return `demo_${body}.${sig}`;
 }
 
-/** Verify + decode a demo token. Returns null on bad signature or expiry. */
-export function verifyDemoToken(token: string): TokenPayload | null {
+/**
+ * Verify the HMAC + shape of a demo token. `allowExpired` is used ONLY by the
+ * resume-proof check below (re-entry to a workspace the caller already held a
+ * token for); request authentication always runs the strict path.
+ */
+function decodeDemoToken(token: string, allowExpired = false): TokenPayload | null {
   if (!token.startsWith('demo_')) return null;
   const rest = token.slice('demo_'.length);
   const dot = rest.indexOf('.');
@@ -75,9 +85,15 @@ export function verifyDemoToken(token: string): TokenPayload | null {
   } catch {
     return null;
   }
-  if (typeof payload.exp !== 'number' || payload.exp < Math.floor(Date.now() / 1000)) return null;
+  if (typeof payload.exp !== 'number') return null;
+  if (!allowExpired && payload.exp < Math.floor(Date.now() / 1000)) return null;
   if (typeof payload.u !== 'string' || typeof payload.o !== 'string') return null;
   return payload;
+}
+
+/** Verify + decode a demo token. Returns null on bad signature or expiry. */
+export function verifyDemoToken(token: string): TokenPayload | null {
+  return decodeDemoToken(token);
 }
 
 /** Resolve a demo Bearer token to an AuthContext (called by the auth plugin). */
@@ -148,41 +164,77 @@ export interface DemoSession {
 }
 
 /**
- * Re-signin lookup: resolve a visitor already provisioned under a demo org by
- * email, so they land back in their own workspace rather than spawning a
- * duplicate (and colliding on the unique User.email index). Returns null when
- * the email has no demo org yet.
+ * Raised when the email already owns a demo workspace and the caller cannot
+ * prove it is theirs. Fail-closed: no session is minted (SEC-1).
  */
-async function findExistingDemoSession(normalizedEmail: string): Promise<DemoSession | null> {
-  const existing = await prisma.user.findFirst({
-    where: { email: normalizedEmail, org: { clerkOrg: { startsWith: DEMO_ORG_PREFIX } } },
+export const DEMO_EMAIL_CLAIMED = 'DEMO_EMAIL_CLAIMED';
+
+/**
+ * Re-signin lookup: resolve a visitor already provisioned under a demo org by
+ * email. Used only to decide between "resume with proof" and "refuse" — the
+ * email alone never mints a session. Returns null when the email has no demo
+ * org yet (the caller then provisions a fresh one).
+ */
+async function findDemoVisitor(
+  normalizedEmail: string,
+): Promise<{ id: string; orgId: string } | null> {
+  return prisma.user.findFirst({
+    where: {
+      email: normalizedEmail,
+      deletedAt: null,
+      org: { clerkOrg: { startsWith: DEMO_ORG_PREFIX } },
+    },
     select: { id: true, orgId: true },
   });
-  if (!existing) return null;
-  return {
-    token: signDemoToken(existing.id, existing.orgId),
-    email: normalizedEmail,
-    orgId: existing.orgId,
-  };
 }
 
 /**
- * Provision (or reuse) a demo org for `email` and return a signed session token.
- * Re-signing in with the same email returns to the same workspace; otherwise a
- * fresh org is created and seeded with the curated dataset.
+ * A resume proof is a demo token THIS server signed for THIS visitor. Expiry is
+ * tolerated: an expired token still proves the caller once held the session, and
+ * the workspace itself dies with DEMO_ORG_TTL_HOURS. Signature, user and org
+ * must all match — a forged or foreign token proves nothing.
+ */
+function isResumeProof(
+  proof: string | null | undefined,
+  visitor: { id: string; orgId: string },
+): boolean {
+  if (!proof) return false;
+  const payload = decodeDemoToken(proof, true);
+  return payload !== null && payload.u === visitor.id && payload.o === visitor.orgId;
+}
+
+/**
+ * Provision (or resume) a demo org for `email` and return a signed session token.
  *
- * Provisioning is atomic + idempotent:
+ * A NEW email always gets a fresh seeded org. An email that already has one is
+ * only re-entered when `resumeProof` (the caller's existing demo Bearer token)
+ * matches that visitor — otherwise DEMO_EMAIL_CLAIMED is thrown, because the
+ * seeded visitor is an org admin and their workspace holds whatever they
+ * uploaded.
+ *
+ * Provisioning is atomic:
  *  - org.create + seedOrgData run in one interactive transaction, so a failed
  *    seed rolls back the org (no orphaned empty workspace).
  *  - a concurrent sign-in that wins the User.email unique index surfaces P2002;
- *    we treat that as "already provisioned" and return the existing session.
+ *    the loser resumes only if it can prove ownership, else it is refused.
  */
-export async function provisionDemoSession(email: string, name?: string): Promise<DemoSession> {
+export async function provisionDemoSession(
+  email: string,
+  name?: string,
+  resumeProof?: string | null,
+): Promise<DemoSession> {
   const normalized = email.trim().toLowerCase();
   await reapStaleDemoOrgs();
 
-  const existing = await findExistingDemoSession(normalized);
-  if (existing) return existing;
+  const existing = await findDemoVisitor(normalized);
+  if (existing) {
+    if (!isResumeProof(resumeProof, existing)) throw new Error(DEMO_EMAIL_CLAIMED);
+    return {
+      token: signDemoToken(existing.id, existing.orgId),
+      email: normalized,
+      orgId: existing.orgId,
+    };
+  }
 
   // Capacity guard — keeps a public demo from being used to mass-create orgs.
   const maxOrgs = Number(process.env.DEMO_MAX_ORGS) || 500;
@@ -210,10 +262,18 @@ export async function provisionDemoSession(email: string, name?: string): Promis
     );
   } catch (err) {
     // A concurrent sign-in already provisioned this visitor and won the
-    // User.email unique index — return that session instead of failing.
+    // User.email unique index. Same rule as above: resume only on proof, so a
+    // race cannot be used as a side door into an existing workspace.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      const raced = await findExistingDemoSession(normalized);
-      if (raced) return raced;
+      const raced = await findDemoVisitor(normalized);
+      if (raced) {
+        if (!isResumeProof(resumeProof, raced)) throw new Error(DEMO_EMAIL_CLAIMED, { cause: err });
+        return {
+          token: signDemoToken(raced.id, raced.orgId),
+          email: normalized,
+          orgId: raced.orgId,
+        };
+      }
     }
     throw err;
   }
