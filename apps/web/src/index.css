@@ -371,6 +371,7 @@
   --color-fg-secondary: var(--fg-secondary);
   --color-fg-tertiary: var(--fg-tertiary);
   --color-fg-muted: var(--fg-muted);
+  --color-fg-inverted: var(--fg-inverted);
   --color-fg-on-brand: var(--fg-on-brand);
 
   --color-border-subtle: var(--border-subtle);
@@ -532,12 +533,22 @@ select:focus-visible {
   }
 }
 
-/* Min 44×44 touch targets on interactive elements (Rule WCAG 2.5.5 AA) */
-button,
-[role='button'],
-a {
-  min-height: 44px;
-  min-width: 44px;
+/* Min 44×44 touch targets on interactive elements (Rule WCAG 2.5.5 AA).
+   Scoped to coarse pointers — the same query that backs the `pointer-coarse`
+   custom variant declared at the top of this file. Unconditionally, it inflated
+   every icon button and inline link on mouse-driven desktops and made dense
+   table rows impossible; 2.5.5 is about finger input, and fine pointers are
+   held to the AA-level 2.5.8 (24×24) floor, which our h-8/h-9 controls clear.
+   Written as a raw @media rather than `@variant pointer-coarse { … }`: the
+   Tailwind at-rule form is for utility-bearing rules and silently DROPS a
+   plain-CSS block wrapped at the top level (verified in the built bundle). */
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* Touch devices: always show row actions that are normally hover-only.
