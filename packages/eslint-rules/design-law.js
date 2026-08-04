@@ -5,7 +5,7 @@
 // BIDCRM-design per fusion-validation Amendment 3/4: adopt the existing lint
 // chassis, don't build cold).
 //
-// Three rules, exported as one plugin object:
+// Four rules, exported as one plugin object:
 //
 //   no-theme-variant-geometry  (error) — bans `dark:rounded-*`, `dark:shadow-*`,
 //     `dark:backdrop-*` (any variant chain ending in those utilities). The law:
@@ -18,6 +18,19 @@
 //     the 18-file graft rewrites shadcn names to BidStack names so "card
 //     background" never gets two legal spellings). Zero of these names exist
 //     in BidStack's token bridge — any use silently renders unstyled.
+//
+//   no-arbitrary-geometry  (error) — bans LITERAL arbitrary geometry in class
+//     strings: `rounded-[28px]`, `p-[13px]`, `shadow-[0_8px_40px_rgba(...)]`.
+//     Shape, elevation and spacing come off the scale (--radius-*, --shadow-*,
+//     Tailwind's 4px spacing rhythm) so the 18-file graft cannot smuggle the
+//     CRM's 5px-radius / bespoke-shadow rhythm in one class at a time. An
+//     arbitrary value that REFERENCES a token — `shadow-[var(--shadow-md)]`,
+//     `rounded-[var(--radius-lg)]` — is the sanctioned form and is allowed:
+//     Tailwind has no `shadow-md` bound to our token, so 74 of the 89
+//     arbitrary-geometry sites in apps/web are already written that way.
+//     Positioning (`top-[calc(100%+6px)]`), sizing (`min-h-[44px]`,
+//     `w-[280px]`) and type (`text-[11px]`) are deliberately OUT of scope —
+//     they have no scale to fall back to and are conventional here.
 //
 //   no-raw-hex-in-classname  (warn) — flags hex colours inside Tailwind
 //     arbitrary values (`bg-[#123456]`). Warn, not error: pre-existing debt
@@ -44,6 +57,7 @@
 //     rules: {
 //       'bidstack-design/no-theme-variant-geometry': 'error',
 //       'bidstack-design/no-foreign-token-vocabulary': 'error',
+//       'bidstack-design/no-arbitrary-geometry': 'error',
 //       'bidstack-design/no-raw-hex-in-classname': 'warn',
 //     },
 //   },
@@ -78,6 +92,22 @@ const FOREIGN_TOKEN_RE = new RegExp(
   'g',
 );
 
+// Tailwind arbitrary values on the GEOMETRY utilities only — radius, shadow,
+// and the padding/margin/gap rhythm. Anchored on a class boundary
+// (start-of-string, whitespace, quote, or a variant colon) with an optional
+// leading `-` for negative spacing, so `top-[15vh]` and `backdrop-blur-[2px]`
+// never match on their trailing `p-[`/`r-[` fragment.
+//
+// Group 1 = the full offending class (for the message), group 2 = the value
+// inside the brackets (checked against TOKEN_REFERENCE_RE below).
+const ARBITRARY_GEOMETRY_RE =
+  /(?:^|[\s:'"`])(-?(?:rounded(?:-[a-z]{1,2})?|shadow|p[xytrbles]?|m[xytrbles]?|gap(?:-[xy])?|space-[xy])-\[([^\]]*)\])/g;
+
+// The sanctioned escape: an arbitrary value that resolves to a token. This is
+// how BidStack spells elevation everywhere (`shadow-[var(--shadow-md)]`) —
+// Tailwind's own shadow scale is not bound to our tokens.
+const TOKEN_REFERENCE_RE = /var\(\s*--/;
+
 // Tailwind arbitrary-value hex: `bg-[#2c4bff]`, `border-[#fff]`, etc. The
 // surrounding brackets keep plain data strings like '#2c4bff' (chart configs,
 // tests) out of scope — only class syntax matches.
@@ -108,11 +138,16 @@ function stringScanner(check) {
   };
 }
 
-/** Report every regex match in `text` against `node` with the match as data. */
-function reportMatches(context, node, text, regex, messageId, group = 0) {
+/**
+ * Report every regex match in `text` against `node` with the match as data.
+ * `skip` (optional) receives the whole match array so a rule can whitelist
+ * specific shapes (e.g. arbitrary values that reference a token).
+ */
+function reportMatches(context, node, text, regex, messageId, group = 0, skip) {
   regex.lastIndex = 0;
   let m;
   while ((m = regex.exec(text)) !== null) {
+    if (skip && skip(m)) continue;
     context.report({ node, messageId, data: { match: m[group] } });
   }
 }
@@ -164,6 +199,31 @@ const noForeignTokenVocabulary = {
 };
 
 /** @type {import('eslint').Rule.RuleModule} */
+const noArbitraryGeometry = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        'Disallow literal arbitrary geometry (rounded-[28px], p-[13px], shadow-[0_8px_40px_…]) — radius, elevation and spacing come off the scale. Token references (shadow-[var(--shadow-md)]) are allowed.',
+      category: 'Best Practices',
+      recommended: false,
+    },
+    schema: [],
+    messages: {
+      arbitraryGeometry:
+        'Literal arbitrary geometry "{{ match }}". Radius, elevation and spacing come off the scale — use rounded-md/lg/xl, the p-/m-/gap- 4px rhythm, or reference a token (shadow-[var(--shadow-md)]). Off-scale geometry is how a foreign design system arrives one class at a time (ADR 0002).',
+    },
+  },
+  create(context) {
+    return stringScanner((node, text) => {
+      reportMatches(context, node, text, ARBITRARY_GEOMETRY_RE, 'arbitraryGeometry', 1, (m) =>
+        TOKEN_REFERENCE_RE.test(m[2]),
+      );
+    });
+  },
+};
+
+/** @type {import('eslint').Rule.RuleModule} */
 const noRawHexInClassname = {
   meta: {
     type: 'suggestion',
@@ -190,6 +250,7 @@ export default {
   rules: {
     'no-theme-variant-geometry': noThemeVariantGeometry,
     'no-foreign-token-vocabulary': noForeignTokenVocabulary,
+    'no-arbitrary-geometry': noArbitraryGeometry,
     'no-raw-hex-in-classname': noRawHexInClassname,
   },
 };

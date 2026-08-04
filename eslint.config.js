@@ -166,9 +166,37 @@ export default tseslint.config(
     rules: {
       'bidstack-design/no-theme-variant-geometry': 'error',
       'bidstack-design/no-foreign-token-vocabulary': 'error',
+      'bidstack-design/no-arbitrary-geometry': 'error',
       // warn (not error): pre-existing hex debt in login Hero/DemoSignIn and
       // TerritoryPanels — upgrade once those migrate to tokens.
       'bidstack-design/no-raw-hex-in-classname': 'warn',
+    },
+  },
+
+  // 6a-bis. Legacy literal-geometry debt, quarantined so no-arbitrary-geometry
+  // can land at 'error' for everything new (the table-kit graft included)
+  // without turning the green baseline red. Measured, not guessed: 89
+  // arbitrary-geometry class sites exist in apps/web/src, 74 of which already
+  // reference a token and are legal. These 9 files hold the remaining 15
+  // literals — decorative login/hero chrome (rounded-[28px], rounded-[2rem],
+  // bespoke drop shadows) plus three off-scale spacing values. Same precedent
+  // as no-raw-hex-in-classname above: quarantine the debt, don't weaken the
+  // law. Delete an entry as its file migrates to the scale; delete the block
+  // when the list empties.
+  {
+    files: [
+      'apps/web/src/components/charts/ChartContainer.tsx', // -m-[8px] p-[8px]
+      'apps/web/src/components/layout/CurrencySelector.tsx', // inset highlight shadow
+      'apps/web/src/components/login/BottomLeftCard.tsx', // rounded-[1.2/1.5/2.2rem]
+      'apps/web/src/components/login/BottomRightCorner.tsx', // rounded-tl-[1.5/2/3.5rem]
+      'apps/web/src/components/login/DemoSignIn.tsx', // shadow-[0_8px_40px_rgba(…)]
+      'apps/web/src/components/login/Hero.tsx', // rounded-[2rem] + literal shadow
+      'apps/web/src/components/rfp/shared/PipelineProgress.tsx', // mt-[-14px]
+      'apps/web/src/pages/audit-log/AuditLogHero.tsx', // rounded-[28px]
+      'apps/web/src/pages/integrations/IntegrationHero.tsx', // rounded-[28px]
+    ],
+    rules: {
+      'bidstack-design/no-arbitrary-geometry': 'warn',
     },
   },
 
