@@ -209,6 +209,11 @@ model Org {
   // Sales toolkits — stored collateral (decks/templates/battle-cards), SharePoint-sourced or manual
   salesToolkits SalesToolkit[]
 
+  // Round 2 — BidFact ledger (agent proposals + their citations and decisions)
+  bidFacts         BidFact[]
+  bidFactCitations BidFactCitation[]
+  bidFactDecisions BidFactDecision[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -509,6 +514,7 @@ model Opportunity {
   requirements         Requirement[]
   complianceMatrixRows ComplianceMatrixRow[]
   reviewIssues         ReviewIssue[]
+  bidFacts             BidFact[]
   competitorInsights   CompetitorInsight[]
   approvalGates        ApprovalGate[]
   submissionPackages   SubmissionPackage[]
@@ -1094,11 +1100,11 @@ model Proposal {
   humanReviewRequired Boolean   @default(true) @map("human_review_required")
 
   // Wave 9b: Proposal compilation + QA review fields
-  compiledContent String?   @map("compiled_content") @db.Text
-  compiledAt      DateTime? @map("compiled_at") @db.Timestamptz(6)
-  qaScoreBps      Int?      @map("qa_score_bps")
-  qaReviewedAt    DateTime? @map("qa_reviewed_at") @db.Timestamptz(6)
-  qaIssues        Json?     @map("qa_issues") // [{severity, description, suggestion}]
+  compiledContent    String?          @map("compiled_content") @db.Text
+  compiledAt         DateTime?        @map("compiled_at") @db.Timestamptz(6)
+  qaScoreBps         Int?             @map("qa_score_bps")
+  qaReviewedAt       DateTime?        @map("qa_reviewed_at") @db.Timestamptz(6)
+  qaIssues           Json?            @map("qa_issues") // [{severity, description, suggestion}]
   // UNAVAILABLE = QA fallback ran (no AI provider); qaScoreBps stays null
   // rather than a fake 0. Fusion Phase 6.
   qaAssessmentStatus AssessmentStatus @default(PENDING) @map("qa_assessment_status")
@@ -1458,6 +1464,20 @@ enum AssessmentStatus {
   @@map("assessment_status")
 }
 
+// Round 2 — BidFact ledger lifecycle. A fact is written once as PROPOSED and
+// never updated in place: acceptance moves it to APPLIED, refusal to
+// DISMISSED, and a newer fact for the same subject marks the older one
+// SUPERSEDED (via BidFact.supersededById). Uppercase to match the
+// worker/API wire literals, exactly as AssessmentStatus does.
+enum BidFactStatus {
+  PROPOSED
+  APPLIED
+  DISMISSED
+  SUPERSEDED
+
+  @@map("bid_fact_status")
+}
+
 enum RfpRiskLevel {
   low
   medium
@@ -1599,11 +1619,12 @@ model SourceChunk {
   hash              String?  @db.VarChar(128)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  org             Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  bidDocument     BidDocument     @relation(fields: [bidDocumentId], references: [id], onDelete: Cascade)
-  documentVersion DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
-  requirements    Requirement[]
-  reviewIssues    ReviewIssue[]
+  org              Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  bidDocument      BidDocument       @relation(fields: [bidDocumentId], references: [id], onDelete: Cascade)
+  documentVersion  DocumentVersion   @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  requirements     Requirement[]
+  reviewIssues     ReviewIssue[]
+  bidFactCitations BidFactCitation[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -1657,26 +1678,26 @@ model Requirement {
 }
 
 model ComplianceMatrixRow {
-  id             String              @id @default(uuid()) @db.Uuid
-  orgId          String              @map("org_id") @db.Uuid
-  opportunityId  String?             @map("opportunity_id") @db.Uuid
-  requirementId  String              @unique @map("requirement_id") @db.Uuid
-  ownerId        String?             @map("owner_id") @db.Uuid
-  status         ComplianceRowStatus @default(open)
-  risk           RfpRiskLevel        @default(medium)
-  responseStatus String              @default("not_started") @map("response_status") @db.VarChar(100)
-  answerDraft    String?             @map("answer_draft")
+  id               String              @id @default(uuid()) @db.Uuid
+  orgId            String              @map("org_id") @db.Uuid
+  opportunityId    String?             @map("opportunity_id") @db.Uuid
+  requirementId    String              @unique @map("requirement_id") @db.Uuid
+  ownerId          String?             @map("owner_id") @db.Uuid
+  status           ComplianceRowStatus @default(open)
+  risk             RfpRiskLevel        @default(medium)
+  responseStatus   String              @default("not_started") @map("response_status") @db.VarChar(100)
+  answerDraft      String?             @map("answer_draft")
   // Confidence of the compliance-fill assessment itself (was previously
   // discarded by the worker). Null until an assessment produces one.
-  confidenceBps    Int?             @map("confidence_bps")
-  assessmentStatus AssessmentStatus @default(PENDING) @map("assessment_status")
-  evidence       Json                @default("[]")
-  citations      Json                @default("[]")
-  dueDate        DateTime?           @map("due_date") @db.Date
-  approvedAt     DateTime?           @map("approved_at") @db.Timestamptz(6)
-  approverUserId String?             @map("approver_user_id") @db.Uuid
-  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  confidenceBps    Int?                @map("confidence_bps")
+  assessmentStatus AssessmentStatus    @default(PENDING) @map("assessment_status")
+  evidence         Json                @default("[]")
+  citations        Json                @default("[]")
+  dueDate          DateTime?           @map("due_date") @db.Date
+  approvedAt       DateTime?           @map("approved_at") @db.Timestamptz(6)
+  approverUserId   String?             @map("approver_user_id") @db.Uuid
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
@@ -1724,6 +1745,113 @@ model ReviewIssue {
   @@index([sourceChunkId])
   @@index([deletedAt])
   @@map("review_issues")
+}
+
+/// Round 2 — the BidFact ledger. Every claim the agent proposes about a
+/// compliance row or a requirement lands here first; nothing it produces
+/// reaches `answerDraft` without a human decision.
+///
+/// IMMUTABLE BY DISCIPLINE: a row is never updated to change its claim.
+/// A revised claim is a NEW row and the old one is marked SUPERSEDED with
+/// `supersededById` pointing forward. Hence no `updatedAt` and no
+/// `deletedAt` — an audit ledger you can soft-delete is not an audit ledger.
+model BidFact {
+  id                 String           @id @default(uuid()) @db.Uuid
+  orgId              String           @map("org_id") @db.Uuid
+  opportunityId      String?          @map("opportunity_id") @db.Uuid
+  /// matrix_row | requirement — the kind of thing the claim is about
+  subjectType        String           @map("subject_type") @db.VarChar(40)
+  subjectId          String           @map("subject_id") @db.Uuid
+  /// The proposed answerDraft text
+  claim              String
+  /// YES | NO | PARTIAL | NOT_APPLICABLE | GAP
+  verdict            String           @db.VarChar(30)
+  // Nullable for the same reason as Requirement.confidenceBps: null = no
+  // score exists. 0 is a real score, never a "no assessment" sentinel.
+  confidenceBps      Int?             @map("confidence_bps")
+  /// VERIFIED | PROBABLE | POSSIBLE — below POSSIBLE the fact is not stored
+  band               String?          @db.VarChar(12)
+  // Reused verbatim from Round 1; UNAVAILABLE when the requirement has no
+  // source chunk to assess, which must never render as a 0 score.
+  assessmentStatus   AssessmentStatus @default(PENDING) @map("assessment_status")
+  /// Rep-readable explanation of why this claim was proposed
+  rationale          String?
+  status             BidFactStatus    @default(PROPOSED)
+  // Normalized SHA-256 of the claim (lowercase, whitespace collapsed,
+  // punctuation stripped) — hashed in code, stored here so a value a human
+  // already dismissed is never re-offered.
+  valueHash          String           @map("value_hash") @db.VarChar(64)
+  producedByAgentKey String           @map("produced_by_agent_key") @db.VarChar(80)
+  // Unlinked ids by RFP-domain convention (cf. ComplianceMatrixRow.approverUserId):
+  // dust_runs and Clerk users are cross-domain, and a ledger row must survive
+  // the disappearance of the run or user that produced it.
+  dustRunId          String?          @map("dust_run_id") @db.Uuid
+  /// Forward pointer to the fact that replaced this one
+  supersededById     String?          @map("superseded_by_id") @db.Uuid
+  decidedByUserId    String?          @map("decided_by_user_id") @db.Uuid
+  decidedAt          DateTime?        @map("decided_at") @db.Timestamptz(6)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org         Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  opportunity Opportunity?      @relation(fields: [opportunityId], references: [id])
+  citations   BidFactCitation[]
+  decisions   BidFactDecision[]
+
+  @@index([orgId, subjectType, subjectId, status])
+  @@index([orgId, opportunityId, createdAt])
+  @@map("bid_facts")
+}
+
+/// Typed replacement for ComplianceMatrixRow.citations Json "[]". A citation
+/// only exists because its `quote` was re-found in the chunk text by code
+/// before insert — a quote that cannot be re-verified is rejected, not
+/// stored at a lower score.
+model BidFactCitation {
+  id            String @id @default(uuid()) @db.Uuid
+  orgId         String @map("org_id") @db.Uuid
+  bidFactId     String @map("bid_fact_id") @db.Uuid
+  // NOT NULL and a real FK, unlike the nullable Requirement.sourceChunkId:
+  // a requirement with no chunk is UNAVAILABLE evidence, but a citation with
+  // no chunk is an invented citation. Cascade because a citation is a pointer
+  // into chunk text — once the chunk is gone the quote can no longer be
+  // re-verified, and an unverifiable citation must not survive as evidence.
+  // The BidFact itself remains, then reading as evidence UNAVAILABLE.
+  sourceChunkId String @map("source_chunk_id") @db.Uuid
+  pageStart     Int?   @map("page_start")
+  pageEnd       Int?   @map("page_end")
+  quote         String
+
+  org         Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  bidFact     BidFact     @relation(fields: [bidFactId], references: [id], onDelete: Cascade)
+  sourceChunk SourceChunk @relation(fields: [sourceChunkId], references: [id], onDelete: Cascade)
+
+  @@index([bidFactId])
+  @@index([sourceChunkId])
+  @@map("bid_fact_citations")
+}
+
+/// Calibration flywheel: one row per human accept/dismiss. `evidenceKinds`
+/// is a deliberate denormalized snapshot of what the agent observed at
+/// decision time — the evidence weights are explicit guesses (ADR-0004) and
+/// this is the only record that can ever re-price them.
+model BidFactDecision {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  bidFactId       String   @map("bid_fact_id") @db.Uuid
+  /// accept | dismiss
+  decision        String   @db.VarChar(10)
+  decidedByUserId String   @map("decided_by_user_id") @db.Uuid
+  evidenceKinds   String[] @map("evidence_kinds")
+  scoreBps        Int?     @map("score_bps")
+  band            String?  @db.VarChar(12)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  bidFact BidFact @relation(fields: [bidFactId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([bidFactId])
+  @@map("bid_fact_decisions")
 }
 
 model ApprovalGate {
