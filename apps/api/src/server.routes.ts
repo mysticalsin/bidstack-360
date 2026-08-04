@@ -132,6 +132,8 @@ import { csRoutes } from './routes/cs.js';
 import { publicNpsRoutes } from './routes/public-nps.js';
 // Wave 9 — RFP pipeline HTTP endpoints (upload, SSE stream, autofill, approval gate)
 import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
+// Round 2 — BidFact ledger: list the agent's proposals, accept/dismiss them
+import { bidFactRoutes } from './routes/bid-facts.js';
 import { competitorRoutes } from './routes/competitors.js';
 // Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
 import { monitoringRoutes } from './routes/monitoring.js';
@@ -311,6 +313,10 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 9 — RFP pipeline: upload, SSE progress stream, matrix autofill, approval gate
   await server.register(rfpPipelineRoutes, { prefix: '/api/v1' });
+  // Round 2 — the BidFact ledger's human doors (list + accept/dismiss).
+  // Registered after rfpPipelineRoutes: same domain, and the decide endpoint is
+  // the per-row twin of that plugin's pipeline-level approval gate (ADR-0003).
+  await server.register(bidFactRoutes, { prefix: '/api/v1' });
   await server.register(competitorRoutes, { prefix: '/api/v1' });
 
   // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
