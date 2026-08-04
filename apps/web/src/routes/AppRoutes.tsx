@@ -15,6 +15,7 @@ import { PageTransition } from '@/components/motion/PageTransition';
 import { adminRouteElements } from './AdminRoutes';
 import { RequireAuth, RequireAdmin } from './AuthGuards';
 import { bidRouteElements } from './BidRoutes';
+import { devRouteElements } from './DevRoutes';
 import {
   AccountsPage,
   AgentStudioPage,
@@ -463,6 +464,8 @@ export function AppRoutes() {
           {bidRouteElements()}
           {adminRouteElements()}
           {opsRouteElements()}
+          {/* Design-system specimen sheet — compiled out of production builds. */}
+          {devRouteElements()}
 
           {/* ── 404 ─────────────────────────────────────────────────────── */}
           <Route

@@ -4,6 +4,10 @@
 
 import type { CSSProperties } from 'react';
 
+import { cn } from '@/lib/cn';
+
+import { type IconMotion, iconMotionFor } from './icon-motion';
+
 const PATHS: Record<string, JSX.Element> = {
   dashboard: (
     <>
@@ -325,6 +329,11 @@ const PATHS: Record<string, JSX.Element> = {
 
 export type IconName = keyof typeof PATHS;
 
+// The re-keyed MOTION_BY_ICON lookup lives in ./icon-motion (file-size budget).
+// Re-exported here so `@/components/ui/Icon` stays the single public entrypoint
+// and none of the 342 existing call sites change an import.
+export { ICON_MOTIONS, iconMotionFor, type IconMotion } from './icon-motion';
+
 interface IconProps {
   name: IconName;
   size?: number;
@@ -332,6 +341,8 @@ interface IconProps {
   className?: string;
   style?: CSSProperties;
   ariaHidden?: boolean;
+  /** Override the name-derived motion verb. Pass "none" to opt a call site out. */
+  motion?: IconMotion;
 }
 
 export function Icon({
@@ -341,6 +352,7 @@ export function Icon({
   className,
   style,
   ariaHidden = true,
+  motion,
 }: IconProps) {
   const path = PATHS[name];
   if (!path) return null;
@@ -354,7 +366,10 @@ export function Icon({
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
+      // `cds-icon` + `data-motion` are inert until the CSS in index.css picks
+      // them up on hover — every existing call site keeps its own className.
+      className={cn('cds-icon', className)}
+      data-motion={motion ?? iconMotionFor(name)}
       style={style}
       aria-hidden={ariaHidden}
     >

@@ -1,0 +1,75 @@
+/* table-kit/dropdown-menu.css — open/close motion for the grafted menu.
+   ============================================================
+   WHY a component-scoped stylesheet instead of a dependency:
+   the CRM source (D:\CRM\packages\ui\src\components\dropdown-menu.tsx:46,248)
+   spells its motion with `animate-in / fade-in-0 / zoom-in-95 /
+   slide-in-from-top-2` — utilities that ship in `tw-animate-css`, which
+   BidStack does not have. Adding that package would also require an
+   `@import` in apps/web/src/index.css, a file another track owns this wave.
+   Four keyframe rules cost less than a dependency and a cross-track edit, so
+   the motion lives here and travels with the component (same pattern as
+   styles/cockpit.css → DashboardPage, styles/org-dashboard.css → OrgDashboard).
+
+   Motion law (~/.claude/rules/design-standards.md): transform + opacity only,
+   never scale(0), enter on the house curve, exit ~65% of enter, < 300ms.
+   Reduced motion is already clamped globally by index.css
+   (`prefers-reduced-motion` → animation-duration: 0.01ms) so there is no
+   per-component media query here — one rhythm, declared once.
+   ============================================================ */
+
+@keyframes tk-menu-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translate(var(--tk-menu-x), var(--tk-menu-y));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+@keyframes tk-menu-exit {
+  from {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translate(var(--tk-menu-x), var(--tk-menu-y));
+  }
+}
+
+.tk-menu-surface {
+  /* Defaults so the keyframes resolve even before Radix has resolved a side
+     (first paint of a collision-flipped menu). */
+  --tk-menu-x: 0px;
+  --tk-menu-y: 0px;
+  /* Radix publishes the popper's true origin; scaling from the trigger corner
+     is what makes the menu read as "grown from the button" rather than
+     "faded in over it". Set here rather than as `origin-(--var)` so the whole
+     motion contract lives in one file. */
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+}
+
+/* The 0.5rem offsets mirror the source's slide-in-from-*-2 (Tailwind 2 = 8px),
+   inverted per side so the panel always travels away from its trigger. */
+.tk-menu-surface[data-side='bottom'] {
+  --tk-menu-y: -0.5rem;
+}
+.tk-menu-surface[data-side='top'] {
+  --tk-menu-y: 0.5rem;
+}
+.tk-menu-surface[data-side='left'] {
+  --tk-menu-x: 0.5rem;
+}
+.tk-menu-surface[data-side='right'] {
+  --tk-menu-x: -0.5rem;
+}
+
+.tk-menu-surface[data-state='open'] {
+  animation: tk-menu-enter 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.tk-menu-surface[data-state='closed'] {
+  animation: tk-menu-exit 80ms cubic-bezier(0.23, 1, 0.32, 1);
+}
