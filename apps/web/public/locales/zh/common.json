@@ -382,5 +382,54 @@
   },
   "dialog": {
     "closeAriaLabel": "关闭"
+  },
+  "tableKit": {
+    "pagination": {
+      "noResults": "无结果",
+      "range": "显示第 {{start}}–{{end}} 条，共 {{total}} 条",
+      "previous": "上一页",
+      "next": "下一页",
+      "pageOf": "{{page}} / {{totalPages}}",
+      "ariaLabel": "分页"
+    },
+    "dataTable": {
+      "filters": "筛选",
+      "all": "全部",
+      "sort": "排序",
+      "sortBy": "排序方式",
+      "ascending": "升序",
+      "descending": "降序",
+      "detail": "明细",
+      "columns": "列",
+      "toggleColumns": "显示或隐藏列",
+      "noResults": "未找到结果。"
+    }
+  },
+  "devPlayground": {
+    "title": "表格套件 — 样张",
+    "subtitle": "所有移植的 table-kit 组件，配以投标台示例数据。开发路由，产品外壳中不会链接。",
+    "sectionThemes": "双主题并排",
+    "hintThemes": "两块面板的几何完全一致，只有颜色改变——这就是全部规则。",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "sectionData": "数据表格",
+    "sectionRows": "表格基元",
+    "hintRows": "悬停某一行：2px 的竖条贴住边缘，首列单元格外移 4px。带虚线的值都有来源。",
+    "sectionEmpty": "空状态与菜单",
+    "emptyTitle": "没有标书符合这些筛选条件",
+    "emptyBody": "清除负责人筛选，或把截止时间放宽到下个季度。",
+    "emptyAction": "清除筛选",
+    "sectionStatus": "状态指示器",
+    "bloomAura": "仅圆点，光晕效果",
+    "sectionStats": "KPI 条",
+    "deltaInline": "独立的变化值：",
+    "sectionDashboard": "仪表板布局",
+    "dashboardTitle": "第三季度投标台",
+    "dashboardCaption": "移植的布局基元，未引入图表库。",
+    "emptyPanel": "此时间段内暂无内容。",
+    "loading": "正在重新计算评分…",
+    "sectionSkeleton": "加载层",
+    "sectionIcons": "图标微动效",
+    "hintIcons": "悬停任一图块。动作由 Icon.tsx 内的图标名推导，调用处无需传参。"
   }
 }

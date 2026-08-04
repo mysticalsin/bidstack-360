@@ -382,5 +382,54 @@
   },
   "dialog": {
     "closeAriaLabel": "Chiudi"
+  },
+  "tableKit": {
+    "pagination": {
+      "noResults": "Nessun risultato",
+      "range": "Visualizzati {{start}}–{{end}} di {{total}}",
+      "previous": "Precedente",
+      "next": "Successivo",
+      "pageOf": "{{page}} / {{totalPages}}",
+      "ariaLabel": "Impaginazione"
+    },
+    "dataTable": {
+      "filters": "Filtri",
+      "all": "Tutti",
+      "sort": "Ordina",
+      "sortBy": "Ordina per",
+      "ascending": "Crescente",
+      "descending": "Decrescente",
+      "detail": "Dettaglio",
+      "columns": "Colonne",
+      "toggleColumns": "Mostra o nascondi colonne",
+      "noResults": "Nessun risultato trovato."
+    }
+  },
+  "devPlayground": {
+    "title": "Kit tabelle — foglio di riferimento",
+    "subtitle": "Tutti i componenti innestati del table-kit con dati fittizi di bid desk. Rotta di sviluppo — mai collegata dall’applicazione.",
+    "sectionThemes": "Entrambi i temi, affiancati",
+    "hintThemes": "La geometria è identica nei due pannelli. Cambia solo il colore — è tutta qui la regola.",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "sectionData": "Tabella dati",
+    "sectionRows": "Primitive di tabella",
+    "hintRows": "Passa sopra una riga: una barra di 2 px si fissa al bordo e la prima cella scorre di 4 px. I valori punteggiati hanno una fonte.",
+    "sectionEmpty": "Stato vuoto e menu",
+    "emptyTitle": "Nessuna offerta corrisponde a questi filtri",
+    "emptyBody": "Rimuovi il filtro referente o estendi la scadenza al trimestre successivo.",
+    "emptyAction": "Azzera i filtri",
+    "sectionStatus": "Indicatori di stato",
+    "bloomAura": "Solo punto, alone aura",
+    "sectionStats": "Fascia KPI",
+    "deltaInline": "Variazione, isolata:",
+    "sectionDashboard": "Impaginazione della dashboard",
+    "dashboardTitle": "Bid desk T3",
+    "dashboardCaption": "Primitive di impaginazione innestate, senza libreria di grafici.",
+    "emptyPanel": "Ancora nulla in questo periodo.",
+    "loading": "Ricalcolo dei punteggi…",
+    "sectionSkeleton": "Livello di caricamento",
+    "sectionIcons": "Micro-animazione delle icone",
+    "hintIcons": "Passa sopra una tessera. Il verbo deriva dal nome dell’icona dentro Icon.tsx — nessun chiamante lo passa."
   }
 }

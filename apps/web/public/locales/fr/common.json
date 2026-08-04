@@ -382,5 +382,54 @@
   },
   "dialog": {
     "closeAriaLabel": "Fermer"
+  },
+  "tableKit": {
+    "pagination": {
+      "noResults": "Aucun résultat",
+      "range": "Affichage de {{start}} à {{end}} sur {{total}}",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "pageOf": "{{page}} / {{totalPages}}",
+      "ariaLabel": "Pagination"
+    },
+    "dataTable": {
+      "filters": "Filtres",
+      "all": "Tous",
+      "sort": "Trier",
+      "sortBy": "Trier par",
+      "ascending": "Croissant",
+      "descending": "Décroissant",
+      "detail": "Détail",
+      "columns": "Colonnes",
+      "toggleColumns": "Afficher ou masquer les colonnes",
+      "noResults": "Aucun résultat trouvé."
+    }
+  },
+  "devPlayground": {
+    "title": "Kit de tableaux — planche de référence",
+    "subtitle": "Tous les composants greffés du table-kit avec des données fictives de bid desk. Route de développement — jamais liée depuis l’application.",
+    "sectionThemes": "Les deux thèmes, côte à côte",
+    "hintThemes": "La géométrie est identique dans les deux panneaux. Seule la couleur change — c’est toute la règle.",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "sectionData": "Tableau de données",
+    "sectionRows": "Primitives de tableau",
+    "hintRows": "Survolez une ligne : une barre de 2 px se cale sur le bord et la première cellule glisse de 4 px. Les valeurs pointillées ont une source.",
+    "sectionEmpty": "État vide et menu",
+    "emptyTitle": "Aucune offre ne correspond à ces filtres",
+    "emptyBody": "Retirez le filtre responsable ou élargissez l’échéance au trimestre suivant.",
+    "emptyAction": "Effacer les filtres",
+    "sectionStatus": "Indicateurs de statut",
+    "bloomAura": "Point seul, halo aura",
+    "sectionStats": "Bandeau d’indicateurs",
+    "deltaInline": "Variation, isolée :",
+    "sectionDashboard": "Mise en page du tableau de bord",
+    "dashboardTitle": "Bid desk T3",
+    "dashboardCaption": "Primitives de mise en page greffées, sans bibliothèque de graphiques.",
+    "emptyPanel": "Rien sur cette période.",
+    "loading": "Recalcul des scores…",
+    "sectionSkeleton": "Niveau de chargement",
+    "sectionIcons": "Micro-animation des icônes",
+    "hintIcons": "Survolez une tuile. Le verbe vient du nom de l’icône dans Icon.tsx — aucun appelant ne le passe."
   }
 }

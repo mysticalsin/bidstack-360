@@ -382,5 +382,54 @@
   },
   "dialog": {
     "closeAriaLabel": "Close"
+  },
+  "tableKit": {
+    "pagination": {
+      "noResults": "No results",
+      "range": "Showing {{start}}–{{end}} of {{total}}",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "{{page}} / {{totalPages}}",
+      "ariaLabel": "Pagination"
+    },
+    "dataTable": {
+      "filters": "Filters",
+      "all": "All",
+      "sort": "Sort",
+      "sortBy": "Sort by",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "detail": "Detail",
+      "columns": "Columns",
+      "toggleColumns": "Toggle columns",
+      "noResults": "No results found."
+    }
+  },
+  "devPlayground": {
+    "title": "Table kit — specimen sheet",
+    "subtitle": "Every grafted table-kit component against bid-desk fixture data. Dev route — never linked from the product shell.",
+    "sectionThemes": "Both themes, side by side",
+    "hintThemes": "Geometry is identical in both panels. Only colour changes — that is the whole law.",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "sectionData": "Data table",
+    "sectionRows": "Table primitives",
+    "hintRows": "Hover a row: a 2px bar pins to the edge and the first cell eases out 4px. Dotted values carry a receipt.",
+    "sectionEmpty": "Empty state and menu",
+    "emptyTitle": "No bids match these filters",
+    "emptyBody": "Clear the owner facet, or widen the deadline window to the next quarter.",
+    "emptyAction": "Clear filters",
+    "sectionStatus": "Status indicators",
+    "bloomAura": "Dot only, aura bloom",
+    "sectionStats": "KPI strip",
+    "deltaInline": "Delta, standalone:",
+    "sectionDashboard": "Dashboard layout",
+    "dashboardTitle": "Q3 bid desk",
+    "dashboardCaption": "Grafted layout primitives, no chart library.",
+    "emptyPanel": "Nothing yet in this window.",
+    "loading": "Recomputing scores…",
+    "sectionSkeleton": "Loading tier",
+    "sectionIcons": "Icon micro-motion",
+    "hintIcons": "Hover a tile. The verb is derived from the icon name inside Icon.tsx — no call site passes it."
   }
 }

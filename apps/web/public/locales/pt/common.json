@@ -382,5 +382,54 @@
   },
   "dialog": {
     "closeAriaLabel": "Fechar"
+  },
+  "tableKit": {
+    "pagination": {
+      "noResults": "Sem resultados",
+      "range": "A mostrar {{start}}–{{end}} de {{total}}",
+      "previous": "Anterior",
+      "next": "Seguinte",
+      "pageOf": "{{page}} / {{totalPages}}",
+      "ariaLabel": "Paginação"
+    },
+    "dataTable": {
+      "filters": "Filtros",
+      "all": "Todos",
+      "sort": "Ordenar",
+      "sortBy": "Ordenar por",
+      "ascending": "Crescente",
+      "descending": "Decrescente",
+      "detail": "Detalhe",
+      "columns": "Colunas",
+      "toggleColumns": "Mostrar ou ocultar colunas",
+      "noResults": "Nenhum resultado encontrado."
+    }
+  },
+  "devPlayground": {
+    "title": "Kit de tabelas — folha de amostras",
+    "subtitle": "Todos os componentes enxertados do table-kit com dados fictícios de bid desk. Rota de desenvolvimento — nunca ligada a partir da aplicação.",
+    "sectionThemes": "Ambos os temas, lado a lado",
+    "hintThemes": "A geometria é idêntica nos dois painéis. Só a cor muda — é essa toda a regra.",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "sectionData": "Tabela de dados",
+    "sectionRows": "Primitivas de tabela",
+    "hintRows": "Passe o rato numa linha: uma barra de 2 px fixa-se à margem e a primeira célula desliza 4 px. Valores tracejados têm fonte.",
+    "sectionEmpty": "Estado vazio e menu",
+    "emptyTitle": "Nenhuma proposta corresponde a estes filtros",
+    "emptyBody": "Limpe o filtro de responsável ou alargue o prazo ao trimestre seguinte.",
+    "emptyAction": "Limpar filtros",
+    "sectionStatus": "Indicadores de estado",
+    "bloomAura": "Só o ponto, halo aura",
+    "sectionStats": "Faixa de KPI",
+    "deltaInline": "Variação, isolada:",
+    "sectionDashboard": "Disposição do painel",
+    "dashboardTitle": "Bid desk T3",
+    "dashboardCaption": "Primitivas de disposição enxertadas, sem biblioteca de gráficos.",
+    "emptyPanel": "Nada ainda neste período.",
+    "loading": "A recalcular pontuações…",
+    "sectionSkeleton": "Camada de carregamento",
+    "sectionIcons": "Microanimação dos ícones",
+    "hintIcons": "Passe o rato num cartão. O verbo vem do nome do ícone dentro de Icon.tsx — nenhuma chamada o passa."
   }
 }
