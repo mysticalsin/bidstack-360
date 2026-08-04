@@ -7,6 +7,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
+import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
 
 import { ApiError } from '@/lib/api';
 import { initAccent } from '@/lib/accent';
@@ -223,7 +224,16 @@ root.render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
           <ErrorBoundary>
-            <App />
+            {/* Below BrowserRouter by requirement, not by preference: the v6
+                adapter is built on react-router's own useNavigate /
+                useSearchParams, so it throws outside a router. Kept below
+                ErrorBoundary so that throw surfaces as the error screen rather
+                than a blank page. Mount-only for now — no page reads or writes
+                query state through nuqs yet; see
+                docs/design-system/url-param-audit.md. */}
+            <NuqsAdapter>
+              <App />
+            </NuqsAdapter>
           </ErrorBoundary>
         </BrowserRouter>
       </QueryClientProvider>
