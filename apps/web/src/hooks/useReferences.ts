@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { keepPreviousTableData } from '@/lib/table/use-table-query';
 
 export interface Reference {
   id: string;
@@ -34,6 +35,12 @@ export function useReferences(filters?: {
       if (filters?.search) params.set('search', filters.search);
       return api(`/api/references?${params.toString()}`);
     },
+    // ROUND2-ULTRAPLAN risk #7 ("the port must not feel worse than the source"):
+    // ReferencesPage drives these filters from the URL, so every keystroke and
+    // every facet click is a new query key. Without this the table would blank
+    // to a spinner between each one; with it the previous rows stay on screen
+    // and only the pagination spinner moves. Sole consumer is ReferencesPage.
+    placeholderData: keepPreviousTableData,
   });
 }
 

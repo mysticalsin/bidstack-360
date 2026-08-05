@@ -1,67 +1,93 @@
-// Reference Library — reusable customer references, case studies, and testimonials.
-// Searchable by industry, tags, and company. Track usage to surface the best references.
+// Reference Library — reusable customer references, case studies, testimonials.
+//
+// ROUND2-ULTRAPLAN "the density retarget", surface 4: the 2-column card grid is
+// retired for a table-kit `DataTable`. Two things changed that matter beyond
+// pixels:
+//   1. URL-as-state. Search, industry and tag used to live in three `useState`
+//      calls, so a filtered view could not be shared, bookmarked or reported in
+//      a bug. They are now URL params (referencesPage/references-search-params.ts)
+//      and the only `useState` left on this page is the create-dialog toggle,
+//      which is view chrome and belongs nowhere near a link.
+//   2. Density. Each reference used ~9 stacked lines in a card; it is now one
+//      scannable row, with the long-form description one click away in the
+//      expanded detail row (`?expand=` — also part of the shareable URL).
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotion } from 'framer-motion';
 
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Icon } from '@/components/ui/Icon';
+import { DataTable, type DataTableFacet } from '@/components/table-kit/data-table';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/table-kit/empty';
 import { Button } from '@/components/ui/Button';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { Icon } from '@/components/ui/Icon';
+import { ErrorState } from '@/components/ui/StateMessages';
+import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useCreateReference,
   useDeleteReference,
   useReferences,
   useUseReference,
+  type Reference,
 } from '@/hooks/useReferences';
-import { useAccountIndustries } from '@/hooks/useKeyAccounts';
-import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
-import { toast } from '@/components/ui/Toast';
-import { confirm } from '@/components/ui/ConfirmDialog';
-import { useHasPermission } from '@/hooks/useCapabilities';
-import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
+import { staggerChild, staggerParent } from '@/lib/motion';
+import { tableFetchState, useTableQuery } from '@/lib/table/use-table-query';
 
-// Defense in depth: the API now rejects non-http(s) documentUrl values on
-// write, but existing rows (or a future write path) could still carry a
-// javascript:/data: URL — rendering it as a clickable <a href> would execute
-// it. Only render the link when the scheme is verifiably http(s).
-export function isSafeHttpUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
+import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
+import {
+  buildReferenceColumns,
+  REFERENCE_EXPANDABLE,
+} from './referencesPage/reference-columns';
+import {
+  applyReferencesView,
+  hasActiveReferenceFilters,
+  referenceIndustryOptions,
+  referencesSearchParams,
+  referenceTagOptions,
+  toReferencesFilters,
+} from './referencesPage/references-search-params';
+
+// Re-exported so the security regression test (and any future caller) keeps one
+// import site for the document-link scheme guard.
+export { isSafeHttpUrl } from './referencesPage/reference-columns';
 
 export function ReferencesPage() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
-  const [search, setSearch] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [tag, setTag] = useState('');
+  // The ONLY local state left: whether the create dialog is open. Filtering,
+  // sorting, paging and row expansion all live in the URL.
+  const [showCreate, setShowCreate] = useState(false);
   // References writes are gated server-side behind accounts:write — hide the
   // write controls for users who lack it (they previously 403'd on click).
   const canWrite = useHasPermission('accounts:write');
 
-  const industries = useAccountIndustries();
-  const references = useReferences({
-    search: search || undefined,
-    industry: industry || undefined,
-    tag: tag || undefined,
-  });
-  // Unfiltered source for the tag dropdown — deriving tag options from the
-  // tag/search-filtered `references` collapsed the list to the active selection,
-  // trapping the user. Mirrors the independent industry-filter source.
-  const allReferencesForTags = useReferences({});
-  const useRef = useUseReference();
-  const createRef = useCreateReference();
-  const deleteRef = useDeleteReference();
-  const [showCreate, setShowCreate] = useState(false);
+  const { query, input } = useTableQuery(referencesSearchParams);
+  const references = useReferences(toReferencesFilters(input));
+  // Unfiltered source for the facet dropdowns — deriving options from the
+  // filtered result collapses each list to the active selection and traps the
+  // user with no way back.
+  const allReferences = useReferences({});
 
-  const items = references.data?.items ?? [];
+  const { rows, total } = useMemo(
+    () => applyReferencesView(references.data?.items ?? [], input),
+    [references.data, input],
+  );
+  const { showSkeleton, showSpinner } = tableFetchState(references);
+
+  // Destructured because react-query returns a fresh result object each render
+  // while `mutate` itself is stable — depending on the mutation object would
+  // rebuild `columns` on every render.
+  const { mutate: recordUse, isPending: isRecording } = useUseReference();
+  const { mutate: deleteReference, isPending: isDeleting } = useDeleteReference();
+  const createRef = useCreateReference();
 
   const handleCreate = (body: NewReferenceBody) => {
     createRef.mutate(body, {
@@ -73,33 +99,66 @@ export function ReferencesPage() {
     });
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    const ok = await confirm({
-      title: t('references.deleteConfirm.title', 'Delete reference?'),
-      description: t(
-        'references.deleteConfirm.description',
-        '"{{title}}" will be removed from your library. This can\'t be undone.',
-        { title },
-      ),
-      confirmLabel: t('references.deleteConfirm.confirmLabel', 'Delete'),
-      destructive: true,
-    });
-    if (!ok) return;
-    deleteRef.mutate(id, {
-      onSuccess: () => toast.success(t('references.toast.deleted', 'Reference deleted')),
-      onError: () => toast.error(t('references.toast.deleteError', 'Could not delete reference')),
-    });
-  };
+  // Both callbacks are stable, which keeps `columns` stable, which keeps
+  // DataTable from re-deriving its hidden-column parser (and re-subscribing the
+  // `hide` URL key) on every keystroke in the search box.
+  const handleUse = useCallback((id: string) => recordUse(id), [recordUse]);
 
-  // Collect all unique tags for the filter from the UNFILTERED source so the
-  // dropdown always offers every tag, regardless of the active tag/search.
-  const allTags = Array.from(
-    new Set((allReferencesForTags.data?.items ?? []).flatMap((r) => r.tags)),
-  ).sort();
+  const handleDelete = useCallback(
+    async (id: string, title: string) => {
+      const ok = await confirm({
+        title: t('references.deleteConfirm.title', 'Delete reference?'),
+        description: t(
+          'references.deleteConfirm.description',
+          '"{{title}}" will be removed from your library. This can\'t be undone.',
+          { title },
+        ),
+        confirmLabel: t('references.deleteConfirm.confirmLabel', 'Delete'),
+        destructive: true,
+      });
+      if (!ok) return;
+      deleteReference(id, {
+        onSuccess: () => toast.success(t('references.toast.deleted', 'Reference deleted')),
+        onError: () => toast.error(t('references.toast.deleteError', 'Could not delete reference')),
+      });
+    },
+    [t, deleteReference],
+  );
+
+  const columns = useMemo(
+    () =>
+      buildReferenceColumns({
+        t,
+        canWrite,
+        onUse: handleUse,
+        onDelete: (id, title) => void handleDelete(id, title),
+        isUsing: isRecording,
+        isDeleting,
+      }),
+    [t, canWrite, handleUse, handleDelete, isRecording, isDeleting],
+  );
+
+  const facets = useMemo<DataTableFacet[]>(() => {
+    const allItems = allReferences.data?.items ?? [];
+    return [
+      {
+        id: 'industry',
+        label: t('references.allIndustries', 'All industries'),
+        options: referenceIndustryOptions(allItems),
+      },
+      {
+        id: 'tag',
+        label: t('references.allTags', 'All tags'),
+        options: referenceTagOptions(allItems),
+      },
+    ];
+  }, [t, allReferences.data]);
+
+  const filtered = hasActiveReferenceFilters(input);
 
   return (
     <motion.div
-      className="space-y-6"
+      className="flex min-h-0 flex-1 flex-col gap-6"
       variants={reducedMotion ? undefined : staggerParent}
       initial={reducedMotion ? false : 'initial'}
       animate="animate"
@@ -109,10 +168,10 @@ export function ReferencesPage() {
         className="flex items-start justify-between gap-4"
       >
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight text-fg-primary">
             {t('references.heading', 'Reference Library')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+          <p className="mt-1 text-sm text-fg-secondary">
             {t(
               'references.subtitle',
               'Proof that wins bids — the right case study and testimonial for every proposal.',
@@ -126,66 +185,12 @@ export function ReferencesPage() {
         )}
       </motion.header>
 
-      {/* Filters */}
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="flex flex-wrap items-center gap-3"
-      >
-        <div className="relative flex-1 min-w-[200px]">
-          <Icon
-            name="search"
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
-            ariaHidden
-          />
-          <input
-            type="search"
-            placeholder={t('references.searchPlaceholder', 'Search references...')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label={t('references.searchAriaLabel', 'Search references')}
-            className="input w-full pl-9"
-          />
-        </div>
-        <select
-          value={industry}
-          onChange={(e) => setIndustry(e.target.value)}
-          aria-label={t('references.filterIndustryAriaLabel', 'Filter by industry')}
-          className="input"
-        >
-          <option value="">{t('references.allIndustries', 'All industries')}</option>
-          {(industries.data?.items ?? []).map((i: string) => (
-            <option key={i} value={i}>
-              {i}
-            </option>
-          ))}
-        </select>
-        <select
-          value={tag}
-          onChange={(e) => setTag(e.target.value)}
-          aria-label={t('references.filterTagAriaLabel', 'Filter by tag')}
-          className="input"
-        >
-          <option value="">{t('references.allTags', 'All tags')}</option>
-          {allTags.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </motion.div>
-
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!references.isLoading && references.data
-          ? t('references.resultCount', '{{count}} references', { count: items.length })
-          : ''}
+        {showSkeleton ? '' : t('references.resultCount', '{{count}} references', { count: total })}
       </p>
 
-      {/* Reference grid */}
-      {references.isLoading ? (
-        <LoadingSkeleton rows={4} />
-      ) : references.isError ? (
+      {references.isError ? (
         <ErrorState
           title={t('references.errorTitle', 'Could not load references')}
           message={
@@ -194,124 +199,77 @@ export function ReferencesPage() {
               : t('references.errorMessage', 'Please try again in a moment.')
           }
         />
-      ) : items.length === 0 ? (
-        <EmptyState
-          title={t('references.emptyTitle', 'No references yet')}
-          message={t('references.emptyMessage', 'Add customer references to build your proposal library.')}
-          action={
-            <Button onClick={() => setShowCreate(true)}>
-              {t('references.emptyAction', 'Add reference')}
-            </Button>
+      ) : (
+        <DataTable<Reference, Reference>
+          query={query}
+          columns={columns}
+          rows={rows}
+          total={total}
+          getRowId={(row) => row.id}
+          facets={facets}
+          expandable={REFERENCE_EXPANDABLE}
+          // The table frame, its header and the toolbar render on the first
+          // paint and never unmount: a cold load shows the in-body spinner, a
+          // filter change keeps the previous rows (ROUND2-ULTRAPLAN risk #7,
+          // "no blank table frame").
+          loading={showSkeleton || showSpinner}
+          leadingActions={
+            <div className="relative w-full sm:w-64">
+              <Icon
+                name="search"
+                size={14}
+                className="absolute top-1/2 left-3 -translate-y-1/2 text-fg-tertiary"
+                ariaHidden
+              />
+              <input
+                type="search"
+                value={query.q}
+                onChange={(event) => query.setQ(event.target.value)}
+                placeholder={t('references.searchPlaceholder', 'Search references...')}
+                aria-label={t('references.searchAriaLabel', 'Search references')}
+                className="input h-8 w-full pl-9 text-xs"
+              />
+            </div>
+          }
+          empty={
+            <Empty className="border-0">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Icon name="file" size={16} ariaHidden />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {filtered
+                    ? t('references.noMatch.title', 'No references match these filters')
+                    : t('references.emptyTitle', 'No references yet')}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {filtered
+                    ? t(
+                        'references.noMatch.message',
+                        'Clear the industry or tag facet, or search for a different term.',
+                      )
+                    : t(
+                        'references.emptyMessage',
+                        'Add customer references to build your proposal library.',
+                      )}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent layout="row">
+                {filtered ? (
+                  <Button variant="secondary" size="sm" onClick={() => query.resetFilters()}>
+                    {t('references.noMatch.action', 'Clear filters')}
+                  </Button>
+                ) : (
+                  canWrite && (
+                    <Button variant="secondary" size="sm" onClick={() => setShowCreate(true)}>
+                      {t('references.emptyAction', 'Add reference')}
+                    </Button>
+                  )
+                )}
+              </EmptyContent>
+            </Empty>
           }
         />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {items.map((ref, index) => (
-            <motion.div
-              key={ref.id}
-              variants={reducedMotion ? undefined : staggerChild}
-              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
-            >
-              <Card>
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-[var(--fg-primary)]">
-                          {ref.title}
-                        </span>
-                        {ref.industry && <Badge tone="blue">{ref.industry}</Badge>}
-                      </div>
-                      {ref.company && (
-                        <div className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-                          {ref.company.name}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-[var(--fg-tertiary)]">
-                      <Icon name="check" size={12} ariaHidden />
-                      <span>{ref.usageCount}</span>
-                    </div>
-                  </div>
-
-                  {ref.description && (
-                    <p className="mt-2 text-sm text-[var(--fg-secondary)] line-clamp-3">
-                      {ref.description}
-                    </p>
-                  )}
-
-                  {ref.documentUrl && isSafeHttpUrl(ref.documentUrl) ? (
-                    <a
-                      href={ref.documentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center rounded text-xs font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                    >
-                      {t('references.viewDocument', 'View document')}
-                    </a>
-                  ) : ref.documentUrl ? (
-                    <span className="mt-2 inline-flex items-center text-xs text-[var(--fg-tertiary)]">
-                      {t('references.unsafeDocumentUrl', 'Document link unavailable')}
-                    </span>
-                  ) : null}
-
-                  {ref.tags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {ref.tags.map((t) => (
-                        <span
-                          key={t}
-                          className="rounded-md bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)]"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="text-xs text-[var(--fg-tertiary)]">
-                      {ref.contactName && <span className="mr-3">{ref.contactName}</span>}
-                      {ref.lastUsedAt && (
-                        <span>
-                          {t('references.lastUsed', 'Last used: {{date}}', {
-                            date: new Date(ref.lastUsedAt).toLocaleDateString(),
-                          })}
-                        </span>
-                      )}
-                    </div>
-                    {canWrite && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(ref.id, ref.title)}
-                        aria-label={t('references.deleteAriaLabel', 'Delete reference: {{title}}', {
-                          title: ref.title,
-                        })}
-                        disabled={deleteRef.isPending}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fg-tertiary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] disabled:opacity-50 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
-                      >
-                        <Icon name="trash" size={15} ariaHidden />
-                      </button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => useRef.mutate(ref.id)}
-                        disabled={useRef.isPending}
-                      >
-                        {useRef.isPending
-                          ? t('references.recording', 'Recording...')
-                          : t('references.useReference', 'Use reference')}
-                      </Button>
-                    </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
       )}
 
       {showCreate && (
