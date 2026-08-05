@@ -7,7 +7,9 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
   // Alpine runtime is musl + OpenSSL 3; ship that engine alongside native so
   // both `prisma generate` (build) and migrate/query (runtime) resolve libssl.
-  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  // Vercel Functions run Amazon Linux (glibc + OpenSSL 3), which neither of the
+  // above covers, so the serverless demo needs the rhel engine as well.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x", "rhel-openssl-3.0.x"]
   output          = "../generated/client"
 }
 

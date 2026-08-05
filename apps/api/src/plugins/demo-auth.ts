@@ -258,7 +258,13 @@ export async function provisionDemoSession(
         });
         return created;
       },
-      { timeout: 30000 },
+      // Seeding a whole workspace inside one transaction is heavy (it upserts the
+      // full permission matrix), and how long it takes depends entirely on how
+      // close and how fast the database is. 30s is ample against a co-located
+      // managed Postgres but overruns on a slower or more distant one, which
+      // surfaces as a 500 the visitor can do nothing about — so allow the
+      // deployment to raise it.
+      { timeout: Number(process.env.DEMO_PROVISION_TIMEOUT_MS) || 30000 },
     );
   } catch (err) {
     // A concurrent sign-in already provisioned this visitor and won the
