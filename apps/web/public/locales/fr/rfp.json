@@ -42,7 +42,41 @@
     "emptyMessage": "Créez votre première proposition pour commencer.",
     "viewProposal": "Voir la proposition : {{name}}",
     "version": "v{{version}}",
-    "due": "Échéance {{date}}"
+    "due": "Échéance {{date}}",
+    "columns": {
+      "name": "Proposition",
+      "stage": "Étape",
+      "owner": "Responsable",
+      "compliance": "Conformité",
+      "version": "Vers.",
+      "due": "Échéance",
+      "updated": "Mise à jour"
+    },
+    "facets": {
+      "owner": "Responsable",
+      "dueWindow": "Échéance",
+      "compliance": "Conformité"
+    },
+    "dueWindow": {
+      "overdue": "En retard",
+      "week": "Sous 7 jours",
+      "month": "Sous 30 jours",
+      "later": "Au-delà de 30 jours",
+      "none": "Sans échéance"
+    },
+    "compliance": {
+      "complete": "Complète (90 % et plus)",
+      "partial": "En cours (moins de 90 %)",
+      "unscored": "Non évaluée"
+    },
+    "ownerUnknown": "Responsable inconnu",
+    "ownerUnassigned": "Non attribuée",
+    "searchLabel": "Rechercher des propositions",
+    "searchPlaceholder": "Rechercher des propositions…",
+    "allStages": "Toutes les étapes",
+    "emptyFiltered": "Aucune proposition ne correspond à ces filtres.",
+    "truncated": "Affichage des {{loaded}} propositions les plus récemment mises à jour sur {{total}}. Affinez l’étape ou la recherche pour voir les autres.",
+    "percent": "{{value}} %"
   },
   "rfpCrew": {
     "statusWaiting": "En attente",
@@ -104,6 +138,52 @@
     "label": "Brouillon assisté par IA"
   },
   "compliance": {
-    "notAssessed": "Non évalué"
+    "notAssessed": "Non évalué",
+    "colAnswer": "Réponse",
+    "colConfidence": "Confiance",
+    "colActions": "Actions",
+    "facetStatus": "Statut",
+    "facetSection": "Section",
+    "facetMandatory": "Obligatoire",
+    "mandatory": "Obligatoire",
+    "mandatoryYes": "Obligatoires uniquement",
+    "mandatoryNo": "Facultatives uniquement",
+    "clearFilters": "Effacer les filtres",
+    "noMatches": "Aucune exigence ne correspond à ces filtres.",
+    "cancel": "Annuler",
+    "status": {
+      "compliant": "Conforme",
+      "partial": "Partiel",
+      "non_compliant": "Non conforme",
+      "pending": "En attente"
+    }
+  },
+  "states": {
+    "saving": "Enregistrement…"
+  },
+  "agent": {
+    "held": "Suspendu",
+    "heldNote": "non moyenné — résolvez d'abord la contradiction",
+    "accept": "Accepter",
+    "dismiss": "Écarter",
+    "acceptAria": "Accepter la réponse proposée",
+    "dismissAria": "Écarter la réponse proposée",
+    "filledFrom": "renseigné depuis {{document}}",
+    "filledFromPage": "renseigné depuis {{document}}, p. {{pages}}",
+    "filledByAgent": "renseigné par l'agent d'offre",
+    "acceptedOn": "accepté le {{date}}",
+    "observedAt": "Observé le {{date}}",
+    "rationaleListTitle": "Ce que l'agent a fait",
+    "rationaleScope": "Couvre les exigences affichées sur cette page.",
+    "rationaleEmpty": "L'agent n'a encore rien proposé sur cette offre.",
+    "colOutcome": "Résultat",
+    "colClaim": "Proposition",
+    "colWhen": "Quand",
+    "status": {
+      "PROPOSED": "Proposé",
+      "APPLIED": "Appliqué",
+      "DISMISSED": "Écarté",
+      "SUPERSEDED": "Remplacé"
+    }
   }
 }

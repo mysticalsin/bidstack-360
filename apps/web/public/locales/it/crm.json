@@ -1542,6 +1542,57 @@
       "title": "Note sulla decisione",
       "placeholder": "Aggiungi motivazioni, criticità chiave o condizioni per offrire…",
       "aria": "Note sulla decisione di offerta"
+    },
+    "panel": {
+      "composite": "Punteggio composito",
+      "compositeDescription": "Partecipare da {{bid}} in su, condizionale da {{caution}}.",
+      "deltaVsSaved": "rispetto al salvato",
+      "recommendation": "Raccomandazione",
+      "recommendationPending": "Non ancora valutato",
+      "recommendationDescription": "Un punteggio sotto la soglia richiede una deroga registrata prima del salvataggio.",
+      "rated": "Criteri valutati",
+      "ratedDescription": "I criteri non valutati contano zero nel composito.",
+      "weightRated": "Peso valutato",
+      "weightRatedDescription": "di {{total}} punti ponderati hanno una valutazione."
+    },
+    "filter": {
+      "aria": "Filtra i criteri per categoria",
+      "all": "Tutti i criteri",
+      "allAria": "Tutti i criteri, punteggio composito {{score}} su 100",
+      "categoryAria": "{{category}}, punteggio di categoria {{score}} su 100"
+    },
+    "category": {
+      "strategic": "Allineamento strategico",
+      "technical": "Prontezza tecnica",
+      "commercial": "Sostenibilità commerciale",
+      "risk": "Valutazione dei rischi"
+    },
+    "categoryShort": {
+      "strategic": "Strategico",
+      "technical": "Tecnico",
+      "commercial": "Commerciale",
+      "risk": "Rischio"
+    },
+    "rating": {
+      "unrated": "Non valutato",
+      "veryWeak": "Molto debole",
+      "weak": "Debole",
+      "neutral": "Neutro",
+      "strong": "Forte",
+      "veryStrong": "Molto forte"
+    },
+    "table": {
+      "criterion": "Criterio",
+      "category": "Categoria",
+      "weight": "Peso",
+      "score": "Punteggio",
+      "rating": "Valutazione",
+      "contribution": "Punti",
+      "total": "Totale ponderato",
+      "empty": "Nessun criterio corrisponde a questo filtro.",
+      "sortBy": "Ordina per {{column}}.",
+      "sortedAsc": "{{column}}, ordine crescente. Attiva per ordinare in modo decrescente.",
+      "sortedDesc": "{{column}}, ordine decrescente. Attiva per ordinare in modo crescente."
     }
   },
   "opportunityDetail": {
@@ -1812,6 +1863,23 @@
     "createContact": "Crea contatto"
   },
   "references": {
+    "column": {
+      "reference": "Riferimento",
+      "company": "Azienda",
+      "industry": "Settore",
+      "tags": "Tag",
+      "uses": "Utilizzi",
+      "lastUsed": "Ultimo utilizzo",
+      "document": "Documento",
+      "actions": "Azioni"
+    },
+    "noMatch": {
+      "title": "Nessun riferimento corrisponde a questi filtri",
+      "message": "Azzera il filtro settore o tag, oppure cerca un altro termine.",
+      "action": "Azzera i filtri"
+    },
+    "viewDocument": "Visualizza documento",
+    "unsafeDocumentUrl": "Link al documento non disponibile",
     "heading": "Libreria di referenze",
     "subtitle": "Prove che vincono le gare: il caso studio e la testimonianza giusti per ogni proposta.",
     "newButton": "Nuova referenza",

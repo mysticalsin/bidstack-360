@@ -1597,6 +1597,57 @@
       "title": "Notes de décision",
       "placeholder": "Ajoutez la justification, les points clés ou les conditions pour soumissionner…",
       "aria": "Notes de décision de l'offre"
+    },
+    "panel": {
+      "composite": "Score composite",
+      "compositeDescription": "Soumissionner à partir de {{bid}}, conditionnel à partir de {{caution}}.",
+      "deltaVsSaved": "vs enregistré",
+      "recommendation": "Recommandation",
+      "recommendationPending": "Pas encore noté",
+      "recommendationDescription": "Un score sous le seuil exige une dérogation enregistrée avant sauvegarde.",
+      "rated": "Critères notés",
+      "ratedDescription": "Les critères non notés comptent pour zéro dans le composite.",
+      "weightRated": "Poids noté",
+      "weightRatedDescription": "sur {{total}} points pondérés portent une note."
+    },
+    "filter": {
+      "aria": "Filtrer les critères par catégorie",
+      "all": "Tous les critères",
+      "allAria": "Tous les critères, score composite {{score}} sur 100",
+      "categoryAria": "{{category}}, score de catégorie {{score}} sur 100"
+    },
+    "category": {
+      "strategic": "Alignement stratégique",
+      "technical": "Maturité technique",
+      "commercial": "Viabilité commerciale",
+      "risk": "Évaluation des risques"
+    },
+    "categoryShort": {
+      "strategic": "Stratégique",
+      "technical": "Technique",
+      "commercial": "Commercial",
+      "risk": "Risque"
+    },
+    "rating": {
+      "unrated": "Non noté",
+      "veryWeak": "Très faible",
+      "weak": "Faible",
+      "neutral": "Neutre",
+      "strong": "Fort",
+      "veryStrong": "Très fort"
+    },
+    "table": {
+      "criterion": "Critère",
+      "category": "Catégorie",
+      "weight": "Poids",
+      "score": "Note",
+      "rating": "Évaluation",
+      "contribution": "Points",
+      "total": "Total pondéré",
+      "empty": "Aucun critère ne correspond à ce filtre.",
+      "sortBy": "Trier par {{column}}.",
+      "sortedAsc": "{{column}}, tri croissant. Activer pour trier par ordre décroissant.",
+      "sortedDesc": "{{column}}, tri décroissant. Activer pour trier par ordre croissant."
     }
   },
   "opportunityDetail": {
@@ -1867,6 +1918,23 @@
     "createContact": "Créer le contact"
   },
   "references": {
+    "column": {
+      "reference": "Référence",
+      "company": "Entreprise",
+      "industry": "Secteur",
+      "tags": "Étiquettes",
+      "uses": "Utilisations",
+      "lastUsed": "Dernière utilisation",
+      "document": "Document",
+      "actions": "Actions"
+    },
+    "noMatch": {
+      "title": "Aucune référence ne correspond à ces filtres",
+      "message": "Effacez le filtre secteur ou étiquette, ou recherchez un autre terme.",
+      "action": "Effacer les filtres"
+    },
+    "viewDocument": "Voir le document",
+    "unsafeDocumentUrl": "Lien du document indisponible",
     "heading": "Bibliothèque de références",
     "subtitle": "Des preuves qui remportent les appels d'offres — la bonne étude de cas et le bon témoignage pour chaque proposition.",
     "newButton": "Nouvelle référence",

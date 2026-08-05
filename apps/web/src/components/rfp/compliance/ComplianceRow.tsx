@@ -1,178 +1,322 @@
+// One requirement, at table density, in three slots:
+//
+//   value | provenance-if-applied | suggestion-if-proposed
+//
+// The value is the answer as it stands. If an agent fact was accepted into it,
+// the value carries a dotted underline and a hover receipt (SourcedValue +
+// Provenance). If a fact is still proposed, a pale strip sits under the row
+// with the proposal, its rationale, and the two clicks that settle it.
+//
+// UNKNOWN IS NEUTRAL. AssessmentStatus PENDING/UNAVAILABLE renders a grey dot
+// and the words "Not assessed", and a null confidence renders an em-dash —
+// never a red badge, never 0%. "We have not looked at this" is not "this
+// fails", and the matrix is the one screen where confusing the two loses bids.
+
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EditorContent, useEditor } from '@tiptap/react';
-import { StarterKit } from '@tiptap/starter-kit';
 import DOMPurify from 'dompurify';
 
+import { ProposedAnswers } from '@/components/agent/ProposedAnswers';
+import { confidencePct, pageRange } from '@/components/agent/bid-fact-view';
 import { AiDisclosureBadge } from '@/components/rfp/shared/AiDisclosureBadge';
+import { EmptyCellValue } from '@/components/table-kit/empty-cell';
+import { Provenance, SOURCED_VALUE, SourcedValue } from '@/components/table-kit/sourced-value';
+import { StatusIndicator, type StatusTone } from '@/components/table-kit/status-indicator';
+import { TableCell, TableRow } from '@/components/table-kit/table';
+import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
+import type { BidFact } from '@/hooks/agent/useBidFacts';
 import type { ComplianceRow as ComplianceRowData } from '@/hooks/rfp/useRfpCompliance';
+import { cn } from '@/lib/cn';
+import { formatDate } from '@/lib/format';
+import { ROW_ACCENT } from '@/lib/table/row-accent';
 
-interface ComplianceRowProps {
-  row: ComplianceRowData;
-  onSave: (rowId: string, answerDraft: string) => void;
-  isSaving: boolean;
-  style?: React.CSSProperties;
-}
+import { ComplianceAnswerEditor } from './ComplianceAnswerEditor';
 
-const STATUS_STYLES: Record<ComplianceRowData['status'], string> = {
-  pending: 'bg-[var(--tag-gray-bg)] text-[var(--tag-gray-fg)]',
-  compliant: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
-  partial: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
-  non_compliant: 'bg-[var(--tag-tomato-bg)] text-[var(--tag-tomato-fg)]',
+const STATUS_TONE: Record<ComplianceRowData['status'], StatusTone> = {
+  // Not "error": a pending row has no verdict at all yet.
+  pending: 'neutral',
+  compliant: 'success',
+  partial: 'warning',
+  non_compliant: 'error',
 };
 
-const STATUS_LABELS: Record<ComplianceRowData['status'], string> = {
+const STATUS_FALLBACK: Record<ComplianceRowData['status'], string> = {
   pending: 'Pending',
   compliant: 'Compliant',
   partial: 'Partial',
   non_compliant: 'Non-compliant',
 };
 
-/**
- * Lazy TipTap editor — only mounts a ProseMirror instance when the row is
- * being edited. WHY: compliance matrices can have 200+ rows; mounting TipTap
- * for every row on load would create 200+ ProseMirror instances and tank
- * render performance. The textarea content is an HTML string stored in
- * answerDraft; TipTap reads and writes it as rich text.
- */
-function ComplianceEditorInner({
-  initialContent,
-  onDone,
-  isSaving,
-  rowLabel,
-}: {
-  initialContent: string;
-  onDone: (html: string) => void;
+export interface ComplianceRowProps {
+  row: ComplianceRowData;
+  /** Live proposals for this row. */
+  proposed: readonly BidFact[];
+  /** The fact currently behind this row's answer, if the answer came from one. */
+  applied: BidFact | null;
+  columnCount: number;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  onSave: (rowId: string, answerDraft: string) => void;
   isSaving: boolean;
-  rowLabel: string;
-}) {
-  const { t } = useTranslation('rfp');
-
-  const editor = useEditor({
-    extensions: [StarterKit],
-    content: initialContent || '',
-    editorProps: {
-      attributes: {
-        role: 'textbox',
-        'aria-multiline': 'true',
-        'aria-label': `Edit response for: ${rowLabel}`,
-        class:
-          'min-h-[72px] p-2 text-xs text-[var(--fg-primary)] focus:outline-none prose prose-xs max-w-none dark:prose-invert',
-      },
-    },
-  });
-
-  return (
-    <div className="mt-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] focus-within:ring-1 focus-within:ring-[var(--brand-primary)]">
-      <EditorContent editor={editor} />
-      <div className="flex justify-end border-t border-[var(--border-subtle)] px-2 py-1">
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => {
-            if (editor) {
-              onDone(editor.getText() ? editor.getHTML() : '');
-            }
-          }}
-          className="min-h-[44px] min-w-[44px] rounded-md px-2 py-1 text-[10px] font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={t('compliance.done')}
-        >
-          {isSaving ? t('states.saving') : t('compliance.done')}
-        </button>
-      </div>
-    </div>
-  );
+  busyFactId: string | null;
+  errorFactId: string | null;
+  errorMessage: string | null;
+  onDecide: (factId: string, decision: 'accept' | 'dismiss') => void;
 }
 
-export function ComplianceRow({ row, onSave, isSaving, style }: ComplianceRowProps) {
+export function ComplianceRow(props: ComplianceRowProps) {
+  const { row, proposed, applied, columnCount, expanded, onToggleExpanded } = props;
   const { t } = useTranslation('rfp');
   const [isEditing, setIsEditing] = useState(false);
-  // Null confidence = no assessment produced one — render "not assessed",
-  // never a fake 0% (fusion Phase 6: unknown ≠ bad).
-  const confidencePct =
-    row.aiConfidenceBps === null ? null : Math.round(row.aiConfidenceBps / 100);
+  const detailId = `compliance-detail-${row.id}`;
 
   function handleDone(html: string) {
-    onSave(row.id, html);
+    props.onSave(row.id, html);
     setIsEditing(false);
   }
 
   return (
-    <div
-      className="flex items-start gap-3 border-b border-[var(--border-subtle)] px-4 py-3"
-      style={style}
-    >
-      {/* Requirement + editable response */}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-[var(--fg-primary)] line-clamp-2">
-          {row.requirement}
-        </p>
-        {!isEditing && row.response && (
-          // Sanitize TipTap HTML before rendering. Content originates from users/AI
-          // but XSS defense-in-depth is mandatory (CSP is not enough for stored HTML).
-          <p
-            className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-2 prose prose-xs max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(row.response) }}
-          />
-        )}
-        {!isEditing && !row.response && (
-          <p className="mt-1 text-xs italic text-[var(--fg-tertiary)]">
-            {t('compliance.noResponse')}
-          </p>
-        )}
-        {isEditing && (
-          <ComplianceEditorInner
-            initialContent={row.response ?? ''}
-            onDone={handleDone}
-            isSaving={isSaving}
-            rowLabel={row.requirement}
-          />
-        )}
-      </div>
-
-      {/* Status badge + AI disclosure + edit toggle */}
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <span
-          className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold ${STATUS_STYLES[row.status]}`}
-          aria-label={`Status: ${STATUS_LABELS[row.status]}`}
-        >
-          {STATUS_LABELS[row.status]}
-        </span>
-        {row.autoFilled && (
-          // EU AI Act Art. 50 — unambiguous AI disclosure is mandatory for
-          // auto-filled compliance answers. The AiDisclosureBadge is always
-          // visible when autoFilled=true; it is not behind a toggle.
-          <div className="flex flex-col items-end gap-0.5">
-            <AiDisclosureBadge />
-            {confidencePct !== null && (
+    <>
+      <TableRow
+        className={ROW_ACCENT}
+        onClick={onToggleExpanded}
+        aria-expanded={expanded}
+        aria-controls={detailId}
+      >
+        <TableCell className="overflow-hidden px-3 py-2">
+          <span className="flex items-center gap-1.5">
+            {row.mandatory && (
               <span
-                className="text-[10px] text-[var(--fg-tertiary)]"
-                aria-label={`AI confidence: ${confidencePct}%`}
+                className="text-xs font-semibold text-warning"
+                title={t('compliance.mandatory', 'Mandatory')}
+                aria-label={t('compliance.mandatory', 'Mandatory')}
               >
-                {confidencePct}% confidence
+                *
               </span>
             )}
-          </div>
-        )}
-        {row.assessmentStatus === 'UNAVAILABLE' && (
-          // The AI fallback ran without an assessment — say so plainly instead
-          // of implying a 0% score or a PARTIAL verdict.
-          <span className="text-[10px] italic text-[var(--fg-tertiary)]">
-            {t('compliance.notAssessed', 'Not assessed')}
+            <span className="truncate text-xs text-fg-primary" title={row.requirement}>
+              {row.requirement}
+            </span>
           </span>
-        )}
-        {/* Only show the Edit toggle when not actively editing (Done is inside the editor) */}
-        {!isEditing && (
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="min-h-[44px] min-w-[44px] rounded-md px-2 py-1 text-[10px] font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-            aria-label={t('compliance.edit')}
+        </TableCell>
+
+        <TableCell className="overflow-hidden px-3 py-2">
+          <AnswerCell row={row} applied={applied} />
+        </TableCell>
+
+        <TableCell className="overflow-hidden px-3 py-2">
+          <StatusIndicator
+            size="sm"
+            tone={STATUS_TONE[row.status]}
+            label={t(`compliance.status.${row.status}`, STATUS_FALLBACK[row.status])}
+          />
+          {row.assessmentStatus === 'UNAVAILABLE' && (
+            // The AI fallback ran without producing an assessment — say so
+            // plainly rather than implying a 0% score or a PARTIAL verdict.
+            <span className="block truncate text-[11px] italic text-fg-secondary">
+              {t('compliance.notAssessed', 'Not assessed')}
+            </span>
+          )}
+        </TableCell>
+
+        <TableCell className="px-3 py-2 text-right tabular-nums text-fg-secondary">
+          <ConfidenceCell row={row} />
+        </TableCell>
+
+        <TableCell className="px-3 py-2 text-right">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(event) => {
+              // The row toggles the detail; the button opens the editor. Without
+              // this the click would do both and the editor would open inside a
+              // panel that is closing.
+              event.stopPropagation();
+              setIsEditing(true);
+              if (!expanded) onToggleExpanded();
+            }}
+            aria-label={`${t('compliance.edit', 'Edit')}: ${row.requirement}`}
           >
-            {t('compliance.edit')}
-          </button>
-        )}
-      </div>
+            {t('compliance.edit', 'Edit')}
+          </Button>
+        </TableCell>
+      </TableRow>
+
+      {proposed.length > 0 && (
+        <TableRow className="hover:bg-transparent">
+          <TableCell colSpan={columnCount} className="whitespace-normal p-0">
+            <div className="py-1 pl-6 pr-3">
+              <ProposedAnswers
+                facts={proposed}
+                busyFactId={props.busyFactId}
+                errorFactId={props.errorFactId}
+                errorMessage={props.errorMessage}
+                onDecide={props.onDecide}
+              />
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+
+      {(expanded || isEditing) && (
+        <TableRow className="hover:bg-transparent">
+          <TableCell
+            colSpan={columnCount}
+            id={detailId}
+            className="whitespace-normal bg-surface-soft px-6 py-3 align-top"
+          >
+            <RowDetail
+              row={row}
+              applied={applied}
+              isEditing={isEditing}
+              isSaving={props.isSaving}
+              onDone={handleDone}
+              onCancelEdit={() => setIsEditing(false)}
+            />
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+function AnswerCell({ row, applied }: { row: ComplianceRowData; applied: BidFact | null }) {
+  const { t } = useTranslation('rfp');
+
+  if (!row.response) {
+    return (
+      <span className="flex items-center gap-2">
+        <EmptyCellValue />
+        <span className="sr-only">
+          {t('compliance.noResponse', 'No response — pending review')}
+        </span>
+      </span>
+    );
+  }
+
+  // Sanitize before rendering: the string is TipTap HTML written by people and
+  // by the agent, and stored HTML needs defence in depth regardless of CSP.
+  const answer = (
+    <span
+      className={cn('block truncate text-xs text-fg-primary', applied && SOURCED_VALUE)}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(row.response) }}
+    />
+  );
+
+  if (!applied) return answer;
+
+  return (
+    <SourcedValue source={<AppliedProvenance fact={applied} />} side="top">
+      {answer}
+    </SourcedValue>
+  );
+}
+
+/** The receipt: the claim, every citation, and when the agent observed it. */
+export function AppliedProvenance({ fact }: { fact: BidFact }) {
+  const { t } = useTranslation('rfp');
+
+  const reasons = fact.citations.map((citation) => {
+    const pages = pageRange(citation);
+    const where = [citation.documentName, pages ? `p. ${pages}` : null].filter(Boolean).join(', ');
+    return where ? `${where}: “${citation.quote}”` : `“${citation.quote}”`;
+  });
+
+  return (
+    <Provenance
+      claim={fact.claim}
+      reasons={reasons}
+      observedAt={t('agent.observedAt', 'Observed {{date}}', { date: formatDate(fact.createdAt) })}
+    />
+  );
+}
+
+function ConfidenceCell({ row }: { row: ComplianceRowData }) {
+  const pct = confidencePct(row.aiConfidenceBps);
+  // Null confidence = no assessment produced one. An em-dash, never a fake 0%.
+  if (pct === null) return <EmptyCellValue />;
+  return <span aria-label={`AI confidence: ${pct}%`}>{pct}%</span>;
+}
+
+function RowDetail({
+  row,
+  applied,
+  isEditing,
+  isSaving,
+  onDone,
+  onCancelEdit,
+}: {
+  row: ComplianceRowData;
+  applied: BidFact | null;
+  isEditing: boolean;
+  isSaving: boolean;
+  onDone: (html: string) => void;
+  onCancelEdit: () => void;
+}) {
+  const { t } = useTranslation('rfp');
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-medium text-fg-primary">{row.requirement}</p>
+
+      {row.response ? (
+        <div
+          className="prose prose-xs max-w-none text-xs text-fg-secondary dark:prose-invert"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(row.response) }}
+        />
+      ) : (
+        <p className="text-xs italic text-fg-tertiary">
+          {t('compliance.noResponse', 'No response — pending review')}
+        </p>
+      )}
+
+      {applied && <AppliedRationaleLine fact={applied} />}
+
+      {row.autoFilled && (
+        // EU AI Act Art. 50 — the disclosure is never behind a toggle. It moved
+        // out of the dense row and into the detail so the grid stays scannable;
+        // the row itself still says "not assessed" inline where that applies.
+        <AiDisclosureBadge />
+      )}
+
+      {isEditing && (
+        <ComplianceAnswerEditor
+          initialContent={row.response ?? ''}
+          onDone={onDone}
+          onCancel={onCancelEdit}
+          isSaving={isSaving}
+          rowLabel={row.requirement}
+        />
+      )}
     </div>
+  );
+}
+
+/** "filled from Meridian delivery model, p. 14 — accepted 4 Aug 2026". */
+function AppliedRationaleLine({ fact }: { fact: BidFact }) {
+  const { t } = useTranslation('rfp');
+  const source = fact.citations[0];
+  const pages = source ? pageRange(source) : null;
+
+  const origin =
+    source?.documentName && pages
+      ? t('agent.filledFromPage', 'filled from {{document}}, p. {{pages}}', {
+          document: source.documentName,
+          pages,
+        })
+      : source?.documentName
+        ? t('agent.filledFrom', 'filled from {{document}}', { document: source.documentName })
+        : t('agent.filledByAgent', 'filled by the bid agent');
+
+  const settled = fact.decidedAt
+    ? t('agent.acceptedOn', 'accepted {{date}}', { date: formatDate(fact.decidedAt) })
+    : null;
+
+  return (
+    <p className="flex items-center gap-1.5 text-[11px] text-fg-secondary">
+      <Icon name="sparkle" size={12} />
+      {[origin, settled].filter(Boolean).join(' — ')}
+    </p>
   );
 }

@@ -122,6 +122,14 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
                 autoFilled: z.boolean(),
                 aiConfidenceBps: z.number().int().min(0).max(10000).nullable(),
                 assessmentStatus: z.enum(['ASSESSED', 'UNAVAILABLE', 'PENDING']),
+                // Round 2 — the matrix's `section` and `mandatory` facets.
+                // `section` is Requirement.requirementType: there is NO section
+                // column in the schema (requirements table, schema.prisma:1640-
+                // 1680), and requirementType is the only field that groups
+                // requirements. Named `section` on the wire because that is what
+                // the surface calls it; remap here the day a real one exists.
+                section: z.string().nullable(),
+                mandatory: z.boolean(),
               }),
             ),
             total: z.number().int(),
@@ -145,7 +153,7 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
           answerDraft: true,
           confidenceBps: true,
           assessmentStatus: true,
-          requirement: { select: { text: true } },
+          requirement: { select: { text: true, requirementType: true, mandatory: true } },
         },
       });
 
@@ -166,6 +174,13 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
         autoFilled: row.responseStatus !== 'not_started',
         aiConfidenceBps: row.confidenceBps,
         assessmentStatus: row.assessmentStatus,
+        // 'general' is the column default, i.e. "not classified" — send null so
+        // the facet does not offer a bucket that means nothing.
+        section:
+          row.requirement.requirementType && row.requirement.requirementType !== 'general'
+            ? row.requirement.requirementType
+            : null,
+        mandatory: row.requirement.mandatory,
       }));
 
       return {

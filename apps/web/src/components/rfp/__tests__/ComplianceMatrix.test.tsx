@@ -1,25 +1,27 @@
 /**
- * Tests for ComplianceMatrix.
+ * Tests for ComplianceMatrix after the Round-2 density retarget.
  *
- * Implementation notes (spec vs reality):
- * - The spec describes an "Autofill button per row" — the real ComplianceRow
- *   has an Edit/Done toggle button, not Autofill. Tests reflect the real
- *   component structure.
- * - The spec says "AI badge on rows where answerDraft is present" — the real
- *   component shows AI confidence % on rows where `autoFilled=true`. Tests
- *   use `autoFilled` as the discriminator.
- * - ComplianceRow is mocked here to keep the matrix tests focused on
- *   data-loading, list rendering, and state display rather than row internals
- *   (ComplianceRow has its own test surface).
+ * What changed from the previous version of this file: the matrix is now a real
+ * <table> (it was a div list), so the old `role="list"` / `role="region"`
+ * assertions are gone and replaced with table roles. The row is no longer
+ * mocked — the whole point of the retarget is what a row renders (the three
+ * slots: value | provenance | suggestion), so stubbing it out would test
+ * nothing that matters.
  *
- * Mock strategy: vi.mock the useRfpCompliance hook and useRfpPipelineStore
- * to inject controlled data. react-i18next returns key as-is.
- * framer-motion is mocked to prevent animation timer issues.
+ * Mock strategy: the two data hooks (compliance + bid facts) and the pipeline
+ * store are mocked so the component under test is the only real thing.
+ * react-i18next returns the key as-is, so assertions match on keys.
  */
+import type { ReactNode } from 'react';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
+import { BrowserRouter } from 'react-router-dom';
 
 import { ComplianceMatrix } from '../compliance/ComplianceMatrix';
+import type * as BidFactsModule from '@/hooks/agent/useBidFacts';
+import type { BidFact } from '@/hooks/agent/useBidFacts';
 import type { ComplianceRow as ComplianceRowData } from '@/hooks/rfp/useRfpCompliance';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +29,7 @@ import type { ComplianceRow as ComplianceRowData } from '@/hooks/rfp/useRfpCompl
 // ---------------------------------------------------------------------------
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
 }));
 
 vi.mock('@/stores/rfpPipeline', () => ({
@@ -38,20 +40,18 @@ vi.mock('@/stores/rfpPipeline', () => ({
 
 vi.mock('@/hooks/rfp/useRfpCompliance', () => ({
   useRfpCompliance: vi.fn(),
-  // useSaveComplianceRow must be mocked here because ComplianceMatrix now calls
-  // it at render time; without the mock it would throw "not a function".
-  useSaveComplianceRow: vi.fn(() => ({
-    mutate: vi.fn(),
-    isPending: false,
-  })),
+  useSaveComplianceRow: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-// Stub Card to avoid framer-motion / CSS-var complexity
+vi.mock('@/hooks/agent/useBidFacts', async () => {
+  const actual = await vi.importActual<typeof BidFactsModule>('@/hooks/agent/useBidFacts');
+  return { ...actual, useSubjectBidFacts: vi.fn(), useDecideBidFact: vi.fn() };
+});
+
 vi.mock('@/components/ui/Card', () => ({
-  Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
+  Card: ({ children }: { children: ReactNode }) => <div data-testid="card">{children}</div>,
 }));
 
-// Stub StateMessages to isolate matrix from animation library
 vi.mock('@/components/ui/StateMessages', () => ({
   LoadingSkeleton: () => <div data-testid="loading-skeleton" />,
   EmptyState: ({ title, message }: { title: string; message?: string }) => (
@@ -62,22 +62,12 @@ vi.mock('@/components/ui/StateMessages', () => ({
   ),
 }));
 
-// Stub ComplianceRow — renders the row id and requirement so matrix tests can
-// count rows without depending on ComplianceRow's internal DOM structure.
-vi.mock('../compliance/ComplianceRow', () => ({
-  ComplianceRow: ({ row }: { row: ComplianceRowData }) => (
-    <div data-testid="compliance-row" data-row-id={row.id}>
-      <span>{row.requirement}</span>
-      {row.autoFilled && <span data-testid="ai-filled-indicator">AI filled</span>}
-    </div>
-  ),
-}));
+import { useRfpCompliance } from '@/hooks/rfp/useRfpCompliance';
+import { useDecideBidFact, useSubjectBidFacts } from '@/hooks/agent/useBidFacts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-import { useRfpCompliance } from '@/hooks/rfp/useRfpCompliance';
 
 type ComplianceResult = {
   items: ComplianceRowData[];
@@ -97,186 +87,261 @@ function mockCompliance(value: {
     isLoading: value.isLoading ?? false,
     isError: value.isError ?? false,
     error: value.error ?? null,
-    // Satisfy the full UseQueryResult shape with no-ops for unused fields
     isPending: value.isLoading ?? false,
     isSuccess: !!value.data,
     status: value.isLoading ? 'pending' : value.isError ? 'error' : 'success',
   } as ReturnType<typeof useRfpCompliance>);
 }
 
+const decideMutate = vi.fn();
+
+function mockFacts(bySubject: Record<string, { proposed?: BidFact[]; applied?: BidFact[] }> = {}) {
+  const map = new Map(
+    Object.entries(bySubject).map(([subjectId, buckets]) => [
+      subjectId,
+      { proposed: buckets.proposed ?? [], applied: buckets.applied ?? [] },
+    ]),
+  );
+  vi.mocked(useSubjectBidFacts).mockReturnValue({
+    bySubject: map,
+    all: [...map.values()].flatMap((entry) => [...entry.proposed, ...entry.applied]),
+    isFetching: false,
+  });
+  vi.mocked(useDecideBidFact).mockReturnValue({
+    mutate: decideMutate,
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+  } as unknown as ReturnType<typeof useDecideBidFact>);
+}
+
 function makeRow(overrides: Partial<ComplianceRowData> = {}): ComplianceRowData {
   return {
-    id: overrides.id ?? 'row-1',
-    requirement: overrides.requirement ?? 'Must provide SOC 2 Type II evidence',
-    response: overrides.response ?? null,
-    status: overrides.status ?? 'pending',
-    autoFilled: overrides.autoFilled ?? false,
-    // Null is the honest default: a fresh row has no assessment confidence.
-    aiConfidenceBps: overrides.aiConfidenceBps ?? null,
-    assessmentStatus: overrides.assessmentStatus ?? 'PENDING',
+    id: 'row-1',
+    requirement: 'Must provide SOC 2 Type II evidence',
+    response: null,
+    status: 'pending',
+    autoFilled: false,
+    aiConfidenceBps: null,
+    assessmentStatus: 'PENDING',
+    section: null,
+    mandatory: false,
     ...overrides,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Before/after
-// ---------------------------------------------------------------------------
+function makeFact(overrides: Partial<BidFact> = {}): BidFact {
+  return {
+    id: 'fact-1',
+    opportunityId: 'ws-001',
+    subjectType: 'matrix_row',
+    subjectId: 'row-1',
+    claim: 'YES — hosting is delivered from EU datacentres',
+    verdict: 'YES',
+    confidenceBps: 9100,
+    band: 'VERIFIED',
+    assessmentStatus: 'ASSESSED',
+    rationale: 'The bid library states this directly',
+    status: 'PROPOSED',
+    producedByAgentKey: 'compliance-fill',
+    decidedByUserId: null,
+    decidedAt: null,
+    createdAt: '2026-08-01T09:00:00.000Z',
+    citations: [],
+    ...overrides,
+  };
+}
+
+function renderMatrix(url = '/rfp/ws-001/pipeline') {
+  window.history.replaceState(null, '', url);
+  return render(<ComplianceMatrix />, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <NuqsAdapter>{children}</NuqsAdapter>
+      </BrowserRouter>
+    ),
+  });
+}
+
+function result(items: ComplianceRowData[]): ComplianceResult {
+  return {
+    items,
+    total: items.length,
+    compliantCount: items.filter((item) => item.status === 'compliant').length,
+    pendingCount: items.filter((item) => item.status === 'pending').length,
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockFacts();
 });
 
 afterEach(() => {
   cleanup();
+  window.history.replaceState(null, '', '/');
 });
 
 // ---------------------------------------------------------------------------
-// Loading state
-// ---------------------------------------------------------------------------
 
-describe('ComplianceMatrix — loading state', () => {
-  it('shows a loading skeleton while data is fetching', () => {
+describe('ComplianceMatrix — fetch states', () => {
+  it('shows a loading skeleton and no rows while fetching', () => {
     mockCompliance({ isLoading: true });
-    render(<ComplianceMatrix />);
+    renderMatrix();
     expect(screen.getByTestId('loading-skeleton')).toBeDefined();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('does NOT render rows while loading', () => {
-    mockCompliance({ isLoading: true });
-    render(<ComplianceMatrix />);
-    expect(screen.queryByTestId('compliance-row')).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Error state
-// ---------------------------------------------------------------------------
-
-describe('ComplianceMatrix — error state', () => {
   it('shows an error alert when the query errors', () => {
     mockCompliance({ isError: true, error: new Error('Network failure') });
-    render(<ComplianceMatrix />);
+    renderMatrix();
     expect(screen.getByRole('alert')).toBeDefined();
   });
-});
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
-
-describe('ComplianceMatrix — empty state', () => {
-  it('shows the empty state when the items array is empty', () => {
-    mockCompliance({
-      data: { items: [], total: 0, compliantCount: 0, pendingCount: 0 },
-    });
-    render(<ComplianceMatrix />);
+  it('shows the empty state for an empty matrix and for no data at all', () => {
+    mockCompliance({ data: result([]) });
+    renderMatrix();
     expect(screen.getByTestId('empty-state')).toBeDefined();
-  });
+    cleanup();
 
-  it('shows the empty state when data is null', () => {
     mockCompliance({ data: undefined });
-    render(<ComplianceMatrix />);
+    renderMatrix();
     expect(screen.getByTestId('empty-state')).toBeDefined();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Row rendering
-// ---------------------------------------------------------------------------
-
-describe('ComplianceMatrix — row rendering', () => {
-  it('renders one row per compliance item', () => {
+describe('ComplianceMatrix — density', () => {
+  it('renders one table row per requirement plus the header row', () => {
     mockCompliance({
-      data: {
-        items: [
-          makeRow({ id: 'r1', requirement: 'ISO 27001 certificate' }),
-          makeRow({ id: 'r2', requirement: 'GDPR DPA signed' }),
-          makeRow({ id: 'r3', requirement: 'Insurance coverage 5M EUR' }),
-        ],
-        total: 3,
-        compliantCount: 0,
-        pendingCount: 3,
-      },
+      data: result([
+        makeRow({ id: 'r1', requirement: 'ISO 27001 certificate' }),
+        makeRow({ id: 'r2', requirement: 'GDPR DPA signed' }),
+      ]),
     });
-    render(<ComplianceMatrix />);
-    const rows = screen.getAllByTestId('compliance-row');
-    expect(rows).toHaveLength(3);
+    renderMatrix();
+    expect(screen.getByRole('table')).toBeDefined();
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByText('ISO 27001 certificate')).toBeDefined();
+    expect(screen.getByText('GDPR DPA signed')).toBeDefined();
   });
 
-  it('renders the requirement text of each row', () => {
-    mockCompliance({
-      data: {
-        items: [makeRow({ requirement: 'Must be ISO 27001 certified' })],
-        total: 1,
-        compliantCount: 0,
-        pendingCount: 1,
-      },
-    });
-    render(<ComplianceMatrix />);
-    expect(screen.getByText('Must be ISO 27001 certified')).toBeDefined();
+  it('renders an em-dash for a missing answer and for a null confidence', () => {
+    mockCompliance({ data: result([makeRow({ response: null, aiConfidenceBps: null })]) });
+    renderMatrix();
+    // One in the answer cell, one in the confidence cell — never a 0%.
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByText('0%')).toBeNull();
   });
 
-  it('renders rows for autoFilled items with the AI filled indicator', () => {
+  it('renders an unassessed row NEUTRALLY — pending status, no red verdict', () => {
     mockCompliance({
-      data: {
-        items: [
-          makeRow({ id: 'r1', autoFilled: true, aiConfidenceBps: 8500 }),
-          makeRow({ id: 'r2', autoFilled: false }),
-        ],
-        total: 2,
-        compliantCount: 1,
-        pendingCount: 1,
-      },
+      data: result([makeRow({ status: 'pending', assessmentStatus: 'UNAVAILABLE' })]),
     });
-    render(<ComplianceMatrix />);
-    // Only the autoFilled row carries the AI indicator in the stub
-    const aiIndicators = screen.getAllByTestId('ai-filled-indicator');
-    expect(aiIndicators).toHaveLength(1);
+    renderMatrix();
+    expect(screen.getByText('compliance.status.pending')).toBeDefined();
+    expect(screen.getByText('compliance.notAssessed')).toBeDefined();
+    expect(screen.queryByText('compliance.status.non_compliant')).toBeNull();
+    // The status dot carries its tone as data — neutral, not error.
+    const dot = document.querySelector('[data-slot="indicator-dot"]');
+    expect(dot?.getAttribute('data-tone')).toBe('neutral');
   });
 
-  it('does NOT show an AI indicator on rows where autoFilled is false', () => {
+  it('paginates at 25 rows and reproduces page 2 from the URL', () => {
+    const rows = Array.from({ length: 26 }, (_, index) =>
+      makeRow({ id: `r${index}`, requirement: `Requirement ${index}` }),
+    );
+    mockCompliance({ data: result(rows) });
+    renderMatrix();
+    expect(screen.getAllByRole('row')).toHaveLength(26); // 25 rows + header
+    cleanup();
+
+    mockCompliance({ data: result(rows) });
+    renderMatrix('/rfp/ws-001/pipeline?page=2');
+    expect(screen.getAllByRole('row')).toHaveLength(2); // 1 row + header
+    expect(screen.getByText('Requirement 25')).toBeDefined();
+  });
+
+  it('applies the ?status= facet from the URL', () => {
     mockCompliance({
-      data: {
-        items: [makeRow({ autoFilled: false })],
-        total: 1,
-        compliantCount: 0,
-        pendingCount: 1,
-      },
+      data: result([
+        makeRow({ id: 'r1', requirement: 'Compliant one', status: 'compliant' }),
+        makeRow({ id: 'r2', requirement: 'Pending one', status: 'pending' }),
+      ]),
     });
-    render(<ComplianceMatrix />);
-    expect(screen.queryByTestId('ai-filled-indicator')).toBeNull();
+    renderMatrix('/rfp/ws-001/pipeline?status=compliant');
+    expect(screen.getByText('Compliant one')).toBeDefined();
+    expect(screen.queryByText('Pending one')).toBeNull();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Accessibility
-// ---------------------------------------------------------------------------
+describe('ComplianceMatrix — the strip', () => {
+  it('renders a proposed fact as an accept/dismiss strip under its row', () => {
+    mockCompliance({ data: result([makeRow({ id: 'row-1' })]) });
+    mockFacts({ 'row-1': { proposed: [makeFact()] } });
+    renderMatrix();
 
-describe('ComplianceMatrix — accessibility', () => {
-  it('exposes a labelled region when items are present', () => {
-    mockCompliance({
-      data: {
-        items: [makeRow()],
-        total: 1,
-        compliantCount: 0,
-        pendingCount: 1,
-      },
-    });
-    render(<ComplianceMatrix />);
-    // The scrollable container has role="region" with an aria-label
-    expect(screen.getByRole('region', { name: /compliance.matrixLabel/i })).toBeDefined();
+    const strip = document.querySelector('[data-slot="agent-suggestion"]');
+    expect(strip).not.toBeNull();
+    expect(within(strip as HTMLElement).getByText(/EU datacentres/)).toBeDefined();
+    expect(screen.getByRole('button', { name: 'agent.acceptAria' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'agent.dismissAria' })).toBeDefined();
   });
 
-  it('has a list with aria-label for the rows', () => {
-    mockCompliance({
-      data: {
-        items: [makeRow()],
-        total: 1,
-        compliantCount: 0,
-        pendingCount: 1,
+  it('accepts and dismisses through the decide mutation, carrying the subject id', () => {
+    mockCompliance({ data: result([makeRow({ id: 'row-1' })]) });
+    mockFacts({ 'row-1': { proposed: [makeFact({ id: 'fact-9' })] } });
+    renderMatrix();
+
+    fireEvent.click(screen.getByRole('button', { name: 'agent.acceptAria' }));
+    expect(decideMutate).toHaveBeenCalledWith({
+      factId: 'fact-9',
+      decision: 'accept',
+      subjectId: 'row-1',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'agent.dismissAria' }));
+    expect(decideMutate).toHaveBeenLastCalledWith({
+      factId: 'fact-9',
+      decision: 'dismiss',
+      subjectId: 'row-1',
+    });
+  });
+
+  it('marks a held fact amber and never as an error', () => {
+    mockCompliance({ data: result([makeRow({ id: 'row-1' })]) });
+    mockFacts({
+      'row-1': {
+        proposed: [
+          makeFact({
+            rationale: 'Held: amendment 2 contradicts the base document on SLA.',
+            confidenceBps: 4500,
+            band: 'POSSIBLE',
+          }),
+        ],
       },
     });
-    render(<ComplianceMatrix />);
-    expect(screen.getByRole('list', { name: /compliance.matrixLabel/i })).toBeDefined();
+    renderMatrix();
+
+    const strip = document.querySelector('[data-slot="agent-suggestion"]');
+    expect(strip?.getAttribute('data-held')).toBe('true');
+    expect(strip?.className).toContain('warning');
+    expect(strip?.className).not.toContain('danger');
+  });
+
+  it('gives an applied answer the sourced-value underline; a bare answer keeps none', () => {
+    mockCompliance({
+      data: result([
+        makeRow({ id: 'row-1', response: 'Yes, EU only', autoFilled: true }),
+        makeRow({ id: 'row-2', response: 'Typed by a person' }),
+      ]),
+    });
+    mockFacts({ 'row-1': { applied: [makeFact({ status: 'APPLIED' })] } });
+    renderMatrix();
+
+    const applied = screen.getByText('Yes, EU only');
+    const typed = screen.getByText('Typed by a person');
+    expect(applied.className).toContain('decoration-dotted');
+    expect(typed.className).not.toContain('decoration-dotted');
   });
 });

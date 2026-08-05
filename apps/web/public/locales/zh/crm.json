@@ -1542,6 +1542,57 @@
       "title": "决策备注",
       "placeholder": "添加理由、关键顾虑或投标条件…",
       "aria": "投标决策备注"
+    },
+    "panel": {
+      "composite": "综合得分",
+      "compositeDescription": "{{bid}} 分及以上可投标，{{caution}} 分起为有条件投标。",
+      "deltaVsSaved": "对比已保存",
+      "recommendation": "建议",
+      "recommendationPending": "尚未评分",
+      "recommendationDescription": "低于阈值的得分须先记录例外说明才能保存。",
+      "rated": "已评分标准",
+      "ratedDescription": "未评分的标准在综合得分中按零计算。",
+      "weightRated": "已评分权重",
+      "weightRatedDescription": "共 {{total}} 个加权分中已评分的部分。"
+    },
+    "filter": {
+      "aria": "按类别筛选标准",
+      "all": "全部标准",
+      "allAria": "全部标准，综合得分 {{score}}（满分 100）",
+      "categoryAria": "{{category}}，类别得分 {{score}}（满分 100）"
+    },
+    "category": {
+      "strategic": "战略契合度",
+      "technical": "技术就绪度",
+      "commercial": "商务可行性",
+      "risk": "风险评估"
+    },
+    "categoryShort": {
+      "strategic": "战略",
+      "technical": "技术",
+      "commercial": "商务",
+      "risk": "风险"
+    },
+    "rating": {
+      "unrated": "未评分",
+      "veryWeak": "很弱",
+      "weak": "较弱",
+      "neutral": "一般",
+      "strong": "较强",
+      "veryStrong": "很强"
+    },
+    "table": {
+      "criterion": "标准",
+      "category": "类别",
+      "weight": "权重",
+      "score": "评分",
+      "rating": "评级",
+      "contribution": "分值",
+      "total": "加权合计",
+      "empty": "没有符合此筛选条件的标准。",
+      "sortBy": "按{{column}}排序。",
+      "sortedAsc": "{{column}}，升序排列。激活可改为降序。",
+      "sortedDesc": "{{column}}，降序排列。激活可改为升序。"
     }
   },
   "opportunityDetail": {
@@ -1812,6 +1863,23 @@
     "createContact": "创建联系人"
   },
   "references": {
+    "column": {
+      "reference": "参考案例",
+      "company": "公司",
+      "industry": "行业",
+      "tags": "标签",
+      "uses": "使用次数",
+      "lastUsed": "最近使用",
+      "document": "文档",
+      "actions": "操作"
+    },
+    "noMatch": {
+      "title": "没有符合这些筛选条件的参考案例",
+      "message": "请清除行业或标签筛选，或换一个搜索词。",
+      "action": "清除筛选"
+    },
+    "viewDocument": "查看文档",
+    "unsafeDocumentUrl": "文档链接不可用",
     "heading": "参考资料库",
     "subtitle": "赢得投标的有力证明——为每份提案提供合适的案例研究和客户推荐。",
     "newButton": "新建参考资料",

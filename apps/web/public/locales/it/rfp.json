@@ -42,7 +42,41 @@
     "emptyMessage": "Crea la tua prima proposta per iniziare.",
     "viewProposal": "Visualizza proposta: {{name}}",
     "version": "v{{version}}",
-    "due": "Scadenza {{date}}"
+    "due": "Scadenza {{date}}",
+    "columns": {
+      "name": "Proposta",
+      "stage": "Fase",
+      "owner": "Responsabile",
+      "compliance": "Conformità",
+      "version": "Ver.",
+      "due": "Scadenza",
+      "updated": "Aggiornato"
+    },
+    "facets": {
+      "owner": "Responsabile",
+      "dueWindow": "Scadenza",
+      "compliance": "Conformità"
+    },
+    "dueWindow": {
+      "overdue": "In ritardo",
+      "week": "Entro 7 giorni",
+      "month": "Entro 30 giorni",
+      "later": "Oltre 30 giorni",
+      "none": "Senza scadenza"
+    },
+    "compliance": {
+      "complete": "Completa (90% o più)",
+      "partial": "In corso (sotto il 90%)",
+      "unscored": "Non valutata"
+    },
+    "ownerUnknown": "Responsabile sconosciuto",
+    "ownerUnassigned": "Non assegnata",
+    "searchLabel": "Cerca proposte",
+    "searchPlaceholder": "Cerca proposte…",
+    "allStages": "Tutte le fasi",
+    "emptyFiltered": "Nessuna proposta corrisponde a questi filtri.",
+    "truncated": "Vengono mostrate le {{loaded}} proposte aggiornate più di recente su {{total}}. Restringi la fase o la ricerca per vedere le altre.",
+    "percent": "{{value}}%"
   },
   "rfpCrew": {
     "statusWaiting": "In attesa",
@@ -104,6 +138,52 @@
     "label": "Bozza assistita dall'IA"
   },
   "compliance": {
-    "notAssessed": "Non valutato"
+    "notAssessed": "Non valutato",
+    "colAnswer": "Risposta",
+    "colConfidence": "Affidabilità",
+    "colActions": "Azioni",
+    "facetStatus": "Stato",
+    "facetSection": "Sezione",
+    "facetMandatory": "Obbligatorio",
+    "mandatory": "Obbligatorio",
+    "mandatoryYes": "Solo obbligatori",
+    "mandatoryNo": "Solo facoltativi",
+    "clearFilters": "Cancella filtri",
+    "noMatches": "Nessun requisito corrisponde a questi filtri.",
+    "cancel": "Annulla",
+    "status": {
+      "compliant": "Conforme",
+      "partial": "Parziale",
+      "non_compliant": "Non conforme",
+      "pending": "In attesa"
+    }
+  },
+  "states": {
+    "saving": "Salvataggio…"
+  },
+  "agent": {
+    "held": "Sospeso",
+    "heldNote": "non mediato — risolvi prima la contraddizione",
+    "accept": "Accetta",
+    "dismiss": "Scarta",
+    "acceptAria": "Accetta la risposta proposta",
+    "dismissAria": "Scarta la risposta proposta",
+    "filledFrom": "compilato da {{document}}",
+    "filledFromPage": "compilato da {{document}}, p. {{pages}}",
+    "filledByAgent": "compilato dall'agente di gara",
+    "acceptedOn": "accettato il {{date}}",
+    "observedAt": "Osservato il {{date}}",
+    "rationaleListTitle": "Cosa ha fatto l'agente",
+    "rationaleScope": "Copre i requisiti mostrati in questa pagina.",
+    "rationaleEmpty": "L'agente non ha ancora proposto nulla per questa gara.",
+    "colOutcome": "Esito",
+    "colClaim": "Cosa ha proposto",
+    "colWhen": "Quando",
+    "status": {
+      "PROPOSED": "Proposto",
+      "APPLIED": "Applicato",
+      "DISMISSED": "Scartato",
+      "SUPERSEDED": "Sostituito"
+    }
   }
 }

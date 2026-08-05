@@ -1542,6 +1542,57 @@
       "title": "Notas da decisão",
       "placeholder": "Adicione justificativa, principais preocupações ou condições para concorrer…",
       "aria": "Notas da decisão de proposta"
+    },
+    "panel": {
+      "composite": "Pontuação composta",
+      "compositeDescription": "Concorrer a partir de {{bid}}, condicional a partir de {{caution}}.",
+      "deltaVsSaved": "face ao guardado",
+      "recommendation": "Recomendação",
+      "recommendationPending": "Ainda sem pontuação",
+      "recommendationDescription": "Uma pontuação abaixo do limiar exige uma derrogação registada antes de guardar.",
+      "rated": "Critérios pontuados",
+      "ratedDescription": "Os critérios sem pontuação contam como zero no composto.",
+      "weightRated": "Peso pontuado",
+      "weightRatedDescription": "de {{total}} pontos ponderados têm pontuação."
+    },
+    "filter": {
+      "aria": "Filtrar critérios por categoria",
+      "all": "Todos os critérios",
+      "allAria": "Todos os critérios, pontuação composta {{score}} de 100",
+      "categoryAria": "{{category}}, pontuação de categoria {{score}} de 100"
+    },
+    "category": {
+      "strategic": "Alinhamento estratégico",
+      "technical": "Maturidade técnica",
+      "commercial": "Viabilidade comercial",
+      "risk": "Avaliação de riscos"
+    },
+    "categoryShort": {
+      "strategic": "Estratégico",
+      "technical": "Técnico",
+      "commercial": "Comercial",
+      "risk": "Risco"
+    },
+    "rating": {
+      "unrated": "Sem pontuação",
+      "veryWeak": "Muito fraco",
+      "weak": "Fraco",
+      "neutral": "Neutro",
+      "strong": "Forte",
+      "veryStrong": "Muito forte"
+    },
+    "table": {
+      "criterion": "Critério",
+      "category": "Categoria",
+      "weight": "Peso",
+      "score": "Pontuação",
+      "rating": "Avaliação",
+      "contribution": "Pontos",
+      "total": "Total ponderado",
+      "empty": "Nenhum critério corresponde a este filtro.",
+      "sortBy": "Ordenar por {{column}}.",
+      "sortedAsc": "{{column}}, ordem crescente. Ative para ordenar por ordem decrescente.",
+      "sortedDesc": "{{column}}, ordem decrescente. Ative para ordenar por ordem crescente."
     }
   },
   "opportunityDetail": {
@@ -1812,6 +1863,23 @@
     "createContact": "Criar contato"
   },
   "references": {
+    "column": {
+      "reference": "Referência",
+      "company": "Empresa",
+      "industry": "Setor",
+      "tags": "Etiquetas",
+      "uses": "Utilizações",
+      "lastUsed": "Última utilização",
+      "document": "Documento",
+      "actions": "Ações"
+    },
+    "noMatch": {
+      "title": "Nenhuma referência corresponde a estes filtros",
+      "message": "Limpe o filtro de setor ou etiqueta, ou pesquise outro termo.",
+      "action": "Limpar filtros"
+    },
+    "viewDocument": "Ver documento",
+    "unsafeDocumentUrl": "Ligação do documento indisponível",
     "heading": "Biblioteca de referências",
     "subtitle": "Provas que vencem licitações — o estudo de caso e o depoimento certos para cada proposta.",
     "newButton": "Nova referência",

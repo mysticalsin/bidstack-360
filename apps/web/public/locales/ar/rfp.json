@@ -1,1 +1,123 @@
-{}
+{
+  "proposals": {
+    "title": "المقترحات",
+    "subtitle": "مساحة عمل طلبات العروض — صياغة المقترحات ومراجعتها وتقديمها.",
+    "newProposal": "مقترح جديد",
+    "createProposal": "إنشاء مقترح",
+    "nameLabel": "اسم المقترح",
+    "namePlaceholder": "اسم المقترح…",
+    "creating": "جارٍ الإنشاء…",
+    "create": "إنشاء",
+    "cancel": "إلغاء",
+    "createError": "تعذر إنشاء المقترح.",
+    "resultCount": "{{count}} مقترح",
+    "loading": "جارٍ تحميل المقترحات",
+    "loadError": "تعذر تحميل المقترحات",
+    "loadErrorRetry": "يرجى المحاولة مرة أخرى بعد قليل.",
+    "emptyTitle": "لا توجد مقترحات بعد.",
+    "version": "v{{version}}",
+    "columns": {
+      "name": "المقترح",
+      "stage": "المرحلة",
+      "owner": "المسؤول",
+      "compliance": "الامتثال",
+      "version": "الإصدار",
+      "due": "الاستحقاق",
+      "updated": "آخر تحديث"
+    },
+    "facets": {
+      "owner": "المسؤول",
+      "dueWindow": "الموعد النهائي",
+      "compliance": "الامتثال"
+    },
+    "dueWindow": {
+      "overdue": "متأخر",
+      "week": "خلال 7 أيام",
+      "month": "خلال 30 يومًا",
+      "later": "بعد 30 يومًا",
+      "none": "بدون موعد نهائي"
+    },
+    "compliance": {
+      "complete": "مكتمل (90% فأكثر)",
+      "partial": "قيد التنفيذ (أقل من 90%)",
+      "unscored": "غير مقيَّم"
+    },
+    "ownerUnknown": "مسؤول غير معروف",
+    "ownerUnassigned": "غير مُسند",
+    "searchLabel": "البحث في المقترحات",
+    "searchPlaceholder": "البحث في المقترحات…",
+    "allStages": "كل المراحل",
+    "emptyFiltered": "لا توجد مقترحات مطابقة لعوامل التصفية.",
+    "truncated": "يتم عرض {{loaded}} من أحدث المقترحات المحدَّثة من أصل {{total}}. ضيّق نطاق المرحلة أو البحث للوصول إلى البقية.",
+    "percent": "{{value}}%"
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "مسودة",
+      "review": "قيد المراجعة",
+      "approved": "معتمد",
+      "submitted": "مُقدَّم",
+      "won": "مكسوب",
+      "lost": "خاسر"
+    }
+  },
+  "states": {
+    "saving": "جارٍ الحفظ…"
+  },
+  "compliance": {
+    "heading": "مصفوفة الامتثال",
+    "matrixLabel": "مصفوفة الامتثال",
+    "summary": "{{compliant}} / {{total}} مطابق · {{pending}} قيد الانتظار",
+    "noResponse": "لا توجد إجابة — بانتظار المراجعة",
+    "colRequirement": "المتطلب",
+    "colStatus": "الحالة",
+    "edit": "تحرير",
+    "done": "تم",
+    "emptyTitle": "لا توجد بيانات امتثال بعد",
+    "emptyMessage": "ستظهر صفوف الامتثال هنا بعد مرحلة تعبئة الامتثال.",
+    "notAssessed": "لم يُقيَّم",
+    "colAnswer": "الإجابة",
+    "colConfidence": "الثقة",
+    "colActions": "إجراءات",
+    "facetStatus": "الحالة",
+    "facetSection": "القسم",
+    "facetMandatory": "إلزامي",
+    "mandatory": "إلزامي",
+    "mandatoryYes": "الإلزامية فقط",
+    "mandatoryNo": "الاختيارية فقط",
+    "clearFilters": "مسح عوامل التصفية",
+    "noMatches": "لا توجد متطلبات تطابق عوامل التصفية هذه.",
+    "cancel": "إلغاء",
+    "status": {
+      "compliant": "مطابق",
+      "partial": "مطابق جزئيًا",
+      "non_compliant": "غير مطابق",
+      "pending": "قيد الانتظار"
+    }
+  },
+  "agent": {
+    "held": "معلّق",
+    "heldNote": "لم يتم حساب المتوسط — احسم التعارض أولًا",
+    "accept": "قبول",
+    "dismiss": "تجاهل",
+    "acceptAria": "قبول الإجابة المقترحة",
+    "dismissAria": "تجاهل الإجابة المقترحة",
+    "filledFrom": "معبأة من {{document}}",
+    "filledFromPage": "معبأة من {{document}}، ص {{pages}}",
+    "filledByAgent": "معبأة بواسطة وكيل العطاءات",
+    "acceptedOn": "قُبلت في {{date}}",
+    "observedAt": "لوحظت في {{date}}",
+    "rationaleListTitle": "ما قام به الوكيل",
+    "rationaleScope": "يشمل المتطلبات المعروضة في هذه الصفحة.",
+    "rationaleEmpty": "لم يقترح الوكيل أي شيء على هذا العطاء بعد.",
+    "colOutcome": "النتيجة",
+    "colClaim": "ما اقترحه",
+    "colWhen": "متى",
+    "status": {
+      "PROPOSED": "مقترح",
+      "APPLIED": "مطبَّق",
+      "DISMISSED": "متجاهَل",
+      "SUPERSEDED": "مُستبدَل"
+    }
+  }
+}

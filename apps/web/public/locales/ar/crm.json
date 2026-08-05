@@ -1,1 +1,74 @@
-{}
+{
+  "references": {
+    "column": {
+      "reference": "المرجع",
+      "company": "الشركة",
+      "industry": "القطاع",
+      "tags": "الوسوم",
+      "uses": "مرات الاستخدام",
+      "lastUsed": "آخر استخدام",
+      "document": "المستند",
+      "actions": "الإجراءات"
+    },
+    "noMatch": {
+      "title": "لا توجد مراجع تطابق هذه المرشحات",
+      "message": "امسح مرشح القطاع أو الوسم، أو ابحث عن مصطلح آخر.",
+      "action": "مسح المرشحات"
+    },
+    "viewDocument": "عرض المستند",
+    "unsafeDocumentUrl": "رابط المستند غير متاح"
+  },
+  "bidNoBid": {
+    "panel": {
+      "composite": "النتيجة المركبة",
+      "compositeDescription": "قدّم العرض عند {{bid}} فأكثر، ومشروط ابتداءً من {{caution}}.",
+      "deltaVsSaved": "مقارنة بالمحفوظ",
+      "recommendation": "التوصية",
+      "recommendationPending": "لم يُقيَّم بعد",
+      "recommendationDescription": "النتيجة دون العتبة تتطلب تجاوزًا مسجلًا قبل الحفظ.",
+      "rated": "المعايير المقيَّمة",
+      "ratedDescription": "المعايير غير المقيَّمة تُحتسب صفرًا في النتيجة المركبة.",
+      "weightRated": "الوزن المقيَّم",
+      "weightRatedDescription": "من أصل {{total}} نقطة مرجّحة تحمل تقييمًا."
+    },
+    "filter": {
+      "aria": "تصفية المعايير حسب الفئة",
+      "all": "كل المعايير",
+      "allAria": "كل المعايير، النتيجة المركبة {{score}} من 100",
+      "categoryAria": "{{category}}، نتيجة الفئة {{score}} من 100"
+    },
+    "category": {
+      "strategic": "التوافق الاستراتيجي",
+      "technical": "الجاهزية التقنية",
+      "commercial": "الجدوى التجارية",
+      "risk": "تقييم المخاطر"
+    },
+    "categoryShort": {
+      "strategic": "استراتيجي",
+      "technical": "تقني",
+      "commercial": "تجاري",
+      "risk": "المخاطر"
+    },
+    "rating": {
+      "unrated": "غير مقيَّم",
+      "veryWeak": "ضعيف جدًا",
+      "weak": "ضعيف",
+      "neutral": "متوسط",
+      "strong": "قوي",
+      "veryStrong": "قوي جدًا"
+    },
+    "table": {
+      "criterion": "المعيار",
+      "category": "الفئة",
+      "weight": "الوزن",
+      "score": "الدرجة",
+      "rating": "التقييم",
+      "contribution": "النقاط",
+      "total": "الإجمالي المرجّح",
+      "empty": "لا توجد معايير مطابقة لهذه التصفية.",
+      "sortBy": "الترتيب حسب {{column}}.",
+      "sortedAsc": "{{column}}، مرتَّب تصاعديًا. فعّل للترتيب تنازليًا.",
+      "sortedDesc": "{{column}}، مرتَّب تنازليًا. فعّل للترتيب تصاعديًا."
+    }
+  }
+}

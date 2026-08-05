@@ -42,7 +42,41 @@
     "emptyMessage": "Crea tu primera propuesta para comenzar.",
     "viewProposal": "Ver propuesta: {{name}}",
     "version": "v{{version}}",
-    "due": "Vence {{date}}"
+    "due": "Vence {{date}}",
+    "columns": {
+      "name": "Propuesta",
+      "stage": "Etapa",
+      "owner": "Responsable",
+      "compliance": "Cumplimiento",
+      "version": "Ver.",
+      "due": "Vencimiento",
+      "updated": "Actualizado"
+    },
+    "facets": {
+      "owner": "Responsable",
+      "dueWindow": "Vencimiento",
+      "compliance": "Cumplimiento"
+    },
+    "dueWindow": {
+      "overdue": "Vencida",
+      "week": "Vence en 7 días",
+      "month": "Vence en 30 días",
+      "later": "Más de 30 días",
+      "none": "Sin fecha límite"
+    },
+    "compliance": {
+      "complete": "Completo (90 % o más)",
+      "partial": "En curso (menos del 90 %)",
+      "unscored": "Sin evaluar"
+    },
+    "ownerUnknown": "Responsable desconocido",
+    "ownerUnassigned": "Sin asignar",
+    "searchLabel": "Buscar propuestas",
+    "searchPlaceholder": "Buscar propuestas…",
+    "allStages": "Todas las etapas",
+    "emptyFiltered": "Ninguna propuesta coincide con estos filtros.",
+    "truncated": "Mostrando las {{loaded}} propuestas actualizadas más recientemente de {{total}}. Ajusta la etapa o la búsqueda para ver el resto.",
+    "percent": "{{value}} %"
   },
   "rfpCrew": {
     "statusWaiting": "En espera",
@@ -104,6 +138,52 @@
     "label": "Borrador asistido por IA"
   },
   "compliance": {
-    "notAssessed": "Sin evaluar"
+    "notAssessed": "Sin evaluar",
+    "colAnswer": "Respuesta",
+    "colConfidence": "Confianza",
+    "colActions": "Acciones",
+    "facetStatus": "Estado",
+    "facetSection": "Sección",
+    "facetMandatory": "Obligatorio",
+    "mandatory": "Obligatorio",
+    "mandatoryYes": "Solo obligatorios",
+    "mandatoryNo": "Solo opcionales",
+    "clearFilters": "Borrar filtros",
+    "noMatches": "Ningún requisito coincide con estos filtros.",
+    "cancel": "Cancelar",
+    "status": {
+      "compliant": "Conforme",
+      "partial": "Parcial",
+      "non_compliant": "No conforme",
+      "pending": "Pendiente"
+    }
+  },
+  "states": {
+    "saving": "Guardando…"
+  },
+  "agent": {
+    "held": "En espera",
+    "heldNote": "sin promediar — resuelve antes la contradicción",
+    "accept": "Aceptar",
+    "dismiss": "Descartar",
+    "acceptAria": "Aceptar la respuesta propuesta",
+    "dismissAria": "Descartar la respuesta propuesta",
+    "filledFrom": "rellenado desde {{document}}",
+    "filledFromPage": "rellenado desde {{document}}, p. {{pages}}",
+    "filledByAgent": "rellenado por el agente de ofertas",
+    "acceptedOn": "aceptado el {{date}}",
+    "observedAt": "Observado el {{date}}",
+    "rationaleListTitle": "Lo que hizo el agente",
+    "rationaleScope": "Cubre los requisitos mostrados en esta página.",
+    "rationaleEmpty": "El agente aún no ha propuesto nada en esta oferta.",
+    "colOutcome": "Resultado",
+    "colClaim": "Lo que propuso",
+    "colWhen": "Cuándo",
+    "status": {
+      "PROPOSED": "Propuesto",
+      "APPLIED": "Aplicado",
+      "DISMISSED": "Descartado",
+      "SUPERSEDED": "Sustituido"
+    }
   }
 }

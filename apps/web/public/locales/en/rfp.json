@@ -3,7 +3,8 @@
     "rfpSection": "RFP Automation"
   },
   "states": {
-    "error": "Something went wrong. Please try again."
+    "error": "Something went wrong. Please try again.",
+    "saving": "Saving…"
   },
   "upload": {
     "title": "Upload RFP Document",
@@ -81,7 +82,25 @@
     "done": "Done",
     "emptyTitle": "No compliance data yet",
     "emptyMessage": "Compliance rows will appear here after the compliance fill stage.",
-    "notAssessed": "Not assessed"
+    "notAssessed": "Not assessed",
+    "colAnswer": "Answer",
+    "colConfidence": "Confidence",
+    "colActions": "Actions",
+    "facetStatus": "Status",
+    "facetSection": "Section",
+    "facetMandatory": "Mandatory",
+    "mandatory": "Mandatory",
+    "mandatoryYes": "Mandatory only",
+    "mandatoryNo": "Optional only",
+    "clearFilters": "Clear filters",
+    "noMatches": "No requirements match these filters.",
+    "cancel": "Cancel",
+    "status": {
+      "compliant": "Compliant",
+      "partial": "Partial",
+      "non_compliant": "Non-compliant",
+      "pending": "Pending"
+    }
   },
   "approval": {
     "title": "Review & Approve",
@@ -170,7 +189,41 @@
     "emptyMessage": "Create your first proposal to get started.",
     "viewProposal": "View proposal: {{name}}",
     "version": "v{{version}}",
-    "due": "Due {{date}}"
+    "due": "Due {{date}}",
+    "columns": {
+      "name": "Proposal",
+      "stage": "Stage",
+      "owner": "Owner",
+      "compliance": "Compliance",
+      "version": "Ver.",
+      "due": "Due",
+      "updated": "Updated"
+    },
+    "facets": {
+      "owner": "Owner",
+      "dueWindow": "Deadline",
+      "compliance": "Compliance"
+    },
+    "dueWindow": {
+      "overdue": "Overdue",
+      "week": "Due within 7 days",
+      "month": "Due within 30 days",
+      "later": "Due beyond 30 days",
+      "none": "No deadline"
+    },
+    "compliance": {
+      "complete": "Complete (90%+)",
+      "partial": "In progress (below 90%)",
+      "unscored": "Not scored"
+    },
+    "ownerUnknown": "Unknown owner",
+    "ownerUnassigned": "Unassigned",
+    "searchLabel": "Search proposals",
+    "searchPlaceholder": "Search proposals…",
+    "allStages": "All stages",
+    "emptyFiltered": "No proposals match these filters.",
+    "truncated": "Showing the {{loaded}} most recently updated proposals of {{total}}. Narrow the stage or search to reach the rest.",
+    "percent": "{{value}}%"
   },
   "rfpCrew": {
     "statusWaiting": "Waiting",
@@ -230,5 +283,30 @@
     "ariaLabel": "This content was generated with AI assistance",
     "title": "AI-assisted draft — review before sending",
     "label": "AI-assisted draft"
+  },
+  "agent": {
+    "held": "Held",
+    "heldNote": "not averaged — resolve the disagreement first",
+    "accept": "Accept",
+    "dismiss": "Dismiss",
+    "acceptAria": "Accept the proposed answer",
+    "dismissAria": "Dismiss the proposed answer",
+    "filledFrom": "filled from {{document}}",
+    "filledFromPage": "filled from {{document}}, p. {{pages}}",
+    "filledByAgent": "filled by the bid agent",
+    "acceptedOn": "accepted {{date}}",
+    "observedAt": "Observed {{date}}",
+    "rationaleListTitle": "What the agent did",
+    "rationaleScope": "Covers the requirements shown on this page.",
+    "rationaleEmpty": "The agent has not proposed anything on this bid yet.",
+    "colOutcome": "Outcome",
+    "colClaim": "What it proposed",
+    "colWhen": "When",
+    "status": {
+      "PROPOSED": "Proposed",
+      "APPLIED": "Applied",
+      "DISMISSED": "Dismissed",
+      "SUPERSEDED": "Superseded"
+    }
   }
 }

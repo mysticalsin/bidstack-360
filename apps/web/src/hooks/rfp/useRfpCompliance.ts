@@ -11,6 +11,10 @@ export interface ComplianceRow {
   aiConfidenceBps: number | null; // 0-10000; null = no assessment confidence exists
   // UNAVAILABLE = the AI fallback ran — render "not assessed", never 0%.
   assessmentStatus: 'ASSESSED' | 'UNAVAILABLE' | 'PENDING';
+  // Requirement.requirementType, surfaced as the matrix's "section" facet.
+  // Null = unclassified ('general'), which the facet must not offer as a bucket.
+  section: string | null;
+  mandatory: boolean;
 }
 
 interface ComplianceResult {

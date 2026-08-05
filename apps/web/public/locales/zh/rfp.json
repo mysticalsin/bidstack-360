@@ -42,7 +42,41 @@
     "emptyMessage": "创建您的第一个提案即可开始。",
     "viewProposal": "查看提案：{{name}}",
     "version": "v{{version}}",
-    "due": "截止 {{date}}"
+    "due": "截止 {{date}}",
+    "columns": {
+      "name": "提案",
+      "stage": "阶段",
+      "owner": "负责人",
+      "compliance": "合规度",
+      "version": "版本",
+      "due": "截止日期",
+      "updated": "更新时间"
+    },
+    "facets": {
+      "owner": "负责人",
+      "dueWindow": "截止日期",
+      "compliance": "合规度"
+    },
+    "dueWindow": {
+      "overdue": "已逾期",
+      "week": "7 天内到期",
+      "month": "30 天内到期",
+      "later": "30 天以后到期",
+      "none": "无截止日期"
+    },
+    "compliance": {
+      "complete": "已完成（90% 及以上）",
+      "partial": "进行中（低于 90%）",
+      "unscored": "未评分"
+    },
+    "ownerUnknown": "未知负责人",
+    "ownerUnassigned": "未分配",
+    "searchLabel": "搜索提案",
+    "searchPlaceholder": "搜索提案…",
+    "allStages": "全部阶段",
+    "emptyFiltered": "没有符合这些筛选条件的提案。",
+    "truncated": "显示 {{total}} 个提案中最近更新的 {{loaded}} 个。请缩小阶段范围或使用搜索查看其余提案。",
+    "percent": "{{value}}%"
   },
   "rfpCrew": {
     "statusWaiting": "等待中",
@@ -104,6 +138,52 @@
     "label": "AI 辅助草稿"
   },
   "compliance": {
-    "notAssessed": "未评估"
+    "notAssessed": "未评估",
+    "colAnswer": "答复",
+    "colConfidence": "置信度",
+    "colActions": "操作",
+    "facetStatus": "状态",
+    "facetSection": "章节",
+    "facetMandatory": "强制性",
+    "mandatory": "强制要求",
+    "mandatoryYes": "仅强制项",
+    "mandatoryNo": "仅可选项",
+    "clearFilters": "清除筛选",
+    "noMatches": "没有符合这些筛选条件的要求。",
+    "cancel": "取消",
+    "status": {
+      "compliant": "符合",
+      "partial": "部分符合",
+      "non_compliant": "不符合",
+      "pending": "待处理"
+    }
+  },
+  "states": {
+    "saving": "保存中…"
+  },
+  "agent": {
+    "held": "暂缓",
+    "heldNote": "未取平均值 — 请先解决来源冲突",
+    "accept": "采纳",
+    "dismiss": "忽略",
+    "acceptAria": "采纳建议答复",
+    "dismissAria": "忽略建议答复",
+    "filledFrom": "来自 {{document}}",
+    "filledFromPage": "来自 {{document}} 第 {{pages}} 页",
+    "filledByAgent": "由投标智能体填写",
+    "acceptedOn": "{{date}} 采纳",
+    "observedAt": "{{date}} 观察到",
+    "rationaleListTitle": "智能体做了什么",
+    "rationaleScope": "仅涵盖本页显示的要求。",
+    "rationaleEmpty": "智能体尚未对此投标提出任何建议。",
+    "colOutcome": "结果",
+    "colClaim": "建议内容",
+    "colWhen": "时间",
+    "status": {
+      "PROPOSED": "已建议",
+      "APPLIED": "已采纳",
+      "DISMISSED": "已忽略",
+      "SUPERSEDED": "已取代"
+    }
   }
 }

@@ -1543,6 +1543,57 @@
       "title": "Decision Notes",
       "placeholder": "Add rationale, key concerns, or conditions for bidding…",
       "aria": "Bid decision notes"
+    },
+    "panel": {
+      "composite": "Composite score",
+      "compositeDescription": "Bid at {{bid}} and above, conditional from {{caution}}.",
+      "deltaVsSaved": "vs saved",
+      "recommendation": "Recommendation",
+      "recommendationPending": "Not yet rated",
+      "recommendationDescription": "A score below the threshold requires a logged override before it saves.",
+      "rated": "Criteria rated",
+      "ratedDescription": "Unrated criteria count as zero in the composite.",
+      "weightRated": "Weight rated",
+      "weightRatedDescription": "of {{total}} weighted points carry a rating."
+    },
+    "filter": {
+      "aria": "Filter criteria by category",
+      "all": "All criteria",
+      "allAria": "All criteria, composite score {{score}} of 100",
+      "categoryAria": "{{category}}, category score {{score}} of 100"
+    },
+    "category": {
+      "strategic": "Strategic Alignment",
+      "technical": "Technical Readiness",
+      "commercial": "Commercial Viability",
+      "risk": "Risk Assessment"
+    },
+    "categoryShort": {
+      "strategic": "Strategic",
+      "technical": "Technical",
+      "commercial": "Commercial",
+      "risk": "Risk"
+    },
+    "rating": {
+      "unrated": "Not rated",
+      "veryWeak": "Very weak",
+      "weak": "Weak",
+      "neutral": "Neutral",
+      "strong": "Strong",
+      "veryStrong": "Very strong"
+    },
+    "table": {
+      "criterion": "Criterion",
+      "category": "Category",
+      "weight": "Weight",
+      "score": "Score",
+      "rating": "Rating",
+      "contribution": "Points",
+      "total": "Weighted total",
+      "empty": "No criteria match this filter.",
+      "sortBy": "Sort by {{column}}.",
+      "sortedAsc": "{{column}}, sorted ascending. Activate to sort descending.",
+      "sortedDesc": "{{column}}, sorted descending. Activate to sort ascending."
     }
   },
   "opportunityDetail": {
@@ -1813,6 +1864,23 @@
     "createContact": "Create contact"
   },
   "references": {
+    "column": {
+      "reference": "Reference",
+      "company": "Company",
+      "industry": "Industry",
+      "tags": "Tags",
+      "uses": "Uses",
+      "lastUsed": "Last used",
+      "document": "Document",
+      "actions": "Actions"
+    },
+    "noMatch": {
+      "title": "No references match these filters",
+      "message": "Clear the industry or tag facet, or search for a different term.",
+      "action": "Clear filters"
+    },
+    "viewDocument": "View document",
+    "unsafeDocumentUrl": "Document link unavailable",
     "heading": "Reference Library",
     "subtitle": "Proof that wins bids — the right case study and testimonial for every proposal.",
     "newButton": "New reference",

@@ -42,7 +42,41 @@
     "emptyMessage": "Crie sua primeira proposta para começar.",
     "viewProposal": "Ver proposta: {{name}}",
     "version": "v{{version}}",
-    "due": "Vencimento {{date}}"
+    "due": "Vencimento {{date}}",
+    "columns": {
+      "name": "Proposta",
+      "stage": "Fase",
+      "owner": "Responsável",
+      "compliance": "Conformidade",
+      "version": "Ver.",
+      "due": "Prazo",
+      "updated": "Atualizado"
+    },
+    "facets": {
+      "owner": "Responsável",
+      "dueWindow": "Prazo",
+      "compliance": "Conformidade"
+    },
+    "dueWindow": {
+      "overdue": "Atrasada",
+      "week": "Vence em 7 dias",
+      "month": "Vence em 30 dias",
+      "later": "Mais de 30 dias",
+      "none": "Sem prazo"
+    },
+    "compliance": {
+      "complete": "Completa (90% ou mais)",
+      "partial": "Em andamento (abaixo de 90%)",
+      "unscored": "Sem avaliação"
+    },
+    "ownerUnknown": "Responsável desconhecido",
+    "ownerUnassigned": "Não atribuída",
+    "searchLabel": "Pesquisar propostas",
+    "searchPlaceholder": "Pesquisar propostas…",
+    "allStages": "Todas as fases",
+    "emptyFiltered": "Nenhuma proposta corresponde a estes filtros.",
+    "truncated": "A mostrar as {{loaded}} propostas atualizadas mais recentemente de {{total}}. Restrinja a fase ou a pesquisa para ver as restantes.",
+    "percent": "{{value}}%"
   },
   "rfpCrew": {
     "statusWaiting": "Aguardando",
@@ -104,6 +138,52 @@
     "label": "Rascunho assistido por IA"
   },
   "compliance": {
-    "notAssessed": "Não avaliado"
+    "notAssessed": "Não avaliado",
+    "colAnswer": "Resposta",
+    "colConfidence": "Confiança",
+    "colActions": "Ações",
+    "facetStatus": "Status",
+    "facetSection": "Seção",
+    "facetMandatory": "Obrigatório",
+    "mandatory": "Obrigatório",
+    "mandatoryYes": "Apenas obrigatórios",
+    "mandatoryNo": "Apenas opcionais",
+    "clearFilters": "Limpar filtros",
+    "noMatches": "Nenhum requisito corresponde a estes filtros.",
+    "cancel": "Cancelar",
+    "status": {
+      "compliant": "Conforme",
+      "partial": "Parcial",
+      "non_compliant": "Não conforme",
+      "pending": "Pendente"
+    }
+  },
+  "states": {
+    "saving": "Salvando…"
+  },
+  "agent": {
+    "held": "Retido",
+    "heldNote": "sem média — resolva antes a contradição",
+    "accept": "Aceitar",
+    "dismiss": "Descartar",
+    "acceptAria": "Aceitar a resposta proposta",
+    "dismissAria": "Descartar a resposta proposta",
+    "filledFrom": "preenchido a partir de {{document}}",
+    "filledFromPage": "preenchido a partir de {{document}}, p. {{pages}}",
+    "filledByAgent": "preenchido pelo agente de propostas",
+    "acceptedOn": "aceito em {{date}}",
+    "observedAt": "Observado em {{date}}",
+    "rationaleListTitle": "O que o agente fez",
+    "rationaleScope": "Abrange os requisitos exibidos nesta página.",
+    "rationaleEmpty": "O agente ainda não propôs nada nesta proposta.",
+    "colOutcome": "Resultado",
+    "colClaim": "O que propôs",
+    "colWhen": "Quando",
+    "status": {
+      "PROPOSED": "Proposto",
+      "APPLIED": "Aplicado",
+      "DISMISSED": "Descartado",
+      "SUPERSEDED": "Substituído"
+    }
   }
 }

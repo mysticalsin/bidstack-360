@@ -1575,6 +1575,57 @@
       "title": "Notas de decisión",
       "placeholder": "Añade la justificación, preocupaciones clave o condiciones para pujar…",
       "aria": "Notas de decisión de la puja"
+    },
+    "panel": {
+      "composite": "Puntuación compuesta",
+      "compositeDescription": "Licitar a partir de {{bid}}, condicional desde {{caution}}.",
+      "deltaVsSaved": "frente a lo guardado",
+      "recommendation": "Recomendación",
+      "recommendationPending": "Sin puntuar todavía",
+      "recommendationDescription": "Una puntuación por debajo del umbral exige una anulación registrada antes de guardar.",
+      "rated": "Criterios puntuados",
+      "ratedDescription": "Los criterios sin puntuar cuentan como cero en el compuesto.",
+      "weightRated": "Peso puntuado",
+      "weightRatedDescription": "de {{total}} puntos ponderados tienen puntuación."
+    },
+    "filter": {
+      "aria": "Filtrar criterios por categoría",
+      "all": "Todos los criterios",
+      "allAria": "Todos los criterios, puntuación compuesta {{score}} de 100",
+      "categoryAria": "{{category}}, puntuación de categoría {{score}} de 100"
+    },
+    "category": {
+      "strategic": "Alineación estratégica",
+      "technical": "Preparación técnica",
+      "commercial": "Viabilidad comercial",
+      "risk": "Evaluación de riesgos"
+    },
+    "categoryShort": {
+      "strategic": "Estratégico",
+      "technical": "Técnico",
+      "commercial": "Comercial",
+      "risk": "Riesgo"
+    },
+    "rating": {
+      "unrated": "Sin puntuar",
+      "veryWeak": "Muy débil",
+      "weak": "Débil",
+      "neutral": "Neutro",
+      "strong": "Fuerte",
+      "veryStrong": "Muy fuerte"
+    },
+    "table": {
+      "criterion": "Criterio",
+      "category": "Categoría",
+      "weight": "Peso",
+      "score": "Puntuación",
+      "rating": "Valoración",
+      "contribution": "Puntos",
+      "total": "Total ponderado",
+      "empty": "Ningún criterio coincide con este filtro.",
+      "sortBy": "Ordenar por {{column}}.",
+      "sortedAsc": "{{column}}, orden ascendente. Active para ordenar de forma descendente.",
+      "sortedDesc": "{{column}}, orden descendente. Active para ordenar de forma ascendente."
     }
   },
   "opportunityDetail": {
@@ -1845,6 +1896,23 @@
     "createContact": "Crear contacto"
   },
   "references": {
+    "column": {
+      "reference": "Referencia",
+      "company": "Empresa",
+      "industry": "Sector",
+      "tags": "Etiquetas",
+      "uses": "Usos",
+      "lastUsed": "Último uso",
+      "document": "Documento",
+      "actions": "Acciones"
+    },
+    "noMatch": {
+      "title": "Ninguna referencia coincide con estos filtros",
+      "message": "Borra el filtro de sector o etiqueta, o busca otro término.",
+      "action": "Borrar filtros"
+    },
+    "viewDocument": "Ver documento",
+    "unsafeDocumentUrl": "Enlace del documento no disponible",
     "heading": "Biblioteca de referencias",
     "subtitle": "Pruebas que ganan licitaciones: el caso práctico y testimonio adecuados para cada propuesta.",
     "newButton": "Nueva referencia",
