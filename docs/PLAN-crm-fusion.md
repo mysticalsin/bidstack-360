@@ -48,6 +48,17 @@ what they want.
 "Reference Library" could equally sit under Bids. Revisit once it can be watched
 in use rather than argued about.
 
+**Revision, at build time.** The shell already implemented this decision. The
+existing sidebar carries six accordion sections plus Settings — seven — and
+collapses to an icon-only rail with hover flyouts, where only the active
+section's items are expanded. Building a second `AppIconRail` beside it would
+have been a rewrite of working navigation to reach the same information
+architecture, and it would have forced a secondary nav onto all 28 pages before
+any of them had been converted. What shipped instead: the rail narrowed from
+72px to the reference's 56px, and the page skeleton it frames was rebuilt. The
+in-section secondary nav stays open, to be added per page during conversion
+(steps 4–5) where a section actually has sub-destinations worth showing.
+
 ## ADR-2 — Detail and create become sheets
 
 **Decision.** Record create and record detail open in a right-side `Sheet`; the
@@ -100,8 +111,8 @@ Each step ships green and is verifiable in the live demo before the next starts.
 1. **Token layer** — accent, neutrals, radius, shadows, type. Highest leverage:
    changes every screen at once with no structural risk. *(Contrast re-verified
    per DESIGN.md §1, including the dark-mode accent trap.)*
-2. **Shell** — `AppIconRail` + `PageShell` primitives; 7-item IA with section
-   sub-nav.
+2. **Shell** — icon rail + page skeleton. *Done, with one revision to ADR-1
+   recorded below.*
 3. **Sheet infrastructure** — `DetailSheet` / `ResponsiveSheet` + URL binding.
 4. **Convert the CRM core** — Companies, Contacts, Opportunities: tables to the
    shared data-table, create + detail to sheets.

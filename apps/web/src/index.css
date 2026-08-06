@@ -833,10 +833,10 @@ select:focus-visible {
   /* Width comes from the parent grid (--sidebar-w on .app-shell). We claim
      the full track width so collapse can never produce a stale gutter. */
   /* Width is driven solely by the parent grid track (--sidebar-w on
-     .app-shell): 220px expanded, 72px collapsed. We fill that track at 100%.
+     .app-shell): 220px expanded, 56px collapsed. We fill that track at 100%.
      DO NOT hard-code a px width here — a second width declaration overrides
      this 100% and pins the element at one size inside a resizing track, which
-     produced the broken "220px sidebar jammed into a 72px rail" regression. */
+     produced the broken "220px sidebar jammed into a 56px rail" regression. */
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -847,9 +847,11 @@ select:focus-visible {
    take over labeling on hover/focus. The actual width comes from the
    parent grid via --sidebar-w (set by .app-shell.has-collapsed-sidebar). */
 .sidebar.is-collapsed {
-  padding-left: 8px;
-  padding-right: 8px;
-  /* Let the section hover-flyouts escape the 72px rail as popovers. With
+  /* 5px, not 8 — see the --sidebar-w note on .app-shell: at a 56px rail this is
+     what keeps the icon buttons ≥44px wide for coarse pointers. */
+  padding-left: 5px;
+  padding-right: 5px;
+  /* Let the section hover-flyouts escape the 56px rail as popovers. With
      overflow-y:auto the browser also computes overflow-x:auto, so the absolute
      flyouts (left:100%, 180px wide) extended the rail's scroll width to ~251px
      and produced a stray horizontal scrollbar + a scrollable second column.
@@ -1715,27 +1717,39 @@ select:focus-visible {
   border: 0;
 }
 
-/* ---------- Page head ---------- */
+/* ---------- Page head ----------
+   Two columns: title + description left, actions right (docs/DESIGN.md §5).
+   Top-aligned, not bottom-aligned — a two-line description used to drag the
+   action buttons down with it. */
 .page-head {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
   margin-bottom: 4px;
   min-width: 0;
 }
+/* Medium, not bold. A large part of the reference's calm comes from refusing
+   600/700 weights at the top of the page; hierarchy is carried by size and
+   space instead (docs/DESIGN.md §4). */
 .page-title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   color: var(--fg-primary);
   font-family: var(--font-display);
+}
+@media (min-width: 768px) {
+  .page-title {
+    font-size: 30px;
+  }
 }
 .page-sub {
   color: var(--fg-tertiary);
   font-size: 13px;
   margin-top: 4px;
+  max-width: 68ch;
 }
 .page-actions {
   display: flex;
@@ -1747,6 +1761,10 @@ select:focus-visible {
   position: relative;
   padding-bottom: 8px;
 }
+/* A plain hairline. This was a brand-coloured gradient that swept in over 0.72s
+   on every single page load — motion that announces itself, and the accent
+   spent on decoration rather than meaning (docs/DESIGN.md §7, §8). The rule's
+   job is to separate the header from the content; a border does that. */
 .motion-page-head::after {
   content: '';
   position: absolute;
@@ -1754,14 +1772,7 @@ select:focus-visible {
   right: 0;
   bottom: 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--brand-primary) 54%, transparent),
-    transparent
-  );
-  transform-origin: left center;
-  animation: bs-line-reveal 0.72s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  background: var(--border-subtle);
 }
 .account-heading-cluster > span:first-child {
   box-shadow:
@@ -2447,7 +2458,7 @@ select:focus-visible {
 
 /* ---------- App shell ---------- */
 .app-shell {
-  /* WHY a CSS var: the sidebar itself is 220px (or 72px collapsed) — driving
+  /* WHY a CSS var: the sidebar itself is 220px (or 56px collapsed) — driving
      both the grid AND the sidebar width from one variable keeps them in sync
      so a collapsed icon rail can't leave a stale gutter beside the content. */
   --sidebar-w: 220px;
@@ -2460,7 +2471,11 @@ select:focus-visible {
 }
 .app-shell.has-collapsed-sidebar,
 [data-sidebar-collapsed='true'] .app-shell {
-  --sidebar-w: 72px;
+  /* 56px = the reference's w-14 rail. The rail's own 0.5px right border eats
+     into that, so the collapsed padding is 5px per side, not 8: 56 − 0.5 − 10
+     leaves items 45.5px wide, which clears the 44px coarse-pointer touch-target
+     floor. Widening the padding drops below it — measured, not guessed. */
+  --sidebar-w: 56px;
 }
 .app-shell .main {
   min-width: 0;
@@ -2474,14 +2489,28 @@ select:focus-visible {
 [data-theme='dark'] .app-shell .main {
   background: var(--surface-page);
 }
+/* One centred column, not a full-bleed sprawl. On a 27" monitor a 2000px-wide
+   table row is unreadable — the eye loses the row between the first and last
+   column. 80rem is the reference's measure and the widest this app's densest
+   table needs (docs/DESIGN.md §5). */
 .app-shell .page {
   min-width: 0;
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
   padding: 22px 28px 60px;
   display: flex;
   flex-direction: column;
   gap: 20px;
   position: relative;
   z-index: 1;
+}
+/* Escape hatch for surfaces that genuinely own the whole viewport — a kanban
+   board that scrolls sideways, a calendar grid, a canvas. The page opts in by
+   rendering a `.page-bleed` element as its direct child; no prop plumbing
+   through the shell, and the constraint stays the default. */
+.app-shell .page:has(> .page-bleed) {
+  max-width: none;
 }
 @media (min-width: 768px) and (max-width: 900px) {
   .topbar {

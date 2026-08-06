@@ -22,6 +22,7 @@ import { useQueryState } from 'nuqs';
 import { computeBidComposite } from '@bidstack/shared';
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -177,10 +178,10 @@ export function BidNoBidPage() {
 
   return (
     <>
-      <div className="motion-page-head page-head">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="page-title">{t('bidNoBid.title', 'Bid/No-Bid Decision Matrix')}</h1>
+      <PageHeader
+        title={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {t('bidNoBid.title', 'Bid/No-Bid Decision Matrix')}
             {latestScore?.overrideJustification ? (
               <Tooltip content={latestScore.overrideJustification}>
                 <span
@@ -196,8 +197,10 @@ export function BidNoBidPage() {
                 </span>
               </Tooltip>
             ) : null}
-          </div>
-          <p className="page-sub">
+          </span>
+        }
+        description={
+          <>
             {t(
               'bidNoBid.subtitle',
               'Score each criterion to get an AI-powered go/no-go recommendation.',
@@ -207,10 +210,10 @@ export function BidNoBidPage() {
                 rated: ratedCount,
                 total: CRITERIA.length,
               })}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {opportunityId && (
+          </>
+        }
+        actions={
+          opportunityId ? (
             <>
               <Button
                 variant="secondary"
@@ -250,9 +253,9 @@ export function BidNoBidPage() {
                   : t('bidNoBid.save.label', 'Save Score')}
               </Button>
             </>
-          )}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       {actionError ? (
         <div

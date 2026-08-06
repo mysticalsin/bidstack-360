@@ -29,6 +29,7 @@ import { useQueryState } from 'nuqs';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@/components/layout/PageHeader';
 import { proposalStatusLabel } from '@/components/rfp/shared/ProposalStatusChip';
 import { DataTable } from '@/components/table-kit/data-table';
 import { Skeleton } from '@/components/table-kit/skeleton';
@@ -239,17 +240,18 @@ export function ProposalsPage() {
 function ProposalsHead({ onCreate }: { onCreate: () => void }) {
   const { t } = useTranslation('rfp');
   return (
-    <div className="motion-page-head page-head">
-      <div>
-        <h1 className="page-title">{t('proposals.title', 'Proposals')}</h1>
-        <p className="page-sub">
-          {t('proposals.subtitle', 'RFP workspace — draft, review, and submit winning proposals.')}
-        </p>
-      </div>
-      <Button variant="primary" size="sm" onClick={onCreate}>
-        {t('proposals.newProposal', 'New Proposal')}
-      </Button>
-    </div>
+    <PageHeader
+      title={t('proposals.title', 'Proposals')}
+      description={t(
+        'proposals.subtitle',
+        'RFP workspace — draft, review, and submit winning proposals.',
+      )}
+      actions={
+        <Button variant="primary" size="sm" onClick={onCreate}>
+          {t('proposals.newProposal', 'New Proposal')}
+        </Button>
+      }
+    />
   );
 }
 
