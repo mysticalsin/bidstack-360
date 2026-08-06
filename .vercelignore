@@ -27,3 +27,11 @@ handoff/
 # Working artifacts not needed by the build
 walteur-kit/
 _relay/
+
+# The Vercel project is the SPA ONLY — the API runs on Railway and the SPA calls
+# it directly via VITE_API_URL. A root `api/` directory makes Vercel add an
+# `@vercel/node` build, and its dependency tracing OOMs on this monorepo:
+# `vercel build` dies with exit 134 after copying the static output but before
+# writing `.vercel/output/config.json`, so the follow-up `--prebuilt` deploy
+# fails with "Config file was not found". Keep the functions build out of it.
+api/
