@@ -128,6 +128,46 @@ tenant. Stale demo orgs auto-reap after `DEMO_ORG_TTL_HOURS`.
 - Demo data is **per-visitor and ephemeral** — workspaces reset after
   `DEMO_ORG_TTL_HOURS`.
 
+## When Railway is down: the local-backend stopgap
+
+The Railway trial expired on 2026-08-04. All four services (api, worker,
+Postgres, Redis) have zero deployments and `railway redeploy` answers **"Your
+trial has expired. Please select a plan to continue using Railway."** The env
+vars and the `api-production-3437.up.railway.app` domain are intact, so picking
+a plan and redeploying restores the demo with no reconfiguration — that is the
+real fix, and the only one that survives this machine being switched off.
+
+Until then:
+
+```bash
+node scripts/demo-local-backend.mjs
+```
+
+It starts Postgres + Redis, builds and runs the api against the `bidstack_demo`
+database, opens a Cloudflare quick tunnel, then rebuilds the SPA against that
+tunnel and redeploys it. `--no-deploy` stops after the tunnel.
+
+**It is a stopgap, and it has teeth:**
+
+- The tunnel hostname is random and changes on every start, so the SPA has to be
+  rebuilt and redeployed each time — the api origin is inlined at build time.
+- It dies with the machine.
+- Cloudflare quick tunnels hard-cap a request at 100 seconds (Error 524). Demo
+  provisioning of a fresh tenant can approach that.
+- WebSocket realtime is already a known cross-origin casualty (see above); the
+  tunnel does not change that.
+
+Two traps worth knowing even if you never run the script, because both fail
+**silently** and look like a backend outage:
+
+- `VITE_API_URL` is stored on Vercel as a **sensitive** variable. `vercel env
+  pull` returns `[SENSITIVE]`, so a local `vercel build` bakes an EMPTY api base;
+  every request then hits the SPA origin and gets `index.html` back through the
+  catch-all rewrite. Export `VITE_API_URL` into the build environment —
+  `vite.config.ts` prefers `process.env` over the env file.
+- A stale `.vercel/.env.production.local` from an earlier session overrides the
+  pull, so a rebuild re-inlines the *old* api host. Delete it before building.
+
 ## Single-platform alternative
 
 If you'd rather run everything on Railway (one URL, no Vercel), add a third
