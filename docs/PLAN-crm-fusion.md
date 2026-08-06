@@ -113,7 +113,8 @@ Each step ships green and is verifiable in the live demo before the next starts.
    per DESIGN.md §1, including the dark-mode accent trap.)*
 2. **Shell** — icon rail + page skeleton. *Done, with one revision to ADR-1
    recorded below.*
-3. **Sheet infrastructure** — `DetailSheet` / `ResponsiveSheet` + URL binding.
+3. **Sheet infrastructure** — `ui/Sheet` + `lib/use-sheet-param` URL binding.
+   *Done.* First call site: proposal create. Detail sheets follow in step 4.
 4. **Convert the CRM core** — Companies, Contacts, Opportunities: tables to the
    shared data-table, create + detail to sheets.
 5. **Convert the rest** — remaining lists, then dashboard, then settings.
@@ -134,6 +135,18 @@ and keyboard walk of every converted surface · live demo verification.
 - Rail on narrow viewports → left `Sheet`, focus trapped, Esc closes.
 - A destination absorbed into a section must keep its old URL working (redirect,
   never a 404).
+
+## Found while building
+
+**Radix modals do not hide the page behind them.** With a sheet open, `#root`
+carries no `aria-hidden` — verified in the dev server *and* in a production
+build, so it is not a StrictMode artefact. Radix calls `hideOthers()` for this
+and it is not landing. Pointer events are blocked and focus is trapped, so the
+defect is confined to assistive tech, which can still walk the list behind the
+panel. `ui/Sheet` sets `aria-modal="true"` itself, which does not depend on that
+side effect. **`ui/Dialog` shares the same Radix code path and is still exposed**
+— fixing it at the root (or auditing every modal) is separate work, not part of
+this redesign.
 
 ## Risks
 

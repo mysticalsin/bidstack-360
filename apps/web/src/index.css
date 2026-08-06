@@ -2253,6 +2253,68 @@ select:focus-visible {
   }
 }
 
+/* ---------- Sheet (side panel) ----------
+   Motion law: ease-out on enter, the default curve, under 300ms, transform and
+   opacity only. Exit runs ~65% of enter, so closing feels like a release rather
+   than a second animation. Written as CSS keyed off Radix's `data-state` — the
+   `animate-in`/`slide-in-from-*` utility classes elsewhere in this codebase are
+   no-ops, because tailwindcss-animate is not installed. */
+@keyframes bs-sheet-in {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes bs-sheet-out {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+@keyframes bs-sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bs-sheet-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.sheet-panel[data-state='open'] {
+  animation: bs-sheet-in 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.sheet-panel[data-state='closed'] {
+  animation: bs-sheet-out 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.sheet-overlay[data-state='open'] {
+  animation: bs-sheet-fade-in 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.sheet-overlay[data-state='closed'] {
+  animation: bs-sheet-fade-out 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* Reduced motion keeps the fade — which carries the "something arrived" signal
+   — and drops the movement. Not `animation: none`: that would make the panel
+   appear with no transition at all, which reads as a glitch. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel[data-state='open'] {
+    animation: bs-sheet-fade-in 120ms linear;
+  }
+  .sheet-panel[data-state='closed'] {
+    animation: bs-sheet-fade-out 90ms linear;
+  }
+}
+
 /* ---------- Frosted glass sidebar (upgrade) ---------- */
 @supports (backdrop-filter: blur(20px)) {
   .sidebar {

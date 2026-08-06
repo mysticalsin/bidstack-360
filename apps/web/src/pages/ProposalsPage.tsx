@@ -25,7 +25,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useQueryState } from 'nuqs';
+import { parseAsString, useQueryState } from 'nuqs';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,6 +35,7 @@ import { DataTable } from '@/components/table-kit/data-table';
 import { Skeleton } from '@/components/table-kit/skeleton';
 import { Button } from '@/components/ui/Button';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { Sheet, SheetContent } from '@/components/ui/Sheet';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
 import { keepPreviousTableData, tableFetchState, useTableQuery } from '@/lib/table/use-table-query';
@@ -68,7 +69,13 @@ function LoadingRows() {
   );
 }
 
-function CreateProposalPanel({ onClose }: { onClose: () => void }) {
+// Create as a side panel (ADR-2), not a card wedged above the table. The card
+// pushed every row down the moment it opened, so the list you were reading
+// jumped; the sheet lays over it and the rows stay where they were.
+//
+// `open` stays driven by `?new=1` — the flag was already a URL param, and the
+// sheet only makes that state visible in the right place.
+function CreateProposalSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation('rfp');
   const qc = useQueryClient();
   const [name, setName] = useState('');
@@ -77,19 +84,49 @@ function CreateProposalPanel({ onClose }: { onClose: () => void }) {
       api<ProposalRow>('/api/v1/proposals', { method: 'POST', body }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['proposals'] });
+      setName('');
       onClose();
     },
   });
 
   return (
-    <GlassCard className="mb-4">
-      <h3 className="text-sm font-semibold mb-2">
-        {t('proposals.createProposal', 'Create Proposal')}
-      </h3>
-      <div className="flex gap-2">
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <SheetContent
+        size="md"
+        title={t('proposals.createProposal', 'Create Proposal')}
+        description={t(
+          'proposals.createSubtitle',
+          'Name it now; everything else is editable on the proposal itself.',
+        )}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              {t('proposals.cancel', 'Cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => create.mutate({ name })}
+              disabled={!name.trim() || create.isPending}
+            >
+              {create.isPending
+                ? t('proposals.creating', 'Creating…')
+                : t('proposals.create', 'Create')}
+            </Button>
+          </>
+        }
+      >
+        <label className="block text-xs font-medium text-fg-secondary" htmlFor="proposal-name">
+          {t('proposals.nameLabel', 'Proposal name')}
+        </label>
         <input
-          className="dialog-input flex-1"
-          aria-label={t('proposals.nameLabel', 'Proposal name')}
+          id="proposal-name"
+          className="dialog-input mt-1.5 w-full"
           placeholder={t('proposals.namePlaceholder', 'Proposal name…')}
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -97,26 +134,15 @@ function CreateProposalPanel({ onClose }: { onClose: () => void }) {
             if (event.key === 'Enter' && name.trim()) create.mutate({ name });
           }}
         />
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => create.mutate({ name })}
-          disabled={!name.trim() || create.isPending}
-        >
-          {create.isPending ? t('proposals.creating', 'Creating…') : t('proposals.create', 'Create')}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={onClose}>
-          {t('proposals.cancel', 'Cancel')}
-        </Button>
-      </div>
-      {create.isError && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400" role="alert">
-          {create.error instanceof Error
-            ? create.error.message
-            : t('proposals.createError', 'Failed to create proposal.')}
-        </p>
-      )}
-    </GlassCard>
+        {create.isError && (
+          <p className="mt-3 text-xs text-[var(--danger)]" role="alert">
+            {create.error instanceof Error
+              ? create.error.message
+              : t('proposals.createError', 'Failed to create proposal.')}
+          </p>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -131,7 +157,14 @@ export function ProposalsPage() {
   // (not local state) so the deep link is reproducible, and nuqs MERGES its
   // write — clearing the stage filter no longer wipes it, which is the exact
   // bug docs/design-system/url-param-audit.md §4 recorded on this page.
-  const [newFlag, setNewFlag] = useQueryState('new');
+  // `push`, not the default `replace`: opening the create panel moves between
+  // views rather than refining one, so it earns a history entry and Back closes
+  // the sheet instead of leaving the page (ADR-2; url-param-audit.md §6 — the
+  // same rule lib/use-sheet-param.ts follows for record sheets).
+  const [newFlag, setNewFlag] = useQueryState(
+    'new',
+    parseAsString.withOptions({ history: 'push' }),
+  );
   const { query, input } = useTableQuery(proposalsSearchParams);
 
   const search = useDebounced(input.q);
@@ -168,6 +201,13 @@ export function ProposalsPage() {
   const facets = useProposalFacets(items, ownerLabel);
   const truncated = (windowQuery.data?.total ?? 0) > items.length;
 
+  // Rendered in BOTH branches below, and outside the error early-return, so a
+  // `?new=1` deep link still opens the create panel when the list behind it
+  // failed to load. Previously the create form was unreachable in that state.
+  const createSheet = (
+    <CreateProposalSheet open={newFlag === '1'} onClose={() => void setNewFlag(null)} />
+  );
+
   if (windowQuery.isError) {
     return (
       <>
@@ -182,6 +222,7 @@ export function ProposalsPage() {
               : t('proposals.loadErrorRetry', 'Please try again in a moment.')}
           </p>
         </GlassCard>
+        {createSheet}
       </>
     );
   }
@@ -190,7 +231,7 @@ export function ProposalsPage() {
     <>
       <ProposalsHead onCreate={() => void setNewFlag('1')} />
 
-      {newFlag === '1' && <CreateProposalPanel onClose={() => void setNewFlag(null)} />}
+      {createSheet}
 
       {/* sr-only live region — announces the filtered count to AT. */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
