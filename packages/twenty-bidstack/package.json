@@ -16,7 +16,7 @@
     "typecheck": "nx typecheck twenty-bidstack"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@nestjs/common":            "*",
     "@nestjs/config":            "*",
     "@nestjs/typeorm":           "*",
