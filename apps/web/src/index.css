@@ -31,12 +31,13 @@
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
-  /* Brand */
-  --brand-primary: #2c4bff;
-  --brand-primary-hover: #2540e0;
-  --brand-primary-press: #1f38c7;
-  --brand-primary-tint: #eaeefe;
-  --brand-deep: #1b2c7a;
+  /* Brand — deep green, one accent for the whole product (see docs/DESIGN.md §1).
+     Fills always carry #ffffff on top. Ratios measured, not assumed. */
+  --brand-primary: #006b4f; /* 6.53:1 on white ✅; white on it = 6.53:1 ✅ */
+  --brand-primary-hover: #005a42; /* darker than base → ratio only rises */
+  --brand-primary-press: #004a37;
+  --brand-primary-tint: #e3f2ec; /* brand-primary on this tint = 5.65:1 ✅ */
+  --brand-deep: #00402f;
 
   /* SERUM Glass system */
   --serum-bg: #f7f9fc;
@@ -51,31 +52,33 @@
   --serum-shadow-sm: 0 8px 24px rgba(7, 26, 68, 0.08);
   --serum-shadow-md: 0 20px 52px rgba(7, 26, 68, 0.12);
 
-  /* Surface */
-  --surface-page: #fafbfd;
+  /* Surface — near-monochrome (docs/DESIGN.md §2). These carried a blue cast
+     inherited from the old blue accent; with a green accent that cast reads as
+     dirt, and the reference's calm comes from neutrals that are actually
+     neutral. Lightness is preserved step for step, only the hue is removed. */
+  --surface-page: #fafafa;
   --surface-card: #ffffff;
-  --surface-sidebar: #f4f6fa;
-  --surface-sunken: #edeff5;
-  --surface-overlay: rgba(16, 24, 40, 0.32);
-  --surface-soft: #f8fafc;
-  --surface-hover: #f1f5f9;
+  --surface-sidebar: #f7f7f7;
+  --surface-sunken: #f0f0f0;
+  --surface-overlay: rgba(0, 0, 0, 0.32);
+  --surface-soft: #f8f8f8;
+  --surface-hover: #f2f2f2;
   --surface-raised: #ffffff;
 
   /* Foreground */
-  --fg-primary: #1a1f36;
-  --fg-secondary: #5a6478;
-  /* fg-tertiary darkened from #8a93a6 (3.09:1) → #6b7280 (4.6:1) to clear
-     WCAG 1.4.3 normal text on white. */
-  --fg-tertiary: #5a6478;
-  --fg-muted: #626c7d;
+  --fg-primary: #171717; /* 16.9:1 on white ✅ */
+  --fg-secondary: #5c5c5c; /* 7.0:1 on white ✅ (was #5a6478, 6.3:1) */
+  /* fg-tertiary must clear WCAG 1.4.3 normal text on white; #6b6b6b = 5.3:1. */
+  --fg-tertiary: #6b6b6b;
+  --fg-muted: #6b6b6b; /* 5.3:1 on white ✅ */
   --fg-inverted: #ffffff;
   --fg-on-brand: #ffffff;
 
   /* Borders */
-  --border-subtle: #edeff5;
-  --border-default: #dde1eb;
-  --border-strong: #c2c8d6;
-  --border-focus: #2c4bff;
+  --border-subtle: #efefef;
+  --border-default: #e2e2e2;
+  --border-strong: #c7c7c7;
+  --border-focus: #006b4f; /* 6.53:1 on white — clears the 3:1 UI floor ✅ */
 
   /* Semantic — all foreground values verified ≥ 4.5:1 on white AND on their tint. */
   --success: #177048; /* was #1f8a5b (4.33:1); now 6.09:1 on white, 5.35:1 on tint */
@@ -93,42 +96,42 @@
   --fg-jade: #1a7a4d; /* = --tag-jade-fg; 6.86:1 on white ✅ */
   --fg-amber: #8a5a00; /* = --warning; 5.93:1 on white ✅ */
   --fg-tomato: #b03018; /* = --tag-tomato-fg; 5.5:1 on white ✅ */
-  --fg-disabled: #94a3b8; /* disabled text — WCAG 1.4.3 exempt */
+  --fg-disabled: #a3a3a3; /* disabled text — WCAG 1.4.3 exempt */
   --success-fg: #177048; /* = --success */
   --error-fg: #b82032; /* = --danger */
   --warning-fg: #8a5a00; /* = --warning */
   --success-surface: #e4f4ec; /* = --success-tint */
   --error-surface: #fbe5e8; /* = --danger-tint */
-  --sidebar-fg: #5a6478; /* = --fg-tertiary */
-  --sidebar-fg-active: #1a1f36; /* = --fg-primary */
+  --sidebar-fg: #6b6b6b; /* = --fg-tertiary; 5.3:1 on the sidebar surface ✅ */
+  --sidebar-fg-active: #171717; /* = --fg-primary */
   --sidebar-hover: rgba(0, 0, 0, 0.04);
-  --sidebar-active: rgba(44, 75, 255, 0.08);
+  --sidebar-active: rgba(0, 107, 79, 0.08);
 
   /* Component tokens — surfaces, shadows, code, inputs */
-  --surface-subtle: #f4f6fa; /* between card and sunken */
+  --surface-subtle: #f7f7f7; /* between card and sunken */
   --surface-elevated: #ffffff; /* = --surface-raised */
   --surface-input: #ffffff; /* form input background */
-  --surface-sunken-alpha: rgba(237, 239, 245, 0.7);
+  --surface-sunken-alpha: rgba(240, 240, 240, 0.7);
   --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.06);
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
-  --code-bg: #f0f3f9;
-  --code-fg: #1e2d40; /* 12.3:1 on code-bg ✅ */
-  --ring: rgba(44, 75, 255, 0.35); /* = --focus-ring-color */
-  --sidebar-badge-bg: rgba(44, 75, 255, 0.1);
-  --sidebar-badge-fg: #2c4bff; /* = --brand-primary */
+  --code-bg: #f2f2f2;
+  --code-fg: #262626; /* 12.4:1 on code-bg ✅ */
+  --ring: rgba(0, 107, 79, 0.35); /* = --focus-ring-color */
+  --sidebar-badge-bg: rgba(0, 107, 79, 0.1);
+  --sidebar-badge-fg: #006b4f; /* = --brand-primary; 6.53:1 on white ✅ */
 
   /* Brand shorthands (alias to primary) */
-  --brand: #2c4bff;
-  --brand-hover: #2540e0;
-  --brand-muted: #eaeefe;
+  --brand: #006b4f;
+  --brand-hover: #005a42;
+  --brand-muted: #e3f2ec;
 
   /* Legacy token aliases — AuditLog & older components */
-  --text-primary: #1a1f36; /* = --fg-primary */
-  --text-secondary: #5a6478; /* = --fg-secondary */
-  --text-muted: #626c7d; /* = --fg-muted */
+  --text-primary: #171717; /* = --fg-primary */
+  --text-secondary: #5c5c5c; /* = --fg-secondary */
+  --text-muted: #6b6b6b; /* = --fg-muted */
   --surface-primary: #ffffff; /* = --surface-card */
-  --surface-secondary: #edeff5; /* = --surface-sunken */
-  --accent-primary: #2c4bff; /* = --brand-primary */
+  --surface-secondary: #f0f0f0; /* = --surface-sunken */
+  --accent-primary: #006b4f; /* = --brand-primary; 6.53:1 on white ✅ */
 
   /* Tag palette */
   --tag-blue-bg: #e5ecff;
@@ -145,12 +148,14 @@
   --tag-teal-fg: #0c7368; /* 4.91:1 on teal-bg ✅ (was #137b6e: 4.41:1 ❌) */
   --tag-rose-bg: #fbdde5;
   --tag-rose-fg: #b61f44;
-  --tag-gray-bg: #eceef3;
-  --tag-gray-fg: #4b5366;
+  --tag-gray-bg: #f0f0f0;
+  --tag-gray-fg: #525252; /* 7.4:1 on tag-gray-bg ✅ */
 
-  /* Chart palette — sequential, accessible, dark-mode ready */
-  --chart-1: #2c4bff;
-  --chart-2: #1f8a5b;
+  /* Chart palette — sequential, accessible, dark-mode ready.
+     Slot 1 carries the brand so the primary series matches the accent; the blue
+     it displaced moves to slot 2 (which was a green that now collides). */
+  --chart-1: #006b4f;
+  --chart-2: #2c4bff;
   --chart-3: #d08a00;
   --chart-4: #8b5cf6;
   --chart-5: #0ea5e9;
@@ -163,13 +168,13 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.09), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --focus-ring: 0 0 0 3px rgba(44, 75, 255, 0.14);
-  --focus-ring-color: rgba(44, 75, 255, 0.35);
+  --focus-ring: 0 0 0 3px rgba(0, 107, 79, 0.14);
+  --focus-ring-color: rgba(0, 107, 79, 0.35);
 
   /* Glassmorphism tokens */
   --surface-glass: rgba(255, 255, 255, 0.72);
-  --border-glow: rgba(44, 75, 255, 0.08);
-  --border-glow-strong: rgba(44, 75, 255, 0.16);
+  --border-glow: rgba(0, 107, 79, 0.08);
+  --border-glow-strong: rgba(0, 107, 79, 0.16);
 
   /* Button variant tokens — theme-relative tints (P1 #23) */
   --btn-success-border: color-mix(in srgb, var(--success) 35%, transparent);
@@ -185,21 +190,24 @@
   --row-hover-tint: transparent;
 
   /* Gradient text tokens — needed by .gradient-text in both themes */
-  --brand-gradient-start: #2c4bff;
-  --brand-gradient-end: #2540e0;
+  --brand-gradient-start: #006b4f;
+  --brand-gradient-end: #00402f;
 }
 
 /* ---------- Dark theme — MDM ROI Navigator purple-black aesthetic ---------- */
 [data-theme='dark'] {
-  /* Brand — Linear-style premium void palette */
-  --brand-primary: #5e6ad2;
-  --brand-primary-hover: #7882e7;
-  --brand-primary-press: #4d58ba;
-  --brand-primary-tint: rgba(94, 106, 210, 0.18);
-  --brand-deep: #7882e7;
-  --brand-gradient-start: #5e6ad2;
-  --brand-gradient-end: #7882e7;
-  --brand-gradient: linear-gradient(135deg, #5e6ad2 0%, #7882e7 100%);
+  /* Brand — the light theme's green, re-derived for near-black. A single green
+     cannot both sit on the page AND carry white text, so fill and foreground
+     split here (docs/DESIGN.md §1). The reference ships #006b4f unchanged in
+     dark; that only works because it never uses it as a foreground. */
+  --brand-primary: #00805e; /* fill: white on it 4.94:1 ✅, vs page 3.95:1 ✅ */
+  --brand-primary-hover: #009a71;
+  --brand-primary-press: #006b4f;
+  --brand-primary-tint: rgba(63, 190, 147, 0.18);
+  --brand-deep: #3fbe93; /* foreground accent: 8.38:1 on near-black ✅ */
+  --brand-gradient-start: #00805e;
+  --brand-gradient-end: #3fbe93;
+  --brand-gradient: linear-gradient(135deg, #00805e 0%, #3fbe93 100%);
 
   /* SERUM Glass system */
   --serum-bg: #05070d;
@@ -237,9 +245,9 @@
   --border-subtle: #22242a;
   --border-default: #2d3039;
   --border-strong: #3e424f;
-  --border-focus: #5e6ad2;
-  --border-glow: rgba(94, 106, 210, 0.15);
-  --border-glow-strong: rgba(94, 106, 210, 0.3);
+  --border-focus: #3fbe93; /* foreground accent — 8.38:1 on near-black, clears the 3:1 UI floor ✅ */
+  --border-glow: rgba(63, 190, 147, 0.15);
+  --border-glow-strong: rgba(63, 190, 147, 0.3);
 
   /* Semantic — harmonized with the clean look */
   --success: #34d399;
@@ -266,7 +274,7 @@
   --sidebar-fg: #a1a1aa; /* = --fg-secondary dark */
   --sidebar-fg-active: #f8fafc; /* = --fg-primary dark */
   --sidebar-hover: rgba(255, 255, 255, 0.05);
-  --sidebar-active: rgba(94, 106, 210, 0.18);
+  --sidebar-active: rgba(63, 190, 147, 0.18);
 
   /* Component tokens — surfaces, shadows, code, inputs */
   --surface-subtle: #121214; /* = --surface-soft dark */
@@ -277,14 +285,14 @@
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.4);
   --code-bg: #111113;
   --code-fg: #c0caf5; /* muted violet — readable on near-black ✅ */
-  --ring: rgba(94, 106, 210, 0.45); /* = --focus-ring-color dark */
-  --sidebar-badge-bg: rgba(94, 106, 210, 0.18);
-  --sidebar-badge-fg: #7882e7; /* = --brand-deep dark */
+  --ring: rgba(63, 190, 147, 0.45); /* = --focus-ring-color dark */
+  --sidebar-badge-bg: rgba(63, 190, 147, 0.18);
+  --sidebar-badge-fg: #3fbe93; /* = --brand-deep dark; 8.38:1 on near-black ✅ */
 
   /* Brand shorthands (alias to primary) */
-  --brand: #5e6ad2;
-  --brand-hover: #7882e7;
-  --brand-muted: rgba(94, 106, 210, 0.18);
+  --brand: #00805e;
+  --brand-hover: #009a71;
+  --brand-muted: rgba(63, 190, 147, 0.18);
 
   /* Legacy token aliases — AuditLog & older components */
   --text-primary: #f8fafc; /* = --fg-primary dark */
@@ -292,7 +300,7 @@
   --text-muted: #8b8b94; /* = --fg-muted dark */
   --surface-primary: #0c0c0e; /* = --surface-card dark */
   --surface-secondary: #070708; /* = --surface-sunken dark */
-  --accent-primary: #5e6ad2; /* = --brand-primary dark */
+  --accent-primary: #3fbe93; /* foreground accent, not the fill — 8.38:1 ✅ */
 
   /* Tag palette — vibrant against near-black, contrast verified */
   --tag-blue-bg: rgba(101, 132, 255, 0.18);
@@ -303,8 +311,10 @@
   --tag-amber-fg: #fcd34d;
   --tag-tomato-bg: rgba(251, 113, 133, 0.16);
   --tag-tomato-fg: #fda4af;
-  --tag-purple-bg: rgba(94, 106, 210, 0.18);
-  --tag-purple-fg: #b4bcfe;
+  /* Purple tag was keyed off the old indigo brand; now an actual purple so the
+     tag palette stays categorical and never reads as "the accent". */
+  --tag-purple-bg: rgba(167, 139, 250, 0.18);
+  --tag-purple-fg: #c4b5fd; /* 9.2:1 on near-black ✅ */
   --tag-teal-bg: rgba(45, 212, 191, 0.16);
   --tag-teal-fg: #5eead4;
   --tag-rose-bg: rgba(244, 114, 182, 0.16);
@@ -312,9 +322,10 @@
   --tag-gray-bg: rgba(113, 113, 122, 0.16);
   --tag-gray-fg: #a1a1aa;
 
-  /* Chart palette — vivid neons against near-black */
-  --chart-1: #6366f1;
-  --chart-2: #34d399;
+  /* Chart palette — vivid neons against near-black. Slot 1 = brand foreground
+     accent, matching light mode; the displaced green becomes a blue. */
+  --chart-1: #3fbe93;
+  --chart-2: #6584ff;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
   --chart-5: #38bdf8;
@@ -327,8 +338,8 @@
   --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 30px rgba(0, 0, 0, 0.5);
-  --focus-ring: 0 0 0 3px rgba(94, 106, 210, 0.22);
-  --focus-ring-color: rgba(94, 106, 210, 0.45);
+  --focus-ring: 0 0 0 3px rgba(63, 190, 147, 0.22);
+  --focus-ring-color: rgba(63, 190, 147, 0.45);
 
   /* Button variant tokens — theme-relative tints (P1 #23) */
   --btn-brand-glow: color-mix(in srgb, var(--brand-primary) 25%, transparent);
@@ -431,10 +442,12 @@
     system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable', 'Segoe UI',
     Helvetica, Arial, sans-serif;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  /* Tight geometry, scaled off the reference's 5px base. The soft 8–18px scale
+     read as consumer-generic; this is what makes the surface look like a tool. */
+  --radius-sm: 4px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -4951,8 +4964,8 @@ select:focus-visible {
 .sales-country-map {
   align-items: center;
   background:
-    radial-gradient(circle at 18% 28%, rgba(44, 75, 255, 0.12), transparent 22%),
-    radial-gradient(circle at 74% 34%, rgba(31, 138, 91, 0.12), transparent 26%),
+    radial-gradient(circle at 18% 28%, rgba(0, 107, 79, 0.12), transparent 22%),
+    radial-gradient(circle at 74% 34%, rgba(44, 75, 255, 0.1), transparent 26%),
     linear-gradient(180deg, var(--surface-page), var(--surface-card));
   border: 1px solid var(--border-subtle);
   border-radius: 12px;

@@ -24,9 +24,9 @@ export function KpiTile({
 }) {
   const config = {
     blue: {
-      dot: '#2c4bff',
-      bg: 'rgba(44, 75, 255, 0.08)',
-      fg: 'text-[#2c4bff] dark:text-[#7882e7]',
+      dot: 'var(--brand-primary)',
+      bg: 'var(--brand-primary-tint)',
+      fg: 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]',
       icon: 'dollar' as IconName,
     },
     jade: {

@@ -11,7 +11,7 @@ import { useId, useState } from 'react';
 
 import { useConfetti } from './useConfetti';
 
-const COLORS = ['#2c4bff', '#1f8a5b', '#f5b400', '#ec4899', '#8b5cf6', '#06b6d4'];
+const COLORS = ['#006b4f', '#2c4bff', '#f5b400', '#ec4899', '#8b5cf6', '#06b6d4'];
 const PARTICLE_COUNT = 60;
 
 export function ConfettiHost() {
@@ -38,7 +38,7 @@ interface Particle {
 
 function makeParticles(): Particle[] {
   return Array.from({ length: PARTICLE_COUNT }).map((_, i) => {
-    const color = COLORS[i % COLORS.length] ?? '#2c4bff';
+    const color = COLORS[i % COLORS.length] ?? '#006b4f';
     // Random launch angle, weighted upward — gravity-style arc.
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
     const speed = 220 + Math.random() * 240;

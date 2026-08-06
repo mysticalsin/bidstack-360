@@ -2,7 +2,8 @@
 // `--brand-primary` token chain as inline styles on <html>. Base tokens in
 // index.css are never touched, so "Default" is simply "no overrides" and the
 // original blue theme is always the fallback. Values are derived from a single
-// primary hex per (accent, theme) so the whole chain stays in sync.
+// primary hex per (accent, theme) so the whole chain stays in sync. "Default"
+// is the product accent shipped in index.css — deep green (docs/DESIGN.md §1).
 
 export type AccentId = 'default' | 'violet' | 'emerald' | 'rose' | 'amber' | 'sky';
 
@@ -20,9 +21,12 @@ interface AccentDef {
 // primary-on-white (text) both clear 4.5:1; dark buttons clear the app's
 // existing 4.70:1 baseline. See scratchpad/brand/contrast.mjs.
 export const ACCENTS: AccentDef[] = [
-  { id: 'default', label: 'Default', swatch: '#2c4bff', light: null, dark: null },
+  { id: 'default', label: 'Default', swatch: '#006b4f', light: null, dark: null },
   { id: 'violet', label: 'Polo Violet', swatch: '#4a17f0', light: '#4a17f0', dark: '#6a48e6' },
-  { id: 'emerald', label: 'Emerald', swatch: '#047857', light: '#047857', dark: '#0a7d57' },
+  // Retuned from emerald #047857 to teal: with the default accent now a deep
+  // green, the old emerald was visually indistinguishable from "Default" in the
+  // picker. The id stays so stored preferences keep resolving.
+  { id: 'emerald', label: 'Teal', swatch: '#0f766e', light: '#0f766e', dark: '#14907f' },
   { id: 'rose', label: 'Rose', swatch: '#be123c', light: '#be123c', dark: '#e11d48' },
   { id: 'amber', label: 'Amber', swatch: '#b45309', light: '#b45309', dark: '#b45309' },
   { id: 'sky', label: 'Sky', swatch: '#0369a1', light: '#0369a1', dark: '#0369a1' },

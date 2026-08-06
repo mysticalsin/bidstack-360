@@ -4,8 +4,8 @@ import { ACCENTS, applyAccent, getStoredAccent, ACCENT_STORAGE_KEY } from './acc
 
 // WHY these matter: the accent system overrides live theme tokens. If a derived
 // value is malformed the whole UI accent breaks silently; if "default" fails to
-// clear, users can never get back to the shipped blue; if the light/dark values
-// don't diverge, dark-mode contrast regresses.
+// clear, users can never get back to the shipped accent; if the light/dark
+// values don't diverge, dark-mode contrast regresses.
 describe('accent', () => {
   beforeEach(() => {
     document.documentElement.removeAttribute('style');
@@ -18,7 +18,7 @@ describe('accent', () => {
     for (const a of ACCENTS) expect(a.swatch).toMatch(/^#[0-9a-f]{6}$/i);
   });
 
-  it('"default" clears inline overrides so the shipped blue is always restorable', () => {
+  it('"default" clears inline overrides so the shipped accent is always restorable', () => {
     applyAccent('violet');
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#4a17f0');
     applyAccent('default');

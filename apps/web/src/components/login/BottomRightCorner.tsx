@@ -76,7 +76,7 @@ export function BottomRightCorner() {
 
       {/* Info column */}
       <div className="flex flex-col">
-        <span className="text-[16px] md:text-[20px] font-normal text-[rgba(30,50,90,0.95)] group-hover:text-[#2c4bff] transition-colors duration-200">
+        <span className="text-[16px] md:text-[20px] font-normal text-[rgba(30,50,90,0.95)] group-hover:text-[var(--brand-primary)] transition-colors duration-200">
           {t('bottomRightCorner.title', 'Enter demo')}
         </span>
         <div className="flex items-center gap-1 text-[rgba(30,50,90,0.6)]">
