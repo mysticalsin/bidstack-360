@@ -107,7 +107,7 @@
   "devDependencies": {
     "@bidstack/db": "workspace:*",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "^4.1.8",
     "bullmq": "^5.34.6",
     "cross-env": "^10.1.0",
