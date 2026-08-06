@@ -224,6 +224,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       const adminRoleCount = await prisma.userRole.count({
         where: {
           userId: req.auth.userId,
+          // Revocation soft-deletes the assignment row — see
+          // lib/rbac-decision-cache.ts. Without this a revoked Admin keeps the
+          // override on every task in the org.
+          deletedAt: null,
           user: { orgId: req.auth.orgId, deletedAt: null },
           role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
         },
@@ -348,6 +352,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       const adminRoleCount = await prisma.userRole.count({
         where: {
           userId: req.auth.userId,
+          // Revocation soft-deletes the assignment row — see
+          // lib/rbac-decision-cache.ts. Without this a revoked Admin keeps the
+          // override on every task in the org.
+          deletedAt: null,
           user: { orgId: req.auth.orgId, deletedAt: null },
           role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
         },

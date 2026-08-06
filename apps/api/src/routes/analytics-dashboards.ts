@@ -35,6 +35,10 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
     const adminRoleCount = await prisma.userRole.count({
       where: {
         userId: req.auth.userId,
+        // Revocation soft-deletes the assignment row; without this filter a
+        // revoked Admin keeps read/edit/delete on every private dashboard in
+        // the org. Same omission as lib/rbac-decision-cache.ts had.
+        deletedAt: null,
         user: { orgId: req.auth.orgId, deletedAt: null },
         role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
       },

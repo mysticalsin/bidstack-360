@@ -98,6 +98,10 @@ describe('rbac plugin', () => {
     expect(userRoleCount).toHaveBeenCalledWith({
       where: {
         userId: 'user-1',
+        // The assignment row's own tombstone. Revocation soft-deletes it, so
+        // omitting this filter let a revoked role keep granting access; these
+        // assertions previously pinned that buggy shape.
+        deletedAt: null,
         user: { orgId: 'org-1', deletedAt: null },
         role: {
           orgId: 'org-1',
@@ -123,6 +127,10 @@ describe('rbac plugin', () => {
     expect(userRoleCount).toHaveBeenCalledWith({
       where: {
         userId: 'user-1',
+        // The assignment row's own tombstone. Revocation soft-deletes it, so
+        // omitting this filter let a revoked role keep granting access; these
+        // assertions previously pinned that buggy shape.
+        deletedAt: null,
         user: { orgId: 'org-1', deletedAt: null },
         role: {
           orgId: 'org-1',
@@ -207,12 +215,15 @@ describe('rbac plugin', () => {
     expect(userRoleCount).toHaveBeenCalledWith({
       where: {
         userId: 'user-1',
+        deletedAt: null,
         user: { orgId: 'org-1', deletedAt: null },
         role: {
           orgId: 'org-1',
           deletedAt: null,
           permissions: {
             some: {
+              // Revoking one permission from a role is soft-deleted too.
+              deletedAt: null,
               permission: { key: 'settings:write' },
             },
           },

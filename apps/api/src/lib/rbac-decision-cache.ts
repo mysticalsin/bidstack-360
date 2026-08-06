@@ -43,6 +43,12 @@ export async function userHasAnyRole(
     const assignedRoleCount = await prisma.userRole.count({
       where: {
         userId,
+        // The ASSIGNMENT row's own tombstone. Revocation is a soft delete on
+        // user_roles (routes/users.ts DELETE /users/:id/roles/:roleId), so
+        // without this the revoked user keeps the role forever: the audit log
+        // records the revoke and the users list stops showing it, while every
+        // authorization check here still passes.
+        deletedAt: null,
         user: { orgId, deletedAt: null },
         role: {
           orgId,
@@ -65,12 +71,18 @@ export async function userHasPermission(
     const assignedPermissionCount = await prisma.userRole.count({
       where: {
         userId,
+        // See userHasAnyRole: the assignment's own tombstone, without which a
+        // revoked role keeps granting every permission it carries.
+        deletedAt: null,
         user: { orgId, deletedAt: null },
         role: {
           orgId,
           deletedAt: null,
           permissions: {
             some: {
+              // RolePermission is soft-deletable too, and revoking a single
+              // permission from a role is the same class of no-op without this.
+              deletedAt: null,
               permission: { key: permission },
             },
           },
