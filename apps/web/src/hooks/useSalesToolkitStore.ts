@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { toast } from '@/components/ui/Toast';
+
 import { api } from '@/lib/api';
 import type {
   SalesToolkit,
@@ -39,6 +41,8 @@ export function useCreateToolkit() {
     mutationFn: (body: SalesToolkitCreate) =>
       api<SalesToolkit>('/api/sales-toolkits/store', { method: 'POST', body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not create toolkit'),
   });
 }
 
@@ -48,6 +52,8 @@ export function useUpdateToolkit() {
     mutationFn: ({ id, patch }: { id: string; patch: SalesToolkitPatch }) =>
       api<SalesToolkit>(`/api/sales-toolkits/store/${id}`, { method: 'PATCH', body: patch }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not update toolkit'),
   });
 }
 
@@ -57,6 +63,8 @@ export function useDeleteToolkit() {
     mutationFn: (id: string) =>
       api<null>(`/api/sales-toolkits/store/${id}`, { method: 'DELETE' }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not delete toolkit'),
   });
 }
 

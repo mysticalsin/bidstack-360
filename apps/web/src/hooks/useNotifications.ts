@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 
 export type NotificationType =
   | 'mention'
@@ -47,6 +48,8 @@ export function useMarkNotificationRead() {
     mutationFn: (id: string) =>
       api<AppNotification>(`/api/notifications/${id}/read`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not mark notification read'),
   });
 }
 
@@ -56,5 +59,7 @@ export function useMarkAllNotificationsRead() {
     mutationFn: () =>
       api<{ updated: number }>('/api/notifications/read-all', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not mark all notifications read'),
   });
 }

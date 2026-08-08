@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
+import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import type { LeadCreate, LeadDetail, LeadFilter, LeadPage, LeadPatch } from '@bidstack/shared';
 
@@ -52,6 +53,7 @@ export function useUpdateLead(id: string) {
       qc.invalidateQueries({ queryKey: [LEADS_KEY, id] });
       qc.invalidateQueries({ queryKey: [LEADS_KEY] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update lead'),
   });
 }
 
@@ -109,8 +111,9 @@ export function useUpdateLeadById() {
       });
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       ctx?.snapshots.forEach(([key, value]) => qc.setQueryData(key, value));
+      toast.error(err instanceof Error ? err.message : 'Could not update lead');
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: [LEADS_KEY] }),
   });

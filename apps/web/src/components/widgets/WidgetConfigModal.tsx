@@ -32,7 +32,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: Partial<CreateWidgetInput>;
-  onSave: (config: CreateWidgetInput) => void;
+  onSave: (config: CreateWidgetInput) => void | Promise<void>;
 }
 
 export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props) {
@@ -44,15 +44,27 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
   const [reportId, setReportId] = useState(initial?.reportId ?? '');
   const [xKey, setXKey] = useState('name');
   const [yKey, setYKey] = useState('value');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave({
-      title: title || (WIDGET_TYPES.find((w) => w.type === type)?.label ?? type),
-      type,
-      reportId: reportId || undefined,
-      config: { xKey, yKey },
-    });
-    onOpenChange(false);
+  // onSave (handleAddWidget in the parent) is async and can reject — e.g. a
+  // 403 from a role without reports:write, or a transient network error. Await
+  // it and only close on success; on failure the caller has already surfaced a
+  // toast, so just keep the modal open with the user's input intact for retry.
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave({
+        title: title || (WIDGET_TYPES.find((w) => w.type === type)?.label ?? type),
+        type,
+        reportId: reportId || undefined,
+        config: { xKey, yKey },
+      });
+      onOpenChange(false);
+    } catch {
+      // handled by the caller's toast
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputCls = cn(
@@ -207,13 +219,14 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                 </Dialog.Close>
                 <button
                   onClick={handleSave}
+                  disabled={saving}
                   className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium text-white',
                     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)]',
-                    'transition-colors min-h-[44px]',
+                    'transition-colors min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed',
                   )}
                 >
-                  {t('widgetConfig.save', 'Save widget')}
+                  {saving ? t('widgetConfig.saving', 'Saving…') : t('widgetConfig.save', 'Save widget')}
                 </button>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 
 interface OrgUser {
   id: string;
@@ -97,6 +98,8 @@ export function useUpdateUserRole() {
         body: { role },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not update user role'),
   });
 }
 
@@ -132,6 +135,7 @@ export function useAssignUserRole(userId: string) {
       // The actor's own effective permissions may have changed.
       qc.invalidateQueries({ queryKey: ['me', 'capabilities'] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not assign role'),
   });
 }
 
@@ -144,5 +148,6 @@ export function useRevokeUserRole(userId: string) {
       qc.invalidateQueries({ queryKey: ['user-roles', userId] });
       qc.invalidateQueries({ queryKey: ['me', 'capabilities'] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not revoke role'),
   });
 }

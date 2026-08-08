@@ -9,6 +9,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import {
   inferAllowedFileContentType,
   type FileAttachment,
@@ -93,6 +94,9 @@ export function useDeleteFile(accountId: string) {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/api/files/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY(accountId) }),
+    // FilesPanel's delete-confirm dialog only wires onSuccess — a rejected
+    // mutation left the dialog open with the spinner just stopping silently.
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not delete file'),
   });
 }
 

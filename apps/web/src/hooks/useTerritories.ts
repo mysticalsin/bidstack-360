@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import type {
   Territory,
   TerritoryCreate,
@@ -43,6 +44,7 @@ export function useCreateTerritory() {
     mutationFn: (body: TerritoryCreate) =>
       api<Territory>('/api/territories', { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['territories'] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not create territory'),
   });
 }
 
@@ -55,6 +57,7 @@ export function useUpdateTerritory() {
       qc.invalidateQueries({ queryKey: ['territories'] });
       qc.invalidateQueries({ queryKey: ['territories', 'analytics'] });
     },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not update territory'),
   });
 }
 
@@ -66,6 +69,7 @@ export function useDeleteTerritory() {
       qc.invalidateQueries({ queryKey: ['territories'] });
       qc.invalidateQueries({ queryKey: ['territories', 'analytics'] });
     },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not delete territory'),
   });
 }
 
@@ -82,6 +86,7 @@ export function useCreateLeadRoutingRule() {
     mutationFn: (body: LeadRoutingRuleCreate) =>
       api<LeadRoutingRule>('/api/lead-routing-rules', { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['lead-routing-rules'] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not create routing rule'),
   });
 }
 
@@ -91,6 +96,7 @@ export function useUpdateLeadRoutingRule() {
     mutationFn: ({ id, ...body }: { id: string } & LeadRoutingRulePatch) =>
       api<LeadRoutingRule>(`/api/lead-routing-rules/${id}`, { method: 'PATCH', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['lead-routing-rules'] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not update routing rule'),
   });
 }
 
@@ -99,6 +105,7 @@ export function useDeleteLeadRoutingRule() {
   return useMutation({
     mutationFn: (id: string) => api(`/api/lead-routing-rules/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['lead-routing-rules'] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not delete routing rule'),
   });
 }
 

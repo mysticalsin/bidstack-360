@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import type {
   LeadStageRotConfig,
   LeadStageRotConfigList,
@@ -34,5 +35,9 @@ export function useRecoverySuggest() {
         method: 'POST',
         body: {},
       }),
+    // RotBadge.onOpen awaits mutateAsync with no catch — a rejected mutation
+    // left the recovery-plays menu open and empty with zero feedback.
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not suggest recovery plays'),
   });
 }
