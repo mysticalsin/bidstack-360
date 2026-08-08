@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCreateContact, useUpdateContact } from '@/hooks/useContacts';
 import type { Contact, Sentiment } from '@bidstack/shared';
 
@@ -101,6 +102,16 @@ function ContactForm({
   const { t } = useTranslation('crm');
   const create = useCreateContact();
   const update = useUpdateContact();
+  // POST/PATCH /api/contacts are gated server-side behind contacts:write
+  // (apps/api/src/routes/contacts.ts). This dialog can be opened from
+  // read-only paths (row Edit, context menu, Quick Look), so rather than
+  // hiding the whole form we disable Save/Create with a hint — a dead-end
+  // 403 after filling out the form is worse than knowing up front.
+  const canWrite = useHasPermission('contacts:write');
+  const readOnlyHint = t(
+    'contact.readOnlyHint',
+    'You need contacts write access to save this contact.',
+  );
 
   const [customer, setCustomer] = useState(contact?.customer ?? defaultCustomer ?? '');
   const [name, setName] = useState(contact?.name ?? '');
@@ -234,11 +245,20 @@ function ContactForm({
         </p>
       ) : null}
 
+      {!canWrite ? (
+        <p className="text-xs text-[var(--danger)]">{readOnlyHint}</p>
+      ) : null}
+
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="secondary" onClick={onDone} disabled={isPending}>
           {t('contact.cancel', 'Cancel')}
         </Button>
-        <Button type="submit" size="sm" disabled={isPending}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isPending || !canWrite}
+          title={canWrite ? undefined : readOnlyHint}
+        >
           {isPending
             ? t('contact.saving', 'Saving…')
             : contact

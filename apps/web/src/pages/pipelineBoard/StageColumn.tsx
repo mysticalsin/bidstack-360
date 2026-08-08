@@ -26,6 +26,8 @@ interface StageColumnProps {
   isHoverTarget: boolean;
   draggingId: string | null;
   focusedId: string | null;
+  /** opportunities:write — false hides drag/keyboard move affordances on every card. */
+  canWrite: boolean;
   onDragOver: (e: DragEvent<HTMLDivElement>) => void;
   onDragLeave: () => void;
   onDrop: (e: DragEvent<HTMLDivElement>) => void;
@@ -46,6 +48,7 @@ export const StageColumn = memo(function StageColumn({
   isHoverTarget,
   draggingId,
   focusedId,
+  canWrite,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -117,6 +120,7 @@ export const StageColumn = memo(function StageColumn({
                 opp={o}
                 isDragging={draggingId === o.id}
                 isFocused={focusedId === o.id}
+                canWrite={canWrite}
                 onDragStart={onCardDragStart}
                 onDragEnd={onCardDragEnd}
                 onFocus={onCardFocus}

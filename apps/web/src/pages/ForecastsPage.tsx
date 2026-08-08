@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useForecasts, useCreateForecast, useDeleteForecast } from '@/hooks/useForecasts';
 import { useUsers } from '@/hooks/useUsers';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
@@ -41,6 +42,15 @@ export function ForecastsPage() {
   const users = useUsers({ limit: 200 });
   const createForecast = useCreateForecast();
   const deleteForecast = useDeleteForecast();
+  // Manual-override cell edits, "New Forecast", and per-row delete all persist
+  // through POST/PATCH/DELETE /api/forecasts, gated server-side behind
+  // territories:write (apps/api/src/routes/territories-forecast.ts:63,146) —
+  // hide/disable the write affordances rather than let a read-only role 403.
+  const canWrite = useHasPermission('territories:write');
+  const readOnlyHint = t(
+    'forecasts.readOnlyHint',
+    'You need territories write access to edit forecasts.',
+  );
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('monthly');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -145,45 +155,50 @@ export function ForecastsPage() {
             )}
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Icon name="plus" size={14} /> {t('forecasts.newForecast', 'New Forecast')}
-            </Button>
-          </DialogTrigger>
-          <NewForecastDialogContent
-            users={users.data ?? []}
-            onClose={() => setDialogOpen(false)}
-            onSubmit={async (body) => {
-              try {
-                const entries = Object.entries(body.amounts) as [Forecast['category'], number][];
-                await Promise.all(
-                  entries
-                    .filter(([, amount]) => amount > 0)
-                    .map(([category, amount]) =>
-                      createForecast.mutateAsync({
-                        ownerId: body.ownerId,
-                        period: body.period,
-                        category,
-                        amountMicros: amount,
-                        currency: 'EUR',
-                      }),
-                    ),
-                );
-                toast.success(t('forecasts.toastCreated', 'Forecast created'));
-                setDialogOpen(false);
-              } catch (err) {
-                toast.error(t('forecasts.toastCreateFailed', 'Failed to create forecast'), {
-                  description:
-                    err instanceof Error
-                      ? err.message
-                      : t('forecasts.unknownError', 'Unknown error'),
-                });
-              }
-            }}
-            isPending={createForecast.isPending}
-          />
-        </Dialog>
+        {canWrite && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Icon name="plus" size={14} /> {t('forecasts.newForecast', 'New Forecast')}
+              </Button>
+            </DialogTrigger>
+            <NewForecastDialogContent
+              users={users.data ?? []}
+              onClose={() => setDialogOpen(false)}
+              onSubmit={async (body) => {
+                try {
+                  const entries = Object.entries(body.amounts) as [
+                    Forecast['category'],
+                    number,
+                  ][];
+                  await Promise.all(
+                    entries
+                      .filter(([, amount]) => amount > 0)
+                      .map(([category, amount]) =>
+                        createForecast.mutateAsync({
+                          ownerId: body.ownerId,
+                          period: body.period,
+                          category,
+                          amountMicros: amount,
+                          currency: 'EUR',
+                        }),
+                      ),
+                  );
+                  toast.success(t('forecasts.toastCreated', 'Forecast created'));
+                  setDialogOpen(false);
+                } catch (err) {
+                  toast.error(t('forecasts.toastCreateFailed', 'Failed to create forecast'), {
+                    description:
+                      err instanceof Error
+                        ? err.message
+                        : t('forecasts.unknownError', 'Unknown error'),
+                  });
+                }
+              }}
+              isPending={createForecast.isPending}
+            />
+          </Dialog>
+        )}
       </motion.header>
 
       {/* ── Derived projection (primary, always-populated view) ── */}
@@ -270,6 +285,8 @@ export function ForecastsPage() {
           onSaveCell={handleSaveCell}
           onDeleteRow={(row) => void handleDeleteRow(row)}
           formatMoneyMicros={formatMoneyMicros}
+          canWrite={canWrite}
+          readOnlyHint={readOnlyHint}
         />
       </motion.div>
     </motion.div>

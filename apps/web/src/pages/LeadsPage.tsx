@@ -17,6 +17,7 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useDeleteLead, useLeads, useUpdateLeadById } from '@/hooks/useLeads';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
@@ -69,6 +70,10 @@ export function LeadsPage() {
   // A2 — inline cell editing (Twenty pattern). One mutation instance fans
   // across the whole table via optimistic updates keyed to lead id.
   const updateLead = useUpdateLeadById();
+  // Lead writes (create/patch/delete/convert) are gated server-side behind
+  // leads:write (apps/api/src/routes/leads.write.routes.ts) — hide/disable
+  // write affordances so a read-only role doesn't see controls that 403.
+  const canWrite = useHasPermission('leads:write');
 
   const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
 
@@ -282,10 +287,12 @@ export function LeadsPage() {
             <Icon name="download" size={14} />
             {t('leads.actions.exportCsv', 'Export CSV')}
           </LiquidGlassButton>
-          <LiquidGlassButton onClick={() => nav('/leads/new')} size="sm" data-tour="leads-page-add">
-            <Icon name="plus" size={14} />
-            {t('leads.actions.newLead', 'New lead')}
-          </LiquidGlassButton>
+          {canWrite && (
+            <LiquidGlassButton onClick={() => nav('/leads/new')} size="sm" data-tour="leads-page-add">
+              <Icon name="plus" size={14} />
+              {t('leads.actions.newLead', 'New lead')}
+            </LiquidGlassButton>
+          )}
         </div>
       </div>
 
@@ -371,7 +378,7 @@ export function LeadsPage() {
       <BulkActionBar
         count={bulk.count}
         onExport={exportSelected}
-        onDelete={bulkDelete}
+        onDelete={canWrite ? bulkDelete : undefined}
         onClear={bulk.clear}
         isDeleting={del.isPending}
       />
@@ -404,9 +411,11 @@ export function LeadsPage() {
                 )
           }
           action={
-            <Button onClick={() => nav('/leads/new')}>
-              {t('leads.actions.newLead', 'New lead')}
-            </Button>
+            canWrite ? (
+              <Button onClick={() => nav('/leads/new')}>
+                {t('leads.actions.newLead', 'New lead')}
+              </Button>
+            ) : undefined
           }
           secondary={
             hasLeadFilters ? null : (
@@ -488,6 +497,7 @@ export function LeadsPage() {
                   lead={lead}
                   selected={bulk.isSelected(lead.id)}
                   query={deferredSearch}
+                  canWrite={canWrite}
                   onToggle={() => bulk.toggleOne(lead.id)}
                   onPatch={(patch) => updateLead.mutate({ id: lead.id, patch })}
                   onDelete={async () => {

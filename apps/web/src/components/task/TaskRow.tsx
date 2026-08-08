@@ -28,6 +28,7 @@ export const TaskRow = memo(function TaskRow({
   canMoveDown = false,
   onMoveUp,
   onMoveDown,
+  canWrite,
 }: {
   task: Task;
   /** When wrapped in Reorder.Item, show a drag handle. */
@@ -36,11 +37,16 @@ export const TaskRow = memo(function TaskRow({
   canMoveDown?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  // Status-cycle and snooze both PATCH /api/tasks/:id, gated server-side
+  // behind tasks:write — disable instead of rendering controls that 403 on
+  // click (matches ReportsListPage/CompanyRow convention).
+  canWrite: boolean;
 }) {
   const { t } = useTranslation('crm');
   const update = useUpdateTask();
   const d = daysUntil(task.dueDate);
   const overdue = d !== null && d < 0;
+  const readOnlyHint = t('taskRow.readOnlyHint', 'You need task write access to edit this task.');
 
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const snoozeRef = useRef<HTMLDivElement>(null);
@@ -269,11 +275,13 @@ export const TaskRow = memo(function TaskRow({
               type="button"
               onClick={() => setSnoozeOpen((v) => !v)}
               onKeyDown={handleSnoozeKeyDown}
+              disabled={!canWrite}
+              title={canWrite ? undefined : readOnlyHint}
               aria-label={t('taskRow.snoozeTask', 'Snooze {{title}}', { title: task.title })}
               aria-haspopup="listbox"
               aria-expanded={snoozeOpen}
               className={cn(
-                'rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] text-[var(--fg-secondary)] flex items-center gap-1 hover:bg-[var(--surface-hover)] focus-visible:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:outline-none transition-all duration-150',
+                'rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] text-[var(--fg-secondary)] flex items-center gap-1 hover:bg-[var(--surface-hover)] focus-visible:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:outline-none transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40',
                 snoozeOpen
                   ? 'opacity-100 ring-2 ring-[var(--brand-primary)]'
                   : 'opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 focus-visible:opacity-100',
@@ -329,7 +337,7 @@ export const TaskRow = memo(function TaskRow({
         <motion.button
           type="button"
           onClick={cycle}
-          disabled={update.isPending}
+          disabled={update.isPending || !canWrite}
           whileTap={{ scale: 0.94 }}
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-60"
           aria-label={t(
@@ -340,9 +348,13 @@ export const TaskRow = memo(function TaskRow({
               next: STATUS_CYCLE[task.status].replace('_', ' '),
             },
           )}
-          title={t('taskRow.statusTitle', 'Activate to change status to {{next}}', {
-            next: STATUS_CYCLE[task.status].replace('_', ' '),
-          })}
+          title={
+            canWrite
+              ? t('taskRow.statusTitle', 'Activate to change status to {{next}}', {
+                  next: STATUS_CYCLE[task.status].replace('_', ' '),
+                })
+              : readOnlyHint
+          }
         >
           <Badge
             tone={

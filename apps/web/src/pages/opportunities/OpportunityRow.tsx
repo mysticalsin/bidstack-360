@@ -54,12 +54,16 @@ export const Row = memo(function Row({
   isSelected,
   onToggleSelect,
   patch,
+  canWrite,
 }: {
   opp: Opportunity;
   stageOptions: PipelineStage[];
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   patch: ReturnType<typeof usePatchOpportunity>;
+  /** False when the signed-in user lacks opportunities:write — the backend
+   * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
+  canWrite: boolean;
 }) {
   const { formatMoney } = useFormatMoney();
   const fireConfetti = useConfetti((s) => s.fire);
@@ -160,6 +164,7 @@ export const Row = memo(function Row({
           stage={resolvePipelineStage(opp)}
           options={stageOptions}
           isSaving={saving.stage}
+          canEdit={canWrite}
           onSave={(nextId) => {
             const nextStage = stageOptions.find((s) => s.id === nextId);
             startSave('stage');
@@ -204,6 +209,7 @@ export const Row = memo(function Row({
           min={0}
           align="right"
           isSaving={saving.value}
+          canEdit={canWrite}
           format={(v) => formatMoney(v, 'EUR')}
           onSave={(next) => {
             startSave('value');
@@ -234,6 +240,7 @@ export const Row = memo(function Row({
           step={5}
           align="right"
           isSaving={saving.probability}
+          canEdit={canWrite}
           format={(v) => `${v}%`}
           onSave={(next) => {
             startSave('probability');
@@ -265,6 +272,7 @@ export const Row = memo(function Row({
             value={opp.dueDate}
             format={(v) => formatDate(v)}
             isSaving={saving.dueDate}
+            canEdit={canWrite}
             onSave={(next) => {
               startSave('dueDate');
               patch.mutate(

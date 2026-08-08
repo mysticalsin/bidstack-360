@@ -11,6 +11,7 @@ import { TaskCalendar } from '@/components/task/TaskCalendar';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks } from '@/hooks/useTasks';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
@@ -49,6 +50,11 @@ function parseFilter(raw: string | null): StatusFilter {
 
 export function TasksPage() {
   const { t } = useTranslation('crm');
+  // Task writes (create/update/delete) are gated server-side behind
+  // tasks:write — hide the create affordances and disable per-row write
+  // actions for users without it instead of rendering controls that 403 on
+  // click (matches ReportsListPage/CompaniesPage convention).
+  const canWrite = useHasPermission('tasks:write');
   // Filter rides on the query string so the view is shareable + back/forward
   // navigable. Linking to "/tasks?filter=overdue" lands a coworker on the
   // exact same slice we were looking at.
@@ -222,7 +228,7 @@ export function TasksPage() {
             basePath="/tasks"
             namePlaceholder={t('savedViewsBar.namePromptPlaceholder', 'e.g. "My overdue today"')}
           />
-          <CreateTaskDialog />
+          {canWrite && <CreateTaskDialog />}
         </div>
       </header>
 
@@ -343,7 +349,7 @@ export function TasksPage() {
                       )
                     : undefined
                 }
-                action={filter === 'all' ? <CreateTaskDialog /> : null}
+                action={filter === 'all' && canWrite ? <CreateTaskDialog /> : null}
               />
             ) : sort === 'natural' ? (
               // Manual ordering — use framer-motion's Reorder primitive so
@@ -369,6 +375,7 @@ export function TasksPage() {
                       canMoveDown={i < items.length - 1}
                       onMoveUp={() => moveTask(i, i - 1)}
                       onMoveDown={() => moveTask(i, i + 1)}
+                      canWrite={canWrite}
                     />
                   </Reorder.Item>
                 ))}
@@ -377,14 +384,16 @@ export function TasksPage() {
               <div role="list" className="divide-y divide-[var(--border-subtle)]">
                 <AnimatePresence initial={false}>
                   {items.map((t) => (
-                    <TaskRow key={t.id} task={t} />
+                    <TaskRow key={t.id} task={t} canWrite={canWrite} />
                   ))}
                 </AnimatePresence>
               </div>
             )}
             {/* Inline quick-add — sits at the bottom of the list so power users
-              don't need to open the dialog for a one-shot follow-up. */}
-            <InlineTaskAdd />
+              don't need to open the dialog for a one-shot follow-up. Hidden
+              (not just disabled) for read-only users, matching the primary-CTA
+              convention for POST /api/tasks (tasks:write). */}
+            {canWrite && <InlineTaskAdd />}
             {/* Cursor pager — only meaningful on the list view. For the
               client-side 'overdue'/'today' filters it pages the underlying
               status-unfiltered set, so a page may render fewer rows than the

@@ -20,6 +20,7 @@ import type { SortState } from '@/components/ui/SortableHeader';
 import { useTableSort } from '@/hooks/useTableSort';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
@@ -57,6 +58,10 @@ export function CompaniesPage() {
   const companies = useCompanies(filter);
   const createCompany = useCreateCompany();
   const deleteCompany = useDeleteCompany();
+  // Company writes are gated server-side behind companies:write + the literal
+  // 'admin' role — hide the write affordances for everyone else instead of
+  // showing a button that always 403s (matches ReferencesPage/ProposalDetailPage).
+  const canWrite = useHasPermission('companies:write');
 
   const rawItems = useMemo(() => companies.data?.items ?? [], [companies.data?.items]);
 
@@ -226,10 +231,12 @@ export function CompaniesPage() {
             <Icon name="copy" size={14} />
             {t('companies.findDuplicates', 'Find duplicates')}
           </Button>
-          <LiquidGlassButton onClick={() => setShowNew(true)}>
-            <Icon name="plus" size={14} />
-            {t('companies.newCompany', 'New company')}
-          </LiquidGlassButton>
+          {canWrite && (
+            <LiquidGlassButton onClick={() => setShowNew(true)}>
+              <Icon name="plus" size={14} />
+              {t('companies.newCompany', 'New company')}
+            </LiquidGlassButton>
+          )}
         </div>
       </header>
 
@@ -330,7 +337,7 @@ export function CompaniesPage() {
       <BulkActionBar
         count={bulk.count}
         onExport={exportSelected}
-        onDelete={bulkDelete}
+        onDelete={canWrite ? bulkDelete : undefined}
         onClear={bulk.clear}
         isDeleting={deleteCompany.isPending}
       />
@@ -387,9 +394,11 @@ export function CompaniesPage() {
                 {t('companies.empty.clearSearch', 'Clear search')}
               </Button>
             ) : (
-              <Button size="sm" onClick={() => setShowNew(true)}>
-                {t('companies.empty.addCompany', 'Add company')}
-              </Button>
+              canWrite && (
+                <Button size="sm" onClick={() => setShowNew(true)}>
+                  {t('companies.empty.addCompany', 'Add company')}
+                </Button>
+              )
             )
           }
         />
@@ -458,6 +467,7 @@ export function CompaniesPage() {
                   selected={bulk.isSelected(c.id)}
                   onToggle={bulk.toggleOne}
                   onDelete={deleteCompany.mutate}
+                  canDelete={canWrite}
                   query={searchTerm}
                 />
               ))}

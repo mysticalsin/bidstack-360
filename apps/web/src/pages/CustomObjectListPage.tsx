@@ -18,6 +18,7 @@ import {
   useCustomObjectDefs,
   useCustomObjectRecords,
 } from '@/hooks/useCustomObjects';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
 import { Icon } from '@/components/ui/Icon';
@@ -36,6 +37,10 @@ export function CustomObjectListPage() {
 
   const recordsQuery = useCustomObjectRecords(def?.id ?? '', { page, limit });
   const createRecord = useCreateCustomObjectRecord(def?.id ?? '');
+  // Record creation (POST /api/custom-objects/:id/records) is gated
+  // server-side behind customObjects:write — hide the "New" affordance for
+  // roles that lack it instead of showing a form that always 403s on submit.
+  const canWrite = useHasPermission('customObjects:write');
 
   const [showCreate, setShowCreate] = useState(false);
   const [createValues, setCreateValues] = useState<Record<string, string>>({ name: '' });
@@ -112,19 +117,21 @@ export function CustomObjectListPage() {
             {total > 0 ? t('customObjectList.totalCount', '{{count}} total', { count: total }) : ''}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className={cn(
-            'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium',
-            'bg-[var(--brand-primary)] text-[var(--fg-on-brand)] hover:opacity-90 active:opacity-80',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
-            'transition-opacity min-h-[44px]',
-          )}
-        >
-          <Icon name="plus" size={14} />
-          {t('customObjectList.newRecordButton', 'New {{label}}', { label: def.labelSingular })}
-        </button>
+        {canWrite && (
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className={cn(
+              'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium',
+              'bg-[var(--brand-primary)] text-[var(--fg-on-brand)] hover:opacity-90 active:opacity-80',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
+              'transition-opacity min-h-[44px]',
+            )}
+          >
+            <Icon name="plus" size={14} />
+            {t('customObjectList.newRecordButton', 'New {{label}}', { label: def.labelSingular })}
+          </button>
+        )}
       </div>
 
       {/* Table */}

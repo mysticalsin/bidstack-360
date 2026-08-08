@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/table-kit/skeleton';
 import { Button } from '@/components/ui/Button';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Sheet, SheetContent } from '@/components/ui/Sheet';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
 import { keepPreviousTableData, tableFetchState, useTableQuery } from '@/lib/table/use-table-query';
@@ -75,7 +76,20 @@ function LoadingRows() {
 //
 // `open` stays driven by `?new=1` — the flag was already a URL param, and the
 // sheet only makes that state visible in the right place.
-function CreateProposalSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateProposalSheet({
+  open,
+  onClose,
+  canWrite,
+  readOnlyHint,
+}: {
+  open: boolean;
+  onClose: () => void;
+  // Defense in depth: `?new=1` is a bookmarkable/typeable deep link, so the
+  // sheet can open even when the trigger button (gated below) is hidden.
+  // Submit still PATCHes /api/v1/proposals behind proposals:write server-side.
+  canWrite: boolean;
+  readOnlyHint: string;
+}) {
   const { t } = useTranslation('rfp');
   const qc = useQueryClient();
   const [name, setName] = useState('');
@@ -112,7 +126,8 @@ function CreateProposalSheet({ open, onClose }: { open: boolean; onClose: () => 
               variant="primary"
               size="sm"
               onClick={() => create.mutate({ name })}
-              disabled={!name.trim() || create.isPending}
+              disabled={!name.trim() || create.isPending || !canWrite}
+              title={canWrite ? undefined : readOnlyHint}
             >
               {create.isPending
                 ? t('proposals.creating', 'Creating…')
@@ -131,7 +146,7 @@ function CreateProposalSheet({ open, onClose }: { open: boolean; onClose: () => 
           value={name}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && name.trim()) create.mutate({ name });
+            if (event.key === 'Enter' && name.trim() && canWrite) create.mutate({ name });
           }}
         />
         {create.isError && (
@@ -152,6 +167,13 @@ export function ProposalsPage() {
   const navigate = useNavigate();
   const ownerLabel = useOwnerLabel();
   const columns = useProposalColumns(ownerLabel);
+  // Create is gated server-side behind proposals:write — hide the primary CTA
+  // instead of letting it 403 on submit.
+  const canWrite = useHasPermission('proposals:write');
+  const readOnlyHint = t(
+    'proposals.readOnlyHint',
+    'You need proposals write access to create a proposal.',
+  );
 
   // `?new=1` is the RFP hub's "New Proposal" shortcut. It stays a URL param
   // (not local state) so the deep link is reproducible, and nuqs MERGES its
@@ -205,13 +227,18 @@ export function ProposalsPage() {
   // `?new=1` deep link still opens the create panel when the list behind it
   // failed to load. Previously the create form was unreachable in that state.
   const createSheet = (
-    <CreateProposalSheet open={newFlag === '1'} onClose={() => void setNewFlag(null)} />
+    <CreateProposalSheet
+      open={newFlag === '1'}
+      onClose={() => void setNewFlag(null)}
+      canWrite={canWrite}
+      readOnlyHint={readOnlyHint}
+    />
   );
 
   if (windowQuery.isError) {
     return (
       <>
-        <ProposalsHead onCreate={() => void setNewFlag('1')} />
+        <ProposalsHead onCreate={() => void setNewFlag('1')} canWrite={canWrite} />
         <GlassCard className="py-12 text-center" role="alert">
           <p className="text-sm font-medium text-red-600 dark:text-red-400">
             {t('proposals.loadError', 'Failed to load proposals')}
@@ -229,7 +256,7 @@ export function ProposalsPage() {
 
   return (
     <>
-      <ProposalsHead onCreate={() => void setNewFlag('1')} />
+      <ProposalsHead onCreate={() => void setNewFlag('1')} canWrite={canWrite} />
 
       {createSheet}
 
@@ -278,7 +305,7 @@ export function ProposalsPage() {
   );
 }
 
-function ProposalsHead({ onCreate }: { onCreate: () => void }) {
+function ProposalsHead({ onCreate, canWrite }: { onCreate: () => void; canWrite: boolean }) {
   const { t } = useTranslation('rfp');
   return (
     <PageHeader
@@ -288,9 +315,11 @@ function ProposalsHead({ onCreate }: { onCreate: () => void }) {
         'RFP workspace — draft, review, and submit winning proposals.',
       )}
       actions={
-        <Button variant="primary" size="sm" onClick={onCreate}>
-          {t('proposals.newProposal', 'New Proposal')}
-        </Button>
+        canWrite ? (
+          <Button variant="primary" size="sm" onClick={onCreate}>
+            {t('proposals.newProposal', 'New Proposal')}
+          </Button>
+        ) : undefined
       }
     />
   );

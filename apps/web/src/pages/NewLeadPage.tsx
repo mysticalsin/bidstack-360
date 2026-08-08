@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCreateLead } from '@/hooks/useLeads';
 import type { LeadCreate } from '@bidstack/shared';
 
@@ -12,6 +13,11 @@ export function NewLeadPage() {
   const { t } = useTranslation('crm');
   const nav = useNavigate();
   const create = useCreateLead();
+  // POST /api/leads is gated server-side behind leads:write
+  // (apps/api/src/routes/leads.write.routes.ts) — show a read-only notice
+  // instead of a form that always 403s on submit when this page is reached
+  // directly (e.g. a bookmarked/typed URL) without the permission.
+  const canWrite = useHasPermission('leads:write');
   const firstNameRef = useRef<HTMLInputElement>(null);
   const lastNameRef = useRef<HTMLInputElement>(null);
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -82,21 +88,46 @@ export function NewLeadPage() {
       setForm((s) => ({ ...s, [key]: e.target.value }));
     };
 
+  const breadcrumb = (
+    <nav aria-label={t('newLead.breadcrumbLabel', 'Breadcrumb')} className="mb-4">
+      <ol className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
+        <li>
+          <Link to="/leads" className="hover:text-[var(--fg-primary)]">
+            {t('newLead.breadcrumbLeads', 'Leads')}
+          </Link>
+        </li>
+        <li aria-hidden>/</li>
+        <li aria-current="page" className="text-[var(--fg-primary)]">
+          {t('newLead.breadcrumbCurrent', 'New lead')}
+        </li>
+      </ol>
+    </nav>
+  );
+
+  if (!canWrite) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        {breadcrumb}
+        <Card>
+          <div className="p-6">
+            <h1 className="text-xl font-semibold text-[var(--fg-primary)]">
+              {t('newLead.heading', 'New lead')}
+            </h1>
+            <p className="mt-2 text-sm text-[var(--fg-secondary)]">
+              {t('newLead.readOnlyNotice', 'You need lead write access to create a lead.')}
+            </p>
+            <Button variant="secondary" className="mt-4" onClick={() => nav('/leads')}>
+              {t('newLead.backToLeads', 'Back to leads')}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
-      <nav aria-label={t('newLead.breadcrumbLabel', 'Breadcrumb')} className="mb-4">
-        <ol className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-          <li>
-            <Link to="/leads" className="hover:text-[var(--fg-primary)]">
-              {t('newLead.breadcrumbLeads', 'Leads')}
-            </Link>
-          </li>
-          <li aria-hidden>/</li>
-          <li aria-current="page" className="text-[var(--fg-primary)]">
-            {t('newLead.breadcrumbCurrent', 'New lead')}
-          </li>
-        </ol>
-      </nav>
+      {breadcrumb}
 
       <Card>
         <form onSubmit={handleSubmit} className="p-6">

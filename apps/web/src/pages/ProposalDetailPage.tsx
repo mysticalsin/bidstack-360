@@ -360,7 +360,7 @@ export function ProposalDetailPage() {
                 <span className="text-[10px] text-fg-muted">
                   {t('proposalDetail.wordCount', '{{count}} words', { count: section.wordCount })}
                 </span>
-                {editingSection !== section.id && (
+                {canWrite && editingSection !== section.id && (
                   <>
                     <Button
                       variant="secondary"
@@ -395,6 +395,12 @@ export function ProposalDetailPage() {
                 )}
               </div>
             </div>
+
+            {draftSection.isError && draftSection.variables === section.key && (
+              <p role="alert" className="mb-2 text-xs text-[var(--danger)]">
+                {t('proposalDetail.draftSectionError', 'Could not generate an AI draft. Please try again.')}
+              </p>
+            )}
 
             {editingSection === section.id ? (
               <div className="space-y-2">

@@ -17,6 +17,9 @@ interface CompanyRowProps {
   selected: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  // Delete is gated server-side behind companies:write + the 'admin' role —
+  // hide the row action for everyone else (matches CompaniesPage's canWrite).
+  canDelete: boolean;
   query: string;
 }
 
@@ -25,6 +28,7 @@ export const CompanyRow = memo(function CompanyRow({
   selected,
   onToggle,
   onDelete,
+  canDelete,
   query,
 }: CompanyRowProps) {
   const { t } = useTranslation('crm');
@@ -93,27 +97,29 @@ export const CompanyRow = memo(function CompanyRow({
           >
             {t('companyRow.view', 'View')}
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-[var(--danger)] hover:text-[var(--danger)]"
-            onClick={async () => {
-              const ok = await confirmDialog({
-                title: t('companyRow.deleteConfirmTitle', 'Delete {{name}}?', {
-                  name: company.name,
-                }),
-                description: t(
-                  'companyRow.deleteConfirmDescription',
-                  'This action cannot be undone.',
-                ),
-                confirmLabel: t('companyRow.deleteConfirmLabel', 'Delete'),
-                destructive: true,
-              });
-              if (ok) onDelete(company.id);
-            }}
-          >
-            {t('companyRow.delete', 'Delete')}
-          </Button>
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[var(--danger)] hover:text-[var(--danger)]"
+              onClick={async () => {
+                const ok = await confirmDialog({
+                  title: t('companyRow.deleteConfirmTitle', 'Delete {{name}}?', {
+                    name: company.name,
+                  }),
+                  description: t(
+                    'companyRow.deleteConfirmDescription',
+                    'This action cannot be undone.',
+                  ),
+                  confirmLabel: t('companyRow.deleteConfirmLabel', 'Delete'),
+                  destructive: true,
+                });
+                if (ok) onDelete(company.id);
+              }}
+            >
+              {t('companyRow.delete', 'Delete')}
+            </Button>
+          )}
         </div>
       </td>
     </SpotlightTableRow>

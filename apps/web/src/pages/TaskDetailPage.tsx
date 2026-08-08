@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
@@ -15,6 +17,11 @@ export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const tasks = useTasks();
   const update = useUpdateTask();
+  // PATCH /api/tasks/:id is gated server-side behind tasks:write — disable the
+  // Edit entry point instead of letting the user fill out a form that 403s on
+  // save (matches CompanyDetailsForm's canWrite convention).
+  const canWrite = useHasPermission('tasks:write');
+  const readOnlyHint = t('taskDetail.readOnlyHint', 'You need task write access to edit this task.');
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('');
@@ -52,10 +59,26 @@ export function TaskDetailPage() {
     if (title !== task.title) patch.title = title;
     if (status !== task.status)
       patch.status = status as 'open' | 'in_progress' | 'done' | 'blocked';
-    if (Object.keys(patch).length > 0) {
-      update.mutate({ id: task.id, patch });
+    if (Object.keys(patch).length === 0) {
+      setEditing(false);
+      return;
     }
-    setEditing(false);
+    // Close the editor only once the save actually lands — mirroring
+    // TaskRow.tsx's cycle()/snoozeTo() — otherwise a 4xx/5xx (e.g. invalid
+    // status) silently reverts the optimistic UI with no feedback.
+    update.mutate(
+      { id: task.id, patch },
+      {
+        onSuccess: () => setEditing(false),
+        onError: (err) =>
+          toast.error(t('taskDetail.toast.updateFailedTitle', 'Could not update task'), {
+            description:
+              err instanceof Error
+                ? err.message
+                : t('taskDetail.toast.serverRejected', 'The server rejected the request.'),
+          }),
+      },
+    );
   };
 
   return (
@@ -111,7 +134,13 @@ export function TaskDetailPage() {
               </Button>
             </>
           ) : (
-            <Button variant="secondary" size="sm" onClick={startEdit}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={startEdit}
+              disabled={!canWrite}
+              title={canWrite ? undefined : readOnlyHint}
+            >
               {t('taskDetail.edit', 'Edit')}
             </Button>
           )}

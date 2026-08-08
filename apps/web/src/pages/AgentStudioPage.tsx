@@ -1,8 +1,12 @@
 // Agent Studio — the user-facing surface for the crew (CrewAI-style) infra.
 //
 // Infrastructure, not a toy: ADMINS author the agents + crews (create / delete /
-// load standard); regular MEMBERS may only RUN a crew and read the result. The
-// page is open to members; every authoring control is gated behind useIsAdmin().
+// load standard); MEMBERS holding the `agents:write` permission may RUN a crew
+// and read the result. The page is open to all members, but every authoring
+// control is gated behind useIsAdmin() and the run control behind
+// useHasPermission('agents:write') — the backend enforces the same permission
+// on POST /crews/:id/run, so gating client-side avoids a 403 after the user
+// has already filled out the RFP form.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +21,7 @@ import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useIsAdmin } from '@/lib/auth';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { api } from '@/lib/api';
 
 interface CrewAgent {
@@ -54,6 +59,7 @@ export function AgentStudioPage() {
   useDocumentTitle();
   const { t } = useTranslation('crm');
   const isAdmin = useIsAdmin();
+  const canRunCrews = useHasPermission('agents:write');
   const qc = useQueryClient();
 
   const agents = useQuery<{ items: CrewAgent[] }>({
@@ -90,7 +96,9 @@ export function AgentStudioPage() {
             {t('agentStudio.subtitle', 'Role-based AI agents that answer each step of an RFP.')}{' '}
             {isAdmin
               ? t('agentStudio.subtitleAdmin', 'Author them here.')
-              : t('agentStudio.subtitleMember', 'Run a crew and review the result.')}
+              : canRunCrews
+                ? t('agentStudio.subtitleMember', 'Run a crew and review the result.')
+                : t('agentStudio.subtitleReadOnly', 'Browse the agents and crews an admin has set up.')}
           </p>
         </div>
         {isAdmin && (
@@ -117,7 +125,7 @@ export function AgentStudioPage() {
       />
 
       {/* ── Crews ──────────────────────────────────────────────── */}
-      <CrewsSection crews={crews} agents={agents.data?.items ?? []} />
+      <CrewsSection crews={crews} agents={agents.data?.items ?? []} canRunCrews={canRunCrews} />
     </div>
   );
 }
@@ -341,12 +349,18 @@ function NewAgentForm({ onDone }: { onDone: () => void }) {
 function CrewsSection({
   crews,
   agents,
+  canRunCrews,
 }: {
   crews: ReturnType<typeof useQuery<{ items: CrewListItem[] }>>;
   agents: CrewAgent[];
+  canRunCrews: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [runCrewId, setRunCrewId] = useState<string | null>(null);
+  const runPermissionHint = t(
+    'agentStudio.runPermissionHint',
+    'You need agent run access to run a crew. Ask an admin to grant it.',
+  );
 
   return (
     <Card>
@@ -404,13 +418,15 @@ function CrewsSection({
                   size="sm"
                   onClick={() => setRunCrewId(runCrewId === c.id ? null : c.id)}
                   aria-expanded={runCrewId === c.id}
+                  disabled={!canRunCrews}
+                  title={canRunCrews ? undefined : runPermissionHint}
                 >
                   {runCrewId === c.id
                     ? t('agentStudio.close', 'Close')
                     : t('agentStudio.run', 'Run')}
                 </Button>
               </div>
-              {runCrewId === c.id && <RunPanel crewId={c.id} agents={agents} />}
+              {canRunCrews && runCrewId === c.id && <RunPanel crewId={c.id} agents={agents} />}
             </li>
           ))}
         </ul>

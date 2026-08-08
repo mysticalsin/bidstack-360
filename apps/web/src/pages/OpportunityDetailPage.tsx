@@ -30,6 +30,7 @@ import { Icon } from '@/components/ui/Icon';
 import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useCommandContext } from '@/hooks/useCommandContext';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
@@ -63,6 +64,15 @@ export function OpportunityDetailPage() {
   const { data, isLoading, isError, error } = useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
+  // Delete/patch/stage-move all 403 server-side without opportunities:write
+  // (apps/api/src/routes/opportunities.mutations.ts,
+  // opportunities.transitions.ts) — hide/disable those affordances instead
+  // of letting the click round-trip to a rejected request.
+  const canWrite = useHasPermission('opportunities:write');
+  const readOnlyHint = t(
+    'opportunityDetail.readOnlyHint',
+    'You need opportunities write access to edit this opportunity.',
+  );
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
   const nav = useNavigate();
@@ -193,39 +203,51 @@ export function OpportunityDetailPage() {
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="min-w-0 flex-1">
               <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
-                <InlineEditText
-                  value={data.name}
-                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { name: v } })}
-                  label={t('opportunityDetail.editNameLabel', 'Edit opportunity name')}
-                  validate={(v) =>
-                    v.length < 1 ? t('opportunityDetail.nameRequired', 'Name is required') : null
-                  }
-                />
+                {canWrite ? (
+                  <InlineEditText
+                    value={data.name}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { name: v } })}
+                    label={t('opportunityDetail.editNameLabel', 'Edit opportunity name')}
+                    validate={(v) =>
+                      v.length < 1 ? t('opportunityDetail.nameRequired', 'Name is required') : null
+                    }
+                  />
+                ) : (
+                  <span title={readOnlyHint}>{data.name}</span>
+                )}
               </h1>
               <div className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
                 <span className="flex items-center gap-1.5 font-medium">
                   <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
-                  <InlineEditText
-                    value={data.customer}
-                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { customer: v } })}
-                    label={t('opportunityDetail.editCustomerLabel', 'Edit customer name')}
-                    validate={(v) =>
-                      v.length < 1
-                        ? t('opportunityDetail.customerRequired', 'Customer is required')
-                        : null
-                    }
-                  />
+                  {canWrite ? (
+                    <InlineEditText
+                      value={data.customer}
+                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { customer: v } })}
+                      label={t('opportunityDetail.editCustomerLabel', 'Edit customer name')}
+                      validate={(v) =>
+                        v.length < 1
+                          ? t('opportunityDetail.customerRequired', 'Customer is required')
+                          : null
+                      }
+                    />
+                  ) : (
+                    <span title={readOnlyHint}>{data.customer}</span>
+                  )}
                 </span>
                 <span className="opacity-30">|</span>
                 <span className="flex items-center gap-1.5">
                   <Icon name="reports" size={14} className="text-[var(--info)]" />
-                  <InlineEditText
-                    value={data.industry ?? ''}
-                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
-                    label={t('opportunityDetail.editIndustryLabel', 'Edit industry')}
-                    display={(v) => v || '—'}
-                    placeholder={t('opportunityDetail.industryPlaceholder', 'Industry')}
-                  />
+                  {canWrite ? (
+                    <InlineEditText
+                      value={data.industry ?? ''}
+                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
+                      label={t('opportunityDetail.editIndustryLabel', 'Edit industry')}
+                      display={(v) => v || '—'}
+                      placeholder={t('opportunityDetail.industryPlaceholder', 'Industry')}
+                    />
+                  ) : (
+                    <span title={readOnlyHint}>{data.industry || '—'}</span>
+                  )}
                 </span>
                 <span className="opacity-30">|</span>
                 <span className="flex items-center gap-1.5">
@@ -275,18 +297,22 @@ export function OpportunityDetailPage() {
                 >
                   {t('opportunityDetail.askDustButton', 'Ask Dust')}
                 </MagneticButton>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full text-[var(--danger)]"
-                  disabled={isDeleting}
-                  onClick={handleDelete}
-                >
-                  <Icon name="trash" size={13} className="mr-1" />
-                  {isDeleting
-                    ? t('opportunityDetail.deleting', 'Deleting…')
-                    : t('opportunityDetail.deleteButton', 'Delete')}
-                </Button>
+                {/* Destructive per-record action — hidden (not just disabled)
+                    for read-only roles, matching CompanyRow's delete gating. */}
+                {canWrite ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full text-[var(--danger)]"
+                    disabled={isDeleting}
+                    onClick={handleDelete}
+                  >
+                    <Icon name="trash" size={13} className="mr-1" />
+                    {isDeleting
+                      ? t('opportunityDetail.deleting', 'Deleting…')
+                      : t('opportunityDetail.deleteButton', 'Delete')}
+                  </Button>
+                ) : null}
               </div>
               <div
                 className="flex flex-wrap items-center gap-2"
@@ -302,7 +328,8 @@ export function OpportunityDetailPage() {
                     variant="success"
                     size="sm"
                     className="rounded-full"
-                    disabled={stageMove.isPending || isOutcomeLocked}
+                    disabled={stageMove.isPending || isOutcomeLocked || !canWrite}
+                    title={canWrite ? undefined : readOnlyHint}
                     onClick={() => moveToOutcome('closed_won')}
                   >
                     <Icon name="trophy" size={13} />
@@ -321,7 +348,8 @@ export function OpportunityDetailPage() {
                     variant="destructive"
                     size="sm"
                     className="rounded-full"
-                    disabled={stageMove.isPending || isOutcomeLocked}
+                    disabled={stageMove.isPending || isOutcomeLocked || !canWrite}
+                    title={canWrite ? undefined : readOnlyHint}
                     onClick={() => moveToOutcome('closed_lost')}
                   >
                     <Icon name="close" size={13} />
@@ -331,52 +359,75 @@ export function OpportunityDetailPage() {
                   </Button>
                 )}
               </div>
-              <InlineEditSelect<OpportunityStage>
-                value={data.stage as OpportunityStage}
-                onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
-                options={stageOptions}
-                label={t('opportunityDetail.changeStageLabel', 'Change stage')}
-                display={(v) => (
-                  <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
-                    {formatStage(v)}
+              {canWrite ? (
+                <InlineEditSelect<OpportunityStage>
+                  value={data.stage as OpportunityStage}
+                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
+                  options={stageOptions}
+                  label={t('opportunityDetail.changeStageLabel', 'Change stage')}
+                  display={(v) => (
+                    <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
+                      {formatStage(v)}
+                    </Badge>
+                  )}
+                />
+              ) : (
+                <span title={readOnlyHint}>
+                  <Badge
+                    tone={stageTone(data.stage as OpportunityStage)}
+                    className="px-4 py-1 text-xs uppercase tracking-wider"
+                  >
+                    {formatStage(data.stage as OpportunityStage)}
                   </Badge>
-                )}
-              />
+                </span>
+              )}
               <div className="text-right border-l border-[var(--border-subtle)] pl-4">
                 <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
-                  <InlineEditNumber
-                    value={data.value}
-                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
-                    label={t('opportunityDetail.editValueLabel', 'Edit deal value (EUR)')}
-                    min={0}
-                    step={1000}
-                    display={(v) => formatMoney(v, 'EUR')}
-                  />
+                  {canWrite ? (
+                    <InlineEditNumber
+                      value={data.value}
+                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
+                      label={t('opportunityDetail.editValueLabel', 'Edit deal value (EUR)')}
+                      min={0}
+                      step={1000}
+                      display={(v) => formatMoney(v, 'EUR')}
+                    />
+                  ) : (
+                    <span title={readOnlyHint}>{formatMoney(data.value, 'EUR')}</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-end gap-2 text-xs text-[var(--fg-tertiary)] mt-1">
                   <span className="flex items-center gap-1">
                     <span className="font-semibold text-[var(--success)]">
-                      <InlineEditNumber
-                        value={data.probability}
-                        onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
-                        label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
-                        min={0}
-                        max={100}
-                        step={5}
-                        suffix="%"
-                      />
+                      {canWrite ? (
+                        <InlineEditNumber
+                          value={data.probability}
+                          onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
+                          label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
+                          min={0}
+                          max={100}
+                          step={5}
+                          suffix="%"
+                        />
+                      ) : (
+                        <span title={readOnlyHint}>{data.probability}%</span>
+                      )}
                     </span>
                     <span>{t('opportunityDetail.likely', 'likely')}</span>
                   </span>
                   <span className="opacity-30">·</span>
                   <span className="flex items-center gap-2">
                     <Icon name="clock" size={12} />
-                    <InlineEditDate
-                      value={data.dueDate}
-                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
-                      label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
-                      display={(v) => formatDate(v)}
-                    />
+                    {canWrite ? (
+                      <InlineEditDate
+                        value={data.dueDate}
+                        onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
+                        label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
+                        display={(v) => formatDate(v)}
+                      />
+                    ) : (
+                      <span title={readOnlyHint}>{formatDate(data.dueDate)}</span>
+                    )}
                     <DueDateChip dueDate={data.dueDate} size="lg" />
                   </span>
                 </div>

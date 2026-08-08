@@ -18,6 +18,7 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Icon } from '@/components/ui/Icon';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
@@ -51,6 +52,10 @@ export function TerritoriesPage() {
   const rules = useLeadRoutingRules();
   const analytics = useTerritoryAnalytics();
   const reducedMotion = useReducedMotion();
+  // Every write route (POST/PATCH/DELETE on territories + lead-routing-rules)
+  // is gated server-side behind territories:write — hide the write controls
+  // for users who lack it (they previously 403'd on click).
+  const canWrite = useHasPermission('territories:write');
   const [selected, setSelected] = useState<TerritoryAnalyticsItem | null>(null);
   // Which dimension the main panel breaks opportunities down by. 'region' keeps
   // the world map; 'industry'/'account' swap in the segment breakdown.
@@ -153,24 +158,29 @@ export function TerritoriesPage() {
               )}
             </div>
           ) : null}
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditingRule(null);
-              setRuleDialogOpen(true);
-            }}
-          >
-            <Icon name="git-branch" size={14} /> {t('territories.newRuleButton', 'New rule')}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditingTerritory(null);
-              setTerritoryDialogOpen(true);
-            }}
-          >
-            <Icon name="plus" size={14} /> {t('territories.newTerritoryButton', 'New territory')}
-          </Button>
+          {canWrite && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingRule(null);
+                setRuleDialogOpen(true);
+              }}
+            >
+              <Icon name="git-branch" size={14} /> {t('territories.newRuleButton', 'New rule')}
+            </Button>
+          )}
+          {canWrite && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingTerritory(null);
+                setTerritoryDialogOpen(true);
+              }}
+            >
+              <Icon name="plus" size={14} />{' '}
+              {t('territories.newTerritoryButton', 'New territory')}
+            </Button>
+          )}
         </div>
       </motion.header>
 
@@ -373,6 +383,7 @@ export function TerritoriesPage() {
           }}
           onDelete={handleDeleteTerritory}
           selectedCountryCode={selected?.countryCode}
+          canWrite={canWrite}
         />
         <RoutingRuleListPanel
           items={rItems}
@@ -386,6 +397,7 @@ export function TerritoriesPage() {
           }}
           onDelete={handleDeleteRule}
           selectedCountryCode={selected?.countryCode}
+          canWrite={canWrite}
         />
       </motion.div>
     </motion.div>

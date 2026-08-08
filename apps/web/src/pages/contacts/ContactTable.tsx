@@ -83,6 +83,10 @@ export interface ContactTableProps {
   setEditTarget: (c: Contact) => void;
   onDelete: (c: Contact) => Promise<void>;
   setContextMenu: (m: { x: number; y: number; contact: Contact } | null) => void;
+  /** False when the signed-in user lacks contacts:write — the backend 403s
+   * DELETE otherwise, so the row action is disabled with a hint instead. */
+  canWrite: boolean;
+  readOnlyHint: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -110,6 +114,8 @@ export function ContactTable({
   setEditTarget,
   onDelete,
   setContextMenu,
+  canWrite,
+  readOnlyHint,
 }: ContactTableProps) {
   const { t } = useTranslation('crm');
 
@@ -167,13 +173,15 @@ export function ContactTable({
                   {t('contactTable.clearSearch', 'Clear search')}
                 </Button>
               ) : (
-                <ContactDialog
-                  trigger={
-                    <Button size="sm" variant="primary">
-                      {t('contactTable.addFirstContact', 'Add first contact')}
-                    </Button>
-                  }
-                />
+                canWrite && (
+                  <ContactDialog
+                    trigger={
+                      <Button size="sm" variant="primary">
+                        {t('contactTable.addFirstContact', 'Add first contact')}
+                      </Button>
+                    }
+                  />
+                )
               )
             }
             secondary={
@@ -395,7 +403,8 @@ export function ContactTable({
                         size="sm"
                         variant="ghost"
                         onClick={() => onDelete(c)}
-                        disabled={del.isPending}
+                        disabled={del.isPending || !canWrite}
+                        title={canWrite ? undefined : readOnlyHint}
                         aria-label={t('contactTable.deleteRowLabel', 'Delete {{name}}', {
                           name: c.name,
                         })}

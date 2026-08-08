@@ -22,6 +22,7 @@ import {
 
 import { cn } from '@/lib/cn';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useAnalyticsReportsList,
   useRunReport,
@@ -38,6 +39,14 @@ export function ReportsListPage() {
   const runMutation = useRunReport();
   const duplicateMutation = useDuplicateReport();
   const deleteMutation = useDeleteReport();
+  // Every mutation on this page (run/duplicate/delete/create) is gated
+  // server-side behind reports:write — most non-Admin roles never hold it.
+  // Without this the buttons render for everyone and just 403 on click.
+  const canWrite = useHasPermission('reports:write');
+  const readOnlyHint = t(
+    'reportsList.readOnlyHint',
+    'You need reports write access to manage this report.',
+  );
 
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
@@ -122,18 +131,20 @@ export function ReportsListPage() {
             {t('reportsList.savedCount', '{{count}} saved reports', { count: reports.length })}
           </p>
         </div>
-        <Link
-          to="/reports/new"
-          data-tour="reports-new"
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
-            'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
-            'min-h-[44px]',
-          )}
-        >
-          <Plus size={16} />
-          {t('reportsList.newReport', 'New report')}
-        </Link>
+        {canWrite && (
+          <Link
+            to="/reports/new"
+            data-tour="reports-new"
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
+              'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
+              'min-h-[44px]',
+            )}
+          >
+            <Plus size={16} />
+            {t('reportsList.newReport', 'New report')}
+          </Link>
+        )}
       </div>
 
       {/* Search */}
@@ -177,7 +188,7 @@ export function ReportsListPage() {
               : t('reportsList.emptyMessage', 'Create your first analytical report.')
           }
           action={
-            !search ? (
+            !search && canWrite ? (
               <Link
                 to="/reports/new"
                 className={cn(
@@ -280,14 +291,15 @@ export function ReportsListPage() {
                       {/* Run */}
                       <button
                         onClick={() => handleRun(r)}
-                        disabled={runningIds.has(r.id)}
+                        disabled={runningIds.has(r.id) || !canWrite}
+                        title={canWrite ? undefined : readOnlyHint}
                         aria-label={t('reportsList.runAriaLabel', 'Run report {{name}}', {
                           name: r.name,
                         })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--success)] hover:bg-[var(--success-tint)]',
-                          'disabled:opacity-50',
+                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]',
                         )}
                       >
                         <Play size={13} />
@@ -308,12 +320,15 @@ export function ReportsListPage() {
                       {/* Duplicate */}
                       <button
                         onClick={() => duplicateMutation.mutate(r.id)}
+                        disabled={!canWrite}
+                        title={canWrite ? undefined : readOnlyHint}
                         aria-label={t('reportsList.duplicateAriaLabel', 'Duplicate report {{name}}', {
                           name: r.name,
                         })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
+                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]',
                         )}
                       >
                         <Copy size={13} />
@@ -324,12 +339,15 @@ export function ReportsListPage() {
                           if (confirm(t('reportsList.deleteConfirm', 'Delete "{{name}}"?', { name: r.name })))
                             deleteMutation.mutate(r.id);
                         }}
+                        disabled={!canWrite}
+                        title={canWrite ? undefined : readOnlyHint}
                         aria-label={t('reportsList.deleteAriaLabel', 'Delete report {{name}}', {
                           name: r.name,
                         })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--danger)] hover:bg-[var(--danger-tint)]',
+                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]',
                         )}
                       >
                         <Trash2 size={13} />

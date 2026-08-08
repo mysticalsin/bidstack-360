@@ -19,6 +19,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
@@ -48,6 +49,12 @@ export function PipelinePage() {
   // from `data.items` were silently truncated for any org past 50 deals.
   const report = usePipelineReport();
   const move = useStageMutation();
+  // Stage moves POST /api/opportunities/:id/stage, gated server-side behind
+  // opportunities:write (apps/api/src/routes/opportunities.transitions.ts) —
+  // without this, a read-only role could drag/arrow-key a card and watch it
+  // silently snap back on the 403. The board stays fully viewable; only the
+  // move affordances (drag + arrow-key) are withheld.
+  const canWrite = useHasPermission('opportunities:write');
 
   // Stage filter via the URL. `?pipelineStageId=...` collapses the board to a
   // single column so the user can focus that slice and share the link.
@@ -116,6 +123,7 @@ export function PipelinePage() {
 
   const handleKey = (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (!canWrite) return;
     const ids = stages.map((s) => s.id);
     const idx = ids.indexOf(getVisibleStageId(opp));
     const nextIdx = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
@@ -130,6 +138,13 @@ export function PipelinePage() {
             toast.success(
               t('pipeline.movedToStageToast', 'Moved to {{stage}}', { stage: nextStage.name }),
             ),
+          onError: (err) =>
+            toast.error(t('pipeline.moveErrorToastTitle', 'Could not move opportunity'), {
+              description:
+                err instanceof Error
+                  ? err.message
+                  : t('pipeline.moveErrorToastDescription', 'The server rejected the request.'),
+            }),
         },
       );
     }
@@ -138,6 +153,7 @@ export function PipelinePage() {
   const handleDrop = (e: DragEvent<HTMLDivElement>, stageId: string) => {
     e.preventDefault();
     setHoverStageId(null);
+    if (!canWrite) return;
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
     const item = data?.items.find((o) => o.id === id);
@@ -365,6 +381,7 @@ export function PipelinePage() {
                 isHoverTarget={isHover}
                 draggingId={draggingId}
                 focusedId={focusedId}
+                canWrite={canWrite}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setHoverStageId(stage.id);

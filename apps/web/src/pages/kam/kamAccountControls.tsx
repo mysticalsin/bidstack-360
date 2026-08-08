@@ -4,6 +4,7 @@
  * existing companies, a rich account hero, and a bespoke zero state.
  */
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +15,7 @@ import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useDesignateAccount, useKamCandidates } from '@/hooks/useKamAccounts';
 import type { KamAccount } from '@bidstack/shared';
 
@@ -83,6 +85,11 @@ export function KamAccountSwitcher({
     const needle = q.trim().toLowerCase();
     return needle ? accounts.filter((a) => a.name.toLowerCase().includes(needle)) : accounts;
   }, [accounts, q]);
+  // Both the candidates typeahead (GET) and the designate PATCH are gated
+  // server-side behind kam:write (kam-accounts.ts:83,114) — hide the entry
+  // point into that flow for roles that lack it instead of letting the
+  // candidate search 403 as soon as they start typing.
+  const canWrite = useHasPermission('kam:write');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,16 +126,18 @@ export function KamAccountSwitcher({
               <li className="px-2 py-6 text-center text-sm text-[var(--fg-tertiary)]">No matching key accounts.</li>
             )}
           </ul>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              onOpenChange(false);
-              onDesignate();
-            }}
-            className="w-full justify-center"
-          >
-            <Icon name="plus" size={16} ariaHidden /> Designate a key account
-          </Button>
+          {canWrite && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                onOpenChange(false);
+                onDesignate();
+              }}
+              className="w-full justify-center"
+            >
+              <Icon name="plus" size={16} ariaHidden /> Designate a key account
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -151,6 +160,15 @@ export function KamDesignateDialog({
   const designate = useDesignateAccount();
   const [picked, setPicked] = useState<{ id: string; name: string; countryCode: string | null } | null>(null);
   const [ownerModel, setOwnerModel] = useState<KamAccount['kamOwnerModel']>(null);
+  const { t } = useTranslation('crm');
+  // The candidates typeahead (GET) and the designate PATCH are gated
+  // server-side behind kam:write (kam-accounts.ts:83,114) — disable the
+  // submit for a role that lacks it instead of letting it 403.
+  const canWrite = useHasPermission('kam:write');
+  const readOnlyHint = t(
+    'kam.designate.readOnlyHint',
+    'You need Key Account write access to designate this account.',
+  );
 
   const reset = () => {
     setQ('');
@@ -255,7 +273,12 @@ export function KamDesignateDialog({
               <Button variant="ghost" onClick={() => setPicked(null)}>
                 Back
               </Button>
-              <Button variant="primary" disabled={designate.isPending} onClick={submit}>
+              <Button
+                variant="primary"
+                disabled={designate.isPending || !canWrite}
+                title={canWrite ? undefined : readOnlyHint}
+                onClick={submit}
+              >
                 {designate.isPending ? 'Designating…' : 'Designate key account'}
               </Button>
             </div>
@@ -268,6 +291,10 @@ export function KamDesignateDialog({
 
 // ─── Bespoke zero state ──────────────────────────────────────────────────────
 export function KamZeroState({ onDesignate }: { onDesignate: () => void }) {
+  // See KamAccountSwitcher: the whole designate flow needs kam:write server-
+  // side, so the entry point is hidden rather than opening a dialog that
+  // 403s as soon as the user searches.
+  const canWrite = useHasPermission('kam:write');
   return (
     <Card>
       <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -279,11 +306,13 @@ export function KamZeroState({ onDesignate }: { onDesignate: () => void }) {
           Designate a company as a key account to capture workshop initiatives, track them to a qualified opportunity,
           and hand off to OM. Spain runs presales-led; Switzerland manager-led.
         </p>
-        <div className="mt-5">
-          <Button variant="primary" onClick={onDesignate}>
-            <Icon name="plus" size={16} ariaHidden /> Designate a key account
-          </Button>
-        </div>
+        {canWrite && (
+          <div className="mt-5">
+            <Button variant="primary" onClick={onDesignate}>
+              <Icon name="plus" size={16} ariaHidden /> Designate a key account
+            </Button>
+          </div>
+        )}
       </div>
     </Card>
   );

@@ -11,6 +11,7 @@ import { Plus, Layout, Globe, Lock, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { staggerParent, staggerChild } from '@/lib/motion';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useDashboards, useCreateDashboard, useDeleteDashboard } from '@/hooks/useDashboards';
 
 export function DashboardsListPage() {
@@ -18,14 +19,27 @@ export function DashboardsListPage() {
   const { data: dashboards = [], isLoading, error } = useDashboards();
   const createMutation = useCreateDashboard();
   const deleteMutation = useDeleteDashboard();
+  // Create/delete both persist through POST/DELETE /api/dashboards, gated
+  // server-side behind reports:write (apps/api/src/routes/analytics-dashboards.ts:94,139)
+  // — hide/disable the write affordances rather than let a read-only role 403.
+  const canWrite = useHasPermission('reports:write');
+  const readOnlyHint = t(
+    'dashboardsList.readOnlyHint',
+    'You need reports write access to manage dashboards.',
+  );
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    await createMutation.mutateAsync({ name: newName.trim() });
-    setNewName('');
-    setCreating(false);
+    try {
+      await createMutation.mutateAsync({ name: newName.trim() });
+      setNewName('');
+      setCreating(false);
+    } catch {
+      // useCreateDashboard's onError already toasts; just keep the form open
+      // (with the typed name intact) instead of getting stuck disabled forever.
+    }
   };
 
   if (isLoading) {
@@ -66,21 +80,23 @@ export function DashboardsListPage() {
               : t('dashboardsList.countOther', '{{count}} dashboards', { count: dashboards.length })}
           </p>
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
-            'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
-            'min-h-[44px]',
-          )}
-        >
-          <Plus size={16} />
-          {t('dashboardsList.newButton', 'New dashboard')}
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setCreating(true)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
+              'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
+              'min-h-[44px]',
+            )}
+          >
+            <Plus size={16} />
+            {t('dashboardsList.newButton', 'New dashboard')}
+          </button>
+        )}
       </div>
 
       {/* Create form */}
-      {creating && (
+      {creating && canWrite && (
         <div className="flex items-center gap-2 p-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)]">
           <input
             autoFocus
@@ -130,17 +146,19 @@ export function DashboardsListPage() {
             'Create your first dashboard to start tracking what matters.',
           )}
           action={
-            <button
-              onClick={() => setCreating(true)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
-                'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
-                'min-h-[44px]',
-              )}
-            >
-              <Plus size={16} />
-              {t('dashboardsList.newButton', 'New dashboard')}
-            </button>
+            canWrite ? (
+              <button
+                onClick={() => setCreating(true)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
+                  'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
+                  'min-h-[44px]',
+                )}
+              >
+                <Plus size={16} />
+                {t('dashboardsList.newButton', 'New dashboard')}
+              </button>
+            ) : undefined
           }
         />
       ) : (
@@ -203,6 +221,8 @@ export function DashboardsListPage() {
                     deleteMutation.mutate(d.id);
                   }
                 }}
+                disabled={!canWrite}
+                title={canWrite ? undefined : readOnlyHint}
                 aria-label={t('dashboardsList.deleteAria', 'Delete dashboard {{name}}', {
                   name: d.name,
                 })}
@@ -211,6 +231,7 @@ export function DashboardsListPage() {
                   'w-7 h-7 rounded-lg text-[var(--fg-tertiary)]',
                   'hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors',
                   'min-w-[44px] min-h-[44px]',
+                  'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]',
                 )}
               >
                 <Trash2 size={13} />

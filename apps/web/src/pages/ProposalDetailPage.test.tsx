@@ -112,3 +112,84 @@ describe('ProposalDetailPage — due date mutation', () => {
     ).toBeTruthy();
   });
 });
+
+const SECTION = {
+  id: 's1',
+  proposalId: 'p1',
+  key: 'executive-summary',
+  title: 'Executive Summary',
+  content: '',
+  wordCount: 0,
+  aiDrafted: false,
+  sortOrder: 0,
+  required: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+const PROPOSAL_WITH_SECTION = { ...PROPOSAL, sections: [SECTION] };
+
+describe('ProposalDetailPage — AI draft section', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('renders an error alert when the AI draft request fails, instead of failing silently', async () => {
+    // WHY this matters: the draft endpoint is rate-limited (10/min) and
+    // permission-gated server-side, so failures are routine, not exotic. Before
+    // this fix, a rejected mutation just reverted the button text with no
+    // indication anything went wrong.
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) {
+        return Promise.resolve(PROPOSAL_WITH_SECTION);
+      }
+      if (path === '/api/v1/proposals/p1/draft' && opts?.method === 'POST') {
+        return Promise.reject(new Error('Rate limit exceeded'));
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    renderPage();
+
+    const draftButton = await screen.findByRole('button', {
+      name: 'AI Draft for Executive Summary',
+    });
+    fireEvent.click(draftButton);
+
+    expect(
+      await screen.findByText('Could not generate an AI draft. Please try again.'),
+    ).toBeTruthy();
+  });
+
+  it('hides the AI Draft and edit controls for a user without proposals:write', async () => {
+    // WHY this matters: both actions 403 server-side for roles that only hold
+    // proposals:read (Sales, Manager, Executive, External Partner). Before this
+    // fix the buttons rendered unconditionally, promising an action that always
+    // fails for those roles.
+    const readOnlyCapabilities = {
+      ...CAPABILITIES,
+      isAdmin: false,
+      roles: ['Sales'],
+      permissions: ['proposals:read'],
+    };
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(readOnlyCapabilities);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) {
+        return Promise.resolve(PROPOSAL_WITH_SECTION);
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    renderPage();
+
+    await screen.findByText('Executive Summary');
+    expect(
+      screen.queryByRole('button', { name: 'AI Draft for Executive Summary' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Edit Executive Summary section' }),
+    ).toBeNull();
+  });
+});

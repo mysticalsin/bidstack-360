@@ -14,6 +14,7 @@ import { cn } from '@/lib/cn';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { WidgetRenderer } from '@/components/widgets/WidgetRenderer';
 import { WidgetConfigModal } from '@/components/widgets/WidgetConfigModal';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useDashboards,
   useDashboardWidgets,
@@ -32,6 +33,11 @@ export function AnalyticsDashboardPage() {
   const [activeDashId, setActiveDashId] = useState<string>(searchParams.get('id') ?? '');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [addingWidget, setAddingWidget] = useState(false);
+  // Add/delete widget both persist through POST/DELETE
+  // /api/dashboards/:id/widgets*, gated server-side behind reports:write
+  // (apps/api/src/routes/analytics-dashboards.ts:94,139) — hide the write
+  // affordances rather than let a read-only role 403.
+  const canWrite = useHasPermission('reports:write');
 
   // Resolve the active dashboard (default to first). Fall back to the first
   // dashboard when ?id points at a stale/foreign/deleted id, so a bad deep-link
@@ -66,6 +72,9 @@ export function AnalyticsDashboardPage() {
   const handleAddWidget = useCallback(
     async (cfg: CreateWidgetInput) => {
       if (!activeDash) return;
+      // useAddWidget's onError already toasts; just propagate the rejection so
+      // WidgetConfigModal keeps the dialog open (with the user's input) on failure
+      // instead of closing as if the widget saved.
       await addWidgetMutation.mutateAsync(cfg);
     },
     [activeDash, addWidgetMutation],
@@ -175,7 +184,7 @@ export function AnalyticsDashboardPage() {
           >
             {t('analyticsDashboard.newReportLink', 'New report')}
           </Link>
-          {activeDash && (
+          {activeDash && canWrite && (
             <button
               onClick={() => setAddingWidget(true)}
               className={cn(
@@ -225,16 +234,18 @@ export function AnalyticsDashboardPage() {
               'Add your first widget to start visualising data.',
             )}
             action={
-              <button
-                onClick={() => setAddingWidget(true)}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
-                  'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] min-h-[44px]',
-                )}
-              >
-                <Plus size={16} />
-                {t('analyticsDashboard.addWidget', 'Add widget')}
-              </button>
+              canWrite ? (
+                <button
+                  onClick={() => setAddingWidget(true)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
+                    'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] min-h-[44px]',
+                  )}
+                >
+                  <Plus size={16} />
+                  {t('analyticsDashboard.addWidget', 'Add widget')}
+                </button>
+              ) : undefined
             }
           />
         ) : (
@@ -256,7 +267,10 @@ export function AnalyticsDashboardPage() {
                     widget-update endpoint + edit modal). Rather than surface a
                     dead "Configure" menu item, we omit onConfigure so the
                     action isn't rendered. Re-add when editing is implemented. */}
-                <WidgetRenderer widget={w} onDelete={() => handleDeleteWidget(w.id)} />
+                <WidgetRenderer
+                  widget={w}
+                  onDelete={canWrite ? () => handleDeleteWidget(w.id) : undefined}
+                />
               </Reorder.Item>
             ))}
           </Reorder.Group>
@@ -264,7 +278,7 @@ export function AnalyticsDashboardPage() {
       </div>
 
       {/* Add widget modal */}
-      {activeDash && (
+      {activeDash && canWrite && (
         <WidgetConfigModal
           open={addingWidget}
           onOpenChange={setAddingWidget}

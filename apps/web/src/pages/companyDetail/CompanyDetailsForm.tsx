@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useUpdateCompany } from '@/hooks/useCompanies';
 import type { CompanyDetail, CompanyPatch } from '@bidstack/shared';
 
@@ -15,6 +16,10 @@ const TIERS = ['key', 'top', 'standard'] as const;
 
 export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail; onDone: () => void }) {
   const update = useUpdateCompany();
+  // PATCH /companies/:id is admin-only (companies:write) — surface that up
+  // front so non-admins don't fill out the whole form only to have it
+  // rejected on submit.
+  const canWrite = useHasPermission('companies:write');
   const [form, setForm] = useState({
     name: company.name,
     legalName: company.legalName ?? '',
@@ -68,6 +73,11 @@ export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail
       <div className="border-b border-[var(--border-subtle)] p-4">
         <h2 className="text-base font-semibold text-[var(--fg-primary)]">Edit account details</h2>
         <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">Only changed fields are saved.</p>
+        {!canWrite && (
+          <p className="mt-1 text-xs text-[var(--danger)]">
+            You don&apos;t have permission to save changes to company details. Only admins can edit this form.
+          </p>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
         <Field label="Company name" error={errors.name} required>
@@ -137,7 +147,12 @@ export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail
         <Button variant="secondary" onClick={onDone}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={update.isPending} onClick={save}>
+        <Button
+          variant="primary"
+          disabled={update.isPending || !canWrite}
+          title={canWrite ? undefined : "You don't have permission to save changes to company details"}
+          onClick={save}
+        >
           {update.isPending ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
