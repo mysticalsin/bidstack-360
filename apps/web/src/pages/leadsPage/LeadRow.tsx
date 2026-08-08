@@ -139,9 +139,13 @@ export function LeadRow({
           disabled={!canWrite}
           title={canWrite ? undefined : readOnlyHint}
           className="rounded-md px-2 py-1 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-          aria-label={t('leadRow.deleteLead', 'Delete {{name}}', {
-            name: `${lead.firstName} ${lead.lastName}`,
-          })}
+          aria-label={
+            canWrite
+              ? t('leadRow.deleteLead', 'Delete {{name}}', {
+                  name: `${lead.firstName} ${lead.lastName}`,
+                })
+              : `${t('leadRow.deleteLead', 'Delete {{name}}', { name: `${lead.firstName} ${lead.lastName}` })} — ${readOnlyHint}`
+          }
         >
           {t('leadRow.delete', 'Delete')}
         </button>

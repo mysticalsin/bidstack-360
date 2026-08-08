@@ -111,17 +111,27 @@ describe('WorkflowsPage — workflows:write gating', () => {
     expect(screen.getByText('Notify on stage change')).toBeTruthy();
     // ... but every write affordance is gone or disabled, not a silent 403 trap.
     expect(screen.queryByRole('button', { name: 'New workflow' })).toBeNull();
-    expect((screen.getByRole('button', { name: 'Run' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(
-      (screen.getByRole('checkbox', { name: /^(Active|Paused)$/ }) as HTMLInputElement).disabled,
-    ).toBe(true);
-    expect(
-      (
-        screen.getByRole('button', {
-          name: 'Delete workflow: Notify on stage change',
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
+
+    // Disabled controls stay in the tab order (native `disabled`), so a
+    // screen-reader/keyboard user still needs a reason beyond the mouse-only
+    // `title` tooltip — the accessible name itself must carry the hint.
+    const readOnlyHint = 'You need workflows write access to manage this workflow.';
+
+    const runButton = screen.getByRole('button', { name: /^Run/ }) as HTMLButtonElement;
+    expect(runButton.disabled).toBe(true);
+    expect(runButton.getAttribute('aria-label')).toBe(`Run — ${readOnlyHint}`);
+
+    const toggle = screen.getByRole('checkbox', { name: /^Active —/ }) as HTMLInputElement;
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.getAttribute('aria-label')).toBe(`Active — ${readOnlyHint}`);
+
+    const deleteButton = screen.getByRole('button', {
+      name: /^Delete workflow: Notify on stage change/,
+    }) as HTMLButtonElement;
+    expect(deleteButton.disabled).toBe(true);
+    expect(deleteButton.getAttribute('aria-label')).toBe(
+      `Delete workflow: Notify on stage change — ${readOnlyHint}`,
+    );
   });
 
   it('hides the New workflow empty-state action for a user without workflows:write', () => {

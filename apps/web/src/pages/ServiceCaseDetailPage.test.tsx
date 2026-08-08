@@ -155,13 +155,20 @@ describe('ServiceCaseDetailPage — service-desk:write gating', () => {
 
     renderPage();
 
-    const markResolved = screen.getByRole('button', { name: 'Mark resolved' }) as HTMLButtonElement;
+    const markResolved = screen.getByRole('button', { name: /^Mark resolved/ }) as HTMLButtonElement;
     expect(markResolved.disabled).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Save note' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    const saveNote = screen.getByRole('button', { name: /^Save note/ }) as HTMLButtonElement;
+    expect(saveNote.disabled).toBe(true);
     expect(markResolved.getAttribute('title')).toBe(
       'You need service desk write access to update this case.',
+    );
+    // `title` is mouse-only — the accessible name itself must carry the
+    // reason so screen-reader/keyboard users get it too.
+    expect(markResolved.getAttribute('aria-label')).toBe(
+      'Mark resolved — You need service desk write access to update this case.',
+    );
+    expect(saveNote.getAttribute('aria-label')).toBe(
+      'Save note — You need service desk write access to update this case.',
     );
   });
 });

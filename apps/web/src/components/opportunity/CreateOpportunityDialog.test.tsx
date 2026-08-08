@@ -49,7 +49,7 @@ describe('CreateOpportunityDialog — opportunities:write gating', () => {
     hookMocks.canWrite = false;
     render(<CreateOpportunityDialog open onOpenChange={vi.fn()} />);
 
-    const submit = screen.getByRole('button', { name: 'Create opportunity' }) as HTMLButtonElement;
+    const submit = screen.getByRole('button', { name: /^Create opportunity/ }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
     expect(submit.getAttribute('title')).toBe(
       'You need opportunities write access to create an opportunity.',
@@ -57,6 +57,11 @@ describe('CreateOpportunityDialog — opportunities:write gating', () => {
     expect(
       screen.getByText('You need opportunities write access to create an opportunity.'),
     ).toBeTruthy();
+    // `title` is mouse-only — the accessible name itself must carry the
+    // reason so screen-reader/keyboard users get it too.
+    expect(submit.getAttribute('aria-label')).toBe(
+      'Create opportunity — You need opportunities write access to create an opportunity.',
+    );
   });
 
   it('keeps Create opportunity enabled for a user with opportunities:write', () => {

@@ -5,18 +5,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { CompaniesPage } from './CompaniesPage';
 import { useCompanies } from '@/hooks/useCompanies';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useHasAdminPermission } from '@/hooks/useCapabilities';
 
 // Companies POST/PATCH/DELETE are gated server-side behind companies:write +
 // the literal 'admin' role (apps/api/src/routes/companies.ts) — the write
-// affordances must reflect that, not just show a button that always 403s.
+// affordances must reflect that AND-of-both gate, not just the permission
+// grant alone (useHasPermission's isAdmin-OR would show controls a
+// permission-holding non-admin gets 403'd on). Only useHasAdminPermission is
+// mocked here — if the page regresses to importing useHasPermission it is
+// undefined under this mock and the render throws, failing the test loudly.
 vi.mock('@/hooks/useCompanies', () => ({
   useCompanies: vi.fn(),
   useCreateCompany: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
   useDeleteCompany: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn() }));
+vi.mock('@/hooks/useCapabilities', () => ({ useHasAdminPermission: vi.fn() }));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -73,7 +77,7 @@ describe('CompaniesPage — companies:write gating', () => {
   });
 
   it('hides New company and row Delete for a user without companies:write', () => {
-    vi.mocked(useHasPermission).mockReturnValue(false);
+    vi.mocked(useHasAdminPermission).mockReturnValue(false);
 
     renderWithProviders(<CompaniesPage />);
 
@@ -84,7 +88,7 @@ describe('CompaniesPage — companies:write gating', () => {
   });
 
   it('shows New company and row Delete for a user with companies:write', () => {
-    vi.mocked(useHasPermission).mockReturnValue(true);
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
 
     renderWithProviders(<CompaniesPage />);
 
@@ -93,7 +97,7 @@ describe('CompaniesPage — companies:write gating', () => {
   });
 
   it('hides the empty-state "Add company" action for a user without companies:write', () => {
-    vi.mocked(useHasPermission).mockReturnValue(false);
+    vi.mocked(useHasAdminPermission).mockReturnValue(false);
     mockCompanies({
       data: { items: [], nextCursor: undefined },
       isLoading: false,
@@ -104,5 +108,19 @@ describe('CompaniesPage — companies:write gating', () => {
     renderWithProviders(<CompaniesPage />);
 
     expect(screen.queryByRole('button', { name: /Add company/i })).toBeNull();
+  });
+
+  it('checks the admin+permission gate, not just the permission grant', () => {
+    // A non-admin holding the raw companies:write grant must still see the
+    // controls hidden — the server 403s them regardless (requireRole('admin')
+    // stacks on top of requirePermission). useHasAdminPermission is called
+    // with the exact key the server checks; asserting the call args pins the
+    // wiring so a regression to the wrong key/hook fails here.
+    vi.mocked(useHasAdminPermission).mockReturnValue(false);
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(useHasAdminPermission).toHaveBeenCalledWith('companies:write');
+    expect(screen.queryByRole('button', { name: /New company/i })).toBeNull();
   });
 });

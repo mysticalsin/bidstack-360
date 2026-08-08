@@ -347,17 +347,19 @@ export function ContactsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ContactCsvImportDialog
-            trigger={
-              <Button
-                size="sm"
-                variant="secondary"
-                aria-label={t('contacts.actions.importCsv.aria', 'Import contacts from CSV')}
-              >
-                {t('contacts.actions.importCsv.label', 'Import CSV')}
-              </Button>
-            }
-          />
+          {canWrite && (
+            <ContactCsvImportDialog
+              trigger={
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label={t('contacts.actions.importCsv.aria', 'Import contacts from CSV')}
+                >
+                  {t('contacts.actions.importCsv.label', 'Import CSV')}
+                </Button>
+              }
+            />
+          )}
           <LiquidGlassButton
             tone="secondary"
             size="sm"

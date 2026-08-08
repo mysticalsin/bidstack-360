@@ -39,3 +39,20 @@ export function useHasPermission(key: string): boolean {
   if (!data) return false;
   return data.isAdmin || data.permissions.includes(key);
 }
+
+/**
+ * Returns whether the signed-in user holds a given permission key AND the
+ * literal 'admin' role. Some routes stack `requirePermission(key)` with
+ * `requireRole('admin')` server-side (e.g. the company write routes) rather
+ * than accepting any custom role that merely holds the grant. useHasPermission's
+ * isAdmin-OR would show write controls to a permission-holding non-admin that
+ * the server 403s, and (less commonly) an admin without the grant would still
+ * fail useHasPermission's AND-less check in the other direction — this helper
+ * mirrors the server's exact two-part gate so the UI never shows a control the
+ * API will reject. While the manifest is loading this returns false.
+ */
+export function useHasAdminPermission(key: string): boolean {
+  const { data } = useCapabilities();
+  if (!data) return false;
+  return data.isAdmin && data.permissions.includes(key);
+}

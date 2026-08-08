@@ -277,7 +277,11 @@ export const TaskRow = memo(function TaskRow({
               onKeyDown={handleSnoozeKeyDown}
               disabled={!canWrite}
               title={canWrite ? undefined : readOnlyHint}
-              aria-label={t('taskRow.snoozeTask', 'Snooze {{title}}', { title: task.title })}
+              aria-label={
+                canWrite
+                  ? t('taskRow.snoozeTask', 'Snooze {{title}}', { title: task.title })
+                  : `${t('taskRow.snoozeTask', 'Snooze {{title}}', { title: task.title })} — ${readOnlyHint}`
+              }
               aria-haspopup="listbox"
               aria-expanded={snoozeOpen}
               className={cn(
@@ -340,14 +344,25 @@ export const TaskRow = memo(function TaskRow({
           disabled={update.isPending || !canWrite}
           whileTap={{ scale: 0.94 }}
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label={t(
-            'taskRow.statusAction',
-            'Status: {{status}}. Activate to change to {{next}}.',
-            {
-              status: task.status.replace('_', ' '),
-              next: STATUS_CYCLE[task.status].replace('_', ' '),
-            },
-          )}
+          aria-label={
+            canWrite
+              ? t(
+                  'taskRow.statusAction',
+                  'Status: {{status}}. Activate to change to {{next}}.',
+                  {
+                    status: task.status.replace('_', ' '),
+                    next: STATUS_CYCLE[task.status].replace('_', ' '),
+                  },
+                )
+              : `${t(
+                  'taskRow.statusAction',
+                  'Status: {{status}}. Activate to change to {{next}}.',
+                  {
+                    status: task.status.replace('_', ' '),
+                    next: STATUS_CYCLE[task.status].replace('_', ' '),
+                  },
+                )} — ${readOnlyHint}`
+          }
           title={
             canWrite
               ? t('taskRow.statusTitle', 'Activate to change status to {{next}}', {

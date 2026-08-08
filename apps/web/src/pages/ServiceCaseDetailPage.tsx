@@ -141,6 +141,11 @@ export function ServiceCaseDetailPage() {
               }
               disabled={update.isPending || !canWrite}
               title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite
+                  ? undefined
+                  : `${t('serviceCaseDetail.markStatusButton', 'Mark {{status}}', { status: s.replace(/_/g, ' ') })} — ${readOnlyHint}`
+              }
             >
               {t('serviceCaseDetail.markStatusButton', 'Mark {{status}}', {
                 status: s.replace(/_/g, ' '),
@@ -181,6 +186,11 @@ export function ServiceCaseDetailPage() {
                 onClick={handleSaveNote}
                 disabled={!note.trim() || update.isPending || !canWrite}
                 title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? undefined
+                    : `${t('serviceCaseDetail.saveNoteButton', 'Save note')} — ${readOnlyHint}`
+                }
               >
                 {update.isPending
                   ? t('serviceCaseDetail.savingButton', 'Saving…')

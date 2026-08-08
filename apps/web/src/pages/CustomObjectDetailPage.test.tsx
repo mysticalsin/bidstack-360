@@ -116,11 +116,15 @@ describe('CustomObjectDetailPage — customObjects:write gating', () => {
     expect(screen.getByRole('heading', { name: 'Acme Supplies' })).toBeTruthy();
     // ... but the write affordances are disabled, not just visually muted,
     // so they can't 403 on submit.
-    const deleteButton = screen.getByRole('button', { name: 'Delete' });
+    const deleteButton = screen.getByRole('button', { name: /^Delete/ });
     expect(deleteButton.hasAttribute('disabled')).toBe(true);
     expect(deleteButton.getAttribute('title')).toMatch(/customObjectDetail\.readOnlyHint|write access/i);
+    // `title` is mouse-only — the accessible name itself must carry the
+    // reason so screen-reader/keyboard users get it too.
+    expect(deleteButton.getAttribute('aria-label')).toMatch(/write access/i);
 
     const editTrigger = screen.getByRole('button', { name: /Edit name: Acme Supplies/i });
     expect(editTrigger.hasAttribute('disabled')).toBe(true);
+    expect(editTrigger.getAttribute('aria-label')).toMatch(/write access/i);
   });
 });

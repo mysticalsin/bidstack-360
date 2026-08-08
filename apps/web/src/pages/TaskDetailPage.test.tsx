@@ -193,10 +193,15 @@ describe('TaskDetailPage — tasks:write gating', () => {
     // Read access stays intact — the task still renders.
     expect(screen.getByText('Send follow-up email')).toBeTruthy();
 
-    const editButton = screen.getByRole('button', { name: 'Edit' });
+    const editButton = screen.getByRole('button', { name: /^Edit/ });
     expect((editButton as HTMLButtonElement).disabled).toBe(true);
     expect(editButton.getAttribute('title')).toBe(
       'You need task write access to edit this task.',
+    );
+    // `title` is mouse-only — the disabled button stays in the tab order, so
+    // the accessible name itself must carry the reason too.
+    expect(editButton.getAttribute('aria-label')).toBe(
+      'Edit — You need task write access to edit this task.',
     );
     // Disabled means unreachable — the title editor never mounts.
     fireEvent.click(editButton);

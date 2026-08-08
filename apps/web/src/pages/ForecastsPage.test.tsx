@@ -100,14 +100,21 @@ describe('ForecastsPage — territories:write gating', () => {
     expect(screen.getAllByText('Alice Dev').length).toBeGreaterThan(0);
     // ...but every write affordance is gone or disabled, not just visually hidden.
     expect(screen.queryByRole('button', { name: /New Forecast/i })).toBeNull();
-    const editButtons = screen.getAllByRole('button', { name: /^Edit .+ for 2026-08$/ });
+    const hint = 'You need territories write access to edit forecasts.';
+    const editButtons = screen.getAllByRole('button', { name: /^Edit .+ for 2026-08/ });
     expect(editButtons.length).toBeGreaterThan(0);
     editButtons.forEach((btn) => {
       expect((btn as HTMLButtonElement).disabled).toBe(true);
-      expect(btn.getAttribute('title')).toBe('You need territories write access to edit forecasts.');
+      expect(btn.getAttribute('title')).toBe(hint);
+      // `title` is mouse-only — the accessible name itself must carry the
+      // reason so screen-reader/keyboard users get it too.
+      expect(btn.getAttribute('aria-label')).toMatch(new RegExp(`— ${hint}$`));
     });
     const deleteButtons = screen.getAllByRole('button', { name: /Delete forecasts for 2026-08/i });
     expect(deleteButtons.length).toBeGreaterThan(0);
-    deleteButtons.forEach((btn) => expect((btn as HTMLButtonElement).disabled).toBe(true));
+    deleteButtons.forEach((btn) => {
+      expect((btn as HTMLButtonElement).disabled).toBe(true);
+      expect(btn.getAttribute('aria-label')).toMatch(new RegExp(`— ${hint}$`));
+    });
   });
 });

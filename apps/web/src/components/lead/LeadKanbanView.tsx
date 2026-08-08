@@ -86,7 +86,9 @@ export function LeadKanbanView({ leads }: Props) {
             toast.success(
               t('leadKanban.moveSuccess', 'Moved to {{status}}', { status: targetStatus }),
             ),
-          onError: () => toast.error(t('leadKanban.moveError', 'Could not move lead')),
+          // No onError toast here — useUpdateLeadById already toasts (and rolls
+          // back the optimistic update) at the hook level; a callsite toast
+          // would double-fire.
         },
       );
     },

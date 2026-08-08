@@ -17,8 +17,9 @@ interface CompanyRowProps {
   selected: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  // Delete is gated server-side behind companies:write + the 'admin' role —
-  // hide the row action for everyone else (matches CompaniesPage's canWrite).
+  // Delete is gated server-side behind companies:write AND the literal 'admin'
+  // role — hide the row action for everyone else (matches CompaniesPage's
+  // canWrite, sourced from useHasAdminPermission('companies:write')).
   canDelete: boolean;
   query: string;
 }

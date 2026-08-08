@@ -101,10 +101,15 @@ describe('ProposalsPage — proposals:write gating', () => {
 
     renderPage();
 
-    const createButton = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement;
+    const createButton = screen.getByRole('button', { name: /^Create/ }) as HTMLButtonElement;
     expect(createButton.disabled).toBe(true);
     expect(createButton.getAttribute('title')).toBe(
       'You need proposals write access to create a proposal.',
+    );
+    // `title` is mouse-only — the accessible name itself must carry the
+    // reason so screen-reader/keyboard users get it too.
+    expect(createButton.getAttribute('aria-label')).toBe(
+      'Create — You need proposals write access to create a proposal.',
     );
   });
 });

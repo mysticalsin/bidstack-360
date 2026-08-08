@@ -396,6 +396,11 @@ export function SmartCompanyDialog({ trigger }: Props) {
                 type="button"
                 disabled={!canCreate}
                 title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? undefined
+                    : `${t('smartCompany.action.createEnriched', 'Create enriched account')} — ${readOnlyHint}`
+                }
                 onClick={() => createCompany.mutate()}
                 whileHover={reducedMotion || !canCreate ? undefined : { y: -1 }}
               >

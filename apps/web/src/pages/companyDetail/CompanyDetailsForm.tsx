@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useHasAdminPermission } from '@/hooks/useCapabilities';
 import { useUpdateCompany } from '@/hooks/useCompanies';
 import type { CompanyDetail, CompanyPatch } from '@bidstack/shared';
 
@@ -19,7 +19,7 @@ export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail
   // PATCH /companies/:id is admin-only (companies:write) — surface that up
   // front so non-admins don't fill out the whole form only to have it
   // rejected on submit.
-  const canWrite = useHasPermission('companies:write');
+  const canWrite = useHasAdminPermission('companies:write');
   const [form, setForm] = useState({
     name: company.name,
     legalName: company.legalName ?? '',
@@ -151,6 +151,11 @@ export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail
           variant="primary"
           disabled={update.isPending || !canWrite}
           title={canWrite ? undefined : "You don't have permission to save changes to company details"}
+          aria-label={
+            canWrite
+              ? undefined
+              : "Save changes — You don't have permission to save changes to company details"
+          }
           onClick={save}
         >
           {update.isPending ? 'Saving…' : 'Save changes'}

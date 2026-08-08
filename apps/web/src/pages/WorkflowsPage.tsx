@@ -200,6 +200,15 @@ export function WorkflowsPage() {
                     checked={w.active}
                     onChange={() => handleToggle(w.id, w.active)}
                     disabled={updateWf.isPending || !canWrite}
+                    aria-label={
+                      canWrite
+                        ? undefined
+                        : `${
+                            w.active
+                              ? t('workflows.statusActive', 'Active')
+                              : t('workflows.statusPaused', 'Paused')
+                          } — ${readOnlyHint}`
+                    }
                     className="h-4 w-4 rounded border-[var(--border-subtle)]"
                   />
                   {w.active
@@ -213,6 +222,9 @@ export function WorkflowsPage() {
                     onClick={() => handleRun(w.id)}
                     disabled={runWf.isPending || !canWrite}
                     title={canWrite ? undefined : readOnlyHint}
+                    aria-label={
+                      canWrite ? undefined : `${t('workflows.run', 'Run')} — ${readOnlyHint}`
+                    }
                   >
                     {runWf.isPending
                       ? t('workflows.running', 'Running…')
@@ -221,9 +233,11 @@ export function WorkflowsPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(w.id, w.name)}
-                    aria-label={t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', {
-                      name: w.name,
-                    })}
+                    aria-label={
+                      canWrite
+                        ? t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })
+                        : `${t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })} — ${readOnlyHint}`
+                    }
                     disabled={deleteWf.isPending || !canWrite}
                     title={canWrite ? undefined : readOnlyHint}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fg-tertiary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] disabled:opacity-50 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"

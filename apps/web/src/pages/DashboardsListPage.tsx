@@ -223,9 +223,11 @@ export function DashboardsListPage() {
                 }}
                 disabled={!canWrite}
                 title={canWrite ? undefined : readOnlyHint}
-                aria-label={t('dashboardsList.deleteAria', 'Delete dashboard {{name}}', {
-                  name: d.name,
-                })}
+                aria-label={
+                  canWrite
+                    ? t('dashboardsList.deleteAria', 'Delete dashboard {{name}}', { name: d.name })
+                    : `${t('dashboardsList.deleteAria', 'Delete dashboard {{name}}', { name: d.name })} — ${readOnlyHint}`
+                }
                 className={cn(
                   'absolute top-2 right-2 hidden group-hover:flex items-center justify-center',
                   'w-7 h-7 rounded-lg text-[var(--fg-tertiary)]',

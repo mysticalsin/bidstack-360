@@ -293,9 +293,11 @@ export function ReportsListPage() {
                         onClick={() => handleRun(r)}
                         disabled={runningIds.has(r.id) || !canWrite}
                         title={canWrite ? undefined : readOnlyHint}
-                        aria-label={t('reportsList.runAriaLabel', 'Run report {{name}}', {
-                          name: r.name,
-                        })}
+                        aria-label={
+                          canWrite
+                            ? t('reportsList.runAriaLabel', 'Run report {{name}}', { name: r.name })
+                            : `${t('reportsList.runAriaLabel', 'Run report {{name}}', { name: r.name })} — ${readOnlyHint}`
+                        }
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--success)] hover:bg-[var(--success-tint)]',
@@ -322,9 +324,11 @@ export function ReportsListPage() {
                         onClick={() => duplicateMutation.mutate(r.id)}
                         disabled={!canWrite}
                         title={canWrite ? undefined : readOnlyHint}
-                        aria-label={t('reportsList.duplicateAriaLabel', 'Duplicate report {{name}}', {
-                          name: r.name,
-                        })}
+                        aria-label={
+                          canWrite
+                            ? t('reportsList.duplicateAriaLabel', 'Duplicate report {{name}}', { name: r.name })
+                            : `${t('reportsList.duplicateAriaLabel', 'Duplicate report {{name}}', { name: r.name })} — ${readOnlyHint}`
+                        }
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
@@ -341,9 +345,11 @@ export function ReportsListPage() {
                         }}
                         disabled={!canWrite}
                         title={canWrite ? undefined : readOnlyHint}
-                        aria-label={t('reportsList.deleteAriaLabel', 'Delete report {{name}}', {
-                          name: r.name,
-                        })}
+                        aria-label={
+                          canWrite
+                            ? t('reportsList.deleteAriaLabel', 'Delete report {{name}}', { name: r.name })
+                            : `${t('reportsList.deleteAriaLabel', 'Delete report {{name}}', { name: r.name })} — ${readOnlyHint}`
+                        }
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--danger)] hover:bg-[var(--danger-tint)]',

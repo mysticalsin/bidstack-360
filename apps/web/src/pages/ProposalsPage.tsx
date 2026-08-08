@@ -128,6 +128,9 @@ function CreateProposalSheet({
               onClick={() => create.mutate({ name })}
               disabled={!name.trim() || create.isPending || !canWrite}
               title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite ? undefined : `${t('proposals.create', 'Create')} — ${readOnlyHint}`
+              }
             >
               {create.isPending
                 ? t('proposals.creating', 'Creating…')

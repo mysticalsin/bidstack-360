@@ -258,6 +258,15 @@ function ContactForm({
           size="sm"
           disabled={isPending || !canWrite}
           title={canWrite ? undefined : readOnlyHint}
+          aria-label={
+            canWrite
+              ? undefined
+              : `${
+                  contact
+                    ? t('contact.saveChanges', 'Save changes')
+                    : t('contact.createContact', 'Create contact')
+                } — ${readOnlyHint}`
+          }
         >
           {isPending
             ? t('contact.saving', 'Saving…')

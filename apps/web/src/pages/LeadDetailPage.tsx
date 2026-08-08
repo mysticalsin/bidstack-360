@@ -193,6 +193,11 @@ export function LeadDetailPage() {
                 onClick={() => setIsConverting(true)}
                 disabled={!canWrite}
                 title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? undefined
+                    : `${t('leadDetail.convertAction', 'Convert to opportunity')} — ${readOnlyHint}`
+                }
               >
                 {t('leadDetail.convertAction', 'Convert to opportunity')}
               </Button>
@@ -206,6 +211,9 @@ export function LeadDetailPage() {
               onClick={handleDelete}
               disabled={!canWrite}
               title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite ? undefined : `${t('leadDetail.deleteAction', 'Delete')} — ${readOnlyHint}`
+              }
             >
               {t('leadDetail.deleteAction', 'Delete')}
             </Button>
@@ -256,7 +264,11 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelStatus', 'Status')}
                 </label>
                 <select
-                  aria-label={t('leadDetail.labelStatus', 'Status')}
+                  aria-label={
+                    canWrite
+                      ? t('leadDetail.labelStatus', 'Status')
+                      : `${t('leadDetail.labelStatus', 'Status')} — ${readOnlyHint}`
+                  }
                   value={l.status}
                   onChange={(e) => handleStatusChange(LeadStatus.parse(e.target.value))}
                   disabled={isConverted || !canWrite}
@@ -275,7 +287,11 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelPriority', 'Priority')}
                 </label>
                 <select
-                  aria-label={t('leadDetail.labelPriority', 'Priority')}
+                  aria-label={
+                    canWrite
+                      ? t('leadDetail.labelPriority', 'Priority')
+                      : `${t('leadDetail.labelPriority', 'Priority')} — ${readOnlyHint}`
+                  }
                   value={l.priority}
                   onChange={(e) => handlePriorityChange(LeadPriority.parse(e.target.value))}
                   disabled={!canWrite}
@@ -295,7 +311,11 @@ export function LeadDetailPage() {
                 </label>
                 <div className="flex items-center gap-2">
                   <input
-                    aria-label={t('leadDetail.labelScore', 'Score')}
+                    aria-label={
+                      canWrite
+                        ? t('leadDetail.labelScore', 'Score')
+                        : `${t('leadDetail.labelScore', 'Score')} — ${readOnlyHint}`
+                    }
                     type="number"
                     min={0}
                     max={100}
@@ -312,7 +332,11 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelSource', 'Source')}
                 </label>
                 <select
-                  aria-label={t('leadDetail.labelSource', 'Source')}
+                  aria-label={
+                    canWrite
+                      ? t('leadDetail.labelSource', 'Source')
+                      : `${t('leadDetail.labelSource', 'Source')} — ${readOnlyHint}`
+                  }
                   value={l.source}
                   onChange={(e) => update.mutate({ source: LeadSource.parse(e.target.value) })}
                   disabled={!canWrite}
@@ -348,6 +372,11 @@ export function LeadDetailPage() {
                   placeholder={t('leadDetail.placeholderBudget', 'e.g. €500K')}
                   disabled={!canWrite}
                   title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite
+                      ? undefined
+                      : `${t('leadDetail.labelBudget', 'Budget')} — ${readOnlyHint}`
+                  }
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -362,6 +391,11 @@ export function LeadDetailPage() {
                   placeholder={t('leadDetail.placeholderAuthority', 'Decision maker')}
                   disabled={!canWrite}
                   title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite
+                      ? undefined
+                      : `${t('leadDetail.labelAuthority', 'Authority')} — ${readOnlyHint}`
+                  }
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -379,6 +413,9 @@ export function LeadDetailPage() {
                   rows={2}
                   disabled={!canWrite}
                   title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite ? undefined : `${t('leadDetail.labelNeed', 'Need')} — ${readOnlyHint}`
+                  }
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -393,6 +430,11 @@ export function LeadDetailPage() {
                   placeholder={t('leadDetail.placeholderTimeline', 'e.g. Q2 2026')}
                   disabled={!canWrite}
                   title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite
+                      ? undefined
+                      : `${t('leadDetail.labelTimeline', 'Timeline')} — ${readOnlyHint}`
+                  }
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -414,6 +456,9 @@ export function LeadDetailPage() {
               rows={4}
               disabled={!canWrite}
               title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite ? undefined : `${t('leadDetail.labelNotes', 'Notes')} — ${readOnlyHint}`
+              }
               className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>

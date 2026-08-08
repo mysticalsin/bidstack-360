@@ -277,6 +277,7 @@ export function KamDesignateDialog({
                 variant="primary"
                 disabled={designate.isPending || !canWrite}
                 title={canWrite ? undefined : readOnlyHint}
+                aria-label={canWrite ? undefined : `Designate key account — ${readOnlyHint}`}
                 onClick={submit}
               >
                 {designate.isPending ? 'Designating…' : 'Designate key account'}

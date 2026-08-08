@@ -145,12 +145,18 @@ describe('AgentStudioPage', () => {
     renderAgentStudio();
 
     const runButton = (await screen.findByRole('button', {
-      name: 'Run',
+      name: /^Run/,
     })) as HTMLButtonElement;
 
     expect(runButton.disabled).toBe(true);
     expect(runButton.title).toBe(
       'You need agent run access to run a crew. Ask an admin to grant it.',
+    );
+    // `title` is mouse-only — the disabled button stays in the tab order, so
+    // the accessible name itself must carry the reason for screen-reader and
+    // keyboard-only users.
+    expect(runButton.getAttribute('aria-label')).toBe(
+      'Run — You need agent run access to run a crew. Ask an admin to grant it.',
     );
 
     // Clicking a disabled button is a no-op — the run panel never mounts, so

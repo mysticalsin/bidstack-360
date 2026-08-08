@@ -202,11 +202,19 @@ export function ForecastList({
                                     value: val,
                                   })
                                 }
-                                aria-label={t(
-                                  'forecastList.cellEditLabel',
-                                  'Edit {{category}} for {{period}}',
-                                  { category: CATEGORY_LABELS[cat], period: row.period },
-                                )}
+                                aria-label={
+                                  canWrite
+                                    ? t(
+                                        'forecastList.cellEditLabel',
+                                        'Edit {{category}} for {{period}}',
+                                        { category: CATEGORY_LABELS[cat], period: row.period },
+                                      )
+                                    : `${t(
+                                        'forecastList.cellEditLabel',
+                                        'Edit {{category}} for {{period}}',
+                                        { category: CATEGORY_LABELS[cat], period: row.period },
+                                      )} — ${readOnlyHint}`
+                                }
                               >
                                 {formatMoneyMicros(val, 'EUR')}
                               </button>
@@ -229,9 +237,13 @@ export function ForecastList({
                           title={canWrite ? undefined : readOnlyHint}
                           onClick={() => onDeleteRow(row)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]"
-                          aria-label={t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
-                            period: row.period,
-                          })}
+                          aria-label={
+                            canWrite
+                              ? t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
+                                  period: row.period,
+                                })
+                              : `${t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', { period: row.period })} — ${readOnlyHint}`
+                          }
                         >
                           <Icon name="trash" size={14} />
                         </button>
@@ -291,11 +303,19 @@ export function ForecastList({
                                 value: val,
                               })
                             }
-                            aria-label={t(
-                              'forecastList.cellEditLabel',
-                              'Edit {{category}} for {{period}}',
-                              { category: CATEGORY_LABELS[cat], period: row.period },
-                            )}
+                            aria-label={
+                              canWrite
+                                ? t(
+                                    'forecastList.cellEditLabel',
+                                    'Edit {{category}} for {{period}}',
+                                    { category: CATEGORY_LABELS[cat], period: row.period },
+                                  )
+                                : `${t(
+                                    'forecastList.cellEditLabel',
+                                    'Edit {{category}} for {{period}}',
+                                    { category: CATEGORY_LABELS[cat], period: row.period },
+                                  )} — ${readOnlyHint}`
+                            }
                           >
                             {formatMoneyMicros(val, 'EUR')}
                           </button>
@@ -318,9 +338,13 @@ export function ForecastList({
                     title={canWrite ? undefined : readOnlyHint}
                     onClick={() => onDeleteRow(row)}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]"
-                    aria-label={t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
-                      period: row.period,
-                    })}
+                    aria-label={
+                      canWrite
+                        ? t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
+                            period: row.period,
+                          })
+                        : `${t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', { period: row.period })} — ${readOnlyHint}`
+                    }
                   >
                     <Icon name="trash" size={14} />
                   </button>

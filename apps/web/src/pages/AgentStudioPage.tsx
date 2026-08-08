@@ -420,6 +420,11 @@ function CrewsSection({
                   aria-expanded={runCrewId === c.id}
                   disabled={!canRunCrews}
                   title={canRunCrews ? undefined : runPermissionHint}
+                  aria-label={
+                    canRunCrews
+                      ? undefined
+                      : `${t('agentStudio.run', 'Run')} — ${runPermissionHint}`
+                  }
                 >
                   {runCrewId === c.id
                     ? t('agentStudio.close', 'Close')

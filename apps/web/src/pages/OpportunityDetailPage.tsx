@@ -330,6 +330,11 @@ export function OpportunityDetailPage() {
                     className="rounded-full"
                     disabled={stageMove.isPending || isOutcomeLocked || !canWrite}
                     title={canWrite ? undefined : readOnlyHint}
+                    aria-label={
+                      canWrite
+                        ? undefined
+                        : `${t('opportunityDetail.markWonButton', 'Mark Won')} — ${readOnlyHint}`
+                    }
                     onClick={() => moveToOutcome('closed_won')}
                   >
                     <Icon name="trophy" size={13} />
@@ -350,6 +355,11 @@ export function OpportunityDetailPage() {
                     className="rounded-full"
                     disabled={stageMove.isPending || isOutcomeLocked || !canWrite}
                     title={canWrite ? undefined : readOnlyHint}
+                    aria-label={
+                      canWrite
+                        ? undefined
+                        : `${t('opportunityDetail.markLostButton', 'Mark Lost')} — ${readOnlyHint}`
+                    }
                     onClick={() => moveToOutcome('closed_lost')}
                   >
                     <Icon name="close" size={13} />

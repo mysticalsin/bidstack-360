@@ -20,7 +20,7 @@ import type { SortState } from '@/components/ui/SortableHeader';
 import { useTableSort } from '@/hooks/useTableSort';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useHasAdminPermission } from '@/hooks/useCapabilities';
 import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
@@ -61,7 +61,7 @@ export function CompaniesPage() {
   // Company writes are gated server-side behind companies:write + the literal
   // 'admin' role — hide the write affordances for everyone else instead of
   // showing a button that always 403s (matches ReferencesPage/ProposalDetailPage).
-  const canWrite = useHasPermission('companies:write');
+  const canWrite = useHasAdminPermission('companies:write');
 
   const rawItems = useMemo(() => companies.data?.items ?? [], [companies.data?.items]);
 

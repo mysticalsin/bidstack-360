@@ -95,4 +95,38 @@ describe('ReceiveStep — no account selected', () => {
     fireEvent.click(screen.getByRole('option', { name: /Acme Corp/i }));
     expect(onSelectAccount).toHaveBeenCalledWith('company-1');
   });
+
+  it('moves focus to the step heading once the account transitions from empty to set', () => {
+    // Selecting an account unmounts IntakeAccountPicker (the parent swaps to
+    // the files view once accountId is non-empty) which used to drop focus
+    // to <body> with no indication of where a keyboard-only user landed.
+    hookMocks.companies = [company({ id: 'company-1', name: 'Acme Corp' })];
+    const { rerender } = render(
+      <ReceiveStep
+        accountId=""
+        files={idleFiles}
+        selectedDocs={new Set()}
+        onToggle={vi.fn()}
+        onNext={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('option', { name: /Acme Corp/i }));
+
+    // The real app re-renders ReceiveStep with the newly-selected accountId
+    // once IntakePage's setSearchParams commits — simulate that transition.
+    rerender(
+      <ReceiveStep
+        accountId="company-1"
+        files={idleFiles}
+        selectedDocs={new Set()}
+        onToggle={vi.fn()}
+        onNext={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(document.activeElement).toBe(screen.getByText('Select documents'));
+  });
 });

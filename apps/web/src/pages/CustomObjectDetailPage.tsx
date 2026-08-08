@@ -194,6 +194,11 @@ export function CustomObjectDetailPage() {
           }}
           disabled={!canWrite}
           title={canWrite ? undefined : readOnlyHint}
+          aria-label={
+            canWrite
+              ? undefined
+              : `${t('customObjectDetail.deleteButton', 'Delete')} — ${readOnlyHint}`
+          }
           className={cn(
             'px-3 py-1.5 rounded-lg border border-[var(--danger)]/40',
             'text-sm text-[var(--fg-error)] hover:bg-[var(--error-surface)]',
@@ -319,10 +324,14 @@ export function CustomObjectDetailPage() {
                       'transition-colors min-h-[44px] flex items-center',
                       'disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-transparent',
                     )}
-                    aria-label={t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', {
-                      field: key.replace(/_/g, ' '),
-                      value: String(values[key] ?? '—'),
-                    })}
+                    aria-label={
+                      canWrite
+                        ? t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', {
+                            field: key.replace(/_/g, ' '),
+                            value: String(values[key] ?? '—'),
+                          })
+                        : `${t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', { field: key.replace(/_/g, ' '), value: String(values[key] ?? '—') })} — ${readOnlyHint}`
+                    }
                   >
                     {String(values[key] ?? '—')}
                   </button>

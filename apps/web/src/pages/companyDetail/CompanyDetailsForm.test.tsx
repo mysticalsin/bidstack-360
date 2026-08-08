@@ -3,16 +3,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CompanyDetail } from '@bidstack/shared';
 
-// PATCH /companies/:id is admin-only (companies:write, packages/db/src/seed.rbac.ts);
-// this locks in that the Save button reflects that up front instead of only
-// failing after a non-admin fills out the whole form and submits.
+// PATCH /companies/:id stacks requirePermission('companies:write') AND
+// requireRole('admin') server-side (apps/api/src/routes/companies.ts); this
+// locks in that the Save button reflects that AND-gate up front instead of
+// only failing after a non-admin (who may still hold the raw permission
+// grant) fills out the whole form and submits. Only useHasAdminPermission is
+// mocked — if the form regresses to the OR-based useHasPermission it is
+// undefined under this mock and the render throws, failing the test loudly.
 const hookMocks = vi.hoisted(() => ({
   canWrite: true,
   mutate: vi.fn(),
 }));
 
 vi.mock('@/hooks/useCapabilities', () => ({
-  useHasPermission: () => hookMocks.canWrite,
+  useHasAdminPermission: () => hookMocks.canWrite,
 }));
 
 vi.mock('@/hooks/useCompanies', () => ({

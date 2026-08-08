@@ -98,6 +98,13 @@ describe('ReportsListPage — reports:write permission gate', () => {
     expect(runButton.title).toMatch(/reports write access/i);
     expect(duplicateButton.title).toMatch(/reports write access/i);
     expect(deleteButton.title).toMatch(/reports write access/i);
+
+    // `title` is mouse-only — a screen reader/keyboard user gets the same
+    // native `disabled` (still in tab order) with zero explanation unless the
+    // accessible name itself carries the reason. Assert it does.
+    expect(runButton.getAttribute('aria-label')).toMatch(/reports write access/i);
+    expect(duplicateButton.getAttribute('aria-label')).toMatch(/reports write access/i);
+    expect(deleteButton.getAttribute('aria-label')).toMatch(/reports write access/i);
   });
 
   it('shows "New report" and enables Run/Duplicate/Delete for a writer', () => {

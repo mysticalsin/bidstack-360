@@ -140,6 +140,9 @@ export function TaskDetailPage() {
               onClick={startEdit}
               disabled={!canWrite}
               title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite ? undefined : `${t('taskDetail.edit', 'Edit')} — ${readOnlyHint}`
+              }
             >
               {t('taskDetail.edit', 'Edit')}
             </Button>

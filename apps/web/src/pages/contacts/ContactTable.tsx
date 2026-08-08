@@ -405,9 +405,11 @@ export function ContactTable({
                         onClick={() => onDelete(c)}
                         disabled={del.isPending || !canWrite}
                         title={canWrite ? undefined : readOnlyHint}
-                        aria-label={t('contactTable.deleteRowLabel', 'Delete {{name}}', {
-                          name: c.name,
-                        })}
+                        aria-label={
+                          canWrite
+                            ? t('contactTable.deleteRowLabel', 'Delete {{name}}', { name: c.name })
+                            : `${t('contactTable.deleteRowLabel', 'Delete {{name}}', { name: c.name })} — ${readOnlyHint}`
+                        }
                         className="text-[var(--danger)] hover:text-[var(--danger)]"
                       >
                         {t('contactTable.deleteAction', 'Delete')}

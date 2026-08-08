@@ -2,7 +2,7 @@
  * ReceiveStep - upload dropzone + document list for the Intake workflow.
  * Step 1: user selects (and optionally uploads) documents for extraction.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
@@ -36,6 +36,21 @@ export function ReceiveStep({
   const upload = useUploadFile(accountId);
   const [isDragging, setIsDragging] = useState(false);
   const canUpload = Boolean(accountId) && !upload.isPending;
+
+  // Selecting an account in IntakeAccountPicker unmounts it (this component
+  // switches to the files view), which drops keyboard focus to <body> with
+  // no indication of where the user landed. Move focus to this step's
+  // heading on the empty→set transition so a keyboard-only user has
+  // somewhere meaningful to be, matching the standard route-change focus
+  // pattern.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const prevAccountId = useRef(accountId);
+  useEffect(() => {
+    if (!prevAccountId.current && accountId) {
+      headingRef.current?.focus();
+    }
+    prevAccountId.current = accountId;
+  }, [accountId]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -78,7 +93,11 @@ export function ReceiveStep({
   return (
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-sm font-semibold text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2"
+        >
           {t('crm.receiveStep.title', 'Select documents')}
         </h2>
         <span className="text-xs text-[var(--fg-tertiary)]">

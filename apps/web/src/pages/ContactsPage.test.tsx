@@ -118,6 +118,25 @@ describe('ContactsPage — contacts:write gating', () => {
     expect(screen.getByRole('button', { name: /Delete selected/i })).toBeTruthy();
   });
 
+  it('hides Import CSV for a user without contacts:write', () => {
+    // ContactCsvImportDialog drives per-row POST /api/contacts; a reader-role
+    // user could walk the whole multi-step flow and only fail on the final
+    // confirm. It must be gated exactly like New contact.
+    vi.mocked(useHasPermission).mockReturnValue(false);
+
+    renderWithProviders(<ContactsPage />);
+
+    expect(screen.queryByRole('button', { name: /Import contacts from CSV/i })).toBeNull();
+  });
+
+  it('shows Import CSV for a user with contacts:write', () => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
+
+    renderWithProviders(<ContactsPage />);
+
+    expect(screen.getByRole('button', { name: /Import contacts from CSV/i })).toBeTruthy();
+  });
+
   it('hides the empty-state "Add first contact" action for a user without contacts:write', () => {
     vi.mocked(useHasPermission).mockReturnValue(false);
     mockContacts({

@@ -296,6 +296,11 @@ export function CreateOpportunityDialog({
               type="submit"
               disabled={create.isPending || !canWrite}
               title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite
+                  ? undefined
+                  : `${t('createOpportunity.submit', 'Create opportunity')} — ${readOnlyHint}`
+              }
             >
               {create.isPending
                 ? t('createOpportunity.submitting', 'Creating…')
