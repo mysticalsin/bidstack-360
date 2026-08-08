@@ -3962,5 +3962,9 @@
       "pickAccountListLabel": "Account",
       "pickAccountEmpty": "Nessun account corrispondente."
     }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "Ti serve l'accesso companies:write per unire gli account.",
+    "mergeDisabledHintContact": "Ti serve l'accesso contacts:write per unire i contatti."
   }
 }

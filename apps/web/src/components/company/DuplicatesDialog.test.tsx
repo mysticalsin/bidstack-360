@@ -14,11 +14,20 @@ import {
 } from '@/hooks/useDuplicates';
 import { confirm } from '@/components/ui/ConfirmDialog';
 
+// Merge is gated server-side per entity (companies:write / contacts:write —
+// see POST /duplicates/merge). Default to "holds the grant" so the existing
+// merge-flow assertions below keep exercising an enabled button; the
+// permission-gating tests at the bottom flip this per case.
+const hookMocks = vi.hoisted(() => ({ canMerge: true }));
+
 vi.mock('@/hooks/useDuplicates', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/useDuplicates')>()),
   useCompanyDuplicates: vi.fn(),
   useContactDuplicates: vi.fn(),
   useMergeDuplicates: vi.fn(),
+}));
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: () => hookMocks.canMerge,
 }));
 vi.mock('@/components/ui/ConfirmDialog', () => ({ confirm: vi.fn() }));
 vi.mock('@/components/ui/Toast', () => ({
@@ -84,6 +93,7 @@ describe('DuplicatesDialog', () => {
   beforeEach(() => {
     mutateAsync.mockClear();
     vi.mocked(confirm).mockReset();
+    hookMocks.canMerge = true;
   });
 
   it('shows every cluster record side-by-side with the match reason', () => {
@@ -146,5 +156,31 @@ describe('DuplicatesDialog', () => {
     renderDialog();
     expect(screen.getByText('The duplicate scan failed')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Scan again' })).toBeDefined();
+  });
+
+  it('disables "Keep this record" with a hint when the caller lacks companies:write', () => {
+    hookMocks.canMerge = false;
+    mockQueries(oneCluster);
+    renderDialog();
+    const keepButtons = screen.getAllByRole('button', { name: /^Keep/ }) as HTMLButtonElement[];
+    for (const button of keepButtons) {
+      expect(button.disabled).toBe(true);
+      expect(button.title).toMatch(/companies:write/i);
+      expect(button.getAttribute('aria-label')).toMatch(/companies:write/i);
+    }
+    fireEvent.click(keepButtons[0]!);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('restores "Keep this record" once companies:write is granted', () => {
+    hookMocks.canMerge = true;
+    mockQueries(oneCluster);
+    renderDialog();
+    const keepButtons = screen.getAllByRole('button', { name: /^Keep/ }) as HTMLButtonElement[];
+    for (const button of keepButtons) {
+      expect(button.disabled).toBe(false);
+      expect(button.title).toBe('');
+    }
   });
 });

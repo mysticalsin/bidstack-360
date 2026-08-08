@@ -3962,5 +3962,9 @@
       "pickAccountListLabel": "客户",
       "pickAccountEmpty": "没有匹配的客户。"
     }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "您需要 companies:write 权限才能合并客户。",
+    "mergeDisabledHintContact": "您需要 contacts:write 权限才能合并联系人。"
   }
 }

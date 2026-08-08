@@ -4017,5 +4017,9 @@
       "pickAccountListLabel": "Comptes",
       "pickAccountEmpty": "Aucun compte ne correspond."
     }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "Vous devez disposer de l'accès companies:write pour fusionner des comptes.",
+    "mergeDisabledHintContact": "Vous devez disposer de l'accès contacts:write pour fusionner des contacts."
   }
 }

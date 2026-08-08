@@ -6,8 +6,10 @@
 // then resolves per-org credentials via lib/dust-credentials.ts.
 //
 // SECURITY: the API key is NEVER returned to the client (only a masked tail),
-// NEVER logged, and NEVER serialized into a job payload. Mutations are
-// admin-only (requireRole('admin'), matching the crew-infra precedent).
+// NEVER logged, and NEVER serialized into a job payload. Mutations require
+// both the admin role AND the granular integrations:write permission
+// (matching apps/api/src/routes/org-settings.ts's admin-grade-settings
+// precedent) — no claim-based bypass.
 //
 // Raw SQL (not prisma.integrationConfig.*) because the 'dust' IntegrationType
 // enum value isn't in the generated client until it's regenerated — Azure/Linux
@@ -93,7 +95,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/dust/credentials',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { body: PutCredentialsBody, response: { 200: DustCredentialsSummary } },
     },
     async (req) => {
@@ -207,7 +209,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/dust/credentials',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { response: { 204: z.null() } },
     },
     async (req, reply) => {

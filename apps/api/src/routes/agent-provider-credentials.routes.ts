@@ -144,7 +144,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
     '/agent-providers/credentials/:provider',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: {
         params: ProviderParam,
         body: PutProviderCredentialBody,
@@ -226,7 +226,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
     '/agent-providers/credentials/:provider',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { params: ProviderParam, response: { 204: z.null() } },
     },
     async (req, reply) => {
@@ -276,7 +276,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
     '/agent-providers/active',
     {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { body: SetActiveBody, response: { 200: ProviderCredentialList } },
     },
     async (req) => {

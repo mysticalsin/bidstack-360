@@ -28,9 +28,15 @@ let orgId: string | null = null;
 let foreignOrgId: string | null = null;
 let seedUserId: string | null = null;
 let restoreAuth: (() => void) | null = null;
+let previousStubRoleHeader: string | undefined;
 const suffix = randomUUID().slice(0, 8);
 
 beforeAll(async () => {
+  // Enables 'x-bidstack-e2e-role' below (RBAC-gate tests need a real
+  // no-companies:write/no-contacts:write identity, not just the isolated
+  // org's default Admin).
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -66,6 +72,11 @@ afterAll(async () => {
   if (foreignOrgId) await dropIsolatedOrg(foreignOrgId);
   if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
+  }
 });
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId && !!seedUserId);
@@ -309,4 +320,75 @@ describe('duplicates routes', () => {
     expect(untouched?.deletedAt).toBeNull();
     expect(untouched?.orgId).toBe(foreignOrgId);
   });
+
+  skipIfNoDb(
+    'merge is gated per entity: companies:write for company merges, contacts:write for contact merges',
+    async () => {
+      const survivorCompany = await createCompany(orgId!, `Nomad Bridge Systems ${suffix}`);
+      const loserCompany = await createCompany(orgId!, `NOMAD Bridge Systems ${suffix}`);
+      const survivorContact = await prisma.contact.create({
+        data: { orgId: orgId!, customer: 'Nomad Bridge', name: `Priya Chandra ${suffix}` },
+        select: { id: true },
+      });
+      const loserContact = await prisma.contact.create({
+        data: { orgId: orgId!, customer: 'Nomad Bridge', name: `PRIYA chandra ${suffix}` },
+        select: { id: true },
+      });
+
+      // Read-Only holds every :read permission and zero :write — exactly the
+      // "authenticated but lacking the grant" identity both merge paths must
+      // reject before touching a row.
+      const readOnlyHeaders = { 'x-bidstack-e2e-role': 'read-only' };
+
+      const companyDenied = await server.inject({
+        method: 'POST',
+        url: '/api/v1/duplicates/merge',
+        headers: readOnlyHeaders,
+        payload: { entity: 'company', survivorId: survivorCompany.id, duplicateId: loserCompany.id },
+      });
+      expect(companyDenied.statusCode).toBe(403);
+
+      const contactDenied = await server.inject({
+        method: 'POST',
+        url: '/api/v1/duplicates/merge',
+        headers: readOnlyHeaders,
+        payload: { entity: 'contact', survivorId: survivorContact.id, duplicateId: loserContact.id },
+      });
+      expect(contactDenied.statusCode).toBe(403);
+
+      // Neither denied attempt touched a row.
+      const [stillLiveCompany, stillLiveContact] = await Promise.all([
+        prisma.company.findUnique({ where: { id: loserCompany.id }, select: { deletedAt: true } }),
+        prisma.contact.findUnique({ where: { id: loserContact.id }, select: { deletedAt: true } }),
+      ]);
+      expect(stillLiveCompany?.deletedAt).toBeNull();
+      expect(stillLiveContact?.deletedAt).toBeNull();
+
+      // Sales Manager holds contacts:write but NOT companies:write (the seed
+      // matrix omits 'companies' from its write set) — proves the gate reads
+      // the entity out of the body rather than a single blanket permission.
+      const managerHeaders = { 'x-bidstack-e2e-role': 'manager' };
+      const companyDeniedForManager = await server.inject({
+        method: 'POST',
+        url: '/api/v1/duplicates/merge',
+        headers: managerHeaders,
+        payload: { entity: 'company', survivorId: survivorCompany.id, duplicateId: loserCompany.id },
+      });
+      expect(companyDeniedForManager.statusCode).toBe(403);
+
+      const contactAllowedForManager = await server.inject({
+        method: 'POST',
+        url: '/api/v1/duplicates/merge',
+        headers: managerHeaders,
+        payload: { entity: 'contact', survivorId: survivorContact.id, duplicateId: loserContact.id },
+      });
+      expect(contactAllowedForManager.statusCode).toBe(200);
+
+      const tombstonedContact = await prisma.contact.findFirst({
+        where: { id: loserContact.id, deletedAt: { not: null } },
+        select: { id: true },
+      });
+      expect(tombstonedContact?.id).toBe(loserContact.id);
+    },
+  );
 });

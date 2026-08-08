@@ -3995,5 +3995,9 @@
       "pickAccountListLabel": "Cuentas",
       "pickAccountEmpty": "Ninguna cuenta coincide."
     }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "Necesitas acceso companies:write para fusionar cuentas.",
+    "mergeDisabledHintContact": "Necesitas acceso contacts:write para fusionar contactos."
   }
 }

@@ -176,7 +176,8 @@
       "connecting": "Conectando...",
       "connect": "Conectar",
       "requiresKey": "requiere clave",
-      "open": "abierto"
+      "open": "abierto",
+      "slackWriteHint": "Necesitas acceso de escritura en integraciones para desconectar el espacio de trabajo de Slack compartido."
     },
     "status": {
       "healthy": "saludable",

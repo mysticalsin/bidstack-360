@@ -186,7 +186,8 @@
       "connecting": "正在连接...",
       "connect": "连接",
       "requiresKey": "需要密钥",
-      "open": "开放"
+      "open": "开放",
+      "slackWriteHint": "您需要集成的写入权限才能断开共享的 Slack 工作区。"
     },
     "status": {
       "healthy": "正常",

@@ -4020,5 +4020,9 @@
       "pickAccountListLabel": "Accounts",
       "pickAccountEmpty": "No matching accounts."
     }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "You need companies:write access to merge accounts.",
+    "mergeDisabledHintContact": "You need contacts:write access to merge contacts."
   }
 }

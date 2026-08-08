@@ -11,16 +11,21 @@ import { useHasAdminPermission } from '@/hooks/useCapabilities';
 // the literal 'admin' role (apps/api/src/routes/companies.ts) — the write
 // affordances must reflect that AND-of-both gate, not just the permission
 // grant alone (useHasPermission's isAdmin-OR would show controls a
-// permission-holding non-admin gets 403'd on). Only useHasAdminPermission is
-// mocked here — if the page regresses to importing useHasPermission it is
-// undefined under this mock and the render throws, failing the test loudly.
+// permission-holding non-admin gets 403'd on). useHasPermission is mocked to
+// true so the "gate holds" assertions below prove the page consults
+// useHasAdminPermission — a regression back to the permission-only hook would
+// render the controls and fail those tests. (Children like DuplicatesDialog
+// legitimately use useHasPermission for their own permission-only routes.)
 vi.mock('@/hooks/useCompanies', () => ({
   useCompanies: vi.fn(),
   useCreateCompany: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
   useDeleteCompany: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('@/hooks/useCapabilities', () => ({ useHasAdminPermission: vi.fn() }));
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasAdminPermission: vi.fn(),
+  useHasPermission: vi.fn(() => true),
+}));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 

@@ -1,12 +1,14 @@
 // Crew + run infrastructure routes — Wave 10.
 //
-// RBAC: admins CREATE / EDIT / DELETE crews (and their tasks). Running a crew —
-// run / cancel / retry — spends AI compute, so it requires the `agents:write`
-// permission and a human session (no read-scoped roles, no API keys); this
-// mirrors the AI-compute gate on POST /calls/:id/extract-insights. Any
-// authenticated member may LIST/GET a crew. Runs are owner-scoped on read (a
-// member sees only their own runs; admins see all) — mirrors the proposal model.
-// Crew tables are accessed via parameterized raw SQL (not in the generated client).
+// RBAC: authoring crews (create / edit / delete / seed-standard) requires the
+// `agents:write` permission AND the admin role — the stacked-gate pattern from
+// companies.ts, never looser than the original admin-only gate. Running a crew
+// — run / cancel / retry — requires `agents:write` plus a human session (no
+// read-scoped roles, no API keys); mirrors POST /calls/:id/extract-insights.
+// Any authenticated member may LIST/GET a crew. Runs are owner-scoped on read
+// (a member sees only their own runs; admins see all) — mirrors the proposal
+// model. Crew tables are accessed via parameterized raw SQL (not in the
+// generated client).
 
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -387,7 +389,6 @@ async function assertSerumAllowsCrewRun(args: {
 
 export const crewRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
-  const admin = server.requireRole('admin');
 
   // GET /crews — list crews with task counts (any member).
   app.get(
@@ -431,10 +432,14 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     },
   );
 
-  // POST /crews — create crew + tasks (admin only).
+  // POST /crews — create crew + tasks (agents:write + admin role).
   app.post(
     '/crews',
-    { preHandler: admin, schema: { body: CrewBody, response: { 201: CrewResponse } } },
+    {
+      config: { permission: 'agents:write' },
+      preHandler: [app.requirePermission('agents:write'), app.requireRole('admin')],
+      schema: { body: CrewBody, response: { 201: CrewResponse } },
+    },
     async (req, reply) => {
     const { orgId, userId } = req.auth;
     const b = req.body;
@@ -463,11 +468,12 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     return crew;
   });
 
-  // PATCH /crews/:id — update crew + replace its tasks (admin only).
+  // PATCH /crews/:id — update crew + replace its tasks (agents:write + admin role).
   app.patch(
     '/crews/:id',
     {
-      preHandler: admin,
+      config: { permission: 'agents:write' },
+      preHandler: [app.requirePermission('agents:write'), app.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: CrewBody,
@@ -503,11 +509,12 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     },
   );
 
-  // DELETE /crews/:id — soft-delete (admin only).
+  // DELETE /crews/:id — soft-delete (agents:write + admin role).
   app.delete(
     '/crews/:id',
     {
-      preHandler: admin,
+      config: { permission: 'agents:write' },
+      preHandler: [app.requirePermission('agents:write'), app.requireRole('admin')],
       schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
@@ -522,10 +529,14 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   );
 
   // POST /crews/seed-standard — load the out-of-the-box standard agents + the
-  // default RFP-response crew for this org (admin only). Idempotent.
+  // default RFP-response crew for this org (agents:write + admin role). Idempotent.
   app.post(
     '/crews/seed-standard',
-    { preHandler: admin, schema: { response: { 201: CrewResponse } } },
+    {
+      config: { permission: 'agents:write' },
+      preHandler: [app.requirePermission('agents:write'), app.requireRole('admin')],
+      schema: { response: { 201: CrewResponse } },
+    },
     async (req, reply) => {
     const crewId = await seedStandardCrew(req.auth.orgId, req.auth.userId);
     const crew = await loadCrew(req.auth.orgId, crewId);

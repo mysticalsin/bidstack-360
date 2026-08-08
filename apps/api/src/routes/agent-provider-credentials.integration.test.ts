@@ -20,6 +20,7 @@ let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let restoreAuth: (() => void) | null = null;
+let previousStubRoleHeader: string | undefined;
 
 const BASE = '/api/v1/integrations/agent-providers';
 
@@ -34,6 +35,8 @@ async function cleanupAgentProviderRows(id: string): Promise<void> {
 }
 
 beforeAll(async () => {
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -55,6 +58,11 @@ afterAll(async () => {
   if (restoreAuth) restoreAuth();
   if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
+  }
 });
 
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
@@ -112,6 +120,16 @@ describe('agent provider routes', () => {
     } finally {
       await prisma.apiKey.delete({ where: { id: apiKey.id } });
     }
+  });
+
+  t('403s a role without integrations:write at provider credential writes', async () => {
+    const res = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/credentials/gemma`,
+      headers: { 'x-bidstack-e2e-role': 'read-only' },
+      payload: { model: 'gemma3' },
+    });
+    expect(res.statusCode).toBe(403);
   });
 
   t('stores a keyless gemma credential, activates it, and reports it active', async () => {

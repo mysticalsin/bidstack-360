@@ -44,6 +44,10 @@ let userId: string | null = null;
 let restoreAuth: (() => void) | undefined;
 let previousStubRoleHeader: string | undefined;
 const ADMIN_HEADERS = { 'x-bidstack-e2e-role': 'admin' };
+// Sales Manager holds every :read permission (including agents:read) but no
+// agents:write per packages/db/src/seed.rbac.ts — the right "authenticated but
+// unpermitted" fixture for the 403 side of the agents:write gate below.
+const NO_AGENTS_WRITE_HEADERS = { 'x-bidstack-e2e-role': 'manager' };
 
 const createdCrewIds: string[] = [];
 const createdRunIds: string[] = [];
@@ -386,5 +390,96 @@ describe('crew run controls', () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('crew authoring RBAC (agents:write)', () => {
+  const crewPayload = (name: string) => ({
+    name,
+    process: 'sequential' as const,
+    tasks: [] as unknown[],
+  });
+
+  skipIfNoDb('POST /crews rejects a caller without agents:write', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/crews',
+      headers: NO_AGENTS_WRITE_HEADERS,
+      payload: crewPayload(`RBAC denied crew ${randomUUID()}`),
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  skipIfNoDb('POST /crews admits a caller with agents:write (Admin)', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/crews',
+      headers: ADMIN_HEADERS,
+      payload: crewPayload(`RBAC admitted crew ${randomUUID()}`),
+    });
+    expect(res.statusCode).toBe(201);
+    createdCrewIds.push(res.json<{ id: string }>().id);
+  });
+
+  skipIfNoDb('PATCH /crews/:id rejects a caller without agents:write', async () => {
+    const crewId = await createCrew();
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/crews/${crewId}`,
+      headers: NO_AGENTS_WRITE_HEADERS,
+      payload: crewPayload('Renamed without permission'),
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  skipIfNoDb('PATCH /crews/:id admits a caller with agents:write (Admin)', async () => {
+    const crewId = await createCrew();
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/crews/${crewId}`,
+      headers: ADMIN_HEADERS,
+      payload: crewPayload('Renamed by admin'),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ name: string }>().name).toBe('Renamed by admin');
+  });
+
+  skipIfNoDb('DELETE /crews/:id rejects a caller without agents:write', async () => {
+    const crewId = await createCrew();
+    const res = await server.inject({
+      method: 'DELETE',
+      url: `/api/v1/crews/${crewId}`,
+      headers: NO_AGENTS_WRITE_HEADERS,
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  skipIfNoDb('DELETE /crews/:id admits a caller with agents:write (Admin)', async () => {
+    const crewId = await createCrew();
+    const res = await server.inject({
+      method: 'DELETE',
+      url: `/api/v1/crews/${crewId}`,
+      headers: ADMIN_HEADERS,
+    });
+    expect(res.statusCode).toBe(204);
+  });
+
+  skipIfNoDb('POST /crews/seed-standard rejects a caller without agents:write', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/crews/seed-standard',
+      headers: NO_AGENTS_WRITE_HEADERS,
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  skipIfNoDb('POST /crews/seed-standard admits a caller with agents:write (Admin)', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/crews/seed-standard',
+      headers: ADMIN_HEADERS,
+    });
+    expect(res.statusCode).toBe(201);
+    createdCrewIds.push(res.json<{ id: string }>().id);
   });
 });

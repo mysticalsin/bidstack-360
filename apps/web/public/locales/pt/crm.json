@@ -3962,5 +3962,9 @@
       "pickAccountListLabel": "Contas",
       "pickAccountEmpty": "Nenhuma conta correspondente."
     }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "Você precisa do acesso companies:write para mesclar contas.",
+    "mergeDisabledHintContact": "Você precisa do acesso contacts:write para mesclar contatos."
   }
 }

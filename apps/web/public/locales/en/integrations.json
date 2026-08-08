@@ -186,7 +186,8 @@
       "connecting": "Connecting...",
       "connect": "Connect",
       "requiresKey": "requires key",
-      "open": "open"
+      "open": "open",
+      "slackWriteHint": "You need integrations write access to disconnect the shared Slack workspace."
     },
     "status": {
       "healthy": "healthy",
