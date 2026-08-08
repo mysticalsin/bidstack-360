@@ -13,12 +13,15 @@ import { toast } from '@/components/ui/Toast';
 import { type useFiles, useUploadFile } from '@/hooks/useFiles';
 import { FILE_INPUT_ACCEPT } from '@bidstack/shared';
 
+import { IntakeAccountPicker } from './IntakeAccountPicker';
+
 interface ReceiveStepProps {
   accountId: string;
   files: ReturnType<typeof useFiles>;
   selectedDocs: Set<string>;
   onToggle: (id: string) => void;
   onNext: () => void;
+  onSelectAccount: (id: string) => void;
 }
 
 export function ReceiveStep({
@@ -27,6 +30,7 @@ export function ReceiveStep({
   selectedDocs,
   onToggle,
   onNext,
+  onSelectAccount,
 }: ReceiveStepProps) {
   const { t } = useTranslation('crm');
   const upload = useUploadFile(accountId);
@@ -136,10 +140,7 @@ export function ReceiveStep({
       </div>
 
       {!accountId ? (
-        <EmptyState
-          title={t('crm.receiveStep.noAccountTitle', 'No account selected')}
-          message={t('crm.receiveStep.noAccountMessage', 'Add ?account=ACCOUNT_ID to the URL.')}
-        />
+        <IntakeAccountPicker onSelect={onSelectAccount} />
       ) : files.isError ? (
         <ErrorState
           title={t('crm.receiveStep.loadFailedTitle', 'Failed to load files')}
