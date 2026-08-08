@@ -102,10 +102,10 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Scrollable nav region: the brand (above) and footer (below) stay
-            pinned; only this list scrolls when every group is expanded, so the
-            hamburger/collapse toggle never scrolls out of reach. min-h-0 lets a
-            flex child actually overflow instead of growing the whole sidebar. */}
+        {/* True accordion (see useUiStore.setSectionCollapsed) keeps at most one
+            section open, so this region fits without scrolling in normal use.
+            overflow-y-auto stays as a safety net for small viewports /
+            large zoom levels, not as the primary answer to a tall list. */}
         <div className="sb-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
         {sections.map((section) => (
           <SidebarSection

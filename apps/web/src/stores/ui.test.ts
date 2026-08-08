@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useUiStore } from './ui';
 
@@ -30,5 +30,39 @@ describe('useUiStore sidebar shell state', () => {
 
     expect(useUiStore.getState().collapsedSections.sales).toBe(true);
     expect(document.documentElement.dataset.sidebarCollapsed).toBeUndefined();
+  });
+
+  it('closes every other section when one is expanded, so the rail never needs a scrollbar', () => {
+    useUiStore.getState().setSectionCollapsed('accounts', false);
+    expect(useUiStore.getState().collapsedSections.accounts).toBe(false);
+
+    useUiStore.getState().setSectionCollapsed('pipeline', false);
+
+    const sections = useUiStore.getState().collapsedSections;
+    expect(sections.pipeline).toBe(false);
+    expect(sections.accounts).toBe(true);
+  });
+
+  it('migrates pre-accordion state where multiple sections were left expanded', async () => {
+    // Two sections stuck expanded, as real localStorage looked before the
+    // accordion was enforced (every independent toggle persisted forever).
+    localStorage.setItem(
+      'bidstack-ui.v1',
+      JSON.stringify({
+        sidebarCollapsed: false,
+        collapsedSections: { sales: false, accounts: false, pipeline: true },
+      }),
+    );
+
+    // The migration runs at module load time, so force a fresh import to
+    // observe it — the module already imported above ran its migration
+    // against whatever localStorage held before this test.
+    vi.resetModules();
+    const fresh = await import('./ui');
+
+    // No route context exists at load time to pick a "correct" survivor, so
+    // the migration drops all overrides and lets each component fall back to
+    // its own active-route default instead of shipping two sections open.
+    expect(fresh.useUiStore.getState().collapsedSections).toEqual({});
   });
 });
