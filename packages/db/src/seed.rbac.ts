@@ -408,6 +408,10 @@ async function upsertPermissions(prisma: RbacSeedClient): Promise<Map<string, st
   const rows = await prisma.permission.findMany({
     where: { key: { in: [...ALL_PERMISSION_KEYS] } },
     select: { id: true, key: true, name: true, description: true },
+    // `take` is not defensive padding — the query-guard plugin rejects any
+    // findMany without one, and the catalogue is a compile-time constant, so the
+    // exact length is the honest bound.
+    take: PERMISSION_SEEDS.length,
   });
   const byKey = new Map(rows.map((row) => [row.key, row]));
 
@@ -444,6 +448,9 @@ async function upsertRoles(prisma: RbacSeedClient, orgId: string): Promise<Map<s
   const rows = await prisma.role.findMany({
     where: { orgId, name: { in: names } },
     select: { id: true, name: true, description: true, isSystem: true, deletedAt: true },
+    // Bounded for the query guard; ROLE_SEEDS is a compile-time constant and the
+    // (orgId, name) unique index caps the result at exactly its length.
+    take: ROLE_SEEDS.length,
   });
   const byName = new Map(rows.map((row) => [row.name, row]));
 
