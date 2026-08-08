@@ -628,7 +628,9 @@
     "runFailed": "运行失败。",
     "fallback": "回退",
     "finalResponsePartial": "最终应答（部分步骤使用了回退）",
-    "finalResponse": "最终应答"
+    "finalResponse": "最终应答",
+    "subtitleReadOnly": "浏览管理员已设置的智能体和团队。",
+    "runPermissionHint": "您需要智能体运行权限才能运行团队。请管理员为您授权。"
   },
   "contractAgreements": {
     "regionLabel": "合同协议",
@@ -1077,7 +1079,8 @@
     "metaCreated": "创建于 {{date}}",
     "metaUpdated": "更新于 {{date}}",
     "metaOwner": "负责人：{{name}}",
-    "liveCollaboration": "实时协作"
+    "liveCollaboration": "实时协作",
+    "readOnlyHint": "您需要潜在客户写入权限才能进行更改。"
   },
   "dashboard": {
     "srHeading": "仪表板",
@@ -1284,7 +1287,8 @@
     "dueIn": "{{count}}天后",
     "snoozeTask": "延后{{title}}",
     "statusAction": "状态：{{status}}。激活以更改为{{next}}。",
-    "statusTitle": "激活以将状态更改为{{next}}"
+    "statusTitle": "激活以将状态更改为{{next}}",
+    "readOnlyHint": "您需要任务写入权限才能编辑此任务。"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} 正在编辑",
@@ -1629,7 +1633,8 @@
     "editProbabilityLabel": "编辑成交概率",
     "likely": "可能性",
     "editDueDateLabel": "编辑截止日期",
-    "liveCollaborationLabel": "实时协作"
+    "liveCollaborationLabel": "实时协作",
+    "readOnlyHint": "您需要商机写入权限才能编辑此商机。"
   },
   "callSummary": {
     "meddicEmpty": "未提取到 MEDDIC 信号。转录内容可能过短或尚未处理。",
@@ -1782,7 +1787,8 @@
     "countryLabel": "国家",
     "cancel": "取消",
     "submitting": "正在创建…",
-    "submit": "创建商机"
+    "submit": "创建商机",
+    "readOnlyHint": "您需要商机写入权限才能创建商机。"
   },
   "companyDetail": {
     "error": {
@@ -2161,7 +2167,9 @@
     "labelScore": "评分",
     "submitPending": "创建中…",
     "submit": "创建线索",
-    "cancel": "取消"
+    "cancel": "取消",
+    "readOnlyNotice": "您需要线索写入权限才能创建线索。",
+    "backToLeads": "返回线索列表"
   },
   "topAccounts": {
     "heading": "重点客户",
@@ -2507,7 +2515,8 @@
     "xAxisLabel": "X 轴字段",
     "yAxisLabel": "Y 轴字段",
     "cancel": "取消",
-    "save": "保存小组件"
+    "save": "保存小组件",
+    "saving": "保存中…"
   },
   "auditLogInsights": {
     "activityCadenceTitle": "活动节奏",
@@ -2878,7 +2887,9 @@
     "createdLabel": "创建时间",
     "updatedLabel": "更新时间",
     "resolvedLabel": "已解决",
-    "closedLabel": "已关闭"
+    "closedLabel": "已关闭",
+    "statusErrorToast": "无法更新工单状态",
+    "readOnlyHint": "您需要服务台写入权限才能更新此工单。"
   },
   "tagPicker": {
     "addTag": "标签",
@@ -2921,7 +2932,8 @@
     "statusPaused": "已暂停",
     "running": "运行中…",
     "run": "运行",
-    "deleteAriaLabel": "删除工作流：{{name}}"
+    "deleteAriaLabel": "删除工作流：{{name}}",
+    "readOnlyHint": "您需要工作流写入权限才能管理此工作流。"
   },
   "topbarNotifications": {
     "tooltipUnread": "{{count}} 条未读通知",
@@ -3238,7 +3250,11 @@
     "statusBlocked": "已阻塞",
     "statusDone": "已完成",
     "idLabel": "ID",
-    "createdLabel": "创建时间"
+    "createdLabel": "创建时间",
+    "toast": {
+      "updateFailedTitle": "无法更新任务",
+      "serverRejected": "服务器拒绝了请求。"
+    }
   },
   "auditLogHero": {
     "badge": "治理控制台",
@@ -3515,7 +3531,8 @@
     "editStatusLabel": "编辑 {{name}} 的状态",
     "editPriorityLabel": "编辑 {{name}} 的优先级",
     "deleteLead": "删除 {{name}}",
-    "delete": "删除"
+    "delete": "删除",
+    "readOnlyHint": "您需要线索写入权限才能管理此记录。"
   },
   "companyRow": {
     "selectCompany": "选择 {{name}}",
@@ -3934,5 +3951,16 @@
     "title": "文件",
     "emptyTitle": "选择一个客户",
     "emptyMessage": "从 /accounts 打开一个客户，以附加提案、保密协议和参考架构。"
+  },
+  "crm": {
+    "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}, {{stage}}, {{value}}.",
+    "receiveStep": {
+      "pickAccountTitle": "选择一个客户以开始",
+      "pickAccountHint": "搜索您要为其执行接收流程的客户。",
+      "pickAccountPlaceholder": "搜索客户…",
+      "pickAccountErrorTitle": "无法加载客户",
+      "pickAccountListLabel": "客户",
+      "pickAccountEmpty": "没有匹配的客户。"
+    }
   }
 }

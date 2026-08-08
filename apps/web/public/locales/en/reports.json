@@ -213,7 +213,8 @@
     "editAriaLabel": "Edit report {{name}}",
     "duplicateAriaLabel": "Duplicate report {{name}}",
     "deleteConfirm": "Delete \"{{name}}\"?",
-    "deleteAriaLabel": "Delete report {{name}}"
+    "deleteAriaLabel": "Delete report {{name}}",
+    "readOnlyHint": "You need reports write access to manage this report."
   },
   "fieldPicker": {
     "placeholder": "Pick a field…",

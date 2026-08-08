@@ -193,7 +193,8 @@
     "editAriaLabel": "Editar informe {{name}}",
     "duplicateAriaLabel": "Duplicar informe {{name}}",
     "deleteConfirm": "¿Eliminar \"{{name}}\"?",
-    "deleteAriaLabel": "Eliminar informe {{name}}"
+    "deleteAriaLabel": "Eliminar informe {{name}}",
+    "readOnlyHint": "Necesitas acceso de escritura a informes para gestionar este informe."
   },
   "fieldPicker": {
     "placeholder": "Elige un campo…",

@@ -213,7 +213,8 @@
     "editAriaLabel": "Modifica il report {{name}}",
     "duplicateAriaLabel": "Duplica il report {{name}}",
     "deleteConfirm": "Eliminare \"{{name}}\"?",
-    "deleteAriaLabel": "Elimina il report {{name}}"
+    "deleteAriaLabel": "Elimina il report {{name}}",
+    "readOnlyHint": "È necessario l'accesso in scrittura ai report per gestire questo report."
   },
   "fieldPicker": {
     "placeholder": "Scegli un campo…",

@@ -167,7 +167,8 @@
     "cancel": "Cancel",
     "saving": "Saving…",
     "save": "Save",
-    "emptyContent": "No content yet. Use AI Draft to generate a first version."
+    "emptyContent": "No content yet. Use AI Draft to generate a first version.",
+    "draftSectionError": "Could not generate an AI draft. Please try again."
   },
   "proposals": {
     "title": "Proposals",
@@ -223,7 +224,8 @@
     "allStages": "All stages",
     "emptyFiltered": "No proposals match these filters.",
     "truncated": "Showing the {{loaded}} most recently updated proposals of {{total}}. Narrow the stage or search to reach the rest.",
-    "percent": "{{value}}%"
+    "percent": "{{value}}%",
+    "readOnlyHint": "You need proposals write access to create a proposal."
   },
   "rfpCrew": {
     "statusWaiting": "Waiting",

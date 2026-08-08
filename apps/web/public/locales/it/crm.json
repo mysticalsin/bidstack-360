@@ -628,7 +628,9 @@
     "runFailed": "L'esecuzione non è riuscita.",
     "fallback": "ripiego",
     "finalResponsePartial": "Risposta finale (alcuni passaggi hanno usato un ripiego)",
-    "finalResponse": "Risposta finale"
+    "finalResponse": "Risposta finale",
+    "subtitleReadOnly": "Sfoglia gli agenti e i team configurati da un amministratore.",
+    "runPermissionHint": "Hai bisogno dell’accesso all’esecuzione degli agenti per eseguire un team. Chiedi a un amministratore di concedertelo."
   },
   "contractAgreements": {
     "regionLabel": "Accordi contrattuali",
@@ -1077,7 +1079,8 @@
     "metaCreated": "Creato {{date}}",
     "metaUpdated": "Aggiornato {{date}}",
     "metaOwner": "Proprietario: {{name}}",
-    "liveCollaboration": "Collaborazione in tempo reale"
+    "liveCollaboration": "Collaborazione in tempo reale",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura ai lead per apportare modifiche."
   },
   "dashboard": {
     "srHeading": "Dashboard",
@@ -1284,7 +1287,8 @@
     "dueIn": "tra {{count}} g",
     "snoozeTask": "Posticipa {{title}}",
     "statusAction": "Stato: {{status}}. Attiva per passare a {{next}}.",
-    "statusTitle": "Attiva per cambiare lo stato in {{next}}"
+    "statusTitle": "Attiva per cambiare lo stato in {{next}}",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura alle attività per modificare questa attività."
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} sta modificando",
@@ -1629,7 +1633,8 @@
     "editProbabilityLabel": "Modifica probabilità",
     "likely": "probabile",
     "editDueDateLabel": "Modifica data di scadenza",
-    "liveCollaborationLabel": "Collaborazione in tempo reale"
+    "liveCollaborationLabel": "Collaborazione in tempo reale",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura alle opportunità per modificare questa opportunità."
   },
   "callSummary": {
     "meddicEmpty": "Nessun segnale MEDDIC estratto. La trascrizione potrebbe essere troppo breve o non ancora elaborata.",
@@ -1782,7 +1787,8 @@
     "countryLabel": "Paese",
     "cancel": "Annulla",
     "submitting": "Creazione…",
-    "submit": "Crea opportunità"
+    "submit": "Crea opportunità",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura alle opportunità per creare un’opportunità."
   },
   "companyDetail": {
     "error": {
@@ -2161,7 +2167,9 @@
     "labelScore": "Punteggio",
     "submitPending": "Creazione…",
     "submit": "Crea lead",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "readOnlyNotice": "Hai bisogno dell’accesso in scrittura ai lead per creare un lead.",
+    "backToLeads": "Torna ai lead"
   },
   "topAccounts": {
     "heading": "Account principali",
@@ -2507,7 +2515,8 @@
     "xAxisLabel": "Campo dell’asse X",
     "yAxisLabel": "Campo dell’asse Y",
     "cancel": "Annulla",
-    "save": "Salva widget"
+    "save": "Salva widget",
+    "saving": "Salvataggio…"
   },
   "auditLogInsights": {
     "activityCadenceTitle": "Cadenza di attività",
@@ -2878,7 +2887,9 @@
     "createdLabel": "Creato",
     "updatedLabel": "Aggiornato",
     "resolvedLabel": "Risolto",
-    "closedLabel": "Chiuso"
+    "closedLabel": "Chiuso",
+    "statusErrorToast": "Impossibile aggiornare lo stato del caso",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura al service desk per aggiornare questo caso."
   },
   "tagPicker": {
     "addTag": "Etichetta",
@@ -2921,7 +2932,8 @@
     "statusPaused": "In pausa",
     "running": "In esecuzione…",
     "run": "Esegui",
-    "deleteAriaLabel": "Elimina workflow: {{name}}"
+    "deleteAriaLabel": "Elimina workflow: {{name}}",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura ai workflow per gestire questo workflow."
   },
   "topbarNotifications": {
     "tooltipUnread": "{{count}} notifica non letta",
@@ -3238,7 +3250,11 @@
     "statusBlocked": "Bloccata",
     "statusDone": "Completata",
     "idLabel": "ID",
-    "createdLabel": "Creata"
+    "createdLabel": "Creata",
+    "toast": {
+      "updateFailedTitle": "Impossibile aggiornare l’attività",
+      "serverRejected": "Il server ha rifiutato la richiesta."
+    }
   },
   "auditLogHero": {
     "badge": "Console di governance",
@@ -3515,7 +3531,8 @@
     "editStatusLabel": "Modifica lo stato di {{name}}",
     "editPriorityLabel": "Modifica la priorità di {{name}}",
     "deleteLead": "Elimina {{name}}",
-    "delete": "Elimina"
+    "delete": "Elimina",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura ai lead per gestire questo record."
   },
   "companyRow": {
     "selectCompany": "Seleziona {{name}}",
@@ -3934,5 +3951,16 @@
     "title": "File",
     "emptyTitle": "Scegli un account",
     "emptyMessage": "Apri un account da /accounts per allegare proposte, accordi di riservatezza e architetture di riferimento."
+  },
+  "crm": {
+    "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}, {{stage}}, {{value}}.",
+    "receiveStep": {
+      "pickAccountTitle": "Scegli un account per iniziare",
+      "pickAccountHint": "Cerca l’account per cui vuoi avviare l’acquisizione.",
+      "pickAccountPlaceholder": "Cerca account…",
+      "pickAccountErrorTitle": "Impossibile caricare gli account",
+      "pickAccountListLabel": "Account",
+      "pickAccountEmpty": "Nessun account corrispondente."
+    }
   }
 }

@@ -20,7 +20,8 @@
     "cancel": "Annulla",
     "saving": "Salvataggio…",
     "save": "Salva",
-    "emptyContent": "Ancora nessun contenuto. Usa Bozza IA per generare una prima versione."
+    "emptyContent": "Ancora nessun contenuto. Usa Bozza IA per generare una prima versione.",
+    "draftSectionError": "Impossibile generare la bozza IA. Riprova."
   },
   "proposals": {
     "title": "Proposte",
@@ -76,7 +77,8 @@
     "allStages": "Tutte le fasi",
     "emptyFiltered": "Nessuna proposta corrisponde a questi filtri.",
     "truncated": "Vengono mostrate le {{loaded}} proposte aggiornate più di recente su {{total}}. Restringi la fase o la ricerca per vedere le altre.",
-    "percent": "{{value}}%"
+    "percent": "{{value}}%",
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura alle proposte per creare una proposta."
   },
   "rfpCrew": {
     "statusWaiting": "In attesa",

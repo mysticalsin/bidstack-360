@@ -213,7 +213,8 @@
     "editAriaLabel": "编辑报告 {{name}}",
     "duplicateAriaLabel": "复制报告 {{name}}",
     "deleteConfirm": "删除“{{name}}”？",
-    "deleteAriaLabel": "删除报告 {{name}}"
+    "deleteAriaLabel": "删除报告 {{name}}",
+    "readOnlyHint": "您需要报告写入权限才能管理此报告。"
   },
   "fieldPicker": {
     "placeholder": "选择一个字段…",
