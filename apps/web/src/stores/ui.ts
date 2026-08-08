@@ -81,6 +81,10 @@ interface UiStore extends PersistedState {
   toggleSection: (key: string) => void;
   /** Explicit set (accordion override) — true = collapsed, false = expanded. */
   setSectionCollapsed: (key: string, collapsed: boolean) => void;
+  /** Expand the section that owns the current route, collapsing every other
+   *  accordion section (same write shape as the expand branch of
+   *  setSectionCollapsed). */
+  expandSectionForRoute: (key: string) => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (v: boolean) => void;
   toggleMobileNav: () => void;
@@ -122,6 +126,24 @@ export const useUiStore = create<UiStore>((set, get) => ({
           ...Object.fromEntries(ACCORDION_SECTION_KEYS.map((k) => [k, true])),
           [key]: false,
         };
+    writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
+    set({ collapsedSections: next });
+  },
+  // Navigation must always reveal the section owning the active route. A
+  // persisted user collapse of an OTHER section stays a legitimate
+  // preference, but the section the user just navigated into (deep link,
+  // search result, back/forward) can't stay hidden behind a stale explicit
+  // collapse=true recorded on a previous visit — that's the accordion
+  // regression this action exists to close (one sibling-collapse click used
+  // to survive every future route change until the user manually reopened
+  // the group).
+  expandSectionForRoute: (key) => {
+    const current = get().collapsedSections;
+    const next = {
+      ...current,
+      ...Object.fromEntries(ACCORDION_SECTION_KEYS.map((k) => [k, true])),
+      [key]: false,
+    };
     writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
     set({ collapsedSections: next });
   },
