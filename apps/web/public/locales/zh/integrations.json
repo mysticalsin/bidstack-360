@@ -144,7 +144,8 @@
       "cancel": "取消",
       "saving": "保存中...",
       "save": "保存提供商"
-    }
+    },
+    "omnirouteHint": "免费的本地 AI 网关 — 无需密钥。可在多个免费提供商之间自动路由与回退。"
   },
   "connectors": {
     "category": {

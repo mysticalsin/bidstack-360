@@ -26,6 +26,17 @@ export {
 
 export type DirectAgentProvider = DirectAgentProviderId;
 
+/**
+ * Providers that can be saved/activated/tested with NO stored API key:
+ * gemma (local Ollama, ignores the bearer token) and omniroute (local
+ * keyless AI gateway — free-tier providers behind it need no key either).
+ * Centralised so the "keyless" carve-out is one predicate, not a scattered
+ * set of `provider !== 'gemma'` checks that silently miss the next one.
+ */
+export function isKeylessProvider(provider: DirectAgentProvider): boolean {
+  return provider === 'gemma' || provider === 'omniroute';
+}
+
 export type OrgAgentProviderCredential = {
   provider: DirectAgentProvider;
   apiKey?: string;
@@ -74,7 +85,7 @@ function credentialFromRow(row: {
     }
   }
 
-  if (provider !== 'gemma' && !apiKey) return null;
+  if (!isKeylessProvider(provider) && !apiKey) return null;
 
   return {
     provider,
@@ -148,11 +159,12 @@ export async function getOrgActiveAgentProvider(
 
 /**
  * Map a stored org credential to a runnable {@link ResolvedLlm}. Returns null
- * when a non-Gemma provider has no key (can't call it). Used by the live
- * "test provider" ping; the worker has its own equivalent resolver.
+ * when a non-keyless provider has no key (can't call it) — see
+ * {@link isKeylessProvider}. Used by the live "test provider" ping; the
+ * worker has its own equivalent resolver.
  */
 export function credentialToResolvedLlm(cred: OrgAgentProviderCredential): ResolvedLlm | null {
-  if (cred.provider !== 'gemma' && !cred.apiKey) return null;
+  if (!isKeylessProvider(cred.provider) && !cred.apiKey) return null;
   return buildResolvedLlm({
     provider: cred.provider,
     apiKey: cred.apiKey,

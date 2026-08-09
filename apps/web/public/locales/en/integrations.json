@@ -144,7 +144,8 @@
       "cancel": "Cancel",
       "saving": "Saving...",
       "save": "Save provider"
-    }
+    },
+    "omnirouteHint": "Free local AI gateway — no key needed. Routes across many free providers with auto-fallback."
   },
   "connectors": {
     "category": {

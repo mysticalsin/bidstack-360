@@ -144,7 +144,8 @@
       "cancel": "Annuler",
       "saving": "Enregistrement...",
       "save": "Enregistrer le fournisseur"
-    }
+    },
+    "omnirouteHint": "Passerelle IA locale et gratuite — aucune clé requise. Achemine vers de nombreux fournisseurs gratuits avec bascule automatique."
   },
   "connectors": {
     "category": {

@@ -105,6 +105,26 @@ if (NO_BUILD) {
   if (!run('pnpm', ['--filter', '@bidstack/worker', 'build'])) die('worker build');
 }
 
+// ── 2b. OmniRoute AI gateway (free, keyless) — powers every AI feature ───────
+const omniBase = (envVars.OMNIROUTE_BASE_URL ?? 'http://localhost:20128/v1').replace(/\/v1\/?$/, '');
+if (await ok(`${omniBase}/v1/models`)) {
+  log('OmniRoute already running');
+} else {
+  log('starting OmniRoute AI gateway');
+  const omni = spawn('omniroute', [], {
+    detached: true, stdio: 'ignore', shell: process.platform === 'win32', env: childEnv,
+  });
+  omni.unref();
+  const deadline = Date.now() + 60_000;
+  let up = false;
+  while (Date.now() < deadline) {
+    if (await ok(`${omniBase}/v1/models`)) { up = true; break; }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  // Non-fatal: AI features degrade to Dust/stub if the gateway is unavailable.
+  log(up ? 'OmniRoute up' : 'OmniRoute not up — AI features will use Dust/stub fallback');
+}
+
 // ── 3. Start API + worker (detached, reading the prod env) ───────────────────
 function startService(name, cwd) {
   log(`starting ${name}`);

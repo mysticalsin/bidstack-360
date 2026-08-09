@@ -78,6 +78,13 @@ PII_FIELD_ENCRYPTION=true
 PII_ENCRYPTION_MASTER_KEY=__GEN__
 BIDSTACK_JOB_SIGNING_SECRET=__GEN__
 
+# ── AI gateway (OmniRoute — free, keyless, runs on this PC) ───────
+# Every AI feature (copilot + RFP) routes through OmniRoute unless an org picks
+# a specific provider in Settings. go-live starts it on :20128 automatically.
+RFP_LLM_PROVIDER=omniroute
+OMNIROUTE_BASE_URL=http://localhost:20128/v1
+OMNIROUTE_MODEL=auto
+
 # ── Multi-tenant safety (leave as-is) ─────────────────────────────
 BIDSTACK_TENANT_SCOPE_GUARD=enforce
 QUERY_GUARD_REJECT=true

@@ -13,8 +13,8 @@
 //
 // Dependency-free on purpose: global fetch (Node 18+), so we don't drag the
 // OpenAI / Anthropic SDKs into either bundle. OpenAI, Moonshot (Kimi), NVIDIA
-// NIM, and Gemma share the OpenAI-compatible /chat/completions shape; Anthropic
-// uses /v1/messages.
+// NIM, Gemma, and OmniRoute share the OpenAI-compatible /chat/completions shape;
+// Anthropic uses /v1/messages.
 
 /** Wire-level provider families. */
 export type LlmProviderKind = 'openai' | 'anthropic' | 'moonshot' | 'nim' | 'gemma';
@@ -24,11 +24,21 @@ export type LlmProviderKind = 'openai' | 'anthropic' | 'moonshot' | 'nim' | 'gem
  * brand-facing names; {@link DIRECT_PROVIDER_TO_KIND} maps them to the wire
  * family above. Kept in sync with `DIRECT_AGENT_PROVIDERS` in the API lib.
  */
-export type DirectAgentProviderId = 'claude' | 'openai' | 'kimi' | 'nvidia_nim' | 'gemma';
+export type DirectAgentProviderId =
+  | 'claude'
+  | 'openai'
+  | 'omniroute'
+  | 'kimi'
+  | 'nvidia_nim'
+  | 'gemma';
 
 export const DIRECT_PROVIDER_TO_KIND: Record<DirectAgentProviderId, LlmProviderKind> = {
   claude: 'anthropic',
   openai: 'openai',
+  // OmniRoute speaks the OpenAI-compatible /chat/completions wire shape (it
+  // is a local gateway, not OpenAI itself — see DIRECT_PROVIDER_OVERRIDES for
+  // its own baseUrl/model/apiKey/extraBody so it doesn't inherit OpenAI's).
+  omniroute: 'openai',
   kimi: 'moonshot',
   nvidia_nim: 'nim',
   gemma: 'gemma',
@@ -38,6 +48,7 @@ export const DIRECT_PROVIDER_TO_KIND: Record<DirectAgentProviderId, LlmProviderK
 export const DIRECT_AGENT_PROVIDERS = [
   'claude',
   'openai',
+  'omniroute',
   'kimi',
   'nvidia_nim',
   'gemma',
@@ -69,6 +80,30 @@ export const PROVIDER_DEFAULTS: Record<LlmProviderKind, { baseUrl: string; model
   gemma: { baseUrl: 'http://localhost:11434/v1', model: 'gemma3' },
 };
 
+/**
+ * Per-provider-id overrides, consulted BEFORE {@link PROVIDER_DEFAULTS}.
+ * WHY: PROVIDER_DEFAULTS is keyed by wire *kind*, and omniroute shares the
+ * 'openai' kind (same /chat/completions shape) without being OpenAI itself —
+ * without this it would wrongly inherit api.openai.com + gpt-4o-mini. Also
+ * carries the keyless placeholder apiKey (mirrors gemma) and the extraBody
+ * OmniRoute needs: it defaults to SSE streaming, so `stream: false` is
+ * required to get a parseable chat.completion JSON body instead of an
+ * event-stream completeChat can't read.
+ */
+const DIRECT_PROVIDER_OVERRIDES: Partial<
+  Record<
+    DirectAgentProviderId,
+    { baseUrl: string; model: string; apiKey: string; extraBody?: Record<string, unknown> }
+  >
+> = {
+  omniroute: {
+    baseUrl: 'http://localhost:20128/v1',
+    model: 'auto',
+    apiKey: 'omniroute',
+    extraBody: { stream: false },
+  },
+};
+
 export interface ResolvedLlm {
   kind: LlmProviderKind;
   apiKey: string;
@@ -82,7 +117,7 @@ export interface ChatInput {
   system?: string;
   user: string;
   maxTokens?: number;
-  /** Force JSON (OpenAI-compatible providers: OpenAI/Moonshot/NIM/Gemma). Omit for prose. */
+  /** Force JSON (OpenAI-compatible providers: OpenAI/OmniRoute/Moonshot/NIM/Gemma). Omit for prose. */
   responseFormat?: 'json_object' | 'text';
   /** Per-call abort timeout in ms (default 120s). */
   timeoutMs?: number;
@@ -93,8 +128,9 @@ export interface ChatInput {
 /**
  * Build a {@link ResolvedLlm} from stored (org) or runtime config. Maps the
  * brand-facing provider id to its wire family and fills missing model/baseUrl
- * from {@link PROVIDER_DEFAULTS}. The Anthropic base is normalised so callers can
- * paste either `https://api.anthropic.com` or the full `/v1/messages` URL.
+ * from {@link DIRECT_PROVIDER_OVERRIDES} (checked first) or {@link PROVIDER_DEFAULTS}.
+ * The Anthropic base is normalised so callers can paste either
+ * `https://api.anthropic.com` or the full `/v1/messages` URL.
  */
 export function buildResolvedLlm(input: {
   provider: DirectAgentProviderId;
@@ -103,17 +139,19 @@ export function buildResolvedLlm(input: {
   baseUrl?: string;
 }): ResolvedLlm {
   const kind = DIRECT_PROVIDER_TO_KIND[input.provider];
-  const defaults = PROVIDER_DEFAULTS[kind];
+  const providerOverride = DIRECT_PROVIDER_OVERRIDES[input.provider];
+  const defaults = providerOverride ?? PROVIDER_DEFAULTS[kind];
   let baseUrl = (input.baseUrl ?? defaults.baseUrl).replace(/\/+$/, '');
   // Anthropic's path is appended by completeChat; accept a pasted /v1/messages.
   if (kind === 'anthropic') baseUrl = baseUrl.replace(/\/v1\/messages$/, '');
   return {
     kind,
-    // Gemma local servers ignore the bearer token; a placeholder keeps the
+    // Gemma and OmniRoute are keyless local servers; a placeholder keeps the
     // header well-formed without requiring a key.
-    apiKey: input.apiKey ?? (kind === 'gemma' ? 'local' : ''),
+    apiKey: input.apiKey ?? providerOverride?.apiKey ?? (kind === 'gemma' ? 'local' : ''),
     model: input.model ?? defaults.model,
     baseUrl,
+    extraBody: providerOverride?.extraBody,
   };
 }
 

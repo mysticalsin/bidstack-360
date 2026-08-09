@@ -117,6 +117,34 @@ describe('resolveLlmFromEnv', () => {
       baseUrl: 'https://openrouter.ai/api/v1',
     });
   });
+
+  it('resolves omniroute LOCALLY and keyless by default, forcing non-streaming JSON', () => {
+    // WHY stream:false matters: OmniRoute defaults to SSE. Without extraBody
+    // forcing stream:false, completeChat would get text/event-stream and fail
+    // to parse choices[0].message.content — this must fail if that regresses.
+    expect(resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'omniroute' })).toMatchObject({
+      kind: 'openai',
+      apiKey: 'omniroute',
+      model: 'auto',
+      baseUrl: 'http://localhost:20128/v1',
+      extraBody: { stream: false },
+    });
+  });
+
+  it('honours OMNIROUTE_BASE_URL and OMNIROUTE_MODEL overrides', () => {
+    expect(
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'omniroute',
+        OMNIROUTE_BASE_URL: 'http://localhost:9999/v1/',
+        OMNIROUTE_MODEL: 'llama-free',
+      }),
+    ).toMatchObject({
+      kind: 'openai',
+      model: 'llama-free',
+      baseUrl: 'http://localhost:9999/v1',
+      extraBody: { stream: false },
+    });
+  });
 });
 
 describe('coerceJsonObject', () => {

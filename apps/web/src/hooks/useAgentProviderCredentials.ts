@@ -2,7 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
-export type DirectAgentProvider = 'claude' | 'openai' | 'kimi' | 'nvidia_nim' | 'gemma';
+// Kept in sync with DIRECT_AGENT_PROVIDERS in @bidstack/shared/llm. 'omniroute'
+// is the keyless free AI gateway (localhost:20128) and, like 'gemma', needs no key.
+export type DirectAgentProvider =
+  | 'omniroute'
+  | 'claude'
+  | 'openai'
+  | 'kimi'
+  | 'nvidia_nim'
+  | 'gemma';
 
 export interface AgentProviderCredentialSummary {
   provider: DirectAgentProvider;

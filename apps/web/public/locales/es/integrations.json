@@ -134,7 +134,8 @@
       "cancel": "Cancelar",
       "saving": "Guardando...",
       "save": "Guardar proveedor"
-    }
+    },
+    "omnirouteHint": "Puerta de enlace de IA local y gratuita: sin clave. Enruta entre muchos proveedores gratuitos con recuperación automática."
   },
   "connectors": {
     "category": {

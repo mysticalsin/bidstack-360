@@ -13,6 +13,7 @@ import {
   type DirectAgentProvider,
   credentialToResolvedLlm,
   getOrgActiveAgentProvider,
+  isKeylessProvider,
   listOrgAgentProviderCredentials,
   resolveOrgAgentProviderCredential,
 } from '../lib/agent-provider-credentials.js';
@@ -58,8 +59,15 @@ const PutProviderCredentialBody = z.object({
   baseUrl: z.string().trim().url().max(300).optional(),
 });
 
-function isLocalGemmaUrl(provider: DirectAgentProvider, parsed: URL): boolean {
-  if (provider !== 'gemma' || process.env.NODE_ENV === 'production') return false;
+// Keyless local-gateway providers may point at localhost without the public
+// https:// requirement below. Gemma's localhost bypass is DEV-ONLY — a
+// production Gemma endpoint must be public https. OmniRoute is different: it
+// IS a locally-running gateway by design in every environment (there is no
+// hosted OmniRoute to point at instead), so its localhost bypass applies in
+// production too.
+function isLocalKeylessGatewayUrl(provider: DirectAgentProvider, parsed: URL): boolean {
+  if (!isKeylessProvider(provider)) return false;
+  if (provider === 'gemma' && process.env.NODE_ENV === 'production') return false;
   return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsed.hostname);
 }
 
@@ -76,13 +84,15 @@ function assertSafeProviderBaseUrl(
     throw server.httpErrors.badRequest('Base URL must be a valid URL.');
   }
 
-  if (isLocalGemmaUrl(provider, parsed)) return;
+  if (isLocalKeylessGatewayUrl(provider, parsed)) return;
 
   if (parsed.protocol !== 'https:' || !isPublicHostname(parsed.hostname)) {
     throw server.httpErrors.badRequest(
       provider === 'gemma'
         ? 'Gemma base URL must be public https:// in production, or localhost in local development.'
-        : 'Base URL must be a public https:// endpoint.',
+        : provider === 'omniroute'
+          ? 'OmniRoute base URL must be public https://, or localhost for the local gateway.'
+          : 'Base URL must be a public https:// endpoint.',
     );
   }
 }
@@ -158,7 +168,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
       const model = req.body.model ?? existing?.model;
       const baseUrl = req.body.baseUrl ?? existing?.baseUrl;
 
-      if (provider !== 'gemma' && !apiKey) {
+      if (!isKeylessProvider(provider) && !apiKey) {
         throw server.httpErrors.badRequest('API key is required for this provider.');
       }
       if (provider === 'claude' && !model) {

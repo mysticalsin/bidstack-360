@@ -150,6 +150,21 @@ build (no rebuild). Test it without rebooting: `Start-ScheduledTask -TaskName Bi
 
 ---
 
+## AI features — powered by OmniRoute (free, no keys)
+
+Every AI feature (RFP drafting, contract extraction, the copilot's email drafts,
+deal sentiment, account intel, meeting prep) routes through **OmniRoute** — a
+free, keyless OpenAI-compatible gateway that runs on this PC (`:20128`) and
+auto-falls-back across ~291 providers / ~1.5B free tokens a month. `go-live`
+(and the demo launcher) start it automatically; `RFP_LLM_PROVIDER=omniroute` in
+the env makes it the default.
+
+- No API keys needed to start. It just works.
+- Any org can still pick a specific provider (Claude / OpenAI / Kimi / NVIDIA /
+  local Gemma / OmniRoute) in **Settings → Integrations → AI provider**; that
+  per-org choice overrides the default.
+- Install once if missing: `npm i -g omniroute`.
+
 ## Enterprise-readiness checklist (what "production" means here)
 
 - [x] Real per-user auth + org invitations (Clerk), RBAC roles enforced server-side

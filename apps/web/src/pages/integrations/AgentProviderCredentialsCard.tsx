@@ -28,6 +28,13 @@ const PROVIDERS: Array<{
   keyOptional?: boolean;
 }> = [
   {
+    value: 'omniroute',
+    label: 'OmniRoute (free gateway)',
+    placeholderModel: 'auto',
+    placeholderBaseUrl: 'http://localhost:20128/v1',
+    keyOptional: true,
+  },
+  {
     value: 'claude',
     label: 'Claude',
     placeholderModel: 'claude-sonnet-4-5',
@@ -573,6 +580,14 @@ function ProviderDialog({
                         'Optional for local runtimes',
                       )
                     : t('agentProviderCredentials.dialog.apiKeyPlaceholder', 'Paste provider key')
+              }
+              hint={
+                draftProvider === 'omniroute'
+                  ? t(
+                      'agentProviderCredentials.omnirouteHint',
+                      'Free local AI gateway — no key needed. Routes across many free providers with auto-fallback.',
+                    )
+                  : undefined
               }
             />
             <Field

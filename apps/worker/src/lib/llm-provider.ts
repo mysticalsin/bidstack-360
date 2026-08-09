@@ -74,6 +74,11 @@ function assertHostedProviderBaseUrl(
  *       http://localhost:11434/v1, keyless — on-prem & private (best for NDA-Tier-D RFPs).
  *     • hosted: point GEMMA_BASE_URL at an OpenAI-compatible gateway
  *       (Vertex AI / OpenRouter / Groq / Together) + set GEMMA_API_KEY.
+ *   RFP_LLM_PROVIDER=omniroute  (no key — free gateway) [OMNIROUTE_MODEL, OMNIROUTE_BASE_URL]
+ *     • local OmniRoute gateway at http://localhost:20128/v1, model "auto"
+ *       (OmniRoute itself picks/falls back across free providers). Keyless,
+ *       same as gemma. Defaults SSE-streaming, so the resolver forces
+ *       `stream: false` via extraBody to get a parseable chat.completion body.
  *   RFP_LLM_TIMEOUT_MS  per-call abort timeout (default 120000) — raise it for slow
  *     local inference so big drafts complete instead of failing open to a placeholder.
  */
@@ -134,6 +139,21 @@ export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): Resolve
       apiKey: env.GEMMA_API_KEY ?? 'local', // placeholder — local servers ignore the bearer token
       model: env.GEMMA_MODEL ?? 'gemma3',
       baseUrl: (env.GEMMA_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, ''),
+    };
+  }
+  // OmniRoute is a keyless local gateway (same posture as gemma) that speaks
+  // the OpenAI-compatible /chat/completions shape, so its wire kind is
+  // 'openai'. It defaults to SSE streaming; extraBody.stream=false forces the
+  // non-streaming JSON body completeChat expects (see @bidstack/shared/llm).
+  // NOT run through assertHostedProviderBaseUrl — localhost is the intended
+  // target, not an accidental SSRF-prone override.
+  if (kind === 'omniroute') {
+    return {
+      kind: 'openai',
+      apiKey: 'omniroute', // placeholder — OmniRoute is keyless for free providers
+      model: env.OMNIROUTE_MODEL ?? 'auto',
+      baseUrl: (env.OMNIROUTE_BASE_URL ?? 'http://localhost:20128/v1').replace(/\/$/, ''),
+      extraBody: { stream: false },
     };
   }
   return null;

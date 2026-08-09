@@ -144,7 +144,8 @@
       "cancel": "Annulla",
       "saving": "Salvataggio...",
       "save": "Salva provider"
-    }
+    },
+    "omnirouteHint": "Gateway AI locale e gratuito — nessuna chiave necessaria. Instrada su molti provider gratuiti con fallback automatico."
   },
   "connectors": {
     "category": {

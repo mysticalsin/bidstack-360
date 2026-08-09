@@ -13,6 +13,7 @@ describe('buildResolvedLlm', () => {
   it('maps each brand provider id to its wire family', () => {
     expect(buildResolvedLlm({ provider: 'claude', apiKey: 'k' }).kind).toBe('anthropic');
     expect(buildResolvedLlm({ provider: 'openai', apiKey: 'k' }).kind).toBe('openai');
+    expect(buildResolvedLlm({ provider: 'omniroute' }).kind).toBe('openai');
     expect(buildResolvedLlm({ provider: 'kimi', apiKey: 'k' }).kind).toBe('moonshot');
     expect(buildResolvedLlm({ provider: 'nvidia_nim', apiKey: 'k' }).kind).toBe('nim');
     expect(buildResolvedLlm({ provider: 'gemma' }).kind).toBe('gemma');
@@ -49,6 +50,38 @@ describe('buildResolvedLlm', () => {
   it('uses a placeholder key for keyless local Gemma', () => {
     expect(buildResolvedLlm({ provider: 'gemma' }).apiKey).toBe('local');
   });
+
+  describe('omniroute (keyless local OpenAI-compatible gateway)', () => {
+    it('resolves to its own defaults, not openai kind defaults', () => {
+      // Regression: omniroute shares the 'openai' wire kind, so without a
+      // per-provider-id override it would silently inherit api.openai.com +
+      // gpt-4o-mini instead of the local gateway.
+      const llm = buildResolvedLlm({ provider: 'omniroute' });
+      expect(llm.kind).toBe('openai');
+      expect(llm.baseUrl).toBe('http://localhost:20128/v1');
+      expect(llm.model).toBe('auto');
+      expect(llm.apiKey).toBeTruthy();
+    });
+
+    it('forces stream:false via extraBody so completeChat gets parseable JSON', () => {
+      // Regression: OmniRoute defaults to SSE streaming; without stream:false
+      // completeChat's `res.json()` on the OpenAI-compatible path would fail
+      // to parse a text/event-stream body.
+      expect(buildResolvedLlm({ provider: 'omniroute' }).extraBody).toEqual({ stream: false });
+    });
+
+    it('lets explicit input.baseUrl and input.model override the omniroute defaults', () => {
+      const llm = buildResolvedLlm({
+        provider: 'omniroute',
+        baseUrl: 'http://localhost:9999/v1',
+        model: 'llama-3.1-70b',
+      });
+      expect(llm.baseUrl).toBe('http://localhost:9999/v1');
+      expect(llm.model).toBe('llama-3.1-70b');
+      // extraBody is provider-level, not overridden by baseUrl/model input.
+      expect(llm.extraBody).toEqual({ stream: false });
+    });
+  });
 });
 
 describe('storage-key helpers (shared by API writes + worker reads)', () => {
@@ -59,7 +92,7 @@ describe('storage-key helpers (shared by API writes + worker reads)', () => {
     expect(AGENT_PROVIDER_ACTIVE_NAME).toBe('agent-provider:__active__');
     expect(isDirectAgentProvider('__active__')).toBe(false);
   });
-  it('recognises only the five supported provider ids', () => {
+  it('recognises only the six supported provider ids', () => {
     for (const id of Object.keys(DIRECT_PROVIDER_TO_KIND)) {
       expect(isDirectAgentProvider(id)).toBe(true);
     }

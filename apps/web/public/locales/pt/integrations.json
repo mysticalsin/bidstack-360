@@ -144,7 +144,8 @@
       "cancel": "Cancelar",
       "saving": "Salvando...",
       "save": "Salvar provedor"
-    }
+    },
+    "omnirouteHint": "Gateway de IA local e gratuito — sem chave. Roteia entre vários provedores gratuitos com fallback automático."
   },
   "connectors": {
     "category": {

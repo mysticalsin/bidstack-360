@@ -68,7 +68,7 @@ afterAll(async () => {
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('agent provider routes', () => {
-  t('lists all five providers with no active provider by default', async () => {
+  t('lists all six providers with no active provider by default', async () => {
     const res = await server.inject({ method: 'GET', url: `${BASE}/credentials` });
     expect(res.statusCode).toBe(200);
     const body = res.json() as {
@@ -80,6 +80,7 @@ describe('agent provider routes', () => {
       'gemma',
       'kimi',
       'nvidia_nim',
+      'omniroute',
       'openai',
     ]);
     expect(body.active).toBeNull();
@@ -157,6 +158,52 @@ describe('agent provider routes', () => {
       where: { orgId: orgId!, action: 'agent_provider.active.set' },
     });
     expect(audit).not.toBeNull();
+  });
+
+  // Regression for the omniroute rollout: it must get the SAME keyless
+  // carve-out as gemma everywhere (save/activate/resolve), not just get
+  // listed. Before isKeylessProvider(), only 'gemma' bypassed the apiKey
+  // gate and this save would 400.
+  t('stores a keyless omniroute credential, activates it, and resolves it without an apiKey', async () => {
+    const save = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/credentials/omniroute`,
+      payload: {},
+    });
+    expect(save.statusCode).toBe(200);
+    expect((save.json() as { configured: boolean }).configured).toBe(true);
+
+    const activate = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/active`,
+      payload: { provider: 'omniroute' },
+    });
+    expect(activate.statusCode).toBe(200);
+    expect((activate.json() as { active: string | null }).active).toBe('omniroute');
+
+    const list = await server.inject({ method: 'GET', url: `${BASE}/credentials` });
+    expect((list.json() as { active: string | null }).active).toBe('omniroute');
+
+    // The test-call route only short-circuits with "No usable credentials"
+    // when credentialToResolvedLlm() returns null. Getting past that (even
+    // though the network call itself fails in CI, where no local OmniRoute
+    // gateway is running) proves the keyless credential DID resolve to a
+    // runnable ResolvedLlm.
+    const probe = await server.inject({
+      method: 'POST',
+      url: `${BASE}/credentials/omniroute/test`,
+    });
+    expect(probe.statusCode).toBe(200);
+    const probeBody = probe.json() as { ok: boolean; model: string | null; error: string | null };
+    expect(probeBody.model).not.toBeNull();
+    // Null when the local gateway actually answered (dev box), a different
+    // message when it refused/timed out — either way NOT the short-circuit
+    // "no usable credentials" text, which only fires when resolution failed.
+    expect(probeBody.error ?? '').not.toMatch(/no usable credentials/i);
+
+    // Clean up so later assertions (active === null etc.) aren't polluted.
+    await server.inject({ method: 'PUT', url: `${BASE}/active`, payload: { provider: null } });
+    await server.inject({ method: 'DELETE', url: `${BASE}/credentials/omniroute` });
   });
 
   t('test-call returns ok:false (no network) when the provider has no credentials', async () => {
