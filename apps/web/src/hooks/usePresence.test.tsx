@@ -10,7 +10,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReactNode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 
 import { api } from '@/lib/api';
 import { useUser } from '@/lib/auth';
@@ -46,6 +46,20 @@ function wrapper({ children }: { children: ReactNode }) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+// StrictMode (dev only) double-invokes effects on initial mount — setup,
+// cleanup, setup again — synchronously. Used only by the dedupe test below;
+// the other tests assert against the plain (non-StrictMode) contract.
+function strictWrapper({ children }: { children: ReactNode }) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return (
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </StrictMode>
+  );
 }
 
 describe('usePresence', () => {
@@ -90,13 +104,17 @@ describe('usePresence', () => {
     expect(joinCallsAfter).toBe(2);
   });
 
-  it('leaves (clears currentRecordType/currentRecordId) on unmount without going offline', () => {
+  it('leaves (clears currentRecordType/currentRecordId) on unmount without going offline', async () => {
     vi.mocked(api).mockResolvedValue({ items: [] });
 
     const { unmount } = renderHook(() => usePresence(ENTITY_TYPE, ENTITY_ID), { wrapper });
     vi.mocked(api).mockClear();
 
     unmount();
+    // The leave POST is deferred by one macrotask (see usePresence.ts) so a
+    // StrictMode synthetic remount can cancel it instead of firing a
+    // redundant duplicate — flush that macrotask before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(api).toHaveBeenCalledWith('/api/presence', {
       method: 'POST',
@@ -110,11 +128,37 @@ describe('usePresence', () => {
 
     const { unmount } = renderHook(() => usePresence(ENTITY_TYPE, ENTITY_ID), { wrapper });
     unmount();
+    // Flush the deferred leave's 0ms macrotask before clearing the mock, so
+    // it doesn't get miscounted as a heartbeat below.
+    vi.advanceTimersByTime(0);
     vi.mocked(api).mockClear();
 
     vi.advanceTimersByTime(60_000);
 
     expect(api).not.toHaveBeenCalled();
+  });
+
+  it('collapses React 18 StrictMode double-invoke (mount→cleanup→mount) into a single join POST', async () => {
+    // Real regression: StrictMode's dev-only synthetic remount runs setup,
+    // cleanup, and setup-again synchronously before either network call
+    // settles. Without the dedupe in usePresence.ts, that fires TWO
+    // identical join POSTs for the same record and the loser 409s racing
+    // the winner's DB upsert — this is the "opening an opportunity fires
+    // presence 2-3x" bug. This test fails if that dedupe regresses.
+    vi.mocked(api).mockResolvedValue({ items: [] });
+
+    renderHook(() => usePresence(ENTITY_TYPE, ENTITY_ID), { wrapper: strictWrapper });
+
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
+
+    const joinCalls = vi
+      .mocked(api)
+      .mock.calls.filter(
+        ([, opts]) =>
+          (opts as { method?: string })?.method === 'POST' &&
+          (opts as { body?: { currentRecordId?: string } })?.body?.currentRecordId === ENTITY_ID,
+      );
+    expect(joinCalls).toHaveLength(1);
   });
 
   it('exposes other viewers of the same record and never includes self', async () => {

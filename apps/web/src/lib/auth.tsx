@@ -196,14 +196,31 @@ export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
 function DemoAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
 
-  useEffect(() => {
+  // Register the token provider SYNCHRONOUSLY, during this component's own
+  // render — not in a useEffect. React commits child effects before parent
+  // effects, so a parent-only useEffect registration would still let a child
+  // data-fetching hook (useQuery et al.) mount and fire its first request
+  // before this ran, sending it with a null token → a guaranteed 401 on every
+  // cold page load, immediately "fixed" by that hook's own forced-refresh
+  // retry. useState's lazy initializer runs inline in this render, strictly
+  // before React ever invokes a child component, so the provider is
+  // guaranteed live before any descendant can issue a fetch. The initializer
+  // itself is idempotent (last-write-wins on a module-level variable), so
+  // re-mounts are harmless.
+  useState(() => {
     // The token is a plain string in localStorage (the app has no cookie layer;
     // this matches the existing Bearer-token model used for Clerk).
     setApiTokenProvider(() => localStorage.getItem(DEMO_TOKEN_KEY));
+    return null;
+  });
+
+  // Cleanup only — registration happens above, once, at first render.
+  useEffect(() => () => setApiTokenProvider(null), []);
+
+  useEffect(() => {
     if (signedIn && localStorage.getItem(DEMO_TOKEN_KEY)) {
       writeSessionMarker('demo');
     }
-    return () => setApiTokenProvider(null);
   }, [signedIn]);
 
   const signIn = useCallback((cb?: () => void) => {
