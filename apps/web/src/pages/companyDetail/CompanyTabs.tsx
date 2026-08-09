@@ -20,6 +20,7 @@ import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatStage } from '@/lib/format';
 
 export function ContactTab({
   contacts,
@@ -121,7 +122,13 @@ export function OpportunityTab({
               </TableCell>
               <TableCell>{o.name}</TableCell>
               <TableCell>
-                <Badge tone="gray">{o.stage}</Badge>
+                {/* Route through the same raw-stage formatter cockpit widgets use
+                    (RecentOpportunitiesCard, PipelineByStageCard) — this tab only
+                    carries the bare stage id, not a full Opportunity, so it can't
+                    call resolvePipelineStage; formatStage still turns
+                    's3_technical_iteration' into 'S3 Technical Iteration' instead
+                    of leaking the raw enum value. */}
+                <Badge tone="gray">{formatStage(o.stage)}</Badge>
               </TableCell>
               <TableCell className="font-medium text-[var(--fg-primary)]">
                 {formatMoneyMicros(o.valueMicros)}

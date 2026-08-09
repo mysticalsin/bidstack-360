@@ -551,6 +551,27 @@ export const WorldMap = memo(function WorldMap({
                     strokeWidth={1}
                     pointerEvents="none"
                   />
+                  {/* Invisible hit target, sized well past the visible dot. Markers
+                      paint after <Geographies> in this group so this circle is
+                      already topmost in the DOM, but the visible circles above are
+                      pointer-events:none (so hover/pulse never blocks the country
+                      path's own hover state) — without a real interactive layer,
+                      a click at the marker's center falls through to whichever
+                      geography <path> occupies that pixel, which for a large
+                      country is not reliably the country's own path at this map's
+                      polygon simplification. Giving this circle pointer-events
+                      and the click handler guarantees the marker's own country is
+                      what receives the click. */}
+                  <circle
+                    cx={0}
+                    cy={0}
+                    r={9}
+                    fill="transparent"
+                    pointerEvents={onCountryClick ? 'all' : 'none'}
+                    style={{ cursor: onCountryClick ? 'pointer' : 'default' }}
+                    onClick={() => onCountryClick?.(item)}
+                    data-testid={`marker-hit-${item.countryCode}`}
+                  />
                 </g>
               </Marker>
             );
