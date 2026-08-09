@@ -12,6 +12,7 @@ import {
   buildDustClient,
   resolveAgentId,
   checkDailyCap,
+  completeChatOrNull,
   estimateCost,
   persistSession,
   recordCost,
@@ -55,6 +56,16 @@ export async function analyzeDealSentiment(
     } catch (err) {
       childLog.warn({ err }, 'Dust sentiment agent failed, using stub');
     }
+  }
+
+  if (!responseText) {
+    // OmniRoute (free gateway) powers the copilot when Dust isn't configured;
+    // stub is the last resort.
+    responseText = (await completeChatOrNull(
+      opts.orgId,
+      { user: prompt, responseFormat: 'json_object' },
+      childLog,
+    )) ?? '';
   }
 
   if (!responseText) {
@@ -163,6 +174,16 @@ export async function summarizeAccountIntel(
     } catch (err) {
       childLog.warn({ err }, 'Dust account-intel agent failed, using stub');
     }
+  }
+
+  if (!responseText) {
+    // OmniRoute (free gateway) powers the copilot when Dust isn't configured;
+    // stub is the last resort.
+    responseText = (await completeChatOrNull(
+      opts.orgId,
+      { user: prompt, responseFormat: 'json_object' },
+      childLog,
+    )) ?? '';
   }
 
   if (!responseText) {

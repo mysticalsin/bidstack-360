@@ -13,6 +13,7 @@ import {
   buildDustClient,
   resolveAgentId,
   checkDailyCap,
+  completeChatOrNull,
   estimateCost,
   persistSession,
   recordCost,
@@ -51,7 +52,19 @@ export async function draftEmail(
     }
   }
 
-  // Stub fallback (Dust not configured, or agent call failed).
+  // OmniRoute (free, keyless gateway) powers the copilot when Dust isn't
+  // configured; the static stub below is the last resort, only reached if
+  // no direct LLM resolves either.
+  if (!responseText) {
+    const direct = await completeChatOrNull(
+      input.orgId,
+      { user: prompt, responseFormat: 'json_object' },
+      childLog,
+    );
+    if (direct) responseText = direct;
+  }
+
+  // Stub fallback (Dust not configured, direct LLM unavailable, or both failed).
   if (!responseText) {
     const tonedSalutation =
       input.tone === 'formal'

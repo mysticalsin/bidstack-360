@@ -12,6 +12,7 @@ import {
   buildDustClient,
   resolveAgentId,
   checkDailyCap,
+  completeChatOrNull,
   estimateCost,
   persistSession,
   recordCost,
@@ -59,6 +60,17 @@ export async function prepMeeting(
     } catch (err) {
       childLog.warn({ err }, 'Dust meeting-prep agent failed, using stub');
     }
+  }
+
+  // WHY: OmniRoute (free gateway) powers the copilot when Dust isn't
+  // configured; the static stub below is the last resort, not the default.
+  if (!responseText) {
+    const direct = await completeChatOrNull(
+      opts.orgId,
+      { user: prompt, responseFormat: 'json_object', maxTokens: 500 },
+      childLog,
+    );
+    if (direct) responseText = direct;
   }
 
   if (!responseText) {
@@ -152,6 +164,20 @@ export async function enrichContact(
       enrichSource = 'domain-inference';
     } catch (err) {
       childLog.warn({ err }, 'Dust enrich agent failed, using stub');
+    }
+  }
+
+  // WHY: OmniRoute (free gateway) powers the copilot when Dust isn't
+  // configured; the static stub below is the last resort, not the default.
+  if (!responseText) {
+    const direct = await completeChatOrNull(
+      opts.orgId,
+      { user: prompt, responseFormat: 'json_object', maxTokens: 300 },
+      childLog,
+    );
+    if (direct) {
+      responseText = direct;
+      enrichSource = 'domain-inference';
     }
   }
 
