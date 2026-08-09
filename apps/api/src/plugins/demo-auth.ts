@@ -15,9 +15,12 @@
  *
  * SEC-1: an email is a guess, not a credential. Re-entering an ALREADY
  * provisioned workspace therefore requires a resume proof — a demo token this
- * server signed for that exact visitor. Without it the request is refused
- * (DEMO_EMAIL_CLAIMED) instead of being handed an admin session for someone
- * else's workspace and their uploaded documents.
+ * server signed for that exact visitor. Without proof the caller is NOT handed
+ * the existing workspace; instead the email is released from the old visitor
+ * (tombstone-renamed) and a FRESH seeded org is provisioned. Takeover stays
+ * impossible — the old workspace remains reachable only through its own signed
+ * token — while a returning visitor on a new device / cleared storage is never
+ * locked out of the demo.
  */
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 
@@ -164,10 +167,25 @@ export interface DemoSession {
 }
 
 /**
- * Raised when the email already owns a demo workspace and the caller cannot
- * prove it is theirs. Fail-closed: no session is minted (SEC-1).
+ * Historical name, kept for the route's error mapping: raised only when even
+ * the release-and-reprovision path cannot complete (e.g. a pathological rename
+ * race). The common claimed-email case no longer throws — it provisions a
+ * fresh workspace instead (see provisionDemoSession).
  */
 export const DEMO_EMAIL_CLAIMED = 'DEMO_EMAIL_CLAIMED';
+
+/**
+ * Release `email` from an existing demo visitor by renaming that user to a
+ * unique tombstone alias. Their workspace stays fully reachable through the
+ * token already in their browser (resume matches user/org IDs, not email) —
+ * only the email's "claim" moves on, so the next sign-in can seed a fresh org
+ * under the exact address the visitor typed.
+ */
+async function releaseDemoEmail(visitorId: string, normalizedEmail: string): Promise<void> {
+  const [local, domain] = normalizedEmail.split('@');
+  const alias = `${local}+reclaimed-${randomUUID().slice(0, 8)}@${domain}`.slice(0, 200);
+  await prisma.user.update({ where: { id: visitorId }, data: { email: alias } });
+}
 
 /**
  * Re-signin lookup: resolve a visitor already provisioned under a demo org by
@@ -206,11 +224,12 @@ function isResumeProof(
 /**
  * Provision (or resume) a demo org for `email` and return a signed session token.
  *
- * A NEW email always gets a fresh seeded org. An email that already has one is
- * only re-entered when `resumeProof` (the caller's existing demo Bearer token)
- * matches that visitor — otherwise DEMO_EMAIL_CLAIMED is thrown, because the
- * seeded visitor is an org admin and their workspace holds whatever they
- * uploaded.
+ * A NEW email always gets a fresh seeded org. An email that already has one
+ * resumes its OWN workspace when `resumeProof` (the caller's existing demo
+ * Bearer token) matches that visitor. Without proof the email is released from
+ * the old visitor (tombstone alias) and a fresh org is seeded — the caller
+ * never sees the previous workspace, and the previous owner keeps token-only
+ * access until the TTL reaper collects it.
  *
  * Provisioning is atomic:
  *  - org.create + seedOrgData run in one interactive transaction, so a failed
@@ -228,12 +247,16 @@ export async function provisionDemoSession(
 
   const existing = await findDemoVisitor(normalized);
   if (existing) {
-    if (!isResumeProof(resumeProof, existing)) throw new Error(DEMO_EMAIL_CLAIMED);
-    return {
-      token: signDemoToken(existing.id, existing.orgId),
-      email: normalized,
-      orgId: existing.orgId,
-    };
+    if (isResumeProof(resumeProof, existing)) {
+      return {
+        token: signDemoToken(existing.id, existing.orgId),
+        email: normalized,
+        orgId: existing.orgId,
+      };
+    }
+    // No proof: never hand over the existing workspace — free the email and
+    // fall through to provision a fresh one for this caller.
+    await releaseDemoEmail(existing.id, normalized);
   }
 
   // Capacity guard — keeps a public demo from being used to mass-create orgs.
@@ -268,8 +291,9 @@ export async function provisionDemoSession(
     );
   } catch (err) {
     // A concurrent sign-in already provisioned this visitor and won the
-    // User.email unique index. Same rule as above: resume only on proof, so a
-    // race cannot be used as a side door into an existing workspace.
+    // User.email unique index. Resume on proof; without proof the winner keeps
+    // the workspace they just got and this caller is refused rather than
+    // recursively reclaiming it — a race must not become a rename ping-pong.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const raced = await findDemoVisitor(normalized);
       if (raced) {
