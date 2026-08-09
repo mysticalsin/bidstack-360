@@ -34,7 +34,11 @@ import type { AuthContext } from './auth.js';
 
 /** Every demo org's clerkOrg starts with this — the reaper + dedup key off it. */
 const DEMO_ORG_PREFIX = 'demo_org_';
-const TOKEN_TTL_SECONDS = 2 * 60 * 60; // 2h sessions
+// 7-day sessions: long enough that someone evaluating the demo over a few days
+// isn't kicked out mid-session. The client now clears a rejected token and
+// re-auths gracefully (see setAuthInvalidHandler), so expiry is a soft prompt,
+// not a dead end; the workspace itself still reaps on DEMO_ORG_TTL_HOURS.
+const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export function isDemoMode(): boolean {
   return process.env.DEMO_MODE === 'true';

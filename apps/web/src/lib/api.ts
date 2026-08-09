@@ -38,8 +38,29 @@ export function setApiTokenProvider(provider: ApiTokenProvider | null): void {
   apiTokenProvider = provider;
 }
 
+// Invoked when an authenticated request (one that DID send a token) is rejected
+// 401 even after a forced token refresh — i.e. the stored session is dead, not
+// merely stale. The active auth provider registers a handler that clears the
+// dead credential and bounces the user to sign-in, instead of the app 401ing
+// forever behind a "Failed to load…" state. 403 (permission denied) is NOT
+// auth-invalid and never triggers this.
+let authInvalidHandler: (() => void) | null = null;
+
+export function setAuthInvalidHandler(handler: (() => void) | null): void {
+  authInvalidHandler = handler;
+}
+
 function shouldRefreshAuth(status: number): boolean {
   return status === 401 || status === 403;
+}
+
+// Fire the auth-invalid handler once for a token-bearing request that still
+// 401'd after refresh. Guard on a non-null token so unauthenticated calls
+// (no session at all — handled by route guards) never force a sign-out loop.
+async function handleTerminal401(status: number): Promise<void> {
+  if (status !== 401 || !authInvalidHandler) return;
+  const hadToken = (await getApiToken()) != null;
+  if (hadToken) authInvalidHandler();
 }
 
 async function getApiToken(options?: ApiTokenOptions): Promise<string | null> {
@@ -141,6 +162,7 @@ export async function downloadFromApi(
   }
 
   if (!res.ok) {
+    await handleTerminal401(res.status);
     throw new ApiError(`Export failed (${res.status})`, res.status, null);
   }
 
@@ -176,6 +198,7 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   if (!res.ok && apiTokenProvider && shouldRefreshAuth(res.status)) {
     res = await requestJson(true);
   }
+  if (!res.ok) await handleTerminal401(res.status);
 
   const data = await parseJsonResponse(res);
 

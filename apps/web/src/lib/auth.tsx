@@ -30,7 +30,7 @@ import {
   type ComponentType,
 } from 'react';
 
-import { setApiTokenProvider } from '@/lib/api';
+import { setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
 import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
 
 interface AuthUser {
@@ -216,6 +216,21 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
 
   // Cleanup only — registration happens above, once, at first render.
   useEffect(() => () => setApiTokenProvider(null), []);
+
+  // When the API rejects the stored demo token as dead (e.g. an expired
+  // session left in localStorage from a previous visit), clear it and drop to
+  // signed-out so RequireAuth routes back to the passwordless sign-in — instead
+  // of every query 401ing forever behind "Failed to load…". Registered in an
+  // effect (only needed after mount, on a 401) so it can close over setSignedIn.
+  useEffect(() => {
+    setAuthInvalidHandler(() => {
+      localStorage.removeItem(DEMO_TOKEN_KEY);
+      localStorage.removeItem(DEMO_EMAIL_KEY);
+      writeSessionMarker(null);
+      setSignedIn(false);
+    });
+    return () => setAuthInvalidHandler(null);
+  }, []);
 
   useEffect(() => {
     if (signedIn && localStorage.getItem(DEMO_TOKEN_KEY)) {

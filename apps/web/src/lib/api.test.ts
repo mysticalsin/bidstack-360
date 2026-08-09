@@ -6,6 +6,7 @@ import {
   normalizeApiBase,
   normalizeApiPath,
   setApiTokenProvider,
+  setAuthInvalidHandler,
   type ApiError,
 } from './api';
 
@@ -19,6 +20,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 afterEach(() => {
   setApiTokenProvider(null);
+  setAuthInvalidHandler(null);
   vi.unstubAllGlobals();
 });
 
@@ -121,6 +123,47 @@ describe('api fetch wrapper', () => {
       status: 403,
     } satisfies Partial<ApiError>);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('fires the auth-invalid handler when a token-bearing request 401s after refresh', async () => {
+    // Regression: a dead session left in storage (e.g. an expired demo token
+    // from a previous visit) 401'd on every request and the app showed
+    // "Failed to load…" forever. Now the terminal 401 on a token-bearing
+    // request clears the session and re-auths.
+    const fetchMock = vi.fn(async () => jsonResponse({ message: 'Invalid or expired demo session' }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+    setApiTokenProvider(async () => 'dead-token');
+    const onInvalid = vi.fn();
+    setAuthInvalidHandler(onInvalid);
+
+    await expect(api('/api/dashboards')).rejects.toMatchObject({ status: 401 });
+    expect(onInvalid).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT fire the auth-invalid handler for a 403 permission denial', async () => {
+    // 403 = signed in but lacks the permission; signing the user out would be
+    // wrong. Only 401 (bad credential) triggers re-auth.
+    const fetchMock = vi.fn(async () => jsonResponse({ message: 'Forbidden' }, 403));
+    vi.stubGlobal('fetch', fetchMock);
+    setApiTokenProvider(async () => 'valid-token');
+    const onInvalid = vi.fn();
+    setAuthInvalidHandler(onInvalid);
+
+    await expect(api('/api/reports')).rejects.toMatchObject({ status: 403 });
+    expect(onInvalid).not.toHaveBeenCalled();
+  });
+
+  it('does NOT fire the auth-invalid handler when no token was sent', async () => {
+    // No credential at all = an unauthenticated call; route guards handle that,
+    // and forcing a sign-out here would loop the login screen.
+    const fetchMock = vi.fn(async () => jsonResponse({ message: 'Missing Authorization header' }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+    setApiTokenProvider(async () => null);
+    const onInvalid = vi.fn();
+    setAuthInvalidHandler(onInvalid);
+
+    await expect(api('/api/dashboards')).rejects.toMatchObject({ status: 401 });
+    expect(onInvalid).not.toHaveBeenCalled();
   });
 
   it('uses error payloads when APIs return legacy error bodies', async () => {
