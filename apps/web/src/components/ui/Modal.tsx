@@ -10,10 +10,20 @@
  *
  * WCAG 2.1.2 compliance: Radix Content handles the focus trap automatically.
  *
+ * `title` is rendered as a visually-hidden `RadixDialog.Title` (the `sr-only`
+ * pattern Radix's own docs recommend). Every caller here already paints its
+ * own styled heading inside `children`, so Radix's Title stays off-screen —
+ * but it must still exist, because Radix keys its dev-mode a11y check (and
+ * the DOM's auto `aria-labelledby`) off an actual `<Title>` element, not off
+ * whatever `aria-label`/`aria-labelledby` a caller bolts on by hand. Passing
+ * `aria-describedby={undefined}` likewise stops Radix from pointing at a
+ * `Description` id that was never rendered — see the sibling `DialogContent`
+ * primitive in Dialog.tsx for the same convention.
+ *
  * @example
- * <Modal open={show} onClose={() => setShow(false)} labelId="my-title-id">
+ * <Modal open={show} onClose={() => setShow(false)} title="My dialog">
  *   <div className="bg-[var(--surface)] rounded-2xl p-6">
- *     <h2 id="my-title-id">Title</h2>
+ *     <h2>My dialog</h2>
  *     …
  *   </div>
  * </Modal>
@@ -27,20 +37,15 @@ interface ModalProps {
   /** Called when the user closes the modal (Escape key or backdrop click). */
   onClose: () => void;
   /**
-   * The `id` of the element that labels this modal (`aria-labelledby`).
-   * Provide this when a visible heading inside the modal carries the label.
-   * Mutually exclusive with `label`.
+   * Accessible name for the dialog, announced by screen readers on open.
+   * Rendered as a visually-hidden Radix `Title` — pass the same text your
+   * visible in-modal heading already shows.
    */
-  labelId?: string;
-  /**
-   * A short string that labels this modal when no visible heading id exists
-   * (`aria-label`). Mutually exclusive with `labelId`.
-   */
-  label?: string;
+  title: string;
   children: ReactNode;
 }
 
-export function Modal({ open, onClose, labelId, label, children }: ModalProps) {
+export function Modal({ open, onClose, title, children }: ModalProps) {
   return (
     <RadixDialog.Root
       open={open}
@@ -51,11 +56,11 @@ export function Modal({ open, onClose, labelId, label, children }: ModalProps) {
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/40 data-[state=open]:animate-fade-in" />
         <RadixDialog.Content
-          aria-labelledby={labelId}
-          aria-label={label}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 outline-none"
           onInteractOutside={() => onClose()}
+          aria-describedby={undefined}
         >
+          <RadixDialog.Title className="sr-only">{title}</RadixDialog.Title>
           {children}
         </RadixDialog.Content>
       </RadixDialog.Portal>

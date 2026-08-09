@@ -58,17 +58,22 @@ export function CreateWebhookDialog({
   };
 
   return (
-    <Modal open onClose={onClose} labelId="webhook-dialog-title">
+    <Modal
+      open
+      onClose={onClose}
+      title={
+        isEditing
+          ? t('createWebhook.editTitle', 'Edit webhook subscription')
+          : t('createWebhook.createTitle', 'New webhook subscription')
+      }
+    >
       <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] px-6 py-4">
           <div>
             <Badge tone="purple" className="mb-2">
               {t('createWebhook.adminOnlyBadge', 'Admin only')}
             </Badge>
-            <h2
-              id="webhook-dialog-title"
-              className="text-lg font-semibold text-[var(--fg-primary)]"
-            >
+            <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
               {isEditing
                 ? t('createWebhook.editTitle', 'Edit webhook subscription')
                 : t('createWebhook.createTitle', 'New webhook subscription')}

@@ -62,7 +62,7 @@ export function CreateEventModal({
   }
 
   return (
-    <Modal open onClose={onClose} label={t('createEvent.modalLabel', 'Create calendar event')}>
+    <Modal open onClose={onClose} title={t('createEvent.modalLabel', 'Create calendar event')}>
       <div className="bg-(--color-surface) rounded-2xl p-6 shadow-xl w-full max-w-md mx-4 focus:outline-none">
         <h2 className="text-lg font-semibold mb-4 text-(--color-text-primary)">
           {t('createEvent.heading', 'New event')}

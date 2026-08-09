@@ -252,10 +252,10 @@ export function CustomObjectListPage() {
           setCreateValues({ name: '' });
           setCreateError(null);
         }}
-        labelId="create-record-title"
+        title={t('customObjectList.newRecordTitle', 'New {{label}}', { label: def.labelSingular })}
       >
         <div className="bg-[var(--surface-card)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-          <h2 id="create-record-title" className="text-lg font-semibold text-[var(--fg-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
             {t('customObjectList.newRecordTitle', 'New {{label}}', { label: def.labelSingular })}
           </h2>
           <form
