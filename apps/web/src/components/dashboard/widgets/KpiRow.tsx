@@ -1,152 +1,57 @@
 /**
- * dashboard/widgets/KpiRow.tsx — animated KPI grid row with per-card mini
- * signal bar charts.
+ * dashboard/widgets/KpiRow.tsx — the workspace metric strip.
  *
- * WHY a separate module: KpiRow + KpiSignal together (~117 source lines) are
- * self-contained presentation logic. Extracting them keeps OrgDashboard an
- * orchestration shell and makes the KPI grid independently testable.
+ * WHY a strip and not six cards: the previous design rendered six identical
+ * glow-icon cards, each in its own accent hue with a decorative mini bar
+ * chart. Six equal heroes = no hierarchy, six hues = color carrying zero
+ * meaning, and the sparkbars mixed unrelated entities inside one tile. These
+ * are entity COUNTS, not analytical series — so they read as one quiet row of
+ * numbers: hairline-divided, neutral ink, tabular numerals, with a single
+ * accent reserved for the one metric flagged `emphasis` (open pipeline — the
+ * number a sales lead actually steers by). Identity comes from the label,
+ * hierarchy from the accent, and the whole strip stays scannable in a glance.
  */
-import { type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
-import { GlassCard } from '@/components/ui/GlassCard';
-import { Icon } from '@/components/ui/Icon';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
-import { springSoft, springSnap, staggerParent, staggerChild } from '@/lib/motion';
+import { staggerParent, staggerChild } from '@/lib/motion';
 
-import {
-  type OrgKpi,
-  type KpiTone,
-  type SignalPoint,
-  TONE_BG,
-  TONE_FG,
-  TONE_GLOW,
-} from './dashboard-types';
-
-// ─── KpiRow ─────────────────────────────────────────────────────────────────
+import { type OrgKpi } from './dashboard-types';
 
 export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | null }) {
   const { t } = useTranslation('crm');
   return (
     <motion.section
-      className="kpi-grid cols-6"
+      className="kpi-strip"
       aria-label={t('kpiRow.workspaceMetricsAriaLabel', 'Workspace metrics')}
       variants={reduced ? undefined : staggerParent}
       initial="initial"
       animate="animate"
     >
-      {kpis.map((kpi, i) => (
-        <GlassCard
+      {kpis.map((kpi) => (
+        <motion.div
           key={kpi.label}
-          className="flex gap-3 dashboard-kpi-card"
+          className="kpi-strip-cell"
           variants={reduced ? undefined : staggerChild}
-          transition={springSnap}
-          hoverable
-          glow={kpi.tone}
         >
           <Link
             to={kpi.href}
-            className="dashboard-kpi-link"
-            style={{ textDecoration: 'none', color: 'inherit' }}
+            className={`kpi-strip-item${kpi.emphasis ? ' is-primary' : ''}`}
+            aria-label={`${kpi.label}: ${kpi.value.toLocaleString()}`}
           >
-            <div
-              className="kpi-icon"
-              style={{
-                background: TONE_BG[kpi.tone],
-                color: TONE_FG[kpi.tone],
-                boxShadow: `0 0 16px ${TONE_GLOW[kpi.tone]}`,
-              }}
-              aria-hidden
-            >
-              <Icon name={kpi.icon} size={18} />
-            </div>
-            <div className="kpi-text" style={{ flex: 1, minWidth: 0 }}>
-              <div className="kpi-label">{kpi.label}</div>
-              <div className="kpi-value" style={{ fontSize: 26, fontWeight: 800 }}>
-                <AnimatedNumber
-                  value={kpi.value}
-                  duration={reduced ? 0 : 0.9}
-                  format={(n) => Math.round(n).toLocaleString()}
-                />
-              </div>
-              <div className="kpi-meta">
-                {kpi.detail ? <span className="kpi-sub">{kpi.detail}</span> : null}
-                {kpi.trend !== undefined && (
-                  <span className={`kpi-trend ${kpi.trend >= 0 ? 'trend-up' : 'trend-down'}`}>
-                    {kpi.trend >= 0 ? '↑' : '↓'} {Math.abs(kpi.trend)}%
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="dashboard-kpi-signal" aria-hidden style={{ color: TONE_FG[kpi.tone] }}>
-              <KpiSignal points={kpi.signal} tone={kpi.tone} reduced={reduced} delay={i * 0.04} />
-            </div>
+            <span className="kpi-strip-label">{kpi.label}</span>
+            <span className="kpi-strip-value">
+              <AnimatedNumber
+                value={kpi.value}
+                duration={reduced ? 0 : 0.9}
+                format={(n) => Math.round(n).toLocaleString()}
+              />
+            </span>
           </Link>
-        </GlassCard>
+        </motion.div>
       ))}
     </motion.section>
-  );
-}
-
-// ─── KpiSignal (private — used only by KpiRow) ───────────────────────────────
-
-function KpiSignal({
-  points,
-  tone,
-  reduced,
-  delay = 0,
-}: {
-  points: SignalPoint[];
-  tone: KpiTone;
-  reduced: boolean | null;
-  delay?: number;
-}) {
-  const { t } = useTranslation('crm');
-  const visible = points
-    .filter((point) => Number.isFinite(point.value) && point.value > 0)
-    .slice(0, 5);
-
-  if (visible.length === 0) {
-    return (
-      <div
-        className="kpi-signal kpi-signal-empty"
-        title={t('kpiRow.noLiveSignalTitle', 'No live signal yet')}
-      >
-        <span />
-        <span />
-        <span />
-      </div>
-    );
-  }
-
-  const max = Math.max(...visible.map((point) => point.value), 1);
-  const title = visible
-    .map((point) => `${point.label}: ${Math.round(point.value).toLocaleString()}`)
-    .join(', ');
-
-  return (
-    <div className="kpi-signal" title={title}>
-      {visible.map((point, index) => {
-        const height = Math.max(18, (point.value / max) * 100);
-        return (
-          <motion.span
-            key={`${point.label}-${index}`}
-            className="kpi-signal-bar"
-            style={
-              {
-                '--signal-color': point.color ?? TONE_FG[tone],
-              } as CSSProperties
-            }
-            initial={
-              reduced ? { height: `${height}%`, opacity: 1 } : { height: '18%', opacity: 0.45 }
-            }
-            animate={{ height: `${height}%`, opacity: 1 }}
-            transition={{ ...springSoft, delay: reduced ? 0 : delay + index * 0.045 }}
-          />
-        );
-      })}
-    </div>
   );
 }

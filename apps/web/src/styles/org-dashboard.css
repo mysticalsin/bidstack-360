@@ -182,141 +182,84 @@
   opacity: 1;
 }
 
-/* KPI meta with trend */
-.kpi-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.kpi-trend {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.kpi-trend.trend-up {
-  color: var(--success);
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.kpi-trend.trend-down {
-  color: var(--danger);
-  background: rgba(244, 63, 94, 0.12);
-  border: 1px solid rgba(244, 63, 94, 0.2);
-}
-
-.dashboard-kpi-card {
-  min-height: 112px;
-  /* Lay each card out by its OWN width, not the viewport. At narrow column
-     counts (6-across on a laptop) the inline icon|number|signal row squeezed
-     the number cell until the big value overflowed into the signal column;
-     a container query keys the inline layout to real card width instead. */
-  container-type: inline-size;
-}
-
-.dashboard-kpi-link {
+/* ── Workspace metric strip ────────────────────────────────────────────────
+   One quiet row of entity counts (see widgets/KpiRow.tsx for the WHY). The
+   1px `gap` over a border-colored background draws the hairline dividers, so
+   they stay correct at every wrap point without per-breakpoint border rules. */
+.kpi-strip {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  grid-template-areas:
-    'icon text'
-    'signal signal';
-  align-items: start;
-  column-gap: 12px;
-  row-gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.kpi-strip-cell {
+  display: flex;
+  min-width: 0;
+  background: var(--surface-raised);
+}
+
+.kpi-strip-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   flex: 1;
   min-width: 0;
+  /* 14px vertical padding + label + value comfortably clears the 44px floor. */
+  padding: 14px 18px;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease-out;
 }
 
-.dashboard-kpi-link .kpi-icon {
-  grid-area: icon;
+.kpi-strip-item:hover {
+  background: var(--surface-sunken);
 }
 
-.dashboard-kpi-link .kpi-text {
-  grid-area: text;
+.kpi-strip-item:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+  border-radius: 8px;
 }
 
-.dashboard-kpi-signal {
-  grid-area: signal;
-  justify-self: stretch;
-  min-width: 0;
+.kpi-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.kpi-signal {
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 3px;
-  width: 100%;
-  min-width: 0;
-  height: 34px;
-  padding: 7px 9px;
-  border: 1px solid color-mix(in srgb, var(--border-default) 78%, transparent);
-  border-radius: 12px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-raised) 94%, transparent),
-      transparent
-    ),
-    radial-gradient(
-      circle at 50% 0%,
-      color-mix(in srgb, currentColor 10%, transparent),
-      transparent 62%
-    );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 10px 24px rgba(0, 0, 0, 0.05);
+.kpi-strip-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-primary);
 }
 
-.kpi-signal-bar {
-  display: block;
-  width: clamp(5px, 8%, 7px);
-  min-height: 7px;
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, white 32%, var(--signal-color)),
-    var(--signal-color)
-  );
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--signal-color) 20%, transparent),
-    0 6px 16px color-mix(in srgb, var(--signal-color) 24%, transparent);
-  transform-origin: bottom;
+/* The single allowed accent — the metric flagged `emphasis` in OrgDashboard. */
+.kpi-strip-item.is-primary .kpi-strip-value {
+  color: var(--brand-primary);
 }
 
-/* Only place the sparkline inline (to the right of the number) when the card
-   itself is wide enough to hold both without collision. Narrower cards keep
-   the stacked layout (signal on its own full-width row below). */
-@container (min-width: 232px) {
-  .dashboard-kpi-link {
-    grid-template-columns: 36px minmax(0, 1fr) minmax(58px, 72px);
-    grid-template-areas: 'icon text signal';
-    align-items: center;
-  }
-
-  .dashboard-kpi-signal {
-    justify-self: end;
-  }
-
-  .kpi-signal {
-    width: 64px;
-    height: 38px;
-    padding: 8px;
-    justify-content: center;
+@media (max-width: 1100px) {
+  .kpi-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-.kpi-signal-empty span {
-  display: block;
-  width: 7px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--border-default);
-  opacity: 0.5;
+@media (max-width: 560px) {
+  .kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .pipeline-live-visual {
