@@ -151,7 +151,7 @@ export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): Resolve
     return {
       kind: 'openai',
       apiKey: 'omniroute', // placeholder — OmniRoute is keyless for free providers
-      model: env.OMNIROUTE_MODEL ?? 'auto',
+      model: env.OMNIROUTE_MODEL ?? 'auto/best-free',
       baseUrl: (env.OMNIROUTE_BASE_URL ?? 'http://localhost:20128/v1').replace(/\/$/, ''),
       extraBody: { stream: false },
     };

@@ -125,7 +125,7 @@ describe('resolveLlmFromEnv', () => {
     expect(resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'omniroute' })).toMatchObject({
       kind: 'openai',
       apiKey: 'omniroute',
-      model: 'auto',
+      model: 'auto/best-free',
       baseUrl: 'http://localhost:20128/v1',
       extraBody: { stream: false },
     });

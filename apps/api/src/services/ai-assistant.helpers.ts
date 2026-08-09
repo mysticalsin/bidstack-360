@@ -288,6 +288,18 @@ export async function resolveActiveLlm(orgId: string): Promise<ResolvedLlm | nul
 }
 
 /**
+/**
+ * Strip a leading/trailing markdown code fence (```json … ``` or ``` … ```)
+ * from a model response, returning the inner JSON text (array or object) so a
+ * caller's JSON.parse succeeds. Returns the trimmed input unchanged when there
+ * is no fence, so non-fenced JSON is unaffected.
+ */
+function stripJsonFence(raw: string): string {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return (fenced?.[1] ?? raw).trim();
+}
+
+/**
  * Resolve a direct LLM and complete a chat, or return null on any failure
  * (unresolved provider, network error, non-2xx, timeout). NEVER throws —
  * callers still have their static stub as the final fallback. NEVER logs
@@ -308,7 +320,13 @@ export async function completeChatOrNull(
   const llm = await resolveActiveLlm(orgId);
   if (!llm) return null;
   try {
-    return await completeChat(llm, args);
+    const text = await completeChat(llm, args);
+    // Models (esp. via OmniRoute's free providers) often wrap JSON in a
+    // ```json … ``` markdown fence even when asked for raw JSON. Strip the fence
+    // for json_object callers so their JSON.parse sees the array/object, not the
+    // backticks — otherwise a good AI answer would be discarded for the stub.
+    if (args.responseFormat === 'json_object') return stripJsonFence(text);
+    return text;
   } catch (err) {
     log.warn(
       { err, provider: llm.kind, model: llm.model },

@@ -30,7 +30,7 @@ const PROVIDERS: Array<{
   {
     value: 'omniroute',
     label: 'OmniRoute (free gateway)',
-    placeholderModel: 'auto',
+    placeholderModel: 'auto/best-free',
     placeholderBaseUrl: 'http://localhost:20128/v1',
     keyOptional: true,
   },

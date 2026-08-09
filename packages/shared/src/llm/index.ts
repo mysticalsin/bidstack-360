@@ -98,7 +98,10 @@ const DIRECT_PROVIDER_OVERRIDES: Partial<
 > = {
   omniroute: {
     baseUrl: 'http://localhost:20128/v1',
-    model: 'auto',
+    // 'auto/best-free' routes to reliable free-tier models (e.g. deepseek-v4-flash-free);
+    // bare 'auto' can land on a degenerate keyless provider that returns near-empty
+    // content. Override per-org via Settings or OMNIROUTE_MODEL if you add paid keys.
+    model: 'auto/best-free',
     apiKey: 'omniroute',
     extraBody: { stream: false },
   },

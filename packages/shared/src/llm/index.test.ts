@@ -59,7 +59,7 @@ describe('buildResolvedLlm', () => {
       const llm = buildResolvedLlm({ provider: 'omniroute' });
       expect(llm.kind).toBe('openai');
       expect(llm.baseUrl).toBe('http://localhost:20128/v1');
-      expect(llm.model).toBe('auto');
+      expect(llm.model).toBe('auto/best-free');
       expect(llm.apiKey).toBeTruthy();
     });
 

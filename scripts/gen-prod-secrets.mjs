@@ -83,7 +83,7 @@ BIDSTACK_JOB_SIGNING_SECRET=__GEN__
 # a specific provider in Settings. go-live starts it on :20128 automatically.
 RFP_LLM_PROVIDER=omniroute
 OMNIROUTE_BASE_URL=http://localhost:20128/v1
-OMNIROUTE_MODEL=auto
+OMNIROUTE_MODEL=auto/best-free
 
 # ── Multi-tenant safety (leave as-is) ─────────────────────────────
 BIDSTACK_TENANT_SCOPE_GUARD=enforce
