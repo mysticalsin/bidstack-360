@@ -76,6 +76,9 @@ export const envSchema = z.object({
   ODOO_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
 
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  // Explicit opt-in to run a production tenant on ephemeral local disk before
+  // object storage is configured (see the storage semantic check below).
+  BIDSTACK_ALLOW_LOCAL_STORAGE: z.enum(['true', 'false']).default('false'),
   LOCAL_STORAGE_ROOT: z.string().min(1).optional().or(z.literal('')),
   S3_BUCKET: z.string().min(1).optional().or(z.literal('')),
   S3_REGION: z.string().min(1).optional().or(z.literal('')),
@@ -360,8 +363,19 @@ export function getEnv(): Env {
   // Production normally requires S3 object storage. The public demo runs without
   // an S3 bucket and its data is ephemeral by design, so demo mode may use local
   // disk storage (lost on restart — acceptable for a throwaway demo).
-  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER !== 's3' && env.DEMO_MODE !== 'true') {
-    semanticErrors.push('STORAGE_DRIVER=s3 is required in production');
+  // BIDSTACK_ALLOW_LOCAL_STORAGE=true is an explicit operator opt-in to run a
+  // real production tenant on local disk before object storage (R2/S3) is wired:
+  // uploaded files live on the container's ephemeral disk and are lost on
+  // redeploy/restart, so it is a launch-now stopgap, not a durable state.
+  if (
+    env.NODE_ENV === 'production' &&
+    env.STORAGE_DRIVER !== 's3' &&
+    env.DEMO_MODE !== 'true' &&
+    env.BIDSTACK_ALLOW_LOCAL_STORAGE !== 'true'
+  ) {
+    semanticErrors.push(
+      'STORAGE_DRIVER=s3 is required in production (or set BIDSTACK_ALLOW_LOCAL_STORAGE=true to launch on ephemeral local disk until object storage is configured)',
+    );
   }
   if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) {
     semanticErrors.push('S3_BUCKET is required when STORAGE_DRIVER=s3');
