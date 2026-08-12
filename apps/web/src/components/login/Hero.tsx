@@ -5,7 +5,6 @@ import { motion } from 'motion/react';
 import { Navbar } from './Navbar';
 import { HeroBadge } from './HeroBadge';
 import { BottomLeftCard } from './BottomLeftCard';
-import { BottomRightCorner } from './BottomRightCorner';
 
 const VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
@@ -75,7 +74,6 @@ export function Hero() {
           </div>
 
           <BottomLeftCard />
-          <BottomRightCorner />
         </div>
       </section>
     </div>

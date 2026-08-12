@@ -506,7 +506,11 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       authorizedParties,
     });
 
-    const clerkOrgId = payload.org_id as string | undefined;
+    // Clerk v2 session tokens nest org claims under `o` ({ id, rol, slg });
+    // legacy tokens use the flat `org_id` / `org_role`. Read both so the app
+    // works regardless of the instance's token version.
+    const orgClaim = payload.o as { id?: string; rol?: string } | undefined;
+    const clerkOrgId = (payload.org_id as string | undefined) ?? orgClaim?.id;
     if (!clerkOrgId) {
       throw req.server.httpErrors.forbidden('No organization context in token');
     }
@@ -515,7 +519,7 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       clerkOrgId,
       clerkUserId: payload.sub as string,
       sessionId: payload.sid as string | undefined,
-      orgRole: payload.org_role as string | undefined,
+      orgRole: (payload.org_role as string | undefined) ?? orgClaim?.rol,
       email: (payload.email as string | undefined) ?? '',
       firstName: (payload.first_name as string | undefined) ?? '',
       lastName: (payload.last_name as string | undefined) ?? '',

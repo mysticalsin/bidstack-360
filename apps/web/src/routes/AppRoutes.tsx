@@ -80,7 +80,9 @@ export function AppRoutes() {
       <PageTransition pageKey={segmentKey || '/'}>
         <Routes location={location}>
           {/* ── Public ──────────────────────────────────────────────────── */}
-          <Route path="/login" element={<LoginPage />} />
+          {/* Catch-all so Clerk's path-routed sign-in sub-steps (factor-two,
+              sso-callback, verify) render the LoginPage instead of 404ing. */}
+          <Route path="/login/*" element={<LoginPage />} />
           <Route path="/sign/:token" element={<PublicSignPage />} />
           <Route path="/book/:slug" element={<PublicBookingPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -17,11 +17,18 @@ import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
  */
 export function mapClerkRole(orgRole: string | undefined): string {
   if (orgRole === undefined || orgRole === null) return 'member';
+  // Clerk v2 org tokens carry the role WITHOUT the `org:` prefix (e.g. "admin"),
+  // while legacy tokens use "org:admin". Accept both forms.
   const roleMap: Record<string, string> = {
     'org:admin': 'admin',
     'org:member': 'member',
     'org:manager': 'manager',
     'org:finance': 'finance',
+    admin: 'admin',
+    member: 'member',
+    basic_member: 'member',
+    manager: 'manager',
+    finance: 'finance',
   };
   const mapped = roleMap[orgRole];
   if (!mapped) {
