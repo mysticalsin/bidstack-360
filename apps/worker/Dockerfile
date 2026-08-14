@@ -25,7 +25,7 @@ COPY packages/dust-client/package.json ./packages/dust-client/
 COPY packages/memos/package.json ./packages/memos/
 COPY packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
 COPY packages/integrations/package.json ./packages/integrations/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # ─── Builder ──────────────────────────────────────────────────────────────────
 FROM base AS builder
