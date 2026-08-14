@@ -10,12 +10,14 @@ export const EmailSignIn = lazy(() =>
           signUpUrl="/login"
           afterSignInUrl="/dashboard"
           appearance={{
-            // Flatten Clerk's own card so the form blends into the white login
-            // card in Hero.tsx (one surface, not a card-in-a-card). Light theme.
+            // Clerk's <SignIn> IS the single login card (Hero.tsx puts the brand
+            // above it, no wrapper). Style the card cleanly; hide its own header
+            // (we render the title/subtitle above); flatten the dev footer chrome.
+            variables: { colorPrimary: '#111826', borderRadius: '12px' },
             elements: {
               rootBox: 'w-full',
-              cardBox: 'shadow-none bg-transparent w-full',
-              card: 'shadow-none bg-transparent p-0',
+              cardBox: 'w-full rounded-3xl shadow-2xl border-0',
+              card: 'bg-white rounded-3xl px-6 py-7 sm:px-7',
               header: 'hidden',
               headerTitle: 'hidden',
               headerSubtitle: 'hidden',
@@ -33,7 +35,7 @@ export const EmailSignIn = lazy(() =>
               footerActionLink: 'text-[#111826] hover:text-black text-sm font-body',
               identityPreviewText: 'text-sm text-[#111826] font-body',
               identityPreviewEditButton: 'text-[#5b6472] hover:text-[#111826]',
-              footer: 'bg-transparent',
+              footer: 'bg-transparent shadow-none',
             },
           }}
         />

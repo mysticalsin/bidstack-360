@@ -50,15 +50,19 @@ export function Hero() {
             {t('hero.signInSubtitle', 'Welcome back to your workspace.')}
           </p>
 
-          {/* Single card. */}
-          <div className="w-full rounded-[22px] bg-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] px-6 py-6 sm:px-7">
-            {hasClerk ? (
+          {/* One card. In Clerk mode the Clerk <SignIn> IS the card (styled via
+              EmailSignIn appearance) — no wrapper, so there is no card-in-card.
+              Stub mode gets a plain white card with a single button. */}
+          {hasClerk ? (
+            <div className="w-full">
               <Suspense
-                fallback={<div className="h-44 animate-pulse rounded-xl bg-black/5" aria-hidden />}
+                fallback={<div className="h-56 w-full animate-pulse rounded-3xl bg-white/10" aria-hidden />}
               >
                 <EmailSignIn />
               </Suspense>
-            ) : (
+            </div>
+          ) : (
+            <div className="w-full rounded-3xl bg-white shadow-2xl px-6 py-7">
               <button
                 type="button"
                 onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
@@ -66,8 +70,8 @@ export function Hero() {
               >
                 {t('hero.enterWorkspace', 'Enter workspace')}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </motion.div>
       </section>
     </div>
