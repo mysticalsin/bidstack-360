@@ -155,7 +155,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = buildAllowedCorsOrigins(config.PUBLIC_BASE_URL, config.NODE_ENV);
+      const allowed = buildAllowedCorsOrigins(config.PUBLIC_BASE_URL, config.NODE_ENV, config.CORS_EXTRA_ORIGINS);
       // Production safety: never allow loopback origins.
       if (config.NODE_ENV === 'production' && isLoopbackOrigin(origin)) {
         return cb(new Error('loopback origin rejected in production'), false);

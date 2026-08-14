@@ -18,6 +18,9 @@ export const envSchema = z.object({
 
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:5173'),
   PUBLIC_API_URL: z.string().url().optional(),
+  // Extra browser origins (comma-separated) allowed for CORS alongside
+  // PUBLIC_BASE_URL — e.g. a second/legacy front-end domain.
+  CORS_EXTRA_ORIGINS: z.string().optional().or(z.literal('')),
 
   CLERK_SECRET_KEY: z.string().min(1).optional().or(z.literal('')),
   CLERK_PUBLISHABLE_KEY: z.string().min(1).optional().or(z.literal('')),

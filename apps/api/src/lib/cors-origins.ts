@@ -35,6 +35,11 @@ function addLoopbackVariants(origins: Set<string>, url: URL): void {
 export function buildAllowedCorsOrigins(
   publicBaseUrl: string | undefined,
   nodeEnv: string,
+  // Extra browser origins allowed alongside PUBLIC_BASE_URL — comma-separated,
+  // from CORS_EXTRA_ORIGINS. Lets a second front-end domain (e.g. a renamed
+  // vercel.app or a custom domain) reach the same API without changing the
+  // canonical PUBLIC_BASE_URL used for links/emails.
+  extraOrigins?: string,
 ): string[] {
   const origins = new Set<string>();
   const publicUrl = publicBaseUrl ? parseOrigin(publicBaseUrl) : null;
@@ -42,6 +47,13 @@ export function buildAllowedCorsOrigins(
   if (publicUrl) {
     origins.add(publicUrl.origin);
     if (nodeEnv !== 'production') addLoopbackVariants(origins, publicUrl);
+  }
+
+  for (const raw of (extraOrigins ?? '').split(',')) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const url = parseOrigin(trimmed);
+    if (url) origins.add(url.origin);
   }
 
   if (nodeEnv !== 'production') {
