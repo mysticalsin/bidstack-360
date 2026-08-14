@@ -42,20 +42,23 @@ export function Hero() {
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/45 via-black/30 to-black/55" />
 
         <motion.div className="relative z-10 w-full max-w-[380px] mx-4" {...card}>
-          <div className="rounded-[28px] bg-white/10 backdrop-blur-2xl border border-white/15 shadow-[0_24px_70px_rgba(0,0,0,0.4)] px-7 py-9 sm:px-9 sm:py-10">
-            <div className="flex flex-col items-center text-center mb-7">
-              <PoloPreSalesLogo variant="full" className="h-11 w-auto mb-6" />
-              <h1 className="text-white text-[22px] font-medium tracking-tight">
+          {/* One unified white card: logo + heading + the Clerk form, whose own
+              card chrome is flattened (see EmailSignIn appearance) so it reads
+              as a single surface instead of a card-in-a-card. */}
+          <div className="rounded-[28px] bg-white shadow-[0_24px_70px_rgba(0,0,0,0.4)] px-7 pt-9 pb-7 sm:px-9 sm:pt-10">
+            <div className="flex flex-col items-center text-center mb-6">
+              <PoloPreSalesLogo variant="full" className="h-11 w-auto mb-5" />
+              <h1 className="text-[#111826] text-[22px] font-semibold tracking-tight">
                 {t('hero.signInTitle', 'Sign in')}
               </h1>
-              <p className="text-white/55 text-sm mt-1.5">
+              <p className="text-[#5b6472] text-sm mt-1.5">
                 {t('hero.signInSubtitle', 'Welcome back to your workspace.')}
               </p>
             </div>
 
             {hasClerk ? (
               <Suspense
-                fallback={<div className="h-44 animate-pulse rounded-2xl bg-white/5" aria-hidden />}
+                fallback={<div className="h-44 animate-pulse rounded-2xl bg-black/5" aria-hidden />}
               >
                 <EmailSignIn />
               </Suspense>
@@ -63,7 +66,7 @@ export function Hero() {
               <button
                 type="button"
                 onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
-                className="w-full h-11 rounded-full bg-white/90 hover:bg-white text-black text-sm font-medium transition-colors active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                className="w-full h-11 rounded-full bg-[#111826] hover:bg-black text-white text-sm font-medium transition-colors active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111826]/40 focus-visible:ring-offset-2"
               >
                 {t('hero.enterWorkspace', 'Enter workspace')}
               </button>

@@ -42,6 +42,7 @@
     "i18next-http-backend": "^3.0.5",
     "js-base64": "^3.7.8",
     "lib0": "^0.2.117",
+    "liquid-gooey": "^0.1.0",
     "lucide-react": "^1.16.0",
     "motion": "^12.40.0",
     "nuqs": "^2.9.4",
