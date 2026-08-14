@@ -302,12 +302,27 @@ const LazyClerkBranch = lazy(async () => {
     const { user } = useClerkUser();
     const clerk = useClerk();
 
+    // Register the token provider SYNCHRONOUSLY during render — NOT in a
+    // useEffect. React commits child effects before parent effects, so an
+    // effect-based registration here lets the dashboard's data hooks (deep
+    // children) fire their first requests before the provider exists → those
+    // requests go out with no token → 401, and the query layer does not retry
+    // 4xx, so the page hangs on skeletons forever. Registering in the render
+    // body makes the provider live before any descendant mounts. auth.getToken
+    // is called lazily and re-registering the closure each render is idempotent
+    // (module-level last-write-wins).
+    setApiTokenProvider(({ forceRefresh } = {}) =>
+      auth.getToken(forceRefresh ? { skipCache: true } : undefined),
+    );
+
+    // Clear the provider only when this bridge unmounts (auth mode switch /
+    // sign-out remount), never on every auth change — a deps-driven cleanup
+    // would blank the provider mid-session and re-open the race above.
+    useEffect(() => () => setApiTokenProvider(null), []);
+
+    // Keep bidstack:session in sync with Clerk auth state so
+    // watchAuthForCacheClear can detect sign-out/org switches on any tab.
     useEffect(() => {
-      setApiTokenProvider(({ forceRefresh } = {}) =>
-        auth.getToken(forceRefresh ? { skipCache: true } : undefined),
-      );
-      // Keep bidstack:session in sync with Clerk auth state so
-      // watchAuthForCacheClear can detect sign-out/org switches on any tab.
       if (auth.isLoaded) {
         if (auth.isSignedIn && auth.userId) {
           const orgId = auth.orgId ?? 'personal';
@@ -317,7 +332,6 @@ const LazyClerkBranch = lazy(async () => {
           writeSessionMarker(null);
         }
       }
-      return () => setApiTokenProvider(null);
     }, [auth]);
 
     return (
