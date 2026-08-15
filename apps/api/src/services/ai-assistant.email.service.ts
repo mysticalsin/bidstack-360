@@ -35,9 +35,13 @@ export async function draftEmail(
   }
 
   const { contextStr } = await buildEmailDraftContext(input.orgId, input.contactId, input.dealId);
+  // Ask for a JSON OBJECT (not a bare array): the call forces
+  // response_format=json_object, and strict providers (OmniRoute's free tier)
+  // emit malformed output when told to json_object-mode a top-level array.
   const prompt =
     `Draft 3 email variations. Tone: ${input.tone}. Intent: ${input.intent}.` +
-    `${contextStr}\n\nReturn JSON array: [{"subject":"...","body":"..."}, ...]`;
+    `${contextStr}\n\nReturn JSON: {"drafts":[{"subject":"...","body":"..."},` +
+    `{"subject":"...","body":"..."},{"subject":"...","body":"..."}]}`;
 
   const { client: dust, creds } = await buildDustClient(input.orgId, childLog);
   const emailDraftAgentId = resolveAgentId(creds, 'emailDraft', process.env.DUST_AGENT_EMAIL_DRAFT);
@@ -72,20 +76,22 @@ export async function draftEmail(
         : input.tone === 'friendly'
           ? 'Hope you are doing great!'
           : 'Quick note:';
-    responseText = JSON.stringify([
-      {
-        subject: `[Draft 1] ${input.intent}`,
-        body: `${tonedSalutation}\n\n${input.intent}\n\nBest regards`,
-      },
-      {
-        subject: `[Draft 2] Re: ${input.intent}`,
-        body: `${tonedSalutation}\n\nFollowing up on ${input.intent}.\n\nWarm regards`,
-      },
-      {
-        subject: `[Draft 3] ${input.intent} — follow-up`,
-        body: `${tonedSalutation}\n\nI wanted to touch base regarding ${input.intent}.\n\nBest`,
-      },
-    ]);
+    responseText = JSON.stringify({
+      drafts: [
+        {
+          subject: `[Draft 1] ${input.intent}`,
+          body: `${tonedSalutation}\n\n${input.intent}\n\nBest regards`,
+        },
+        {
+          subject: `[Draft 2] Re: ${input.intent}`,
+          body: `${tonedSalutation}\n\nFollowing up on ${input.intent}.\n\nWarm regards`,
+        },
+        {
+          subject: `[Draft 3] ${input.intent} — follow-up`,
+          body: `${tonedSalutation}\n\nI wanted to touch base regarding ${input.intent}.\n\nBest`,
+        },
+      ],
+    });
   }
 
   const tokenInput = Math.ceil(prompt.length / 4);
@@ -95,8 +101,11 @@ export async function draftEmail(
   // Ensure exactly 3 drafts regardless of model output.
   let drafts: [EmailDraft, EmailDraft, EmailDraft];
   try {
-    const parsed = JSON.parse(responseText) as EmailDraft[];
-    const three = parsed.slice(0, 3);
+    const parsed = JSON.parse(responseText) as EmailDraft[] | { drafts?: EmailDraft[] };
+    // Accept both the object shape {"drafts":[…]} (current prompt) and a bare
+    // array (older prompt / a model that ignored the wrapper).
+    const arr = Array.isArray(parsed) ? parsed : (parsed?.drafts ?? []);
+    const three = arr.slice(0, 3);
     while (three.length < 3)
       three.push({ subject: `[Draft ${three.length + 1}] ${input.intent}`, body: '' });
     drafts = three as [EmailDraft, EmailDraft, EmailDraft];
