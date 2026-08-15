@@ -100,6 +100,9 @@ export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.gateDecision.findMany({
         where: { orgId, opportunityId: req.params.id },
         orderBy: { decidedAt: 'desc' },
+        // Bounded per queryGuardPlugin (no unbounded finds); a single opp never
+        // has more than a handful of gates across the lifecycle.
+        take: 100,
       });
       return { items: rows.map(serializeGate) };
     },
