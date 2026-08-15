@@ -142,10 +142,13 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               where: {
                 orgId: req.auth.orgId,
                 deletedAt: null,
+                // email is PII-encrypted at rest (emailHash index supports only
+                // equality/in, never `contains`) — substring-searching it throws
+                // in the pii-encryption middleware and 500s the whole request.
+                // Search the plaintext columns; email still ranks matched rows.
                 AND: tokenAndClauses(tokens, [
                   'firstName',
                   'lastName',
-                  'email',
                   'companyName',
                 ]) as Prisma.LeadWhereInput['AND'],
               },
@@ -181,9 +184,10 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               where: {
                 orgId: req.auth.orgId,
                 deletedAt: null,
+                // email is PII-encrypted (see the lead query above) — substring
+                // search on it throws in the middleware. Search name/role only.
                 AND: tokenAndClauses(tokens, [
                   'name',
-                  'email',
                   'role',
                 ]) as Prisma.ContactWhereInput['AND'],
               },
