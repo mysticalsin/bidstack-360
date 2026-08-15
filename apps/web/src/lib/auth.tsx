@@ -321,9 +321,13 @@ const LazyClerkBranch = lazy(async () => {
       // the first request carries it. Signed-out returns null immediately (no
       // wait) — the route guard, not a token, handles that case.
       if (token || !auth.isSignedIn) return token;
-      for (let i = 0; i < 10; i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        const retried = await auth.getToken({ skipCache: true });
+      // Poll the CACHED token (light — no network per iteration); it resolves
+      // the moment Clerk finishes minting the session token after a cold load.
+      // ~6s window comfortably covers Clerk's cold-start latency; we only get
+      // here when isSignedIn is true, so a token is expected to arrive.
+      for (let i = 0; i < 30; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const retried = await auth.getToken();
         if (retried) return retried;
       }
       return null;
