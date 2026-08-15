@@ -368,7 +368,7 @@ export function BidNoBidPage() {
         onOverride={(justification) => saveScore('override', justification)}
       />
 
-      <BidClassificationPanel />
+      <BidClassificationPanel opportunityId={opportunityId} />
 
       <div className={`${PANEL} mb-8`}>
         <h2 className="mb-2 text-sm font-semibold text-fg-primary">

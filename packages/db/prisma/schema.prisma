@@ -216,6 +216,9 @@ model Org {
   bidFactCitations BidFactCitation[]
   bidFactDecisions BidFactDecision[]
 
+  // Amaris Bid Office — formal gate sign-off records (Go/No-Go, Bid/No-Bid, C4 gates)
+  gateDecisions GateDecision[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -499,6 +502,11 @@ model Opportunity {
   country          String?          @db.VarChar(2)
   territoryId      String?          @map("territory_id") @db.Uuid
   viewCount        Int              @default(0) @map("view_count")
+  // Amaris Bid Office classification (C0–C4 = FTE size × commitment, not revenue).
+  // See @bidstack/shared/bid-classification. Nullable: legacy opps predate it.
+  bidClass         String?          @map("bid_class")
+  fteEstimate      Float?           @map("fte_estimate")
+  commitmentLevel  String?          @map("commitment_level")
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -521,6 +529,7 @@ model Opportunity {
   approvalGates        ApprovalGate[]
   submissionPackages   SubmissionPackage[]
   winLossRecord        WinLossRecord?
+  gateDecisions        GateDecision[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -3069,6 +3078,38 @@ model BidScore {
   @@index([orgId, recommendation])
   @@index([deletedAt])
   @@map("bid_scores")
+}
+
+/// Amaris Bid Office — a formal governance gate sign-off (Go/No-Go, Bid/No-Bid,
+/// or the three C4 gates). The playbook treats each gate as a real decision
+/// event with a named/role-based approver, timestamp, and outcome — not a
+/// comment. Append-only (no update); the latest per (opportunity, gate) is the
+/// standing decision.
+model GateDecision {
+  id            String  @id @default(uuid()) @db.Uuid
+  orgId         String  @map("org_id") @db.Uuid
+  opportunityId String  @map("opportunity_id") @db.Uuid
+  /// go_no_go | bid_no_bid | strategy_validation | proposal_review | pricing_bid_validation | quality_check
+  gate          String
+  /// go | no_go | bid | no_bid | approved | rejected
+  outcome       String
+  /// The bid class at decision time (C0–C4), for audit.
+  bidClass      String? @map("bid_class")
+  /// Plain user id (no FK relation — matches BidScore.scoredBy convention).
+  decidedById   String? @map("decided_by_id") @db.Uuid
+  /// Free-text role of the approver (e.g. "Regional Bid & Presales Director").
+  decidedByRole String? @map("decided_by_role")
+  justification String?
+
+  decidedAt DateTime @default(now()) @map("decided_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org         Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, opportunityId])
+  @@index([orgId, opportunityId, gate])
+  @@map("gate_decisions")
 }
 
 // ─── Pipeline / Pipeline Stage (Phase 5 — promote enum to table) ──────────

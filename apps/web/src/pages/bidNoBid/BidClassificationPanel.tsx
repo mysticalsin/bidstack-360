@@ -17,8 +17,29 @@ import {
 } from '@bidstack/shared';
 
 import { Icon } from '@/components/ui/Icon';
+import { useGateDecisions, useSaveClassification, useRecordGate } from '@/hooks/useBidGovernance';
 
 const PANEL = 'rounded-lg border border-border-subtle bg-surface-card p-4';
+
+// Gates a user can record from here (superset of the class-specific named gates).
+const GATE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'go_no_go', label: 'Go/No-Go' },
+  { value: 'bid_no_bid', label: 'Bid/No-Bid' },
+  { value: 'strategy_validation', label: 'Strategy Validation' },
+  { value: 'proposal_review', label: 'Proposal Review' },
+  { value: 'pricing_bid_validation', label: 'Pricing & Bid Validation' },
+  { value: 'quality_check', label: 'Quality Check' },
+];
+const OUTCOME_OPTIONS: { value: string; label: string }[] = [
+  { value: 'go', label: 'Go' },
+  { value: 'no_go', label: 'No-Go' },
+  { value: 'bid', label: 'Bid' },
+  { value: 'no_bid', label: 'No-Bid' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+];
+const GATE_LABEL = Object.fromEntries(GATE_OPTIONS.map((g) => [g.value, g.label]));
+const OUTCOME_LABEL = Object.fromEntries(OUTCOME_OPTIONS.map((o) => [o.value, o.label]));
 
 // Severity tone per class — a legitimate status encoding (simple→strategic).
 const CLASS_TONE: Record<BidClass, string> = {
@@ -70,18 +91,25 @@ function LabelledList({ title, items }: { title: string; items: readonly string[
   );
 }
 
-export function BidClassificationPanel() {
+export function BidClassificationPanel({ opportunityId }: { opportunityId?: string }) {
   const { t } = useTranslation('crm');
   const [fte, setFte] = useState(5);
   const [commitment, setCommitment] = useState<CommitmentLevel>('medium');
   const [triggers, setTriggers] = useState<EscalationTriggers>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [gate, setGate] = useState('go_no_go');
+  const [outcome, setOutcome] = useState('go');
+  const [justification, setJustification] = useState('');
 
   const assessment = useMemo(
     () => assessBid(Number.isFinite(fte) ? fte : 0, commitment, triggers),
     [fte, commitment, triggers],
   );
   const { governance, escalations, sizeBand, bidClass } = assessment;
+
+  const saveClassification = useSaveClassification(opportunityId);
+  const recordGate = useRecordGate(opportunityId);
+  const gateDecisions = useGateDecisions(opportunityId);
 
   return (
     <section className={`${PANEL} mb-6`} aria-label={t('bidClass.aria', 'Bid classification and governance')}>
@@ -212,6 +240,113 @@ export function BidClassificationPanel() {
           )}
         </div>
       </div>
+
+      {/* Persist to the selected opportunity + record formal gate decisions */}
+      {opportunityId ? (
+        <div className="mt-4 border-t border-border-subtle pt-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => saveClassification.mutate({ fteEstimate: fte, commitmentLevel: commitment })}
+              disabled={saveClassification.isPending}
+              className="inline-flex h-9 items-center rounded-md bg-brand-primary px-3 text-xs font-medium text-white transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+            >
+              {saveClassification.isPending
+                ? t('bidClass.saving', 'Saving…')
+                : t('bidClass.save', `Save ${bidClass} to this opportunity`)}
+            </button>
+            {saveClassification.isSuccess && (
+              <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                {t('bidClass.saved', 'Saved to opportunity')}
+              </span>
+            )}
+            {saveClassification.isError && (
+              <span role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">
+                {t('bidClass.saveFailed', 'Save failed')}
+              </span>
+            )}
+          </div>
+
+          {/* Gate recorder */}
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+                {t('bidClass.gate', 'Gate')}
+              </span>
+              <select value={gate} onChange={(e) => setGate(e.target.value)} className="dialog-input h-9 text-xs">
+                {GATE_OPTIONS.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+                {t('bidClass.outcome', 'Outcome')}
+              </span>
+              <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="dialog-input h-9 text-xs">
+                {OUTCOME_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <input
+              value={justification}
+              onChange={(e) => setJustification(e.target.value)}
+              placeholder={t('bidClass.justificationPlaceholder', 'Justification (optional)')}
+              className="dialog-input h-9 min-w-[180px] flex-1 text-xs"
+              aria-label={t('bidClass.justification', 'Gate justification')}
+            />
+            <button
+              type="button"
+              onClick={() =>
+                recordGate.mutate(
+                  {
+                    gate,
+                    outcome,
+                    ...(justification.trim() ? { justification: justification.trim() } : {}),
+                  },
+                  { onSuccess: () => setJustification('') },
+                )
+              }
+              disabled={recordGate.isPending}
+              className="inline-flex h-9 items-center rounded-md border border-border-subtle px-3 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+            >
+              {recordGate.isPending ? t('bidClass.recording', 'Recording…') : t('bidClass.recordGate', 'Record gate decision')}
+            </button>
+          </div>
+
+          {/* Gate history */}
+          {gateDecisions.data && gateDecisions.data.items.length > 0 && (
+            <ul className="mt-3 space-y-1">
+              {gateDecisions.data.items.slice(0, 6).map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-medium text-fg-primary">{GATE_LABEL[d.gate] ?? d.gate}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      /go$|^bid$|approved/.test(d.outcome)
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                    }`}
+                  >
+                    {OUTCOME_LABEL[d.outcome] ?? d.outcome}
+                  </span>
+                  {d.bidClass && <span className="text-fg-tertiary">{d.bidClass}</span>}
+                  {d.justification && <span className="text-fg-secondary">— {d.justification}</span>}
+                  <span className="ml-auto text-fg-tertiary">{new Date(d.decidedAt).toLocaleDateString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <p className="mt-3 border-t border-border-subtle pt-3 text-xs text-fg-tertiary">
+          {t('bidClass.selectToSave', 'Select an opportunity above to save this classification and record gate decisions.')}
+        </p>
+      )}
 
       {/* Lifecycle + RACI (collapsible to keep the page dense) */}
       <details
