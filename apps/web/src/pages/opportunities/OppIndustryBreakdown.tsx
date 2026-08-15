@@ -15,7 +15,7 @@ import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySeg
 export function OppIndustryBreakdown() {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('crm');
-  const { formatMoney } = useFormatMoney();
+  const { formatMoneyMicros } = useFormatMoney();
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
 
@@ -35,7 +35,7 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatMoney(totals.totalValueMicros, 'EUR')}
+              · {formatMoneyMicros(totals.totalValueMicros, 'EUR')}
             </span>
           ) : null}
         </span>
@@ -55,7 +55,7 @@ export function OppIndustryBreakdown() {
             isError={segments.isError}
             errorMessage={segments.error instanceof Error ? segments.error.message : undefined}
             onRetry={() => void segments.refetch()}
-            formatMoneyMicros={formatMoney}
+            formatMoneyMicros={formatMoneyMicros}
           />
         </div>
       ) : null}

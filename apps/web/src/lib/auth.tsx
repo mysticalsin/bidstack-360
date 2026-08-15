@@ -311,9 +311,23 @@ const LazyClerkBranch = lazy(async () => {
     // body makes the provider live before any descendant mounts. auth.getToken
     // is called lazily and re-registering the closure each render is idempotent
     // (module-level last-write-wins).
-    setApiTokenProvider(({ forceRefresh } = {}) =>
-      auth.getToken(forceRefresh ? { skipCache: true } : undefined),
-    );
+    setApiTokenProvider(async ({ forceRefresh } = {}) => {
+      const token = await auth.getToken(forceRefresh ? { skipCache: true } : undefined);
+      // Cold-load race: RequireAuth releases the app the instant auth.isLoaded
+      // flips true, but Clerk may not have minted the session token for a few
+      // ms yet — so the earliest shell queries would fire tokenless and 401
+      // (then recover via api.ts's forced-refresh retry, leaving console noise).
+      // When we're signed in but got null, wait briefly for the real token so
+      // the first request carries it. Signed-out returns null immediately (no
+      // wait) — the route guard, not a token, handles that case.
+      if (token || !auth.isSignedIn) return token;
+      for (let i = 0; i < 10; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const retried = await auth.getToken({ skipCache: true });
+        if (retried) return retried;
+      }
+      return null;
+    });
 
     // Clear the provider only when this bridge unmounts (auth mode switch /
     // sign-out remount), never on every auth change — a deps-driven cleanup
