@@ -44,6 +44,7 @@ import {
   bidNoBidSearchParams,
   opportunityIdParser,
 } from './bidNoBid/bid-no-bid-search-params';
+import { BidClassificationPanel } from './bidNoBid/BidClassificationPanel';
 import { CriteriaCategoryFilter } from './bidNoBid/CriteriaCategoryFilter';
 import { CriteriaTable } from './bidNoBid/CriteriaTable';
 import { OverrideDialog } from './bidNoBid/OverrideDialog';
@@ -366,6 +367,8 @@ export function BidNoBidPage() {
         onFollow={() => saveScore('follow')}
         onOverride={(justification) => saveScore('override', justification)}
       />
+
+      <BidClassificationPanel />
 
       <div className={`${PANEL} mb-8`}>
         <h2 className="mb-2 text-sm font-semibold text-fg-primary">
