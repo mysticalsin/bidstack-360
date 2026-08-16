@@ -103,12 +103,23 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       const nextStage = (toStage?.key ?? requestedStage) as PrismaStage | undefined;
       if (!nextStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
 
-      // ── Amaris stage-gate enforcement (STAGE_GATE_MODE) ──────────────────
-      // Off by default. Two rules: (1) no illegal stage jumps — only one step,
-      // close, or reopen; (2) no forward advancement of a bid with an on-record
-      // no-bid/no-go. 'warn' logs, 'enforce' rejects (409). Fail-open on any
-      // missing data so a config gap can never wedge the pipeline.
-      if (config.STAGE_GATE_MODE !== 'off' && toStage) {
+      // ── Amaris stage-gate enforcement ────────────────────────────────────
+      // Effective mode = the org's stageGateMode override, else the
+      // STAGE_GATE_MODE env default. Off by default. Two rules: (1) no illegal
+      // stage jumps — only one step, close, or reopen; (2) no forward
+      // advancement of a bid with an on-record no-bid/no-go. 'warn' logs,
+      // 'enforce' rejects (409). Fail-open on missing data.
+      const orgGate = await prisma.orgSettings.findUnique({
+        where: { orgId: req.auth.orgId },
+        select: { stageGateMode: true },
+      });
+      const gateMode: 'off' | 'warn' | 'enforce' =
+        orgGate?.stageGateMode === 'off' ||
+        orgGate?.stageGateMode === 'warn' ||
+        orgGate?.stageGateMode === 'enforce'
+          ? orgGate.stageGateMode
+          : config.STAGE_GATE_MODE;
+      if (gateMode !== 'off' && toStage) {
         const stages = await prisma.pipelineStage.findMany({
           where: { pipelineId: toStage.pipelineId, deletedAt: null },
           select: { id: true, orderIndex: true, isWon: true, isLost: true, key: true },
@@ -157,7 +168,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           }
           if (violations.length > 0) {
             const msg = `Stage gate: ${violations.join('; ')}`;
-            if (config.STAGE_GATE_MODE === 'enforce') {
+            if (gateMode === 'enforce') {
               throw server.httpErrors.conflict(msg);
             }
             req.log.warn(
@@ -219,6 +230,58 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           },
         });
       });
+
+      // Presales → Bid Office handoff — a recorded SYSTEM EVENT the first time an
+      // opportunity crosses into the Bid Office zone (orderIndex >= entry). The
+      // playbook: "Bid Office is activated by a stage change, never a verbal
+      // request." Fire-and-forget; a handoff-log failure must not fail the move.
+      if (toStage && !toStage.isWon && !toStage.isLost) {
+        void (async () => {
+          try {
+            const fromStageRow = opp.pipelineStageId
+              ? await prisma.pipelineStage.findUnique({
+                  where: { id: opp.pipelineStageId },
+                  select: { orderIndex: true },
+                })
+              : await prisma.pipelineStage.findFirst({
+                  where: { pipelineId: toStage.pipelineId, key: opp.stage, deletedAt: null },
+                  select: { orderIndex: true },
+                });
+            const fromOrder = fromStageRow?.orderIndex ?? -1;
+            const entry = config.BID_OFFICE_ENTRY_ORDER;
+            if (fromOrder < entry && toStage.orderIndex >= entry) {
+              const already = await prisma.gateDecision.findFirst({
+                where: {
+                  orgId: req.auth.orgId,
+                  opportunityId: opp.id,
+                  gate: 'bid_office_handoff',
+                },
+                select: { id: true },
+              });
+              if (!already) {
+                await prisma.gateDecision.create({
+                  data: {
+                    orgId: req.auth.orgId,
+                    opportunityId: opp.id,
+                    gate: 'bid_office_handoff',
+                    outcome: 'activated',
+                    bidClass: opp.bidClass,
+                    decidedById: req.auth.userId,
+                    decidedByRole: 'Bid Office',
+                  },
+                });
+                void fanOutWebhookEvent(req.auth.orgId, 'opportunity.bid_office_handoff', {
+                  id: opp.id,
+                  stage: nextStage,
+                  stageName: toStage.name,
+                });
+              }
+            }
+          } catch (err) {
+            req.log.warn({ err, opportunityId: opp.id }, 'bid-office handoff logging failed');
+          }
+        })();
+      }
 
       void pushOpportunityToDust(updated.id, req.auth.orgId);
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {

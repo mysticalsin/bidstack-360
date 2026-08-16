@@ -2653,6 +2653,9 @@ model OrgSettings {
   /// Settings. e.g. { agentStudioEnabled, appflowyEnabled, appflowyUrl }. {} =
   /// defaults (agent-studio hidden, Workspace off).
   appModules             Json      @default("{}") @map("app_modules")
+  /// Amaris stage-gate enforcement mode for this org: 'off' | 'warn' | 'enforce'.
+  /// Null = fall back to the STAGE_GATE_MODE env default. Overrides the env per org.
+  stageGateMode          String?   @map("stage_gate_mode")
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
 

@@ -2,6 +2,7 @@
 // adjustable in Settings without a code change. Read returns defaults when no
 // OrgSettings row exists yet.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
@@ -214,6 +215,52 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       return merged;
+    },
+  );
+
+  // ── Stage-gate mode (Amaris) — per-org override of the STAGE_GATE_MODE env ──
+  const StageGate = z.object({ mode: z.enum(['off', 'warn', 'enforce']).nullable() });
+  const readMode = (v: string | null | undefined): 'off' | 'warn' | 'enforce' | null =>
+    v === 'off' || v === 'warn' || v === 'enforce' ? v : null;
+
+  server.get(
+    '/org-settings/stage-gate',
+    {
+      preHandler: [server.requirePermission('settings:read')],
+      schema: { response: { 200: StageGate } },
+    },
+    async (req) => {
+      const row = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { stageGateMode: true },
+      });
+      return { mode: readMode(row?.stageGateMode) };
+    },
+  );
+
+  server.put(
+    '/org-settings/stage-gate',
+    {
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
+      schema: { body: StageGate, response: { 200: StageGate } },
+    },
+    async (req) => {
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: { orgId: req.auth.orgId, stageGateMode: req.body.mode },
+        update: { stageGateMode: req.body.mode },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.stage_gate.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: req.body as object,
+        },
+      });
+      return { mode: req.body.mode };
     },
   );
 };

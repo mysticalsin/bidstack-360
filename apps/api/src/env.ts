@@ -141,6 +141,12 @@ export const envSchema = z.object({
   // existing pipelines keep working until an org opts in.
   STAGE_GATE_MODE: z.enum(['off', 'warn', 'enforce']).default('off'),
 
+  // Pipeline orderIndex at/after which an opportunity is in the Bid Office zone.
+  // Crossing INTO it (from a lower-order Presales/Shape stage) records a formal
+  // Presales→Bid Office handoff event — the playbook's "Bid Office is activated
+  // by a stage change, never a conversation". Default 2 = past the two lead stages.
+  BID_OFFICE_ENTRY_ORDER: z.coerce.number().int().min(1).default(2),
+
   // ─── HTTP server timeouts (bound per-Node-worker resource pinning) ─────
   // Without these Fastify defaults to 0 (unbounded): a slow query or hung
   // downstream pins a Node worker + its DB connection forever, so at 100k

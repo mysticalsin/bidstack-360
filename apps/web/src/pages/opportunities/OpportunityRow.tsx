@@ -28,6 +28,15 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { DateCell, NumberCell, StageCell } from './OppInlineEditCells';
 
+// Amaris bid-class severity tone (simple C0 → strategic C4).
+const ROW_BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
+  C0: 'jade',
+  C1: 'blue',
+  C2: 'amber',
+  C3: 'tomato',
+  C4: 'rose',
+};
+
 // ── UpdatedAgo ────────────────────────────────────────────────────────────────
 
 function UpdatedAgo({ iso }: { iso: string }) {
@@ -143,6 +152,14 @@ export const Row = memo(function Row({
         >
           {opp.name}
         </Link>
+        {opp.bidClass ? (
+          <Badge
+            tone={ROW_BID_CLASS_TONE[opp.bidClass] ?? 'gray'}
+            className="ml-2 align-middle text-[10px]"
+          >
+            {opp.bidClass}
+          </Badge>
+        ) : null}
         <div className="text-xs text-[var(--fg-tertiary)]">
           <span>{opp.customer}</span>
           <UpdatedAgo iso={opp.updatedAt} />

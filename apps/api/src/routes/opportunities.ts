@@ -106,6 +106,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               territoryId: true,
               updatedAt: true,
               viewCount: true,
+              bidClass: true,
               owner: { select: { id: true, name: true, email: true } },
               territory: { select: { name: true } },
               pipelineStage: {

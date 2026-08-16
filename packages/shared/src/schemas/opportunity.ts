@@ -75,6 +75,9 @@ export const Opportunity = z.object({
   taskCount: z.number().int().min(0).default(0),
   commentCount: z.number().int().min(0).default(0),
   viewCount: z.number().int().min(0).default(0),
+  // Amaris Bid Office class (C0–C4). Set via the classification endpoint, not
+  // create/patch. Null for opportunities that haven't been classified.
+  bidClass: z.string().nullable().default(null),
 });
 export type Opportunity = z.infer<typeof Opportunity>;
 
@@ -86,6 +89,7 @@ export const OpportunityCreate = Opportunity.omit({
   viewCount: true,
   territoryName: true,
   pipelineStage: true,
+  bidClass: true,
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
@@ -102,6 +106,7 @@ export const OpportunityPatch = Opportunity.partial().omit({
   viewCount: true,
   territoryName: true,
   pipelineStage: true,
+  bidClass: true,
 }).extend({
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and

@@ -33,6 +33,7 @@ type SerializedOpportunity = {
   territoryId: string | null;
   updatedAt: Date;
   viewCount: number | null;
+  bidClass?: string | null;
   // Only the detail/full path reads intel; the list query omits the column to
   // avoid fetching the large JSONB per row, so this is optional here.
   intel?: unknown;
@@ -88,6 +89,7 @@ export function serializeOpportunity(
     taskCount: counts?.taskCount ?? 0,
     commentCount: counts?.commentCount ?? 0,
     viewCount: o.viewCount ?? 0,
+    bidClass: o.bidClass ?? null,
   };
 }
 

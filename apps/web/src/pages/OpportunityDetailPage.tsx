@@ -46,6 +46,15 @@ import {
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 
+// Amaris bid-class severity tone (simple C0 → strategic C4).
+const BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
+  C0: 'jade',
+  C1: 'blue',
+  C2: 'amber',
+  C3: 'tomato',
+  C4: 'rose',
+};
+
 export function OpportunityDetailPage() {
   const { t } = useTranslation('crm');
   const stageOptions: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
@@ -260,6 +269,18 @@ export function OpportunityDetailPage() {
                     <span className="text-sm text-[var(--fg-tertiary)]">—</span>
                   )}
                 </span>
+                {data.bidClass ? (
+                  <>
+                    <span className="opacity-30">|</span>
+                    <span
+                      className="flex items-center gap-1.5"
+                      title={t('opportunityDetail.bidClassHint', 'Amaris bid class (FTE size × commitment)')}
+                    >
+                      <Icon name="shield" size={14} className="text-[var(--fg-tertiary)]" />
+                      <Badge tone={BID_CLASS_TONE[data.bidClass] ?? 'gray'}>{data.bidClass}</Badge>
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-4">
