@@ -112,6 +112,8 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
         const stages = await prisma.pipelineStage.findMany({
           where: { pipelineId: toStage.pipelineId, deletedAt: null },
           select: { id: true, orderIndex: true, isWon: true, isLost: true, key: true },
+          // Bounded per queryGuardPlugin; a pipeline never has this many stages.
+          take: 100,
         });
         const nodes: StageNode[] = stages.map((s) => ({
           id: s.id,
