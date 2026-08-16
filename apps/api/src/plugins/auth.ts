@@ -486,7 +486,21 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   }
 
   const authHeader = req.headers.authorization ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  let token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  // WebSocket upgrades (e.g. /api/v1/yjs-sync) can't set an Authorization
+  // header from the browser, so accept a ?access_token= query param as a
+  // fallback ONLY when no header is present. Same JWT, same verification path;
+  // scrubUrl() already redacts access_token from any logged URL, and it travels
+  // over wss (TLS). Parsed from req.url directly so it doesn't depend on
+  // req.query being populated at the onRequest stage.
+  if (!token) {
+    const url = req.url ?? '';
+    const qIdx = url.indexOf('?');
+    if (qIdx >= 0) {
+      const qToken = new URLSearchParams(url.slice(qIdx + 1)).get('access_token');
+      if (qToken) token = qToken;
+    }
+  }
   if (!token) {
     throw req.server.httpErrors.unauthorized('Missing Authorization header');
   }
