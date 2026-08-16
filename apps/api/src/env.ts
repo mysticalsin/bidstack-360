@@ -134,6 +134,13 @@ export const envSchema = z.object({
   // production requires 'warn' or 'enforce' (see semantic check below).
   BIDSTACK_TENANT_SCOPE_GUARD: z.enum(['off', 'warn', 'enforce']).default('off'),
 
+  // Amaris Bid Office stage-gate enforcement on POST /opportunities/:id/stage.
+  // 'off' (default) — no change; 'warn' — log illegal jumps / advancing a
+  // no-bid but allow the move; 'enforce' — reject (409) an illegal stage jump
+  // or forward advancement of an on-record no-bid/no-go. Staged rollout so
+  // existing pipelines keep working until an org opts in.
+  STAGE_GATE_MODE: z.enum(['off', 'warn', 'enforce']).default('off'),
+
   // ─── HTTP server timeouts (bound per-Node-worker resource pinning) ─────
   // Without these Fastify defaults to 0 (unbounded): a slow query or hung
   // downstream pins a Node worker + its DB connection forever, so at 100k

@@ -6,5 +6,6 @@ export * from './calendar/index.js';
 export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
 export * from './bid-classification/index.js';
+export * from './stage-transitions/index.js';
 export * from './document-category.js';
 export * from './workflow-engine.js';

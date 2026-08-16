@@ -9,6 +9,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
+import {
+  isLegalStageTransition,
+  isForwardMove,
+  resolveStandingDecision,
+  type StageNode,
+} from '@bidstack/shared';
+import { config } from '../env.js';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
@@ -95,6 +102,69 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       }
       const nextStage = (toStage?.key ?? requestedStage) as PrismaStage | undefined;
       if (!nextStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
+
+      // ── Amaris stage-gate enforcement (STAGE_GATE_MODE) ──────────────────
+      // Off by default. Two rules: (1) no illegal stage jumps — only one step,
+      // close, or reopen; (2) no forward advancement of a bid with an on-record
+      // no-bid/no-go. 'warn' logs, 'enforce' rejects (409). Fail-open on any
+      // missing data so a config gap can never wedge the pipeline.
+      if (config.STAGE_GATE_MODE !== 'off' && toStage) {
+        const stages = await prisma.pipelineStage.findMany({
+          where: { pipelineId: toStage.pipelineId, deletedAt: null },
+          select: { id: true, orderIndex: true, isWon: true, isLost: true, key: true },
+        });
+        const nodes: StageNode[] = stages.map((s) => ({
+          id: s.id,
+          orderIndex: s.orderIndex,
+          isWon: s.isWon,
+          isLost: s.isLost,
+        }));
+        const toNode = nodes.find((n) => n.id === toStage.id) ?? null;
+        const fromByKey = stages.find((s) => s.key === opp.stage);
+        const fromNode =
+          nodes.find((n) => n.id === opp.pipelineStageId) ??
+          (fromByKey ? (nodes.find((n) => n.id === fromByKey.id) ?? null) : null);
+
+        if (toNode) {
+          const violations: string[] = [];
+          if (!isLegalStageTransition(fromNode, toNode, nodes)) {
+            violations.push('illegal stage jump (only one step, close, or reopen allowed)');
+          }
+          if (isForwardMove(fromNode, toNode, nodes)) {
+            const [latestGate, latestBidScore] = await Promise.all([
+              prisma.gateDecision.findFirst({
+                where: {
+                  orgId: req.auth.orgId,
+                  opportunityId: opp.id,
+                  gate: { in: ['go_no_go', 'bid_no_bid'] },
+                },
+                orderBy: { decidedAt: 'desc' },
+                select: { gate: true, outcome: true, decidedAt: true },
+              }),
+              prisma.bidScore.findFirst({
+                where: { orgId: req.auth.orgId, opportunityId: opp.id, deletedAt: null },
+                orderBy: { createdAt: 'desc' },
+                select: { recommendation: true, overrideJustification: true, createdAt: true },
+              }),
+            ]);
+            if (resolveStandingDecision({ latestGate, latestBidScore }) === 'negative') {
+              violations.push(
+                'cannot advance a no-bid/no-go opportunity — record a positive Go/No-Go or override first',
+              );
+            }
+          }
+          if (violations.length > 0) {
+            const msg = `Stage gate: ${violations.join('; ')}`;
+            if (config.STAGE_GATE_MODE === 'enforce') {
+              throw server.httpErrors.conflict(msg);
+            }
+            req.log.warn(
+              { opportunityId: opp.id, fromStage: opp.stage, toStage: nextStage, violations },
+              'stage-gate violation (warn mode)',
+            );
+          }
+        }
+      }
 
       // Re-assert the precondition in the WRITE: the opp was read with findFirst
       // above (no lock), so a concurrent move could change its stage between
