@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type * as Y from 'yjs';
 import { YjsClient, type RemoteCursor, type ConnectionState } from '@/lib/yjs-client';
+import { getAuthToken } from '@/lib/api';
 
 export interface UseYjsFieldOptions {
   entityType: string;
@@ -68,16 +69,12 @@ export function useYjsField({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the Yjs document is created by the external collaboration client.
     setYdoc(client.doc);
 
-    // Obtain a Clerk JWT for the WS auth handshake.
-    // WHY: WebSocket API cannot set headers in browsers — we pass the token
-    //   in the first message. See yjs-client.ts sendJson({ type: 'yjs:init', token }).
-    const tokenProvider = (window as Window & { __apiTokenProvider?: () => Promise<string | null> }).__apiTokenProvider;
-
+    // Obtain a Clerk JWT for the WS auth handshake. Use the app's real token
+    // provider (getAuthToken) — the old window.__apiTokenProvider global was
+    // never set, so the token was always empty and the WS 401'd. The client
+    // passes it as ?access_token= (browsers can't set WS headers).
     const connectWithToken = async (): Promise<void> => {
-      let token = '';
-      if (typeof tokenProvider === 'function') {
-        token = (await tokenProvider()) ?? '';
-      }
+      const token = (await getAuthToken()) ?? '';
       client.connect(token);
     };
 

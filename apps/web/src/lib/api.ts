@@ -67,6 +67,15 @@ async function getApiToken(options?: ApiTokenOptions): Promise<string | null> {
   return apiTokenProvider ? await apiTokenProvider(options) : null;
 }
 
+/**
+ * Public accessor for the current auth token. Used by non-fetch transports that
+ * can't route through api() — notably the collaborative-editing WebSocket, which
+ * passes the token as ?access_token= because browsers can't set WS headers.
+ */
+export async function getAuthToken(): Promise<string | null> {
+  return getApiToken();
+}
+
 function getE2eRoleHeader(): Record<string, string> {
   if (!E2E_ROLE_HEADER_ENABLED || typeof window === 'undefined') return {};
   const role = window.localStorage.getItem(STUB_ROLE_KEY);
