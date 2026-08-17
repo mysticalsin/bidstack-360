@@ -77,6 +77,10 @@ const RUNTIME_KEYS = [
   'RATE_LIMIT_REDIS_REQUIRED', 'STORAGE_DRIVER', 'S3_BUCKET', 'S3_REGION', 'S3_ENDPOINT',
   'S3_FORCE_PATH_STYLE', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY',
   'RFP_LLM_PROVIDER', 'OMNIROUTE_MODEL', 'SENTRY_DSN', 'SENTRY_ENVIRONMENT',
+  // Cloudflare Workers AI. Both the token AND the account id are required —
+  // the account id is part of the endpoint URL, so shipping one without the
+  // other resolves to "no provider" and every AI step silently stubs.
+  'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_MODEL', 'CLOUDFLARE_BASE_URL',
 ];
 function setVars(service) {
   log(`setting env on ${service}`);
