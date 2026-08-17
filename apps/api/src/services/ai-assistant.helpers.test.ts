@@ -12,6 +12,7 @@
  * fail the moment that regresses.
  */
 import type { Logger as PinoLogger } from 'pino';
+import { CLOUDFLARE_DEFAULT_MODEL } from '@bidstack/shared/llm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -89,7 +90,10 @@ describe('resolveActiveLlm', () => {
     expect(llm?.baseUrl).toBe(
       'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1',
     );
-    expect(llm?.model).toBe('@cf/zai-org/glm-4.7-flash');
+    // Against the constant, not a literal: the default moved once already
+    // (glm-4.7-flash is a reasoning model that returns null content on a small
+    // max_tokens) and a literal here would only go stale again.
+    expect(llm?.model).toBe(CLOUDFLARE_DEFAULT_MODEL);
   });
 
   it('returns null for a half-configured Cloudflare env instead of an empty base URL', async () => {

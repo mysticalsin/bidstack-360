@@ -105,7 +105,7 @@ one provider where a token alone is not enough:
 RFP_LLM_PROVIDER=cloudflare          # alias: workers-ai
 CLOUDFLARE_API_TOKEN=                # a Workers AI (Read) token
 CLOUDFLARE_ACCOUNT_ID=               # 32 hex chars — `wrangler whoami`
-CLOUDFLARE_MODEL=@cf/zai-org/glm-4.7-flash
+CLOUDFLARE_MODEL=@cf/meta/llama-4-scout-17b-16e-instruct
 # CLOUDFLARE_BASE_URL=               # optional: a full URL (e.g. an AI Gateway route)
 # CLOUDFLARE_ALLOW_CUSTOM_BASE_URL=false
 ```
@@ -118,13 +118,25 @@ firing a request at an empty URL. Hosts other than `api.cloudflare.com` and
 `gateway.ai.cloudflare.com` are rejected unless
 `CLOUDFLARE_ALLOW_CUSTOM_BASE_URL=true`.
 
-**Pick the model by context window, not by name.** `document-extract.ts` sends
-up to 80,000 characters in a single prompt (~20–27k tokens), so Cloudflare's
-headline `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (24,000-token context) will
-truncate a long RFP. The default `@cf/zai-org/glm-4.7-flash` carries 131,072.
-The curated list with context windows lives in
+**Pick the model on two axes: context window AND whether it reasons.**
+
+1. *Context.* `document-extract.ts` sends up to 80,000 characters in a single
+   prompt (~20–27k tokens), so Cloudflare's headline
+   `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (24,000-token context) truncates a
+   long RFP.
+2. *Reasoning.* `glm-4.7-flash`, `qwen3-30b` and `nemotron-3-120b` emit a
+   chain-of-thought into `message.reasoning` **before** `message.content`. Give
+   them a small `max_tokens` and the budget goes entirely to the trace —
+   `content` comes back `null`, which `completeChat` reports as "returned empty
+   content". Measured against the live endpoint on 2026-08-17: glm-4.7-flash
+   returned `content: null` at `max_tokens=16` and answered normally at 512.
+
+The default is therefore `@cf/meta/llama-4-scout-17b-16e-instruct` — 131k
+context, no reasoning preamble, ~1s, clean JSON under `response_format`. The
+curated list with context windows and reasoning flags lives in
 `packages/shared/src/llm-catalog/index.ts` and is what the Settings picker
-renders.
+renders. (This is also why the connectivity probe uses `maxTokens: 512`, not 16:
+a 16-token probe reports a perfectly healthy reasoning model as dead.)
 
 **Token gotcha (cost a full debugging session once):** a Cloudflare API token
 can carry a Client IP Address Filter. Such a token returns 200 from the

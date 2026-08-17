@@ -417,8 +417,16 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
         const text = await completeChat(llm, {
           system: 'You are a connectivity probe. Reply with the single word OK.',
           user: 'Reply with the single word OK.',
-          maxTokens: 16,
-          timeoutMs: 12_000,
+          // NOT 16. Reasoning models (Cloudflare's glm-4.7-flash, qwen3,
+          // nemotron; NIM's deepseek with thinking on) emit a chain-of-thought
+          // into `message.reasoning` BEFORE `message.content`, so a 16-token
+          // budget is consumed entirely by the trace and content comes back
+          // null — which completeChat reports as "returned empty content".
+          // Measured 2026-08-17 against live Workers AI: glm-4.7-flash failed
+          // this probe at 16 and passed at 512 with a valid token. The probe
+          // must not tell an admin their working provider is dead.
+          maxTokens: 512,
+          timeoutMs: 20_000,
         });
         return {
           provider,

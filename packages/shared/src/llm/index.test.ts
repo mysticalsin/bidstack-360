@@ -118,13 +118,26 @@ describe('buildResolvedLlm', () => {
       expect(llm.model).toBe(CLOUDFLARE_DEFAULT_MODEL);
     });
 
-    it('defaults to a model that can hold the extraction payload', () => {
-      // document-extract.ts sends up to 80,000 CHARACTERS in one prompt. The
-      // default must therefore be a large-context model — llama-3.3-70b's
-      // 24k window would truncate it.
+    it('defaults to a model that is BOTH large-context and non-reasoning', () => {
+      // Two independent constraints, both measured against the live endpoint:
+      // (1) document-extract.ts sends up to 80,000 CHARACTERS in one prompt, so
+      //     llama-3.3-70b's 24k window would truncate it;
+      // (2) a reasoning model spends a small max_tokens budget on its
+      //     chain-of-thought and returns content:null — which completeChat
+      //     reports as "empty content", so the 512-token connectivity probe and
+      //     any short copilot call would read as a dead provider.
       const def = CLOUDFLARE_WORKERS_AI_MODELS.find((m) => m.id === CLOUDFLARE_DEFAULT_MODEL);
       expect(def).toBeDefined();
       expect(def!.contextTokens).toBeGreaterThanOrEqual(100_000);
+      expect(def!.reasoning).toBeFalsy();
+    });
+
+    it('flags reasoning models so the picker can warn and the default can avoid them', () => {
+      const reasoning = CLOUDFLARE_WORKERS_AI_MODELS.filter((m) => m.reasoning);
+      expect(reasoning.length).toBeGreaterThan(0);
+      expect(reasoning.map((m) => m.id)).toContain('@cf/zai-org/glm-4.7-flash');
+      // Every flagged model says so in its note, so the UI needs no extra copy.
+      for (const m of reasoning) expect(m.note.toLowerCase()).toContain('reasoning model');
     });
 
     it('every catalogued model is a @cf/ id with a real context window', () => {

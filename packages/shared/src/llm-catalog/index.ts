@@ -98,6 +98,16 @@ export interface CloudflareModelInfo {
   /** Max context in tokens, from the Cloudflare model catalogue. */
   contextTokens: number;
   note: string;
+  /**
+   * Emits a chain-of-thought into `message.reasoning` BEFORE `message.content`.
+   * Measured consequence, not a label: with a small `max_tokens` the whole
+   * budget goes to the reasoning trace and `content` comes back **null**, which
+   * completeChat treats as "returned empty content". Verified against the live
+   * Workers AI endpoint on 2026-08-17 — glm-4.7-flash returned null content at
+   * max_tokens=16 (the connectivity probe's budget) and answered normally at
+   * 512. Never make one of these the default.
+   */
+  reasoning?: boolean;
 }
 
 /**
@@ -113,41 +123,49 @@ export interface CloudflareModelInfo {
  */
 export const CLOUDFLARE_WORKERS_AI_MODELS: readonly CloudflareModelInfo[] = [
   {
-    id: '@cf/zai-org/glm-4.7-flash',
-    label: 'GLM 4.7 Flash (Zhipu AI)',
-    contextTokens: 131_072,
-    note: 'Recommended. Largest context, function calling + reasoning, fast.',
-  },
-  {
     id: '@cf/meta/llama-4-scout-17b-16e-instruct',
     label: 'Llama 4 Scout 17B (Meta)',
     contextTokens: 131_000,
-    note: 'Natively multimodal MoE, function calling.',
-  },
-  {
-    id: '@cf/nvidia/nemotron-3-120b-a12b',
-    label: 'Nemotron 3 120B (NVIDIA)',
-    contextTokens: 131_072,
-    note: 'Agentic / reasoning-tuned MoE.',
+    note: 'Recommended. 131k context, ~1s, clean JSON, no reasoning preamble.',
   },
   {
     id: '@cf/meta/llama-3.1-8b-instruct-fast',
     label: 'Llama 3.1 8B Fast (Meta)',
     contextTokens: 60_000,
-    note: 'Cheapest and fastest — good for short copilot calls.',
-  },
-  {
-    id: '@cf/qwen/qwen3-30b-a3b-fp8',
-    label: 'Qwen3 30B A3B (Alibaba)',
-    contextTokens: 32_000,
-    note: 'Strong multilingual mid-size model.',
+    note: 'Fastest and cheapest (~0.5s). Good for short copilot calls.',
   },
   {
     id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     label: 'Llama 3.3 70B Fast (Meta)',
     contextTokens: 24_000,
-    note: 'High quality per token, but the smallest context — long RFP extractions will not fit.',
+    note: 'Strong quality, but the smallest context — a long RFP extraction will not fit.',
+  },
+  {
+    id: '@cf/zai-org/glm-4.7-flash',
+    label: 'GLM 4.7 Flash (Zhipu AI)',
+    contextTokens: 131_072,
+    note: 'Reasoning model. Give it room — it returns nothing useful on short replies.',
+    reasoning: true,
+  },
+  {
+    id: '@cf/nvidia/nemotron-3-120b-a12b',
+    label: 'Nemotron 3 120B (NVIDIA)',
+    contextTokens: 131_072,
+    note: 'Reasoning model, agentic-tuned. Give it room.',
+    reasoning: true,
+  },
+  {
+    id: '@cf/qwen/qwen3-30b-a3b-fp8',
+    label: 'Qwen3 30B A3B (Alibaba)',
+    contextTokens: 32_000,
+    note: 'Reasoning model, strong multilingual. Give it room.',
+    reasoning: true,
   },
 ];
 
-export const CLOUDFLARE_DEFAULT_MODEL = '@cf/zai-org/glm-4.7-flash';
+/**
+ * Default: 131k context (Polo's extraction prompt runs to 80,000 characters)
+ * AND non-reasoning, so it still answers a 16-token connectivity probe. Both
+ * halves are load-bearing — see CloudflareModelInfo.reasoning.
+ */
+export const CLOUDFLARE_DEFAULT_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';

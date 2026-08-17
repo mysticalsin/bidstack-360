@@ -7,6 +7,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { CLOUDFLARE_DEFAULT_MODEL } from '@bidstack/shared';
+
 import { AgentProviderCredentialsCard } from './AgentProviderCredentialsCard';
 
 vi.mock('react-i18next', () => ({
@@ -144,7 +146,10 @@ describe('AgentProviderCredentialsCard — Cloudflare Workers AI', () => {
     expect(saveMutateAsync).toHaveBeenCalledWith({
       provider: 'cloudflare',
       apiKey: 'cf-token',
-      model: '@cf/zai-org/glm-4.7-flash',
+      // Asserted against the constant, not a literal — the default moved once
+      // already (glm-4.7-flash is a reasoning model that returns empty content
+      // on short replies) and a literal here would just go stale again.
+      model: CLOUDFLARE_DEFAULT_MODEL,
       baseUrl: '0123456789abcdef0123456789abcdef',
     });
   });
