@@ -47,6 +47,12 @@ export function isLegalStageTransition(
  * Whether a move advances the pursuit forward (deeper into the funnel or won).
  * Closing lost is NOT forward. Used to decide whether the bid-decision gate
  * applies (you can always retreat or abandon a no-bid; you can't push it on).
+ *
+ * Reopening a CLOSED opportunity counts as forward. It used to return false
+ * here, which handed anyone a two-request bypass of the whole gate: close to
+ * lost (always legal, never forward), then reopen straight to the last stage
+ * (legal because from is terminal, not forward because from is terminal). A
+ * killed bid re-entering the pipeline is exactly the move the gate exists for.
  */
 export function isForwardMove(
   from: StageNode | null,
@@ -56,13 +62,41 @@ export function isForwardMove(
   if (to.isLost) return false;
   if (!from) return true;
   if (to.isWon) return true;
-  if (isTerminal(from)) return false; // reopening isn't "forward advancement"
+  if (isTerminal(from)) return true; // reopening a closed bid re-enters the funnel
 
   const active = activeSorted(all);
   const fi = active.findIndex((s) => s.id === from.id);
   const ti = active.findIndex((s) => s.id === to.id);
   if (fi === -1 || ti === -1) return false;
   return ti > fi;
+}
+
+/**
+ * The product's canonical stage enum, in funnel order. Used as the fallback
+ * graph when an org has no PipelineStage rows for the move (no default
+ * pipeline, or a stage key with no row): without it the route resolved no
+ * nodes and skipped the gate entirely, so a plain `{ stage: 's4_negotiation' }`
+ * body walked past every rule. Ordering only — the real pipeline wins whenever
+ * its rows resolve.
+ */
+export const CANONICAL_STAGE_ORDER: readonly string[] = [
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
+  'closed_won',
+  'closed_lost',
+];
+
+/** StageNodes synthesized from CANONICAL_STAGE_ORDER, keyed by the stage enum. */
+export function canonicalStageNodes(): StageNode[] {
+  return CANONICAL_STAGE_ORDER.map((key, i) => ({
+    id: key,
+    orderIndex: i,
+    isWon: key === 'closed_won',
+    isLost: key === 'closed_lost',
+  }));
 }
 
 export type StandingDecision = 'positive' | 'negative' | 'none';
@@ -93,10 +127,18 @@ export function resolveStandingDecision(input: {
           : null
       : null;
 
+  // Whitelist, not "anything that isn't no_bid". A permissive else-branch meant
+  // any BidScore row — including one with an unrecognized recommendation —
+  // registered as a positive signal and, being the newest, silently cleared a
+  // recorded no-go. Only the three real BidRecommendationValue values speak.
   const scoreSignal: StandingDecision | null = b
-    ? b.recommendation === 'no_bid' && !b.overrideJustification
-      ? 'negative'
-      : 'positive'
+    ? b.recommendation === 'no_bid'
+      ? b.overrideJustification
+        ? 'positive' // a justified override is a deliberate proceed
+        : 'negative'
+      : b.recommendation === 'bid' || b.recommendation === 'proceed_with_caution'
+        ? 'positive'
+        : null
     : null;
 
   // Most recent signal wins when both exist.

@@ -5,8 +5,15 @@ import {
   classifyBid,
   assessBid,
   activeEscalations,
+  addBusinessDays,
+  allowedGatesForClass,
+  isGateOutcomeValid,
+  GATE_KEYS,
+  GATE_LABELS,
+  GATE_OUTCOMES,
   GOVERNANCE_BY_CLASS,
   BID_LIFECYCLE,
+  LESSONS_LEARNED_SLA_BUSINESS_DAYS,
   RACI_MATRIX,
   BID_CLASSES,
   type SizeBand,
@@ -148,5 +155,96 @@ describe('lifecycle + RACI integrity', () => {
     for (const gate of RACI_MATRIX.filter((a) => a.isGate)) {
       expect(['R', 'A', 'RA']).toContain(gate.marks.bidOffice);
     }
+  });
+});
+
+describe('gate vocabulary', () => {
+  it('labels and outcome sets cover every gate key exactly once', () => {
+    expect(Object.keys(GATE_LABELS).sort()).toEqual([...GATE_KEYS].sort());
+    expect(Object.keys(GATE_OUTCOMES).sort()).toEqual([...GATE_KEYS].sort());
+  });
+
+  // WHY this matters: resolveStandingDecision only reads go/no_go/bid/no_bid.
+  // A `{ go_no_go, approved }` row produces no readable signal, and because the
+  // stage gate looks at only the LATEST go_no_go/bid_no_bid row, that unreadable
+  // row HIDES an earlier no-go and lets a killed bid advance. The pairing must
+  // be rejected at the API, so the pairing table is the thing under test.
+  it('binds each gate to the outcomes it can actually decide', () => {
+    expect(isGateOutcomeValid('go_no_go', 'go')).toBe(true);
+    expect(isGateOutcomeValid('go_no_go', 'no_go')).toBe(true);
+    expect(isGateOutcomeValid('go_no_go', 'approved')).toBe(false);
+    expect(isGateOutcomeValid('bid_no_bid', 'bid')).toBe(true);
+    expect(isGateOutcomeValid('bid_no_bid', 'go')).toBe(false);
+    expect(isGateOutcomeValid('strategy_validation', 'approved')).toBe(true);
+    expect(isGateOutcomeValid('strategy_validation', 'bid')).toBe(false);
+  });
+
+  it('every gate outcome maps to a decidable signal (no silent-hole pairs)', () => {
+    for (const gate of GATE_KEYS) {
+      expect(GATE_OUTCOMES[gate].length).toBeGreaterThan(0);
+      for (const outcome of GATE_OUTCOMES[gate]) {
+        expect(isGateOutcomeValid(gate, outcome)).toBe(true);
+      }
+    }
+  });
+});
+
+describe('allowedGatesForClass', () => {
+  it('offers a class only its own gates, plus the lifecycle Stage-3 Go/No-Go', () => {
+    // C1–C3 run Go/No-Go then Bid/No-Bid. Strategy Validation is a C4 gate:
+    // recording one on a C1 is a process error, not a preference.
+    expect(allowedGatesForClass('C1')).toEqual(['go_no_go', 'bid_no_bid']);
+    expect(allowedGatesForClass('C1')).not.toContain('strategy_validation');
+    expect(allowedGatesForClass('C4')).toEqual([
+      'go_no_go',
+      'strategy_validation',
+      'proposal_review',
+      'pricing_bid_validation',
+    ]);
+    // C0 has no committee — Bid Office only quality-checks it.
+    expect(allowedGatesForClass('C0')).toEqual(['go_no_go', 'quality_check']);
+  });
+
+  it('accepts any gate while the bid is unclassified (classification is optional)', () => {
+    expect(allowedGatesForClass(null)).toEqual(GATE_KEYS);
+    expect(allowedGatesForClass(undefined)).toEqual(GATE_KEYS);
+  });
+
+  it('never offers a gate the class table does not define for that class', () => {
+    for (const cls of BID_CLASSES) {
+      const classGates = GOVERNANCE_BY_CLASS[cls].gateKeys;
+      for (const gate of allowedGatesForClass(cls)) {
+        // go_no_go is the lifecycle Stage-3 checkpoint, allowed everywhere.
+        if (gate === 'go_no_go') continue;
+        expect(classGates).toContain(gate);
+      }
+    }
+  });
+});
+
+describe('Stage 10 SLA arithmetic', () => {
+  it('skips weekends when adding business days', () => {
+    // 2026-08-13 is a Thursday. +5 business days = Thursday 2026-08-20.
+    expect(addBusinessDays(new Date('2026-08-13T00:00:00Z'), 5).toISOString().slice(0, 10)).toBe(
+      '2026-08-20',
+    );
+    // Friday +1 lands on Monday, not Saturday.
+    expect(addBusinessDays(new Date('2026-08-14T00:00:00Z'), 1).toISOString().slice(0, 10)).toBe(
+      '2026-08-17',
+    );
+    // Saturday +1 lands on Monday.
+    expect(addBusinessDays(new Date('2026-08-15T00:00:00Z'), 1).toISOString().slice(0, 10)).toBe(
+      '2026-08-17',
+    );
+  });
+
+  it('is a no-op for zero or negative days', () => {
+    const d = new Date('2026-08-13T00:00:00Z');
+    expect(addBusinessDays(d, 0).toISOString()).toBe(d.toISOString());
+    expect(addBusinessDays(d, -3).toISOString()).toBe(d.toISOString());
+  });
+
+  it('holds the playbook deadline at 5 business days', () => {
+    expect(LESSONS_LEARNED_SLA_BUSINESS_DAYS).toBe(5);
   });
 });

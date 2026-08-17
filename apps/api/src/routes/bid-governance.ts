@@ -6,7 +6,18 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { assessBid } from '@bidstack/shared';
+import {
+  allowedGatesForClass,
+  assessBid,
+  GATE_LABELS,
+  GATE_OUTCOMES,
+  isGateOutcomeValid,
+  type BidClass,
+  type GateKey,
+  type GateOutcome,
+} from '@bidstack/shared';
+
+import { notifyUsers } from '../services/notification.service.js';
 
 const IdParam = z.object({ id: z.string().uuid() });
 
@@ -53,6 +64,55 @@ function serializeGate(row: {
   };
 }
 
+/**
+ * Roles that sit on an Amaris validation committee in every class (report §3
+ * committee/finalValidators). Matched by Role.name against what the org
+ * actually seeds — the playbook's own position codes (LBM, GBD, CDSO…) are not
+ * seeded roles yet, so this is the closest honest mapping rather than a set of
+ * names that would silently match nobody.
+ */
+const GATE_WATCHER_ROLES = ['Manager', 'Sales Manager', 'Presales', 'Executive'];
+
+const NEGATIVE_OUTCOMES: readonly GateOutcome[] = ['no_go', 'no_bid', 'rejected'];
+
+async function notifyGateRecipients(
+  server: Parameters<FastifyPluginAsyncZod>[0],
+  input: {
+    orgId: string;
+    actorUserId: string;
+    opportunity: { id: string; name: string; customer: string; ownerId: string | null };
+    gate: GateKey;
+    outcome: GateOutcome;
+  },
+): Promise<void> {
+  const { orgId, actorUserId, opportunity, gate, outcome } = input;
+  const watchers = await prisma.userRole.findMany({
+    where: {
+      orgId,
+      deletedAt: null,
+      role: { orgId, name: { in: GATE_WATCHER_ROLES }, deletedAt: null },
+      user: { orgId, deletedAt: null },
+    },
+    select: { userId: true },
+    take: 100,
+  });
+
+  const decided = NEGATIVE_OUTCOMES.includes(outcome) ? 'not cleared' : 'cleared';
+  await notifyUsers({
+    orgId,
+    // notifyUsers de-dupes, so listing the owner alongside the committee is safe.
+    userIds: [...watchers.map((w) => w.userId), ...(opportunity.ownerId ? [opportunity.ownerId] : [])],
+    excludeUserId: actorUserId,
+    type: 'gate_decision',
+    title: `${GATE_LABELS[gate]} ${decided}: ${opportunity.name}`,
+    body: `${opportunity.customer} — outcome ${outcome.replace(/_/g, ' ')}`,
+    entityType: 'opportunity',
+    entityId: opportunity.id,
+    url: `/opportunities/${opportunity.id}`,
+  });
+  server.log.debug({ opportunityId: opportunity.id, gate, outcome }, 'gate decision notified');
+}
+
 export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
   // Compute + persist the classification. Server owns the class (assessBid).
   server.post(
@@ -71,8 +131,12 @@ export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
       const assessment = assessBid(req.body.fteEstimate, req.body.commitmentLevel);
-      await prisma.opportunity.update({
-        where: { id: opp.id },
+      // updateMany, not update: `where` must carry orgId (rule 7). The findFirst
+      // above already proves tenancy, but an unscoped write is exactly what the
+      // tenant-scope guard exists to catch, and the next edit here would inherit
+      // the hole.
+      await prisma.opportunity.updateMany({
+        where: { id: opp.id, orgId },
         data: {
           bidClass: assessment.bidClass,
           fteEstimate: req.body.fteEstimate,
@@ -119,22 +183,63 @@ export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const opp = await prisma.opportunity.findFirst({
         where: { id: req.params.id, orgId, deletedAt: null },
-        select: { id: true, bidClass: true },
+        select: { id: true, name: true, customer: true, ownerId: true, bidClass: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
+
+      const gate = req.body.gate as GateKey;
+      const outcome = req.body.outcome as GateOutcome;
+
+      // The gate x outcome cross-product was unvalidated, and the two were more
+      // than cosmetically mismatched: resolveStandingDecision only reads
+      // go/no_go/bid/no_bid, so a `{ go_no_go, approved }` row produced NO
+      // signal — and because the stage gate reads only the LATEST go_no_go /
+      // bid_no_bid row, that unreadable row hid an earlier no-go and let the
+      // opportunity advance. Reject the pair instead of storing a silent hole.
+      if (!isGateOutcomeValid(gate, outcome)) {
+        throw server.httpErrors.badRequest(
+          `Outcome '${outcome}' is not valid for the ${GATE_LABELS[gate]} gate (expected: ${GATE_OUTCOMES[gate].join(' | ')})`,
+        );
+      }
+
+      // Class-driven governance (report §3): the class determines which gates
+      // exist. A C1 has no Strategy Validation gate, so recording one is a
+      // process error, not a preference. Unclassified bids accept any gate.
+      const allowed = allowedGatesForClass(opp.bidClass as BidClass | null);
+      if (!allowed.includes(gate)) {
+        throw server.httpErrors.conflict(
+          `The ${GATE_LABELS[gate]} gate does not apply to a ${opp.bidClass} bid (its gates: ${allowed
+            .map((g) => GATE_LABELS[g])
+            .join(', ')})`,
+        );
+      }
 
       const row = await prisma.gateDecision.create({
         data: {
           orgId,
           opportunityId: opp.id,
-          gate: req.body.gate,
-          outcome: req.body.outcome,
+          gate,
+          outcome,
           bidClass: opp.bidClass,
           decidedById: userId,
           decidedByRole: req.body.decidedByRole ?? null,
           justification: req.body.justification ?? null,
         },
       });
+
+      // A gate is a governance EVENT, not a private note: the owner and the
+      // bid-office leads need to know a bid was signed off or killed. Awaited
+      // for durability but never allowed to fail the decision itself.
+      void notifyGateRecipients(server, {
+        orgId,
+        actorUserId: userId,
+        opportunity: opp,
+        gate,
+        outcome,
+      }).catch((err: unknown) => {
+        req.log.warn({ err, opportunityId: opp.id, gate }, 'gate-decision notification failed');
+      });
+
       return serializeGate(row);
     },
   );

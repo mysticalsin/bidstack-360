@@ -7,6 +7,7 @@ export type NotificationType =
   | 'mention'
   | 'assignment'
   | 'bid_override'
+  | 'gate_decision'
   | 'stage_change'
   | 'task_due'
   | 'system';

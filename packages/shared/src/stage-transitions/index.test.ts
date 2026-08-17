@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  canonicalStageNodes,
   isLegalStageTransition,
   isForwardMove,
   resolveStandingDecision,
@@ -51,6 +52,46 @@ describe('isForwardMove', () => {
     expect(isForwardMove(sent, won, ALL)).toBe(true);
     expect(isForwardMove(nego, sent, ALL)).toBe(false); // backward
     expect(isForwardMove(sent, lost, ALL)).toBe(false); // abandoning is not forward
+  });
+
+  // REGRESSION — the close-then-reopen laundering bypass. Reopening used to
+  // return false here, so the two-move sequence "close to lost, reopen at the
+  // last stage" cleared the standing-decision gate entirely: move 1 is legal
+  // and not forward (closing lost), move 2 is legal (from is terminal) and used
+  // to be not-forward (from is terminal). A killed bid could reach negotiation
+  // in two allowed requests while a no-go was on record.
+  it('treats reopening a closed bid as forward advancement', () => {
+    expect(isForwardMove(lost, lead, ALL)).toBe(true);
+    expect(isForwardMove(lost, nego, ALL)).toBe(true);
+    expect(isForwardMove(won, nego, ALL)).toBe(true);
+  });
+});
+
+describe('canonicalStageNodes', () => {
+  // REGRESSION — the "no PipelineStage row" bypass. When an org had no default
+  // pipeline (or no row for the requested key) the route resolved zero nodes
+  // and skipped every gate, so a bare `{ stage: 's4_negotiation' }` body walked
+  // straight past both rules. The canonical enum graph is the fallback.
+  it('exposes the product stage enum in funnel order with terminals flagged', () => {
+    const nodes = canonicalStageNodes();
+    expect(nodes.map((n) => n.id)).toEqual([
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
+      'closed_won',
+      'closed_lost',
+    ]);
+    expect(nodes.find((n) => n.id === 'closed_won')?.isWon).toBe(true);
+    expect(nodes.find((n) => n.id === 'closed_lost')?.isLost).toBe(true);
+  });
+
+  it('still blocks a multi-stage jump when used as the graph', () => {
+    const nodes = canonicalStageNodes();
+    const at = (id: string) => nodes.find((n) => n.id === id)!;
+    expect(isLegalStageTransition(at('s1_lead'), at('s4_negotiation'), nodes)).toBe(false);
+    expect(isLegalStageTransition(at('s1_lead'), at('s1_ongoing'), nodes)).toBe(true);
   });
 });
 

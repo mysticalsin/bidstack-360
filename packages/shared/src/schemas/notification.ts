@@ -5,6 +5,11 @@ export const NotificationType = z.enum([
   'mention',
   'assignment',
   'bid_override',
+  // Amaris Bid Office: a formal governance gate was signed off (Go/No-Go,
+  // Bid/No-Bid, or a C4 gate). Deliberately NOT pref-gated — a gate is a
+  // committee decision the owner and bid leads are accountable for, not a
+  // convenience ping.
+  'gate_decision',
   'stage_change',
   'task_due',
   'system',

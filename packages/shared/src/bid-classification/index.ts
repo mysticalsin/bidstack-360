@@ -59,13 +59,83 @@ export function classifyBid(sizeBand: SizeBand, commitment: CommitmentLevel): Bi
   return CLASS_MATRIX[sizeBand][commitment];
 }
 
+/**
+ * Machine keys for the governance gates. The playbook names gates in prose
+ * ("Go/No-Go"); these are the persisted values on GateDecision.gate, and the
+ * link that lets the API refuse a gate that does not belong to the bid's class.
+ */
+export type GateKey =
+  | 'go_no_go'
+  | 'bid_no_bid'
+  | 'strategy_validation'
+  | 'proposal_review'
+  | 'pricing_bid_validation'
+  | 'quality_check';
+
+export type GateOutcome = 'go' | 'no_go' | 'bid' | 'no_bid' | 'approved' | 'rejected';
+
+export const GATE_KEYS: readonly GateKey[] = [
+  'go_no_go',
+  'bid_no_bid',
+  'strategy_validation',
+  'proposal_review',
+  'pricing_bid_validation',
+  'quality_check',
+];
+
+export const GATE_LABELS: Record<GateKey, string> = {
+  go_no_go: 'Go/No-Go',
+  bid_no_bid: 'Bid/No-Bid',
+  strategy_validation: 'Strategy Validation',
+  proposal_review: 'Proposal Review',
+  pricing_bid_validation: 'Pricing & Bid Validation',
+  quality_check: 'Bid Office Quality Check',
+};
+
+/**
+ * Which outcomes each gate may carry. A Go/No-Go gate decides go or no-go — an
+ * "approved" outcome on it is not a milder yes, it is an unreadable signal that
+ * silently voids a standing no-go (resolveStandingDecision maps neither).
+ */
+export const GATE_OUTCOMES: Record<GateKey, readonly [GateOutcome, ...GateOutcome[]]> = {
+  go_no_go: ['go', 'no_go'],
+  bid_no_bid: ['bid', 'no_bid'],
+  strategy_validation: ['approved', 'rejected'],
+  proposal_review: ['approved', 'rejected'],
+  pricing_bid_validation: ['approved', 'rejected'],
+  quality_check: ['approved', 'rejected'],
+};
+
+export function isGateOutcomeValid(gate: GateKey, outcome: GateOutcome): boolean {
+  return GATE_OUTCOMES[gate].includes(outcome);
+}
+
+/**
+ * The gates a class may record. An unclassified opportunity (bidClass null)
+ * accepts any gate — classification is optional and must not block governance.
+ *
+ * `go_no_go` is allowed for EVERY class on top of the class table: it is the
+ * Stage-3 exit gate of the 10-stage lifecycle (report §2), which every bid
+ * passes through, whereas GOVERNANCE_BY_CLASS[].gateKeys is the class-specific
+ * validation path from report §3. The report's own §5 note reconstructs C4 the
+ * same way — 3 class gates "with Go/No-Go Decision as a distinct earlier
+ * checkpoint at Stage 3".
+ */
+export function allowedGatesForClass(bidClass: BidClass | null | undefined): readonly GateKey[] {
+  if (!bidClass || !(bidClass in GOVERNANCE_BY_CLASS)) return GATE_KEYS;
+  const classGates = GOVERNANCE_BY_CLASS[bidClass].gateKeys;
+  return classGates.includes('go_no_go') ? classGates : ['go_no_go', ...classGates];
+}
+
 export interface ClassGovernance {
   bidClass: BidClass;
   description: string;
   /** Estimated duration Stage 3→7, in business days [min, max]. */
   estDurationDays: readonly [number, number];
-  /** Named governance gates for this class, in order. */
+  /** Named governance gates for this class, in order (display prose). */
   gates: readonly string[];
+  /** The same gates as persisted keys, in the same order. */
+  gateKeys: readonly GateKey[];
   /** Committee composition (role-typed). Empty for C0 (no committee). */
   committee: readonly string[];
   /** Final decision validator role(s). */
@@ -80,6 +150,7 @@ export const GOVERNANCE_BY_CLASS: Record<BidClass, ClassGovernance> = {
     description: 'Simple / standard, SM or CoE-led, no committee.',
     estDurationDays: [3, 5],
     gates: ['Bid Office Quality Check (≥24h pre-submission)'],
+    gateKeys: ['quality_check'],
     committee: [],
     finalValidators: ['SM / CoE owns; Bid Office does quality check only'],
     specialRules: [],
@@ -89,6 +160,7 @@ export const GOVERNANCE_BY_CLASS: Record<BidClass, ClassGovernance> = {
     description: 'Standard scope.',
     estDurationDays: [3, 5],
     gates: ['Go/No-Go', 'Bid/No-Bid'],
+    gateKeys: ['go_no_go', 'bid_no_bid'],
     committee: ['Business: BM+', 'Delivery: DM+', 'Account: GAM'],
     finalValidators: ['Business: D1/D2', 'Presales & Bid: LBM+', 'Delivery: LDM+'],
     specialRules: [],
@@ -98,6 +170,7 @@ export const GOVERNANCE_BY_CLASS: Record<BidClass, ClassGovernance> = {
     description: 'Mid complexity — Senior BM required.',
     estDurationDays: [5, 10],
     gates: ['Go/No-Go', 'Bid/No-Bid'],
+    gateKeys: ['go_no_go', 'bid_no_bid'],
     committee: ['Business: BM+', 'Sales: SM+', 'Account: GAM'],
     finalValidators: ['Business: D3', 'Presales & Bid: BD/RBD', 'Delivery: DD/RDD'],
     specialRules: [],
@@ -107,6 +180,7 @@ export const GOVERNANCE_BY_CLASS: Record<BidClass, ClassGovernance> = {
     description: 'High complexity — Lead BM required.',
     estDurationDays: [10, 15],
     gates: ['Go/No-Go', 'Bid/No-Bid'],
+    gateKeys: ['go_no_go', 'bid_no_bid'],
     committee: ['Presales & Bid: PBM+', 'Delivery: DD/RDD', 'Business: D3/GAM'],
     finalValidators: [
       'Business: RD/EVP',
@@ -121,6 +195,7 @@ export const GOVERNANCE_BY_CLASS: Record<BidClass, ClassGovernance> = {
     description: 'Strategic opportunity.',
     estDurationDays: [15, 25],
     gates: ['Strategy Validation', 'Proposal Review', 'Pricing & Bid Validation'],
+    gateKeys: ['strategy_validation', 'proposal_review', 'pricing_bid_validation'],
     committee: [
       'Presales & Bid: PBM+/GBD',
       'Delivery: CDSO',
@@ -278,6 +353,30 @@ export const BID_LIFECYCLE: readonly LifecycleStage[] = [
     exitGate: 'SharePoint repository updated (≤5 business days)',
   },
 ];
+
+/**
+ * Stage 10 SLA: "Win/Loss factors documented, SharePoint repository updated
+ * (≤5 business days)" — report §2. The only hard deadline in the playbook.
+ */
+export const LESSONS_LEARNED_SLA_BUSINESS_DAYS = 5;
+
+/**
+ * Add whole business days (Mon–Fri) to a date. Hand-rolled rather than pulling
+ * date-fns into @bidstack/shared: the package has no date dependency today and
+ * this is the only calendar arithmetic in it. Public holidays are NOT modelled
+ * — the playbook's SLA is stated in business days with no holiday calendar, and
+ * inventing one per country (7 in Americas scope) would be a guess.
+ */
+export function addBusinessDays(from: Date, days: number): Date {
+  const out = new Date(from.getTime());
+  let remaining = Math.max(0, Math.trunc(days));
+  while (remaining > 0) {
+    out.setUTCDate(out.getUTCDate() + 1);
+    const dow = out.getUTCDay();
+    if (dow !== 0 && dow !== 6) remaining -= 1;
+  }
+  return out;
+}
 
 export type RaciMark = 'R' | 'A' | 'RA' | 'C' | 'I' | '';
 export type RaciFunction =

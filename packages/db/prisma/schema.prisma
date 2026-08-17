@@ -669,7 +669,9 @@ model Task {
   // KAM front layer — Initiative-scoped tasks (the per-account to-do list OM
   // lacks). accountId denormalizes the owning Company for the per-account
   // roll-up without an initiative join. `type` = prospection | follow_up |
-  // proposal_prep | internal | other.
+  // proposal_prep | internal | lessons_learned | other. `lessons_learned` is
+  // raised automatically when an opportunity closes (Amaris Stage 10, 5
+  // business-day SLA) and is deduped on (orgId, oppId, type).
   initiativeId String?    @map("initiative_id") @db.Uuid
   accountId    String?    @map("account_id") @db.Uuid
   type         String?
@@ -3092,9 +3094,14 @@ model GateDecision {
   id            String  @id @default(uuid()) @db.Uuid
   orgId         String  @map("org_id") @db.Uuid
   opportunityId String  @map("opportunity_id") @db.Uuid
-  /// go_no_go | bid_no_bid | strategy_validation | proposal_review | pricing_bid_validation | quality_check
+  /// go_no_go | bid_no_bid | strategy_validation | proposal_review | pricing_bid_validation
+  /// | quality_check, plus the system event bid_office_handoff (outcome
+  /// 'activated'), which is written by the stage-transition route, not by a
+  /// human, and is capped at one per opportunity by the partial unique index
+  /// gate_decisions_bid_office_handoff_key (migration 20260817000000 — Prisma
+  /// cannot express a WHERE-filtered unique index in this schema).
   gate          String
-  /// go | no_go | bid | no_bid | approved | rejected
+  /// go | no_go | bid | no_bid | approved | rejected (| activated, system-only)
   outcome       String
   /// The bid class at decision time (C0–C4), for audit.
   bidClass      String? @map("bid_class")
