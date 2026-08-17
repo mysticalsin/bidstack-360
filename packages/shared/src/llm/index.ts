@@ -16,47 +16,23 @@
 // NIM, Gemma, and OmniRoute share the OpenAI-compatible /chat/completions shape;
 // Anthropic uses /v1/messages.
 
-/** Wire-level provider families. */
-export type LlmProviderKind = 'openai' | 'anthropic' | 'moonshot' | 'nim' | 'gemma';
+import {
+  CLOUDFLARE_DEFAULT_MODEL,
+  DIRECT_PROVIDER_TO_KIND,
+  normalizeCloudflareBaseUrl,
+  type DirectAgentProviderId,
+  type LlmProviderKind,
+} from '../llm-catalog/index.js';
 
-/**
- * Provider ids exposed in the Settings UI / stored per-org. These are the
- * brand-facing names; {@link DIRECT_PROVIDER_TO_KIND} maps them to the wire
- * family above. Kept in sync with `DIRECT_AGENT_PROVIDERS` in the API lib.
- */
-export type DirectAgentProviderId =
-  | 'claude'
-  | 'openai'
-  | 'omniroute'
-  | 'kimi'
-  | 'nvidia_nim'
-  | 'gemma';
-
-export const DIRECT_PROVIDER_TO_KIND: Record<DirectAgentProviderId, LlmProviderKind> = {
-  claude: 'anthropic',
-  openai: 'openai',
-  // OmniRoute speaks the OpenAI-compatible /chat/completions wire shape (it
-  // is a local gateway, not OpenAI itself — see DIRECT_PROVIDER_OVERRIDES for
-  // its own baseUrl/model/apiKey/extraBody so it doesn't inherit OpenAI's).
-  omniroute: 'openai',
-  kimi: 'moonshot',
-  nvidia_nim: 'nim',
-  gemma: 'gemma',
-};
-
-/** Every brand-facing provider id, in display order. */
-export const DIRECT_AGENT_PROVIDERS = [
-  'claude',
-  'openai',
-  'omniroute',
-  'kimi',
-  'nvidia_nim',
-  'gemma',
-] as const satisfies readonly DirectAgentProviderId[];
-
-export function isDirectAgentProvider(value: string): value is DirectAgentProviderId {
-  return (DIRECT_AGENT_PROVIDERS as readonly string[]).includes(value);
-}
+// The provider registry (ids, wire kinds, display list) lives in ../llm-catalog
+// — pure data, so the browser can share it. Re-exported for server callers.
+export {
+  DIRECT_AGENT_PROVIDERS,
+  DIRECT_PROVIDER_TO_KIND,
+  isDirectAgentProvider,
+  type DirectAgentProviderId,
+  type LlmProviderKind,
+} from '../llm-catalog/index.js';
 
 // ── integration_configs storage keys (shared by API writes + worker reads) ──
 // Per-org provider keys + the active-provider selector live as rows in the
@@ -70,6 +46,27 @@ export const AGENT_PROVIDER_ACTIVE_NAME = `${AGENT_PROVIDER_CREDENTIAL_PREFIX}__
 export function agentProviderCredentialName(provider: DirectAgentProviderId): string {
   return `${AGENT_PROVIDER_CREDENTIAL_PREFIX}${provider}`;
 }
+
+// ── Cloudflare Workers AI ──────────────────────────────────────────────────
+// Unlike every other provider, Cloudflare's base URL is not a constant: it
+// embeds the account id. Rather than add a field to the stored credential
+// shape ({apiKey, model, baseUrl}) we let `baseUrl` carry EITHER a bare account
+// id or the full URL, and normalise it in buildResolvedLlm — so the UI can ask
+// for just the account id and an operator can still paste a gateway URL.
+//
+// The catalogue itself lives in ../llm-catalog (pure data, no fetch) so the web
+// bundle can render an agreeing model picker without importing this client.
+// Re-exported here so server callers keep a single import site.
+export {
+  CLOUDFLARE_API_HOST,
+  CLOUDFLARE_DEFAULT_MODEL,
+  CLOUDFLARE_GATEWAY_HOST,
+  CLOUDFLARE_WORKERS_AI_MODELS,
+  cloudflareWorkersAiBaseUrl,
+  isCloudflareAccountId,
+  normalizeCloudflareBaseUrl,
+  type CloudflareModelInfo,
+} from '../llm-catalog/index.js';
 
 /** Sensible per-family defaults; every field is OVERRIDABLE by org/env config. */
 export const PROVIDER_DEFAULTS: Record<LlmProviderKind, { baseUrl: string; model: string }> = {
@@ -96,6 +93,14 @@ const DIRECT_PROVIDER_OVERRIDES: Partial<
     { baseUrl: string; model: string; apiKey: string; extraBody?: Record<string, unknown> }
   >
 > = {
+  cloudflare: {
+    // Placeholder only — Cloudflare has no usable base URL without an account
+    // id, so buildResolvedLlm resolves this from the stored value and callers
+    // must treat an unresolved Cloudflare credential as unconfigured.
+    baseUrl: '',
+    model: CLOUDFLARE_DEFAULT_MODEL,
+    apiKey: '',
+  },
   omniroute: {
     baseUrl: 'http://localhost:20128/v1',
     // 'auto/best-free' routes to reliable free-tier models (e.g. deepseek-v4-flash-free);
@@ -147,6 +152,8 @@ export function buildResolvedLlm(input: {
   let baseUrl = (input.baseUrl ?? defaults.baseUrl).replace(/\/+$/, '');
   // Anthropic's path is appended by completeChat; accept a pasted /v1/messages.
   if (kind === 'anthropic') baseUrl = baseUrl.replace(/\/v1\/messages$/, '');
+  // Cloudflare stores an account id OR a full URL in the same field.
+  if (input.provider === 'cloudflare') baseUrl = normalizeCloudflareBaseUrl(baseUrl) ?? '';
   return {
     kind,
     // Gemma and OmniRoute are keyless local servers; a placeholder keeps the
@@ -156,6 +163,17 @@ export function buildResolvedLlm(input: {
     baseUrl,
     extraBody: providerOverride?.extraBody,
   };
+}
+
+/**
+ * Whether a resolved provider can actually be called. Guards the one field
+ * that has no safe default: Cloudflare's base URL is account-scoped, so a
+ * credential saved without an account id resolves to an EMPTY baseUrl and
+ * `fetch('/chat/completions')` then throws "Failed to parse URL" — at runtime,
+ * inside a background job, once per call. Treat it as unconfigured instead.
+ */
+export function isRunnableLlm(llm: ResolvedLlm | null): llm is ResolvedLlm {
+  return Boolean(llm && llm.baseUrl.trim());
 }
 
 function withTimeoutSignal(
@@ -194,6 +212,26 @@ export function coerceJsonObject(raw: string): string {
   return start >= 0 && end > start ? body.slice(start, end + 1) : body;
 }
 
+/**
+ * Read a provider's error body and fold it into the thrown message.
+ *
+ * WHY: `HTTP 401` alone cost a full debugging session once — the actual cause
+ * was in the body Cloudflare returned (`{"errors":[{"code":10000,...}]}`, an
+ * IP-filtered token) and the code threw it away. Provider error bodies never
+ * contain the request's api key, so echoing a bounded slice is safe and is the
+ * difference between "it failed" and "here is what to fix".
+ */
+async function describeProviderError(res: Response, kind: string): Promise<string> {
+  let detail = '';
+  try {
+    const body = (await res.text()).trim();
+    if (body) detail = ` — ${body.slice(0, 300)}`;
+  } catch {
+    /* body already consumed or unreadable — the status alone still throws */
+  }
+  return `${kind} completion failed: HTTP ${res.status}${detail}`;
+}
+
 /** Provider-agnostic chat completion. Returns the assistant text (possibly JSON). */
 export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<string> {
   const maxTokens = input.maxTokens ?? 4096;
@@ -220,7 +258,7 @@ export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<
         }),
       });
       if (!res.ok) {
-        throw new Error(`anthropic completion failed: HTTP ${res.status}`);
+        throw new Error(await describeProviderError(res, 'anthropic'));
       }
       const data = (await res.json()) as { content?: Array<{ text?: string }> };
       return data.content?.[0]?.text ?? '';
@@ -251,7 +289,7 @@ export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<
       }),
     });
     if (res.status !== 200) {
-      throw new Error(`${llm.kind} completion failed: HTTP ${res.status}`);
+      throw new Error(await describeProviderError(res, llm.kind));
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;

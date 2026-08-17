@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
-import { completeChat } from '@bidstack/shared/llm';
+import { completeChat, normalizeCloudflareBaseUrl } from '@bidstack/shared/llm';
 
 import {
   agentProviderCredentialName,
@@ -56,8 +56,41 @@ const ProviderTestResult = z.object({
 const PutProviderCredentialBody = z.object({
   apiKey: z.string().trim().min(1).max(1_000).optional(),
   model: z.string().trim().min(1).max(200).optional(),
-  baseUrl: z.string().trim().url().max(300).optional(),
+  // NOT .url() — Cloudflare Workers AI's endpoint is account-scoped
+  // (https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1), so this field
+  // also accepts a bare 32-hex account id which the handler expands. Every
+  // value still goes through assertSafeProviderBaseUrl, which parses it as a
+  // URL and enforces public https — the validation moved, it did not weaken.
+  baseUrl: z.string().trim().min(1).max(300).optional(),
 });
+
+/**
+ * Cloudflare's base URL is the one provider setting a user cannot reasonably
+ * type from memory, so the field accepts an account id and composes the URL.
+ * Returns the value unchanged for every other provider.
+ */
+function expandProviderBaseUrl(
+  provider: DirectAgentProvider,
+  baseUrl: string | undefined,
+  server: Parameters<FastifyPluginAsyncZod>[0],
+): string | undefined {
+  if (provider !== 'cloudflare') return baseUrl;
+  if (!baseUrl) {
+    // Cloudflare has no usable default: without an account id the composed URL
+    // is empty and every later call fails with "Failed to parse URL" deep in a
+    // background job. Reject at the boundary instead.
+    throw server.httpErrors.badRequest(
+      'Cloudflare Workers AI needs your account ID (or the full https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1 URL).',
+    );
+  }
+  const normalized = normalizeCloudflareBaseUrl(baseUrl);
+  if (!normalized) {
+    throw server.httpErrors.badRequest(
+      'Enter a 32-character Cloudflare account ID, or a full https:// base URL.',
+    );
+  }
+  return normalized;
+}
 
 // Keyless local-gateway providers may point at localhost without the public
 // https:// requirement below. Gemma's localhost bypass is DEV-ONLY — a
@@ -166,7 +199,11 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
       const existing = await resolveOrgAgentProviderCredential(req.auth.orgId, provider);
       const apiKey = req.body.apiKey ?? existing?.apiKey;
       const model = req.body.model ?? existing?.model;
-      const baseUrl = req.body.baseUrl ?? existing?.baseUrl;
+      const baseUrl = expandProviderBaseUrl(
+        provider,
+        req.body.baseUrl ?? existing?.baseUrl,
+        server,
+      );
 
       if (!isKeylessProvider(provider) && !apiKey) {
         throw server.httpErrors.badRequest('API key is required for this provider.');

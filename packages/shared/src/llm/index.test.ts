@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AGENT_PROVIDER_ACTIVE_NAME,
+  CLOUDFLARE_DEFAULT_MODEL,
+  CLOUDFLARE_WORKERS_AI_MODELS,
   DIRECT_PROVIDER_TO_KIND,
   agentProviderCredentialName,
   buildResolvedLlm,
+  cloudflareWorkersAiBaseUrl,
   coerceJsonObject,
+  isCloudflareAccountId,
   isDirectAgentProvider,
+  isRunnableLlm,
+  normalizeCloudflareBaseUrl,
 } from './index.js';
 
 describe('buildResolvedLlm', () => {
@@ -80,6 +86,71 @@ describe('buildResolvedLlm', () => {
       expect(llm.model).toBe('llama-3.1-70b');
       // extraBody is provider-level, not overridden by baseUrl/model input.
       expect(llm.extraBody).toEqual({ stream: false });
+    });
+  });
+
+  describe('cloudflare (Workers AI — account-scoped OpenAI-compatible endpoint)', () => {
+    const ACCOUNT = '0123456789abcdef0123456789abcdef';
+
+    it('composes the account-scoped base URL from a bare account id', () => {
+      // The stored credential shape is {apiKey, model, baseUrl} with no room
+      // for an account id, so baseUrl carries either form and is normalised
+      // here. A bare id must become the full Workers AI endpoint.
+      const llm = buildResolvedLlm({ provider: 'cloudflare', apiKey: 'cf', baseUrl: ACCOUNT });
+      expect(llm.kind).toBe('openai');
+      expect(llm.baseUrl).toBe(
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/v1`,
+      );
+    });
+
+    it('accepts a full URL unchanged (AI Gateway routes stay usable)', () => {
+      const gateway = 'https://gateway.ai.cloudflare.com/v1/acc/gw/compat';
+      expect(
+        buildResolvedLlm({ provider: 'cloudflare', apiKey: 'cf', baseUrl: `${gateway}/` }).baseUrl,
+      ).toBe(gateway);
+    });
+
+    it('does NOT inherit openai defaults despite sharing the wire kind', () => {
+      // Same trap omniroute has: 'cloudflare' maps to kind 'openai', so without
+      // its own override it would call api.openai.com with gpt-4o-mini.
+      const llm = buildResolvedLlm({ provider: 'cloudflare', apiKey: 'cf', baseUrl: ACCOUNT });
+      expect(llm.baseUrl).not.toContain('api.openai.com');
+      expect(llm.model).toBe(CLOUDFLARE_DEFAULT_MODEL);
+    });
+
+    it('defaults to a model that can hold the extraction payload', () => {
+      // document-extract.ts sends up to 80,000 CHARACTERS in one prompt. The
+      // default must therefore be a large-context model — llama-3.3-70b's
+      // 24k window would truncate it.
+      const def = CLOUDFLARE_WORKERS_AI_MODELS.find((m) => m.id === CLOUDFLARE_DEFAULT_MODEL);
+      expect(def).toBeDefined();
+      expect(def!.contextTokens).toBeGreaterThanOrEqual(100_000);
+    });
+
+    it('every catalogued model is a @cf/ id with a real context window', () => {
+      for (const model of CLOUDFLARE_WORKERS_AI_MODELS) {
+        expect(model.id.startsWith('@cf/')).toBe(true);
+        expect(model.contextTokens).toBeGreaterThan(0);
+      }
+    });
+
+    it('yields an EMPTY base URL when the account id is missing, and that is not runnable', () => {
+      // The failure this pins: a credential saved with a key but no account id
+      // used to resolve "successfully" and then throw "Failed to parse URL"
+      // inside a background job on every call.
+      const llm = buildResolvedLlm({ provider: 'cloudflare', apiKey: 'cf' });
+      expect(llm.baseUrl).toBe('');
+      expect(isRunnableLlm(llm)).toBe(false);
+      expect(isRunnableLlm(buildResolvedLlm({ provider: 'openai', apiKey: 'k' }))).toBe(true);
+    });
+
+    it('rejects a value that is neither an account id nor a URL', () => {
+      expect(normalizeCloudflareBaseUrl('not-an-account')).toBeNull();
+      expect(normalizeCloudflareBaseUrl('')).toBeNull();
+      expect(normalizeCloudflareBaseUrl(undefined)).toBeNull();
+      expect(isCloudflareAccountId(ACCOUNT)).toBe(true);
+      expect(isCloudflareAccountId(`${ACCOUNT}0`)).toBe(false);
+      expect(cloudflareWorkersAiBaseUrl(ACCOUNT)).toContain(ACCOUNT);
     });
   });
 });

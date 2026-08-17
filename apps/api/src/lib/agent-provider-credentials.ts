@@ -8,6 +8,7 @@ import {
   agentProviderCredentialName,
   buildResolvedLlm,
   isDirectAgentProvider,
+  isRunnableLlm,
   type DirectAgentProviderId,
   type ResolvedLlm,
 } from '@bidstack/shared/llm';
@@ -165,10 +166,13 @@ export async function getOrgActiveAgentProvider(
  */
 export function credentialToResolvedLlm(cred: OrgAgentProviderCredential): ResolvedLlm | null {
   if (!isKeylessProvider(cred.provider) && !cred.apiKey) return null;
-  return buildResolvedLlm({
+  const resolved = buildResolvedLlm({
     provider: cred.provider,
     apiKey: cred.apiKey,
     model: cred.model,
     baseUrl: cred.baseUrl,
   });
+  // A provider with no resolvable endpoint (Cloudflare saved without an
+  // account id) is unconfigured, not runnable — see isRunnableLlm.
+  return isRunnableLlm(resolved) ? resolved : null;
 }

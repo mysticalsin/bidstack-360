@@ -78,6 +78,31 @@ describe('resolveActiveLlm', () => {
     expect(llm?.extraBody).toEqual({ stream: false }); // forces non-streaming JSON body
   });
 
+  it('resolves Cloudflare Workers AI from the env when both token and account id are set', async () => {
+    process.env.RFP_LLM_PROVIDER = 'cloudflare';
+    process.env.CLOUDFLARE_API_TOKEN = 'cf-token';
+    process.env.CLOUDFLARE_ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
+
+    const llm = await resolveActiveLlm(orgId);
+
+    expect(llm?.kind).toBe('openai'); // Workers AI is OpenAI-wire-compatible
+    expect(llm?.baseUrl).toBe(
+      'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1',
+    );
+    expect(llm?.model).toBe('@cf/zai-org/glm-4.7-flash');
+  });
+
+  it('returns null for a half-configured Cloudflare env instead of an empty base URL', async () => {
+    // The account id is part of the URL. Without it the composed base URL is
+    // '' and completeChat would fetch a relative path — "Failed to parse URL"
+    // once per call, inside a background job.
+    process.env.RFP_LLM_PROVIDER = 'cloudflare';
+    process.env.CLOUDFLARE_API_TOKEN = 'cf-token';
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+
+    expect(await resolveActiveLlm(orgId)).toBeNull();
+  });
+
   it('prefers the org active provider over the env fallback when both resolve', async () => {
     process.env.RFP_LLM_PROVIDER = 'omniroute';
     mocks.getOrgActiveAgentProvider.mockResolvedValue('claude');

@@ -21,6 +21,7 @@ import {
   agentProviderCredentialName,
   buildResolvedLlm,
   isDirectAgentProvider,
+  isRunnableLlm,
   type DirectAgentProviderId,
   type ResolvedLlm,
 } from '@bidstack/shared/llm';
@@ -79,10 +80,13 @@ export async function resolveOrgLlm(orgId: string): Promise<ResolvedLlm | null> 
   const isKeylessProvider = provider === 'gemma' || provider === 'omniroute';
   if (!isKeylessProvider && !apiKey) return null;
 
-  return buildResolvedLlm({
+  const resolved = buildResolvedLlm({
     provider: provider as DirectAgentProviderId,
     apiKey,
     model: str(config.model),
     baseUrl: str(config.baseUrl),
   });
+  // Same guard the API applies: a provider with no resolvable endpoint
+  // (Cloudflare saved without an account id) is unconfigured, not runnable.
+  return isRunnableLlm(resolved) ? resolved : null;
 }

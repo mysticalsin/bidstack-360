@@ -118,6 +118,58 @@ describe('resolveLlmFromEnv', () => {
     });
   });
 
+  it('resolves cloudflare from an account id + token', () => {
+    // Workers AI's endpoint is account-scoped, so BOTH vars are required and
+    // the account id is composed into the URL.
+    expect(
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'cloudflare',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+      }),
+    ).toMatchObject({
+      kind: 'openai',
+      apiKey: 'cf-token',
+      baseUrl:
+        'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1',
+    });
+  });
+
+  it('returns null for cloudflare when the account id or token is missing', () => {
+    // Half-configured must mean "unconfigured", never a request at an empty
+    // base URL — that surfaced as "Failed to parse URL" inside a queue job.
+    expect(
+      resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'cloudflare', CLOUDFLARE_API_TOKEN: 'cf-token' }),
+    ).toBeNull();
+    expect(
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'cloudflare',
+        CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+      }),
+    ).toBeNull();
+  });
+
+  it('accepts the workers-ai alias and honours CLOUDFLARE_MODEL', () => {
+    expect(
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'workers-ai',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        CLOUDFLARE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fast',
+      }),
+    ).toMatchObject({ model: '@cf/meta/llama-3.1-8b-instruct-fast' });
+  });
+
+  it('rejects a non-Cloudflare host for the cloudflare provider (SSRF guard)', () => {
+    expect(() =>
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'cloudflare',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        CLOUDFLARE_BASE_URL: 'https://evil.example.com/v1',
+      }),
+    ).toThrow(/not allowed/i);
+  });
+
   it('resolves omniroute LOCALLY and keyless by default, forcing non-streaming JSON', () => {
     // WHY stream:false matters: OmniRoute defaults to SSE. Without extraBody
     // forcing stream:false, completeChat would get text/event-stream and fail

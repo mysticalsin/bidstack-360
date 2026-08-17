@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import { DIRECT_AGENT_PROVIDERS } from '@bidstack/shared/llm';
 
 import { buildServer } from '../server.js';
 import {
@@ -68,21 +69,19 @@ afterAll(async () => {
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('agent provider routes', () => {
-  t('lists all six providers with no active provider by default', async () => {
+  t('lists every registered provider with no active provider by default', async () => {
     const res = await server.inject({ method: 'GET', url: `${BASE}/credentials` });
     expect(res.statusCode).toBe(200);
     const body = res.json() as {
       items: Array<{ provider: string; configured: boolean }>;
       active: string | null;
     };
-    expect(body.items.map((i) => i.provider).sort()).toEqual([
-      'claude',
-      'gemma',
-      'kimi',
-      'nvidia_nim',
-      'omniroute',
-      'openai',
-    ]);
+    // Asserted against the registry, not a hand-copied literal: the route builds
+    // its items from DIRECT_AGENT_PROVIDERS, so a literal here only ever
+    // re-states the source and goes stale the next time a provider is added.
+    expect(body.items.map((i) => i.provider).sort()).toEqual([...DIRECT_AGENT_PROVIDERS].sort());
+    expect(body.items).toHaveLength(DIRECT_AGENT_PROVIDERS.length);
+    expect(body.items.map((i) => i.provider)).toContain('cloudflare');
     expect(body.active).toBeNull();
     expect(body.items.find((i) => i.provider === 'gemma')?.configured).toBe(false);
   });

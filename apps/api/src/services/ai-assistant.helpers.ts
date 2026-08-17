@@ -12,7 +12,12 @@ import type { Logger as PinoLogger } from 'pino';
 
 import { prisma } from '@bidstack/db';
 import type { DustClient } from '@bidstack/dust-client';
-import { buildResolvedLlm, completeChat, type ResolvedLlm } from '@bidstack/shared/llm';
+import {
+  buildResolvedLlm,
+  cloudflareWorkersAiBaseUrl,
+  completeChat,
+  type ResolvedLlm,
+} from '@bidstack/shared/llm';
 
 import { getOrgDust, type DustCredentials } from '../lib/dust-credentials.js';
 export { resolveAgentId } from '../lib/dust-credentials.js';
@@ -274,6 +279,25 @@ export async function resolveActiveLlm(orgId: string): Promise<ResolvedLlm | nul
       model: process.env.OPENAI_MODEL,
       baseUrl: process.env.OPENAI_BASE_URL,
     });
+  }
+  // Cloudflare Workers AI needs BOTH a token and an account id (the account id
+  // is part of the URL). Missing either means unconfigured, not misconfigured —
+  // fall through to null so the caller keeps its stub.
+  if (kind === 'cloudflare' || kind === 'workers-ai') {
+    const baseUrl =
+      process.env.CLOUDFLARE_BASE_URL ??
+      (process.env.CLOUDFLARE_ACCOUNT_ID
+        ? cloudflareWorkersAiBaseUrl(process.env.CLOUDFLARE_ACCOUNT_ID)
+        : undefined);
+    if (process.env.CLOUDFLARE_API_TOKEN && baseUrl) {
+      return buildResolvedLlm({
+        provider: 'cloudflare',
+        apiKey: process.env.CLOUDFLARE_API_TOKEN,
+        model: process.env.CLOUDFLARE_MODEL,
+        baseUrl,
+      });
+    }
+    return null;
   }
   if (kind === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     // DirectAgentProviderId calls Anthropic 'claude', not 'anthropic'.
