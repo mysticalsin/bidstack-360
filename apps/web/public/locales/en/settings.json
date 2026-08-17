@@ -819,5 +819,24 @@
   "dataImport": {
     "title": "Data import",
     "caption": "Bring companies, contacts, leads, and opportunities in from a CSV export of your previous CRM. Map your columns, choose how duplicates are handled, then import."
+  },
+  "stageGate": {
+    "caption": "Amaris Bid Office: block stage jumps and stop a no-bid opportunity from advancing.",
+    "loadErrorMessage": "Try again shortly.",
+    "loadErrorTitle": "Could not load stage-gate enforcement",
+    "modeEnforce": "Enforce — block violations",
+    "modeInherit": "Use server default",
+    "modeLabel": "Enforcement mode",
+    "modeOff": "Off — no stage checks",
+    "modeWarn": "Warn — log violations, allow",
+    "persistedHint": "Applies to every opportunity in this workspace.",
+    "readOnlyHint": "Stage-gate enforcement is read-only unless you are an admin.",
+    "ruleDecision": "Standing decision: an opportunity with a recorded No-Go / No-Bid cannot advance until a positive gate or a justified override is on record.",
+    "ruleJump": "Stage jumps: a bid moves one step at a time, or closes, or reopens.",
+    "saveButton": "Save stage-gate enforcement",
+    "saveError": "Could not save stage-gate enforcement",
+    "saveSuccess": "Stage-gate enforcement saved",
+    "savingButton": "Saving...",
+    "title": "Stage-gate enforcement"
   }
 }

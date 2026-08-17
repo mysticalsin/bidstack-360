@@ -828,5 +828,24 @@
   "dataImport": {
     "title": "Importación de datos",
     "caption": "Importa empresas, contactos, prospectos y oportunidades desde una exportación CSV de tu CRM anterior. Asigna tus columnas, elige cómo se gestionan los duplicados y luego importa."
+  },
+  "stageGate": {
+    "caption": "Amaris Bid Office: bloquea saltos de etapa e impide que una oportunidad con No-Bid avance.",
+    "loadErrorMessage": "Inténtalo de nuevo en unos momentos.",
+    "loadErrorTitle": "No se pudo cargar el control por etapas",
+    "modeEnforce": "Aplicar — bloquea infracciones",
+    "modeInherit": "Usar valor del servidor",
+    "modeLabel": "Modo de aplicación",
+    "modeOff": "Desactivado — sin validación de etapas",
+    "modeWarn": "Advertir — registra infracciones y permite",
+    "persistedHint": "Aplica a todas las oportunidades de este espacio de trabajo.",
+    "readOnlyHint": "El control por etapas es de solo lectura salvo que seas administrador.",
+    "ruleDecision": "Decisión vigente: una oportunidad con un No-Go / No-Bid registrado no puede avanzar hasta que exista un punto de control positivo o una excepción justificada.",
+    "ruleJump": "Saltos de etapa: una oferta avanza de a una etapa, o se cierra, o se reabre.",
+    "saveButton": "Guardar control por etapas",
+    "saveError": "No se pudo guardar el control por etapas",
+    "saveSuccess": "Control por etapas guardado",
+    "savingButton": "Guardando...",
+    "title": "Control por etapas"
   }
 }

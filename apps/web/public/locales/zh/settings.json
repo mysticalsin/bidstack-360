@@ -825,5 +825,24 @@
   "dataImport": {
     "title": "数据导入",
     "caption": "从您以前的 CRM 的 CSV 导出文件中导入公司、联系人、潜在客户和商机。映射列、选择重复项的处理方式，然后导入。"
+  },
+  "stageGate": {
+    "caption": "Amaris Bid Office：阻止跨阶段跳转，并阻止已判定 No-Bid 的商机继续推进。",
+    "loadErrorMessage": "请稍后重试。",
+    "loadErrorTitle": "无法加载阶段关卡管控",
+    "modeEnforce": "强制 — 阻止违规",
+    "modeInherit": "使用服务器默认值",
+    "modeLabel": "管控模式",
+    "modeOff": "关闭 — 不做阶段校验",
+    "modeWarn": "警告 — 记录违规，允许通过",
+    "persistedHint": "适用于本工作区的所有商机。",
+    "readOnlyHint": "阶段关卡管控仅管理员可修改，其他角色只读。",
+    "ruleDecision": "既有决策：已记录 No-Go / No-Bid 的商机，须有正面关卡结论或经说明理由的例外授权，方可推进。",
+    "ruleJump": "阶段跳转：投标每次只能推进一步，或关闭，或重新开启。",
+    "saveButton": "保存阶段关卡管控",
+    "saveError": "阶段关卡管控保存失败",
+    "saveSuccess": "阶段关卡管控已保存",
+    "savingButton": "保存中...",
+    "title": "阶段关卡管控"
   }
 }

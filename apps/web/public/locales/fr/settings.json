@@ -825,5 +825,24 @@
   "dataImport": {
     "title": "Importation de données",
     "caption": "Importez des entreprises, contacts, prospects et opportunités depuis un export CSV de votre ancien CRM. Mappez vos colonnes, choisissez le traitement des doublons, puis importez."
+  },
+  "stageGate": {
+    "caption": "Amaris Bid Office : bloquer les sauts d'étape et empêcher une opportunité en No-Bid d'avancer.",
+    "loadErrorMessage": "Réessayez dans un instant.",
+    "loadErrorTitle": "Impossible de charger l'application des jalons",
+    "modeEnforce": "Strict — violations bloquées",
+    "modeInherit": "Utiliser la valeur par défaut du serveur",
+    "modeLabel": "Mode d'application",
+    "modeOff": "Désactivé — aucun contrôle d'étape",
+    "modeWarn": "Alerte — violations journalisées, autorisées",
+    "persistedHint": "S'applique à toutes les opportunités de cet espace de travail.",
+    "readOnlyHint": "L'application des jalons est en lecture seule, sauf pour les administrateurs.",
+    "ruleDecision": "Décision en vigueur : une opportunité avec un No-Go / No-Bid consigné ne peut pas avancer tant qu'un jalon positif ou une dérogation justifiée n'est pas enregistré.",
+    "ruleJump": "Sauts d'étape : une offre avance d'une étape à la fois, ou se clôture, ou se rouvre.",
+    "saveButton": "Enregistrer l'application des jalons",
+    "saveError": "Impossible d'enregistrer l'application des jalons",
+    "saveSuccess": "Application des jalons enregistrée",
+    "savingButton": "Enregistrement...",
+    "title": "Application des jalons d'étape"
   }
 }

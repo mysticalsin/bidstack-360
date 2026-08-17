@@ -825,5 +825,24 @@
   "dataImport": {
     "title": "Importação de dados",
     "caption": "Importe empresas, contatos, leads e oportunidades de uma exportação CSV do seu CRM anterior. Mapeie suas colunas, escolha como os duplicados são tratados e importe."
+  },
+  "stageGate": {
+    "caption": "Amaris Bid Office: bloqueia saltos de estágio e impede que uma oportunidade em No-Bid avance.",
+    "loadErrorMessage": "Tente novamente em instantes.",
+    "loadErrorTitle": "Não foi possível carregar o controle de stage-gate",
+    "modeEnforce": "Aplicar — bloqueia violações",
+    "modeInherit": "Usar padrão do servidor",
+    "modeLabel": "Modo de aplicação",
+    "modeOff": "Desligado — sem verificações de estágio",
+    "modeWarn": "Avisar — registra violações, permite",
+    "persistedHint": "Vale para todas as oportunidades deste workspace.",
+    "readOnlyHint": "O controle de stage-gate é somente leitura, exceto para administradores.",
+    "ruleDecision": "Decisão vigente: uma oportunidade com No-Go / No-Bid registrado não pode avançar até haver um gate positivo ou uma exceção justificada no registro.",
+    "ruleJump": "Saltos de estágio: um bid avança um passo por vez, ou fecha, ou reabre.",
+    "saveButton": "Salvar controle de stage-gate",
+    "saveError": "Não foi possível salvar o controle de stage-gate",
+    "saveSuccess": "Controle de stage-gate salvo",
+    "savingButton": "Salvando...",
+    "title": "Controle de stage-gate"
   }
 }
