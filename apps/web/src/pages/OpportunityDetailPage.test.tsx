@@ -53,6 +53,9 @@ vi.mock('./opportunityDetail/IntelCards', () => ({
 }));
 vi.mock('./opportunityDetail/BidScoreCard', () => ({ BidScoreCard: () => null }));
 vi.mock('./opportunityDetail/TimelinePanel', () => ({ TimelinePanel: () => null }));
+vi.mock('./opportunityDetail/LessonsLearnedCard', () => ({ LessonsLearnedCard: () => null }));
+// The governance panel has its own focused test (BidGovernancePanel.test.tsx).
+vi.mock('@/components/bid/BidGovernancePanel', () => ({ BidGovernancePanel: () => null }));
 
 const OPPORTUNITY: OpportunityFull = {
   id: 'opp-1',

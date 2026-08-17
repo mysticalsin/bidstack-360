@@ -44,7 +44,7 @@ import {
   bidNoBidSearchParams,
   opportunityIdParser,
 } from './bidNoBid/bid-no-bid-search-params';
-import { BidClassificationPanel } from './bidNoBid/BidClassificationPanel';
+import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 import { CriteriaCategoryFilter } from './bidNoBid/CriteriaCategoryFilter';
 import { CriteriaTable } from './bidNoBid/CriteriaTable';
 import { OverrideDialog } from './bidNoBid/OverrideDialog';
@@ -368,7 +368,10 @@ export function BidNoBidPage() {
         onOverride={(justification) => saveScore('override', justification)}
       />
 
-      <BidClassificationPanel opportunityId={opportunityId} />
+      <BidGovernancePanel
+        opportunityId={opportunityId}
+        saved={opps?.items.find((o) => o.id === opportunityId) ?? null}
+      />
 
       <div className={`${PANEL} mb-8`}>
         <h2 className="mb-2 text-sm font-semibold text-fg-primary">

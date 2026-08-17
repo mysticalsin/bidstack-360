@@ -45,6 +45,8 @@ import {
 } from './opportunityDetail/IntelCards';
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
+import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
+import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
 const BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
@@ -490,6 +492,16 @@ export function OpportunityDetailPage() {
       </div>
 
       <NewsCard intel={intel} />
+
+      {/* Amaris Bid Office governance lives ON the record: the class, the gates
+          that class requires, and the formal sign-offs against them. */}
+      <BidGovernancePanel opportunityId={data.id} saved={data} />
+
+      {/* Stage 10 — renders only once the bid is closed. */}
+      <LessonsLearnedCard
+        opportunityId={data.id}
+        outcome={isWon ? 'won' : isLost ? 'lost' : null}
+      />
 
       <OpportunityTabs
         oppId={data.id}

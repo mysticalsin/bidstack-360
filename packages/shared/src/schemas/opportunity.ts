@@ -78,6 +78,11 @@ export const Opportunity = z.object({
   // Amaris Bid Office class (C0–C4). Set via the classification endpoint, not
   // create/patch. Null for opportunities that haven't been classified.
   bidClass: z.string().nullable().default(null),
+  // The two inputs the class was derived from. On the wire so the governance
+  // panel opens on the SAVED assessment instead of silently recomputing a
+  // different class from its own defaults.
+  fteEstimate: z.number().nullable().default(null),
+  commitmentLevel: z.string().nullable().default(null),
 });
 export type Opportunity = z.infer<typeof Opportunity>;
 
@@ -90,6 +95,8 @@ export const OpportunityCreate = Opportunity.omit({
   territoryName: true,
   pipelineStage: true,
   bidClass: true,
+  fteEstimate: true,
+  commitmentLevel: true,
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
@@ -107,6 +114,8 @@ export const OpportunityPatch = Opportunity.partial().omit({
   territoryName: true,
   pipelineStage: true,
   bidClass: true,
+  fteEstimate: true,
+  commitmentLevel: true,
 }).extend({
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and

@@ -34,6 +34,8 @@ type SerializedOpportunity = {
   updatedAt: Date;
   viewCount: number | null;
   bidClass?: string | null;
+  fteEstimate?: number | null;
+  commitmentLevel?: string | null;
   // Only the detail/full path reads intel; the list query omits the column to
   // avoid fetching the large JSONB per row, so this is optional here.
   intel?: unknown;
@@ -90,6 +92,8 @@ export function serializeOpportunity(
     commentCount: counts?.commentCount ?? 0,
     viewCount: o.viewCount ?? 0,
     bidClass: o.bidClass ?? null,
+    fteEstimate: o.fteEstimate ?? null,
+    commitmentLevel: o.commitmentLevel ?? null,
   };
 }
 

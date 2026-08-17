@@ -107,6 +107,11 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               updatedAt: true,
               viewCount: true,
               bidClass: true,
+              // Two scalars, no JSONB: the governance panel needs the inputs the
+              // class was derived from, or it reopens on its own defaults and
+              // shows a different class than the one on record.
+              fteEstimate: true,
+              commitmentLevel: true,
               owner: { select: { id: true, name: true, email: true } },
               territory: { select: { name: true } },
               pipelineStage: {
