@@ -70,6 +70,8 @@
       "removeFailedTitle": "Rimozione non riuscita"
     },
     "error": {
+      "accountIdInvalid": "Questo non è un ID account Cloudflare (32 caratteri esadecimali) né un URL https:// completo.",
+      "accountIdRequired": "Cloudflare Workers AI richiede il tuo ID account.",
       "apiKeyRequired": "È richiesta una chiave API per questo provider.",
       "claudeModelRequired": "Claude richiede un modello, ad esempio claude-sonnet-4-5.",
       "saveFailed": "Impossibile salvare le credenziali del provider."
@@ -128,22 +130,24 @@
       "updatedNever": "Mai"
     },
     "dialog": {
-      "updateTitle": "Aggiorna {{label}}",
+      "accountIdHint": "Lo trovi nell'URL della dashboard di Cloudflare, oppure esegui `wrangler whoami`. Funziona anche un URL di base https:// completo.",
+      "accountIdLabel": "ID account Cloudflare",
       "addTitle": "Aggiungi provider di modelli",
-      "description": "La chiave API viene cifrata prima dell'archiviazione e non viene mai restituita al browser. Lascia vuota la chiave durante la modifica per mantenere quella salvata.",
-      "providerLabel": "Provider",
-      "apiKeyLabelOptional": "Chiave API (facoltativa)",
       "apiKeyLabel": "Chiave API",
+      "apiKeyLabelOptional": "Chiave API (facoltativa)",
+      "apiKeyPlaceholder": "Incolla la chiave del provider",
       "apiKeyPlaceholderKeep": "Lascia vuoto per mantenere la chiave salvata",
       "apiKeyPlaceholderOptional": "Facoltativo per i runtime locali",
-      "apiKeyPlaceholder": "Incolla la chiave del provider",
-      "modelLabel": "Modello",
-      "baseUrlLabel": "URL di base",
-      "baseUrlHintLocal": "Localhost è accettato solo nello sviluppo locale. La produzione richiede https pubblico.",
       "baseUrlHint": "Deve essere un endpoint https pubblico.",
+      "baseUrlHintLocal": "Localhost è accettato solo nello sviluppo locale. La produzione richiede https pubblico.",
+      "baseUrlLabel": "URL di base",
       "cancel": "Annulla",
+      "description": "La chiave API viene cifrata prima dell'archiviazione e non viene mai restituita al browser. Lascia vuota la chiave durante la modifica per mantenere quella salvata.",
+      "modelLabel": "Modello",
+      "providerLabel": "Provider",
+      "save": "Salva provider",
       "saving": "Salvataggio...",
-      "save": "Salva provider"
+      "updateTitle": "Aggiorna {{label}}"
     },
     "omnirouteHint": "Gateway AI locale e gratuito — nessuna chiave necessaria. Instrada su molti provider gratuiti con fallback automatico."
   },

@@ -25,6 +25,7 @@ import { ConnectionCommandCenter } from '@/pages/integrations/ConnectionCommandC
 import { ConnectionRunway } from '@/pages/integrations/ConnectionRunway';
 import { ConnectionTester } from '@/pages/integrations/ConnectionTester';
 import { DustAgentsCard } from '@/pages/integrations/DustAgentsCard';
+import { AgentProviderCredentialsCard } from '@/pages/integrations/AgentProviderCredentialsCard';
 import { DustCredentialsCard } from '@/pages/integrations/DustCredentialsCard';
 import { IntegrationHero } from '@/pages/integrations/IntegrationHero';
 import { WebhookEventsCard } from '@/pages/integrations/WebhookEventsCard';
@@ -134,6 +135,12 @@ export function IntegrationsSection() {
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6 outline-none">
+          {/* Model providers first: this is the card that decides which LLM
+              every AI step in the product actually calls. It existed but was
+              never mounted anywhere, so the whole provider registry — keys,
+              active-provider switch, connectivity test — was unreachable from
+              the running app. */}
+          <AgentProviderCredentialsCard />
           <DustCredentialsCard />
 
           <Card>

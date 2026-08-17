@@ -70,6 +70,8 @@
       "removeFailedTitle": "Remove failed"
     },
     "error": {
+      "accountIdInvalid": "That is not a Cloudflare account ID (32 hex characters) or a full https:// URL.",
+      "accountIdRequired": "Cloudflare Workers AI needs your account ID.",
       "apiKeyRequired": "API key is required for this provider.",
       "claudeModelRequired": "Claude requires a model, for example claude-sonnet-4-5.",
       "saveFailed": "Could not save provider credentials."
@@ -128,22 +130,24 @@
       "updatedNever": "Never"
     },
     "dialog": {
-      "updateTitle": "Update {{label}}",
+      "accountIdHint": "Find it in the Cloudflare dashboard URL, or run `wrangler whoami`. A full https:// base URL also works.",
+      "accountIdLabel": "Cloudflare account ID",
       "addTitle": "Add model provider",
-      "description": "The API key is encrypted before storage and never returned to the browser. Leave the key blank when editing to keep the saved key.",
-      "providerLabel": "Provider",
-      "apiKeyLabelOptional": "API key (optional)",
       "apiKeyLabel": "API key",
+      "apiKeyLabelOptional": "API key (optional)",
+      "apiKeyPlaceholder": "Paste provider key",
       "apiKeyPlaceholderKeep": "Leave blank to keep the saved key",
       "apiKeyPlaceholderOptional": "Optional for local runtimes",
-      "apiKeyPlaceholder": "Paste provider key",
-      "modelLabel": "Model",
-      "baseUrlLabel": "Base URL",
-      "baseUrlHintLocal": "Localhost is accepted only in local development. Production requires public https.",
       "baseUrlHint": "Must be a public https endpoint.",
+      "baseUrlHintLocal": "Localhost is accepted only in local development. Production requires public https.",
+      "baseUrlLabel": "Base URL",
       "cancel": "Cancel",
+      "description": "The API key is encrypted before storage and never returned to the browser. Leave the key blank when editing to keep the saved key.",
+      "modelLabel": "Model",
+      "providerLabel": "Provider",
+      "save": "Save provider",
       "saving": "Saving...",
-      "save": "Save provider"
+      "updateTitle": "Update {{label}}"
     },
     "omnirouteHint": "Free local AI gateway — no key needed. Routes across many free providers with auto-fallback."
   },

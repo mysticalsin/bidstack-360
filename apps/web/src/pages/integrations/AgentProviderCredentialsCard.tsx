@@ -19,56 +19,90 @@ import {
   type DirectAgentProvider,
 } from '@/hooks/useAgentProviderCredentials';
 import { useIsAdmin } from '@/lib/auth';
+// Catalogue only (pure data) — the LLM wire client stays out of the web bundle.
+import {
+  CLOUDFLARE_DEFAULT_MODEL,
+  CLOUDFLARE_WORKERS_AI_MODELS,
+  DIRECT_AGENT_PROVIDERS,
+  isCloudflareAccountId,
+} from '@bidstack/shared';
 
-const PROVIDERS: Array<{
+interface ProviderMeta {
   value: DirectAgentProvider;
   label: string;
   placeholderModel: string;
   placeholderBaseUrl: string;
   keyOptional?: boolean;
-}> = [
-  {
+  /** Cloudflare's endpoint is account-scoped — the field is an account ID. */
+  baseUrlIsAccountId?: boolean;
+  /** When set, the model field renders as a picker instead of free text. */
+  models?: readonly { id: string; label: string; contextTokens: number }[];
+}
+
+// EXHAUSTIVE by construction: the Record forces a compile error when a provider
+// is added to DIRECT_AGENT_PROVIDERS and forgotten here. It used to be a bare
+// array, and providerMeta() fell back to PROVIDERS[0] on a miss — so a provider
+// the API served but the UI did not know rendered as a duplicate card labelled
+// "OmniRoute (free gateway)" with OmniRoute's endpoint placeholder.
+const PROVIDER_META: Record<DirectAgentProvider, ProviderMeta> = {
+  omniroute: {
     value: 'omniroute',
     label: 'OmniRoute (free gateway)',
     placeholderModel: 'auto/best-free',
     placeholderBaseUrl: 'http://localhost:20128/v1',
     keyOptional: true,
   },
-  {
+  cloudflare: {
+    value: 'cloudflare',
+    label: 'Cloudflare Workers AI',
+    placeholderModel: CLOUDFLARE_DEFAULT_MODEL,
+    placeholderBaseUrl: '0123456789abcdef0123456789abcdef',
+    baseUrlIsAccountId: true,
+    models: CLOUDFLARE_WORKERS_AI_MODELS,
+  },
+  claude: {
     value: 'claude',
     label: 'Claude',
     placeholderModel: 'claude-sonnet-4-5',
     placeholderBaseUrl: 'https://api.anthropic.com/v1/messages',
   },
-  {
+  openai: {
     value: 'openai',
     label: 'OpenAI',
     placeholderModel: 'gpt-4o-mini',
     placeholderBaseUrl: 'https://api.openai.com/v1',
   },
-  {
+  kimi: {
     value: 'kimi',
     label: 'Kimi',
     placeholderModel: 'moonshot-v1-32k',
     placeholderBaseUrl: 'https://api.moonshot.ai/v1',
   },
-  {
+  nvidia_nim: {
     value: 'nvidia_nim',
     label: 'NVIDIA NIM',
     placeholderModel: 'deepseek-ai/deepseek-v4-pro',
     placeholderBaseUrl: 'https://integrate.api.nvidia.com/v1',
   },
-  {
+  gemma: {
     value: 'gemma',
     label: 'Gemma/local',
     placeholderModel: 'gemma3',
     placeholderBaseUrl: 'http://localhost:11434/v1',
     keyOptional: true,
   },
+};
+
+// Display order: OmniRoute first (it is the zero-config option), then the rest
+// in the shared registry's order. Derived, so a new provider appears
+// automatically once PROVIDER_META has its entry.
+const PROVIDERS: readonly ProviderMeta[] = [
+  PROVIDER_META.omniroute,
+  ...DIRECT_AGENT_PROVIDERS.filter((id) => id !== 'omniroute').map((id) => PROVIDER_META[id]),
 ];
 
-function providerMeta(provider: DirectAgentProvider) {
-  return PROVIDERS.find((item) => item.value === provider) ?? PROVIDERS[0]!;
+function providerMeta(provider: DirectAgentProvider): ProviderMeta {
+  return PROVIDER_META[provider] ?? PROVIDER_META.omniroute;
 }
 
 export function AgentProviderCredentialsCard() {
@@ -197,6 +231,30 @@ export function AgentProviderCredentialsCard() {
         ),
       );
       return;
+    }
+    // Cloudflare's endpoint is account-scoped: without an account id the
+    // composed base URL is empty and every AI call would fail deep inside a
+    // background job. Catch it in the form rather than at request time.
+    if (meta.baseUrlIsAccountId) {
+      const effective = baseUrl || editing.baseUrl || '';
+      if (!effective) {
+        setError(
+          t(
+            'agentProviderCredentials.error.accountIdRequired',
+            'Cloudflare Workers AI needs your account ID.',
+          ),
+        );
+        return;
+      }
+      if (!isCloudflareAccountId(effective) && !/^https?:\/\//i.test(effective)) {
+        setError(
+          t(
+            'agentProviderCredentials.error.accountIdInvalid',
+            'That is not a Cloudflare account ID (32 hex characters) or a full https:// URL.',
+          ),
+        );
+        return;
+      }
     }
 
     try {
@@ -590,24 +648,54 @@ function ProviderDialog({
                   : undefined
               }
             />
+            {meta.models ? (
+              // A picker, not free text: the ids are long and `@cf/`-prefixed,
+              // and the context window is the number that decides whether a
+              // long RFP extraction fits. Showing it here prevents picking a
+              // 24k model for an 80k-character prompt.
+              <label className="block text-xs font-medium text-[var(--fg-secondary)]">
+                {t('agentProviderCredentials.dialog.modelLabel', 'Model')}
+                <select
+                  name="model"
+                  defaultValue={editing.model ?? meta.placeholderModel}
+                  className="mt-1 h-10 w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-sm text-[var(--fg-primary)]"
+                >
+                  {meta.models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label} — {Math.round(model.contextTokens / 1000)}k context
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <Field
+                label={t('agentProviderCredentials.dialog.modelLabel', 'Model')}
+                name="model"
+                defaultValue={editing.model ?? ''}
+                placeholder={meta.placeholderModel}
+              />
+            )}
             <Field
-              label={t('agentProviderCredentials.dialog.modelLabel', 'Model')}
-              name="model"
-              defaultValue={editing.model ?? ''}
-              placeholder={meta.placeholderModel}
-            />
-            <Field
-              label={t('agentProviderCredentials.dialog.baseUrlLabel', 'Base URL')}
+              label={
+                meta.baseUrlIsAccountId
+                  ? t('agentProviderCredentials.dialog.accountIdLabel', 'Cloudflare account ID')
+                  : t('agentProviderCredentials.dialog.baseUrlLabel', 'Base URL')
+              }
               name="baseUrl"
               defaultValue={editing.baseUrl ?? ''}
               placeholder={meta.placeholderBaseUrl}
               hint={
-                draftProvider === 'gemma'
+                meta.baseUrlIsAccountId
                   ? t(
-                      'agentProviderCredentials.dialog.baseUrlHintLocal',
-                      'Localhost is accepted only in local development. Production requires public https.',
+                      'agentProviderCredentials.dialog.accountIdHint',
+                      'Find it in the Cloudflare dashboard URL, or run `wrangler whoami`. A full https:// base URL also works.',
                     )
-                  : t('agentProviderCredentials.dialog.baseUrlHint', 'Must be a public https endpoint.')
+                  : draftProvider === 'gemma'
+                    ? t(
+                        'agentProviderCredentials.dialog.baseUrlHintLocal',
+                        'Localhost is accepted only in local development. Production requires public https.',
+                      )
+                    : t('agentProviderCredentials.dialog.baseUrlHint', 'Must be a public https endpoint.')
               }
             />
             {error ? (

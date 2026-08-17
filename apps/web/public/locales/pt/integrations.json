@@ -70,6 +70,8 @@
       "removeFailedTitle": "Falha ao remover"
     },
     "error": {
+      "accountIdInvalid": "Isso não é um ID de conta Cloudflare (32 caracteres hexadecimais) nem uma URL https:// completa.",
+      "accountIdRequired": "O Workers AI da Cloudflare precisa do ID da sua conta.",
       "apiKeyRequired": "É necessária uma chave de API para este provedor.",
       "claudeModelRequired": "O Claude requer um modelo, por exemplo claude-sonnet-4-5.",
       "saveFailed": "Não foi possível salvar as credenciais do provedor."
@@ -128,22 +130,24 @@
       "updatedNever": "Nunca"
     },
     "dialog": {
-      "updateTitle": "Atualizar {{label}}",
+      "accountIdHint": "Encontre-o na URL do painel da Cloudflare ou execute `wrangler whoami`. Uma URL base https:// completa também funciona.",
+      "accountIdLabel": "ID da conta Cloudflare",
       "addTitle": "Adicionar provedor de modelos",
-      "description": "A chave de API é criptografada antes do armazenamento e nunca é devolvida ao navegador. Deixe a chave em branco ao editar para manter a chave salva.",
-      "providerLabel": "Provedor",
-      "apiKeyLabelOptional": "Chave de API (opcional)",
       "apiKeyLabel": "Chave de API",
+      "apiKeyLabelOptional": "Chave de API (opcional)",
+      "apiKeyPlaceholder": "Cole a chave do provedor",
       "apiKeyPlaceholderKeep": "Deixe em branco para manter a chave salva",
       "apiKeyPlaceholderOptional": "Opcional para runtimes locais",
-      "apiKeyPlaceholder": "Cole a chave do provedor",
-      "modelLabel": "Modelo",
-      "baseUrlLabel": "URL base",
-      "baseUrlHintLocal": "Localhost só é aceito em desenvolvimento local. Produção exige https público.",
       "baseUrlHint": "Deve ser um endpoint https público.",
+      "baseUrlHintLocal": "Localhost só é aceito em desenvolvimento local. Produção exige https público.",
+      "baseUrlLabel": "URL base",
       "cancel": "Cancelar",
+      "description": "A chave de API é criptografada antes do armazenamento e nunca é devolvida ao navegador. Deixe a chave em branco ao editar para manter a chave salva.",
+      "modelLabel": "Modelo",
+      "providerLabel": "Provedor",
+      "save": "Salvar provedor",
       "saving": "Salvando...",
-      "save": "Salvar provedor"
+      "updateTitle": "Atualizar {{label}}"
     },
     "omnirouteHint": "Gateway de IA local e gratuito — sem chave. Roteia entre vários provedores gratuitos com fallback automático."
   },
