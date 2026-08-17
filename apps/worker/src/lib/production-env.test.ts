@@ -30,7 +30,7 @@ describe('worker production env contract', () => {
       'PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production',
       'BIDSTACK_JOB_SIGNING_SECRET is required in production',
       "BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production",
-      'STORAGE_DRIVER=s3 is required in production',
+      'STORAGE_DRIVER=s3 is required in production (or set BIDSTACK_ALLOW_LOCAL_STORAGE=true to launch on ephemeral local disk)',
     ]);
   });
 
@@ -135,7 +135,11 @@ describe('worker production env contract', () => {
         ...validProductionEnv,
         STORAGE_DRIVER: 'local',
       }),
-    ).toContain('STORAGE_DRIVER=s3 is required in production');
+      // 6b792ab9 widened the message with the BIDSTACK_ALLOW_LOCAL_STORAGE
+      // escape hatch; the assertion still pins that local storage is rejected.
+    ).toContain(
+      'STORAGE_DRIVER=s3 is required in production (or set BIDSTACK_ALLOW_LOCAL_STORAGE=true to launch on ephemeral local disk)',
+    );
   });
 
   it('requires S3 bucket and region when S3 storage is active', () => {

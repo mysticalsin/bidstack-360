@@ -72,7 +72,9 @@ describe('resolveActiveLlm', () => {
     expect(llm).not.toBeNull();
     expect(llm?.kind).toBe('openai'); // OmniRoute speaks the OpenAI-compatible wire shape
     expect(llm?.baseUrl).toBe('http://localhost:20128/v1');
-    expect(llm?.model).toBe('auto');
+    // 'auto/best-free', not 'auto': 7a95286f moved the keyless default onto the
+    // free-tier routing pool so an unconfigured org cannot spend paid quota.
+    expect(llm?.model).toBe('auto/best-free');
     expect(llm?.extraBody).toEqual({ stream: false }); // forces non-streaming JSON body
   });
 
@@ -120,7 +122,7 @@ describe('completeChatOrNull', () => {
     // a vacuous one).
     const [meta] = (log.warn as ReturnType<typeof vi.fn>).mock.calls[0] as [Record<string, unknown>];
     expect(Object.keys(meta)).not.toContain('apiKey');
-    expect(meta).toMatchObject({ provider: 'openai', model: 'auto' });
+    expect(meta).toMatchObject({ provider: 'openai', model: 'auto/best-free' });
 
     vi.unstubAllGlobals();
   });
