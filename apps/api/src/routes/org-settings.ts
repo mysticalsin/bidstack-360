@@ -2,7 +2,6 @@
 // adjustable in Settings without a code change. Read returns defaults when no
 // OrgSettings row exists yet.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
@@ -12,6 +11,8 @@ import {
   ORG_LOCALE_DEFAULT,
   OrgLocaleSettings,
   OrgLocaleSettingsUpdate,
+  OrgStageGateSettings,
+  type StageGateMode,
   OpportunityFilterRules,
   OpportunityFilterRulesUpdate,
 } from '@bidstack/shared';
@@ -219,8 +220,10 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   // ── Stage-gate mode (Amaris) — per-org override of the STAGE_GATE_MODE env ──
-  const StageGate = z.object({ mode: z.enum(['off', 'warn', 'enforce']).nullable() });
-  const readMode = (v: string | null | undefined): 'off' | 'warn' | 'enforce' | null =>
+  // Contract lives in @bidstack/shared so the settings UI types against the
+  // same schema the route validates with, like every other org-settings block.
+  const StageGate = OrgStageGateSettings;
+  const readMode = (v: string | null | undefined): StageGateMode | null =>
     v === 'off' || v === 'warn' || v === 'enforce' ? v : null;
 
   server.get(
