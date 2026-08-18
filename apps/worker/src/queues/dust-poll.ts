@@ -115,6 +115,17 @@ export function resetDustCircuitBreakerForTest(): void {
  * when the org has no Dust configured, so the integration UI still has feedback.
  */
 export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
+  // A job can outlive its tenant: the org may be deleted between enqueue and
+  // processing (offboarding, or a dropped test tenant). Writing the stub
+  // sync_event below then violates sync_events_org_id_fkey and throws, so
+  // BullMQ retries the job and the same FK error repeats forever. Exit quietly
+  // instead — there is no tenant left to report a sync status to.
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { id: true } });
+  if (!org) {
+    log.info({ orgId }, 'dust.poll: org no longer exists — dropping job');
+    return;
+  }
+
   const { client: dust, creds } = await getOrgDust(orgId, log.child({ orgId, kind: 'dust' }));
   const dataSourceId = creds?.dataSourceId;
   if (!dust || !dataSourceId) {
