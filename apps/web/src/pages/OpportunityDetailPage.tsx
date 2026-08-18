@@ -211,8 +211,14 @@ export function OpportunityDetailPage() {
             {/* A3 — who else is looking at this bid right now. */}
             <PresenceAvatars entityType="opportunity" entityId={data.id} />
           </div>
+          {/* basis-80 is load-bearing. `flex-1` alone resolves flex-basis to 0, so
+              the title contributes nothing to the wrap calculation: the action
+              toolbar (which carries min-width:auto and cannot shrink below its
+              min-content ~1140px) claimed the whole row and the title collapsed
+              to a 5px column, wrapping the name one character per line. Giving
+              the title a real basis makes the toolbar wrap BELOW it instead. */}
           <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-80">
               <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
                 {canWrite ? (
                   <InlineEditText
@@ -285,7 +291,7 @@ export function OpportunityDetailPage() {
                 ) : null}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-4">
               <div className="flex items-center gap-2 bg-[var(--surface-sunken-alpha)] p-1 rounded-full border border-[var(--border-subtle)]">
                 <CreateTaskDialog
                   oppId={data.id}

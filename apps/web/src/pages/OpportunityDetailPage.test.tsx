@@ -164,3 +164,42 @@ describe('OpportunityDetailPage — opportunities:write gating', () => {
     );
   });
 });
+
+describe('OpportunityDetailPage — hero header layout', () => {
+  // Regression: the title block carried `min-w-0 flex-1`, which resolves
+  // flex-basis to 0. It therefore contributed nothing to the parent's wrap
+  // calculation, while the sibling action toolbar carries min-width:auto and
+  // cannot shrink below its min-content width (~1140px measured in the live
+  // app). The toolbar claimed the entire row and the title collapsed to a 5px
+  // column, rendering the opportunity name one character per line on EVERY
+  // opportunity. `basis-80` gives the title a real basis so the toolbar wraps
+  // onto its own line instead of crushing it; `min-w-0` on the toolbar lets it
+  // shrink on narrow viewports rather than forcing horizontal overflow.
+  //
+  // jsdom/happy-dom does not run flex layout, so this asserts the class
+  // contract that produces the layout — the geometry itself is verified in the
+  // browser. Without these classes the bug returns silently.
+  it('gives the title a flex-basis and lets the action toolbar shrink', () => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: OPPORTUNITY,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    const { container } = renderPage();
+
+    const titleBlock = container.querySelector('h1')?.parentElement;
+    expect(titleBlock).toBeTruthy();
+    const titleCls = titleBlock!.className;
+    expect(titleCls).toContain('min-w-0');
+    expect(titleCls).toContain('flex-1');
+    // The load-bearing part: without a basis, flex-1 resolves to basis 0.
+    expect(titleCls).toMatch(/basis-/);
+
+    const actions = titleBlock!.nextElementSibling as HTMLElement | null;
+    expect(actions).toBeTruthy();
+    expect(actions!.className).toContain('min-w-0');
+  });
+});
