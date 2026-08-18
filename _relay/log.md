@@ -6,3 +6,4 @@
 2026-08-17 Claude(Opus5) | Amaris Bid Office finished: 5 gate bypasses closed, governance+Stage10 on the record, settings control, i18n x7. Gate green. 7 commits, unpushed.
 2026-08-17 Claude(Opus5) | Cloudflare Workers AI first-class + UI card mounted (was never rendered); default llama-4-scout after live probe showed reasoning models return content:null; VERIFIED live end-to-end.
 2026-08-18 Claude(Opus5) | Full-stack verification: worker started + read its log -> found 2 silent defects (dust.poll FK on deleted org; ai-audit retention regclass guard never ran). Both fixed+tested. Stack green.
+2026-08-18 Claude(Opus5) | flex-1(basis 0) collapse: user found opp title 5x242px; swept 51 routes x 5 viewports, found+fixed 4 (opp header, calendar, TaskRow, KpiRow) + source-contract test.
