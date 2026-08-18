@@ -17,7 +17,9 @@ The API logged `openai completion failed: HTTP 401` (provider=openai,
 model=@cf/meta/llama-3.3-70b-instruct-fp8-fast). Every app-side cause was ruled out:
 - `resolveActiveLlm` → env branch (no stored org agent-provider row anywhere).
 - Container env byte-identical to the working value: `OPENAI_API_KEY` len 53,
-  `cfat_Ze7…44c0f6`, no whitespace; `OPENAI_BASE_URL` and `OPENAI_MODEL` correct.
+  `cfat_` prefix, no whitespace; `OPENAI_BASE_URL` and `OPENAI_MODEL` correct.
+  (Deliberately not recording any of the token's own characters — the point is
+  that the value MATCHED, not what it was.)
 - Request shape correct — the exact `completeChat` request returns **200** from my IP.
 - Fresh deployment (forced with a nonce var) so the container snapshotted the clean key.
 
