@@ -89,7 +89,7 @@ function KpiBlock({
         {kpis.map((kpi) => (
           <GlassCard
             key={kpi.label}
-            className="flex gap-3"
+            className="flex flex-wrap gap-3"
             variants={reduced ? undefined : staggerChild}
             transition={springSnap}
           >
@@ -100,7 +100,9 @@ function KpiBlock({
             >
               <Icon name={iconForKpi(kpi.label)} size={18} />
             </div>
-            <div className="kpi-text" style={{ flex: 1, minWidth: 0 }}>
+            {/* Sizing lives in .kpi-text — an inline `flex: 1` here would
+                override the class basis and reintroduce the collapse. */}
+            <div className="kpi-text">
               <div className="kpi-label">{kpi.label}</div>
               <div className="kpi-value">
                 <KpiValue raw={kpi.value} reduced={reduced} />

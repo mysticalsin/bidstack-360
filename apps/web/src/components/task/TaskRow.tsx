@@ -199,7 +199,7 @@ export const TaskRow = memo(function TaskRow({
       initial={false}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, x: -8, transition: { duration: 0.16 } }}
-      className="group flex items-center justify-between gap-4 px-5 py-3"
+      className="group flex flex-wrap items-center justify-between gap-4 px-5 py-3"
     >
       {draggable ? (
         <div className="flex shrink-0 items-center gap-1" aria-label={t('taskRow.reorderTask', 'Reorder task')}>
@@ -230,7 +230,12 @@ export const TaskRow = memo(function TaskRow({
           </button>
         </div>
       ) : null}
-      <div className="min-w-0 flex-1">
+      {/* basis-56, not bare flex-1: `flex-1` resolves flex-basis to 0, so on a
+          narrow viewport the shrink-0 reorder controls and the trailing action
+          buttons (min-width:auto, unshrinkable) claimed the row and the title
+          collapsed to a 36px column, wrapping one character per line. A real
+          basis plus flex-wrap on the row makes the actions wrap instead. */}
+      <div className="min-w-0 flex-1 basis-56">
         <div
           className={cn(
             'text-sm font-medium text-[var(--fg-primary)]',
