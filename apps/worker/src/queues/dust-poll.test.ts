@@ -12,11 +12,12 @@
 // for the same reason.
 import type { Queue } from 'bullmq';
 import type pino from 'pino';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   syncEventCreate: vi.fn(),
   orgFindMany: vi.fn(),
+  orgFindUnique: vi.fn(),
   getOrgDust: vi.fn(),
   upsertOpportunityFromDust: vi.fn(),
   upsertCompanyFromDust: vi.fn(),
@@ -27,7 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@bidstack/db', () => ({
   prisma: {
     syncEvent: { create: mocks.syncEventCreate },
-    org: { findMany: mocks.orgFindMany },
+    org: { findMany: mocks.orgFindMany, findUnique: mocks.orgFindUnique },
   },
 }));
 
@@ -70,7 +71,26 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+beforeEach(() => {
+  // Default: the tenant still exists. pollOrgDust short-circuits when it does
+  // not, so every other case has to opt in to a live org.
+  mocks.orgFindUnique.mockResolvedValue({ id: ORG_A });
+});
+
 describe('pollOrgDust', () => {
+  it('drops the job when the org no longer exists instead of violating the FK forever', async () => {
+    // A queued job can outlive its tenant (offboarding, or a dropped test org).
+    // The stub sync_event write then violates sync_events_org_id_fkey, BullMQ
+    // retries, and the same Prisma error repeats indefinitely — observed in the
+    // dev worker log as 54 identical FK errors from jobs whose org was gone.
+    mocks.orgFindUnique.mockResolvedValue(null);
+
+    await pollOrgDust(ORG_A, log);
+
+    expect(mocks.syncEventCreate).not.toHaveBeenCalled();
+    expect(mocks.getOrgDust).not.toHaveBeenCalled();
+  });
+
   it('writes a stub sync_event and never touches Dust when the org has no credentials configured', async () => {
     mocks.getOrgDust.mockResolvedValue({ client: null, creds: null });
 

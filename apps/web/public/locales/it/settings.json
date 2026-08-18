@@ -825,5 +825,24 @@
   "dataImport": {
     "title": "Importazione dati",
     "caption": "Importa aziende, contatti, lead e opportunità da un'esportazione CSV del tuo CRM precedente. Mappa le colonne, scegli come gestire i duplicati, quindi importa."
+  },
+  "stageGate": {
+    "caption": "Amaris Bid Office: blocca i salti di fase e impedisce l'avanzamento di una gara in No-Bid.",
+    "loadErrorMessage": "Riprova tra poco.",
+    "loadErrorTitle": "Impossibile caricare il controllo dei gate di fase",
+    "modeEnforce": "Blocco — impedisce le violazioni",
+    "modeInherit": "Usa il default del server",
+    "modeLabel": "Modalità di controllo",
+    "modeOff": "Disattivato — nessun controllo di fase",
+    "modeWarn": "Avviso — registra le violazioni, consente",
+    "persistedHint": "Vale per tutte le opportunità di questo workspace.",
+    "readOnlyHint": "Il controllo dei gate di fase è in sola lettura se non sei admin.",
+    "ruleDecision": "Decisione in essere: un'opportunità con un No-Go / No-Bid registrato non può avanzare finché non risulta un gate positivo o un override motivato.",
+    "ruleJump": "Salti di fase: una gara avanza di un passo alla volta, oppure si chiude o si riapre.",
+    "saveButton": "Salva il controllo dei gate",
+    "saveError": "Impossibile salvare il controllo dei gate di fase",
+    "saveSuccess": "Controllo dei gate di fase salvato",
+    "savingButton": "Salvataggio...",
+    "title": "Controllo dei gate di fase"
   }
 }

@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import type {
   Tag,
   TagApply,
@@ -45,6 +46,7 @@ export function useCreateTag() {
   return useMutation({
     mutationFn: (body: TagCreate) => api<Tag>('/api/tags', { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [TAGS_KEY] }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not create tag'),
   });
 }
 
@@ -57,6 +59,7 @@ export function useUpdateTag() {
       qc.invalidateQueries({ queryKey: [TAGS_KEY] });
       qc.invalidateQueries({ queryKey: [ENTITY_TAGS_KEY] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update tag'),
   });
 }
 
@@ -68,6 +71,7 @@ export function useDeleteTag() {
       qc.invalidateQueries({ queryKey: [TAGS_KEY] });
       qc.invalidateQueries({ queryKey: [ENTITY_TAGS_KEY] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not delete tag'),
   });
 }
 
@@ -80,6 +84,7 @@ export function useApplyTags() {
       qc.setQueryData([ENTITY_TAGS_KEY, data.entityType, data.entityId], data);
       qc.invalidateQueries({ queryKey: [TAGS_KEY] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not apply tag'),
   });
 }
 
@@ -92,6 +97,7 @@ export function useRemoveTags() {
       qc.setQueryData([ENTITY_TAGS_KEY, data.entityType, data.entityId], data);
       qc.invalidateQueries({ queryKey: [TAGS_KEY] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not remove tag'),
   });
 }
 
@@ -99,5 +105,7 @@ export function useTagSuggestions() {
   return useMutation({
     mutationFn: (body: TagSuggestRequest) =>
       api<TagSuggestResponse>('/api/tags/suggest', { method: 'POST', body }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not get tag suggestions'),
   });
 }

@@ -8,6 +8,7 @@
 
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 
+import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -190,5 +191,7 @@ export function useExtractInsights(callSessionId: string) {
       // Invalidate this call's detail so the UI picks up updated summaries
       void qc.invalidateQueries({ queryKey: ['call', callSessionId] });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not extract insights'),
   });
 }

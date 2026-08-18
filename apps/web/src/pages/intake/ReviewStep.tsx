@@ -26,19 +26,17 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
   const deleteSolution = useDeleteSolution(accountId || undefined);
   const deleteProduct = useDeleteProduct(accountId || undefined);
 
+  // onError toasts removed: useDeleteSolution/useDeleteProduct now toast at the
+  // hook level, so a callsite onError here would double-fire.
   const handleDeleteSolution = (id: string, name: string) => {
     deleteSolution.mutate(id, {
       onSuccess: () => toast.success(t('reviewStep.toastRemoved', 'Removed "{{name}}"', { name })),
-      onError: () =>
-        toast.error(t('reviewStep.toastRemoveFailed', 'Failed to remove "{{name}}"', { name })),
     });
   };
 
   const handleDeleteProduct = (id: string, name: string) => {
     deleteProduct.mutate(id, {
       onSuccess: () => toast.success(t('reviewStep.toastRemoved', 'Removed "{{name}}"', { name })),
-      onError: () =>
-        toast.error(t('reviewStep.toastRemoveFailed', 'Failed to remove "{{name}}"', { name })),
     });
   };
 

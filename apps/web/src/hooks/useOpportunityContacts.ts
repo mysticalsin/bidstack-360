@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import type {
   OpportunityContact,
   OpportunityContactCreate,
@@ -35,6 +36,7 @@ export function useLinkContact() {
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['opportunity-contacts', vars.opportunityId] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not link contact'),
   });
 }
 
@@ -46,6 +48,7 @@ export function useUnlinkContact() {
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['opportunity-contacts', vars.opportunityId] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not unlink contact'),
   });
 }
 
@@ -68,5 +71,7 @@ export function useUpdateContactRole() {
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['opportunity-contacts', vars.opportunityId] });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not update contact role'),
   });
 }

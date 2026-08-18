@@ -12,9 +12,20 @@ import type { Logger as PinoLogger } from 'pino';
 
 import { prisma } from '@bidstack/db';
 import type { DustClient } from '@bidstack/dust-client';
+import {
+  buildResolvedLlm,
+  cloudflareWorkersAiBaseUrl,
+  completeChat,
+  type ResolvedLlm,
+} from '@bidstack/shared/llm';
 
 import { getOrgDust, type DustCredentials } from '../lib/dust-credentials.js';
 export { resolveAgentId } from '../lib/dust-credentials.js';
+import {
+  credentialToResolvedLlm,
+  getOrgActiveAgentProvider,
+  resolveOrgAgentProviderCredential,
+} from '../lib/agent-provider-credentials.js';
 
 import { redis } from '../redis.js';
 
@@ -227,6 +238,126 @@ export function buildDustClient(
   // Per-org: org IntegrationConfig first, DUST_* env fallback. Returns the creds
   // too so callers can resolve purpose-specific agent ids (resolveAgentId).
   return getOrgDust(orgId, log);
+}
+
+// ─── Direct LLM fallback (free, no Dust required) ─────────────────────────
+// AI-copilot features try Dust first; when Dust is unconfigured they used to
+// drop straight to a static stub. This resolves a real LLM so the fallback
+// path is still AI-powered — free via the keyless OmniRoute gateway.
+//
+// Precedence: (a) the org's configured agent provider (Settings →
+// Integrations — same resolver the live "test provider" ping uses); (b) the
+// deployment-wide RFP_LLM_PROVIDER env var, mirroring the worker's
+// resolveLlmFromEnv (apps/worker/src/lib/llm-provider.ts) so one env var
+// lights up both RFP extraction and the API copilot with the same gateway.
+// OmniRoute is the priority branch (keyless, zero config); openai/anthropic
+// are included as a trivial one-line mirror of the worker's env resolver.
+
+export async function resolveActiveLlm(orgId: string): Promise<ResolvedLlm | null> {
+  const activeProvider = await getOrgActiveAgentProvider(orgId);
+  if (activeProvider) {
+    const cred = await resolveOrgAgentProviderCredential(orgId, activeProvider);
+    const resolved = cred ? credentialToResolvedLlm(cred) : null;
+    if (resolved) return resolved;
+  }
+
+  // No usable org provider — fall back to the env-wide provider (worker parity).
+  const kind = (process.env.RFP_LLM_PROVIDER ?? '').trim().toLowerCase();
+  if (kind === 'omniroute') {
+    // Keyless local gateway: buildResolvedLlm fills base localhost:20128/v1,
+    // model "auto", and extraBody{stream:false} from DIRECT_PROVIDER_OVERRIDES.
+    return buildResolvedLlm({
+      provider: 'omniroute',
+      baseUrl: process.env.OMNIROUTE_BASE_URL,
+      model: process.env.OMNIROUTE_MODEL,
+    });
+  }
+  if (kind === 'openai' && process.env.OPENAI_API_KEY) {
+    return buildResolvedLlm({
+      provider: 'openai',
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL,
+      baseUrl: process.env.OPENAI_BASE_URL,
+    });
+  }
+  // Cloudflare Workers AI needs BOTH a token and an account id (the account id
+  // is part of the URL). Missing either means unconfigured, not misconfigured —
+  // fall through to null so the caller keeps its stub.
+  if (kind === 'cloudflare' || kind === 'workers-ai') {
+    const baseUrl =
+      process.env.CLOUDFLARE_BASE_URL ??
+      (process.env.CLOUDFLARE_ACCOUNT_ID
+        ? cloudflareWorkersAiBaseUrl(process.env.CLOUDFLARE_ACCOUNT_ID)
+        : undefined);
+    if (process.env.CLOUDFLARE_API_TOKEN && baseUrl) {
+      return buildResolvedLlm({
+        provider: 'cloudflare',
+        apiKey: process.env.CLOUDFLARE_API_TOKEN,
+        model: process.env.CLOUDFLARE_MODEL,
+        baseUrl,
+      });
+    }
+    return null;
+  }
+  if (kind === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+    // DirectAgentProviderId calls Anthropic 'claude', not 'anthropic'.
+    return buildResolvedLlm({
+      provider: 'claude',
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      model: process.env.ANTHROPIC_MODEL,
+      baseUrl: process.env.ANTHROPIC_BASE_URL,
+    });
+  }
+  return null;
+}
+
+/**
+/**
+ * Strip a leading/trailing markdown code fence (```json … ``` or ``` … ```)
+ * from a model response, returning the inner JSON text (array or object) so a
+ * caller's JSON.parse succeeds. Returns the trimmed input unchanged when there
+ * is no fence, so non-fenced JSON is unaffected.
+ */
+function stripJsonFence(raw: string): string {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return (fenced?.[1] ?? raw).trim();
+}
+
+/**
+ * Resolve a direct LLM and complete a chat, or return null on any failure
+ * (unresolved provider, network error, non-2xx, timeout). NEVER throws —
+ * callers still have their static stub as the final fallback. NEVER logs
+ * the api key: only `err` (a plain Error from completeChat's message) plus
+ * provider/model are logged.
+ */
+export async function completeChatOrNull(
+  orgId: string,
+  args: {
+    system?: string;
+    user: string;
+    responseFormat?: 'json_object' | 'text';
+    maxTokens?: number;
+    signal?: AbortSignal;
+  },
+  log: PinoLogger,
+): Promise<string | null> {
+  const llm = await resolveActiveLlm(orgId);
+  if (!llm) return null;
+  try {
+    const text = await completeChat(llm, args);
+    // Models (esp. via OmniRoute's free providers) often wrap JSON in a
+    // ```json … ``` markdown fence even when asked for raw JSON. Strip the fence
+    // for json_object callers so their JSON.parse sees the array/object, not the
+    // backticks — otherwise a good AI answer would be discarded for the stub.
+    if (args.responseFormat === 'json_object') return stripJsonFence(text);
+    return text;
+  } catch (err) {
+    log.warn(
+      { err, provider: llm.kind, model: llm.model },
+      'ai-assistant: direct LLM fallback failed, caller will use stub',
+    );
+    return null;
+  }
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────

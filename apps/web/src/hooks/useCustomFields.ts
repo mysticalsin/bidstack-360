@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 
 import type {
   CustomFieldDefinition,
@@ -41,6 +42,8 @@ export function useCreateCustomFieldDefinition() {
         queryKey: ['custom-field-definitions', vars.entityType],
       });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not create custom field'),
   });
 }
 
@@ -65,6 +68,8 @@ export function usePatchCustomFieldDefinition(id: string | undefined) {
         queryKey: ['custom-field-definitions', vars.entityType],
       });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not update custom field'),
   });
 }
 
@@ -80,6 +85,8 @@ export function useDeleteCustomFieldDefinition() {
         queryKey: ['custom-field-definitions', vars.entityType],
       });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not delete custom field'),
   });
 }
 

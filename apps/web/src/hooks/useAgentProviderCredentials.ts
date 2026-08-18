@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
-export type DirectAgentProvider = 'claude' | 'openai' | 'kimi' | 'nvidia_nim' | 'gemma';
+// Re-exported from @bidstack/shared/llm rather than hand-mirrored. The hand
+// written copy had already drifted once (it is a pure type, so nothing failed
+// to compile — the UI just silently omitted a provider the API served).
+export type { DirectAgentProviderId as DirectAgentProvider } from '@bidstack/shared/llm';
+import type { DirectAgentProviderId as DirectAgentProvider } from '@bidstack/shared/llm';
 
 export interface AgentProviderCredentialSummary {
   provider: DirectAgentProvider;

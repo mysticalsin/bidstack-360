@@ -20,7 +20,8 @@
     "cancel": "Annuler",
     "saving": "Enregistrement…",
     "save": "Enregistrer",
-    "emptyContent": "Aucun contenu pour l'instant. Utilisez le brouillon IA pour générer une première version."
+    "emptyContent": "Aucun contenu pour l'instant. Utilisez le brouillon IA pour générer une première version.",
+    "draftSectionError": "Impossible de générer le brouillon IA. Veuillez réessayer."
   },
   "proposals": {
     "title": "Propositions",
@@ -76,7 +77,8 @@
     "allStages": "Toutes les étapes",
     "emptyFiltered": "Aucune proposition ne correspond à ces filtres.",
     "truncated": "Affichage des {{loaded}} propositions les plus récemment mises à jour sur {{total}}. Affinez l’étape ou la recherche pour voir les autres.",
-    "percent": "{{value}} %"
+    "percent": "{{value}} %",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux propositions pour créer une proposition."
   },
   "rfpCrew": {
     "statusWaiting": "En attente",

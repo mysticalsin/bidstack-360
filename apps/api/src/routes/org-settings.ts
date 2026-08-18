@@ -11,6 +11,8 @@ import {
   ORG_LOCALE_DEFAULT,
   OrgLocaleSettings,
   OrgLocaleSettingsUpdate,
+  OrgStageGateSettings,
+  type StageGateMode,
   OpportunityFilterRules,
   OpportunityFilterRulesUpdate,
 } from '@bidstack/shared';
@@ -214,6 +216,54 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       return merged;
+    },
+  );
+
+  // ── Stage-gate mode (Amaris) — per-org override of the STAGE_GATE_MODE env ──
+  // Contract lives in @bidstack/shared so the settings UI types against the
+  // same schema the route validates with, like every other org-settings block.
+  const StageGate = OrgStageGateSettings;
+  const readMode = (v: string | null | undefined): StageGateMode | null =>
+    v === 'off' || v === 'warn' || v === 'enforce' ? v : null;
+
+  server.get(
+    '/org-settings/stage-gate',
+    {
+      preHandler: [server.requirePermission('settings:read')],
+      schema: { response: { 200: StageGate } },
+    },
+    async (req) => {
+      const row = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { stageGateMode: true },
+      });
+      return { mode: readMode(row?.stageGateMode) };
+    },
+  );
+
+  server.put(
+    '/org-settings/stage-gate',
+    {
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
+      schema: { body: StageGate, response: { 200: StageGate } },
+    },
+    async (req) => {
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: { orgId: req.auth.orgId, stageGateMode: req.body.mode },
+        update: { stageGateMode: req.body.mode },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.stage_gate.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: req.body as object,
+        },
+      });
+      return { mode: req.body.mode };
     },
   );
 };

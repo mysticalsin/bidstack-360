@@ -13,6 +13,7 @@ import { Icon } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useContacts,
   useCreateContact,
@@ -54,6 +55,14 @@ export function ContactsPage() {
   // Undo path: re-creates the contact from the snapshot we still have in
   // memory after a successful delete.
   const createContact = useCreateContact();
+  // POST/PATCH/DELETE /api/contacts are gated server-side behind
+  // contacts:write (apps/api/src/routes/contacts.ts) — hide/disable the
+  // write affordances instead of rendering controls that always 403.
+  const canWrite = useHasPermission('contacts:write');
+  const readOnlyHint = t(
+    'contacts.readOnlyHint',
+    'You need contacts write access to manage this contact.',
+  );
 
   // Memoize so its array identity is stable across renders — the
   // selectedContacts useMemo below lists `items` in its deps and would
@@ -338,17 +347,19 @@ export function ContactsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ContactCsvImportDialog
-            trigger={
-              <Button
-                size="sm"
-                variant="secondary"
-                aria-label={t('contacts.actions.importCsv.aria', 'Import contacts from CSV')}
-              >
-                {t('contacts.actions.importCsv.label', 'Import CSV')}
-              </Button>
-            }
-          />
+          {canWrite && (
+            <ContactCsvImportDialog
+              trigger={
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label={t('contacts.actions.importCsv.aria', 'Import contacts from CSV')}
+                >
+                  {t('contacts.actions.importCsv.label', 'Import CSV')}
+                </Button>
+              }
+            />
+          )}
           <LiquidGlassButton
             tone="secondary"
             size="sm"
@@ -368,18 +379,20 @@ export function ContactsPage() {
             <Icon name="copy" size={14} />
             {t('contacts.actions.findDuplicates.label', 'Find duplicates')}
           </Button>
-          <ContactDialog
-            trigger={
-              <Button
-                size="sm"
-                variant="primary"
-                aria-label={t('contacts.actions.newContact.aria', 'Create a new contact')}
-              >
-                <Icon name="plus" size={14} />
-                {t('contacts.actions.newContact.label', 'New contact')}
-              </Button>
-            }
-          />
+          {canWrite && (
+            <ContactDialog
+              trigger={
+                <Button
+                  size="sm"
+                  variant="primary"
+                  aria-label={t('contacts.actions.newContact.aria', 'Create a new contact')}
+                >
+                  <Icon name="plus" size={14} />
+                  {t('contacts.actions.newContact.label', 'New contact')}
+                </Button>
+              }
+            />
+          )}
         </div>
       </header>
 
@@ -390,7 +403,7 @@ export function ContactsPage() {
       <BulkActionBar
         count={selectedContacts.length}
         onExport={() => exportCsv(selectedContacts)}
-        onDelete={bulkDelete}
+        onDelete={canWrite ? bulkDelete : undefined}
         onClear={clearSelection}
         isDeleting={del.isPending}
       />
@@ -452,6 +465,8 @@ export function ContactsPage() {
         setEditTarget={setEditTarget}
         onDelete={onDelete}
         setContextMenu={setContextMenu}
+        canWrite={canWrite}
+        readOnlyHint={readOnlyHint}
       />
 
       <CursorPager

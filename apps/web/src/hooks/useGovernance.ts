@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import type {
   GovernanceActionInput,
   GovernanceActionPatch,
@@ -62,5 +63,9 @@ export function usePatchGovernanceAction() {
       }),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ['governance-meetings'] }),
+    // GovernanceLogCard's status-advance button wires no onError — a rejected
+    // mutation left the "Advance status" pill just stop showing pending state.
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not update governance action'),
   });
 }

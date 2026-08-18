@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import { DIRECT_AGENT_PROVIDERS } from '@bidstack/shared/llm';
 
 import { buildServer } from '../server.js';
 import {
@@ -20,6 +21,7 @@ let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 let orgId: string | null = null;
 let restoreAuth: (() => void) | null = null;
+let previousStubRoleHeader: string | undefined;
 
 const BASE = '/api/v1/integrations/agent-providers';
 
@@ -34,6 +36,8 @@ async function cleanupAgentProviderRows(id: string): Promise<void> {
 }
 
 beforeAll(async () => {
+  previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -55,25 +59,29 @@ afterAll(async () => {
   if (restoreAuth) restoreAuth();
   if (orgId) await dropIsolatedOrg(orgId);
   if (dbReachable) await prisma.$disconnect();
+  if (previousStubRoleHeader === undefined) {
+    delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+  } else {
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
+  }
 });
 
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 describe('agent provider routes', () => {
-  t('lists all five providers with no active provider by default', async () => {
+  t('lists every registered provider with no active provider by default', async () => {
     const res = await server.inject({ method: 'GET', url: `${BASE}/credentials` });
     expect(res.statusCode).toBe(200);
     const body = res.json() as {
       items: Array<{ provider: string; configured: boolean }>;
       active: string | null;
     };
-    expect(body.items.map((i) => i.provider).sort()).toEqual([
-      'claude',
-      'gemma',
-      'kimi',
-      'nvidia_nim',
-      'openai',
-    ]);
+    // Asserted against the registry, not a hand-copied literal: the route builds
+    // its items from DIRECT_AGENT_PROVIDERS, so a literal here only ever
+    // re-states the source and goes stale the next time a provider is added.
+    expect(body.items.map((i) => i.provider).sort()).toEqual([...DIRECT_AGENT_PROVIDERS].sort());
+    expect(body.items).toHaveLength(DIRECT_AGENT_PROVIDERS.length);
+    expect(body.items.map((i) => i.provider)).toContain('cloudflare');
     expect(body.active).toBeNull();
     expect(body.items.find((i) => i.provider === 'gemma')?.configured).toBe(false);
   });
@@ -114,6 +122,16 @@ describe('agent provider routes', () => {
     }
   });
 
+  t('403s a role without integrations:write at provider credential writes', async () => {
+    const res = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/credentials/gemma`,
+      headers: { 'x-bidstack-e2e-role': 'read-only' },
+      payload: { model: 'gemma3' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
   t('stores a keyless gemma credential, activates it, and reports it active', async () => {
     const save = await server.inject({
       method: 'PUT',
@@ -139,6 +157,52 @@ describe('agent provider routes', () => {
       where: { orgId: orgId!, action: 'agent_provider.active.set' },
     });
     expect(audit).not.toBeNull();
+  });
+
+  // Regression for the omniroute rollout: it must get the SAME keyless
+  // carve-out as gemma everywhere (save/activate/resolve), not just get
+  // listed. Before isKeylessProvider(), only 'gemma' bypassed the apiKey
+  // gate and this save would 400.
+  t('stores a keyless omniroute credential, activates it, and resolves it without an apiKey', async () => {
+    const save = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/credentials/omniroute`,
+      payload: {},
+    });
+    expect(save.statusCode).toBe(200);
+    expect((save.json() as { configured: boolean }).configured).toBe(true);
+
+    const activate = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/active`,
+      payload: { provider: 'omniroute' },
+    });
+    expect(activate.statusCode).toBe(200);
+    expect((activate.json() as { active: string | null }).active).toBe('omniroute');
+
+    const list = await server.inject({ method: 'GET', url: `${BASE}/credentials` });
+    expect((list.json() as { active: string | null }).active).toBe('omniroute');
+
+    // The test-call route only short-circuits with "No usable credentials"
+    // when credentialToResolvedLlm() returns null. Getting past that (even
+    // though the network call itself fails in CI, where no local OmniRoute
+    // gateway is running) proves the keyless credential DID resolve to a
+    // runnable ResolvedLlm.
+    const probe = await server.inject({
+      method: 'POST',
+      url: `${BASE}/credentials/omniroute/test`,
+    });
+    expect(probe.statusCode).toBe(200);
+    const probeBody = probe.json() as { ok: boolean; model: string | null; error: string | null };
+    expect(probeBody.model).not.toBeNull();
+    // Null when the local gateway actually answered (dev box), a different
+    // message when it refused/timed out — either way NOT the short-circuit
+    // "no usable credentials" text, which only fires when resolution failed.
+    expect(probeBody.error ?? '').not.toMatch(/no usable credentials/i);
+
+    // Clean up so later assertions (active === null etc.) aren't polluted.
+    await server.inject({ method: 'PUT', url: `${BASE}/active`, payload: { provider: null } });
+    await server.inject({ method: 'DELETE', url: `${BASE}/credentials/omniroute` });
   });
 
   t('test-call returns ok:false (no network) when the provider has no credentials', async () => {

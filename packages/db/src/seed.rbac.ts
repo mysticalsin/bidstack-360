@@ -386,79 +386,142 @@ export async function seedRolesAndPermissions(
   orgId: string,
   usersByInitials: Map<string, string>,
 ): Promise<void> {
-  const permissionIds = new Map<string, string>();
+  const permissionIds = await upsertPermissions(prisma);
+  const roleIds = await upsertRoles(prisma, orgId);
+  await grantRolePermissions(prisma, orgId, roleIds, permissionIds);
+  await assignFixtureUserRoles(prisma, orgId, roleIds, usersByInitials);
+}
+
+/**
+ * Permissions are GLOBAL (unique on `key`, no orgId), so every org after the
+ * first re-writes rows that already exist and are already correct. Insert the
+ * missing ones in one statement, read them all back in one more, and only issue
+ * an UPDATE for a row whose copy has actually drifted — which in steady state is
+ * none. 56 sequential upserts become 2 round trips.
+ */
+async function upsertPermissions(prisma: RbacSeedClient): Promise<Map<string, string>> {
+  await prisma.permission.createMany({
+    data: PERMISSION_SEEDS.map((p) => ({ key: p.key, name: p.name, description: p.description })),
+    skipDuplicates: true,
+  });
+
+  const rows = await prisma.permission.findMany({
+    where: { key: { in: [...ALL_PERMISSION_KEYS] } },
+    select: { id: true, key: true, name: true, description: true },
+    // `take` is not defensive padding — the query-guard plugin rejects any
+    // findMany without one, and the catalogue is a compile-time constant, so the
+    // exact length is the honest bound.
+    take: PERMISSION_SEEDS.length,
+  });
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+
   for (const p of PERMISSION_SEEDS) {
-    const row = await prisma.permission.upsert({
+    const row = byKey.get(p.key);
+    if (!row) throw new Error(`Permission ${p.key} missing after createMany`);
+    if (row.name === p.name && row.description === p.description) continue;
+    await prisma.permission.update({
       where: { key: p.key },
-      create: {
-        key: p.key,
-        name: p.name,
-        description: p.description,
-      },
-      update: {
-        name: p.name,
-        description: p.description,
-      },
+      data: { name: p.name, description: p.description },
     });
-    permissionIds.set(row.key, row.id);
   }
 
-  const roleIds = new Map<string, string>();
-  for (const r of ROLE_SEEDS) {
-    const row = await prisma.role.upsert({
-      where: { orgId_name: { orgId, name: r.name } },
-      create: {
-        orgId,
-        name: r.name,
-        description: r.description,
-        isSystem: true,
-      },
-      update: {
-        description: r.description,
-        isSystem: true,
-        deletedAt: null,
-      },
-    });
-    roleIds.set(r.name, row.id);
+  return new Map(rows.map((row) => [row.key, row.id]));
+}
 
+/**
+ * Same shape as permissions, scoped to the org. The update branch also clears
+ * `deletedAt`, so re-seeding an org whose system roles were soft-deleted brings
+ * them back — that is why drift detection has to consider it.
+ */
+async function upsertRoles(prisma: RbacSeedClient, orgId: string): Promise<Map<string, string>> {
+  await prisma.role.createMany({
+    data: ROLE_SEEDS.map((r) => ({
+      orgId,
+      name: r.name,
+      description: r.description,
+      isSystem: true,
+    })),
+    skipDuplicates: true,
+  });
+
+  const names = ROLE_SEEDS.map((r) => r.name);
+  const rows = await prisma.role.findMany({
+    where: { orgId, name: { in: names } },
+    select: { id: true, name: true, description: true, isSystem: true, deletedAt: true },
+    // Bounded for the query guard; ROLE_SEEDS is a compile-time constant and the
+    // (orgId, name) unique index caps the result at exactly its length.
+    take: ROLE_SEEDS.length,
+  });
+  const byName = new Map(rows.map((row) => [row.name, row]));
+
+  for (const r of ROLE_SEEDS) {
+    const row = byName.get(r.name);
+    if (!row) throw new Error(`Role ${r.name} missing after createMany`);
+    if (row.description === r.description && row.isSystem && row.deletedAt === null) continue;
+    await prisma.role.update({
+      where: { orgId_name: { orgId, name: r.name } },
+      data: { description: r.description, isSystem: true, deletedAt: null },
+    });
+  }
+
+  return new Map(rows.map((row) => [row.name, row.id]));
+}
+
+/**
+ * Rebuild every seeded role's grants in two statements instead of two per role.
+ *
+ * The delete is scoped to the SEEDED role ids specifically: a tenant's custom
+ * roles keep their grants. Rebuilding rather than diffing is deliberate — it is
+ * how a permission removed from a role in code actually gets revoked.
+ */
+async function grantRolePermissions(
+  prisma: RbacSeedClient,
+  orgId: string,
+  roleIds: Map<string, string>,
+  permissionIds: Map<string, string>,
+): Promise<void> {
+  const grants: { orgId: string; roleId: string; permissionId: string }[] = [];
+
+  for (const r of ROLE_SEEDS) {
     const unknownKeys = r.permissionKeys.filter((key) => !permissionIds.has(key));
     if (unknownKeys.length > 0) {
       throw new Error(`Role ${r.name} references unknown permissions: ${unknownKeys.join(', ')}`);
     }
-
-    await prisma.rolePermission.deleteMany({ where: { roleId: row.id } });
-    await prisma.rolePermission.createMany({
-      data: r.permissionKeys.map((key) => ({
-        orgId,
-        roleId: row.id,
-        permissionId: permissionIds.get(key)!,
-      })),
-      skipDuplicates: true,
-    });
+    const roleId = roleIds.get(r.name)!;
+    for (const key of r.permissionKeys) {
+      grants.push({ orgId, roleId, permissionId: permissionIds.get(key)! });
+    }
   }
 
-  const seededSystemRoleIds = Array.from(roleIds.values());
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: { in: [...roleIds.values()] } },
+  });
+  await prisma.rolePermission.createMany({ data: grants, skipDuplicates: true });
+}
+
+/** One delete + one insert for the whole fixture user set, not two per user. */
+async function assignFixtureUserRoles(
+  prisma: RbacSeedClient,
+  orgId: string,
+  roleIds: Map<string, string>,
+  usersByInitials: Map<string, string>,
+): Promise<void> {
+  const seededSystemRoleIds = [...roleIds.values()];
+  const assignments: { orgId: string; userId: string; roleId: string }[] = [];
+  const userIds: string[] = [];
+
   for (const user of fixtureUsers) {
     const userId = usersByInitials.get(user.initials);
     if (!userId) continue;
-
-    const assignedRoleNames = LEGACY_ROLE_ASSIGNMENTS[user.role] ?? ['Read-only'];
-    await prisma.userRole.deleteMany({
-      where: {
-        userId,
-        roleId: { in: seededSystemRoleIds },
-      },
-    });
-    await prisma.userRole.createMany({
-      data: assignedRoleNames.map((name) => ({
-        orgId,
-        userId,
-        roleId: roleIds.get(name)!,
-      })),
-      skipDuplicates: true,
-    });
+    userIds.push(userId);
+    for (const name of LEGACY_ROLE_ASSIGNMENTS[user.role] ?? ['Read-only']) {
+      assignments.push({ orgId, userId, roleId: roleIds.get(name)! });
+    }
   }
+  if (userIds.length === 0) return;
 
-  console.log(`  ✓ permissions: ${PERMISSION_SEEDS.length}`);
-  console.log(`  ✓ roles: ${ROLE_SEEDS.length}`);
+  await prisma.userRole.deleteMany({
+    where: { userId: { in: userIds }, roleId: { in: seededSystemRoleIds } },
+  });
+  await prisma.userRole.createMany({ data: assignments, skipDuplicates: true });
 }

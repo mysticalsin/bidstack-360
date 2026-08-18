@@ -8,6 +8,7 @@ import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { api } from '@/lib/api';
 import { springSnap, springSoft } from '@/lib/motion';
 
@@ -40,6 +41,14 @@ export function SmartCompanyDialog({ trigger }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { t } = useTranslation('crm');
+  // POST /api/crm/companies/:id/enrich (the create-company submit) is gated
+  // server-side behind companies:write — disable the submit instead of
+  // letting it 403 after the user fills out the form.
+  const canWrite = useHasPermission('companies:write');
+  const readOnlyHint = t(
+    'smartCompany.readOnlyHint',
+    'You need companies write access to create a company.',
+  );
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebounced(query.trim()), 220);
@@ -155,7 +164,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
   });
 
   const existing = lookup.data?.match && lookup.data.match !== 'none' && lookup.data.company;
-  const canCreate = previewName.trim().length > 1 && !createCompany.isPending;
+  const canCreate = previewName.trim().length > 1 && !createCompany.isPending && canWrite;
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
@@ -386,6 +395,12 @@ export function SmartCompanyDialog({ trigger }: Props) {
               <Button
                 type="button"
                 disabled={!canCreate}
+                title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? undefined
+                    : `${t('smartCompany.action.createEnriched', 'Create enriched account')} — ${readOnlyHint}`
+                }
                 onClick={() => createCompany.mutate()}
                 whileHover={reducedMotion || !canCreate ? undefined : { y: -1 }}
               >

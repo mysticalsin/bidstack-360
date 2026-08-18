@@ -18,6 +18,9 @@ export const envSchema = z.object({
 
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:5173'),
   PUBLIC_API_URL: z.string().url().optional(),
+  // Extra browser origins (comma-separated) allowed for CORS alongside
+  // PUBLIC_BASE_URL — e.g. a second/legacy front-end domain.
+  CORS_EXTRA_ORIGINS: z.string().optional().or(z.literal('')),
 
   CLERK_SECRET_KEY: z.string().min(1).optional().or(z.literal('')),
   CLERK_PUBLISHABLE_KEY: z.string().min(1).optional().or(z.literal('')),
@@ -76,6 +79,9 @@ export const envSchema = z.object({
   ODOO_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
 
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  // Explicit opt-in to run a production tenant on ephemeral local disk before
+  // object storage is configured (see the storage semantic check below).
+  BIDSTACK_ALLOW_LOCAL_STORAGE: z.enum(['true', 'false']).default('false'),
   LOCAL_STORAGE_ROOT: z.string().min(1).optional().or(z.literal('')),
   S3_BUCKET: z.string().min(1).optional().or(z.literal('')),
   S3_REGION: z.string().min(1).optional().or(z.literal('')),
@@ -127,6 +133,19 @@ export const envSchema = z.object({
   // 'off' so existing deployments aren't broken by a config oversight;
   // production requires 'warn' or 'enforce' (see semantic check below).
   BIDSTACK_TENANT_SCOPE_GUARD: z.enum(['off', 'warn', 'enforce']).default('off'),
+
+  // Amaris Bid Office stage-gate enforcement on POST /opportunities/:id/stage.
+  // 'off' (default) — no change; 'warn' — log illegal jumps / advancing a
+  // no-bid but allow the move; 'enforce' — reject (409) an illegal stage jump
+  // or forward advancement of an on-record no-bid/no-go. Staged rollout so
+  // existing pipelines keep working until an org opts in.
+  STAGE_GATE_MODE: z.enum(['off', 'warn', 'enforce']).default('off'),
+
+  // Pipeline orderIndex at/after which an opportunity is in the Bid Office zone.
+  // Crossing INTO it (from a lower-order Presales/Shape stage) records a formal
+  // Presales→Bid Office handoff event — the playbook's "Bid Office is activated
+  // by a stage change, never a conversation". Default 2 = past the two lead stages.
+  BID_OFFICE_ENTRY_ORDER: z.coerce.number().int().min(1).default(2),
 
   // ─── HTTP server timeouts (bound per-Node-worker resource pinning) ─────
   // Without these Fastify defaults to 0 (unbounded): a slow query or hung
@@ -360,8 +379,19 @@ export function getEnv(): Env {
   // Production normally requires S3 object storage. The public demo runs without
   // an S3 bucket and its data is ephemeral by design, so demo mode may use local
   // disk storage (lost on restart — acceptable for a throwaway demo).
-  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER !== 's3' && env.DEMO_MODE !== 'true') {
-    semanticErrors.push('STORAGE_DRIVER=s3 is required in production');
+  // BIDSTACK_ALLOW_LOCAL_STORAGE=true is an explicit operator opt-in to run a
+  // real production tenant on local disk before object storage (R2/S3) is wired:
+  // uploaded files live on the container's ephemeral disk and are lost on
+  // redeploy/restart, so it is a launch-now stopgap, not a durable state.
+  if (
+    env.NODE_ENV === 'production' &&
+    env.STORAGE_DRIVER !== 's3' &&
+    env.DEMO_MODE !== 'true' &&
+    env.BIDSTACK_ALLOW_LOCAL_STORAGE !== 'true'
+  ) {
+    semanticErrors.push(
+      'STORAGE_DRIVER=s3 is required in production (or set BIDSTACK_ALLOW_LOCAL_STORAGE=true to launch on ephemeral local disk until object storage is configured)',
+    );
   }
   if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) {
     semanticErrors.push('S3_BUCKET is required when STORAGE_DRIVER=s3');

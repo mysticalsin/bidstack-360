@@ -60,6 +60,15 @@ function prettifySegment(s: string, detailLabel: string): string {
   return capitalize(s.replace(/-/g, ' '));
 }
 
+// Real-auth (Clerk) account + organization management. Clerk mounts these
+// methods on window.Clerk once loaded; the buttons that call them only render
+// in clerk mode, so demo/stub builds never reach here.
+const clerkActive = import.meta.env.VITE_AUTH_MODE === 'clerk';
+function openClerk(method: 'openUserProfile' | 'openOrganizationProfile'): void {
+  const clerk = (window as unknown as { Clerk?: Record<string, (() => void) | undefined> }).Clerk;
+  clerk?.[method]?.();
+}
+
 export function Topbar() {
   useDocumentTitle();
   const { t } = useTranslation('common');
@@ -159,6 +168,32 @@ export function Topbar() {
             {user?.primaryEmailAddress?.emailAddress ?? t('app.notSignedIn', 'Not signed in')}
           </div>
         </div>
+        {clerkActive && (
+          <>
+            <Tooltip content={t('topbar.account', 'Account & password')}>
+              <button
+                type="button"
+                onClick={() => openClerk('openUserProfile')}
+                className="tb-signout"
+                aria-label={t('topbar.account', 'Account & password')}
+                title={t('topbar.account', 'Account & password')}
+              >
+                <Icon name="settings" size={15} ariaHidden />
+              </button>
+            </Tooltip>
+            <Tooltip content={t('topbar.invitePeople', 'Invite people')}>
+              <button
+                type="button"
+                onClick={() => openClerk('openOrganizationProfile')}
+                className="tb-signout"
+                aria-label={t('topbar.invitePeople', 'Invite people')}
+                title={t('topbar.invitePeople', 'Invite people')}
+              >
+                <Icon name="contacts" size={15} ariaHidden />
+              </button>
+            </Tooltip>
+          </>
+        )}
         <Tooltip content={t('topbar.productTour', 'Take the product tour')}>
           <button
             type="button"

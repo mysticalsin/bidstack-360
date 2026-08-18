@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 
 import type {
   AccountIntelSnapshot,
@@ -50,6 +51,8 @@ export function useDeleteSolution(accountId: string | undefined) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['account-intel', accountId] });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not delete solution'),
   });
 }
 
@@ -63,5 +66,6 @@ export function useDeleteProduct(accountId: string | undefined) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['account-intel', accountId] });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not delete product'),
   });
 }

@@ -53,10 +53,12 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(customer ? { customer } : {}),
           ...(s
             ? {
+                // email omitted: it is PII-encrypted at rest, and the
+                // pii-encryption middleware throws on `contains` (only
+                // equality/in via emailHash) — searching it would 500 the list.
                 OR: [
                   { name: { contains: s, mode: 'insensitive' } },
                   { customer: { contains: s, mode: 'insensitive' } },
-                  { email: { contains: s, mode: 'insensitive' } },
                   { role: { contains: s, mode: 'insensitive' } },
                 ],
               }

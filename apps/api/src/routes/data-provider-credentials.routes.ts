@@ -82,7 +82,7 @@ export const dataProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serve
     '/data-providers/credentials/:provider',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: {
         params: ProviderParam,
         body: z.object({ apiKey: z.string().trim().min(1).max(2_000) }),
@@ -135,7 +135,7 @@ export const dataProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serve
     '/data-providers/credentials/:provider',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { params: ProviderParam, response: { 204: z.null() } },
     },
     async (req, reply) => {

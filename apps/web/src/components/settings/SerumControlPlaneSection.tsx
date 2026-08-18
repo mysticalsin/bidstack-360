@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { TFunction } from 'i18next';
@@ -1554,6 +1554,7 @@ function renderStructuredFields(
       />,
       <SelectControl
         key="autonomy"
+        name="autonomy"
         label={t('crm.serum.field.autonomy', 'Autonomy')}
         value={readString(config, 'autonomy', 'disabled')}
         disabled={disabled}
@@ -1618,6 +1619,7 @@ function renderStructuredFields(
       />,
       <SelectControl
         key="replayMode"
+        name="replayMode"
         label={t('crm.serum.field.replayMode', 'Replay mode')}
         value={readString(config, 'replayMode', 'manual_only')}
         disabled={disabled}
@@ -1684,6 +1686,7 @@ function renderStructuredFields(
       />,
       <SelectControl
         key="uncertaintyMode"
+        name="uncertaintyMode"
         label={t('crm.serum.field.uncertaintyMode', 'Uncertainty mode')}
         value={readString(config, 'uncertaintyMode', 'answer_with_limits')}
         disabled={disabled}
@@ -1708,6 +1711,7 @@ function renderStructuredFields(
       />,
       <SelectControl
         key="registryMode"
+        name="registryMode"
         label={t('crm.serum.field.registryMode', 'Registry mode')}
         value={readString(config, 'registryMode', 'explicit_allowlist')}
         disabled={disabled}
@@ -1754,6 +1758,7 @@ function renderStructuredFields(
       />,
       <SelectControl
         key="connectorMode"
+        name="connectorMode"
         label={t('crm.serum.field.connectorMode', 'Connector mode')}
         value={readString(config, 'connectorMode', 'read_only')}
         disabled={disabled}
@@ -1774,6 +1779,7 @@ function renderStructuredFields(
       />,
       <SelectControl
         key="syncSchedule"
+        name="syncSchedule"
         label={t('crm.serum.field.syncSchedule', 'Sync schedule')}
         value={readString(config, 'syncSchedule', 'manual')}
         disabled={disabled}
@@ -1883,6 +1889,7 @@ function renderStructuredFields(
     />,
     <SelectControl
       key="writeMode"
+      name="writeMode"
       label={t('crm.serum.field.writeMode', 'Write mode')}
       value={readString(config, 'writeMode', 'draft_only')}
       disabled={disabled}
@@ -2017,21 +2024,30 @@ function NumberControl({
 
 function SelectControl({
   label,
+  name,
   value,
   options,
   disabled,
   onChange,
 }: {
   label: string;
+  /** Stable field key (e.g. "autonomy") — becomes the <select>'s name attribute. */
+  name: string;
   value: string;
   options: Array<[string, string]>;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
+  // id/name were previously absent — a browser a11y/autofill flag on every
+  // SERUM config dropdown. useId keeps ids unique across the many
+  // SelectControl instances rendered on this page simultaneously.
+  const selectId = useId();
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-[var(--fg-secondary)]">{label}</span>
       <select
+        id={selectId}
+        name={name}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.currentTarget.value)}

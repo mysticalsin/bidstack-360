@@ -713,7 +713,9 @@
     "runFailed": "L'exécution a échoué.",
     "fallback": "secours",
     "finalResponsePartial": "Réponse finale (certaines étapes ont utilisé une solution de secours)",
-    "finalResponse": "Réponse finale"
+    "finalResponse": "Réponse finale",
+    "subtitleReadOnly": "Parcourez les agents et équipes qu’un administrateur a configurés.",
+    "runPermissionHint": "Vous avez besoin d’un accès d’exécution des agents pour lancer une équipe. Demandez à un administrateur de vous l’accorder."
   },
   "contractAgreements": {
     "regionLabel": "Accords contractuels",
@@ -1162,7 +1164,8 @@
     "metaCreated": "Créé le {{date}}",
     "metaUpdated": "Mis à jour le {{date}}",
     "metaOwner": "Propriétaire : {{name}}",
-    "liveCollaboration": "Collaboration en direct"
+    "liveCollaboration": "Collaboration en direct",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux prospects pour effectuer des modifications."
   },
   "dashboard": {
     "srHeading": "Tableau de bord",
@@ -1339,7 +1342,8 @@
     "dueIn": "dans {{count}} j",
     "snoozeTask": "Reporter {{title}}",
     "statusAction": "Statut : {{status}}. Activer pour passer à {{next}}.",
-    "statusTitle": "Activer pour changer le statut en {{next}}"
+    "statusTitle": "Activer pour changer le statut en {{next}}",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux tâches pour modifier cette tâche."
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} est en train de modifier",
@@ -1684,7 +1688,8 @@
     "editProbabilityLabel": "Modifier la probabilité",
     "likely": "probable",
     "editDueDateLabel": "Modifier la date d'échéance",
-    "liveCollaborationLabel": "Collaboration en direct"
+    "liveCollaborationLabel": "Collaboration en direct",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux opportunités pour modifier cette opportunité."
   },
   "callSummary": {
     "meddicEmpty": "Aucun signal MEDDIC extrait. La transcription est peut-être trop courte ou pas encore traitée.",
@@ -1837,7 +1842,8 @@
     "countryLabel": "Pays",
     "cancel": "Annuler",
     "submitting": "Création…",
-    "submit": "Créer l'opportunité"
+    "submit": "Créer l'opportunité",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux opportunités pour créer une opportunité."
   },
   "companyDetail": {
     "error": {
@@ -2216,7 +2222,9 @@
     "labelScore": "Score",
     "submitPending": "Création…",
     "submit": "Créer le prospect",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "readOnlyNotice": "Vous avez besoin d’un accès en écriture aux prospects pour créer un prospect.",
+    "backToLeads": "Retour aux prospects"
   },
   "topAccounts": {
     "heading": "Comptes principaux",
@@ -2562,7 +2570,8 @@
     "xAxisLabel": "Champ de l’axe X",
     "yAxisLabel": "Champ de l’axe Y",
     "cancel": "Annuler",
-    "save": "Enregistrer le widget"
+    "save": "Enregistrer le widget",
+    "saving": "Enregistrement…"
   },
   "auditLogInsights": {
     "activityCadenceTitle": "Cadence d'activité",
@@ -2933,7 +2942,9 @@
     "createdLabel": "Créé",
     "updatedLabel": "Mis à jour",
     "resolvedLabel": "Résolu",
-    "closedLabel": "Fermé"
+    "closedLabel": "Fermé",
+    "statusErrorToast": "Impossible de mettre à jour le statut du dossier",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture au service d’assistance pour mettre à jour ce dossier."
   },
   "tagPicker": {
     "addTag": "Étiquette",
@@ -2976,7 +2987,8 @@
     "statusPaused": "En pause",
     "running": "Exécution…",
     "run": "Exécuter",
-    "deleteAriaLabel": "Supprimer le workflow : {{name}}"
+    "deleteAriaLabel": "Supprimer le workflow : {{name}}",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux workflows pour gérer ce workflow."
   },
   "topbarNotifications": {
     "tooltipUnread": "{{count}} notification non lue",
@@ -3293,7 +3305,11 @@
     "statusBlocked": "Bloquée",
     "statusDone": "Terminée",
     "idLabel": "ID",
-    "createdLabel": "Créée"
+    "createdLabel": "Créée",
+    "toast": {
+      "updateFailedTitle": "Impossible de mettre à jour la tâche",
+      "serverRejected": "Le serveur a rejeté la requête."
+    }
   },
   "auditLogHero": {
     "badge": "Console de gouvernance",
@@ -3570,7 +3586,8 @@
     "editStatusLabel": "Modifier le statut de {{name}}",
     "editPriorityLabel": "Modifier la priorité de {{name}}",
     "deleteLead": "Supprimer {{name}}",
-    "delete": "Supprimer"
+    "delete": "Supprimer",
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux prospects pour gérer cet enregistrement."
   },
   "companyRow": {
     "selectCompany": "Sélectionner {{name}}",
@@ -3989,5 +4006,85 @@
     "title": "Fichiers",
     "emptyTitle": "Choisissez un compte",
     "emptyMessage": "Ouvrez un compte depuis /accounts pour joindre des propositions, des accords de confidentialité et des architectures de référence."
+  },
+  "crm": {
+    "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}, {{stage}}, {{value}}.",
+    "receiveStep": {
+      "pickAccountTitle": "Choisissez un compte pour commencer",
+      "pickAccountHint": "Recherchez le compte pour lequel vous souhaitez lancer la réception.",
+      "pickAccountPlaceholder": "Rechercher des comptes…",
+      "pickAccountErrorTitle": "Impossible de charger les comptes",
+      "pickAccountListLabel": "Comptes",
+      "pickAccountEmpty": "Aucun compte ne correspond."
+    }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "Vous devez disposer de l'accès companies:write pour fusionner des comptes.",
+    "mergeDisabledHintContact": "Vous devez disposer de l'accès contacts:write pour fusionner des contacts."
+  },
+  "bidClass": {
+    "activeEscalations": "Escalades actives (classe inchangée)",
+    "aria": "Classification et gouvernance des offres",
+    "commitment": "Engagement / complexité",
+    "committee": "Comité",
+    "escalations": "Déclencheurs d'escalade",
+    "fte": "Taille de l'équipe (FTE)",
+    "gate": "Jalon",
+    "gateFailed": "Impossible de consigner la décision de jalon",
+    "gateRecorded": "Décision de jalon consignée",
+    "gates": "Jalons de gouvernance",
+    "handoff": "Passation Avant-vente → Bid Office",
+    "history": "Registre de gouvernance",
+    "historyEmpty": "Aucune décision de jalon consignée pour l'instant.",
+    "historyError": "Impossible de charger le registre de gouvernance.",
+    "justification": "Justification du jalon",
+    "justificationPlaceholder": "Justification (facultatif)",
+    "lifecycle": "Cycle de vie en 10 étapes et RACI",
+    "outcome": "Résultat",
+    "raciActivity": "Activité",
+    "raciLegend": "R réalise · A approuve · C consulté · I informé · ◆ jalon de gouvernance",
+    "readOnly": "Vous n'avez pas les droits pour modifier ceci",
+    "recordGate": "Consigner la décision de jalon",
+    "recording": "Enregistrement…",
+    "save": "Enregistrer la classification sur cette opportunité",
+    "saveClass": "Enregistrer {{bidClass}} sur cette opportunité",
+    "saveFailed": "Impossible d'enregistrer la classification",
+    "savedOn": "Enregistré sur cette opportunité",
+    "savedToast": "Classification enregistrée",
+    "saving": "Enregistrement…",
+    "selectToSave": "Sélectionnez une opportunité ci-dessus pour enregistrer cette classification et consigner les décisions de jalon.",
+    "specialRules": "Règles particulières",
+    "subtitle": "Amaris Bid Office Americas — classe = taille en FTE × engagement, pas le chiffre d'affaires",
+    "title": "Classification et gouvernance des offres",
+    "unsaved": "Non enregistré — cette opportunité reste enregistrée en {{saved}}",
+    "validators": "Validateurs finaux"
+  },
+  "lessonsLearned": {
+    "caption": "Étape 10 — documenter les facteurs de gain/perte dans les {{days}} jours ouvrés suivant l'attribution.",
+    "competitorLabel": "Concurrent",
+    "competitorPlaceholder": "Qui a remporté l'offre (facultatif)",
+    "emptyReadOnly": "Aucun débriefing enregistré pour cette offre.",
+    "loadError": "Impossible de charger le débriefing. Actualisez pour réessayer.",
+    "lossFactor": "Facteur décisif de la perte",
+    "notYet": "Aucun débriefing enregistré — saisissez-le à chaud.",
+    "noteLabel": "Notes de débriefing",
+    "notePlaceholder": "Ce qui a fait la différence, ce que l'on referait, ce que l'on changerait",
+    "reasonCompetitor": "Concurrence",
+    "reasonLabel": "Facteur principal",
+    "reasonNoDecision": "Sans décision",
+    "reasonOther": "Autre",
+    "reasonPrice": "Prix",
+    "reasonProductFit": "Adéquation de l'offre",
+    "reasonRelationship": "Relation client",
+    "reasonScope": "Périmètre",
+    "reasonTiming": "Calendrier",
+    "record": "Enregistrer le débriefing",
+    "recordedOn": "Dernière mise à jour le {{date}}",
+    "saveError": "Impossible d'enregistrer le débriefing",
+    "saved": "Débriefing enregistré",
+    "saving": "Enregistrement…",
+    "title": "Retour d'expérience",
+    "update": "Mettre à jour",
+    "winFactor": "Facteur décisif du gain"
   }
 }

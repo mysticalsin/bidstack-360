@@ -1,9 +1,11 @@
 // Crew agent (role persona) infrastructure routes — Wave 10.
 //
-// RBAC (the whole point): admins CREATE / EDIT / DELETE agents; any authenticated
-// member may LIST them (to compose or understand a crew run). Regular users never
-// mutate the infrastructure. Org-scoped parameterized raw SQL — the crew tables
-// are not in the generated Prisma client yet (Windows DLL lock; Wave 9 pattern).
+// RBAC (the whole point): CREATE / EDIT / DELETE requires the `agents:write`
+// permission AND the admin role (stacked gate, matching crew authoring in
+// crews.ts — never looser than the original admin-only check); any
+// authenticated member may LIST them (to compose or understand a crew run).
+// Org-scoped parameterized raw SQL — the crew tables are not in the generated
+// Prisma client yet (Windows DLL lock; Wave 9 pattern).
 
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -79,11 +81,12 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     return { items: rows.map(serializeAgent) };
   });
 
-  // POST /crew-agents — create (admin only).
+  // POST /crew-agents — create (requires agents:write).
   app.post(
     '/crew-agents',
     {
-      preHandler: server.requireRole('admin'),
+      config: { permission: 'agents:write' },
+      preHandler: [server.requirePermission('agents:write'), server.requireRole('admin')],
       schema: { body: AgentCreate, response: { 201: AgentResponse } },
     },
     async (req, reply) => {
@@ -114,12 +117,13 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     },
   );
 
-  // PATCH /crew-agents/:id — update role/goal/backstory/tools (admin only).
+  // PATCH /crew-agents/:id — update role/goal/backstory/tools (requires agents:write).
   // agentKey is immutable (it is the stable reference used by crew tasks).
   app.patch(
     '/crew-agents/:id',
     {
-      preHandler: server.requireRole('admin'),
+      config: { permission: 'agents:write' },
+      preHandler: [server.requirePermission('agents:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: AgentFields,
@@ -142,11 +146,12 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     },
   );
 
-  // DELETE /crew-agents/:id — soft-delete (admin only).
+  // DELETE /crew-agents/:id — soft-delete (requires agents:write).
   app.delete(
     '/crew-agents/:id',
     {
-      preHandler: server.requireRole('admin'),
+      config: { permission: 'agents:write' },
+      preHandler: [server.requirePermission('agents:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

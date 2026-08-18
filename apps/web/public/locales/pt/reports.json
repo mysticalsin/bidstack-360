@@ -213,7 +213,8 @@
     "editAriaLabel": "Editar relatório {{name}}",
     "duplicateAriaLabel": "Duplicar relatório {{name}}",
     "deleteConfirm": "Excluir \"{{name}}\"?",
-    "deleteAriaLabel": "Excluir relatório {{name}}"
+    "deleteAriaLabel": "Excluir relatório {{name}}",
+    "readOnlyHint": "Você precisa de acesso de gravação a relatórios para gerenciar este relatório."
   },
   "fieldPicker": {
     "placeholder": "Escolha um campo…",

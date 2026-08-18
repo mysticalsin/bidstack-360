@@ -20,6 +20,7 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   mention: 'messageCircle',
   assignment: 'target',
   bid_override: 'shield',
+  gate_decision: 'checkCircle',
   stage_change: 'growth',
   task_due: 'clock',
   system: 'info',

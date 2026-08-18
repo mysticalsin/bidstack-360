@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
 import { LookupFieldPicker, type LookupOption } from '@/components/ui/LookupFieldPicker';
 import { Select } from '@/components/ui/Select';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCreateOpportunity } from '@/hooks/useOpportunities';
 import { api } from '@/lib/api';
 import {
@@ -38,6 +39,15 @@ export function CreateOpportunityDialog({
   onOpenChange,
 }: Props = {}) {
   const { t } = useTranslation('crm');
+  // POST /api/opportunities is gated server-side behind opportunities:write
+  // (apps/api/src/routes/opportunities.ts) — hide the default trigger and
+  // refuse to submit instead of letting the create 403 after the user has
+  // already filled out the form.
+  const canWrite = useHasPermission('opportunities:write');
+  const readOnlyHint = t(
+    'createOpportunity.readOnlyHint',
+    'You need opportunities write access to create an opportunity.',
+  );
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
@@ -75,6 +85,10 @@ export function CreateOpportunityDialog({
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Belt-and-braces: the submit button is disabled without canWrite, but a
+    // dialog opened programmatically by a controlled caller (e.g. the quick-add
+    // menu) could still be submitted via Enter — refuse before hitting the API.
+    if (!canWrite) return;
     setError(null);
     setFieldErrors({});
     const fd = new FormData(e.currentTarget);
@@ -133,7 +147,14 @@ export function CreateOpportunityDialog({
       }}
     >
       <DialogTrigger asChild>
-        {trigger ?? <Button size="sm">{t('createOpportunity.triggerButton', '+ New opportunity')}</Button>}
+        {trigger ??
+          (canWrite ? (
+            <Button size="sm">{t('createOpportunity.triggerButton', '+ New opportunity')}</Button>
+          ) : (
+            // No default trigger to gate on the caller's behalf — mirrors the
+            // hidden-span technique QuickAddMenu uses for controlled dialogs.
+            <span style={{ display: 'none' }} />
+          ))}
       </DialogTrigger>
       <DialogContent
         title={t('createOpportunity.dialogTitle', 'New opportunity')}
@@ -255,13 +276,32 @@ export function CreateOpportunityDialog({
             </p>
           ) : null}
 
+          {/* Reachable via controlled callers (quick-add menu, command
+              palette, cockpit header) that supply their own trigger — those
+              aren't gated at the call site, so explain the disabled submit
+              rather than dead-ending in a silent 403. */}
+          {!canWrite ? (
+            <p role="alert" className="text-xs text-[var(--danger)]">
+              {readOnlyHint}
+            </p>
+          ) : null}
+
           <div className="flex justify-end gap-2 pt-2">
             <DialogClose asChild>
               <Button type="button" variant="ghost" size="md">
                 {t('createOpportunity.cancel', 'Cancel')}
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={create.isPending}>
+            <Button
+              type="submit"
+              disabled={create.isPending || !canWrite}
+              title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite
+                  ? undefined
+                  : `${t('createOpportunity.submit', 'Create opportunity')} — ${readOnlyHint}`
+              }
+            >
               {create.isPending
                 ? t('createOpportunity.submitting', 'Creating…')
                 : t('createOpportunity.submit', 'Create opportunity')}

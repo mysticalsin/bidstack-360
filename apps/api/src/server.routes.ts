@@ -88,6 +88,7 @@ import { pipelineStageRoutes } from './routes/pipeline-stages.js';
 import { accountsRoutes } from './routes/accounts.js';
 import { referencesRoutes } from './routes/references.js';
 import { bidScoreRoutes } from './routes/bid-scores.js';
+import { bidGovernanceRoutes } from './routes/bid-governance.js';
 import { proposalRoutes } from './routes/proposals.js';
 import { crewAgentRoutes } from './routes/crew-agents.js';
 import { crewRoutes } from './routes/crews.js';
@@ -243,6 +244,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(accountsRoutes, { prefix: '/api/v1' });
   await server.register(referencesRoutes, { prefix: '/api/v1' });
   await server.register(bidScoreRoutes, { prefix: '/api/v1' });
+  await server.register(bidGovernanceRoutes, { prefix: '/api/v1' });
   await server.register(proposalRoutes, { prefix: '/api/v1' });
   await server.register(crewAgentRoutes, { prefix: '/api/v1' });
   await server.register(crewRoutes, { prefix: '/api/v1' });

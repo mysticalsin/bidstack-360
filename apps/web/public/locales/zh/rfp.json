@@ -20,7 +20,8 @@
     "cancel": "取消",
     "saving": "正在保存…",
     "save": "保存",
-    "emptyContent": "暂无内容。使用 AI 草稿生成初始版本。"
+    "emptyContent": "暂无内容。使用 AI 草稿生成初始版本。",
+    "draftSectionError": "无法生成 AI 草稿，请重试。"
   },
   "proposals": {
     "title": "提案",
@@ -76,7 +77,8 @@
     "allStages": "全部阶段",
     "emptyFiltered": "没有符合这些筛选条件的提案。",
     "truncated": "显示 {{total}} 个提案中最近更新的 {{loaded}} 个。请缩小阶段范围或使用搜索查看其余提案。",
-    "percent": "{{value}}%"
+    "percent": "{{value}}%",
+    "readOnlyHint": "您需要提案写入权限才能创建提案。"
   },
   "rfpCrew": {
     "statusWaiting": "等待中",

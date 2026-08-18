@@ -70,6 +70,8 @@
       "removeFailedTitle": "Échec de la suppression"
     },
     "error": {
+      "accountIdInvalid": "Ceci n'est pas un ID de compte Cloudflare (32 caractères hexadécimaux) ni une URL https:// complète.",
+      "accountIdRequired": "Workers AI nécessite votre ID de compte Cloudflare.",
       "apiKeyRequired": "Une clé API est requise pour ce fournisseur.",
       "claudeModelRequired": "Claude nécessite un modèle, par exemple claude-sonnet-4-5.",
       "saveFailed": "Impossible d'enregistrer les identifiants du fournisseur."
@@ -128,23 +130,26 @@
       "updatedNever": "Jamais"
     },
     "dialog": {
-      "updateTitle": "Mettre à jour {{label}}",
+      "accountIdHint": "Vous le trouverez dans l'URL du tableau de bord Cloudflare, ou exécutez `wrangler whoami`. Une URL de base https:// complète fonctionne aussi.",
+      "accountIdLabel": "ID de compte Cloudflare",
       "addTitle": "Ajouter un fournisseur de modèles",
-      "description": "La clé API est chiffrée avant stockage et n'est jamais renvoyée au navigateur. Laissez la clé vide lors de la modification pour conserver la clé enregistrée.",
-      "providerLabel": "Fournisseur",
-      "apiKeyLabelOptional": "Clé API (facultative)",
       "apiKeyLabel": "Clé API",
+      "apiKeyLabelOptional": "Clé API (facultative)",
+      "apiKeyPlaceholder": "Collez la clé du fournisseur",
       "apiKeyPlaceholderKeep": "Laissez vide pour conserver la clé enregistrée",
       "apiKeyPlaceholderOptional": "Facultatif pour les environnements d'exécution locaux",
-      "apiKeyPlaceholder": "Collez la clé du fournisseur",
-      "modelLabel": "Modèle",
-      "baseUrlLabel": "URL de base",
-      "baseUrlHintLocal": "Localhost n'est accepté qu'en développement local. La production requiert un https public.",
       "baseUrlHint": "Doit être un point de terminaison https public.",
+      "baseUrlHintLocal": "Localhost n'est accepté qu'en développement local. La production requiert un https public.",
+      "baseUrlLabel": "URL de base",
       "cancel": "Annuler",
+      "description": "La clé API est chiffrée avant stockage et n'est jamais renvoyée au navigateur. Laissez la clé vide lors de la modification pour conserver la clé enregistrée.",
+      "modelLabel": "Modèle",
+      "providerLabel": "Fournisseur",
+      "save": "Enregistrer le fournisseur",
       "saving": "Enregistrement...",
-      "save": "Enregistrer le fournisseur"
-    }
+      "updateTitle": "Mettre à jour {{label}}"
+    },
+    "omnirouteHint": "Passerelle IA locale et gratuite — aucune clé requise. Achemine vers de nombreux fournisseurs gratuits avec bascule automatique."
   },
   "connectors": {
     "category": {
@@ -186,7 +191,8 @@
       "connecting": "Connexion...",
       "connect": "Connecter",
       "requiresKey": "clé requise",
-      "open": "ouvert"
+      "open": "ouvert",
+      "slackWriteHint": "Vous devez disposer d'un accès en écriture aux intégrations pour déconnecter l'espace de travail Slack partagé."
     },
     "status": {
       "healthy": "sain",

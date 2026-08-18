@@ -15,6 +15,7 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useCompanyDuplicates,
   useContactDuplicates,
@@ -24,6 +25,14 @@ import {
   type DuplicateEntity,
 } from '@/hooks/useDuplicates';
 import { formatDate } from '@/lib/format';
+
+// Merge is gated server-side per entity: companies:write for company pairs,
+// contacts:write for contact pairs (see POST /duplicates/merge). Most non-Admin
+// roles hold read but not write on one or both, so the row action must be
+// gated the same way or it just 403s on click.
+function mergePermissionFor(entity: DuplicateEntity): 'companies:write' | 'contacts:write' {
+  return entity === 'company' ? 'companies:write' : 'contacts:write';
+}
 
 interface CompareRecord {
   id: string;
@@ -134,6 +143,11 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
   const contactQuery = useContactDuplicates(open && entity === 'contact');
   const merge = useMergeDuplicates();
   const [mergingKey, setMergingKey] = useState<string | null>(null);
+  const canMerge = useHasPermission(mergePermissionFor(entity));
+  const mergeDisabledHint =
+    entity === 'company'
+      ? t('duplicates.mergeDisabledHintCompany', 'You need companies:write access to merge accounts.')
+      : t('duplicates.mergeDisabledHintContact', 'You need contacts:write access to merge contacts.');
 
   const copy = entityCopy(entity, t);
   const active = entity === 'company' ? companyQuery : contactQuery;
@@ -152,6 +166,9 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
   const truncated = active.data?.truncated ?? false;
 
   async function keepRecord(cluster: CompareCluster, survivor: CompareRecord) {
+    // Belt-and-suspenders: the button is disabled without the grant, but
+    // guard the handler too in case it's ever reachable another way.
+    if (!canMerge) return;
     const losers = cluster.records.filter((r) => r.id !== survivor.id);
     const mergePhrase =
       losers.length === 1
@@ -239,6 +256,8 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
                 cluster={cluster}
                 merging={mergingKey === cluster.key}
                 anyMerging={mergingKey !== null}
+                canMerge={canMerge}
+                mergeDisabledHint={mergeDisabledHint}
                 onKeep={(record) => void keepRecord(cluster, record)}
               />
             ))}
@@ -253,10 +272,19 @@ interface ClusterSectionProps {
   cluster: CompareCluster;
   merging: boolean;
   anyMerging: boolean;
+  canMerge: boolean;
+  mergeDisabledHint: string;
   onKeep: (record: CompareRecord) => void;
 }
 
-function ClusterSection({ cluster, merging, anyMerging, onKeep }: ClusterSectionProps) {
+function ClusterSection({
+  cluster,
+  merging,
+  anyMerging,
+  canMerge,
+  mergeDisabledHint,
+  onKeep,
+}: ClusterSectionProps) {
   const { t } = useTranslation('crm');
   // Fields that differ across the cluster carry the signal; identical ones
   // recede. Compare per label so the eye lands on the divergence.
@@ -317,12 +345,20 @@ function ClusterSection({ cluster, merging, anyMerging, onKeep }: ClusterSection
                 variant="secondary"
                 size="sm"
                 className="w-full"
-                disabled={anyMerging}
-                aria-label={t(
-                  'duplicates.keepAria',
-                  'Keep {{name}} and merge the other {{count}} into it',
-                  { name: record.title, count: otherCount },
-                )}
+                disabled={anyMerging || !canMerge}
+                title={canMerge ? undefined : mergeDisabledHint}
+                aria-label={
+                  canMerge
+                    ? t(
+                        'duplicates.keepAria',
+                        'Keep {{name}} and merge the other {{count}} into it',
+                        { name: record.title, count: otherCount },
+                      )
+                    : `${t('duplicates.keepAria', 'Keep {{name}} and merge the other {{count}} into it', {
+                        name: record.title,
+                        count: otherCount,
+                      })} — ${mergeDisabledHint}`
+                }
                 onClick={() => onKeep(record)}
               >
                 <Icon name={merging ? 'loader' : 'check'} size={14} />

@@ -99,6 +99,8 @@ export function AuditFilterBar({
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]"
           />
           <input
+            id="audit-log-search"
+            name="auditLogSearch"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t(
@@ -112,6 +114,8 @@ export function AuditFilterBar({
         <label className="block">
           <span className="sr-only">{t('auditLogFilters.dateRangeLabel', 'Date range')}</span>
           <select
+            id="audit-log-date-range"
+            name="auditLogDateRange"
             value={range}
             onChange={(event) => setRange(event.target.value as DateRange)}
             className="h-11 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/15"
@@ -127,6 +131,8 @@ export function AuditFilterBar({
         <label className="block">
           <span className="sr-only">{t('auditLogFilters.targetTypeLabel', 'Target type')}</span>
           <select
+            id="audit-log-target-type"
+            name="auditLogTargetType"
             value={targetType}
             onChange={(event) => setTargetType(event.target.value as TargetTypeFilter)}
             className="h-11 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/15"

@@ -30,7 +30,7 @@ import {
   type ComponentType,
 } from 'react';
 
-import { setApiTokenProvider } from '@/lib/api';
+import { setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
 import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
 
 interface AuthUser {
@@ -196,14 +196,46 @@ export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
 function DemoAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
 
-  useEffect(() => {
+  // Register the token provider SYNCHRONOUSLY, during this component's own
+  // render — not in a useEffect. React commits child effects before parent
+  // effects, so a parent-only useEffect registration would still let a child
+  // data-fetching hook (useQuery et al.) mount and fire its first request
+  // before this ran, sending it with a null token → a guaranteed 401 on every
+  // cold page load, immediately "fixed" by that hook's own forced-refresh
+  // retry. useState's lazy initializer runs inline in this render, strictly
+  // before React ever invokes a child component, so the provider is
+  // guaranteed live before any descendant can issue a fetch. The initializer
+  // itself is idempotent (last-write-wins on a module-level variable), so
+  // re-mounts are harmless.
+  useState(() => {
     // The token is a plain string in localStorage (the app has no cookie layer;
     // this matches the existing Bearer-token model used for Clerk).
     setApiTokenProvider(() => localStorage.getItem(DEMO_TOKEN_KEY));
+    return null;
+  });
+
+  // Cleanup only — registration happens above, once, at first render.
+  useEffect(() => () => setApiTokenProvider(null), []);
+
+  // When the API rejects the stored demo token as dead (e.g. an expired
+  // session left in localStorage from a previous visit), clear it and drop to
+  // signed-out so RequireAuth routes back to the passwordless sign-in — instead
+  // of every query 401ing forever behind "Failed to load…". Registered in an
+  // effect (only needed after mount, on a 401) so it can close over setSignedIn.
+  useEffect(() => {
+    setAuthInvalidHandler(() => {
+      localStorage.removeItem(DEMO_TOKEN_KEY);
+      localStorage.removeItem(DEMO_EMAIL_KEY);
+      writeSessionMarker(null);
+      setSignedIn(false);
+    });
+    return () => setAuthInvalidHandler(null);
+  }, []);
+
+  useEffect(() => {
     if (signedIn && localStorage.getItem(DEMO_TOKEN_KEY)) {
       writeSessionMarker('demo');
     }
-    return () => setApiTokenProvider(null);
   }, [signedIn]);
 
   const signIn = useCallback((cb?: () => void) => {
@@ -270,12 +302,45 @@ const LazyClerkBranch = lazy(async () => {
     const { user } = useClerkUser();
     const clerk = useClerk();
 
+    // Register the token provider SYNCHRONOUSLY during render — NOT in a
+    // useEffect. React commits child effects before parent effects, so an
+    // effect-based registration here lets the dashboard's data hooks (deep
+    // children) fire their first requests before the provider exists → those
+    // requests go out with no token → 401, and the query layer does not retry
+    // 4xx, so the page hangs on skeletons forever. Registering in the render
+    // body makes the provider live before any descendant mounts. auth.getToken
+    // is called lazily and re-registering the closure each render is idempotent
+    // (module-level last-write-wins).
+    setApiTokenProvider(async ({ forceRefresh } = {}) => {
+      const token = await auth.getToken(forceRefresh ? { skipCache: true } : undefined);
+      // Cold-load race: RequireAuth releases the app the instant auth.isLoaded
+      // flips true, but Clerk may not have minted the session token for a few
+      // ms yet — so the earliest shell queries would fire tokenless and 401
+      // (then recover via api.ts's forced-refresh retry, leaving console noise).
+      // When we're signed in but got null, wait briefly for the real token so
+      // the first request carries it. Signed-out returns null immediately (no
+      // wait) — the route guard, not a token, handles that case.
+      if (token || !auth.isSignedIn) return token;
+      // Poll the CACHED token (light — no network per iteration); it resolves
+      // the moment Clerk finishes minting the session token after a cold load.
+      // ~6s window comfortably covers Clerk's cold-start latency; we only get
+      // here when isSignedIn is true, so a token is expected to arrive.
+      for (let i = 0; i < 30; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const retried = await auth.getToken();
+        if (retried) return retried;
+      }
+      return null;
+    });
+
+    // Clear the provider only when this bridge unmounts (auth mode switch /
+    // sign-out remount), never on every auth change — a deps-driven cleanup
+    // would blank the provider mid-session and re-open the race above.
+    useEffect(() => () => setApiTokenProvider(null), []);
+
+    // Keep bidstack:session in sync with Clerk auth state so
+    // watchAuthForCacheClear can detect sign-out/org switches on any tab.
     useEffect(() => {
-      setApiTokenProvider(({ forceRefresh } = {}) =>
-        auth.getToken(forceRefresh ? { skipCache: true } : undefined),
-      );
-      // Keep bidstack:session in sync with Clerk auth state so
-      // watchAuthForCacheClear can detect sign-out/org switches on any tab.
       if (auth.isLoaded) {
         if (auth.isSignedIn && auth.userId) {
           const orgId = auth.orgId ?? 'personal';
@@ -285,7 +350,6 @@ const LazyClerkBranch = lazy(async () => {
           writeSessionMarker(null);
         }
       }
-      return () => setApiTokenProvider(null);
     }, [auth]);
 
     return (

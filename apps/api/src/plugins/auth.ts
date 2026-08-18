@@ -486,7 +486,21 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   }
 
   const authHeader = req.headers.authorization ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  let token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  // WebSocket upgrades (e.g. /api/v1/yjs-sync) can't set an Authorization
+  // header from the browser, so accept a ?access_token= query param as a
+  // fallback ONLY when no header is present. Same JWT, same verification path;
+  // scrubUrl() already redacts access_token from any logged URL, and it travels
+  // over wss (TLS). Parsed from req.url directly so it doesn't depend on
+  // req.query being populated at the onRequest stage.
+  if (!token) {
+    const url = req.url ?? '';
+    const qIdx = url.indexOf('?');
+    if (qIdx >= 0) {
+      const qToken = new URLSearchParams(url.slice(qIdx + 1)).get('access_token');
+      if (qToken) token = qToken;
+    }
+  }
   if (!token) {
     throw req.server.httpErrors.unauthorized('Missing Authorization header');
   }
@@ -506,7 +520,11 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       authorizedParties,
     });
 
-    const clerkOrgId = payload.org_id as string | undefined;
+    // Clerk v2 session tokens nest org claims under `o` ({ id, rol, slg });
+    // legacy tokens use the flat `org_id` / `org_role`. Read both so the app
+    // works regardless of the instance's token version.
+    const orgClaim = payload.o as { id?: string; rol?: string } | undefined;
+    const clerkOrgId = (payload.org_id as string | undefined) ?? orgClaim?.id;
     if (!clerkOrgId) {
       throw req.server.httpErrors.forbidden('No organization context in token');
     }
@@ -515,7 +533,7 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       clerkOrgId,
       clerkUserId: payload.sub as string,
       sessionId: payload.sid as string | undefined,
-      orgRole: payload.org_role as string | undefined,
+      orgRole: (payload.org_role as string | undefined) ?? orgClaim?.rol,
       email: (payload.email as string | undefined) ?? '',
       firstName: (payload.first_name as string | undefined) ?? '',
       lastName: (payload.last_name as string | undefined) ?? '',

@@ -20,7 +20,8 @@
     "cancel": "Cancelar",
     "saving": "Guardando…",
     "save": "Guardar",
-    "emptyContent": "Aún no hay contenido. Usa Borrador de IA para generar una primera versión."
+    "emptyContent": "Aún no hay contenido. Usa Borrador de IA para generar una primera versión.",
+    "draftSectionError": "No se pudo generar el borrador de IA. Vuelve a intentarlo."
   },
   "proposals": {
     "title": "Propuestas",
@@ -76,7 +77,8 @@
     "allStages": "Todas las etapas",
     "emptyFiltered": "Ninguna propuesta coincide con estos filtros.",
     "truncated": "Mostrando las {{loaded}} propuestas actualizadas más recientemente de {{total}}. Ajusta la etapa o la búsqueda para ver el resto.",
-    "percent": "{{value}} %"
+    "percent": "{{value}} %",
+    "readOnlyHint": "Necesitas acceso de escritura a propuestas para crear una propuesta."
   },
   "rfpCrew": {
     "statusWaiting": "En espera",

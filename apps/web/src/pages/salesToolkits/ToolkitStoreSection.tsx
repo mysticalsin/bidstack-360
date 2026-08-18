@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useCreateToolkit,
   useDeleteToolkit,
@@ -56,6 +57,10 @@ export function ToolkitStoreSection() {
   const update = useUpdateToolkit();
   const remove = useDeleteToolkit();
   const importSp = useImportSharePoint();
+  // Toolkit writes are gated server-side behind documents:write (Admin/Presales
+  // only) — hide the add/edit/delete/import controls for every other role so
+  // they don't 403 on click with zero UI feedback.
+  const canWrite = useHasPermission('documents:write');
 
   const runImport = () =>
     importSp.mutate(undefined, {
@@ -130,19 +135,21 @@ export function ToolkitStoreSection() {
             Stored sales collateral — decks, templates, battle-cards. Readable by the MCP.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={importSp.isPending} onClick={runImport}>
-            <Icon name="download" size={14} ariaHidden />
-            {importSp.isPending ? 'Importing…' : 'Import from SharePoint'}
-          </Button>
-          <Button variant="primary" onClick={() => setDraft(draft ? null : { ...EMPTY_DRAFT })}>
-            <Icon name="plus" size={14} ariaHidden />
-            {draft ? 'Close' : 'Add toolkit'}
-          </Button>
-        </div>
+        {canWrite ? (
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" disabled={importSp.isPending} onClick={runImport}>
+              <Icon name="download" size={14} ariaHidden />
+              {importSp.isPending ? 'Importing…' : 'Import from SharePoint'}
+            </Button>
+            <Button variant="primary" onClick={() => setDraft(draft ? null : { ...EMPTY_DRAFT })}>
+              <Icon name="plus" size={14} ariaHidden />
+              {draft ? 'Close' : 'Add toolkit'}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      {draft ? (
+      {draft && canWrite ? (
         <div className="grid grid-cols-1 gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4 lg:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
@@ -269,26 +276,28 @@ export function ToolkitStoreSection() {
                   ) : (
                     <span className="text-xs text-[var(--fg-tertiary)]">No link</span>
                   )}
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(t)}
-                      aria-label={`Edit ${t.title}`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
-                    >
-                      <Icon name="pencil" size={14} ariaHidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`Delete "${t.title}"?`)) remove.mutate(t.id);
-                      }}
-                      aria-label={`Delete ${t.title}`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--danger-tint)] hover:text-[var(--danger)]"
-                    >
-                      <Icon name="trash" size={14} ariaHidden />
-                    </button>
-                  </div>
+                  {canWrite ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(t)}
+                        aria-label={`Edit ${t.title}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
+                      >
+                        <Icon name="pencil" size={14} ariaHidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Delete "${t.title}"?`)) remove.mutate(t.id);
+                        }}
+                        aria-label={`Delete ${t.title}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--danger-tint)] hover:text-[var(--danger)]"
+                      >
+                        <Icon name="trash" size={14} ariaHidden />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </Card>
             ))}

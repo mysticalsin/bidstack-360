@@ -229,6 +229,10 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         const managers = await prisma.userRole.findMany({
           where: {
             orgId: req.auth.orgId,
+            // Not an authorization check, but the same omission: without it a
+            // revoked manager keeps receiving override notifications for bids
+            // they no longer have any role in.
+            deletedAt: null,
             role: { orgId: req.auth.orgId, name: { in: ['Manager', 'Sales Manager'] }, deletedAt: null },
             user: { orgId: req.auth.orgId, deletedAt: null },
           },

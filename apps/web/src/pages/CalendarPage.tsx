@@ -135,7 +135,7 @@ export function CalendarPage() {
       {/* Page landmark heading (the visible date label below is a styled span). */}
       <h1 className="sr-only">{t('calendar.title', 'Calendar')}</h1>
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-default)]">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-[var(--border-default)]">
         <button
           onClick={prevWeek}
           aria-label={t('calendar.previousWeek', 'Previous week')}
@@ -157,7 +157,13 @@ export function CalendarPage() {
           <Icon name="chevron-right" size={16} />
         </button>
 
-        <span className="flex-1 text-sm font-semibold text-[var(--fg-primary)]">
+        {/* basis-48 + nowrap, not bare flex-1: `flex-1` resolves flex-basis
+            to 0, so on a narrow viewport the 44px nav buttons and the filter
+            group (all min-width:auto, none shrinkable) took the whole row and
+            this label collapsed to a 31px column, wrapping the date range one
+            character per line. A real basis makes the row wrap instead, and
+            nowrap keeps "Aug 17, 2026 – Aug 23, 2026" on one line. */}
+        <span className="min-w-0 flex-1 basis-48 whitespace-nowrap text-sm font-semibold text-[var(--fg-primary)]">
           {weekDays[0] && weekDays[6]
             ? `${formatDate(weekDays[0].toISOString())} – ${formatDate(weekDays[6].toISOString())}`
             : ''}

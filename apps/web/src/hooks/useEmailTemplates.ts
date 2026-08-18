@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import type {
   EmailTemplate,
   EmailTemplateCreate,
@@ -46,6 +47,10 @@ export function useDeleteEmailTemplate() {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/api/email-templates/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+    // EmailTemplatesSection.remove() has no catch of its own — without this
+    // the delete silently no-ops on a rejected mutation.
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not delete template'),
   });
 }
 

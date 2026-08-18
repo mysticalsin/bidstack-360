@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useConvertLead, useDeleteLead, useLead, useUpdateLead } from '@/hooks/useLeads';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { DraftInput, DraftTextarea } from '@/components/ui/DraftInput';
@@ -38,10 +39,17 @@ export function LeadDetailPage() {
   const update = useUpdateLead(id ?? '');
   const convert = useConvertLead(id ?? '');
   const del = useDeleteLead();
+  // Status/priority/score/source/BANT/notes PATCH, convert, and delete are all
+  // gated server-side behind leads:write (apps/api/src/routes/leads.write.routes.ts)
+  // — disable the write affordances so a read-only role doesn't see controls
+  // that always 403 (matches OppInlineEditCells' canEdit convention).
+  const canWrite = useHasPermission('leads:write');
+  const readOnlyHint = t('leadDetail.readOnlyHint', 'You need lead write access to make changes.');
   const { debounced: debouncedUpdate } = useDebouncedCallback((patch: Record<string, unknown>) => {
+    // onError now lives on useUpdateLead itself (matches useCompanies.ts), so every
+    // call site gets a failure toast without needing its own override here.
     update.mutate(patch as Parameters<typeof update.mutate>[0], {
       onSuccess: () => toast.success(t('leadDetail.toastSaved', 'Saved')),
-      onError: () => toast.error(t('leadDetail.toastSaveFailed', 'Save failed')),
     });
   }, 500);
   const [isConverting, setIsConverting] = useState(false);
@@ -180,7 +188,17 @@ export function LeadDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             {canConvert ? (
-              <Button data-testid="lead-convert-action" onClick={() => setIsConverting(true)}>
+              <Button
+                data-testid="lead-convert-action"
+                onClick={() => setIsConverting(true)}
+                disabled={!canWrite}
+                title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? undefined
+                    : `${t('leadDetail.convertAction', 'Convert to opportunity')} — ${readOnlyHint}`
+                }
+              >
                 {t('leadDetail.convertAction', 'Convert to opportunity')}
               </Button>
             ) : (
@@ -188,7 +206,15 @@ export function LeadDetailPage() {
                 {t('leadDetail.convertUnavailable', 'Convert lead unavailable')}
               </Button>
             )}
-            <Button variant="ghost" onClick={handleDelete}>
+            <Button
+              variant="ghost"
+              onClick={handleDelete}
+              disabled={!canWrite}
+              title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite ? undefined : `${t('leadDetail.deleteAction', 'Delete')} — ${readOnlyHint}`
+              }
+            >
               {t('leadDetail.deleteAction', 'Delete')}
             </Button>
           </div>
@@ -238,10 +264,16 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelStatus', 'Status')}
                 </label>
                 <select
+                  aria-label={
+                    canWrite
+                      ? t('leadDetail.labelStatus', 'Status')
+                      : `${t('leadDetail.labelStatus', 'Status')} — ${readOnlyHint}`
+                  }
                   value={l.status}
                   onChange={(e) => handleStatusChange(LeadStatus.parse(e.target.value))}
-                  disabled={isConverted}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50"
+                  disabled={isConverted || !canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -255,9 +287,16 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelPriority', 'Priority')}
                 </label>
                 <select
+                  aria-label={
+                    canWrite
+                      ? t('leadDetail.labelPriority', 'Priority')
+                      : `${t('leadDetail.labelPriority', 'Priority')} — ${readOnlyHint}`
+                  }
                   value={l.priority}
                   onChange={(e) => handlePriorityChange(LeadPriority.parse(e.target.value))}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+                  disabled={!canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {PRIORITY_OPTIONS.map((p) => (
                     <option key={p} value={p}>
@@ -272,12 +311,19 @@ export function LeadDetailPage() {
                 </label>
                 <div className="flex items-center gap-2">
                   <input
+                    aria-label={
+                      canWrite
+                        ? t('leadDetail.labelScore', 'Score')
+                        : `${t('leadDetail.labelScore', 'Score')} — ${readOnlyHint}`
+                    }
                     type="number"
                     min={0}
                     max={100}
                     value={l.score}
                     onChange={(e) => debouncedUpdate({ score: Number(e.target.value) })}
-                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+                    disabled={!canWrite}
+                    title={canWrite ? undefined : readOnlyHint}
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -286,9 +332,16 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelSource', 'Source')}
                 </label>
                 <select
+                  aria-label={
+                    canWrite
+                      ? t('leadDetail.labelSource', 'Source')
+                      : `${t('leadDetail.labelSource', 'Source')} — ${readOnlyHint}`
+                  }
                   value={l.source}
                   onChange={(e) => update.mutate({ source: LeadSource.parse(e.target.value) })}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+                  disabled={!canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {LeadSource.options.map((s) => (
                     <option key={s} value={s}>
@@ -317,7 +370,14 @@ export function LeadDetailPage() {
                   serverValue={l.budget ?? ''}
                   commit={(v) => update.mutate({ budget: v || null })}
                   placeholder={t('leadDetail.placeholderBudget', 'e.g. €500K')}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+                  disabled={!canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite
+                      ? undefined
+                      : `${t('leadDetail.labelBudget', 'Budget')} — ${readOnlyHint}`
+                  }
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -329,7 +389,14 @@ export function LeadDetailPage() {
                   serverValue={l.authority ?? ''}
                   commit={(v) => update.mutate({ authority: v || null })}
                   placeholder={t('leadDetail.placeholderAuthority', 'Decision maker')}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+                  disabled={!canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite
+                      ? undefined
+                      : `${t('leadDetail.labelAuthority', 'Authority')} — ${readOnlyHint}`
+                  }
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div className="col-span-2">
@@ -344,7 +411,12 @@ export function LeadDetailPage() {
                     'What problem are they trying to solve?',
                   )}
                   rows={2}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                  disabled={!canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite ? undefined : `${t('leadDetail.labelNeed', 'Need')} — ${readOnlyHint}`
+                  }
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -356,7 +428,14 @@ export function LeadDetailPage() {
                   serverValue={l.timeline ?? ''}
                   commit={(v) => update.mutate({ timeline: v || null })}
                   placeholder={t('leadDetail.placeholderTimeline', 'e.g. Q2 2026')}
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+                  disabled={!canWrite}
+                  title={canWrite ? undefined : readOnlyHint}
+                  aria-label={
+                    canWrite
+                      ? undefined
+                      : `${t('leadDetail.labelTimeline', 'Timeline')} — ${readOnlyHint}`
+                  }
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -375,7 +454,12 @@ export function LeadDetailPage() {
               commit={(v) => update.mutate({ notes: v || null })}
               placeholder={t('leadDetail.placeholderNotes', 'Add notes about this lead…')}
               rows={4}
-              className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+              disabled={!canWrite}
+              title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite ? undefined : `${t('leadDetail.labelNotes', 'Notes')} — ${readOnlyHint}`
+              }
+              className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </Card>

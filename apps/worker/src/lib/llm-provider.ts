@@ -12,8 +12,13 @@
 // header. It is NEVER logged — callers log `${kind}:${model}`, never the key.
 
 import {
-  completeChat,
+  cloudflareWorkersAiBaseUrl,
   coerceJsonObject,
+  completeChat,
+  normalizeCloudflareBaseUrl,
+  CLOUDFLARE_API_HOST,
+  CLOUDFLARE_DEFAULT_MODEL,
+  CLOUDFLARE_GATEWAY_HOST,
   type ChatInput,
   type LlmProviderKind,
   type ResolvedLlm,
@@ -66,6 +71,13 @@ function assertHostedProviderBaseUrl(
  * (model availability changes over time — set the one your account has).
  *
  *   RFP_LLM_PROVIDER=openai     OPENAI_API_KEY=…     [OPENAI_MODEL, OPENAI_BASE_URL]
+ *   RFP_LLM_PROVIDER=cloudflare CLOUDFLARE_API_TOKEN=… + CLOUDFLARE_ACCOUNT_ID=…
+ *                               [CLOUDFLARE_MODEL, CLOUDFLARE_BASE_URL]  (alias: workers-ai)
+ *     • Cloudflare Workers AI's OpenAI-compatible endpoint. The account id is
+ *       part of the URL, so BOTH vars are required; either supply the account
+ *       id and let it compose, or set CLOUDFLARE_BASE_URL to a full URL (e.g.
+ *       an AI Gateway route). Host is restricted to Cloudflare unless
+ *       CLOUDFLARE_ALLOW_CUSTOM_BASE_URL=true.
  *   RFP_LLM_PROVIDER=anthropic  ANTHROPIC_API_KEY=…  [ANTHROPIC_MODEL, ANTHROPIC_BASE_URL]
  *   RFP_LLM_PROVIDER=moonshot   MOONSHOT_API_KEY=…   [MOONSHOT_MODEL, MOONSHOT_BASE_URL]   (Kimi; alias: RFP_LLM_PROVIDER=kimi)
   *   RFP_LLM_PROVIDER=nim        NVIDIA_NIM_API_KEY [NVIDIA_NIM_MODEL, NVIDIA_NIM_BASE_URL]
@@ -74,6 +86,11 @@ function assertHostedProviderBaseUrl(
  *       http://localhost:11434/v1, keyless — on-prem & private (best for NDA-Tier-D RFPs).
  *     • hosted: point GEMMA_BASE_URL at an OpenAI-compatible gateway
  *       (Vertex AI / OpenRouter / Groq / Together) + set GEMMA_API_KEY.
+ *   RFP_LLM_PROVIDER=omniroute  (no key — free gateway) [OMNIROUTE_MODEL, OMNIROUTE_BASE_URL]
+ *     • local OmniRoute gateway at http://localhost:20128/v1, model "auto"
+ *       (OmniRoute itself picks/falls back across free providers). Keyless,
+ *       same as gemma. Defaults SSE-streaming, so the resolver forces
+ *       `stream: false` via extraBody to get a parseable chat.completion body.
  *   RFP_LLM_TIMEOUT_MS  per-call abort timeout (default 120000) — raise it for slow
  *     local inference so big drafts complete instead of failing open to a placeholder.
  */
@@ -95,6 +112,31 @@ export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): Resolve
       model: env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5',
       baseUrl: (env.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com').replace(/\/$/, ''),
     };
+  }
+  // Cloudflare Workers AI — OpenAI-compatible, but the base URL embeds the
+  // account id, so BOTH the token and the account id are required. Falls
+  // through to null (Dust → deterministic) when either is missing rather than
+  // firing a request at a malformed host.
+  if (kind === 'cloudflare' || kind === 'workers-ai') {
+    const baseUrl = normalizeCloudflareBaseUrl(
+      env.CLOUDFLARE_BASE_URL ??
+        (env.CLOUDFLARE_ACCOUNT_ID
+          ? cloudflareWorkersAiBaseUrl(env.CLOUDFLARE_ACCOUNT_ID)
+          : undefined),
+    );
+    if (env.CLOUDFLARE_API_TOKEN && baseUrl) {
+      return {
+        kind: 'openai',
+        apiKey: env.CLOUDFLARE_API_TOKEN,
+        model: env.CLOUDFLARE_MODEL ?? CLOUDFLARE_DEFAULT_MODEL,
+        baseUrl: assertHostedProviderBaseUrl(baseUrl, baseUrl, {
+          provider: 'Cloudflare Workers AI',
+          allowedHosts: [CLOUDFLARE_API_HOST, CLOUDFLARE_GATEWAY_HOST],
+          allowCustom: env.CLOUDFLARE_ALLOW_CUSTOM_BASE_URL === 'true',
+        }),
+      };
+    }
+    return null;
   }
   if ((kind === 'moonshot' || kind === 'kimi') && env.MOONSHOT_API_KEY) {
     return {
@@ -134,6 +176,21 @@ export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): Resolve
       apiKey: env.GEMMA_API_KEY ?? 'local', // placeholder — local servers ignore the bearer token
       model: env.GEMMA_MODEL ?? 'gemma3',
       baseUrl: (env.GEMMA_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, ''),
+    };
+  }
+  // OmniRoute is a keyless local gateway (same posture as gemma) that speaks
+  // the OpenAI-compatible /chat/completions shape, so its wire kind is
+  // 'openai'. It defaults to SSE streaming; extraBody.stream=false forces the
+  // non-streaming JSON body completeChat expects (see @bidstack/shared/llm).
+  // NOT run through assertHostedProviderBaseUrl — localhost is the intended
+  // target, not an accidental SSRF-prone override.
+  if (kind === 'omniroute') {
+    return {
+      kind: 'openai',
+      apiKey: 'omniroute', // placeholder — OmniRoute is keyless for free providers
+      model: env.OMNIROUTE_MODEL ?? 'auto/best-free',
+      baseUrl: (env.OMNIROUTE_BASE_URL ?? 'http://localhost:20128/v1').replace(/\/$/, ''),
+      extraBody: { stream: false },
     };
   }
   return null;

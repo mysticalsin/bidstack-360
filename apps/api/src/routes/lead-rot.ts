@@ -116,9 +116,14 @@ export const leadRotRoutes: FastifyPluginAsyncZod = async (server) => {
   // ─── POST /api/v1/leads/:id/recovery-suggest ──────────────────────────
   // Agent-stub recovery suggestions for a stale lead. Sprint 1 ships a
   // rule-based heuristic; Sprint 2 swaps in a Dust agent call.
+  // RBAC: reads the lead itself (org-scoped) and was previously ungated —
+  // gate it behind leads:read like every other lead read, so a role without
+  // lead visibility (Finance, Presales, Service Desk, External Partner) can't
+  // pull lead detail + AI recovery rationale through this side door.
   server.post(
     '/leads/:id/recovery-suggest',
     {
+      preHandler: server.requirePermission('leads:read'),
       schema: {
         params: IdParam,
         response: { 200: RecoverySuggestResponse },

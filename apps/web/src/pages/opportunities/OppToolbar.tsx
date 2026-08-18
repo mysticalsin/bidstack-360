@@ -314,6 +314,7 @@ export function OppBulkBar({
   onBulkDelete,
   onClearSelection,
   isPending = false,
+  canWrite,
 }: {
   selectedCount: number;
   stageOptions: PipelineStage[];
@@ -322,6 +323,10 @@ export function OppBulkBar({
   onClearSelection: () => void;
   /** P1 #24: disable controls while a stage-move or delete is in-flight */
   isPending?: boolean;
+  /** False when the signed-in user lacks opportunities:write — hides the
+   * move/delete controls (both 403 server-side otherwise); Clear stays since
+   * it's local-only state. */
+  canWrite: boolean;
 }) {
   const { t } = useTranslation('crm');
   return (
@@ -334,35 +339,39 @@ export function OppBulkBar({
         {t('oppToolbar.selectedCount', '{{count}} selected', { count: selectedCount })}
       </span>
       <div className="flex items-center gap-2">
-        <select
-          aria-label={t('oppToolbar.moveSelectionLabel', 'Move selection to stage')}
-          defaultValue=""
-          disabled={isPending}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (next) {
-              onBulkStageChange(next);
-              e.target.value = '';
-            }
-          }}
-          className="dialog-input disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <option value="">{t('oppToolbar.moveToStage', 'Move to stage…')}</option>
-          {stageOptions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onBulkDelete}
-          disabled={isPending}
-          className="text-[var(--danger)] hover:text-[var(--danger)]"
-        >
-          {t('oppToolbar.deleteSelected', 'Delete selected')}
-        </Button>
+        {canWrite && (
+          <>
+            <select
+              aria-label={t('oppToolbar.moveSelectionLabel', 'Move selection to stage')}
+              defaultValue=""
+              disabled={isPending}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next) {
+                  onBulkStageChange(next);
+                  e.target.value = '';
+                }
+              }}
+              className="dialog-input disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">{t('oppToolbar.moveToStage', 'Move to stage…')}</option>
+              {stageOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onBulkDelete}
+              disabled={isPending}
+              className="text-[var(--danger)] hover:text-[var(--danger)]"
+            >
+              {t('oppToolbar.deleteSelected', 'Delete selected')}
+            </Button>
+          </>
+        )}
         <Button size="sm" variant="ghost" onClick={onClearSelection} disabled={isPending}>
           {t('oppToolbar.clearSelection', 'Clear')}
         </Button>

@@ -87,8 +87,12 @@ const yjsCollabPluginImpl: FastifyPluginAsync = async (server) => {
   // by the realtime plugin (fastify-plugin removes encapsulation for shared
   // decorators). We just add a new websocket route.
 
+  // Registered at /api/v1/yjs-sync: the rewriteUrl hook normalizes /api/* to
+  // /api/v1/*, so a route at /api/yjs-sync was never reachable (it 404'd as
+  // /api/v1/yjs-sync). Auth is on the Upgrade via req.auth; the browser client
+  // passes its token as ?access_token= (headers aren't settable on a WS).
   server.get(
-    '/api/yjs-sync',
+    '/api/v1/yjs-sync',
     {
       websocket: true,
       config: { public: false },

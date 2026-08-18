@@ -28,6 +28,11 @@ vi.mock('@/hooks/useTerritories', () => ({
   useDeleteLeadRoutingRule: vi.fn(() => ({ mutate: vi.fn() })),
 }));
 
+const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true) }));
+// Default to full access so the existing rendering assertions below are
+// unaffected; the permission-gating tests flip this per-case.
+vi.mock('@/hooks/useCapabilities', () => capabilitiesMocks);
+
 // Mock the React Simple Maps SVG components so tests don't throw during geography fetching or mapping
 vi.mock('react-simple-maps', () => ({
   ComposableMap: ({ children }: MapChildrenProps) => (
@@ -75,6 +80,9 @@ function renderWithProviders(ui: ReactElement) {
 describe('TerritoriesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks() clears call history but not a permanent mockReturnValue,
+    // so restate the default explicitly per test for isolation.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -173,5 +181,103 @@ describe('TerritoriesPage', () => {
     // Check list entries
     expect(screen.getByText('Europe Central')).toBeTruthy();
     expect(screen.getByText('Germany Auto Assign')).toBeTruthy();
+  });
+
+  // Regression: every write route (territories + lead-routing-rules) is
+  // gated server-side behind territories:write, but the page rendered
+  // New Territory/New Rule buttons and row Edit/Delete icons unconditionally
+  // — a user without the permission saw a fully-editable page that 403'd on
+  // every click.
+  describe('territories:write gating', () => {
+    function mockLoadedData() {
+      mockTerritoryHooks(
+        {
+          data: {
+            items: [
+              {
+                id: 't-1',
+                orgId: 'org-1',
+                name: 'Europe Central',
+                region: 'EMEA',
+                countryCodes: ['DE', 'FR'],
+                postalCodes: [],
+                active: true,
+                ownerId: 'owner-1',
+                ownerName: 'Alice Dev',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+          },
+          isLoading: false,
+          isError: false,
+        },
+        {
+          data: {
+            items: [
+              {
+                id: 'r-1',
+                orgId: 'org-1',
+                name: 'Germany Auto Assign',
+                priority: 1,
+                criteria: { countryCode: 'DE' },
+                active: true,
+                assignToUserId: null,
+                assignToTerritoryId: 't-1',
+                roundRobinTeam: [],
+                roundRobinIndex: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+          },
+          isLoading: false,
+          isError: false,
+        },
+        {
+          data: {
+            totals: {
+              totalOpportunities: 42,
+              totalCountries: 5,
+              totalValueMicros: 15000000000,
+              avgProbability: 75,
+            },
+            items: [],
+          },
+          isLoading: false,
+          isError: false,
+        },
+      );
+    }
+
+    it('shows New Territory/New Rule buttons and row actions for a user with territories:write', () => {
+      capabilitiesMocks.useHasPermission.mockReturnValue(true);
+      mockLoadedData();
+
+      renderWithProviders(<TerritoriesPage />);
+
+      expect(screen.getByRole('button', { name: /New territory/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /New rule/i })).toBeTruthy();
+      // Both the territory row and the routing-rule row carry an Edit/Delete
+      // pair, so two of each are expected here.
+      expect(screen.getAllByTitle('Edit')).toHaveLength(2);
+      expect(screen.getAllByTitle('Delete')).toHaveLength(2);
+    });
+
+    it('hides New Territory/New Rule buttons and row actions for a user without territories:write', () => {
+      capabilitiesMocks.useHasPermission.mockReturnValue(false);
+      mockLoadedData();
+
+      renderWithProviders(<TerritoriesPage />);
+
+      // The list still renders (read access is ungated) ...
+      expect(screen.getByText('Europe Central')).toBeTruthy();
+      expect(screen.getByText('Germany Auto Assign')).toBeTruthy();
+      // ... but every write affordance is gone, not just visually hidden.
+      expect(screen.queryByRole('button', { name: /New territory/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /New rule/i })).toBeNull();
+      expect(screen.queryByTitle('Edit')).toBeNull();
+      expect(screen.queryByTitle('Delete')).toBeNull();
+    });
   });
 });

@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { csvCell } from '@/lib/csv';
+import { toast } from '@/components/ui/Toast';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -208,6 +209,8 @@ export function useDuplicateReport() {
   return useMutation({
     mutationFn: (id: string) => api<Report>(`/api/reports/${id}/duplicate`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.list() }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not duplicate report'),
   });
 }
 
@@ -216,6 +219,7 @@ export function useDeleteReport() {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/api/reports/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.list() }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not delete report'),
   });
 }
 
@@ -227,6 +231,7 @@ export function useRunReport() {
     onSuccess: (run) => {
       qc.invalidateQueries({ queryKey: KEYS.runs(run.reportId) });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not run report'),
   });
 }
 

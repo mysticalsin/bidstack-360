@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 import { keepPreviousTableData } from '@/lib/table/use-table-query';
 
 export interface Reference {
@@ -95,5 +96,7 @@ export function useUseReference() {
   return useMutation({
     mutationFn: async (id: string) => api(`/api/references/${id}/use`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['references'] }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not record reference use'),
   });
 }

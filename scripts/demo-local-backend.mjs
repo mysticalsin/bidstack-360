@@ -98,6 +98,37 @@ const ok = async (url) => {
 log('starting postgres + redis');
 run('docker', ['compose', 'up', '-d', 'postgres', 'redis']);
 
+// ── 1b. OmniRoute AI gateway ────────────────────────────────────────────────
+// The free, keyless AI gateway that powers every AI feature (copilot + RFP).
+// Start it if it isn't already listening on :20128.
+const OMNIROUTE_URL = (process.env.OMNIROUTE_BASE_URL ?? 'http://localhost:20128/v1').replace(
+  /\/v1\/?$/,
+  '',
+);
+if (await ok(`${OMNIROUTE_URL}/v1/models`)) {
+  log('OmniRoute already running');
+} else {
+  log('starting OmniRoute AI gateway');
+  const omni = spawn('omniroute', [], {
+    detached: true,
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
+  });
+  omni.unref();
+  // Non-fatal bounded wait (NOT waitFor, which would die() the whole launch):
+  // if OmniRoute doesn't come up, AI features fall back to Dust/stub.
+  const omniDeadline = Date.now() + 60_000;
+  let omniUp = false;
+  while (Date.now() < omniDeadline) {
+    if (await ok(`${OMNIROUTE_URL}/v1/models`)) {
+      omniUp = true;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  log(omniUp ? 'OmniRoute up' : 'OmniRoute not up — AI features will use Dust/stub fallback');
+}
+
 // ── 2. API ─────────────────────────────────────────────────────────────────
 if (await ok(`http://127.0.0.1:${API_PORT}/health`)) {
   log(`api already healthy on :${API_PORT}`);
@@ -127,6 +158,12 @@ if (await ok(`http://127.0.0.1:${API_PORT}/health`)) {
       PUBLIC_BASE_URL: DEMO_ORIGIN,
       STORAGE_DRIVER: 'local',
       CLERK_SECRET_KEY: '',
+      // Route every AI feature through the local OmniRoute gateway (free,
+      // keyless, auto-fallback across many providers). The copilot services
+      // fall back to it when Dust isn't configured; the worker's RFP steps use
+      // it too. Override OMNIROUTE_BASE_URL if the gateway runs elsewhere.
+      RFP_LLM_PROVIDER: process.env.RFP_LLM_PROVIDER ?? 'omniroute',
+      OMNIROUTE_BASE_URL: process.env.OMNIROUTE_BASE_URL ?? 'http://localhost:20128/v1',
     },
   });
   api.unref();

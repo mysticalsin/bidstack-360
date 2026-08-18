@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,19 @@ const MAX_STARRED = 6;
 
 type Badges = { openBids: number; overdueTasks: number };
 
+// Same route-match rule SidebarSection uses to decide isActiveSection —
+// pulled out so the route-sync effect below (Sidebar()) and the per-section
+// render (SidebarSection()) can't drift on what counts as "this section owns
+// the current route". 'home' is never a target: it renders without a
+// disclosure and never participates in the accordion.
+function findSectionKeyForPath(pathname: string): string | undefined {
+  return NAV_SECTIONS.find(
+    (section) =>
+      section.key !== 'home' &&
+      section.items.some((it) => pathname === it.to || pathname.startsWith(`${it.to}/`)),
+  )?.key;
+}
+
 export function Sidebar() {
   const oppsCount = useOpportunityCount({ excludeClosed: true });
   const taskSummary = useTaskSummary();
@@ -37,6 +50,22 @@ export function Sidebar() {
   const isAdmin = useIsAdmin();
   const { t } = useTranslation('common');
   const { data: appModules } = useAppModules();
+  const location = useLocation();
+
+  // Reveal the section owning the active route on every navigation (deep
+  // link, search result, back/forward) — even if that section carries a
+  // stale explicit collapse=true from a previous accordion click on a
+  // sibling. NAV_SECTIONS is a module-level constant, so pathname is the
+  // only real dependency: a user who then manually collapses the active
+  // section isn't fought, because nothing here re-runs until the route
+  // changes again.
+  useEffect(() => {
+    const activeKey = findSectionKeyForPath(location.pathname);
+    if (!activeKey) return;
+    if (useUiStore.getState().collapsedSections[activeKey] === true) {
+      useUiStore.getState().expandSectionForRoute(activeKey);
+    }
+  }, [location.pathname]);
 
   // Hide module-gated items (agent-studio, Collaborate) unless enabled in
   // Settings → Modules; drop a section that ends up empty after filtering.
@@ -102,10 +131,10 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Scrollable nav region: the brand (above) and footer (below) stay
-            pinned; only this list scrolls when every group is expanded, so the
-            hamburger/collapse toggle never scrolls out of reach. min-h-0 lets a
-            flex child actually overflow instead of growing the whole sidebar. */}
+        {/* True accordion (see useUiStore.setSectionCollapsed) keeps at most one
+            section open, so this region fits without scrolling in normal use.
+            overflow-y-auto stays as a safety net for small viewports /
+            large zoom levels, not as the primary answer to a tall list. */}
         <div className="sb-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
         {sections.map((section) => (
           <SidebarSection

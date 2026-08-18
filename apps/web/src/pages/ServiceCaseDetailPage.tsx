@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useServiceCase, useUpdateServiceCase } from '@/hooks/useServiceCases';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 
 // Transition map keyed by the canonical CaseStatus enum (packages/shared
 // service-desk.ts: new | open | waiting_customer | waiting_internal |
@@ -31,6 +32,14 @@ export function ServiceCaseDetailPage() {
   const c = useServiceCase(id);
   const update = useUpdateServiceCase();
   const [note, setNote] = useState('');
+  // Status transitions and note-saving PATCH through service-cases routes,
+  // gated server-side behind service-desk:write — disable rather than hide so
+  // a read-only agent still sees the case's status flow (avoids 403-on-click).
+  const canWrite = useHasPermission('service-desk:write');
+  const readOnlyHint = t(
+    'serviceCaseDetail.readOnlyHint',
+    'You need service desk write access to update this case.',
+  );
 
   if (c.isLoading) return <LoadingSkeleton rows={6} />;
   if (c.isError)
@@ -119,8 +128,24 @@ export function ServiceCaseDetailPage() {
             <Button
               key={s}
               size="sm"
-              onClick={() => update.mutate({ id: cs.id, body: { status: s as never } })}
-              disabled={update.isPending}
+              onClick={() =>
+                update.mutate(
+                  { id: cs.id, body: { status: s as never } },
+                  {
+                    onError: () =>
+                      toast.error(
+                        t('serviceCaseDetail.statusErrorToast', 'Could not update case status'),
+                      ),
+                  },
+                )
+              }
+              disabled={update.isPending || !canWrite}
+              title={canWrite ? undefined : readOnlyHint}
+              aria-label={
+                canWrite
+                  ? undefined
+                  : `${t('serviceCaseDetail.markStatusButton', 'Mark {{status}}', { status: s.replace(/_/g, ' ') })} — ${readOnlyHint}`
+              }
             >
               {t('serviceCaseDetail.markStatusButton', 'Mark {{status}}', {
                 status: s.replace(/_/g, ' '),
@@ -159,7 +184,13 @@ export function ServiceCaseDetailPage() {
               <Button
                 size="sm"
                 onClick={handleSaveNote}
-                disabled={!note.trim() || update.isPending}
+                disabled={!note.trim() || update.isPending || !canWrite}
+                title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? undefined
+                    : `${t('serviceCaseDetail.saveNoteButton', 'Save note')} — ${readOnlyHint}`
+                }
               >
                 {update.isPending
                   ? t('serviceCaseDetail.savingButton', 'Saving…')

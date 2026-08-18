@@ -17,9 +17,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
-import { AuthProvider, useAuth, useSignOut, useUser } from './auth';
+import { AuthProvider, DEMO_TOKEN_KEY, useAuth, useSignOut, useUser } from './auth';
 import { api } from './api';
 
 // Mocked Clerk SDK. The real one would attempt to fetch session JWKs and
@@ -104,6 +104,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 function Probe() {
@@ -193,6 +194,48 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
     expect(screen.getByTestId('loaded').textContent).toBe('true');
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
     expect(screen.getByTestId('email').textContent).toBe('jane@mantu.com');
+  });
+});
+
+// Regression coverage for the cold-load 401 bug: React commits child effects
+// BEFORE parent effects, so if DemoAuthProvider only registered the api token
+// provider in its OWN useEffect, a child data-fetching hook mounted one level
+// down would fire its first request while the provider was still null.
+function FetchingChild() {
+  useEffect(() => {
+    void api('/api/whoami');
+  }, []);
+  return null;
+}
+
+describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
+  it('registers the api token provider synchronously, before a child effect can fire the first request', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <FetchingChild />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    // If the provider were only wired up in a parent-level useEffect (the
+    // regression), this first fetch would have gone out with no
+    // Authorization header (token: null) — a guaranteed 401 on every cold
+    // load. Asserting the header is present on the FIRST (and only) call
+    // proves synchronous registration, not a lucky retry.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer demo-token-abc' }),
+      }),
+    );
   });
 });
 

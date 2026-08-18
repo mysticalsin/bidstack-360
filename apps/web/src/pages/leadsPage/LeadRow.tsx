@@ -15,6 +15,7 @@ export function LeadRow({
   onToggle,
   onPatch,
   onDelete,
+  canWrite,
 }: {
   lead: LeadSummary;
   selected: boolean;
@@ -23,8 +24,16 @@ export function LeadRow({
   /** A2: called when an inline edit is committed; patch fan is handled by useUpdateLeadById. */
   onPatch: (patch: LeadPatch) => void;
   onDelete: () => void;
+  /** False when the signed-in user lacks leads:write — status/priority render
+   * as static badges instead of click-to-edit triggers (the PATCH 403s
+   * server-side otherwise), and delete is disabled. */
+  canWrite: boolean;
 }) {
   const { t } = useTranslation('crm');
+  const readOnlyHint = t(
+    'leadRow.readOnlyHint',
+    'You need lead write access to manage this record.',
+  );
 
   // Localized option labels, memoized to keep array identity stable across renders.
   const leadStatusOpts = useMemo(
@@ -88,27 +97,35 @@ export function LeadRow({
       {/* A2 — status is inline-editable. Read mode shows the styled badge;
           edit mode swaps in a <select> and blur/Enter commits immediately. */}
       <td className="px-4 py-3">
-        <InlineEditSelect
-          value={lead.status}
-          options={leadStatusOpts}
-          onSave={(next) => onPatch({ status: next })}
-          label={t('leadRow.editStatusLabel', 'Edit status for {{name}}', {
-            name: `${lead.firstName} ${lead.lastName}`,
-          })}
-          display={(v) => <LeadStatusBadge status={v as LeadSummary['status']} />}
-        />
+        {canWrite ? (
+          <InlineEditSelect
+            value={lead.status}
+            options={leadStatusOpts}
+            onSave={(next) => onPatch({ status: next })}
+            label={t('leadRow.editStatusLabel', 'Edit status for {{name}}', {
+              name: `${lead.firstName} ${lead.lastName}`,
+            })}
+            display={(v) => <LeadStatusBadge status={v as LeadSummary['status']} />}
+          />
+        ) : (
+          <LeadStatusBadge status={lead.status} />
+        )}
       </td>
       {/* A2 — priority is inline-editable. */}
       <td className="px-4 py-3">
-        <InlineEditSelect
-          value={lead.priority}
-          options={leadPriorityOpts}
-          onSave={(next) => onPatch({ priority: next })}
-          label={t('leadRow.editPriorityLabel', 'Edit priority for {{name}}', {
-            name: `${lead.firstName} ${lead.lastName}`,
-          })}
-          display={(v) => <LeadPriorityBadge priority={v as LeadSummary['priority']} />}
-        />
+        {canWrite ? (
+          <InlineEditSelect
+            value={lead.priority}
+            options={leadPriorityOpts}
+            onSave={(next) => onPatch({ priority: next })}
+            label={t('leadRow.editPriorityLabel', 'Edit priority for {{name}}', {
+              name: `${lead.firstName} ${lead.lastName}`,
+            })}
+            display={(v) => <LeadPriorityBadge priority={v as LeadSummary['priority']} />}
+          />
+        ) : (
+          <LeadPriorityBadge priority={lead.priority} />
+        )}
       </td>
       <td className="px-4 py-3">
         <span className="font-mono text-xs">{lead.score}</span>
@@ -119,10 +136,16 @@ export function LeadRow({
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-md px-2 py-1 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-          aria-label={t('leadRow.deleteLead', 'Delete {{name}}', {
-            name: `${lead.firstName} ${lead.lastName}`,
-          })}
+          disabled={!canWrite}
+          title={canWrite ? undefined : readOnlyHint}
+          className="rounded-md px-2 py-1 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          aria-label={
+            canWrite
+              ? t('leadRow.deleteLead', 'Delete {{name}}', {
+                  name: `${lead.firstName} ${lead.lastName}`,
+                })
+              : `${t('leadRow.deleteLead', 'Delete {{name}}', { name: `${lead.firstName} ${lead.lastName}` })} — ${readOnlyHint}`
+          }
         >
           {t('leadRow.delete', 'Delete')}
         </button>

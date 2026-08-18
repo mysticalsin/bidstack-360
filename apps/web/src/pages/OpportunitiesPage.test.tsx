@@ -1,16 +1,23 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { OpportunitiesPage } from './OpportunitiesPage';
 import { useOpportunities } from '@/hooks/useOpportunities';
+import { useHasPermission } from '@/hooks/useCapabilities';
 
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: vi.fn(),
   usePatchOpportunity: vi.fn(() => ({ mutate: vi.fn() })),
   useCreateOpportunity: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
+
+// Opportunity writes are gated server-side behind opportunities:write (a role
+// like Presales holds read but not write) — default true here so the existing
+// suite below (which doesn't care about permission) keeps seeing every
+// affordance; the dedicated describe block overrides per-test.
+vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn(() => true) }));
 
 vi.mock('@/hooks/useStageMutation', () => ({
   useStageMutation: vi.fn(() => ({ mutateAsync: vi.fn() })),
@@ -71,9 +78,35 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
+function seededOpportunity() {
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    code: 'OP-0001',
+    name: 'Acme Upgrade',
+    customer: 'Acme Corp',
+    stage: 's1_lead',
+    pipelineStageId: null,
+    pipelineStage: null,
+    value: 10000,
+    probability: 20,
+    dueDate: '2026-10-10',
+    owner: 'owner@example.com',
+    industry: 'Consulting',
+    logo: null,
+    country: 'FR',
+    territoryId: null,
+    territoryName: null,
+    updatedAt: new Date().toISOString(),
+    taskCount: 0,
+    commentCount: 0,
+    viewCount: 0,
+  };
+}
+
 describe('OpportunitiesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useHasPermission).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -195,5 +228,62 @@ describe('OpportunitiesPage', () => {
     expect(
       screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href'),
     ).toBe('/settings?tab=data-import');
+  });
+});
+
+// The backend 403s every opportunity PATCH/DELETE/stage-move for a role
+// (e.g. Presales) that reads but doesn't write opportunities — the frontend
+// must hide those affordances instead of rendering controls that always fail.
+describe('OpportunitiesPage — opportunities:write gating', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOpportunities({
+      data: { items: [seededOpportunity()], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders inline cells read-only and hides bulk write controls without opportunities:write', () => {
+    vi.mocked(useHasPermission).mockReturnValue(false);
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    // Stage/value/probability/date cells lose their click-to-edit trigger —
+    // the underlying value stays visible, just not interactive. Scoped to the
+    // table because "S1 Lead" also appears as a filter chip above it.
+    const table = screen.getByRole('table');
+    expect(within(table).queryByRole('button', { name: /Click to change/i })).toBeNull();
+    expect(within(table).queryAllByRole('button', { name: /Click to edit/i })).toHaveLength(0);
+    expect(within(table).getByText('S1 Lead')).toBeTruthy();
+    expect(within(table).getByText('EUR 10,000')).toBeTruthy();
+
+    // Selecting a row still works (read-only), but the bulk stage-move/delete
+    // controls that would 403 must not render — only Clear survives.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Acme Upgrade/i }));
+    expect(screen.queryByLabelText(/Move selection to stage/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Delete selected/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Clear$/i })).toBeTruthy();
+  });
+
+  it('renders inline-edit triggers and bulk write controls with opportunities:write', () => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('button', { name: /Click to change/i })).toBeTruthy();
+    expect(
+      within(table).queryAllByRole('button', { name: /Click to edit/i }).length,
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Acme Upgrade/i }));
+    expect(screen.getByLabelText(/Move selection to stage/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Delete selected/i })).toBeTruthy();
   });
 });

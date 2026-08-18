@@ -29,7 +29,7 @@
 // Staleness: a crashed tab never sends the leave POST, so viewers whose
 //   lastSeenAt is older than 3 missed heartbeats are dropped client-side too.
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
@@ -67,11 +67,34 @@ function postPresence(body: {
 export function usePresence(entityType: string, entityId: string | undefined): UsePresenceResult {
   const { user } = useUser();
 
+  // React 18 StrictMode (dev only) intentionally double-invokes this effect
+  // on initial mount — setup, cleanup, setup again — synchronously, before
+  // either network call settles. Firing the join POST on both setups sends
+  // two identical "online for record X" announcements back-to-back; the
+  // loser races the winner's DB upsert and comes back 409 (console noise on
+  // every opportunity-detail open). Deferring the cleanup's "leave" POST by
+  // one macrotask lets an immediate re-setup for the SAME key cancel it
+  // outright before it ever fires, collapsing the whole mount→cleanup→mount
+  // dance into a single join — while a genuine unmount, or a real entityId
+  // change, still lets the deferred leave go out normally.
+  const joinedKeyRef = useRef<string | null>(null);
+  const pendingLeaveRef = useRef<{ key: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+
   // Join on mount / entityId change, heartbeat every 15s, leave on cleanup.
   useEffect(() => {
     if (!entityId) return undefined;
+    const key = `${entityType}:${entityId}`;
 
-    postPresence({ status: 'online', currentRecordType: entityType, currentRecordId: entityId });
+    if (pendingLeaveRef.current?.key === key) {
+      // Synthetic (or just very fast) cleanup for this same key hasn't
+      // fired its deferred leave yet — cancel it, we never actually left.
+      clearTimeout(pendingLeaveRef.current.timer);
+      pendingLeaveRef.current = null;
+    } else if (joinedKeyRef.current !== key) {
+      postPresence({ status: 'online', currentRecordType: entityType, currentRecordId: entityId });
+      joinedKeyRef.current = key;
+    }
+
     const interval = setInterval(
       () => postPresence({ status: 'online', currentRecordType: entityType, currentRecordId: entityId }),
       HEARTBEAT_MS,
@@ -79,11 +102,19 @@ export function usePresence(entityType: string, entityId: string | undefined): U
 
     return () => {
       clearInterval(interval);
-      // Clear currentRecordType/currentRecordId — omitting them (not sending
-      // status:'offline') keeps the user "online" app-wide, just no longer
-      // attached to this record. See PresenceUpdate: fields omitted from the
-      // body resolve to null server-side (collaboration.ts POST handler).
-      postPresence({ status: 'online' });
+      pendingLeaveRef.current = {
+        key,
+        timer: setTimeout(() => {
+          // Clear currentRecordType/currentRecordId — omitting them (not
+          // sending status:'offline') keeps the user "online" app-wide,
+          // just no longer attached to this record. See PresenceUpdate:
+          // fields omitted from the body resolve to null server-side
+          // (collaboration.ts POST handler).
+          postPresence({ status: 'online' });
+          joinedKeyRef.current = null;
+          pendingLeaveRef.current = null;
+        }, 0),
+      };
     };
   }, [entityType, entityId]);
 

@@ -332,8 +332,12 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
     },
   });
 
-  // DELETE /integrations/slack/disconnect — revoke token and delete workspace
+  // DELETE /integrations/slack/disconnect — revoke token and delete workspace.
+  // Org-level: SlackWorkspace is one row per org, deleted unconditionally on
+  // orgId (not scoped to the caller), so any member without this gate could
+  // tear down the whole org's Slack integration.
   app.delete('/integrations/slack/disconnect', {
+    preHandler: server.requirePermission('integrations:write'),
     schema: { response: { 204: z.null() } },
     handler: async (req, reply) => {
       const { orgId, userId } = req.auth;

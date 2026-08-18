@@ -213,7 +213,8 @@
     "editAriaLabel": "Modifier le rapport {{name}}",
     "duplicateAriaLabel": "Dupliquer le rapport {{name}}",
     "deleteConfirm": "Supprimer \"{{name}}\" ?",
-    "deleteAriaLabel": "Supprimer le rapport {{name}}"
+    "deleteAriaLabel": "Supprimer le rapport {{name}}",
+    "readOnlyHint": "Vous devez disposer de l'accès en écriture aux rapports pour gérer ce rapport."
   },
   "fieldPicker": {
     "placeholder": "Choisir un champ…",

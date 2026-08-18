@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import type { WorkflowCreate } from '@bidstack/shared';
 import { NewWorkflowDialog } from './workflowsPage/NewWorkflowDialog';
 
@@ -29,6 +30,15 @@ export function WorkflowsPage() {
   const deleteWf = useDeleteWorkflow();
   const runWf = useRunWorkflow();
   const [showCreate, setShowCreate] = useState(false);
+  // Create/toggle/run/delete all PATCH or POST through /api/workflows, gated
+  // server-side behind workflows:write — hide the primary CTA, disable the
+  // per-card affordances (matches ReportsListPage/TerritoriesPage) so a
+  // read-only viewer sees the workflow list without a 403-on-click trap.
+  const canWrite = useHasPermission('workflows:write');
+  const readOnlyHint = t(
+    'workflows.readOnlyHint',
+    'You need workflows write access to manage this workflow.',
+  );
 
   const items = data?.items ?? [];
 
@@ -106,7 +116,11 @@ export function WorkflowsPage() {
             />
             {t('workflows.activeOnly', 'Active only')}
           </label>
-          <Button onClick={() => setShowCreate(true)}>{t('workflows.newWorkflow', 'New workflow')}</Button>
+          {canWrite && (
+            <Button onClick={() => setShowCreate(true)}>
+              {t('workflows.newWorkflow', 'New workflow')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -134,9 +148,11 @@ export function WorkflowsPage() {
           title={t('workflows.emptyTitle', 'No workflows yet')}
           message={t('workflows.emptyMessage', 'Automate your pre-sales workflows.')}
           action={
-            <Button onClick={() => setShowCreate(true)}>
-              {t('workflows.newWorkflow', 'New workflow')}
-            </Button>
+            canWrite ? (
+              <Button onClick={() => setShowCreate(true)}>
+                {t('workflows.newWorkflow', 'New workflow')}
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -175,12 +191,24 @@ export function WorkflowsPage() {
                 )}
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--fg-secondary)]">
+                <label
+                  className="flex cursor-pointer items-center gap-2 text-xs text-[var(--fg-secondary)]"
+                  title={canWrite ? undefined : readOnlyHint}
+                >
                   <input
                     type="checkbox"
                     checked={w.active}
                     onChange={() => handleToggle(w.id, w.active)}
-                    disabled={updateWf.isPending}
+                    disabled={updateWf.isPending || !canWrite}
+                    aria-label={
+                      canWrite
+                        ? undefined
+                        : `${
+                            w.active
+                              ? t('workflows.statusActive', 'Active')
+                              : t('workflows.statusPaused', 'Paused')
+                          } — ${readOnlyHint}`
+                    }
                     className="h-4 w-4 rounded border-[var(--border-subtle)]"
                   />
                   {w.active
@@ -192,7 +220,11 @@ export function WorkflowsPage() {
                     size="sm"
                     variant="secondary"
                     onClick={() => handleRun(w.id)}
-                    disabled={runWf.isPending}
+                    disabled={runWf.isPending || !canWrite}
+                    title={canWrite ? undefined : readOnlyHint}
+                    aria-label={
+                      canWrite ? undefined : `${t('workflows.run', 'Run')} — ${readOnlyHint}`
+                    }
                   >
                     {runWf.isPending
                       ? t('workflows.running', 'Running…')
@@ -201,10 +233,13 @@ export function WorkflowsPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(w.id, w.name)}
-                    aria-label={t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', {
-                      name: w.name,
-                    })}
-                    disabled={deleteWf.isPending}
+                    aria-label={
+                      canWrite
+                        ? t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })
+                        : `${t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })} — ${readOnlyHint}`
+                    }
+                    disabled={deleteWf.isPending || !canWrite}
+                    title={canWrite ? undefined : readOnlyHint}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fg-tertiary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] disabled:opacity-50 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
                   >
                     <Icon name="trash" size={15} ariaHidden />

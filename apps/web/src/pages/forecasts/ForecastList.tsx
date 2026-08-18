@@ -47,6 +47,10 @@ interface ForecastListProps {
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
   formatMoneyMicros: (micros: number, currency: string) => string;
+  /** territories:write — gates cell edits, per-row delete, and the empty-state CTA. */
+  canWrite: boolean;
+  /** Shown as the `title` on disabled controls when `canWrite` is false. */
+  readOnlyHint: string;
 }
 
 export function ForecastList({
@@ -59,6 +63,8 @@ export function ForecastList({
   onSaveCell,
   onDeleteRow,
   formatMoneyMicros,
+  canWrite,
+  readOnlyHint,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
@@ -117,9 +123,11 @@ export function ForecastList({
             'Try changing the period filter or create your first forecast.',
           )}
           action={
-            <Button size="sm" onClick={onNewForecast}>
-              <Icon name="plus" size={14} /> {t('forecastList.newForecast', 'New Forecast')}
-            </Button>
+            canWrite ? (
+              <Button size="sm" onClick={onNewForecast}>
+                <Icon name="plus" size={14} /> {t('forecastList.newForecast', 'New Forecast')}
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -183,7 +191,9 @@ export function ForecastList({
                             ) : (
                               <button
                                 type="button"
-                                className="inline-flex min-w-[80px] justify-end rounded px-3 py-2 text-sm tabular-nums text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] pointer-coarse:min-h-[44px]"
+                                disabled={!canWrite}
+                                title={canWrite ? undefined : readOnlyHint}
+                                className="inline-flex min-w-[80px] justify-end rounded px-3 py-2 text-sm tabular-nums text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] pointer-coarse:min-h-[44px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                                 onClick={() =>
                                   setEditingCell({
                                     ownerId: row.ownerId,
@@ -192,11 +202,19 @@ export function ForecastList({
                                     value: val,
                                   })
                                 }
-                                aria-label={t(
-                                  'forecastList.cellEditLabel',
-                                  'Edit {{category}} for {{period}}',
-                                  { category: CATEGORY_LABELS[cat], period: row.period },
-                                )}
+                                aria-label={
+                                  canWrite
+                                    ? t(
+                                        'forecastList.cellEditLabel',
+                                        'Edit {{category}} for {{period}}',
+                                        { category: CATEGORY_LABELS[cat], period: row.period },
+                                      )
+                                    : `${t(
+                                        'forecastList.cellEditLabel',
+                                        'Edit {{category}} for {{period}}',
+                                        { category: CATEGORY_LABELS[cat], period: row.period },
+                                      )} — ${readOnlyHint}`
+                                }
                               >
                                 {formatMoneyMicros(val, 'EUR')}
                               </button>
@@ -215,11 +233,17 @@ export function ForecastList({
                       <TableCell>
                         <button
                           type="button"
+                          disabled={!canWrite}
+                          title={canWrite ? undefined : readOnlyHint}
                           onClick={() => onDeleteRow(row)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                          aria-label={t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
-                            period: row.period,
-                          })}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]"
+                          aria-label={
+                            canWrite
+                              ? t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
+                                  period: row.period,
+                                })
+                              : `${t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', { period: row.period })} — ${readOnlyHint}`
+                          }
                         >
                           <Icon name="trash" size={14} />
                         </button>
@@ -268,7 +292,9 @@ export function ForecastList({
                         ) : (
                           <button
                             type="button"
-                            className="inline-flex justify-start rounded px-3 py-2 text-sm tabular-nums text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] pointer-coarse:min-h-[44px]"
+                            disabled={!canWrite}
+                            title={canWrite ? undefined : readOnlyHint}
+                            className="inline-flex justify-start rounded px-3 py-2 text-sm tabular-nums text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] pointer-coarse:min-h-[44px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                             onClick={() =>
                               setEditingCell({
                                 ownerId: row.ownerId,
@@ -277,11 +303,19 @@ export function ForecastList({
                                 value: val,
                               })
                             }
-                            aria-label={t(
-                              'forecastList.cellEditLabel',
-                              'Edit {{category}} for {{period}}',
-                              { category: CATEGORY_LABELS[cat], period: row.period },
-                            )}
+                            aria-label={
+                              canWrite
+                                ? t(
+                                    'forecastList.cellEditLabel',
+                                    'Edit {{category}} for {{period}}',
+                                    { category: CATEGORY_LABELS[cat], period: row.period },
+                                  )
+                                : `${t(
+                                    'forecastList.cellEditLabel',
+                                    'Edit {{category}} for {{period}}',
+                                    { category: CATEGORY_LABELS[cat], period: row.period },
+                                  )} — ${readOnlyHint}`
+                            }
                           >
                             {formatMoneyMicros(val, 'EUR')}
                           </button>
@@ -300,11 +334,17 @@ export function ForecastList({
                   </span>
                   <button
                     type="button"
+                    disabled={!canWrite}
+                    title={canWrite ? undefined : readOnlyHint}
                     onClick={() => onDeleteRow(row)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                    aria-label={t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
-                      period: row.period,
-                    })}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]"
+                    aria-label={
+                      canWrite
+                        ? t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
+                            period: row.period,
+                          })
+                        : `${t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', { period: row.period })} — ${readOnlyHint}`
+                    }
                   >
                     <Icon name="trash" size={14} />
                   </button>

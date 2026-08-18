@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
-import { completeChat } from '@bidstack/shared/llm';
+import { completeChat, normalizeCloudflareBaseUrl } from '@bidstack/shared/llm';
 
 import {
   agentProviderCredentialName,
@@ -13,6 +13,7 @@ import {
   type DirectAgentProvider,
   credentialToResolvedLlm,
   getOrgActiveAgentProvider,
+  isKeylessProvider,
   listOrgAgentProviderCredentials,
   resolveOrgAgentProviderCredential,
 } from '../lib/agent-provider-credentials.js';
@@ -55,11 +56,51 @@ const ProviderTestResult = z.object({
 const PutProviderCredentialBody = z.object({
   apiKey: z.string().trim().min(1).max(1_000).optional(),
   model: z.string().trim().min(1).max(200).optional(),
-  baseUrl: z.string().trim().url().max(300).optional(),
+  // NOT .url() — Cloudflare Workers AI's endpoint is account-scoped
+  // (https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1), so this field
+  // also accepts a bare 32-hex account id which the handler expands. Every
+  // value still goes through assertSafeProviderBaseUrl, which parses it as a
+  // URL and enforces public https — the validation moved, it did not weaken.
+  baseUrl: z.string().trim().min(1).max(300).optional(),
 });
 
-function isLocalGemmaUrl(provider: DirectAgentProvider, parsed: URL): boolean {
-  if (provider !== 'gemma' || process.env.NODE_ENV === 'production') return false;
+/**
+ * Cloudflare's base URL is the one provider setting a user cannot reasonably
+ * type from memory, so the field accepts an account id and composes the URL.
+ * Returns the value unchanged for every other provider.
+ */
+function expandProviderBaseUrl(
+  provider: DirectAgentProvider,
+  baseUrl: string | undefined,
+  server: Parameters<FastifyPluginAsyncZod>[0],
+): string | undefined {
+  if (provider !== 'cloudflare') return baseUrl;
+  if (!baseUrl) {
+    // Cloudflare has no usable default: without an account id the composed URL
+    // is empty and every later call fails with "Failed to parse URL" deep in a
+    // background job. Reject at the boundary instead.
+    throw server.httpErrors.badRequest(
+      'Cloudflare Workers AI needs your account ID (or the full https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1 URL).',
+    );
+  }
+  const normalized = normalizeCloudflareBaseUrl(baseUrl);
+  if (!normalized) {
+    throw server.httpErrors.badRequest(
+      'Enter a 32-character Cloudflare account ID, or a full https:// base URL.',
+    );
+  }
+  return normalized;
+}
+
+// Keyless local-gateway providers may point at localhost without the public
+// https:// requirement below. Gemma's localhost bypass is DEV-ONLY — a
+// production Gemma endpoint must be public https. OmniRoute is different: it
+// IS a locally-running gateway by design in every environment (there is no
+// hosted OmniRoute to point at instead), so its localhost bypass applies in
+// production too.
+function isLocalKeylessGatewayUrl(provider: DirectAgentProvider, parsed: URL): boolean {
+  if (!isKeylessProvider(provider)) return false;
+  if (provider === 'gemma' && process.env.NODE_ENV === 'production') return false;
   return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsed.hostname);
 }
 
@@ -76,13 +117,15 @@ function assertSafeProviderBaseUrl(
     throw server.httpErrors.badRequest('Base URL must be a valid URL.');
   }
 
-  if (isLocalGemmaUrl(provider, parsed)) return;
+  if (isLocalKeylessGatewayUrl(provider, parsed)) return;
 
   if (parsed.protocol !== 'https:' || !isPublicHostname(parsed.hostname)) {
     throw server.httpErrors.badRequest(
       provider === 'gemma'
         ? 'Gemma base URL must be public https:// in production, or localhost in local development.'
-        : 'Base URL must be a public https:// endpoint.',
+        : provider === 'omniroute'
+          ? 'OmniRoute base URL must be public https://, or localhost for the local gateway.'
+          : 'Base URL must be a public https:// endpoint.',
     );
   }
 }
@@ -144,7 +187,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
     '/agent-providers/credentials/:provider',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: {
         params: ProviderParam,
         body: PutProviderCredentialBody,
@@ -156,9 +199,13 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
       const existing = await resolveOrgAgentProviderCredential(req.auth.orgId, provider);
       const apiKey = req.body.apiKey ?? existing?.apiKey;
       const model = req.body.model ?? existing?.model;
-      const baseUrl = req.body.baseUrl ?? existing?.baseUrl;
+      const baseUrl = expandProviderBaseUrl(
+        provider,
+        req.body.baseUrl ?? existing?.baseUrl,
+        server,
+      );
 
-      if (provider !== 'gemma' && !apiKey) {
+      if (!isKeylessProvider(provider) && !apiKey) {
         throw server.httpErrors.badRequest('API key is required for this provider.');
       }
       if (provider === 'claude' && !model) {
@@ -226,7 +273,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
     '/agent-providers/credentials/:provider',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { params: ProviderParam, response: { 204: z.null() } },
     },
     async (req, reply) => {
@@ -276,7 +323,7 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
     '/agent-providers/active',
     {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
-      preHandler: server.requireRole('admin'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { body: SetActiveBody, response: { 200: ProviderCredentialList } },
     },
     async (req) => {
@@ -370,8 +417,16 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
         const text = await completeChat(llm, {
           system: 'You are a connectivity probe. Reply with the single word OK.',
           user: 'Reply with the single word OK.',
-          maxTokens: 16,
-          timeoutMs: 12_000,
+          // NOT 16. Reasoning models (Cloudflare's glm-4.7-flash, qwen3,
+          // nemotron; NIM's deepseek with thinking on) emit a chain-of-thought
+          // into `message.reasoning` BEFORE `message.content`, so a 16-token
+          // budget is consumed entirely by the trace and content comes back
+          // null — which completeChat reports as "returned empty content".
+          // Measured 2026-08-17 against live Workers AI: glm-4.7-flash failed
+          // this probe at 16 and passed at 512 with a valid token. The probe
+          // must not tell an admin their working provider is dead.
+          maxTokens: 512,
+          timeoutMs: 20_000,
         });
         return {
           provider,

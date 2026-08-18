@@ -1,1 +1,12 @@
-{}
+{
+  "agentProviderCredentials": {
+    "dialog": {
+      "accountIdHint": "ستجده في عنوان URL الخاص بلوحة تحكم Cloudflare، أو نفّذ الأمر `wrangler whoami`. كما يمكن استخدام عنوان URL أساسي كامل يبدأ بـ https://.",
+      "accountIdLabel": "معرّف حساب Cloudflare"
+    },
+    "error": {
+      "accountIdInvalid": "هذا ليس معرّف حساب Cloudflare (32 خانة ست عشرية) ولا عنوان URL كاملاً يبدأ بـ https://.",
+      "accountIdRequired": "يحتاج Workers AI من Cloudflare إلى معرّف حسابك."
+    }
+  }
+}

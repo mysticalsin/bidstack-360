@@ -30,7 +30,7 @@ defense-in-depth.
 | Layer        | Where                                                             | What |
 | ------------ | ----------------------------------------------------------------- | ---- |
 | Kit          | `apps/worker/src/crew/`                                           | `Agent` / `Task` / `Crew` / `Process` types plus `kickoff()` with sequential context chaining and hierarchical manager consolidation. |
-| Execution    | `apps/worker/src/crew/dust-executor.ts`                           | Shared RFP provider wrapper: direct LLM first, then Dust. Supports NVIDIA NIM, OpenAI, Claude, Kimi, Gemma, and Dust. |
+| Execution    | `apps/worker/src/crew/dust-executor.ts`                           | Shared RFP provider wrapper: direct LLM first, then Dust. Supports NVIDIA NIM, OpenAI, Cloudflare Workers AI, Claude, Kimi, OmniRoute, Gemma, and Dust. |
 | Data         | `packages/db` (`crew_agents`, `crews`, `crew_tasks`, `crew_runs`) | Org-scoped raw SQL tables from migration `20260530010000_crew_infrastructure`. |
 | Queue        | `apps/worker/src/queues/crew-run.ts`                              | Loads a crew, calls `kickoff`, then persists status, task results, and final output. |
 | API          | `apps/api/src/routes/crew-agents.ts`, `crews.ts`                  | Admin-gated CRUD, member crew runs, and scoped run reads. |
@@ -94,6 +94,62 @@ so the workflow continues but cannot be mistaken for real AI review.
 `NVIDIA_NIM_BASE_URL` defaults to the official hosted endpoint. Custom NIM
 base URLs are rejected unless `NVIDIA_NIM_ALLOW_CUSTOM_BASE_URL=true`, and must
 be public HTTPS endpoints.
+
+### Cloudflare Workers AI
+
+Workers AI speaks the OpenAI-compatible `/chat/completions` shape, so it needs
+no client changes — but its endpoint is **account-scoped**, which makes it the
+one provider where a token alone is not enough:
+
+```env
+RFP_LLM_PROVIDER=cloudflare          # alias: workers-ai
+CLOUDFLARE_API_TOKEN=                # a Workers AI (Read) token
+CLOUDFLARE_ACCOUNT_ID=               # 32 hex chars — `wrangler whoami`
+CLOUDFLARE_MODEL=@cf/meta/llama-4-scout-17b-16e-instruct
+# CLOUDFLARE_BASE_URL=               # optional: a full URL (e.g. an AI Gateway route)
+# CLOUDFLARE_ALLOW_CUSTOM_BASE_URL=false
+```
+
+The account id is composed into
+`https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1`. Supplying the token
+without the account id resolves to **no provider** (not a broken one) so the
+executor falls through to Dust / the deterministic placeholder rather than
+firing a request at an empty URL. Hosts other than `api.cloudflare.com` and
+`gateway.ai.cloudflare.com` are rejected unless
+`CLOUDFLARE_ALLOW_CUSTOM_BASE_URL=true`.
+
+**Pick the model on two axes: context window AND whether it reasons.**
+
+1. *Context.* `document-extract.ts` sends up to 80,000 characters in a single
+   prompt (~20–27k tokens), so Cloudflare's headline
+   `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (24,000-token context) truncates a
+   long RFP.
+2. *Reasoning.* `glm-4.7-flash`, `qwen3-30b` and `nemotron-3-120b` emit a
+   chain-of-thought into `message.reasoning` **before** `message.content`. Give
+   them a small `max_tokens` and the budget goes entirely to the trace —
+   `content` comes back `null`, which `completeChat` reports as "returned empty
+   content". Measured against the live endpoint on 2026-08-17: glm-4.7-flash
+   returned `content: null` at `max_tokens=16` and answered normally at 512.
+
+The default is therefore `@cf/meta/llama-4-scout-17b-16e-instruct` — 131k
+context, no reasoning preamble, ~1s, clean JSON under `response_format`. The
+curated list with context windows and reasoning flags lives in
+`packages/shared/src/llm-catalog/index.ts` and is what the Settings picker
+renders. (This is also why the connectivity probe uses `maxTokens: 512`, not 16:
+a 16-token probe reports a perfectly healthy reasoning model as dead.)
+
+**Token gotcha (cost a full debugging session once):** a Cloudflare API token
+can carry a Client IP Address Filter. Such a token returns 200 from the
+developer's network and `401 {"errors":[{"code":10000}]}` from the deploy host,
+with a byte-identical key. Verify from the deploy host's egress IP, not your
+laptop — see `lessons/2026-08-14-cf-token-ip-filter-works-local-401-cloud.md`.
+Provider error bodies are now included in the thrown message, so that response
+is visible in the Settings → Integrations **Test** result instead of a bare
+`HTTP 401`.
+
+Per-org credentials (Settings → Integrations → AI & Agents → Model providers)
+override the env for that org; the account id goes in the **Cloudflare account
+ID** field.
 
 Secrets must live in `.env` or the deployment secret manager. Only placeholders
 belong in `.env.example` and docs.

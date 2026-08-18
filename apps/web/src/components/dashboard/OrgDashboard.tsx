@@ -134,6 +134,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
         icon: 'dollar',
         href: '/opportunities',
         signal: stageSignals,
+        // The strip's single accent: open pipeline is the number a sales lead
+        // actually steers by — everything else stays neutral ink (KpiRow).
+        emphasis: true,
       },
       {
         label: t('orgDashboard.kpiTasksLabel', 'Tasks'),

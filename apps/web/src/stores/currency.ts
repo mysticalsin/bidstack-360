@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { buildApiUrl } from '@/lib/api';
+
 const RATES_KEY = 'bidstack:exchange-rates';
 const RATES_TS_KEY = 'bidstack:exchange-rates-ts';
 const RATES_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -313,7 +315,12 @@ export const useCurrencyStore = create<CurrencyStore>()(
         }
         set({ ratesLoading: true, ratesError: null });
         inflightRatesRequest = (async () => {
-          const res = await fetch('/api/v1/exchange-rates', { credentials: 'include' });
+          // buildApiUrl prefixes the configured API origin (VITE_API_URL) — a
+          // raw '/api/...' would hit the SPA's own origin, which on a split
+          // SPA/API deploy is the static host (returns index.html, not JSON).
+          const res = await fetch(buildApiUrl('/api/v1/exchange-rates'), {
+            credentials: 'include',
+          });
           if (!res.ok) {
             const retryAfterSeconds = Number(res.headers.get('Retry-After'));
             ratesRetryAt =

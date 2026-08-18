@@ -629,7 +629,9 @@
     "runFailed": "The run failed.",
     "fallback": "fallback",
     "finalResponsePartial": "Final response (some steps used a fallback)",
-    "finalResponse": "Final response"
+    "finalResponse": "Final response",
+    "subtitleReadOnly": "Browse the agents and crews an admin has set up.",
+    "runPermissionHint": "You need agent run access to run a crew. Ask an admin to grant it."
   },
   "contractAgreements": {
     "regionLabel": "Contractual agreements",
@@ -1078,7 +1080,8 @@
     "metaCreated": "Created {{date}}",
     "metaUpdated": "Updated {{date}}",
     "metaOwner": "Owner: {{name}}",
-    "liveCollaboration": "Live collaboration"
+    "liveCollaboration": "Live collaboration",
+    "readOnlyHint": "You need lead write access to make changes."
   },
   "dashboard": {
     "srHeading": "Dashboard",
@@ -1285,7 +1288,8 @@
     "dueIn": "in {{count}}d",
     "snoozeTask": "Snooze {{title}}",
     "statusAction": "Status: {{status}}. Activate to change to {{next}}.",
-    "statusTitle": "Activate to change status to {{next}}"
+    "statusTitle": "Activate to change status to {{next}}",
+    "readOnlyHint": "You need task write access to edit this task."
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} is editing",
@@ -1630,7 +1634,8 @@
     "editProbabilityLabel": "Edit probability",
     "likely": "likely",
     "editDueDateLabel": "Edit due date",
-    "liveCollaborationLabel": "Live collaboration"
+    "liveCollaborationLabel": "Live collaboration",
+    "readOnlyHint": "You need opportunities write access to edit this opportunity."
   },
   "callSummary": {
     "meddicEmpty": "No MEDDIC signals extracted. Transcript may be too short or not yet processed.",
@@ -1783,7 +1788,8 @@
     "countryLabel": "Country",
     "cancel": "Cancel",
     "submitting": "Creating…",
-    "submit": "Create opportunity"
+    "submit": "Create opportunity",
+    "readOnlyHint": "You need opportunities write access to create an opportunity."
   },
   "companyDetail": {
     "error": {
@@ -2171,7 +2177,9 @@
     "labelScore": "Score",
     "submitPending": "Creating…",
     "submit": "Create lead",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "readOnlyNotice": "You need lead write access to create a lead.",
+    "backToLeads": "Back to leads"
   },
   "topAccounts": {
     "heading": "Top accounts",
@@ -2517,7 +2525,8 @@
     "xAxisLabel": "X-axis field",
     "yAxisLabel": "Y-axis field",
     "cancel": "Cancel",
-    "save": "Save widget"
+    "save": "Save widget",
+    "saving": "Saving…"
   },
   "auditLogInsights": {
     "activityCadenceTitle": "Activity cadence",
@@ -2890,7 +2899,9 @@
     "createdLabel": "Created",
     "updatedLabel": "Updated",
     "resolvedLabel": "Resolved",
-    "closedLabel": "Closed"
+    "closedLabel": "Closed",
+    "statusErrorToast": "Could not update case status",
+    "readOnlyHint": "You need service desk write access to update this case."
   },
   "tagPicker": {
     "addTag": "Tag",
@@ -2933,7 +2944,8 @@
     "statusPaused": "Paused",
     "running": "Running…",
     "run": "Run",
-    "deleteAriaLabel": "Delete workflow: {{name}}"
+    "deleteAriaLabel": "Delete workflow: {{name}}",
+    "readOnlyHint": "You need workflows write access to manage this workflow."
   },
   "topbarNotifications": {
     "tooltipUnread": "{{count}} unread notification",
@@ -3250,7 +3262,11 @@
     "statusBlocked": "Blocked",
     "statusDone": "Done",
     "idLabel": "ID",
-    "createdLabel": "Created"
+    "createdLabel": "Created",
+    "toast": {
+      "updateFailedTitle": "Could not update task",
+      "serverRejected": "The server rejected the request."
+    }
   },
   "auditLogHero": {
     "badge": "Governance console",
@@ -3527,7 +3543,8 @@
     "editStatusLabel": "Edit status for {{name}}",
     "editPriorityLabel": "Edit priority for {{name}}",
     "deleteLead": "Delete {{name}}",
-    "delete": "Delete"
+    "delete": "Delete",
+    "readOnlyHint": "You need lead write access to manage this record."
   },
   "companyRow": {
     "selectCompany": "Select {{name}}",
@@ -3992,5 +4009,85 @@
     "errorMessage": "Couldn't load bids closing this week.",
     "retry": "Retry",
     "empty": "No bids closing this week."
+  },
+  "crm": {
+    "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}, {{stage}}, {{value}}.",
+    "receiveStep": {
+      "pickAccountTitle": "Choose an account to begin",
+      "pickAccountHint": "Search for the account you want to run intake for.",
+      "pickAccountPlaceholder": "Search accounts…",
+      "pickAccountErrorTitle": "Could not load accounts",
+      "pickAccountListLabel": "Accounts",
+      "pickAccountEmpty": "No matching accounts."
+    }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "You need companies:write access to merge accounts.",
+    "mergeDisabledHintContact": "You need contacts:write access to merge contacts."
+  },
+  "bidClass": {
+    "activeEscalations": "Active escalations (class unchanged)",
+    "aria": "Bid classification and governance",
+    "commitment": "Commitment / complexity",
+    "committee": "Committee",
+    "escalations": "Escalation triggers",
+    "fte": "Team size (FTE)",
+    "gate": "Gate",
+    "gateFailed": "Could not record the gate decision",
+    "gateRecorded": "Gate decision recorded",
+    "gates": "Governance gates",
+    "handoff": "Presales → Bid Office handoff",
+    "history": "Governance record",
+    "historyEmpty": "No gate decisions recorded yet.",
+    "historyError": "Could not load the governance record.",
+    "justification": "Gate justification",
+    "justificationPlaceholder": "Justification (optional)",
+    "lifecycle": "10-stage lifecycle & RACI",
+    "outcome": "Outcome",
+    "raciActivity": "Activity",
+    "raciLegend": "R responsible · A accountable · C consulted · I informed · ◆ governance gate",
+    "readOnly": "You do not have permission to change this",
+    "recordGate": "Record gate decision",
+    "recording": "Recording…",
+    "save": "Save classification to this opportunity",
+    "saveClass": "Save {{bidClass}} to this opportunity",
+    "saveFailed": "Could not save the classification",
+    "savedOn": "Saved on this opportunity",
+    "savedToast": "Classification saved",
+    "saving": "Saving…",
+    "selectToSave": "Select an opportunity above to save this classification and record gate decisions.",
+    "specialRules": "Special rules",
+    "subtitle": "Amaris Bid Office Americas — class = FTE size × commitment, not revenue",
+    "title": "Bid Classification & Governance",
+    "unsaved": "Unsaved — this opportunity is still recorded as {{saved}}",
+    "validators": "Final validators"
+  },
+  "lessonsLearned": {
+    "caption": "Stage 10 — document the win/loss factors within {{days}} business days of the award.",
+    "competitorLabel": "Competitor",
+    "competitorPlaceholder": "Who won it (optional)",
+    "emptyReadOnly": "No debrief recorded for this bid yet.",
+    "loadError": "Could not load the debrief. Refresh to try again.",
+    "lossFactor": "Deciding loss factor",
+    "notYet": "No debrief recorded yet — capture it while it is fresh.",
+    "noteLabel": "Debrief notes",
+    "notePlaceholder": "What decided it, what we would repeat, what we would change",
+    "reasonCompetitor": "Competitor",
+    "reasonLabel": "Primary factor",
+    "reasonNoDecision": "No decision",
+    "reasonOther": "Other",
+    "reasonPrice": "Price",
+    "reasonProductFit": "Product fit",
+    "reasonRelationship": "Relationship",
+    "reasonScope": "Scope",
+    "reasonTiming": "Timing",
+    "record": "Record debrief",
+    "recordedOn": "Last updated {{date}}",
+    "saveError": "Could not record the debrief",
+    "saved": "Debrief recorded",
+    "saving": "Saving…",
+    "title": "Lessons Learned",
+    "update": "Update debrief",
+    "winFactor": "Deciding win factor"
   }
 }

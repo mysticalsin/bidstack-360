@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
@@ -53,6 +54,11 @@ export function OpportunitiesPage() {
   // useTransition: typing in the search box (URL state) is urgent; the
   // table re-render is non-urgent.
   const [, startTransition] = useTransition();
+  // Opportunity writes are gated server-side behind opportunities:write (a role
+  // like Presales holds read but not write) — hide the mutation affordances for
+  // everyone else instead of showing controls that always 403 (matches
+  // CompaniesPage/ProposalDetailPage's canWrite convention).
+  const canWrite = useHasPermission('opportunities:write');
 
   // Stage filter chips (CRM-style quick filters)
   const stageFilter = searchParams.get('pipelineStageId') ?? null;
@@ -428,6 +434,7 @@ export function OpportunitiesPage() {
           onBulkDelete={() => void bulkDelete()}
           onClearSelection={clearSelection}
           isPending={stageMove.isPending || isDeletingBulk}
+          canWrite={canWrite}
         />
       )}
 
@@ -485,6 +492,7 @@ export function OpportunitiesPage() {
                     isSelected={selectedIds.has(opp.id)}
                     onToggleSelect={toggleOne}
                     patch={patch}
+                    canWrite={canWrite}
                   />
                 ))}
               </tbody>

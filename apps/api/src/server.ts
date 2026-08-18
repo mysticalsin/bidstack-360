@@ -155,7 +155,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = buildAllowedCorsOrigins(config.PUBLIC_BASE_URL, config.NODE_ENV);
+      const allowed = buildAllowedCorsOrigins(config.PUBLIC_BASE_URL, config.NODE_ENV, config.CORS_EXTRA_ORIGINS);
       // Production safety: never allow loopback origins.
       if (config.NODE_ENV === 'production' && isLoopbackOrigin(origin)) {
         return cb(new Error('loopback origin rejected in production'), false);
@@ -224,6 +224,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     max: isLowEnv ? 10_000 : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis: rateLimitRedis,
+    // Fail OPEN when the store errors (e.g. the Redis provider's request quota
+    // is exhausted). Rate limiting is a guard, not a hard dependency — a store
+    // outage must never turn every request into a 500. The request is allowed
+    // through; the limit simply isn't enforced until the store recovers.
+    skipOnError: true,
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
       // Fold in orgId so the per-user bucket is partitioned per tenant and keys

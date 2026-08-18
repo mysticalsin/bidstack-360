@@ -249,6 +249,7 @@ export function TerritoryListPanel({
   onEdit,
   onDelete,
   selectedCountryCode,
+  canWrite,
 }: {
   items: Territory[];
   isLoading: boolean;
@@ -258,6 +259,7 @@ export function TerritoryListPanel({
   onEdit: (t: Territory) => void;
   onDelete: (t: Territory) => void;
   selectedCountryCode?: string | null;
+  canWrite: boolean;
 }) {
   const { t } = useTranslation('crm');
   return (
@@ -368,22 +370,24 @@ export function TerritoryListPanel({
                         <Icon name="user" size={10} className="text-[var(--fg-tertiary)]" />
                         {territory.ownerName ?? t('territoryPanels.unassigned', 'Unassigned')}
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
-                        <button
-                          onClick={() => onEdit(territory)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--brand-primary-tint)] hover:text-[var(--brand-primary)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                          title={t('territoryPanels.edit', 'Edit')}
-                        >
-                          <Icon name="pencil" size={13} />
-                        </button>
-                        <button
-                          onClick={() => onDelete(territory)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                          title={t('territoryPanels.delete', 'Delete')}
-                        >
-                          <Icon name="trash" size={13} />
-                        </button>
-                      </div>
+                      {canWrite && (
+                        <div className="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+                          <button
+                            onClick={() => onEdit(territory)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--brand-primary-tint)] hover:text-[var(--brand-primary)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                            title={t('territoryPanels.edit', 'Edit')}
+                          >
+                            <Icon name="pencil" size={13} />
+                          </button>
+                          <button
+                            onClick={() => onDelete(territory)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                            title={t('territoryPanels.delete', 'Delete')}
+                          >
+                            <Icon name="trash" size={13} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -405,6 +409,7 @@ export function RoutingRuleListPanel({
   onEdit,
   onDelete,
   selectedCountryCode,
+  canWrite,
 }: {
   items: LeadRoutingRule[];
   isLoading: boolean;
@@ -414,6 +419,7 @@ export function RoutingRuleListPanel({
   onEdit: (r: LeadRoutingRule) => void;
   onDelete: (r: LeadRoutingRule) => void;
   selectedCountryCode?: string | null;
+  canWrite: boolean;
 }) {
   const { t } = useTranslation('crm');
   return (
@@ -529,22 +535,24 @@ export function RoutingRuleListPanel({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
-                      <button
-                        onClick={() => onEdit(r)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--brand-primary-tint)] hover:text-[var(--brand-primary)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                        title={t('territoryPanels.edit', 'Edit')}
-                      >
-                        <Icon name="pencil" size={13} />
-                      </button>
-                      <button
-                        onClick={() => onDelete(r)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                        title={t('territoryPanels.delete', 'Delete')}
-                      >
-                        <Icon name="trash" size={13} />
-                      </button>
-                    </div>
+                    {canWrite && (
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+                        <button
+                          onClick={() => onEdit(r)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--brand-primary-tint)] hover:text-[var(--brand-primary)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                          title={t('territoryPanels.edit', 'Edit')}
+                        >
+                          <Icon name="pencil" size={13} />
+                        </button>
+                        <button
+                          onClick={() => onDelete(r)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                          title={t('territoryPanels.delete', 'Delete')}
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               </motion.div>

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentStudioPage } from './AgentStudioPage';
 import { api } from '@/lib/api';
+import { useHasPermission } from '@/hooks/useCapabilities';
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn(),
@@ -12,6 +13,11 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/lib/auth', () => ({
   useIsAdmin: () => true,
 }));
+
+// Run is gated server-side behind agents:write (apps/api/src/routes/crews.ts)
+// — the run affordance must reflect that, not just show a button that always
+// 403s once the RFP form is filled out.
+vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn() }));
 
 vi.mock('@/hooks/useDocumentTitle', () => ({
   useDocumentTitle: () => undefined,
@@ -53,6 +59,7 @@ function renderAgentStudio() {
 
 describe('AgentStudioPage', () => {
   beforeEach(() => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
     apiMock.mockImplementation(async (path: string) => {
       if (path === '/api/v1/crew-agents') {
         return {
@@ -130,5 +137,35 @@ describe('AgentStudioPage', () => {
         }),
       );
     });
+  });
+
+  it('disables Run for a user without agents:write instead of letting them 403 after filling the form', async () => {
+    vi.mocked(useHasPermission).mockReturnValue(false);
+
+    renderAgentStudio();
+
+    const runButton = (await screen.findByRole('button', {
+      name: /^Run/,
+    })) as HTMLButtonElement;
+
+    expect(runButton.disabled).toBe(true);
+    expect(runButton.title).toBe(
+      'You need agent run access to run a crew. Ask an admin to grant it.',
+    );
+    // `title` is mouse-only — the disabled button stays in the tab order, so
+    // the accessible name itself must carry the reason for screen-reader and
+    // keyboard-only users.
+    expect(runButton.getAttribute('aria-label')).toBe(
+      'Run — You need agent run access to run a crew. Ask an admin to grant it.',
+    );
+
+    // Clicking a disabled button is a no-op — the run panel never mounts, so
+    // there is no RFP form to fill out and no start-run request to 403 on.
+    fireEvent.click(runButton);
+    expect(screen.queryByLabelText('RFP text')).toBeNull();
+    expect(apiMock).not.toHaveBeenCalledWith(
+      '/api/v1/crews/crew-1/run',
+      expect.anything(),
+    );
   });
 });

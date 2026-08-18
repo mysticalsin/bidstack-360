@@ -31,10 +31,12 @@ export const leadRoutesRead: FastifyPluginAsyncZod = async (server) => {
           ...(ownerId ? { ownerId } : {}),
           ...(search
             ? {
+                // email omitted: it is PII-encrypted at rest, and the
+                // pii-encryption middleware throws on `contains` (only
+                // equality/in via emailHash) — searching it would 500 the list.
                 OR: [
                   { firstName: { contains: search, mode: 'insensitive' } },
                   { lastName: { contains: search, mode: 'insensitive' } },
-                  { email: { contains: search, mode: 'insensitive' } },
                   { companyName: { contains: search, mode: 'insensitive' } },
                 ],
               }

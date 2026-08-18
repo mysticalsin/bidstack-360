@@ -70,9 +70,9 @@ export function TemplatePicker() {
   }
 
   return (
-    <Modal open={open} onClose={close} labelId="template-picker-title">
+    <Modal open={open} onClose={close} title={t('templatePicker.title', 'Choose a starter pipeline')}>
       <div className="w-[min(640px,calc(100vw-2rem))] max-h-[85vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-[var(--shadow-lg)]">
-        <h2 id="template-picker-title" className="text-lg font-bold text-[var(--fg-primary)]">
+        <h2 className="text-lg font-bold text-[var(--fg-primary)]">
           {t('templatePicker.title', 'Choose a starter pipeline')}
         </h2>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">

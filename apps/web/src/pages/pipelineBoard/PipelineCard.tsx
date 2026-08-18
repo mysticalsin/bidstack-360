@@ -20,6 +20,13 @@ interface PipelineCardProps {
   opp: Opportunity;
   isDragging: boolean;
   isFocused: boolean;
+  /**
+   * opportunities:write — false withholds drag/keyboard move affordances
+   * (the card stays fully viewable and navigable, just not draggable).
+   * Optional + defaults true so any other future caller without RBAC
+   * context keeps today's behavior.
+   */
+  canWrite?: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onFocus: (id: string) => void;
@@ -31,6 +38,7 @@ export const PipelineCard = memo(function PipelineCard({
   opp,
   isDragging,
   isFocused,
+  canWrite = true,
   onDragStart,
   onDragEnd,
   onFocus,
@@ -66,8 +74,9 @@ export const PipelineCard = memo(function PipelineCard({
         to={`/opportunities/${opp.id}`}
         data-testid="pipeline-card"
         data-opportunity-id={opp.id}
-        draggable
+        draggable={canWrite}
         onDragStart={(e) => {
+          if (!canWrite) return;
           e.dataTransfer.setData('text/plain', opp.id);
           e.dataTransfer.effectAllowed = 'move';
           onDragStart(opp.id);
@@ -76,23 +85,33 @@ export const PipelineCard = memo(function PipelineCard({
         onFocus={() => onFocus(opp.id)}
         onBlur={() => onBlur(opp.id)}
         onKeyDown={(e) => onKey(e, opp)}
-        aria-roledescription="draggable opportunity"
+        aria-roledescription={canWrite ? 'draggable opportunity' : undefined}
         aria-label={
           // Base label + an ", overdue" suffix so the past-due state reaches
           // screen-reader users — color alone fails WCAG 1.4.1 (Use of Color).
-          t(
-            'crm.pipelineCardAriaLabel',
-            '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
-            {
-              code: opp.code,
-              name: opp.name,
-              stage: stageName,
-              value: formatMoney(opp.value, 'EUR'),
-            },
-          ) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
+          // The "use arrows to move" hint only applies when the signed-in
+          // user actually holds opportunities:write.
+          (canWrite
+            ? t(
+                'crm.pipelineCardAriaLabel',
+                '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
+                {
+                  code: opp.code,
+                  name: opp.name,
+                  stage: stageName,
+                  value: formatMoney(opp.value, 'EUR'),
+                },
+              )
+            : t('crm.pipelineCardAriaLabelReadOnly', '{{code}}: {{name}}, {{stage}}, {{value}}.', {
+                code: opp.code,
+                name: opp.name,
+                stage: stageName,
+                value: formatMoney(opp.value, 'EUR'),
+              })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
         className={cn(
-          'block cursor-grab active:cursor-grabbing rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
+          'block rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
+          canWrite ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
           isFocused &&
             'ring-2 ring-offset-1 ring-[var(--brand-primary)] ring-offset-[var(--surface-page)]',
           isStalled && 'border-red-300/40 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/20',

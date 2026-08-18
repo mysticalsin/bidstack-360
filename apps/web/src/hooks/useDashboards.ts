@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,8 @@ export function useCreateDashboard() {
     mutationFn: (body: CreateDashboardInput) =>
       api<Dashboard>('/api/dashboards', { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.list() }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not create dashboard'),
   });
 }
 
@@ -121,6 +124,8 @@ export function useDeleteDashboard() {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/api/dashboards/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.list() }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not delete dashboard'),
   });
 }
 
@@ -130,6 +135,7 @@ export function useAddWidget(dashboardId: string) {
     mutationFn: (body: CreateWidgetInput) =>
       api<DashboardWidget>(`/api/dashboards/${dashboardId}/widgets`, { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.widgets(dashboardId) }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not add widget'),
   });
 }
 
@@ -151,5 +157,6 @@ export function useDeleteWidget(dashboardId: string) {
     mutationFn: (widgetId: string) =>
       api<void>(`/api/dashboards/${dashboardId}/widgets/${widgetId}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.widgets(dashboardId) }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not delete widget'),
   });
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { LiquidQuickActions } from './LiquidQuickActions';
 import { MobileNav } from './MobileNav';
 import { OfflineIndicator } from './OfflineIndicator';
 import { RouteAnnouncer } from './RouteAnnouncer';
@@ -22,6 +23,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <RouteAnnouncer />
       {/* Bottom-left pill — only visible when navigator reports offline. */}
       <OfflineIndicator />
+      {/* Floating gooey quick-actions (new account / opportunity / task). */}
+      <LiquidQuickActions />
     </div>
   );
 }

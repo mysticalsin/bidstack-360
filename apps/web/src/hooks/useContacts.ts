@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import type { Contact, ContactCreate, ContactPatch } from '@bidstack/shared';
 
@@ -70,8 +71,9 @@ export function useUpdateContact() {
       });
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       ctx?.snapshots.forEach(([key, value]) => qc.setQueryData(key, value));
+      toast.error(err instanceof Error ? err.message : 'Could not update contact');
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ['contacts'] }),
   });

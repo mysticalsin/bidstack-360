@@ -76,8 +76,16 @@ export async function runAiAuditRetentionPass(
 
   // Guard: if the migration that creates ai_invocations hasn't run in this
   // environment, no-op with a warning instead of throwing every night.
+  //
+  // ::text is load-bearing. to_regclass() returns Postgres type `regclass`,
+  // which the Prisma engine cannot deserialize — it throws "Failed to
+  // deserialize column of type 'regclass'" on EVERY run. So the guard meant to
+  // keep this job safe was the one thing guaranteeing it never completed, and
+  // the 90-day purge silently never ran. Casting to text keeps the null-when-
+  // absent semantics (to_regclass returns NULL for a missing table, and
+  // NULL::text is still NULL) while giving Prisma a type it understands.
   const reg = await prisma.$queryRaw<Array<{ reg: string | null }>>`
-    SELECT to_regclass('ai_invocations') AS reg
+    SELECT to_regclass('ai_invocations')::text AS reg
   `;
   if (!reg[0]?.reg) {
     log.warn('ai_invocations table not present — skipping retention purge (run migrations)');

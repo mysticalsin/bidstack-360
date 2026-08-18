@@ -19,17 +19,25 @@ export function StageCell({
   options,
   onSave,
   isSaving = false,
+  canEdit = true,
 }: {
   stage: PipelineStage | null;
   options: PipelineStage[];
   onSave: (nextId: string) => void;
   /** True while the PATCH for this field is in flight (P1 #22). */
   isSaving?: boolean;
+  /** False when the signed-in user lacks opportunities:write — renders a
+   * static badge instead of the click-to-edit trigger (the PATCH 403s
+   * server-side otherwise). */
+  canEdit?: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
   const value = stage?.id ?? '';
   const stageName = stage?.name ?? t('oppInlineEditCells.unknownStage', 'Unknown');
+  if (!canEdit) {
+    return <Badge tone={stageTone(stage?.name ?? '')}>{stageName}</Badge>;
+  }
   if (!editing) {
     return (
       <button
@@ -99,6 +107,7 @@ export function NumberCell({
   step,
   align = 'left',
   isSaving = false,
+  canEdit = true,
 }: {
   value: number;
   onSave: (next: number) => void;
@@ -109,6 +118,10 @@ export function NumberCell({
   align?: 'left' | 'right';
   /** True while the PATCH for this field is in flight (P1 #22). */
   isSaving?: boolean;
+  /** False when the signed-in user lacks opportunities:write — renders a
+   * static value instead of the click-to-edit trigger (the PATCH 403s
+   * server-side otherwise). */
+  canEdit?: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
@@ -123,6 +136,13 @@ export function NumberCell({
     }
   };
 
+  if (!canEdit) {
+    return (
+      <span className={cn('tabular-nums', align === 'right' && 'text-right block')}>
+        {format(value)}
+      </span>
+    );
+  }
   if (!editing) {
     return (
       <button
@@ -178,12 +198,17 @@ export function DateCell({
   onSave,
   format,
   isSaving = false,
+  canEdit = true,
 }: {
   value: string | null;
   onSave: (next: string | null) => void;
   format: (v: string | null) => string;
   /** True while the PATCH for this field is in flight (P1 #22). */
   isSaving?: boolean;
+  /** False when the signed-in user lacks opportunities:write — renders a
+   * static value instead of the click-to-edit trigger (the PATCH 403s
+   * server-side otherwise). */
+  canEdit?: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
@@ -196,6 +221,9 @@ export function DateCell({
     if (next !== value) onSave(next);
   };
 
+  if (!canEdit) {
+    return <span className="text-[var(--fg-secondary)]">{format(value)}</span>;
+  }
   if (!editing) {
     return (
       <button

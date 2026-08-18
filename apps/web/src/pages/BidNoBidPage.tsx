@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useBidScoreLatest,
   useCreateBidScore,
@@ -43,6 +44,7 @@ import {
   bidNoBidSearchParams,
   opportunityIdParser,
 } from './bidNoBid/bid-no-bid-search-params';
+import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 import { CriteriaCategoryFilter } from './bidNoBid/CriteriaCategoryFilter';
 import { CriteriaTable } from './bidNoBid/CriteriaTable';
 import { OverrideDialog } from './bidNoBid/OverrideDialog';
@@ -65,6 +67,11 @@ export function BidNoBidPage() {
   );
   const opportunityId = opportunityIdValue || undefined;
   const { query } = useTableQuery(bidNoBidSearchParams);
+
+  // Save/AI-calibrate/defend all persist through POST /api/v1/bid-scores* which
+  // is gated server-side behind bid-scores:write — hide the actions instead of
+  // letting a read-only role 403 on click.
+  const canWrite = useHasPermission('bid-scores:write');
 
   const [scores, setScores] = useState<Scores>({});
   const [notes, setNotes] = useState('');
@@ -213,7 +220,7 @@ export function BidNoBidPage() {
           </>
         }
         actions={
-          opportunityId ? (
+          opportunityId && canWrite ? (
             <>
               <Button
                 variant="secondary"
@@ -359,6 +366,11 @@ export function BidNoBidPage() {
         onOpenChange={setOverrideOpen}
         onFollow={() => saveScore('follow')}
         onOverride={(justification) => saveScore('override', justification)}
+      />
+
+      <BidGovernancePanel
+        opportunityId={opportunityId}
+        saved={opps?.items.find((o) => o.id === opportunityId) ?? null}
       />
 
       <div className={`${PANEL} mb-8`}>

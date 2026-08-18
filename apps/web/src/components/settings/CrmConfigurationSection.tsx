@@ -8,6 +8,7 @@ import { CustomFieldsSection } from './CustomFieldsSection';
 import { EmailTemplatesSection } from './EmailTemplatesSection';
 import { LeadRotSection } from './LeadRotSection';
 import { PipelineStagesSection } from './PipelineStagesSection';
+import { StageGateSection } from './StageGateSection';
 import { TagsSection } from './TagsSection';
 
 export function CrmConfigurationSection() {
@@ -16,6 +17,8 @@ export function CrmConfigurationSection() {
   return (
     <div className="space-y-6">
       <PipelineStagesSection />
+      {/* Directly under the stages it governs. */}
+      <StageGateSection />
       <LeadRotSection />
       <TagsSection />
       <EmailTemplatesSection />

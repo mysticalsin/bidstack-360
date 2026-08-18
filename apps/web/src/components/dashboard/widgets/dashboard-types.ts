@@ -18,6 +18,8 @@ export interface OrgKpi {
   href: string;
   trend?: number; // percent change
   signal: SignalPoint[];
+  /** The one metric the strip is allowed to accent (see KpiRow) — at most one. */
+  emphasis?: boolean;
 }
 
 export type KpiTone = 'blue' | 'jade' | 'purple' | 'amber' | 'teal' | 'rose';

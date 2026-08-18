@@ -11,6 +11,7 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { LoadingSkeleton, ErrorState, EmptyState } from '@/components/ui/StateMessages';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useConnectorCatalog, useUserIntegrationsStatus } from '@/hooks/useCrmIntegrations';
 import { relativeTime } from '@/lib/format';
 import { api } from '@/lib/api';
@@ -207,6 +208,14 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
   const { t } = useTranslation('integrations');
   const qc = useQueryClient();
   const { data: userIntegrationsData } = useUserIntegrationsStatus();
+  // Slack disconnect tears down the org's ONE shared workspace connection
+  // (server-gated behind integrations:write) — unlike Gmail/Microsoft mail,
+  // which only ever touch the caller's own mailbox and stay open to everyone.
+  const canDisconnectSlack = useHasPermission('integrations:write');
+  const slackWriteHint = t(
+    'connectors.row.slackWriteHint',
+    'You need integrations write access to disconnect the shared Slack workspace.',
+  );
 
   // Connect mutation
   const connectMutation = useMutation({
@@ -326,7 +335,18 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
                 tone="danger"
                 size="sm"
                 onClick={() => disconnectMutation.mutate()}
-                disabled={disconnectMutation.isPending}
+                disabled={
+                  disconnectMutation.isPending ||
+                  (connector.id === 'slack' && !canDisconnectSlack)
+                }
+                title={
+                  connector.id === 'slack' && !canDisconnectSlack ? slackWriteHint : undefined
+                }
+                aria-label={
+                  connector.id === 'slack' && !canDisconnectSlack
+                    ? `${t('connectors.row.disconnect', 'Disconnect')} — ${slackWriteHint}`
+                    : undefined
+                }
               >
                 {disconnectMutation.isPending
                   ? t('connectors.row.disconnecting', 'Disconnecting...')

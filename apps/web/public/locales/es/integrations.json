@@ -60,6 +60,8 @@
       "removeFailedTitle": "Error al eliminar"
     },
     "error": {
+      "accountIdInvalid": "Ese no es un ID de cuenta de Cloudflare (32 caracteres hexadecimales) ni una URL https:// completa.",
+      "accountIdRequired": "Workers AI de Cloudflare necesita el ID de tu cuenta.",
       "apiKeyRequired": "Se requiere una clave de API para este proveedor.",
       "claudeModelRequired": "Claude requiere un modelo, por ejemplo claude-sonnet-4-5.",
       "saveFailed": "No se pudieron guardar las credenciales del proveedor."
@@ -118,23 +120,26 @@
       "updatedNever": "Nunca"
     },
     "dialog": {
-      "updateTitle": "Actualizar {{label}}",
+      "accountIdHint": "Encuéntralo en la URL del panel de Cloudflare o ejecuta `wrangler whoami`. También sirve una URL base https:// completa.",
+      "accountIdLabel": "ID de cuenta de Cloudflare",
       "addTitle": "Añadir proveedor de modelos",
-      "description": "La clave de API se cifra antes de almacenarse y nunca se devuelve al navegador. Deja la clave en blanco al editar para conservar la clave guardada.",
-      "providerLabel": "Proveedor",
-      "apiKeyLabelOptional": "Clave de API (opcional)",
       "apiKeyLabel": "Clave de API",
+      "apiKeyLabelOptional": "Clave de API (opcional)",
+      "apiKeyPlaceholder": "Pega la clave del proveedor",
       "apiKeyPlaceholderKeep": "Déjalo en blanco para conservar la clave guardada",
       "apiKeyPlaceholderOptional": "Opcional para entornos de ejecución locales",
-      "apiKeyPlaceholder": "Pega la clave del proveedor",
-      "modelLabel": "Modelo",
-      "baseUrlLabel": "URL base",
-      "baseUrlHintLocal": "Localhost solo se acepta en desarrollo local. Producción requiere https público.",
       "baseUrlHint": "Debe ser un punto de conexión https público.",
+      "baseUrlHintLocal": "Localhost solo se acepta en desarrollo local. Producción requiere https público.",
+      "baseUrlLabel": "URL base",
       "cancel": "Cancelar",
+      "description": "La clave de API se cifra antes de almacenarse y nunca se devuelve al navegador. Deja la clave en blanco al editar para conservar la clave guardada.",
+      "modelLabel": "Modelo",
+      "providerLabel": "Proveedor",
+      "save": "Guardar proveedor",
       "saving": "Guardando...",
-      "save": "Guardar proveedor"
-    }
+      "updateTitle": "Actualizar {{label}}"
+    },
+    "omnirouteHint": "Puerta de enlace de IA local y gratuita: sin clave. Enruta entre muchos proveedores gratuitos con recuperación automática."
   },
   "connectors": {
     "category": {
@@ -176,7 +181,8 @@
       "connecting": "Conectando...",
       "connect": "Conectar",
       "requiresKey": "requiere clave",
-      "open": "abierto"
+      "open": "abierto",
+      "slackWriteHint": "Necesitas acceso de escritura en integraciones para desconectar el espacio de trabajo de Slack compartido."
     },
     "status": {
       "healthy": "saludable",

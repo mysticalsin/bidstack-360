@@ -286,10 +286,10 @@ export function CustomObjectsAdminPage() {
           setForm(INITIAL_FORM);
           setFormError(null);
         }}
-        labelId="create-obj-title"
+        title={t('customObjectsAdmin.modalTitle', 'New Custom Object')}
       >
         <div className="bg-[var(--surface-card)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-          <h2 id="create-obj-title" className="text-lg font-semibold text-[var(--fg-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
             {t('customObjectsAdmin.modalTitle', 'New Custom Object')}
           </h2>
           <form

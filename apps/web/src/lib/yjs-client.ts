@@ -119,8 +119,21 @@ export class YjsClient {
   private openSocket(): void {
     if (this.destroyed) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/api/yjs-sync`;
+    // In the hybrid deploy the API lives on a different origin (Railway), so the
+    // WS must target VITE_API_URL's host — not window.location.host (the Vercel
+    // SPA, which returns 200/the SPA shell for the upgrade and fails the
+    // handshake). Fall back to the current origin for single-origin deploys.
+    // The token rides as ?access_token= (browsers can't set WS headers); it's
+    // wss (TLS) and scrubUrl() redacts it server-side.
+    const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+    let wsBase: string;
+    if (apiUrl) {
+      const u = new URL(apiUrl);
+      wsBase = `${u.protocol === 'https:' ? 'wss:' : 'ws:'}//${u.host}`;
+    } else {
+      wsBase = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+    }
+    const url = `${wsBase}/api/v1/yjs-sync?access_token=${encodeURIComponent(this.bearerToken)}`;
 
     this.setConnectionState('connecting');
 

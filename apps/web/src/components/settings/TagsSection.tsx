@@ -37,7 +37,9 @@ export function TagsSection() {
       setDraftColor(TAG_COLORS[0]);
       toast.success(t('tags.toastCreated', 'Tag created'));
     } catch {
-      toast.error(t('tags.toastCreateFailed', 'Tag create failed'));
+      // useCreateTag's hook-level onError already surfaces the failure
+      // toast; swallow here only to stop the rejection from propagating
+      // past this void-called async handler.
     }
   };
 

@@ -28,6 +28,15 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { DateCell, NumberCell, StageCell } from './OppInlineEditCells';
 
+// Amaris bid-class severity tone (simple C0 → strategic C4).
+const ROW_BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
+  C0: 'jade',
+  C1: 'blue',
+  C2: 'amber',
+  C3: 'tomato',
+  C4: 'rose',
+};
+
 // ── UpdatedAgo ────────────────────────────────────────────────────────────────
 
 function UpdatedAgo({ iso }: { iso: string }) {
@@ -54,12 +63,16 @@ export const Row = memo(function Row({
   isSelected,
   onToggleSelect,
   patch,
+  canWrite,
 }: {
   opp: Opportunity;
   stageOptions: PipelineStage[];
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   patch: ReturnType<typeof usePatchOpportunity>;
+  /** False when the signed-in user lacks opportunities:write — the backend
+   * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
+  canWrite: boolean;
 }) {
   const { formatMoney } = useFormatMoney();
   const fireConfetti = useConfetti((s) => s.fire);
@@ -139,6 +152,14 @@ export const Row = memo(function Row({
         >
           {opp.name}
         </Link>
+        {opp.bidClass ? (
+          <Badge
+            tone={ROW_BID_CLASS_TONE[opp.bidClass] ?? 'gray'}
+            className="ml-2 align-middle text-[10px]"
+          >
+            {opp.bidClass}
+          </Badge>
+        ) : null}
         <div className="text-xs text-[var(--fg-tertiary)]">
           <span>{opp.customer}</span>
           <UpdatedAgo iso={opp.updatedAt} />
@@ -160,6 +181,7 @@ export const Row = memo(function Row({
           stage={resolvePipelineStage(opp)}
           options={stageOptions}
           isSaving={saving.stage}
+          canEdit={canWrite}
           onSave={(nextId) => {
             const nextStage = stageOptions.find((s) => s.id === nextId);
             startSave('stage');
@@ -204,6 +226,7 @@ export const Row = memo(function Row({
           min={0}
           align="right"
           isSaving={saving.value}
+          canEdit={canWrite}
           format={(v) => formatMoney(v, 'EUR')}
           onSave={(next) => {
             startSave('value');
@@ -234,6 +257,7 @@ export const Row = memo(function Row({
           step={5}
           align="right"
           isSaving={saving.probability}
+          canEdit={canWrite}
           format={(v) => `${v}%`}
           onSave={(next) => {
             startSave('probability');
@@ -265,6 +289,7 @@ export const Row = memo(function Row({
             value={opp.dueDate}
             format={(v) => formatDate(v)}
             isSaving={saving.dueDate}
+            canEdit={canWrite}
             onSave={(next) => {
               startSave('dueDate');
               patch.mutate(

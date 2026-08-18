@@ -2404,7 +2404,11 @@ select:focus-visible {
 }
 .kpi-text {
   min-width: 0;
-  flex: 1;
+  /* 8rem basis, not `flex: 1` (basis 0). With basis 0 this column contributed
+     nothing to the card's wrap calculation, so the fixed-width icon and the
+     unshrinkable badge column took the whole card and the label/value collapsed
+     to a ~27px column that wrapped one character per line on narrow grids. */
+  flex: 1 1 8rem;
 }
 .kpi-label {
   font-size: 11.5px;

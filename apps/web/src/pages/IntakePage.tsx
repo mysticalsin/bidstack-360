@@ -23,7 +23,7 @@ import { ReviewStep } from './intake/ReviewStep';
 import { PublishStep } from './intake/PublishStep';
 
 export function IntakePage() {
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const accountId = params.get('account') ?? '';
   const [step, setStep] = useState<StepId>('receive');
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
@@ -79,6 +79,16 @@ export function IntakePage() {
       setStep('review');
     }, 0);
   }, [intel.data, hasPendingExtractions, extractingDocIds, t]);
+
+  // Attaches the chosen account to the URL (?account=<id>) so the workflow
+  // stays bookmarkable/shareable, matching the ?view= pattern on AccountsPage.
+  const selectAccount = (id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('account', id);
+      return next;
+    });
+  };
 
   const toggleDoc = (id: string) => {
     setSelectedDocs((prev) => {
@@ -169,6 +179,7 @@ export function IntakePage() {
           selectedDocs={selectedDocs}
           onToggle={toggleDoc}
           onNext={() => setStep('extract')}
+          onSelectAccount={selectAccount}
         />
       )}
       {step === 'extract' && (

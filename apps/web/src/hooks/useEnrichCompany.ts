@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { toast } from '@/components/ui/Toast';
 
 import type { CrmCompany } from '@bidstack/shared';
 
@@ -26,5 +27,9 @@ export function useEnrichCompany() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
+    // PageHead.handleEnrich only wires onSuccess — a rejected mutation left the
+    // "Enrich now" button just stop spinning with no feedback.
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not enrich company'),
   });
 }

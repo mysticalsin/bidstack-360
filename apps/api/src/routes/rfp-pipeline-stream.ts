@@ -66,6 +66,7 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
       const allowedOrigins = buildAllowedCorsOrigins(
         process.env.PUBLIC_BASE_URL,
         process.env.NODE_ENV ?? 'development',
+        process.env.CORS_EXTRA_ORIGINS,
       );
       const requestOrigin = req.headers.origin;
       const allowedOrigin =

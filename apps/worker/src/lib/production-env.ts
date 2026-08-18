@@ -95,8 +95,16 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
   }
 
   const storageDriver = trimmed(env, 'STORAGE_DRIVER').toLowerCase();
-  if (trimmed(env, 'DEMO_MODE') !== 'true' && storageDriver !== 's3') {
-    errors.push('STORAGE_DRIVER=s3 is required in production');
+  // BIDSTACK_ALLOW_LOCAL_STORAGE=true is the explicit opt-in to run production on
+  // ephemeral local disk before object storage is wired (mirrors apps/api env.ts).
+  if (
+    trimmed(env, 'DEMO_MODE') !== 'true' &&
+    storageDriver !== 's3' &&
+    trimmed(env, 'BIDSTACK_ALLOW_LOCAL_STORAGE') !== 'true'
+  ) {
+    errors.push(
+      'STORAGE_DRIVER=s3 is required in production (or set BIDSTACK_ALLOW_LOCAL_STORAGE=true to launch on ephemeral local disk)',
+    );
   }
 
   if (storageDriver === 's3') {
