@@ -15,10 +15,10 @@
   "dependencies": {
     "@bidstack/db": "workspace:*",
     "@fastify/rate-limit": "^10.2.1",
-    "@fastify/sensible": "^6.0.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@fastify/sensible": "^6.0.5",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv-flow": "^4.1.0",
-    "fastify": "^5.2.0",
+    "fastify": "^5.12.1",
     "fastify-plugin": "^5.0.1",
     "ioredis": "^5.4.2",
     "pino": "^9.14.0",
@@ -27,8 +27,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.2",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
   }
 }
