@@ -115,16 +115,16 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.6.0",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
     "husky": "^9.1.7",
     "ioredis": "^5.4.2",
-    "lint-staged": "^17.0.4",
-    "prettier": "^3.4.2",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.8",
     "rimraf": "^6.0.1",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.59.2"
+    "typescript-eslint": "^8.70.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
