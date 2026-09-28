@@ -118,7 +118,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
-    "ioredis": "^5.4.2",
+    "ioredis": "^6.0.0",
     "lint-staged": "^17.0.4",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
