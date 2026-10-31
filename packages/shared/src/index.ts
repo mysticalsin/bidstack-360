@@ -1,4 +1,6 @@
 export * from './schemas/index.js';
+export * from './people/standing.js';
+export * from './people/commitment.js';
 export * from './types/index.js';
 export * from './queue-config.js';
 export * from './utils/index.js';
