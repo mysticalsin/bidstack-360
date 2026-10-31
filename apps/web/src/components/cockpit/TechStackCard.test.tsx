@@ -262,22 +262,14 @@ describe('TechStackCard provenance', () => {
 
     render(<TechStackCard cockpit={emptyCockpit} />);
 
-    const startOptions = screen.getByLabelText('Technical stack start options');
-    expect(within(startOptions).getByText('Build the stack from evidence')).toBeTruthy();
-    expect(within(startOptions).getByText('Apollo')).toBeTruthy();
-    expect(within(startOptions).getByText('Seamless.AI')).toBeTruthy();
-    expect(within(startOptions).getByText('Tech Intel')).toBeTruthy();
-    expect(within(startOptions).getByText('Configured MCPs')).toBeTruthy();
-    expect(within(startOptions).getByText('Other sources')).toBeTruthy();
-    expect(
-      within(startOptions).getByRole('button', {
-        name: 'Add technical stack manually',
-      }),
-    ).toBeTruthy();
+    expect(screen.getByText('No technologies recorded on this account.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Import a transcript' })).toBeTruthy();
+    expect(screen.queryByText('Apollo')).toBeNull();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
     fireEvent.click(
-      within(startOptions).getByRole('button', {
-        name: 'Pull source technologies into empty technical stack',
+      screen.getByRole('button', {
+        name: 'Pull technical stack from Apollo MCP/API, Seamless MCP/API, Tech Intel MCPs, and open data',
       }),
     );
     await waitFor(() => expect(hookMocks.refreshStack).toHaveBeenCalledTimes(1));
@@ -347,16 +339,11 @@ describe('TechStackCard provenance', () => {
 
     render(<TechStackCard cockpit={cockpit()} />);
 
-    const launchpad = screen.getByLabelText('Source-backed stack add launchpad');
-    expect(within(launchpad).getByText('Add from verified sources')).toBeTruthy();
-    expect(within(launchpad).getByText('Apollo')).toBeTruthy();
-    expect(within(launchpad).getByText('Seamless.AI')).toBeTruthy();
-    expect(within(launchpad).getByText('Tech Intel')).toBeTruthy();
-    expect(within(launchpad).getByText('Other sources')).toBeTruthy();
-
+    expect(screen.queryByLabelText('Source-backed stack add launchpad')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
     fireEvent.click(
-      within(launchpad).getByRole('button', {
-        name: 'Pull and review technical stack sources from Apollo, Seamless, Tech Intel MCPs, and attributed sources',
+      screen.getByRole('button', {
+        name: 'Pull technical stack from Apollo MCP/API, Seamless MCP/API, Tech Intel MCPs, and open data',
       }),
     );
 
@@ -713,11 +700,11 @@ describe('TechStackCard provenance', () => {
 
     render(<TechStackCard cockpit={cockpit()} />);
 
+    expect(screen.queryByLabelText('Technical stack sources')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
     expect(screen.getByLabelText('Technical stack sources').textContent).toContain(
       'Other sources',
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
 
     const sourceMap = screen.getByLabelText('Source readiness map');
     expect(within(sourceMap).getByText('Other sources')).toBeTruthy();
@@ -1352,6 +1339,7 @@ describe('TechStackCard provenance', () => {
 
     render(<TechStackCard cockpit={cockpit()} />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
     fireEvent.click(
       screen.getByRole('button', {
         name: 'Pull technical stack from Apollo MCP/API, Seamless MCP/API, Tech Intel MCPs, and open data',
@@ -1960,7 +1948,8 @@ describe('TechStackCard provenance', () => {
 
     render(<TechStackCard cockpit={cockpit()} />);
 
-    expect(screen.getByText('Pull sources')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    expect(screen.getAllByText('Pull sources').length).toBeGreaterThan(0);
     fireEvent.click(
       screen.getByRole('button', {
         name: 'Pull technical stack from Apollo MCP/API, Seamless MCP/API, Tech Intel MCPs, and open data',
@@ -2039,6 +2028,7 @@ describe('TechStackCard provenance', () => {
     try {
       render(<TechStackCard cockpit={cockpit()} />);
 
+      fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
       await act(async () => {
         fireEvent.click(
           screen.getByRole('button', {

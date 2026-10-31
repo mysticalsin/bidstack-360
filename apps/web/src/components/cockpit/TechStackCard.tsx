@@ -17,7 +17,6 @@ import { TechLogo } from '@/components/company/TechLogo';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { toast } from '@/components/ui/Toast';
 import {
   useAcceptTechnicalStackSuggestion,
@@ -124,6 +123,10 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
       : cockpit.technicalStack;
   const suggestions = technicalStack.data?.suggestions ?? EMPTY_STACK_SUGGESTIONS;
   const [isEditing, setIsEditing] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptText, setTranscriptText] = useState('');
+  const [transcriptHits, setTranscriptHits] = useState<Array<{ name: string; category: string }>>([]);
+  const [transcriptRead, setTranscriptRead] = useState(false);
   const [draft, setDraft] = useState<TechnicalStackCategory[]>([]);
   const [newCategory, setNewCategory] = useState(AUTO_CATEGORY);
   const [newVendor, setNewVendor] = useState('');
@@ -170,6 +173,30 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
   const cancelEditing = () => {
     setDraft([]);
     setIsEditing(false);
+  };
+
+  const addTranscriptHits = async (hits: Array<{ name: string; category: string }>) => {
+    if (hits.length === 0) return;
+    const next = hits.reduce(
+      (current, hit) =>
+        addManualItem(current, hit.category, hit.name, {
+          source: 'manual:transcript',
+          confidence: 0.7,
+        }),
+      cloneStack(stack),
+    );
+    try {
+      await saveStack.mutateAsync(cleanStack(next));
+      toast.success(t('techStack.toastTranscriptAdded', 'Technologies added from the transcript'));
+      setTranscriptOpen(false);
+      setTranscriptText('');
+      setTranscriptHits([]);
+      setTranscriptRead(false);
+    } catch (err) {
+      toast.error(t('techStack.toastSaveFailed', 'Could not save technical stack'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
   };
 
   const saveDraft = async () => {
@@ -236,48 +263,49 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
             </div>
           ) : (
             <div className="tech-stack-actions">
-              <Tooltip content={t('techStack.pullSourcesTooltip', 'Pull stack sources')}>
-                <button
-                  type="button"
-                  className="tech-source-pull-button"
-                  disabled={refreshStack.isPending}
-                  aria-label={t(
-                    'techStack.pullSourcesAria',
-                    'Pull technical stack from Apollo MCP/API, Seamless MCP/API, Tech Intel MCPs, and open data',
-                  )}
-                  onClick={() => void pullSources()}
-                >
-                  <Icon
-                    name={refreshStack.isPending ? 'loader' : 'refresh'}
-                    size={15}
-                    className={refreshStack.isPending ? 'tech-spin' : undefined}
-                    ariaHidden
-                  />
-                  <span>
-                    {refreshStack.isPending
-                      ? t('techStack.checkingSources', 'Checking')
-                      : t('techStack.checkSources', 'Pull sources')}
-                  </span>
-                </button>
-              </Tooltip>
-              <Tooltip content={t('techStack.editTooltip', 'Edit stack')}>
-                <button
-                  type="button"
-                  className="tech-source-pull-button secondary"
-                  aria-label={t('techStack.editAria', 'Edit technical stack')}
-                  onClick={startEditing}
-                >
-                  <Icon name="plus" size={15} ariaHidden />
-                  <span>{t('techStack.addStack', 'Add stack')}</span>
-                </button>
-              </Tooltip>
+              <button
+                type="button"
+                className="tech-source-pull-button secondary"
+                aria-label={t('techStack.editAria', 'Edit technical stack')}
+                onClick={startEditing}
+              >
+                {t('techStack.editStack', 'Edit')}
+              </button>
+              <button
+                type="button"
+                className="tech-source-pull-button secondary"
+                aria-expanded={transcriptOpen}
+                aria-label={t('techStack.importTranscriptAria', 'Import a transcript')}
+                onClick={() => setTranscriptOpen((open) => !open)}
+              >
+                {t('techStack.importTranscript', 'Import transcript')}
+              </button>
             </div>
           )
         }
       />
       <div className="tech-stack-body">
-        <TechStackSourceRail sources={sourceSummary} />
+        {transcriptOpen && !isEditing ? (
+          <TranscriptImport
+            text={transcriptText}
+            hits={transcriptHits}
+            read={transcriptRead}
+            saving={saveStack.isPending}
+            onTextChange={(value) => {
+              setTranscriptText(value);
+              setTranscriptRead(false);
+              setTranscriptHits([]);
+            }}
+            onRead={() => {
+              setTranscriptHits(technologiesInTranscript(transcriptText));
+              setTranscriptRead(true);
+            }}
+            onAdd={() => void addTranscriptHits(transcriptHits)}
+          />
+        ) : null}
         {isEditing ? (
+          <>
+          <TechStackSourceRail sources={sourceSummary} />
           <TechStackEditor
             draft={draft}
             suggestions={suggestions}
@@ -291,16 +319,11 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
             onNewCategoryChange={setNewCategory}
             onNewVendorChange={setNewVendor}
           />
+          </>
         ) : visibleStack.length > 0 || suggestions.length > 0 ? (
           <>
             {visibleStack.length > 0 ? (
               <>
-                <TechStackAddLaunchpad
-                  pendingSuggestions={suggestions.length}
-                  pullingSources={refreshStack.isPending}
-                  onPullSources={pullSources}
-                  onStartEditing={startEditing}
-                />
                 {visibleStack.map((cat) => (
                   <ReadOnlyStackCategory
                     key={cat.label}
@@ -310,11 +333,9 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
                 ))}
               </>
             ) : (
-              <TechStackEmptyPrompt
-                pullingSources={refreshStack.isPending}
-                onPullSources={pullSources}
-                onStartEditing={startEditing}
-              />
+              <p className="px-1 text-sm text-[var(--fg-secondary)]">
+                {t('techStack.emptyOverview', 'No technologies recorded on this account.')}
+              </p>
             )}
             {stack.length > 3 ? (
               <button
@@ -357,11 +378,9 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
             />
           </>
         ) : (
-          <TechStackEmptyPrompt
-            pullingSources={refreshStack.isPending}
-            onPullSources={pullSources}
-            onStartEditing={startEditing}
-          />
+          <p className="px-1 text-sm text-[var(--fg-secondary)]">
+            {t('techStack.emptyOverview', 'No technologies recorded on this account.')}
+          </p>
         )}
       </div>
     </Card>
@@ -433,204 +452,94 @@ function TechStackSourceRail({ sources }: { sources: SourceRailItem[] }) {
   );
 }
 
-function TechStackEmptyPrompt({
-  pullingSources,
-  onPullSources,
-  onStartEditing,
+function TranscriptImport({
+  text,
+  hits,
+  read,
+  saving,
+  onTextChange,
+  onRead,
+  onAdd,
 }: {
-  pullingSources: boolean;
-  onPullSources: () => Promise<void>;
-  onStartEditing: () => void;
+  text: string;
+  hits: Array<{ name: string; category: string }>;
+  read: boolean;
+  saving: boolean;
+  onTextChange: (value: string) => void;
+  onRead: () => void;
+  onAdd: () => void;
 }) {
   const { t } = useTranslation('crm');
-  const sourceLanes = [
-    {
-      id: 'apollo',
-      label: 'Apollo',
-      detail: t('techStack.emptyApolloLane', 'MCP/API'),
-    },
-    {
-      id: 'seamless',
-      label: 'Seamless.AI',
-      detail: t('techStack.emptySeamlessLane', 'MCP/API'),
-    },
-    {
-      id: 'tech_intel',
-      label: 'Tech Intel',
-      detail: t('techStack.emptyTechIntelLane', 'Configured MCPs'),
-    },
-    {
-      id: 'open_data',
-      label: 'Open data',
-      detail: t('techStack.emptyOpenDataLane', 'Public proof'),
-    },
-    {
-      id: 'other',
-      label: 'Other sources',
-      detail: t('techStack.emptyOtherLane', 'Attributed signals'),
-    },
-  ];
-
   return (
-    <div
-      className="tech-stack-empty-prompt"
-      aria-label={t('techStack.emptyPromptAria', 'Technical stack start options')}
+    <form
+      className="mb-3 space-y-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onRead();
+      }}
     >
-      <div className="tech-stack-empty-main">
-        <Icon name="sparkle" size={17} ariaHidden />
-        <div>
-          <span>{t('techStack.emptyPromptTitle', 'Build the stack from evidence')}</span>
-          <small>
-            {t(
-              'techStack.emptyPromptBody',
-              'Pull provider intelligence first, then stage only the technologies your team trusts.',
-            )}
-          </small>
-        </div>
-      </div>
-      <div
-        className="tech-stack-empty-lanes"
-        aria-label={t('techStack.emptySourceLanesAria', 'Technical stack source lanes')}
-      >
-        {sourceLanes.map((lane) => (
-          <span key={lane.id} data-lane={lane.id}>
-            <strong>{lane.label}</strong>
-            <small>{lane.detail}</small>
-          </span>
-        ))}
-      </div>
-      <div className="tech-stack-empty-actions">
-        <button
-          type="button"
-          className="tech-source-pull-button full"
-          disabled={pullingSources}
-          aria-label={t(
-            'techStack.emptyPullSourcesAria',
-            'Pull source technologies into empty technical stack',
-          )}
-          onClick={() => void onPullSources()}
-        >
-          <Icon
-            name={pullingSources ? 'loader' : 'refresh'}
-            size={15}
-            className={pullingSources ? 'tech-spin' : undefined}
-            ariaHidden
-          />
-          <span>
-            {pullingSources
-              ? t('techStack.checkingSources', 'Checking')
-              : t('techStack.pullSourcesShort', 'Pull sources')}
-          </span>
+      <label className="block text-sm text-[var(--fg-secondary)]" htmlFor="tech-transcript">
+        {t('techStack.transcriptLabel', 'Paste a transcript. Known products in it are added to this stack.')}
+      </label>
+      <textarea
+        id="tech-transcript"
+        value={text}
+        onChange={(event) => onTextChange(event.target.value)}
+        rows={4}
+        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)]"
+        aria-label={t('techStack.transcriptAria', 'Technology transcript')}
+        placeholder={t(
+          'techStack.transcriptPlaceholder',
+          'They run Salesforce and Snowflake, with Okta for access.',
+        )}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="btn btn-secondary min-h-11">
+          {t('techStack.readTranscript', 'Read transcript')}
         </button>
-        <button
-          type="button"
-          className="tech-source-pull-button secondary full"
-          aria-label={t('techStack.emptyAddManualAria', 'Add technical stack manually')}
-          onClick={onStartEditing}
-        >
-          <Icon name="plus" size={15} ariaHidden />
-          <span>{t('techStack.addStack', 'Add stack')}</span>
-        </button>
+        {hits.length > 0 ? (
+          <button type="button" className="btn btn-primary min-h-11" disabled={saving} onClick={onAdd}>
+            {t('techStack.addTranscriptHits', 'Add {{count}} to the stack', { count: hits.length })}
+          </button>
+        ) : null}
       </div>
-    </div>
+      {hits.length > 0 ? (
+        <ul className="flex flex-wrap gap-2" aria-label={t('techStack.transcriptHits', 'Technologies found')}>
+          {hits.map((hit) => (
+            <li
+              key={hit.name}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] px-2 py-1 text-sm"
+            >
+              <TechLogo name={hit.name} size={16} />
+              {hit.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {read && hits.length === 0 ? (
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('techStack.transcriptNone', 'No known technologies in that transcript.')}
+        </p>
+      ) : null}
+    </form>
   );
 }
 
-function TechStackAddLaunchpad({
-  pendingSuggestions,
-  pullingSources,
-  onPullSources,
-  onStartEditing,
-}: {
-  pendingSuggestions: number;
-  pullingSources: boolean;
-  onPullSources: () => Promise<void>;
-  onStartEditing: () => void;
-}) {
-  const { t } = useTranslation('crm');
-  const hasSuggestions = pendingSuggestions > 0;
-  const lanes = [
-    { id: 'apollo', label: 'Apollo', detail: 'MCP/API' },
-    { id: 'seamless', label: 'Seamless.AI', detail: 'MCP/API' },
-    { id: 'tech_intel', label: 'Tech Intel', detail: 'MCPs' },
-    { id: 'other', label: 'Other sources', detail: 'Attributed' },
-  ];
+export function technologiesInTranscript(text: string): Array<{ name: string; category: string }> {
+  const found: Array<{ name: string; category: string }> = [];
+  let remaining = text;
+  const catalog = [...QUICK_TECH_CATALOG].sort((a, b) => b.name.length - a.name.length);
+  for (const item of catalog) {
+    const pattern = new RegExp(`(^|[^A-Za-z0-9])${escapeRegExp(item.name)}([^A-Za-z0-9]|$)`, 'i');
+    if (!pattern.test(remaining)) continue;
+    found.push(item);
+    remaining = remaining.replace(new RegExp(escapeRegExp(item.name), 'ig'), ' ');
+  }
+  return found;
+}
 
-  return (
-    <div
-      className="tech-stack-add-launchpad"
-      aria-label={t('techStack.addLaunchpadAria', 'Source-backed stack add launchpad')}
-    >
-      <div className="tech-stack-add-launchpad-main">
-        <Icon name={hasSuggestions ? 'check' : 'search'} size={16} ariaHidden />
-        <div>
-          <span>
-            {hasSuggestions
-              ? t('techStack.addLaunchpadReadyTitle', 'Review source-detected stack')
-              : t('techStack.addLaunchpadTitle', 'Add from verified sources')}
-          </span>
-          <small>
-            {hasSuggestions
-              ? t(
-                  'techStack.addLaunchpadReadyBody',
-                  '{{count}} Apollo, Seamless, Tech Intel, or attributed source suggestions are ready.',
-                  { count: pendingSuggestions },
-                )
-              : t(
-                  'techStack.addLaunchpadBody',
-                  'Pull Apollo, Seamless.AI, configured Tech Intel MCPs, and attributed sources before staging manual truth.',
-                )}
-          </small>
-        </div>
-      </div>
-      <div
-        className="tech-stack-add-launchpad-lanes"
-        aria-label={t('techStack.addLaunchpadSourcesAria', 'Stack source pull coverage')}
-      >
-        {lanes.map((lane) => (
-          <span key={lane.id} data-lane={lane.id}>
-            <strong>{lane.label}</strong>
-            <small>{lane.detail}</small>
-          </span>
-        ))}
-      </div>
-      <div className="tech-stack-add-launchpad-actions">
-        <button
-          type="button"
-          className="tech-source-pull-button"
-          disabled={pullingSources}
-          aria-label={t(
-            'techStack.addLaunchpadPullAria',
-            'Pull and review technical stack sources from Apollo, Seamless, Tech Intel MCPs, and attributed sources',
-          )}
-          onClick={() => void onPullSources()}
-        >
-          <Icon
-            name={pullingSources ? 'loader' : 'refresh'}
-            size={15}
-            className={pullingSources ? 'tech-spin' : undefined}
-            ariaHidden
-          />
-          <span>
-            {pullingSources
-              ? t('techStack.checkingSources', 'Checking')
-              : hasSuggestions
-                ? t('techStack.reviewSourcesShort', 'Review sources')
-                : t('techStack.pullAndReview', 'Pull and review')}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="tech-source-pull-button secondary"
-          aria-label={t('techStack.addLaunchpadManualAria', 'Add technical stack manually')}
-          onClick={onStartEditing}
-        >
-          <Icon name="plus" size={15} ariaHidden />
-          <span>{t('techStack.manualAddShort', 'Manual add')}</span>
-        </button>
-      </div>
-    </div>
-  );
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function ReadOnlyStackCategory({
