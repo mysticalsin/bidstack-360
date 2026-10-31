@@ -78,7 +78,7 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
             deletedAt: null,
             dueDate: { gte: from, lt: to },
             status: { notIn: ['won', 'lost'] },
-            ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+            ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
           },
           orderBy: { dueDate: 'asc' },
           take: 200,

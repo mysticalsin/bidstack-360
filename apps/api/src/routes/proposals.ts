@@ -45,7 +45,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         orgId: req.auth.orgId,
         deletedAt: null,
         // RFP visibility: non-admins see only the proposals they own; admins see all.
-        ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+        ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         ...(status ? { status } : {}),
         ...(opportunityId ? { opportunityId } : {}),
         ...(search
@@ -84,7 +84,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           id: req.params.id,
           deletedAt: null,
           // RFP visibility: a non-admin may only access proposals they own.
-          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+          ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         },
         include: { sections: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } } },
       });
@@ -280,7 +280,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           id: req.params.id,
           deletedAt: null,
           // RFP visibility: a non-admin may only access proposals they own.
-          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+          ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         },
       });
       if (!row) return reply.notFound('Proposal not found');
@@ -326,7 +326,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           id: req.params.id,
           deletedAt: null,
           // RFP visibility: a non-admin may only access proposals they own.
-          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+          ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         },
       });
       if (!proposal) return reply.notFound('Proposal not found');
@@ -380,7 +380,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           id: req.params.id,
           deletedAt: null,
           // RFP visibility: a non-admin may only access proposals they own.
-          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+          ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         },
         include: { sections: true, opportunity: { include: { company: true, territory: true } } },
       });
@@ -472,7 +472,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           id: req.params.id,
           deletedAt: null,
           // RFP visibility: a non-admin may only access proposals they own.
-          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+          ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         },
       });
       if (!row) return reply.notFound('Proposal not found');
