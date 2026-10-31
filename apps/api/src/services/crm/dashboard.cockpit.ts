@@ -18,14 +18,12 @@ import type {
   SignalFactor,
 } from '@bidstack/shared';
 
-import { defaultCompliance, defaultRisks, defaultTechnicalStack } from './dashboard.defaults.js';
 import {
   asComplianceStatus,
   asRiskSeverity,
   asRiskStatus,
   attribution,
   formatMicrosCompact,
-  mergeTechnicalStack,
   normalizeName,
   parseAttribution,
   record,
@@ -264,7 +262,7 @@ function resolveCockpitTechnicalStack(
     overrides.find((override) => override.fieldKey === TECHNICAL_STACK_FIELD_KEY)?.value,
   );
   if (technicalStackOverride) return technicalStackOverride.stack;
-  return mergeTechnicalStack(providerStack, defaultTechnicalStack());
+  return providerStack;
 }
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
@@ -739,22 +737,15 @@ export function buildCockpit({
         email: contact.email,
         phone: contact.phone,
         influence: contact.influence,
-        roleInDecision: contact.influence && contact.influence >= 5 ? 'champion' : 'influencer',
+        roleInDecision: null,
         updatedAt: contact.createdAt.toISOString(),
       })),
     recentActivity: buildActivities(
       tasks.filter((task) => task.opportunity?.customer === company.name),
     ).slice(0, 5),
-    risks: visibleRisks.length ? visibleRisks.map(serializeRisk) : defaultRisks(),
-    compliance: visibleCompliance.length
-      ? visibleCompliance.map(serializeCompliance)
-      : defaultCompliance(),
-    roadmap: [
-      { id: 'road-q1', quarter: 'Q1 2026', title: 'Windows 11 migration', status: 'in_progress' },
-      { id: 'road-q2', quarter: 'Q2 2026', title: 'Zero Trust initiative', status: 'planned' },
-      { id: 'road-q3', quarter: 'Q3 2026', title: 'Data center modernization', status: 'planned' },
-      { id: 'road-q4', quarter: 'Q4 2026', title: 'Endpoint security upgrade', status: 'planned' },
-    ],
+    risks: visibleRisks.map(serializeRisk),
+    compliance: visibleCompliance.map(serializeCompliance),
+    roadmap: [],
   };
 }
 

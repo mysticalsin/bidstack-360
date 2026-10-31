@@ -170,6 +170,40 @@ describe('buildCockpit technical stack overrides', () => {
   });
 });
 
+describe('buildCockpit recorded facts only', () => {
+  it('does not invent a technology catalog, compliance status, risk, or roadmap', () => {
+    const cockpit = buildCockpit({
+      company: company({ name: 'Acme', technicalStack: [] }),
+      companies: [],
+      opportunities: [],
+      contacts: [
+        {
+          id: 'c1',
+          customer: 'Acme',
+          name: 'Ada',
+          role: 'CIO',
+          email: 'ada@acme.com',
+          phone: null,
+          influence: 5,
+          createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      ],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+
+    expect(cockpit.technicalStack).toEqual([]);
+    expect(cockpit.risks).toEqual([]);
+    expect(cockpit.compliance).toEqual([]);
+    expect(cockpit.roadmap).toEqual([]);
+    expect(cockpit.keyContacts[0]?.roleInDecision).toBeNull();
+    expect(JSON.stringify(cockpit)).not.toContain('Microsoft 365');
+    expect(JSON.stringify(cockpit)).not.toContain('SOC 2');
+  });
+});
+
 describe('buildCockpit win/loss + revenue derivation', () => {
   const baseArgs = (opps: unknown[]) => ({
     company: company({ name: 'Acme' }),

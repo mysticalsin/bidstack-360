@@ -37,7 +37,6 @@ import {
 } from './dashboard.cockpit.js';
 import {
   DEFAULT_WIDGETS,
-  defaultBidOpportunities,
   defaultQueueHealth,
   defaultReleaseScore,
 } from './dashboard.defaults.js';
@@ -373,9 +372,7 @@ export async function buildDashboardSnapshot(
     activities,
     insights,
     widgets: dashboardWidgets,
-    bidOpportunities: bidRows.length
-      ? bidRows.map(serializeBidOpportunity)
-      : defaultBidOpportunities(),
+    bidOpportunities: bidRows.map(serializeBidOpportunity),
     providerHealth: providerRows.length
       ? mergeProviderHealth(providerRows.map(serializeProviderHealth))
       : defaultProviderHealth(),
