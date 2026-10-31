@@ -210,12 +210,17 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.confidence', 'Confidence'),
-      value:
-        sourceCount > 0
-          ? `${Math.round((c.sourceAttribution.reduce((sum, source) => sum + source.confidence, 0) / sourceCount) * 100)}%`
-          : t('businessSnapshot.value.notScored', 'Not scored'),
+      value: (() => {
+        const scored = c.sourceAttribution.filter(
+          (source) => typeof source.confidence === 'number',
+        );
+        if (scored.length === 0) return t('businessSnapshot.value.notScored', 'Not scored');
+        const average =
+          scored.reduce((sum, source) => sum + (source.confidence ?? 0), 0) / scored.length;
+        return `${Math.round(average * 100)}%`;
+      })(),
       source:
-        sourceCount > 0
+        c.sourceAttribution.some((source) => typeof source.confidence === 'number')
           ? {
               label: t('businessSnapshot.source.confidence', 'Receipts'),
               state: 'crm',
@@ -229,7 +234,9 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
               state: 'crm',
               hint: t(
                 'businessSnapshot.source.crmConfidenceHint',
-                'No source receipts are attached, so this is not scored.',
+                sourceCount > 0
+                  ? 'A source receipt is attached, but it is not a scored source.'
+                  : 'No source receipts are attached, so this is not scored.',
               ),
             },
     },

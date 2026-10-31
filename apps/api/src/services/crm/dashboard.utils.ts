@@ -26,11 +26,13 @@ export function attribution({
   label,
   sourceUrl,
   confidence,
+  providerMetadata = {},
 }: {
   source: string;
   label: string;
   sourceUrl: string | null;
-  confidence: number;
+  confidence: number | null;
+  providerMetadata?: Record<string, unknown>;
 }): SourceAttributionType {
   return {
     source,
@@ -38,7 +40,7 @@ export function attribution({
     sourceUrl,
     fetchedAt: new Date().toISOString(),
     confidence,
-    providerMetadata: {},
+    providerMetadata,
   };
 }
 

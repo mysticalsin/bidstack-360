@@ -67,15 +67,13 @@ export function logoUrl(name: string, domain: string | null) {
   return `https://www.${domain.replace(/^www\./, '')}/favicon.ico`;
 }
 
-export function source(name: string, sourceUrl: string | null, confidence: number) {
+export function source(name: string, sourceUrl: string | null, confidence: number | null) {
   return {
     source: sourceUrl?.includes('mantu.com') ? 'official_website' : 'mcp_enrichment',
-    label: sourceUrl?.includes('mantu.com')
-      ? 'Mantu official website'
-      : `${name} enrichment profile`,
+    label: `${name} enrichment profile. Not a scored source.`,
     sourceUrl,
     fetchedAt: new Date().toISOString(),
     confidence,
-    providerMetadata: {},
+    providerMetadata: confidence === null ? { confidenceBasis: 'not_scored' } : {},
   };
 }

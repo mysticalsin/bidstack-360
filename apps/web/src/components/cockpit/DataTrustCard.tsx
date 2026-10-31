@@ -21,8 +21,11 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
   const company = cockpit.company;
   const sources = company.sourceAttribution.slice(0, 4);
   const sourceCount = company.sourceAttribution.length;
-  const averageConfidence = sourceCount
-    ? company.sourceAttribution.reduce((acc, source) => acc + source.confidence, 0) / sourceCount
+  const scoredSources = company.sourceAttribution.filter(
+    (source) => typeof source.confidence === 'number',
+  );
+  const averageConfidence = scoredSources.length
+    ? scoredSources.reduce((acc, source) => acc + (source.confidence ?? 0), 0) / scoredSources.length
     : null;
   const latestFetch = latestFetchedAt(company.sourceAttribution) ?? company.updatedAt;
 
@@ -120,6 +123,7 @@ function SourceReceipt({
   index: number;
   reducedMotion: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const content = (
     <>
       <div>
@@ -127,9 +131,19 @@ function SourceReceipt({
         <span>{relativeTime(source.fetchedAt)}</span>
       </div>
       <Badge
-        tone={source.confidence >= 0.9 ? 'jade' : source.confidence >= 0.72 ? 'blue' : 'amber'}
+        tone={
+          source.confidence == null
+            ? 'gray'
+            : source.confidence >= 0.9
+              ? 'jade'
+              : source.confidence >= 0.72
+                ? 'blue'
+                : 'amber'
+        }
       >
-        {Math.round(source.confidence * 100)}%
+        {source.confidence == null
+          ? t('dataTrust.notScored', 'Not scored')
+          : `${Math.round(source.confidence * 100)}%`}
       </Badge>
     </>
   );

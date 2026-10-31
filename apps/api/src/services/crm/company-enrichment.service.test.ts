@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { serializeCompany } from './company-enrichment.service.js';
+import { buildCompanies, fallbackCompany, serializeCompany } from './company-enrichment.service.js';
 import { canQueueApolloEnrichment } from './enrichment.service.js';
 
 describe('canQueueApolloEnrichment', () => {
@@ -277,5 +277,35 @@ describe('serializeCompany', () => {
     );
     expect(new Set(names)).toEqual(new Set(['Salesforce', 'Snowflake', 'SAP']));
     expect(names?.filter((name) => name === 'Salesforce')).toHaveLength(1);
+  });
+});
+
+describe('unscored company shells', () => {
+  it('does not turn an opportunity customer name into a confidence score', () => {
+    const [company] = buildCompanies(
+      [
+        {
+          customer: 'Northwind',
+          industry: 'logistics',
+          logoUrl: null,
+          updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+        },
+      ],
+      [],
+      [],
+    ).filter((row) => row.name === 'Northwind');
+
+    expect(company?.confidence).toBeNull();
+    expect(company?.sourceAttribution[0]?.confidence).toBeNull();
+    expect(company?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
+    expect(company?.employeeCount).toBeNull();
+    expect(company?.annualRevenueMicros).toBeNull();
+  });
+
+  it('does not invent Mantu headcount or revenue on the placeholder account', () => {
+    const mantu = fallbackCompany('Mantu');
+    expect(mantu.confidence).toBeNull();
+    expect(mantu.employeeCount).toBeNull();
+    expect(mantu.annualRevenueMicros).toBeNull();
   });
 });

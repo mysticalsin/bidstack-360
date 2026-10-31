@@ -23,6 +23,7 @@ import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/componen
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
+import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 import { sourceLabel, titleCase } from './accountsPage/accountUtils';
 import { sectorAccountSignal, sectorCoverageSignal } from './accountsPage/strategicSignals';
 
@@ -557,9 +558,11 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
           {sourceLabel(account.source)}
         </Badge>
         <small>
-          {t('sectorView.accountConfidence', '{{value}}% recorded confidence on this account', {
-            value: Math.round(account.confidence * 100),
-          })}
+          {recordedConfidencePercent(account.confidence) === null
+            ? t('sectorView.accountConfidenceNotScored', 'Confidence not scored')
+            : t('sectorView.accountConfidence', '{{value}}% recorded confidence on this account', {
+                value: recordedConfidencePercent(account.confidence),
+              })}
         </small>
       </span>
       <Icon name="chevron-right" size={16} aria-hidden />

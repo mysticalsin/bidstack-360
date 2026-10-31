@@ -54,11 +54,7 @@ export function slugFor(name: string): string {
   );
 }
 
-/** A typed name or domain is not a confidence score. Only a stored company value is. */
-export function recordedConfidencePercent(confidence: number | null | undefined): number | null {
-  if (typeof confidence !== 'number' || !Number.isFinite(confidence)) return null;
-  return Math.round(Math.max(0, Math.min(1, confidence)) * 100);
-}
+export { recordedConfidencePercent } from '@/lib/recorded-confidence';
 
 /** A field is either recorded or absent. Partial percents would invent progress. */
 export function recordedFill(recorded: boolean): number {

@@ -78,7 +78,7 @@ export const CrmCompany = z.object({
   logo: CrmLogo.nullable(),
   technicalStack: z.array(TechnicalStackCategory).optional(),
   strategicIntel: CompanyStrategicIntel.optional(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
   sourceAttribution: z.array(SourceAttribution).default([]),
   updatedAt: z.string().datetime(),
 });

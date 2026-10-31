@@ -218,8 +218,8 @@ export const crmEnrichCompany: Tool<typeof EnrichCompanyInput> = {
     const domain = normalizeDomain(args.domain);
     const website = args.website ?? (domain ? `https://${domain}/` : null);
     const normalizedName = normalizeName(args.name);
-    const confidenceBps = domain === 'mantu.com' ? 9900 : 7200;
-    const attribution = [source(args.name, website, domain === 'mantu.com' ? 0.99 : 0.72)];
+    const confidenceBps = 0;
+    const attribution = [source(args.name, website, null)];
 
     const upserted = await prisma.companyEnrichment.upsert({
       where: {

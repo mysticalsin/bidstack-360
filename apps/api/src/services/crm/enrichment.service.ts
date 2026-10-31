@@ -152,9 +152,12 @@ export async function upsertVerifiedCompanyEnrichment({
     ...(openProfile?.logoUrl ? [] : favicon.sourceAttribution),
     attribution({
       source: isMantu ? 'official_website' : 'verified_data_source',
-      label: isMantu ? 'Mantu official website' : 'Polo PreSales verified data cache',
+      label: isMantu
+        ? 'Mantu website on the request. Not a scored source.'
+        : 'Typed company profile. Not a scored source.',
       sourceUrl: website,
-      confidence: isMantu ? 0.99 : 0.72,
+      confidence: null,
+      providerMetadata: { confidenceBasis: 'not_scored' },
     }),
   ];
   const sourceAttribution = mergeSourceAttribution(
@@ -187,7 +190,7 @@ export async function upsertVerifiedCompanyEnrichment({
       null) as Prisma.InputJsonValue | null,
     fallbackLogo: favicon.providerMetadata as Prisma.InputJsonValue,
   };
-  const confidenceBps = Math.max(isMantu ? 9900 : 7200, openProfile?.confidenceBps ?? 0);
+  const confidenceBps = openProfile?.confidenceBps ?? 0;
   const industryCodes = openProfile?.industryLabels ?? [];
   const legalName = openProfile?.legalName ?? name;
   const tradeName = openProfile?.tradeName ?? name;
@@ -213,8 +216,8 @@ export async function upsertVerifiedCompanyEnrichment({
       industryCodes,
       status: 'active',
       incorporationDate: incorporationDate ?? null,
-      employeeCount: isMantu ? 12_000 : (openProfile?.employeeCount ?? null),
-      annualRevenueMicros: isMantu ? 1_000_000_000_000_000n : null,
+      employeeCount: openProfile?.employeeCount ?? null,
+      annualRevenueMicros: null,
       confidenceBps,
       sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
       providerMetadata,
@@ -230,8 +233,8 @@ export async function upsertVerifiedCompanyEnrichment({
       ...(countryCode ? { address } : {}),
       status: 'active',
       incorporationDate,
-      employeeCount: isMantu ? 12_000 : (openProfile?.employeeCount ?? undefined),
-      annualRevenueMicros: isMantu ? 1_000_000_000_000_000n : undefined,
+      employeeCount: openProfile?.employeeCount ?? undefined,
+      annualRevenueMicros: undefined,
       industryCodes,
       confidenceBps,
       sourceAttribution: sourceAttribution as Prisma.InputJsonValue,

@@ -12,12 +12,18 @@ import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate, relativeTime } from '@/lib/format';
+import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
 import { labelForBand } from './_tokens';
+
+function readableLabel(value: string | null): string | null {
+  if (!value) return null;
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -67,7 +73,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
     cockpit.company.legalName && cockpit.company.legalName !== cockpit.company.name
       ? cockpit.company.legalName
       : null,
-    cockpit.company.industry,
+    readableLabel(cockpit.company.industry),
     cockpit.company.domain,
   ].filter(Boolean);
   const subtitle = accountView
@@ -78,7 +84,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
         date: formatDate(new Date().toISOString()),
         company: cockpit.company.name,
       });
-  const confidence = Math.round(cockpit.company.confidence * 100);
+  const confidence = recordedConfidencePercent(cockpit.company.confidence);
 
   return (
     <motion.div
@@ -122,9 +128,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
                 })}
               </span>
               <span data-tone="confidence">
-                {t('pageHead.attributionConfidence', '{{percent}}% recorded confidence on this account', {
-                  percent: confidence,
-                })}
+                {confidence === null
+                  ? t('pageHead.confidenceNotScored', 'Confidence not scored')
+                  : t('pageHead.attributionConfidence', '{{percent}}% recorded confidence on this account', {
+                      percent: confidence,
+                    })}
               </span>
               <span data-tone="muted">
                 {t('pageHead.refreshed', 'Refreshed {{time}}', {
@@ -299,9 +307,11 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
         </dl>
       ) : null}
       <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
-          percent: Math.round(c.confidence * 100),
-        })}
+        {recordedConfidencePercent(c.confidence) === null
+          ? t('pageHead.confidenceNotScored', 'Confidence not scored')
+          : t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
+              percent: recordedConfidencePercent(c.confidence),
+            })}
       </div>
     </div>
   );

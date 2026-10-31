@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { springLayout, springSnap } from '@/lib/motion';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
+import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 
 import {
   healthLabel,
@@ -139,7 +140,11 @@ export const AccountCard = memo(function AccountCard({
             <div className="account-card-confidence">
               <span>{t('account.confidence', 'Confidence')}</span>
               <strong>
-                <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
+                {recordedConfidencePercent(company.confidence) === null ? (
+                  t('account.confidenceNotScored', 'Not scored')
+                ) : (
+                  <AnimatedMetric value={`${recordedConfidencePercent(company.confidence)}%`} />
+                )}
               </strong>
             </div>
             <div className="account-card-coverage">
