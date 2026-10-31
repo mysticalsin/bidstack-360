@@ -42,6 +42,9 @@ describe('computeSignalCoverage', () => {
     });
     expect(health.score).toBeLessThan(25);
     expect(health.band).toBe('critical');
+    // No tasks is not partial engagement coverage. The old +25 treated
+    // an empty follow-up list as a score.
+    expect(health.factors?.find((factor) => factor.key === 'engagement')?.score).toBe(0);
     expect(health.factors).toHaveLength(4);
     // Every factor must explain itself — a bare number is useless to a manager.
     for (const factor of health.factors ?? []) {

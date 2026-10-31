@@ -130,7 +130,8 @@ export function computeSignalCoverage(input: {
     'engagement',
     'Engagement recency',
     'Activity in the last 30 days and follow-ups still inside their due dates.',
-    Math.min(50, recent * 17) + (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 25),
+    Math.min(50, recent * 17) +
+      (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 0),
   );
 
   const complete = openDeals.filter(
