@@ -408,6 +408,15 @@ export function getEnv(): Env {
   // mcp-server) against a `where` missing orgId compiling to an all-tenants
   // query. Off by default so an existing deployment isn't broken by a config
   // oversight, but production must run at least 'warn'.
+  const rfpQuotaFailClosed = (process.env.RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED ?? '')
+    .trim()
+    .toLowerCase();
+  if (
+    env.NODE_ENV === 'production' &&
+    (rfpQuotaFailClosed === 'false' || rfpQuotaFailClosed === '0')
+  ) {
+    semanticErrors.push('RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
+  }
   if (env.NODE_ENV === 'production' && env.BIDSTACK_TENANT_SCOPE_GUARD === 'off') {
     semanticErrors.push(
       "BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production (recommend 'enforce')",

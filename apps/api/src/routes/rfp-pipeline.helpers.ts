@@ -109,10 +109,12 @@ export type RfpUploadQuota =
 
 /** Production refuses an RFP upload when the quota store cannot be read. */
 export function rfpUploadQuotaFailsClosed(env: NodeJS.ProcessEnv = process.env): boolean {
+  // An explicit false must not reopen the cap once the process is production.
+  if (env.NODE_ENV === 'production') return true;
   const explicit = env.RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
   if (explicit === 'true' || explicit === '1') return true;
   if (explicit === 'false' || explicit === '0') return false;
-  return env.NODE_ENV === 'production';
+  return false;
 }
 
 /**

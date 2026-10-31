@@ -27,6 +27,15 @@ describe('checkRfpUploadRateLimit', () => {
     expect(result).toEqual({ allowed: false, reason: 'unavailable' });
   });
 
+  it('still refuses a production upload when fail-open is requested', async () => {
+    incr.mockRejectedValue(new Error('ECONNREFUSED'));
+    const result = await checkRfpUploadRateLimit('org-1', {
+      NODE_ENV: 'production',
+      RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED: 'false',
+    });
+    expect(result).toEqual({ allowed: false, reason: 'unavailable' });
+  });
+
   it('still allows a development upload when the quota store is down', async () => {
     incr.mockRejectedValue(new Error('ECONNREFUSED'));
     const result = await checkRfpUploadRateLimit('org-1', { NODE_ENV: 'development' });
