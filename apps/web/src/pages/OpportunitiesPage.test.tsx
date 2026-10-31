@@ -261,7 +261,10 @@ describe('OpportunitiesPage — opportunities:write gating', () => {
     expect(within(table).queryByRole('button', { name: /Click to change/i })).toBeNull();
     expect(within(table).queryAllByRole('button', { name: /Click to edit/i })).toHaveLength(0);
     expect(within(table).getByText('S1 Lead')).toBeTruthy();
-    expect(within(table).getByText('EUR 10,000')).toBeTruthy();
+    // PR #50: amounts carry no recorded currency, so the cell must not claim EUR.
+    expect(
+      within(table).getByText('10,000 (currency not recorded; not a euro forecast)'),
+    ).toBeTruthy();
 
     // Selecting a row still works (read-only), but the bulk stage-move/delete
     // controls that would 403 must not render — only Clear survives.

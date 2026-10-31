@@ -125,7 +125,7 @@ describe('OpportunityDetailPage — opportunities:write gating', () => {
     expect(screen.getByRole('button', { name: 'Edit customer name' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Edit industry' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Change stage' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Edit deal value (EUR)' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit deal value (currency not recorded)' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Edit probability' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Edit due date' })).toBeTruthy();
     expect(
@@ -151,7 +151,7 @@ describe('OpportunityDetailPage — opportunities:write gating', () => {
     expect(screen.queryByRole('button', { name: 'Edit customer name' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit industry' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Change stage' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Edit deal value (EUR)' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit deal value (currency not recorded)' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit probability' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit due date' })).toBeNull();
 
