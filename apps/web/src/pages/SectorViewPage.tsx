@@ -332,6 +332,13 @@ export default function SectorViewPage() {
                   </div>
                 </div>
 
+                <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
+                  {t(
+                    'sectorView.coverageBasis',
+                    'Percents are accounts in {{sector}} with the field filled. Not a measured coverage score.',
+                    { sector: titleCase(selectedSector.sector) },
+                  )}
+                </p>
                 <div className="sector-coverage-grid">
                   <CoverageBar
                     label={t('sectorView.coverageFte', 'FTE coverage')}
@@ -437,14 +444,22 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const max = Math.max(1, ...sorted.map((s) => s.totalValueMicros));
   return (
     <div className="space-y-2.5">
+      <p className="text-xs text-[var(--fg-tertiary)]">
+        {t(
+          'sectorView.industryBarBasis',
+          'Bar length is share of the largest industry. Count is opportunities. Amount is unspecified pipeline. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
+      </p>
       {sorted.map((seg) => (
         <div key={seg.key}>
           <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
             <span className="truncate font-medium text-[var(--fg-primary)]">{titleCase(seg.label)}</span>
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
-              {t('sectorView.geoIndustryCount', '{{count}} opps', { count: seg.opportunityCount })}
-              {' · '}
-              <span>{formatUnspecifiedCompact(seg.totalValueMicros / 1_000_000)}</span>
+              {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
+                count: seg.opportunityCount,
+                value: formatUnspecifiedCompact(seg.totalValueMicros / 1_000_000),
+              })}
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
@@ -492,7 +507,11 @@ function SectorButton({
         <span style={{ width }} />
       </span>
       <span className="sector-radar-fte">
-        {sector.fteVolume != null ? sector.fteVolume.toLocaleString() : t('sectorView.fteUnknown', 'FTE unknown')}
+        {sector.fteVolume != null
+          ? t('sectorView.fteRecorded', '{{fte}} FTE · recorded headcount · this sector', {
+              fte: sector.fteVolume.toLocaleString(),
+            })
+          : t('sectorView.fteUnknown', 'FTE unknown')}
       </span>
     </button>
   );
@@ -535,7 +554,11 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
         <Badge tone={account.source === 'verified_data' ? 'jade' : 'gray'}>
           {sourceLabel(account.source)}
         </Badge>
-        <small>{t('sectorView.accountConfidence', '{{value}}% confidence', { value: Math.round(account.confidence * 100) })}</small>
+        <small>
+          {t('sectorView.accountConfidence', '{{value}}% recorded confidence on this account', {
+            value: Math.round(account.confidence * 100),
+          })}
+        </small>
       </span>
       <Icon name="chevron-right" size={16} aria-hidden />
     </Link>

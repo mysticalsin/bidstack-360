@@ -43,29 +43,31 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
 
   const signals: CommandSignal[] = [
     {
-      label: t('commandCenter.signal.readiness.label', 'Bid readiness estimate'),
+      label: t('commandCenter.signal.readiness.label', 'Bid readiness proxy'),
       value: `${readiness}%`,
-      detail:
-        readiness >= 85
-          ? t('commandCenter.signal.readiness.detailReady', 'ready for exec review')
-          : t('commandCenter.signal.readiness.detailFocus', 'needs presales focus'),
+      detail: t(
+        'commandCenter.signal.readiness.detail',
+        'weighted mix of recorded signals on this account, not a measured score',
+      ),
       progress: readiness,
       tone: readiness >= 85 ? 'jade' : readiness >= 68 ? 'blue' : 'amber',
     },
     {
-      label: t('commandCenter.signal.source.label', 'Source coverage'),
+      label: t('commandCenter.signal.source.label', 'Source receipts'),
       value: proofCount.toLocaleString(),
       detail: t(
         'commandCenter.signal.source.detail',
-        '{{count}} attributed source',
+        '{{count}} attribution receipts on this account, not a coverage percent',
         { count: cockpit.company.sourceAttribution.length },
       ),
       progress: Math.min(100, proofCount * 16),
       tone: proofCount >= 5 ? 'jade' : proofCount >= 3 ? 'blue' : 'amber',
     },
     {
-      label: t('commandCenter.signal.decision.label', 'Decision coverage'),
-      value: `${committee.influence}/5`,
+      label: t('commandCenter.signal.decision.label', 'Influence map'),
+      value: t('commandCenter.signal.decision.value', '{{score}}/5 proxy', {
+        score: committee.influence,
+      }),
       detail: committee.summary,
       progress: committee.influence * 20,
       tone: committee.influence >= 4 ? 'jade' : committee.influence >= 3 ? 'blue' : 'amber',
@@ -102,7 +104,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
           aria-label={t('commandCenter.actions.ariaLabel', 'Account decision signals')}
         >
           <Badge tone={readiness >= 85 ? 'jade' : 'blue'}>
-            {t('commandCenter.badge.ready', '{{count}}% estimate', { count: readiness })}
+            {t('commandCenter.badge.ready', '{{count}}% readiness proxy', { count: readiness })}
           </Badge>
           <Badge tone={healthTone(cockpit.health.band)}>
             {t('commandCenter.badge.coverage', 'Coverage · {{band}}', {
@@ -176,7 +178,7 @@ function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
   const health = cockpit.health.score;
   const compliance =
     cockpit.compliance.length === 0
-      ? 54
+      ? 0
       : (cockpit.compliance.filter((item) => item.status === 'compliant').length /
           cockpit.compliance.length) *
         100;

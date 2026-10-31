@@ -62,7 +62,11 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
               {header('customer', t('winLoss.colCustomer', 'Customer'))}
               {header('outcome', t('winLoss.colOutcome', 'Outcome'))}
               {header('reason', t('winLoss.colReason', 'Reason'))}
-              {header('value', t('winLoss.colValue', 'Value'), 'right')}
+              {header(
+                'value',
+                t('winLoss.colValue', 'Value · currency not recorded'),
+                'right',
+              )}
               {header('owner', t('winLoss.colOwner', 'Owner'))}
               {header('decidedAt', t('winLoss.colDecided', 'Recorded'))}
             </tr>

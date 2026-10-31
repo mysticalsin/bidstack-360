@@ -645,7 +645,9 @@ export function buildCockpit({
       {
         label: 'Industry',
         value: company.industry ? titleCase(company.industry) : 'Not verified',
-        detail: company.industry ? 'company profile' : 'connect Apollo to verify',
+        detail: company.industry
+          ? 'recorded industry on this account'
+          : 'not recorded on this account',
         tone: 'blue',
         ...externalField('industry', Boolean(company.industry)),
       },
@@ -654,14 +656,18 @@ export function buildCockpit({
         value: company.employeeCount
           ? `${company.employeeCount.toLocaleString()}+`
           : 'Not verified',
-        detail: company.employeeCount ? 'company headcount' : 'connect Apollo to verify',
+        detail: company.employeeCount
+          ? 'recorded headcount on this account, not a live census'
+          : 'not recorded on this account',
         tone: company.employeeCount ? 'jade' : 'amber',
         ...externalField('employeeCount', Boolean(company.employeeCount)),
       },
       {
         label: 'Annual revenue',
         value: annualRevenue,
-        detail: company.annualRevenueMicros ? 'company revenue' : 'connect Apollo to verify',
+        detail: company.annualRevenueMicros
+          ? 'currency not recorded; not a euro forecast'
+          : 'not recorded on this account',
         tone: company.annualRevenueMicros ? 'purple' : 'amber',
         ...externalField('annualRevenueMicros', Boolean(company.annualRevenueMicros)),
       },
@@ -673,7 +679,9 @@ export function buildCockpit({
             : apolloIntel?.freshness === 'stale'
               ? 'Stale'
               : 'Not synced',
-        detail: apolloIntel ? apolloIntel.creditPolicy.replace('_', ' ') : 'connect in Settings',
+        detail: apolloIntel
+          ? 'stored sync freshness on this account, not a live probe'
+          : 'not synced',
         tone: apolloIntel?.freshness === 'fresh' ? 'jade' : 'amber',
         ...(apolloIntel ? apolloSource : missingApolloSource),
         block: 'external' as const,
@@ -681,7 +689,7 @@ export function buildCockpit({
       {
         label: 'Projects',
         value: companyOpps.length.toString(),
-        detail: 'active and historical',
+        detail: 'count of opportunities matched to this account',
         tone: 'blue',
         ...internalSource,
         block: 'internal' as const,
@@ -689,7 +697,7 @@ export function buildCockpit({
       {
         label: 'Open deals',
         value: openDeals.length.toString(),
-        detail: 'opportunity pipeline',
+        detail: 'count of open opportunities on this account',
         tone: 'amber',
         ...internalSource,
         block: 'internal' as const,
@@ -701,7 +709,7 @@ export function buildCockpit({
             {
               label: 'Won / Lost',
               value: `${wonDeals} / ${lostDeals}`,
-              detail: 'closed outcomes',
+              detail: 'count of recorded closed outcomes on this account',
               tone: 'teal' as const,
               ...internalSource,
               block: 'internal' as const,

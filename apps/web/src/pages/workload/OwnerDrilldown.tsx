@@ -5,7 +5,10 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { useOpportunities } from '@/hooks/useOpportunities';
@@ -55,7 +58,15 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
   }
 
   return (
-    <ul className="divide-y divide-[var(--border-subtle)]">
+    <div>
+      <p className="px-5 pt-3 text-[10px] text-[var(--fg-tertiary)]">
+        {t(
+          'workload.drilldownBasis',
+          'Open bids for {{owner}}. Amounts are opportunity value in major units. {{basis}}',
+          { owner: ownerLabel, basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
+      </p>
+      <ul className="divide-y divide-[var(--border-subtle)]">
       {open.map((o) => (
         <li key={o.id}>
           <Link
@@ -75,6 +86,7 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
           </Link>
         </li>
       ))}
-    </ul>
+      </ul>
+    </div>
   );
 }

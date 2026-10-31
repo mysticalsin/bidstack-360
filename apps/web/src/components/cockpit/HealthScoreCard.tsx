@@ -36,7 +36,11 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
     >
       <SectionHeader
         title={t('healthScore.title', 'Signal coverage')}
-        caption={t('healthScore.signalsScored', '{{count}} account signals scored', { count: total })}
+        caption={t(
+          'healthScore.signalsScored',
+          '{{count}} factor bands on this account. Recorded-field proxy, not a measured health score.',
+          { count: total },
+        )}
         action={
           <Badge tone={badgeTone(cockpit.health.band)}>
             {labelForHealth(cockpit.health.band, t)}
@@ -179,10 +183,10 @@ function SignalFactorPanel({
 }
 
 function labelForHealth(key: (typeof ORDER)[number], t: TFunction): string {
-  if (key === 'strong') return t('healthScore.band.strong', 'Strong');
-  if (key === 'good') return t('healthScore.band.good', 'Good');
-  if (key === 'needs_attention') return t('healthScore.band.needsAttention', 'Needs attention');
-  return t('healthScore.band.critical', 'Critical');
+  if (key === 'strong') return t('healthScore.band.strong', 'Strong, proxy');
+  if (key === 'good') return t('healthScore.band.good', 'Good, proxy');
+  if (key === 'needs_attention') return t('healthScore.band.needsAttention', 'Watch, proxy');
+  return t('healthScore.band.critical', 'At risk, proxy');
 }
 
 function badgeTone(key: (typeof ORDER)[number]) {

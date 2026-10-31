@@ -237,7 +237,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         title={t('businessSnapshot.title', 'Business snapshot')}
         caption={t(
           'businessSnapshot.caption',
-          'Signal coverage: {{band}} · {{score}}/100. Not measured relationship health.',
+          'Signal band: {{band}}. Score {{score}}/100 is recorded-field coverage on this account, not a measured health score.',
           {
             band: labelForBand(cockpit.health.band),
             score: cockpit.health.score,

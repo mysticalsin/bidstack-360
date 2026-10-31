@@ -30,7 +30,8 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
         title={t('revenueEvolution.title', 'Revenue evolution')}
         caption={t(
           'revenueEvolution.caption',
-          `Won-deal amounts by month. ${UNSPECIFIED_CURRENCY_BASIS}`,
+          'Won-deal amounts by month on this account. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
         )}
       />
       <p className="sr-only">

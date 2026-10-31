@@ -137,11 +137,14 @@ export function titleCase(value: string) {
     .join(' ');
 }
 
+/** Company revenue has no currency column. A dollar sign would invent one. */
 export function formatMicrosCompact(micros: number) {
   const units = micros / 1_000_000;
-  if (units >= 1_000_000_000) return `$${(units / 1_000_000_000).toFixed(1)}B`;
-  if (units >= 1_000_000) return `$${(units / 1_000_000).toFixed(1)}M`;
-  return `$${units.toLocaleString()}`;
+  const compact = new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(Number.isFinite(units) ? units : 0);
+  return `${compact} unspecified`;
 }
 
 // ─── Normalizers ─────────────────────────────────────────────────────────────

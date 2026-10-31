@@ -8,7 +8,10 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useTerritorySegments } from '@/hooks/useTerritories';
 import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySegmentBreakdown';
 
@@ -17,6 +20,7 @@ export function OppIndustryBreakdown() {
   const { t } = useTranslation('crm');
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
+  const formatSegment = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
 
   return (
     <Card>
@@ -34,7 +38,8 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatUnspecifiedCompact(totals.totalValueMicros / 1_000_000)}
+              · {formatUnspecifiedCompact(totals.totalValueMicros / 1_000_000)}{' '}
+              {t('oppIndustryBreakdown.basis', UNSPECIFIED_CURRENCY_BASIS)}
             </span>
           ) : null}
         </span>
@@ -47,6 +52,13 @@ export function OppIndustryBreakdown() {
       </button>
       {open ? (
         <div className="border-t border-[var(--border-subtle)] p-4">
+          <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
+            {t(
+              'oppIndustryBreakdown.chartBasis',
+              'Org opportunities grouped by the account industry. Bar length is share of the largest industry. {{basis}}',
+              { basis: UNSPECIFIED_CURRENCY_BASIS },
+            )}
+          </p>
           <TerritorySegmentBreakdown
             dimension="industry"
             segments={segments.data?.items ?? []}
@@ -54,7 +66,7 @@ export function OppIndustryBreakdown() {
             isError={segments.isError}
             errorMessage={segments.error instanceof Error ? segments.error.message : undefined}
             onRetry={() => void segments.refetch()}
-            formatMoneyMicros={formatMoney}
+            formatMoneyMicros={formatSegment}
           />
         </div>
       ) : null}

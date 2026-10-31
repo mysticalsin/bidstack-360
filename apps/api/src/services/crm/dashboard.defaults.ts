@@ -301,18 +301,14 @@ export function defaultQueueHealth(): Array<z.infer<typeof QueueHealth>> {
 // ─── Release score fallback ───────────────────────────────────────────────────
 
 export function defaultReleaseScore(): z.infer<typeof ReleaseScore> {
-  const functional = 24;
-  const code = 24;
-  const design = 24;
-  const infra = 23;
-  const total = functional + code + design + infra;
+  // No stored rubric. A fabricated 95 used to read as a measured pass.
   return {
-    functional,
-    code,
-    design,
-    infra,
-    total,
-    passed: total >= 95,
-    scoredAt: new Date().toISOString(),
+    functional: 0,
+    code: 0,
+    design: 0,
+    infra: 0,
+    total: 0,
+    passed: false,
+    scoredAt: new Date(0).toISOString(),
   };
 }

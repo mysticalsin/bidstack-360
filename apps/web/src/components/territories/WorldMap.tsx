@@ -616,9 +616,15 @@ export const WorldMap = memo(function WorldMap({
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 px-2.5 py-1.5 text-[10px] shadow-[var(--shadow-xs)] backdrop-blur select-none z-10">
+      <div className="absolute bottom-3 left-3 flex max-w-[min(100%-1.5rem,520px)] flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 px-2.5 py-1.5 text-[10px] shadow-[var(--shadow-xs)] backdrop-blur select-none z-10">
         <span className="text-[var(--fg-tertiary)] font-medium">
-          {t('worldMap.legend.pipeline', 'Pipeline')}
+          {t('worldMap.legend.pipeline', 'Unspecified pipeline')}
+        </span>
+        <span className="text-[var(--fg-tertiary)]">
+          {t(
+            'worldMap.legend.basis',
+            'Heat is opportunity value by country. Currency not recorded; not a euro forecast.',
+          )}
         </span>
         <div className="flex items-center gap-1">
           {legendItems.map((l, i) => (

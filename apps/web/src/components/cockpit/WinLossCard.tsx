@@ -27,7 +27,11 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
     <Card role="region" aria-label={t('winLoss.regionLabel', 'Win / loss')}>
       <SectionHeader
         title={t('winLoss.title', 'Win / loss')}
-        caption={t('winLoss.caption', `Decided deals on this account. ${UNSPECIFIED_CURRENCY_BASIS}`)}
+        caption={t(
+          'winLoss.caption',
+          'Decided deals on this account. Win rate is won ÷ decided. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
       />
       <div className="px-5 pb-5">
         <div className="flex items-end justify-between">

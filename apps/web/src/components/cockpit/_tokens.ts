@@ -27,7 +27,8 @@ export const KPI_TONE_FG: Record<KpiTone, string> = {
 
 export function iconForKpi(label: string) {
   const l = label.toLowerCase();
-  if (l.includes('pipeline') || l.includes('revenue') || l.includes('arr')) return 'dollar';
+  // Revenue and pipeline have no stored currency. A dollar glyph reads as USD.
+  if (l.includes('pipeline') || l.includes('revenue') || l.includes('arr')) return 'briefcase';
   if (l.includes('win') || l.includes('won')) return 'trophy';
   if (l.includes('risk') || l.includes('overdue')) return 'warning';
   if (l.includes('growth') || l.includes('forecast')) return 'growth';
@@ -51,13 +52,14 @@ export function severityShort(s: RiskItem['severity']): string {
 }
 
 export function labelForBand(b: AccountCockpitSnapshot['health']['band']): string {
+  // The cockpit score is recorded-field coverage, not relationship health.
   return b === 'strong'
-    ? 'Strong'
+    ? 'Strong, proxy'
     : b === 'good'
-      ? 'Good'
+      ? 'Good, proxy'
       : b === 'needs_attention'
-        ? 'Watch'
-        : 'At risk';
+        ? 'Watch, proxy'
+        : 'At risk, proxy';
 }
 
 // Static fixtures used by the BusinessSnapshotCard when the company row's
