@@ -170,3 +170,5 @@
   --popover: var(--bg-surface, #fff);
   --popover-foreground: var(--viz-ink);
 }
+.page-sub-info { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 4px; vertical-align: middle; border-radius: 999px; color: var(--fg-tertiary); background: none; border: 0; cursor: help; }
+.page-sub-info:hover, .page-sub-info:focus-visible { color: var(--fg-primary); background: var(--surface-sunken, #f4f4f4); }

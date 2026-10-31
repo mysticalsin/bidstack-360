@@ -17,6 +17,8 @@ import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { fmtCompact } from '@/components/viz/viz-data';
 import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
@@ -216,11 +218,14 @@ export const OrgDashboard = memo(function OrgDashboard() {
               {
                 companies: s?.companies ?? 0,
                 openDeals: s?.openOpportunities ?? 0,
-                pipeline: formatUnspecifiedAmount(s?.pipelineValue ?? 0),
+                pipeline: fmtCompact(s?.pipelineValue ?? 0),
               },
             )}
-            {' · '}
-            {UNSPECIFIED_CURRENCY_BASIS}
+            <Tooltip content={`${formatUnspecifiedAmount(s?.pipelineValue ?? 0)} · ${UNSPECIFIED_CURRENCY_BASIS}`}>
+              <button type="button" className="page-sub-info" aria-label={`Pipeline ${formatUnspecifiedAmount(s?.pipelineValue ?? 0)}: ${UNSPECIFIED_CURRENCY_BASIS}`}>
+                <Icon name="info" size={12} />
+              </button>
+            </Tooltip>
           </div>
         </div>
         <div className="page-actions">
