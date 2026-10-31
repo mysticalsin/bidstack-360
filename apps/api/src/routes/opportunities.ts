@@ -9,6 +9,8 @@ import { z } from 'zod';
 
 import { prisma, type Prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { createNotification } from '../services/notification.service.js';
 import {
   Opportunity,
@@ -25,7 +27,7 @@ import {
 } from '../lib/access-scope.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
-import { resolveCompanyIdByName } from './opportunities.helpers.js';
+import { resolveCompanyIdByName, stageMoveDiff } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
@@ -399,6 +401,13 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         );
       }
 
+      const nextPipelineStageId =
+        req.body.pipelineStageId !== undefined ? req.body.pipelineStageId : before.pipelineStageId;
+      const stageMove = stageMoveDiff(
+        { stage: before.stage, pipelineStageId: before.pipelineStageId },
+        { stage: stageUpdate ?? before.stage, pipelineStageId: nextPipelineStageId },
+      );
+
       const dataPatch = {
         ...(req.body.customer ? { customer: req.body.customer } : {}),
         ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
@@ -474,6 +483,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: req.body as object,
           },
         });
+        if (stageMove) {
+          await tx.auditLog.create({
+            data: {
+              orgId: req.auth.orgId,
+              userId: req.auth.userId,
+              action: 'opportunity.stage',
+              targetType: 'opportunity',
+              targetId: before.id,
+              diff: stageMove,
+            },
+          });
+        }
 
         const updated = await tx.opportunity.findFirst({
           where: { id: before.id },
@@ -505,6 +526,20 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Fire-and-forget push to Dust on any field update.
       void pushOpportunityToDust(updated.id, req.auth.orgId);
+      if (stageMove) {
+        void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {
+          id: updated.id,
+          pipelineStageId: updated.pipelineStageId,
+          stage: updated.stage,
+          stageName: updated.pipelineStage?.name ?? updated.stage,
+        });
+        void dispatchWorkflowEvent(req.auth.orgId, 'stage_changed', 'opportunity', updated.id, {
+          stage: updated.stage,
+          pipelineStageId: updated.pipelineStageId,
+          stageName: updated.pipelineStage?.name ?? updated.stage,
+          ownerId: updated.ownerId,
+        });
+      }
 
       // Notify the owner on a real stage change made by someone else — awaited
       // (not void) so the write is durable before the response returns, but

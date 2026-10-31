@@ -108,6 +108,25 @@ export async function loadCompanyNameIndex(
  * duplicates). Keeps `opportunity.companyId` consistent with `customer` so the
  * /accounts and cockpit rollups (which group by companyId) stay correct.
  */
+/** A stage move that did not happen is not an event. Lost and won both count. */
+export function stageMoveDiff(
+  before: { stage: string; pipelineStageId: string | null },
+  after: { stage: string; pipelineStageId: string | null },
+): {
+  fromStage: string;
+  toStage: string;
+  fromPipelineStageId: string | null;
+  toPipelineStageId: string | null;
+} | null {
+  if (before.stage === after.stage && before.pipelineStageId === after.pipelineStageId) return null;
+  return {
+    fromStage: before.stage,
+    toStage: after.stage,
+    fromPipelineStageId: before.pipelineStageId,
+    toPipelineStageId: after.pipelineStageId,
+  };
+}
+
 export async function resolveCompanyIdByName(
   db: Prisma.TransactionClient,
   orgId: string,
