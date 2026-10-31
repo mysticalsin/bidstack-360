@@ -52,7 +52,7 @@
 
 .health-gauge-core span {
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 500;
   font-family: var(--font-display);
   line-height: 1;
 }
@@ -99,8 +99,8 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--brand-primary), var(--success), var(--warning));
-  opacity: 0.6;
+  background: var(--border-subtle);
+  opacity: 1;
 }
 
 .insights-grid {
@@ -142,8 +142,7 @@
 }
 
 .insight-pill:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  filter: brightness(0.97);
 }
 
 /* Enhanced glass card hover shine */
@@ -461,7 +460,7 @@
 
 .funnel-stage-value {
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 500;
   font-family: var(--font-display);
 }
 

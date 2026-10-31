@@ -5,9 +5,11 @@ import type { TFunction } from 'i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSnap, springSoft } from '@/lib/motion';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
 
@@ -27,7 +29,6 @@ interface CommandSignal {
 
 export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoneyMicros } = useFormatMoney();
   const { t } = useTranslation('crm');
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit, t);
@@ -92,17 +93,10 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
       transition={springSoft}
     >
       <div className="command-center-hero">
-        <div className="command-center-orbit" aria-hidden>
-          <span />
-          <span />
-          <span />
-        </div>
         <div className="command-center-kicker">
-          <Icon name="sparkle" size={14} />
-          <span>{t('commandCenter.kicker', 'Polo PreSales command center')}</span>
+          <span>{t('commandCenter.nextLabel', 'Next')}</span>
         </div>
-        <h2>{cockpit.company.name}</h2>
-        <p>{nextMove}</p>
+        <h2>{nextMove}</h2>
         <div
           className="command-center-actions"
           aria-label={t('commandCenter.actions.ariaLabel', 'Account decision signals')}
@@ -157,7 +151,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
           <span>{t('commandCenter.footer.weightedValue.label', 'Weighted account value')}</span>
           <strong>
             {cockpit.company.annualRevenueMicros
-              ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
+              ? `${formatUnspecifiedAmount(cockpit.company.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
               : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
           </strong>
         </div>

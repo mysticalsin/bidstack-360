@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { springSoft } from '@/lib/motion';
-import { formatUnspecifiedAmount } from '../unspecified-currency';
+import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecified-currency';
 
 import { stageColor, stageLabel } from './dashboard-types';
 
@@ -30,8 +30,11 @@ export function PipelineByStageMini({
 
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
-        {t('pipelineByStageMini.heading', 'Pipeline by stage')}
+      <div className="px-1 pb-2 pt-1">
+        <div className="text-sm text-[var(--fg-secondary)]">
+          {t('pipelineByStageMini.heading', 'Pipeline by stage')}
+        </div>
+        <div className="mt-1 text-xs text-[var(--fg-tertiary)]">{UNSPECIFIED_CURRENCY_BASIS}</div>
       </div>
       <div className="flex flex-col gap-2">
         {report.byStage.map((s, i) => (

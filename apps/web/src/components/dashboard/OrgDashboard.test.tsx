@@ -100,18 +100,38 @@ describe('OrgDashboard first-run state', () => {
     expect(screen.queryByTestId('org-command-hero')).toBeNull();
   });
 
-  it('renders the command center once any record exists', () => {
+  it('shows one pipeline title, an honest total, and one next action once any record exists', () => {
     vi.mocked(useOrgSummary).mockReturnValue({
-      data: { ...emptySummary, leads: 1 },
+      data: { ...emptySummary, leads: 1, pipelineValue: 1200, openOpportunities: 2 },
       isLoading: false,
       isError: false,
     } as never);
 
     renderDashboard();
 
-    expect(screen.getByTestId('kpi-row')).toBeDefined();
-    // The cinematic hero band is the landing moment for any org with data.
-    expect(screen.getByTestId('org-command-hero')).toBeDefined();
+    // A greeting plus a hero plus six KPI cards hid the one number that matters.
+    expect(screen.getByRole('heading', { level: 1, name: 'Pipeline' })).toBeDefined();
+    expect(screen.queryByText(/Good morning|Good afternoon|Good evening/)).toBeNull();
+    expect(screen.getByText('currency not recorded; not a euro forecast')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Review open deals' }).getAttribute('href')).toBe(
+      '/opportunities',
+    );
+    expect(screen.queryByTestId('kpi-row')).toBeNull();
+    expect(screen.queryByTestId('org-command-hero')).toBeNull();
     expect(screen.queryByTestId('getting-started')).toBeNull();
+  });
+
+  it('sends the next action to overdue tasks when follow-ups are late', () => {
+    vi.mocked(useOrgSummary).mockReturnValue({
+      data: { ...emptySummary, companies: 1, overdueTasks: 3 },
+      isLoading: false,
+      isError: false,
+    } as never);
+
+    renderDashboard();
+
+    expect(screen.getByRole('link', { name: 'Review overdue tasks' }).getAttribute('href')).toBe(
+      '/tasks?filter=overdue',
+    );
   });
 });

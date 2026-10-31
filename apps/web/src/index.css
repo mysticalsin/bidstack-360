@@ -1775,9 +1775,7 @@ select:focus-visible {
   background: var(--border-subtle);
 }
 .account-heading-cluster > span:first-child {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent),
-    0 14px 34px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  box-shadow: none;
 }
 .account-meta-chips {
   display: flex;
@@ -1786,30 +1784,30 @@ select:focus-visible {
   margin-top: 8px;
 }
 .account-meta-chips span {
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-card) 78%, transparent);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--fg-secondary);
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1;
-  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 0;
 }
 .account-meta-chips span[data-tone='health'],
 .account-meta-chips span[data-tone='linked'] {
-  background: color-mix(in srgb, var(--success) 10%, var(--surface-card));
-  border-color: color-mix(in srgb, var(--success) 28%, var(--border-subtle));
-  color: var(--tag-jade-fg);
+  background: transparent;
+  border: 0;
+  color: var(--fg-primary);
 }
 .account-meta-chips span[data-tone='confidence'] {
-  background: color-mix(in srgb, var(--brand-primary) 9%, var(--surface-card));
-  border-color: color-mix(in srgb, var(--brand-primary) 24%, var(--border-subtle));
-  color: var(--brand-deep);
+  background: transparent;
+  border: 0;
+  color: var(--fg-secondary);
 }
 .account-meta-chips span[data-tone='warning'] {
-  background: color-mix(in srgb, var(--warning) 12%, var(--surface-card));
-  border-color: color-mix(in srgb, var(--warning) 32%, var(--border-subtle));
-  color: color-mix(in srgb, var(--warning) 82%, var(--fg-primary));
+  background: transparent;
+  border: 0;
+  color: var(--warning);
 }
 .account-meta-chips span[data-tone='muted'] {
   color: var(--fg-tertiary);
@@ -2960,66 +2958,38 @@ select:focus-visible {
   margin: 0 0 16px;
 }
 .command-center-hero {
-  background:
-    radial-gradient(
-      circle at 18% 12%,
-      color-mix(in srgb, var(--tag-purple-bg) 78%, transparent),
-      transparent 32%
-    ),
-    radial-gradient(
-      circle at 88% 86%,
-      color-mix(in srgb, var(--tag-jade-bg) 64%, transparent),
-      transparent 30%
-    ),
-    linear-gradient(135deg, var(--surface-card), var(--surface-page));
-  border: 1px solid var(--border-default);
-  border-radius: 18px;
-  box-shadow: var(--shadow-sm);
-  min-height: 212px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  min-height: 0;
   overflow: hidden;
   padding: 20px;
   position: relative;
 }
 .command-center-orbit {
-  inset: 22px 28px 18px auto;
-  position: absolute;
-  width: 150px;
-}
-.command-center-orbit span {
-  animation: bs-orbit 24s linear infinite;
-  border: 0.5px solid color-mix(in srgb, var(--brand-primary) 10%, transparent);
-  border-radius: 999px;
-  inset: var(--command-orbit, 0);
-  position: absolute;
-}
-.command-center-orbit span:nth-child(2) {
-  --command-orbit: 22px;
-  animation-duration: 36s;
-  animation-direction: reverse;
-}
-.command-center-orbit span:nth-child(3) {
-  --command-orbit: 44px;
-  animation-duration: 48s;
+  display: none;
 }
 .command-center-kicker {
   align-items: center;
-  color: var(--brand-primary);
+  color: var(--fg-secondary);
   display: inline-flex;
-  gap: 7px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
   position: relative;
-  text-transform: uppercase;
+  text-transform: none;
   z-index: 1;
 }
 .command-center h2 {
   color: var(--fg-primary);
   font-family: var(--font-display);
-  font-size: clamp(26px, 3vw, 42px);
-  line-height: 1;
-  margin: 18px 0 0;
-  max-width: 520px;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 8px 0 0;
+  max-width: 36rem;
   position: relative;
   z-index: 1;
 }
@@ -3061,19 +3031,21 @@ select:focus-visible {
   justify-content: space-between;
 }
 .command-signal-head > span {
-  color: var(--fg-tertiary);
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--fg-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .command-signal strong {
   color: var(--fg-primary);
   display: block;
   font-family: var(--font-display);
-  font-size: 29px;
-  line-height: 1.05;
-  margin-top: 12px;
+  font-size: 28px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  margin-top: 8px;
 }
 .command-progress {
   background: var(--surface-sunken);
@@ -3084,9 +3056,8 @@ select:focus-visible {
   overflow: hidden;
 }
 .command-progress span {
-  background: linear-gradient(90deg, var(--brand-primary), var(--success));
+  background: var(--brand-primary);
   border-radius: inherit;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--brand-primary) 22%, transparent);
   display: block;
   height: 100%;
 }
@@ -3104,11 +3075,12 @@ select:focus-visible {
   min-width: 0;
 }
 .command-center-footer span {
-  color: var(--fg-tertiary);
+  color: var(--fg-secondary);
   display: block;
-  font-size: 10.5px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .command-center-footer strong {
   color: var(--fg-primary);
@@ -3124,12 +3096,12 @@ select:focus-visible {
   color: var(--fg-primary);
   display: flex;
   flex-wrap: wrap;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 500;
   gap: 8px;
-  letter-spacing: 0.04em;
-  margin-bottom: 10px;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  margin-bottom: 8px;
+  text-transform: none;
 }
 .section-kicker span {
   color: var(--fg-tertiary);
@@ -4675,7 +4647,7 @@ select:focus-visible {
   }
 
   .command-center h2 {
-    font-size: 28px;
+    font-size: 20px;
   }
 
   .smart-company-shell,

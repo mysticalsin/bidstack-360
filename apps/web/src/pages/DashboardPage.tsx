@@ -203,6 +203,15 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       )}
       <PageHead cockpit={cockpit} accountView={isAccountView} />
       {isAccountView && (
+        <AccountWorkStrip
+          people={cockpit.keyContacts}
+          overdueCount={overdueCount}
+          deals={(accountOpps ?? []).filter(
+            (deal) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost',
+          )}
+        />
+      )}
+      {isAccountView && (
         <div className="flex justify-end">
           <CockpitCustomizeMenu />
         </div>
@@ -358,5 +367,105 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </aside>
       </section>
     </>
+  );
+}
+
+function AccountWorkStrip({
+  people,
+  overdueCount,
+  deals,
+}: {
+  people: Array<{
+    id: string;
+    name: string;
+    title: string | null;
+    email: string | null;
+    source: string;
+  }>;
+  overdueCount: number;
+  deals: Array<{ id: string; name: string; stage: string | null }>;
+}) {
+  const { t } = useTranslation('crm');
+  const shownPeople = people.slice(0, 4);
+  const shownDeals = deals.slice(0, 4);
+  return (
+    <section
+      aria-label={t('dashboard.accountWorkLabel', 'People, deals, and tasks')}
+      className="mt-6 grid gap-8 border-b border-[var(--border-subtle)] pb-6 md:grid-cols-3"
+    >
+      <div>
+        <h2 className="text-sm text-[var(--fg-secondary)]">{t('dashboard.workPeople', 'People')}</h2>
+        {shownPeople.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
+            {t('dashboard.workPeopleEmpty', 'No people recorded')}
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {shownPeople.map((person) => {
+              const recorded = person.title ?? person.email;
+              const evidenced = person.source === 'verified_data';
+              return (
+                <li key={person.id} className="min-h-11">
+                  <div className="text-sm text-[var(--fg-primary)]">{person.name}</div>
+                  <div className="text-sm">
+                    {evidenced ? (
+                      <span className="text-[var(--brand-primary)]">
+                        {t('dashboard.workEvidenced', 'Evidenced')}
+                      </span>
+                    ) : null}
+                    {recorded ? (
+                      <span className="text-[var(--fg-primary)]">
+                        {evidenced ? ' · ' : ''}
+                        {recorded}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--fg-tertiary)]">
+                        {evidenced ? ' · ' : ''}
+                        {t('dashboard.workUnknown', 'Unknown')}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h2 className="text-sm text-[var(--fg-secondary)]">{t('dashboard.workDeals', 'Open deals')}</h2>
+        {shownDeals.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
+            {t('dashboard.workDealsEmpty', 'No open deals')}
+          </p>
+        ) : (
+          <ul className="mt-2">
+            {shownDeals.map((deal) => (
+              <li key={deal.id}>
+                <Link
+                  to={`/opportunities/${deal.id}`}
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-md text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                >
+                  <span className="truncate">{deal.name}</span>
+                  <span className="shrink-0 text-[var(--fg-secondary)]">
+                    {deal.stage ?? t('dashboard.workUnknown', 'Unknown')}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h2 className="text-sm text-[var(--fg-secondary)]">{t('dashboard.workTasks', 'Tasks')}</h2>
+        <Link
+          to={overdueCount > 0 ? '/tasks?filter=overdue' : '/tasks'}
+          className="mt-2 inline-flex min-h-11 items-center text-sm text-[var(--fg-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+        >
+          {overdueCount > 0
+            ? t('dashboard.workTasksOverdue', '{{count}} overdue', { count: overdueCount })
+            : t('dashboard.workTasksClear', 'No overdue tasks')}
+        </Link>
+      </div>
+    </section>
   );
 }

@@ -11,8 +11,8 @@ import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout, springSnap } from '@/lib/motion';
+import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 
 import {
   healthLabel,
@@ -31,7 +31,6 @@ export const AccountCard = memo(function AccountCard({
   index: number;
 }) {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
@@ -121,7 +120,7 @@ export const AccountCard = memo(function AccountCard({
             <div>
               <dt>{t('account.pipeline', 'Pipeline')}</dt>
               <dd>
-                <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
+                <AnimatedMetric value={formatUnspecifiedAmount(pipelineMicros / 1_000_000)} />
               </dd>
             </div>
             <div>

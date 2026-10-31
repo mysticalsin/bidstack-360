@@ -19,7 +19,7 @@ import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { relativeTime } from '@/lib/format';
 
 import { EndpointBox, SnippetBox } from './IntegrationAtoms';
-import { getPathDetail, readinessBadgeLabel } from './integration-helpers';
+import { getPathDetail } from './integration-helpers';
 import type { IntegrationSetupGuide } from './types';
 
 // ─── Path catalogue ────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ function ConnectionPathPanel({
     <div role="tabpanel" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="text-sm text-[var(--fg-secondary)]">
             {t(`connectionCommandCenter.path.${path.key}.eyebrow`, path.eyebrow)}
           </div>
           <h3 className="mt-1 text-xl font-semibold text-[var(--fg-primary)]">
@@ -172,13 +172,19 @@ export function ConnectionCommandCenter({
   }
 
   const activePath = PATHS.find((path) => path.key === active) ?? DEFAULT_PATH;
+  const publicMcp = Boolean(guide.mcp.configured && !guide.mcp.localOnly);
+  const dustStatus = dustConfigured && publicMcp
+    ? t('connectionCommandCenter.readiness.dustCredentials.unverified', 'Configured, unverified')
+    : t(
+        'connectionCommandCenter.readiness.dustCredentials.notConnected',
+        'Unverified / not connected',
+      );
   const readiness = [
     {
-      label: t('connectionCommandCenter.readiness.dustCredentials.label', 'Dust credentials'),
-      value: dustConfigured
-        ? t('connectionCommandCenter.readiness.dustCredentials.ready', 'Ready')
-        : t('connectionCommandCenter.readiness.dustCredentials.needsKey', 'Needs key'),
-      tone: dustConfigured ? 'jade' : 'amber',
+      label: t('connectionCommandCenter.readiness.dustCredentials.label', 'Dust'),
+      value: dustStatus,
+      badge: t('connectionCommandCenter.readiness.badgeUnverified', 'Unverified'),
+      tone: 'amber' as const,
     },
     {
       label: t('connectionCommandCenter.readiness.dustAgents.label', 'Dust agents'),
@@ -186,8 +192,9 @@ export function ConnectionCommandCenter({
         ? t('connectionCommandCenter.readiness.dustAgents.found', '{{count}} found', {
             count: dustAgents,
           })
-        : t('connectionCommandCenter.readiness.dustAgents.disabled', 'Disabled'),
-      tone: dustConfigured && dustAgents > 0 ? 'teal' : dustConfigured ? 'blue' : 'gray',
+        : dustStatus,
+      badge: t('connectionCommandCenter.readiness.badgeUnverified', 'Unverified'),
+      tone: 'amber' as const,
     },
     {
       label: t('connectionCommandCenter.readiness.mcpEndpoint.label', 'MCP endpoint'),
@@ -201,16 +208,18 @@ export function ConnectionCommandCenter({
               'connectionCommandCenter.readiness.mcpEndpoint.publicUnverified',
               'Public URL set, unverified',
             ),
-      tone: 'amber',
+      badge: t('connectionCommandCenter.readiness.badgeUnverified', 'Unverified'),
+      tone: 'amber' as const,
     },
     {
       label: t('connectionCommandCenter.readiness.dustDataSource.label', 'Dust data source'),
       value: guide.dust.dataSourceConfigured
-        ? t('connectionCommandCenter.readiness.dustDataSource.ready', 'Ready')
+        ? t('connectionCommandCenter.readiness.dustDataSource.configured', 'Configured, unverified')
         : t('connectionCommandCenter.readiness.dustDataSource.missing', 'Missing'),
-      tone: guide.dust.dataSourceConfigured ? 'jade' : 'amber',
+      badge: t('connectionCommandCenter.readiness.badgeUnverified', 'Unverified'),
+      tone: 'amber' as const,
     },
-  ] as const;
+  ];
 
   return (
     <Card className="overflow-hidden">
@@ -254,12 +263,10 @@ export function ConnectionCommandCenter({
               key={item.label}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
-                {item.label}
-              </div>
+              <div className="text-sm text-[var(--fg-secondary)]">{item.label}</div>
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-[var(--fg-primary)]">{item.value}</span>
-                <Badge tone={item.tone}>{readinessBadgeLabel(item.tone)}</Badge>
+                <span className="text-sm text-[var(--fg-primary)]">{item.value}</span>
+                <Badge tone={item.tone}>{item.badge}</Badge>
               </div>
             </div>
           ))}
@@ -293,7 +300,7 @@ export function ConnectionCommandCenter({
                   </span>
                   <span>
                     <span
-                      className={`block text-[10px] font-semibold uppercase tracking-wider ${
+                      className={`block text-sm ${
                         isActive ? 'text-[var(--fg-secondary)]' : 'text-[var(--fg-tertiary)]'
                       }`}
                     >

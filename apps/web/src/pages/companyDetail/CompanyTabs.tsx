@@ -21,6 +21,13 @@ import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 
+function RecordedFact({ value, unknownLabel }: { value: string | null; unknownLabel: string }) {
+  if (!value) {
+    return <span className="text-[var(--fg-tertiary)]">{unknownLabel}</span>;
+  }
+  return <span className="text-[var(--fg-primary)]">{value}</span>;
+}
+
 export function ContactTab({
   contacts,
 }: {
@@ -55,13 +62,22 @@ export function ContactTab({
           {contacts.map((c) => (
             <TableRow key={c.id}>
               <TableCell className="font-medium text-[var(--fg-primary)]">
-                <Link to={`/contacts/${c.id}`} className="hover:text-[var(--brand-primary)]">
+                <Link
+                  to={`/contacts/${c.id}`}
+                  className="inline-flex min-h-11 items-center hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                >
                   {c.name}
                 </Link>
               </TableCell>
-              <TableCell>{c.role ?? '—'}</TableCell>
-              <TableCell>{c.email ?? '—'}</TableCell>
-              <TableCell>{c.phone ?? '—'}</TableCell>
+              <TableCell>
+                <RecordedFact value={c.role} unknownLabel={t('companyTabs.contacts.unknown', 'Unknown')} />
+              </TableCell>
+              <TableCell>
+                <RecordedFact value={c.email} unknownLabel={t('companyTabs.contacts.unknown', 'Unknown')} />
+              </TableCell>
+              <TableCell>
+                <RecordedFact value={c.phone} unknownLabel={t('companyTabs.contacts.unknown', 'Unknown')} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

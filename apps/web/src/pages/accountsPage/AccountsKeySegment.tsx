@@ -17,7 +17,10 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
@@ -34,7 +37,6 @@ export function AccountsKeySegment() {
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
-  const { formatMoney } = useFormatMoney();
   // Debounce the value that feeds the query keys so a server fetch fires once the
   // user pauses typing — not on every keystroke. `search` still drives the input
   // display for responsive typing.
@@ -185,7 +187,7 @@ export function AccountsKeySegment() {
               leadingIndustry
                 ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
                     count: leadingIndustry.count,
-                    pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
+                    pipeline: formatUnspecifiedAmount(leadingIndustry.pipeline),
                   })
                 : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
             }
@@ -244,7 +246,7 @@ export function AccountsKeySegment() {
           aria-label={t('keyAccounts.statsStripAria', 'Key account totals on this page')}
           className="space-y-2"
         >
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+          <p className="text-sm text-[var(--fg-secondary)]">
             {t('keyAccounts.statsScope', 'On this page')}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -254,7 +256,8 @@ export function AccountsKeySegment() {
             />
             <StatTile
               label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
-              value={formatMoney(totalPipeline, 'EUR')}
+              value={formatUnspecifiedAmount(totalPipeline)}
+              sublabel={UNSPECIFIED_CURRENCY_BASIS}
             />
             <StatTile
               label={t('keyAccounts.statOpenDeals', 'Open deals')}
@@ -346,7 +349,7 @@ export function AccountsKeySegment() {
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">
-                              {formatMoney(account.totalValue, 'EUR')}
+                              {formatUnspecifiedAmount(account.totalValue)}
                             </span>{' '}
                             {t('keyAccounts.metricPipeline', 'pipeline')}
                           </span>

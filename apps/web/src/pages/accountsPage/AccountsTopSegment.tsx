@@ -14,7 +14,10 @@ import { KeyAccountBadge, TopAccountBadge } from '@/components/company/AccountTi
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
@@ -27,7 +30,6 @@ export function AccountsTopSegment() {
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
-  const { formatMoney } = useFormatMoney();
 
   const industries = useAccountIndustries();
   const accounts = useTopAccounts({
@@ -174,7 +176,7 @@ export function AccountsTopSegment() {
             sub={
               leader
                 ? t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
-                    pipeline: formatMoney(leader.totalValue, 'EUR'),
+                    pipeline: formatUnspecifiedAmount(leader.totalValue),
                     deals: leader.openDeals,
                   })
                 : t('topAccounts.leaderEmpty', 'Add opportunity value to create a ranking.')
@@ -189,8 +191,12 @@ export function AccountsTopSegment() {
             }
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatTile label={t('topAccounts.statPipeline', 'Pipeline')} value={formatMoney(totalPipeline, 'EUR')} />
-              <StatTile label={t('topAccounts.statWon', 'Won')} value={formatMoney(wonPipeline, 'EUR')} />
+              <StatTile
+                label={t('topAccounts.statPipeline', 'Pipeline')}
+                value={formatUnspecifiedAmount(totalPipeline)}
+                sublabel={UNSPECIFIED_CURRENCY_BASIS}
+              />
+              <StatTile label={t('topAccounts.statWon', 'Won')} value={formatUnspecifiedAmount(wonPipeline)} />
               <StatTile label={t('topAccounts.statOpenDeals', 'Open deals')} value={openDeals.toLocaleString()} />
               <StatTile label={t('topAccounts.statContacts', 'Contacts')} value={contactCount.toLocaleString()} />
             </div>
@@ -223,7 +229,7 @@ export function AccountsTopSegment() {
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
-                    <span className="font-medium text-[var(--fg-tertiary)]">{formatMoney(item.pipeline, 'EUR')}</span>
+                    <span className="font-medium tabular-nums text-[var(--fg-secondary)]">{formatUnspecifiedAmount(item.pipeline)}</span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                     <motion.span
@@ -350,14 +356,14 @@ export function AccountsTopSegment() {
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--fg-secondary)]">
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
-                          {formatMoney(account.totalValue, 'EUR')}
+                          {formatUnspecifiedAmount(account.totalValue)}
                         </span>{' '}
                         {t('topAccounts.totalPipeline', 'total pipeline')}
                       </span>
                       <span>·</span>
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
-                          {formatMoney(account.wonValue, 'EUR')}
+                          {formatUnspecifiedAmount(account.wonValue)}
                         </span>{' '}
                         {t('topAccounts.won', 'won')}
                       </span>
