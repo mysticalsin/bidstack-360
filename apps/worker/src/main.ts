@@ -32,6 +32,7 @@ import { startCompetitorResearch } from './queues/competitor-research.js';
 import { startWorkflowDispatchWorker } from './queues/workflow-dispatch.js';
 import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
 // Bid-deadline alerts (7/3/1 days) + scheduled analytics reports — repeatable scans
+import { startAccountWatchdog } from './queues/account-watchdog.js';
 import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
@@ -156,6 +157,8 @@ await Promise.all([
   startWorkflowScheduleWorker(connection, log, workers, queues, webhookDeliveryQueue),
   // Bid-deadline alerts + scheduled analytics reports (repeatable, org-scoped scans)
   startBidDeadlineAlerts(connection, log, workers, queues),
+  // Financial watchdog: public-filing scan per watched account (repeatable)
+  startAccountWatchdog(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),
