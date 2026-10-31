@@ -530,8 +530,8 @@
     "zoomOut": "Zoom Out",
     "resetView": "Reset View",
     "legend": {
-      "pipeline": "Unspecified pipeline",
-      "basis": "Heat is opportunity value by country. Currency not recorded; not a euro forecast."
+      "pipeline": "Opportunities",
+      "basis": "Shade is the number of opportunities recorded in that country."
     },
     "tooltip": {
       "opportunityCount": "{{count}} opps",
