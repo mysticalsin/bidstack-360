@@ -5,7 +5,8 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
+import { enrichmentWatchRows } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
@@ -97,6 +98,43 @@ export const WatchdogFeedResponse = z.object({
   heatWeekStarts: z.array(z.string()),
 });
 export type WatchdogFeedResponse = z.infer<typeof WatchdogFeedResponse>;
+
+/**
+ * Potential projects from account enrichment become ordinary watch events
+ * (source 'enrichment'), so they carry a status and can be dismissed. Insert
+ * only: an existing row (including a dismissed one) is never touched. The
+ * worker's scan does the same org-wide; this keeps the account page current
+ * without waiting for the next scan.
+ */
+export async function syncEnrichmentWatchEvents(orgId: string, companyId: string): Promise<number> {
+  const row = await prisma.companyFirmographics.findFirst({
+    where: { orgId, companyId },
+    select: { projects: true, fetchedAt: true },
+  });
+  if (!row) return 0;
+  const rows = enrichmentWatchRows({ orgId, companyId, fetchedAt: row.fetchedAt, projects: row.projects });
+  if (!rows.length) return 0;
+  const res = await prisma.accountWatchEvent.createMany({
+    skipDuplicates: true,
+    data: rows.map((r) => ({
+      orgId: r.orgId,
+      companyId: r.companyId,
+      source: r.source,
+      externalId: r.externalId,
+      kind: r.kind,
+      occurredAt: r.occurredAt,
+      title: r.title,
+      sourceUrl: r.sourceUrl,
+      summary: r.summary,
+      implication: r.implication,
+      implicationRationale: r.rationale,
+      severity: r.severity,
+      confirmed: r.confirmed,
+      payload: r.payload as unknown as Prisma.InputJsonValue,
+    })),
+  });
+  return res.count;
+}
 
 const HEAT_WEEKS = 8;
 const WEEK_MS = 7 * 86_400_000;
@@ -210,6 +248,10 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
       const access = await canReadAccount({ orgId, userId, companyId, accountName: company.name });
       if (!access.allowed) throw server.httpErrors.notFound('Account not found');
 
+      // Best effort: a sync failure must not hide the rest of the watchdog.
+      await syncEnrichmentWatchEvents(orgId, companyId).catch((err: unknown) =>
+        req.log.warn({ err: err instanceof Error ? err.message : String(err), companyId }, 'enrichment watch sync failed'),
+      );
       const now = new Date();
       const [subject, events, earnings, closed] = await Promise.all([
         prisma.accountWatchSubject.findFirst({ where: { orgId, companyId } }),
@@ -299,6 +341,44 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         pastProjects,
         history,
       };
+    },
+  );
+  // Change a signal's status (dismiss, acknowledge, restore). Org-wide: a
+  // dismissed signal is hidden for everyone who can read the account.
+  server.patch(
+    '/accounts/:companyId/watchdog/events/:eventId',
+    {
+      preHandler: [server.requirePermission('accounts:write')],
+      schema: {
+        params: z.object({ companyId: z.string().uuid(), eventId: z.string().uuid() }),
+        body: z.object({ status: z.enum(['NEW', 'ACKNOWLEDGED', 'DISMISSED']) }),
+        response: { 200: z.object({ id: z.string(), status: z.string() }) },
+      },
+    },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const { companyId, eventId } = req.params;
+      const company = await prisma.company.findFirst({ where: { id: companyId, orgId }, select: { id: true, name: true } });
+      if (!company) throw server.httpErrors.notFound('Account not found');
+      const access = await canReadAccount({ orgId, userId, companyId, accountName: company.name });
+      if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+      const ev = await prisma.accountWatchEvent.findFirst({ where: { id: eventId, orgId, companyId }, select: { id: true, status: true, source: true } });
+      if (!ev) throw server.httpErrors.notFound('Signal not found');
+      const status = req.body.status;
+      if (ev.status !== status) {
+        await prisma.accountWatchEvent.update({ where: { id: ev.id }, data: { status } });
+        await prisma.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'watchdog.event.status',
+            targetType: 'account_watch_event',
+            targetId: ev.id,
+            diff: { companyId, source: ev.source, from: ev.status, to: status } as Prisma.InputJsonValue,
+          },
+        });
+      }
+      return { id: ev.id, status };
     },
   );
 };

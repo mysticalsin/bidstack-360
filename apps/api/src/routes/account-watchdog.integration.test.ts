@@ -131,4 +131,37 @@ describe('GET /accounts/:companyId/watchdog', () => {
     expect(body.alerts[0]).toMatchObject({ title: 'Filing NEWEST', implication: 'RISK' });
     expect(body.earnings.map((d: { fiscalPeriod: string }) => d.fiscalPeriod)).toContain('FY2026-Q4');
   });
+
+  skipIfNoDb('enrichment projects become dismissible signals, and a dismissal sticks across syncs', async () => {
+    const company = await prisma.company.create({ data: { orgId: orgId!, name: `Enrich Co ${Date.now()}` } });
+    const evidence = [{ postingId: 'p1', title: 'Data Engineer', url: 'https://jobs.example/1', region: 'EMEA', seniority: 'senior', postedAt: '2026-10-20T00:00:00.000Z', source: 'apollo' }];
+    const proj = (id: string, confidence: string) => ({ id, kind: id.split(':')[0], name: `Project ${id}`, rationale: 'Hiring.', confidence, region: 'EMEA', postingCount: 9, seniorCount: 1, skills: [], evidence, method: 'rules' });
+    await prisma.companyFirmographics.create({
+      data: { orgId: orgId!, companyId: company.id, status: 'ok', fetchedAt: new Date('2026-10-31T12:00:00.000Z'), projects: [proj('data_platform:EMEA', 'high'), proj('erp:EMEA', 'low')] },
+    });
+    const url = `/api/v1/accounts/${company.id}/watchdog`;
+    let res = await server.inject({ method: 'GET', url });
+    let events = res.json().events as Array<{ id: string; source: string; title: string; sourceUrl: string; implication: string; status: string }>;
+    const enr = events.filter((e) => e.source === 'enrichment');
+    expect(enr).toHaveLength(1);
+    expect(enr[0]).toMatchObject({ title: 'Potential project: Project data_platform:EMEA', implication: 'OPPORTUNITY', status: 'NEW', sourceUrl: `/accounts/${company.id}#enrichment-project-data_platform-EMEA` });
+
+    res = await server.inject({ method: 'PATCH', url: `${url}/events/${enr[0]!.id}`, payload: { status: 'DISMISSED' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: enr[0]!.id, status: 'DISMISSED' });
+    res = await server.inject({ method: 'GET', url });
+    events = res.json().events;
+    expect(events.filter((e) => e.source === 'enrichment')).toHaveLength(0);
+    expect(await prisma.accountWatchEvent.count({ where: { orgId: orgId!, companyId: company.id, source: 'enrichment' } })).toBe(1);
+    expect(await prisma.auditLog.count({ where: { orgId: orgId!, action: 'watchdog.event.status', targetId: enr[0]!.id } })).toBe(1);
+
+    // Restore brings it back; an unknown event or another company's event is a 404.
+    res = await server.inject({ method: 'PATCH', url: `${url}/events/${enr[0]!.id}`, payload: { status: 'NEW' } });
+    expect(res.statusCode).toBe(200);
+    const other = await prisma.company.create({ data: { orgId: orgId!, name: `Other Co ${Date.now()}` } });
+    res = await server.inject({ method: 'PATCH', url: `/api/v1/accounts/${other.id}/watchdog/events/${enr[0]!.id}`, payload: { status: 'DISMISSED' } });
+    expect(res.statusCode).toBe(404);
+    res = await server.inject({ method: 'PATCH', url: `${url}/events/${enr[0]!.id}`, payload: { status: 'BOGUS' } });
+    expect(res.statusCode).toBe(400);
+  });
 });
