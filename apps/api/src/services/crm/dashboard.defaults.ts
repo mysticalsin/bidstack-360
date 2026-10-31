@@ -10,33 +10,6 @@ import { type z } from 'zod';
 
 import type { DashboardWidget, QueueHealth, ReleaseScore } from '@bidstack/shared';
 
-// ─── Company lookup maps ──────────────────────────────────────────────────────
-
-/** WHY: known clients have vanity domains not derivable from their trade names. */
-export const COMPANY_DOMAINS: Record<string, string> = {
-  'CI Financial': 'ci.com',
-  'Logistec Corporation': 'logistec.com',
-  'Rush University System for Health': 'rush.edu',
-  MAPFRE: 'mapfre.com',
-  MAHLE: 'mahle.com',
-  Aritzia: 'aritzia.com',
-  NOS: 'nos.pt',
-  'DNB Bank': 'dnb.no',
-  Mantu: 'mantu.com',
-};
-
-export const COMPANY_WEBSITES: Record<string, string> = {
-  'CI Financial': 'https://www.ci.com/',
-  'Logistec Corporation': 'https://www.logistec.com/',
-  'Rush University System for Health': 'https://www.rush.edu/',
-  MAPFRE: 'https://www.mapfre.com/',
-  MAHLE: 'https://www.mahle.com/',
-  Aritzia: 'https://www.aritzia.com/',
-  NOS: 'https://www.nos.pt/',
-  'DNB Bank': 'https://www.dnb.no/',
-  Mantu: 'https://mantu.com/',
-};
-
 // ─── Dashboard widget layout ──────────────────────────────────────────────────
 
 export const DEFAULT_WIDGETS: Array<z.infer<typeof DashboardWidget>> = [

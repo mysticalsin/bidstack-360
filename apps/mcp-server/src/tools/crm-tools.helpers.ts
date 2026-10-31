@@ -60,11 +60,9 @@ export function normalizeDomain(value: string | null | undefined) {
     .toLowerCase();
 }
 
-export function logoUrl(name: string, domain: string | null) {
-  if (domain === 'mantu.com' || name.toLowerCase() === 'mantu')
-    return 'https://mantu.com/favicon.ico';
+export function logoUrl(_name: string, domain: string | null) {
   if (!domain) return null;
-  return `https://www.${domain.replace(/^www\./, '')}/favicon.ico`;
+  return `https://${domain.replace(/^www\./, '')}/favicon.ico`;
 }
 
 export function source(name: string, sourceUrl: string | null, confidence: number | null) {

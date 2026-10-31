@@ -300,6 +300,8 @@ describe('unscored company shells', () => {
     expect(company?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
     expect(company?.employeeCount).toBeNull();
     expect(company?.annualRevenueMicros).toBeNull();
+    expect(company?.domain).toBeNull();
+    expect(company?.website).toBeNull();
   });
 
   it('does not invent Mantu headcount or revenue on the placeholder account', () => {
@@ -307,5 +309,8 @@ describe('unscored company shells', () => {
     expect(mantu.confidence).toBeNull();
     expect(mantu.employeeCount).toBeNull();
     expect(mantu.annualRevenueMicros).toBeNull();
+    expect(mantu.domain).toBeNull();
+    expect(mantu.website).toBeNull();
+    expect(mantu.logo.url).toBeNull();
   });
 });

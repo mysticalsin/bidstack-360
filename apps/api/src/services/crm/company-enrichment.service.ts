@@ -14,7 +14,6 @@ import {
   type SourceAttribution,
 } from '@bidstack/shared';
 
-import { COMPANY_DOMAINS, COMPANY_WEBSITES } from './dashboard.defaults.js';
 import {
   attribution,
   normalizeName,
@@ -32,12 +31,13 @@ type CompanyTechnicalStack = NonNullable<z.infer<typeof CrmCompany>['technicalSt
 
 // ─── Domain / website lookup ──────────────────────────────────────────────────
 
-export function domainFor(name: string) {
-  return COMPANY_DOMAINS[name] ?? null;
+/** A trade name is not a recorded website. Callers pass a stored domain. */
+export function domainFor(_name: string) {
+  return null;
 }
 
-export function websiteFor(name: string) {
-  return COMPANY_WEBSITES[name] ?? null;
+export function websiteFor(_name: string) {
+  return null;
 }
 
 // ─── Logo helpers ─────────────────────────────────────────────────────────────
@@ -54,25 +54,21 @@ function asLogoSource(value: string): z.infer<typeof CrmLogoSource> {
     : 'manual';
 }
 
-export function logoUrlFor(name: string, domain: string | null) {
-  if (name === 'Mantu' || domain === 'mantu.com') return 'https://mantu.com/favicon.ico';
+export function logoUrlFor(_name: string, domain: string | null) {
   if (!domain) return null;
   return `https://${domain.replace(/^www\./, '')}/favicon.ico`;
 }
 
-export function logoFor(name: string, url: string | null, source?: string | null) {
-  const resolvedSource =
-    name === 'Mantu' && (url === null || url === 'https://mantu.com/favicon.ico')
-      ? 'official_website'
-      : (source ?? 'favicon');
+export function logoFor(_name: string, url: string | null, source?: string | null) {
+  const resolvedSource = source ?? 'favicon';
   return {
-    url: url ?? logoUrlFor(name, domainFor(name)),
+    url,
     source: asLogoSource(resolvedSource),
     cachedAt: new Date().toISOString(),
     attribution: attribution({
       source: resolvedSource,
-      label: name === 'Mantu' ? 'Mantu official website logo/fav icon' : 'Company favicon fallback',
-      sourceUrl: websiteFor(name),
+      label: resolvedSource === 'favicon' ? 'Company favicon fallback' : 'Stored logo',
+      sourceUrl: null,
       confidence: null,
       providerMetadata: { confidenceBasis: 'not_scored' },
     }),
@@ -344,11 +340,7 @@ export function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
     formerNames: [],
     incorporationDate: null,
     imageUrl: null,
-    logo: logoFor(
-      name,
-      logoUrlFor(name, domain),
-      name === 'Mantu' ? 'official_website' : 'favicon',
-    ),
+    logo: logoFor(name, null, 'favicon'),
     confidence: null,
     sourceAttribution: [
       attribution({
