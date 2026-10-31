@@ -75,7 +75,7 @@ describe('ReceiveStep — no account selected', () => {
     );
 
     expect(screen.queryByText(/add \?account=/i)).toBeNull();
-    expect(screen.getByRole('option', { name: /Acme Corp/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Acme Corp/i })).toBeTruthy();
   });
 
   it('calls onSelectAccount with the picked account id', () => {
@@ -92,7 +92,7 @@ describe('ReceiveStep — no account selected', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('option', { name: /Acme Corp/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Acme Corp/i }));
     expect(onSelectAccount).toHaveBeenCalledWith('company-1');
   });
 
@@ -112,7 +112,7 @@ describe('ReceiveStep — no account selected', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('option', { name: /Acme Corp/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Acme Corp/i }));
 
     // The real app re-renders ReceiveStep with the newly-selected accountId
     // once IntakePage's setSearchParams commits — simulate that transition.

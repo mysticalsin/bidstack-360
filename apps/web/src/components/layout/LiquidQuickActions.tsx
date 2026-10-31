@@ -51,6 +51,9 @@ export function LiquidQuickActions() {
               aria-label={a.label}
               title={a.label}
               tabIndex={open ? 0 : -1}
+              // Collapsed actions are invisible: keep them out of the a11y tree
+              // too, so "New account" etc. resolve to the visible page control.
+              aria-hidden={open ? undefined : true}
               style={{
                 width: FAB,
                 height: FAB,

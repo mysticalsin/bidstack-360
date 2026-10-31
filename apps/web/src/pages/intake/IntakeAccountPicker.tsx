@@ -52,15 +52,12 @@ export function IntakeAccountPicker({ onSelect }: IntakeAccountPickerProps) {
       ) : (
         <ul
           className="max-h-64 space-y-1 overflow-y-auto"
-          role="listbox"
           aria-label={t('crm.receiveStep.pickAccountListLabel', 'Accounts')}
         >
           {items.map((c) => (
             <li key={c.id}>
               <button
                 type="button"
-                role="option"
-                aria-selected={false}
                 onClick={() => onSelect(c.id)}
                 className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
               >
