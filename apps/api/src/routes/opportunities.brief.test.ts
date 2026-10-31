@@ -46,6 +46,8 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('Source-grounded account brief');
     expect(brief).toContain('Payments Modernization');
     expect(brief).toContain('unspecified');
+    expect(brief).toContain('stored stage probability');
+    expect(brief).not.toMatch(/win probability/i);
     expect(brief).not.toMatch(/EUR|€/);
     expect(brief).toContain('Validate margin model');
     expect(brief).toContain('Avery Sponsor');
@@ -83,6 +85,7 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('Opted-out stakeholder (PII withheld)');
     expect(brief).not.toContain('Private Counsel');
     expect(brief).not.toContain('General Counsel');
-    expect(brief).toContain('low win probability requires bid/no-bid challenge');
+    expect(brief).toContain('stored stage probability is below 40, so challenge bid/no-bid before drafting');
+    expect(brief).not.toMatch(/win probability/i);
   });
 });

@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Run your first bid/no-bid",
-        "description": "Score an opportunity on fit, value, and win probability before you commit."
+        "description": "Score an opportunity on fit and value before you commit. Stored probability is a stage proxy."
       },
       "firstRfp": {
         "label": "Start your first RFP response",

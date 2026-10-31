@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Esegui la tua prima decisione offrire/non offrire",
-        "description": "Valuta un'opportunità su idoneità, valore e probabilità di vittoria prima di impegnarti."
+        "description": "Valuta un'opportunità su idoneità e valore prima di impegnarti. La probabilità registrata è un proxy di fase."
       },
       "firstRfp": {
         "label": "Avvia la tua prima risposta a una RFP",

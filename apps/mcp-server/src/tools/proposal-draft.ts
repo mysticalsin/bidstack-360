@@ -251,10 +251,10 @@ function sectionBody(input: GroundedDraftInput): string[] {
   }
 
   return [
-    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${opportunity.stage}), win probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
+    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${opportunity.stage}), stored stage probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
     opportunity.probability < 40
-      ? 'Win probability is below 40%, so the bid/no-bid decision should be challenged before major drafting effort continues.'
-      : 'Win probability is workable, but assumptions must still be tested against legal, finance, delivery, and procurement gates.',
+      ? 'Stored stage probability is below 40%. Challenge the bid/no-bid decision before major drafting continues.'
+      : 'Stored stage probability is recorded. Test assumptions against legal, finance, delivery, and procurement gates.',
     `${stakeholderLine} ${refLine}`,
     activeTasks.some((task) => task.status === 'blocked')
       ? 'At least one task is blocked; unblock it or mark the proposal risk as high.'

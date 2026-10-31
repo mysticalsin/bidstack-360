@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Lancez votre première décision soumissionner ou non",
-        "description": "Évaluez une opportunité selon l'adéquation, la valeur et la probabilité de gain avant de vous engager."
+        "description": "Évaluez une opportunité selon l'adéquation et la valeur avant de vous engager. La probabilité enregistrée est un proxy d'étape."
       },
       "firstRfp": {
         "label": "Démarrez votre première réponse à appel d'offres",

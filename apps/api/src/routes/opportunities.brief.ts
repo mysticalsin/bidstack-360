@@ -72,7 +72,9 @@ function stakeholderLine(contact: BriefContact): string {
 function riskLine(input: OpportunityBriefInput): string {
   const { opportunity, tasks, contacts } = input;
   const risks: string[] = [];
-  if (opportunity.probability < 40) risks.push('low win probability requires bid/no-bid challenge');
+  if (opportunity.probability < 40) {
+    risks.push('stored stage probability is below 40, so challenge bid/no-bid before drafting');
+  }
   if (!opportunity.dueDate) risks.push('no due date is recorded');
   if (tasks.some((task) => task.status === 'blocked')) risks.push('blocked pursuit tasks need escalation');
   if (contacts.length === 0) risks.push('stakeholder map is incomplete');
@@ -115,11 +117,11 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
     `> Source-grounded account brief | Updated: ${opportunity.updatedAt.toISOString()}`,
     '',
     `**Opportunity:** ${opportunity.name} (${opportunity.code})`,
-    `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Probability:** ${opportunity.probability}% | **Due:** ${formatDate(opportunity.dueDate)}`,
+    `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Stored probability:** ${opportunity.probability}% (stage proxy) | **Due:** ${formatDate(opportunity.dueDate)}`,
     opportunity.industry ? `**Industry:** ${opportunity.industry}` : '**Industry:** not set',
     '',
     '## Current Read',
-    `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, ${opportunity.probability}% win probability, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
+    `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, a stored stage probability of ${opportunity.probability}%, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
     '',
     '## Stakeholders',
     stakeholders,

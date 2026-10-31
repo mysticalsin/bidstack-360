@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Ejecuta tu primer pujar/no pujar",
-        "description": "Puntúa una oportunidad según ajuste, valor y probabilidad de ganar antes de comprometerte."
+        "description": "Puntúa una oportunidad según ajuste y valor antes de comprometerte. La probabilidad guardada es un proxy de etapa."
       },
       "firstRfp": {
         "label": "Inicia tu primera respuesta a RFP",

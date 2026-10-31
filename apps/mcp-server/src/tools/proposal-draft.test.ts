@@ -110,6 +110,8 @@ describe('proposal.draft grounded builder', () => {
       notes: [],
     });
 
+    expect(result.markdown).toContain('stored stage probability');
+    expect(result.markdown).not.toMatch(/win probability/i);
     expect(result.markdown).toContain('Opted-out stakeholder (PII withheld)');
     expect(result.markdown).not.toContain('Private Person');
     expect(result.markdown).not.toContain('General Counsel');

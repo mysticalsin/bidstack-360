@@ -53,7 +53,7 @@ const CSV_HEADERS = [
   'Customer',
   'Stage',
   'Value (currency not recorded)',
-  'Probability',
+  'Stored probability (stage proxy)',
   'Due date',
   'Owner',
   'Territory',

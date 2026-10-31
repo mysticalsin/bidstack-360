@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "进行你的第一次投标/不投标决策",
-        "description": "在投入前从契合度、价值和胜率为机会评分。"
+        "description": "在投入前从契合度和价值为机会评分。已记录的概率是阶段代理。"
       },
       "firstRfp": {
         "label": "开始你的第一份 RFP 响应",
