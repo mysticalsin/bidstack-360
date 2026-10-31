@@ -107,6 +107,7 @@ export function serializeCompany(enrichment: {
     source: 'verified_data',
     name,
     legalName: enrichment.legalName,
+    legalNameSource: enrichment.legalName && parsePublicFacts(metadata.publicFacts) ? 'public' : null,
     domain: enrichment.domain,
     website: enrichment.website,
     industry: industryCodes[0] ?? null,
@@ -404,7 +405,13 @@ export function buildCompanies(
     sourceAttribution: unknown;
     updatedAt: Date;
   }>,
-  companyRows: Array<{ id: string; name: string; domain: string | null; logoUrl: string | null }> = [],
+  companyRows: Array<{
+    id: string;
+    name: string;
+    domain: string | null;
+    logoUrl: string | null;
+    legalName?: string | null;
+  }> = [],
 ) {
   const byName = new Map<string, z.infer<typeof CrmCompany>>();
   for (const enrichment of enrichments) {
@@ -454,6 +461,11 @@ export function buildCompanies(
     if (!existing) continue;
     existing.id = row.id;
     if (row.domain) existing.domain = row.domain;
+    const savedLegalName = row.legalName?.trim();
+    if (savedLegalName && savedLegalName !== row.name.trim()) {
+      existing.legalName = savedLegalName;
+      existing.legalNameSource = 'account';
+    }
     const logoDomain = row.domain ?? existing.domain;
     if (row.logoUrl) {
       existing.logo = logoFor(existing.name, row.logoUrl, 'official_website');

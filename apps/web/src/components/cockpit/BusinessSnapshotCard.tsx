@@ -73,13 +73,22 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.legalName', 'Legal name'),
       value: c.legalName ?? notVerified,
       source: c.legalName
-        ? fieldSource(c.sourceAttribution, latestSource, t, {
-            fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
-            missingHint: t(
-              'businessSnapshot.source.noRegistry',
-              'No registry attribution is attached.',
-            ),
-          })
+        ? c.legalNameSource === 'account'
+          ? {
+              label: t('businessSnapshot.source.accountRecord', 'Account record'),
+              state: 'crm' as const,
+              hint: t(
+                'businessSnapshot.source.accountLegalName',
+                'Saved on the account record. This replaces the public official name.',
+              ),
+            }
+          : fieldSource(c.sourceAttribution, latestSource, t, {
+              fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
+              missingHint: t(
+                'businessSnapshot.source.noRegistry',
+                'No registry attribution is attached.',
+              ),
+            })
         : missingSource(
             t(
               'businessSnapshot.source.missingLegalName',

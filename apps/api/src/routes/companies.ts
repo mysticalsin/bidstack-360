@@ -11,6 +11,7 @@ import {
   type CompanyHierarchyNode,
 } from '@bidstack/shared';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
+import { invalidateDashboardSnapshotCache } from './crm/dashboard.js';
 
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -264,6 +265,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         ...cfOps,
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
+      if (patch.legalName !== undefined) invalidateDashboardSnapshotCache(req.auth.orgId);
 
       const changedFields: string[] = [];
       const changes: Record<string, unknown> = {};

@@ -267,7 +267,7 @@ export async function resolveCockpitCompany(
     // enrichment for richer fields, then stamp the authoritative id/domain.
     const company = await prisma.company.findFirst({
       where: { orgId, deletedAt: null, id: companyId },
-      select: { id: true, name: true, domain: true, logoUrl: true },
+      select: { id: true, name: true, domain: true, logoUrl: true, legalName: true },
     });
     if (!company) return null;
     const byNameEnrichment = await prisma.companyEnrichment.findFirst({

@@ -339,7 +339,7 @@ describe('unscored company shells', () => {
           updatedAt: new Date('2026-06-07T12:00:00.000Z'),
         },
       ],
-      [{ id: 'company-1', name: 'DNB Bank', domain: 'dnb.no', logoUrl: null }],
+      [{ id: 'company-1', name: 'DNB Bank', domain: 'dnb.no', logoUrl: null, legalName: 'DNB Bank' }],
     );
 
     expect(company?.logo.url).toContain('DNB_Logo.svg');
@@ -348,6 +348,56 @@ describe('unscored company shells', () => {
     expect(company?.publicFacts?.headquarters).toBe('Oslo, Norway');
     expect(company?.employeeCount).toBe(9020);
     expect(company?.legalName).toBe('DNB Bank ASA');
+    expect(company?.legalNameSource).toBe('public');
+  });
+
+  it('lets a saved account legal name replace the public official name', () => {
+    const [company] = buildCompanies(
+      [],
+      [
+        {
+          id: 'enrich-1',
+          tradeName: 'DNB Bank',
+          legalName: 'DNB Bank ASA',
+          domain: 'dnb.no',
+          website: 'https://www.dnb.no/',
+          industryCodes: ['financial services'],
+          providerMetadata: {
+            publicFacts: {
+              description: 'DNB Bank is a Norwegian bank.',
+              headquarters: 'Oslo, Norway',
+              chiefExecutive: null,
+              stockExchange: null,
+              revenueLabel: null,
+              revenueCurrency: null,
+            },
+          },
+          employeeCount: null,
+          annualRevenueMicros: null,
+          status: 'active',
+          registryIds: {},
+          formerNames: [],
+          incorporationDate: null,
+          logoUrl: null,
+          logoSource: null,
+          confidenceBps: 0,
+          sourceAttribution: [],
+          updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+        },
+      ],
+      [
+        {
+          id: 'company-1',
+          name: 'DNB Bank',
+          domain: 'dnb.no',
+          logoUrl: null,
+          legalName: 'DNB Bank Group',
+        },
+      ],
+    );
+
+    expect(company?.legalName).toBe('DNB Bank Group');
+    expect(company?.legalNameSource).toBe('account');
   });
 
   it('does not invent Mantu headcount or revenue on the placeholder account', () => {

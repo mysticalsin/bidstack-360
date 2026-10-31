@@ -213,6 +213,30 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.getByText('2002-09-10')).toBeTruthy();
   });
 
+  it('cites the account record when a saved legal name replaces the public one', () => {
+    render(
+      <BusinessSnapshotCard
+        cockpit={cockpit({
+          legalName: 'DNB Bank Group',
+          legalNameSource: 'account',
+          sourceAttribution: [
+            {
+              source: 'wikidata',
+              label: 'Wikidata entity profile',
+              sourceUrl: 'https://www.wikidata.org/wiki/Q80788',
+              fetchedAt: '2026-10-31T21:00:00.000Z',
+              confidence: null,
+              providerMetadata: {},
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Account record')).toBeTruthy();
+    expect(screen.getByText('DNB Bank Group')).toBeTruthy();
+  });
+
   it('does not invent a headquarters from the company name', () => {
     render(
       <BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: null })} />,

@@ -76,6 +76,8 @@ export const CrmCompany = z.object({
   source: CrmObjectSource.default('external_crm'),
   name: z.string().min(1),
   legalName: z.string().nullable(),
+  /** account = saved on the company record. public = copied from a public profile. */
+  legalNameSource: z.enum(['public', 'account']).nullable().optional(),
   domain: z.string().nullable(),
   website: z.string().url().nullable(),
   industry: z.string().nullable(),

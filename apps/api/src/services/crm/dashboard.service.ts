@@ -296,7 +296,7 @@ export async function buildDashboardSnapshot(
     // derived companies so manual edits win and the cockpit resolves by real id.
     prisma.company.findMany({
       where: { orgId, deletedAt: null },
-      select: { id: true, name: true, domain: true, logoUrl: true },
+      select: { id: true, name: true, domain: true, logoUrl: true, legalName: true },
       take: 500,
     }),
   ]);
