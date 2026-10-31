@@ -23,7 +23,7 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -40,7 +40,6 @@ export function PipelinePage() {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const navigate = useNavigate();
-  const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
   const configuredStages = usePipelineStages();
   // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
@@ -249,12 +248,12 @@ export function PipelinePage() {
             return [
               {
                 label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
+                value: loading ? '…' : formatUnspecifiedCompact(totalValue),
                 tone: 'blue' as const,
               },
               {
                 label: t('pipeline.kpiOpenValue', 'Open value'),
-                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
+                value: loading ? '…' : formatUnspecifiedCompact(rep?.totalValueOpen ?? 0),
                 tone: 'jade' as const,
               },
               {

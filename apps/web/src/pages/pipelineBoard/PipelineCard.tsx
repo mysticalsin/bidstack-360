@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
@@ -39,7 +39,6 @@ export const PipelineCard = memo(function PipelineCard({
 }: PipelineCardProps) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
@@ -87,7 +86,7 @@ export const PipelineCard = memo(function PipelineCard({
               code: opp.code,
               name: opp.name,
               stage: stageName,
-              value: formatMoney(opp.value, 'EUR'),
+              value: formatUnspecifiedCompact(opp.value),
             },
           ) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
@@ -104,7 +103,7 @@ export const PipelineCard = memo(function PipelineCard({
             {opp.customer}
           </span>
           <span className="tabular-nums text-[11px] font-bold text-[var(--fg-primary)] shrink-0">
-            {formatMoney(opp.value, 'EUR')}
+            {formatUnspecifiedCompact(opp.value)}
           </span>
         </div>
 

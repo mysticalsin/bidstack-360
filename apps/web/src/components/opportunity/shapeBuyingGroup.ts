@@ -10,12 +10,14 @@ export const STANDING_LABEL: Record<ConnectionStanding, string> = {
 
 export interface BuyingGroupNode {
   name: string;
+  [key: string]: unknown;
 }
 
 export interface BuyingGroupLink {
   source: number;
   target: number;
-  value: 1;
+  value: number;
+  [key: string]: unknown;
 }
 
 /**

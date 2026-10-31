@@ -22,14 +22,15 @@ import {
   TableScrollArea,
 } from '@/components/ui/Table';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
 type FormatMoney = (micros: number, currency?: string) => string;
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
+  const formatMoneyMicros = (micros: number, _currency?: string) =>
+    formatUnspecifiedCompact(micros / 1_000_000);
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
