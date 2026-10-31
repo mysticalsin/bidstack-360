@@ -1,8 +1,8 @@
 /**
  * Cross-tenant isolation sweep.
  *
- * Provisions a second org with one record per core CRM entity, then, as the
- * seed-org admin (the most privileged caller), probes every registered
+ * Provisions an isolated caller org (Admin) and a foreign org with one record
+ * per core CRM entity, then, as the caller Admin, probes every registered
  * GET/PATCH/PUT/DELETE `/:id` route for that entity with the foreign id.
  * Nothing may succeed (2xx) and the foreign record must be unchanged.
  * Lists must not include foreign ids either.
@@ -14,12 +14,19 @@ import type { FastifyInstance, HTTPMethods } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 type Entity = 'companies' | 'contacts' | 'leads' | 'tasks' | 'opportunities';
 
 let server: FastifyInstance;
 let dbOk = false;
 let foreignOrgId = '';
+let callerOrgId = '';
+let restoreAuth: (() => void) | null = null;
 const foreign: Record<Entity, string> = {
   companies: '',
   contacts: '',
@@ -31,12 +38,15 @@ const foreign: Record<Entity, string> = {
 beforeAll(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    const seed = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
-    dbOk = !!seed;
+    dbOk = true;
   } catch {
     dbOk = false;
   }
   if (!dbOk) return;
+  // The caller is the Admin of a fully seeded isolated org.
+  const caller = await createIsolatedOrg('sweep');
+  callerOrgId = caller.orgId;
+  restoreAuth = useIsolatedOrgAuth(caller.clerkOrg);
   const org = await prisma.org.create({
     data: { clerkOrg: `org_sweep_${randomUUID()}`, name: 'Isolation Sweep Foreign Org' },
   });
@@ -83,13 +93,15 @@ afterAll(async () => {
     await prisma.company.deleteMany({ where: { orgId: foreignOrgId } });
     await prisma.org.deleteMany({ where: { id: foreignOrgId } });
   }
+  if (callerOrgId) await dropIsolatedOrg(callerOrgId);
+  restoreAuth?.();
   if (server) await server.close();
 });
 
 const METHODS: HTTPMethods[] = ['GET', 'PATCH', 'PUT', 'DELETE'];
 const ENTITIES: Entity[] = ['companies', 'contacts', 'leads', 'tasks', 'opportunities'];
 
-describe('tenant isolation sweep (seed admin vs foreign org)', () => {
+describe('tenant isolation sweep (org admin vs foreign org)', () => {
   for (const entity of ENTITIES) {
     it(`/${entity}/:id never succeeds for a foreign ${entity} id`, async (t) => {
       if (!dbOk) t.skip();
