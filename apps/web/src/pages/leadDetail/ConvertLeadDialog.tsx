@@ -70,7 +70,10 @@ export function ConvertLeadDialog({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
-              {t('convertLead.valueLabel', 'Value (EUR)')}
+              {t('convertLead.valueLabel', 'Value')}
+              <span className="mt-0.5 block font-normal normal-case tracking-normal text-[var(--fg-tertiary)]">
+                {t('convertLead.valueHint', 'Currency not recorded')}
+              </span>
             </label>
             <input
               type="number"

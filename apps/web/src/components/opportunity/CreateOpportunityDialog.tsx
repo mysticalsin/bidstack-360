@@ -139,7 +139,7 @@ export function CreateOpportunityDialog({
         title={t('createOpportunity.dialogTitle', 'New opportunity')}
         description={t(
           'createOpportunity.dialogDescription',
-          'Add a bid to your pipeline. You can refine intel after Dust data verification runs.',
+          'Add a bid to your pipeline. The amount does not store a currency.',
         )}
       >
         <form key={formKey} onSubmit={submit} className="space-y-4">
@@ -209,7 +209,8 @@ export function CreateOpportunityDialog({
           </div>
           <div className="grid grid-cols-4 gap-3">
             <Field
-              label={t('createOpportunity.valueLabel', 'Value (EUR)')}
+              label={t('createOpportunity.valueLabel', 'Value')}
+              hint={t('createOpportunity.valueHint', 'Currency not recorded')}
               htmlFor="value"
               error={fieldErrors.value?.[0]}
             >
@@ -278,11 +279,13 @@ function Field({
   htmlFor,
   children,
   error,
+  hint,
 }: {
   label: string;
   htmlFor: string;
   children: React.ReactNode;
   error?: string;
+  hint?: string;
 }) {
   const errorId = error ? `${htmlFor}-error` : undefined;
   return (
@@ -291,6 +294,9 @@ function Field({
         {label}
       </span>
       {children}
+      {hint && !error ? (
+        <span className="mt-1 block text-[10px] text-[var(--fg-tertiary)]">{hint}</span>
+      ) : null}
       {error ? (
         <span
           id={errorId}
