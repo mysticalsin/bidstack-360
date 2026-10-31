@@ -422,6 +422,8 @@
       "deleted": "Se eliminó a {{name}}"
     },
     "linkedTitle": "Contactos vinculados",
+    "countCaption_one": "{{count}} contacto",
+    "countCaption_other": "{{count}} contactos",
     "countCaption": "{{count}} contactos",
     "linkAction": "+ Vincular contacto",
     "selectPlaceholder": "Selecciona un contacto…",
@@ -450,6 +452,8 @@
     "summary": {
       "companyCount_one": "{{count}} empresa",
       "companyCount_other": "{{count}} empresas",
+      "openDeals_one": "{{count}} oportunidad abierta",
+      "openDeals_other": "{{count}} oportunidades abiertas",
       "openDeals": "{{count}} oportunidades abiertas",
       "weightedPipeline": "{{amount}} de pipeline ponderado"
     },
@@ -985,6 +989,8 @@
     "decisionUnitEmptyTitle": "Aún no hay miembros de la unidad de decisión",
     "decisionUnitEmptyMessage": "Agrega un contacto desde la página de Contactos o sincroniza desde Dust.",
     "decisionUnitTitle": "Unidad de decisión",
+    "stakeholdersCount_one": "{{count}} interesado",
+    "stakeholdersCount_other": "{{count}} interesados",
     "stakeholdersCount": "{{count}} interesados",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influencia {{value}} de 5",
@@ -1833,6 +1839,8 @@
       "domain": "Dominio"
     },
     "meta": {
+      "employees_one": "{{count}} empleado",
+      "employees_other": "{{count}} empleados",
       "employees": "{{count}} empleados",
       "taxId": "NIF: {{taxId}}",
       "parent": "Matriz:"
@@ -1922,6 +1930,8 @@
     "allIndustries": "Todos los sectores",
     "filterTagAriaLabel": "Filtrar por etiqueta",
     "allTags": "Todas las etiquetas",
+    "resultCount_one": "{{count}} referencia",
+    "resultCount_other": "{{count}} referencias",
     "resultCount": "{{count}} referencias",
     "errorTitle": "No se pudieron cargar las referencias",
     "errorMessage": "Vuelve a intentarlo en un momento.",
@@ -2209,6 +2219,8 @@
     "allIndustries": "Todos los sectores",
     "industryLoadError": "No se pudieron cargar los filtros de sector.",
     "retry": "Reintentar",
+    "resultCount_one": "{{count}} cuenta",
+    "resultCount_other": "{{count}} cuentas",
     "resultCount": "{{count}} cuenta",
     "errorTitle": "No se pudieron cargar las cuentas principales",
     "errorMessage": "No se pudieron cargar las cuentas principales.",
@@ -2216,7 +2228,11 @@
     "emptyMessage": "Añade oportunidades con valores para ver las cuentas principales clasificadas por pipeline.",
     "totalPipeline": "pipeline total",
     "won": "ganado",
+    "openDeals_one": "{{count}} negocio abierto",
+    "openDeals_other": "{{count}} negocios abiertos",
     "openDeals": "{{count}} negocios abiertos",
+    "contacts_one": "{{count}} contacto",
+    "contacts_other": "{{count}} contactos",
     "contacts": "{{count}} contactos",
     "sourceCurated": "Top 10 seleccionado",
     "sourceAuto": "Clasificación automática",
@@ -2296,8 +2312,14 @@
       "advance": "Avanza el siguiente paso de la propuesta con el contexto de la cuenta disponible y la alineación del responsable."
     },
     "committee": {
+      "champions_one": "{{count}} impulsor mapeado",
+      "champions_other": "{{count}} impulsores mapeados",
       "champions": "{{count}} impulsor mapeado",
+      "buyers_one": "{{count}} comprador mapeado",
+      "buyers_other": "{{count}} compradores mapeados",
       "buyers": "{{count}} comprador mapeado",
+      "stakeholders_one": "{{count}} parte interesada mapeada",
+      "stakeholders_other": "{{count}} partes interesadas mapeadas",
       "stakeholders": "{{count}} parte interesada mapeada",
       "empty": "mapear comprador e impulsor"
     },
@@ -3224,7 +3246,11 @@
     "emptyFilteredTitle": "No hay cursos etiquetados como \"{{sector}}\"",
     "emptyTitle": "Aún no hay cursos publicados",
     "emptyMessage": "Los cursos aparecen aquí en cuanto Mantu Academy los publica con etiquetas de sector.",
+    "resultCount_one": "{{count}} curso",
+    "resultCount_other": "{{count}} cursos",
     "resultCount": "{{count}} curso",
+    "resultCountInSector_one": "{{count}} curso en {{sector}}",
+    "resultCountInSector_other": "{{count}} cursos en {{sector}}",
     "resultCountInSector": "{{count}} curso en {{sector}}",
     "filterGroupLabel": "Filtrar por sector",
     "allSectors": "Todos los sectores",
@@ -3868,12 +3894,18 @@
     "noTitleOrEmail": "n/d"
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} negocio",
+    "dealCount_other": "{{count}} negocios",
+    "openCaption": "Solo etapas abiertas. Las ganadas y perdidas quedan en la tasa de éxito.",
+    "emptyOpen": "No hay pipeline abierto.",
     "heading": "Pipeline por etapa"
   },
   "microsoftSignInButton": {
     "label": "Iniciar sesión con Microsoft"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} registro",
+    "recordCountLabel_other": "{{count}} registros",
     "recordCountLabel": "{{count}} registros"
   },
   "alert": {
@@ -3891,6 +3923,8 @@
   },
   "oppIndustryBreakdown": {
     "title": "Cartera por sector",
+    "sectorCount_one": "{{count}} sector",
+    "sectorCount_other": "{{count}} sectores",
     "sectorCount": "{{count}} sector"
   },
   "revenueEvolution": {

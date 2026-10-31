@@ -83,6 +83,19 @@ describe('pipeline empty state', () => {
     expect(visual.currency).toBeNull();
   });
 
+  it('leaves closed won and lost out of the open pipeline chart', () => {
+    const visual = shapePipelineByStage([
+      opportunity({ stage: 'closed_won', value: 80_000 }),
+      opportunity({
+        id: '22222222-2222-4222-8222-222222222222',
+        code: 'OP-1002',
+        stage: 's4_negotiation',
+        value: 10_000,
+      }),
+    ]);
+    expect(visual.stages.map((stage) => stage.id)).toEqual(['s4_negotiation']);
+  });
+
   it('counts only stages that actually hold opportunities', () => {
     const visual = shapePipelineByStage([opportunity({ stage: 's1_lead', value: 0 })]);
     expect(visual.stages).toEqual([

@@ -181,9 +181,7 @@ export default function SectorViewPage() {
               icon="checkCircle"
               label={t('sectorView.metricClassified', 'Classified')}
               value={classifiedPercent}
-              detail={t('sectorView.metricClassifiedDetail', '{{count}} accounts', {
-                count: view.data.classifiedAccounts,
-              })}
+              detail={labeledCount(view.data.classifiedAccounts, 'account', 'accounts')}
             />
             <SectorMetric
               icon="globe"
@@ -194,12 +192,10 @@ export default function SectorViewPage() {
             <SectorMetric
               icon="contacts"
               label={t('sectorView.metricLeaders', 'Largest sector')}
-              value={largestSector?.sector ?? '-'}
+              value={largestSector ? titleCase(largestSector.sector) : '-'}
               detail={
                 largestSector
-                  ? t('sectorView.metricLeaderDetail', '{{count}} accounts', {
-                      count: largestSector.accountCount,
-                    })
+                  ? labeledCount(largestSector.accountCount, 'account', 'accounts')
                   : '-'
               }
             />
@@ -534,7 +530,7 @@ export function sectorDetailMeta(accounts: number, countries: number): string {
   return `${labeledCount(accounts, 'account', 'accounts')} across ${labeledCount(countries, 'country', 'countries')}`;
 }
 
-function labeledCount(count: number, one: string, many: string): string {
+export function labeledCount(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 

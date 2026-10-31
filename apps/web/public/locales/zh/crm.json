@@ -359,6 +359,8 @@
       "deleted": "已删除 {{name}}"
     },
     "linkedTitle": "关联联系人",
+    "countCaption_one": "{{count}} 个联系人",
+    "countCaption_other": "{{count}} 个联系人",
     "countCaption": "{{count}} 个联系人",
     "linkAction": "+ 关联联系人",
     "selectPlaceholder": "选择联系人…",
@@ -387,6 +389,8 @@
     "summary": {
       "companyCount_one": "{{count}} 家公司",
       "companyCount_other": "{{count}} 家公司",
+      "openDeals_one": "{{count}} 个进行中的交易",
+      "openDeals_other": "{{count}} 个进行中的交易",
       "openDeals": "{{count}} 个进行中的交易",
       "weightedPipeline": "{{amount}} 加权销售管道"
     },
@@ -922,6 +926,8 @@
     "decisionUnitEmptyTitle": "暂无决策单元成员",
     "decisionUnitEmptyMessage": "从联系人页面添加联系人或从 Dust 同步。",
     "decisionUnitTitle": "决策单元",
+    "stakeholdersCount_one": "{{count}} 位干系人",
+    "stakeholdersCount_other": "{{count}} 位干系人",
     "stakeholdersCount": "{{count}} 位干系人",
     "dustBadge": "Dust",
     "influenceAriaLabel": "影响力 {{value}}（满分 5）",
@@ -1800,6 +1806,8 @@
       "domain": "域名"
     },
     "meta": {
+      "employees_one": "{{count}} 名员工",
+      "employees_other": "{{count}} 名员工",
       "employees": "{{count}} 名员工",
       "taxId": "税号：{{taxId}}",
       "parent": "母公司："
@@ -1889,6 +1897,8 @@
     "allIndustries": "所有行业",
     "filterTagAriaLabel": "按标签筛选",
     "allTags": "所有标签",
+    "resultCount_one": "{{count}} 条参考资料",
+    "resultCount_other": "{{count}} 条参考资料",
     "resultCount": "{{count}} 条参考资料",
     "errorTitle": "无法加载参考资料",
     "errorMessage": "请稍后重试。",
@@ -2176,6 +2186,8 @@
     "allIndustries": "所有行业",
     "industryLoadError": "无法加载行业筛选器。",
     "retry": "重试",
+    "resultCount_one": "{{count}} 个账户",
+    "resultCount_other": "{{count}} 个账户",
     "resultCount": "{{count}} 个账户",
     "errorTitle": "无法加载热门账户",
     "errorMessage": "无法加载重点客户。",
@@ -2183,7 +2195,11 @@
     "emptyMessage": "添加带数值的商机以查看按管道排名的热门账户。",
     "totalPipeline": "总管道",
     "won": "已赢",
+    "openDeals_one": "{{count}} 个进行中的交易",
+    "openDeals_other": "{{count}} 个进行中的交易",
     "openDeals": "{{count}} 个进行中的交易",
+    "contacts_one": "{{count}} 个联系人",
+    "contacts_other": "{{count}} 个联系人",
     "contacts": "{{count}} 个联系人",
     "sourceCurated": "精选前10名",
     "sourceAuto": "自动排名",
@@ -2263,8 +2279,14 @@
       "advance": "借助现有客户背景和责任人共识推进提案的下一步。"
     },
     "committee": {
+      "champions_one": "已识别 {{count}} 位内部支持者",
+      "champions_other": "已识别 {{count}} 位内部支持者",
       "champions": "已识别 {{count}} 位内部支持者",
+      "buyers_one": "已识别 {{count}} 位采购方",
+      "buyers_other": "已识别 {{count}} 位采购方",
       "buyers": "已识别 {{count}} 位采购方",
+      "stakeholders_one": "已识别 {{count}} 位相关方",
+      "stakeholders_other": "已识别 {{count}} 位相关方",
       "stakeholders": "已识别 {{count}} 位相关方",
       "empty": "识别采购方与内部支持者"
     },
@@ -3191,7 +3213,11 @@
     "emptyFilteredTitle": "没有标记为“{{sector}}”的课程",
     "emptyTitle": "尚未发布课程",
     "emptyMessage": "Mantu Academy 发布带有行业标签的课程后，课程将显示在此处。",
+    "resultCount_one": "{{count}} 门课程",
+    "resultCount_other": "{{count}} 门课程",
     "resultCount": "{{count}} 门课程",
+    "resultCountInSector_one": "{{sector}} 中有 {{count}} 门课程",
+    "resultCountInSector_other": "{{sector}} 中有 {{count}} 门课程",
     "resultCountInSector": "{{sector}} 中有 {{count}} 门课程",
     "filterGroupLabel": "按行业筛选",
     "allSectors": "所有行业",
@@ -3835,12 +3861,18 @@
     "noTitleOrEmail": "无"
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} 笔交易",
+    "dealCount_other": "{{count}} 笔交易",
+    "openCaption": "仅含进行中的阶段。赢单和输单计入赢单率。",
+    "emptyOpen": "没有进行中的商机。",
     "heading": "按阶段划分的销售管道"
   },
   "microsoftSignInButton": {
     "label": "使用 Microsoft 登录"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} 条记录",
+    "recordCountLabel_other": "{{count}} 条记录",
     "recordCountLabel": "{{count}} 条记录"
   },
   "alert": {
@@ -3858,6 +3890,8 @@
   },
   "oppIndustryBreakdown": {
     "title": "按行业划分的销售管道",
+    "sectorCount_one": "{{count}} 个行业",
+    "sectorCount_other": "{{count}} 个行业",
     "sectorCount": "{{count}} 个行业"
   },
   "revenueEvolution": {

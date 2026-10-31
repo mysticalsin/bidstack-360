@@ -32,6 +32,10 @@ import { keyAccountSignal } from './strategicSignals';
 const KEY_ACCOUNTS_PAGE_SIZE = 50;
 const KEY_ACCOUNTS_SIGNAL_SIZE = 200;
 
+export function labeledAccountCount(count: number): string {
+  return `${count} ${count === 1 ? 'account' : 'accounts'}`;
+}
+
 export function AccountsKeySegment() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
@@ -185,10 +189,7 @@ export function AccountsKeySegment() {
             }
             sub={
               leadingIndustry
-                ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
-                    count: leadingIndustry.count,
-                    pipeline: formatUnspecifiedCompact(leadingIndustry.pipeline),
-                  })
+                ? `${labeledAccountCount(leadingIndustry.count)} / ${formatUnspecifiedCompact(leadingIndustry.pipeline)}`
                 : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
             }
           >
@@ -214,7 +215,7 @@ export function AccountsKeySegment() {
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
                     <span className="text-right font-medium tabular-nums text-[var(--fg-tertiary)]">
-                      {t('keyAccounts.industryAccountCount', '{{count}} accounts', { count: item.count })}
+                      {labeledAccountCount(item.count)}
                       {' · '}
                       {formatUnspecifiedCompact(item.pipeline)}
                     </span>

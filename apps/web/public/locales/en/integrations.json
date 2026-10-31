@@ -158,6 +158,8 @@
     "header": {
       "title": "Connectors catalog",
       "caption": "External data sources Polo PreSales can reach. Open feeds run without keys; licensed feeds need credentials.",
+      "sourcesBadge_one": "{{count}} source",
+      "sourcesBadge_other": "{{count}} sources",
       "sourcesBadge": "{{count}} sources"
     },
     "error": {

@@ -359,6 +359,8 @@
       "deleted": "Deleted {{name}}"
     },
     "linkedTitle": "Linked contacts",
+    "countCaption_one": "{{count}} contact",
+    "countCaption_other": "{{count}} contacts",
     "countCaption": "{{count}} contacts",
     "linkAction": "+ Link contact",
     "selectPlaceholder": "Select a contact…",
@@ -387,6 +389,8 @@
     "summary": {
       "companyCount_one": "{{count}} company",
       "companyCount_other": "{{count}} companies",
+      "openDeals_one": "{{count}} open deal",
+      "openDeals_other": "{{count}} open deals",
       "openDeals": "{{count}} open deals",
       "weightedPipeline": "{{amount}} weighted pipeline"
     },
@@ -924,6 +928,8 @@
     "decisionUnitEmptyTitle": "No decision-unit members yet",
     "decisionUnitEmptyMessage": "Add a contact from the Contacts page or sync from Dust.",
     "decisionUnitTitle": "Decision unit",
+    "stakeholdersCount_one": "{{count}} stakeholder",
+    "stakeholdersCount_other": "{{count}} stakeholders",
     "stakeholdersCount": "{{count}} stakeholders",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influence {{value}} out of 5",
@@ -1807,6 +1813,8 @@
       "domain": "Domain"
     },
     "meta": {
+      "employees_one": "{{count}} employee",
+      "employees_other": "{{count}} employees",
       "employees": "{{count}} employees",
       "taxId": "Tax ID: {{taxId}}",
       "parent": "Parent:"
@@ -1896,6 +1904,8 @@
     "allIndustries": "All industries",
     "filterTagAriaLabel": "Filter by tag",
     "allTags": "All tags",
+    "resultCount_one": "{{count}} reference",
+    "resultCount_other": "{{count}} references",
     "resultCount": "{{count}} references",
     "errorTitle": "Could not load references",
     "errorMessage": "Please try again in a moment.",
@@ -2193,6 +2203,8 @@
     "allIndustries": "All industries",
     "industryLoadError": "Could not load industry filters.",
     "retry": "Retry",
+    "resultCount_one": "{{count}} account",
+    "resultCount_other": "{{count}} accounts",
     "resultCount": "{{count}} account",
     "errorTitle": "Couldn't load top accounts",
     "errorMessage": "Couldn't load top accounts.",
@@ -2200,7 +2212,11 @@
     "emptyMessage": "Add opportunities with values to see top accounts ranked by pipeline.",
     "totalPipeline": "total pipeline",
     "won": "won",
+    "openDeals_one": "{{count}} open deal",
+    "openDeals_other": "{{count}} open deals",
     "openDeals": "{{count}} open deals",
+    "contacts_one": "{{count}} contact",
+    "contacts_other": "{{count}} contacts",
     "contacts": "{{count}} contacts",
     "sourceCurated": "Curated top 10",
     "sourceAuto": "Auto-ranked",
@@ -2281,8 +2297,14 @@
       "advance": "Advance the next proposal step with available account context and owner alignment."
     },
     "committee": {
+      "champions_one": "{{count}} champion mapped",
+      "champions_other": "{{count}} champions mapped",
       "champions": "{{count}} champion mapped",
+      "buyers_one": "{{count}} buyer mapped",
+      "buyers_other": "{{count}} buyers mapped",
       "buyers": "{{count}} buyer mapped",
+      "stakeholders_one": "{{count}} stakeholder mapped",
+      "stakeholders_other": "{{count}} stakeholders mapped",
       "stakeholders": "{{count}} stakeholder mapped",
       "empty": "map buyer and champion"
     },
@@ -3214,7 +3236,11 @@
     "emptyFilteredTitle": "No courses tagged \"{{sector}}\"",
     "emptyTitle": "No courses published yet",
     "emptyMessage": "Courses appear here as soon as Mantu Academy publishes them with sector tags.",
+    "resultCount_one": "{{count}} course",
+    "resultCount_other": "{{count}} courses",
     "resultCount": "{{count}} course",
+    "resultCountInSector_one": "{{count}} course in {{sector}}",
+    "resultCountInSector_other": "{{count}} courses in {{sector}}",
     "resultCountInSector": "{{count}} course in {{sector}}",
     "filterGroupLabel": "Filter by sector",
     "allSectors": "All sectors",
@@ -3860,12 +3886,18 @@
     "noTitleOrEmail": "n/a"
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} deal",
+    "dealCount_other": "{{count}} deals",
+    "openCaption": "Open stages only. Closed won and lost stay in the win rate.",
+    "emptyOpen": "No open pipeline.",
     "heading": "Pipeline by stage"
   },
   "microsoftSignInButton": {
     "label": "Sign in with Microsoft"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} record",
+    "recordCountLabel_other": "{{count}} records",
     "recordCountLabel": "{{count}} records"
   },
   "alert": {
@@ -3883,6 +3915,8 @@
   },
   "oppIndustryBreakdown": {
     "title": "Pipeline by industry",
+    "sectorCount_one": "{{count}} sector",
+    "sectorCount_other": "{{count}} sectors",
     "sectorCount": "{{count}} sector"
   },
   "revenueEvolution": {

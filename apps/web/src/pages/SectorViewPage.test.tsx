@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import SectorViewPage, { sectorDetailMeta, sectorRadarMeta } from './SectorViewPage';
+import SectorViewPage, { labeledCount, sectorDetailMeta, sectorRadarMeta } from './SectorViewPage';
 import { useSectorView, type SectorViewResponse } from '@/hooks/useSectorView';
 import { useTerritoryAnalytics, useTerritorySegments } from '@/hooks/useTerritories';
 
@@ -78,6 +78,8 @@ describe('SectorViewPage load resilience', () => {
     renderPage();
 
     expect(screen.getByText('Sector momentum')).toBeTruthy();
+    expect(screen.getAllByText('Technology').length).toBeGreaterThan(0);
+    expect(screen.queryByText('technology')).toBeNull();
     expect(screen.queryByText('Could not load the sector view')).toBeNull();
   });
 
@@ -195,5 +197,7 @@ describe('sector count wording', () => {
     expect(sectorRadarMeta(1, 1)).toBe('1 account / 1 country');
     expect(sectorRadarMeta(2, 3)).toBe('2 accounts / 3 countries');
     expect(sectorDetailMeta(1, 2)).toBe('1 account across 2 countries');
+    expect(labeledCount(1, 'account', 'accounts')).toBe('1 account');
+    expect(labeledCount(9, 'account', 'accounts')).toBe('9 accounts');
   });
 });

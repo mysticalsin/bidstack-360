@@ -444,6 +444,8 @@
       "deleted": "{{name}} supprimé"
     },
     "linkedTitle": "Contacts liés",
+    "countCaption_one": "{{count}} contact",
+    "countCaption_other": "{{count}} contacts",
     "countCaption": "{{count}} contacts",
     "linkAction": "+ Lier un contact",
     "selectPlaceholder": "Sélectionner un contact…",
@@ -472,6 +474,8 @@
     "summary": {
       "companyCount_one": "{{count}} entreprise",
       "companyCount_other": "{{count}} entreprises",
+      "openDeals_one": "{{count}} affaire ouverte",
+      "openDeals_other": "{{count}} affaires ouvertes",
       "openDeals": "{{count}} affaires ouvertes",
       "weightedPipeline": "{{amount}} de pipeline pondéré"
     },
@@ -1007,6 +1011,8 @@
     "decisionUnitEmptyTitle": "Aucun membre de l'unité de décision pour l'instant",
     "decisionUnitEmptyMessage": "Ajoutez un contact depuis la page Contacts ou synchronisez depuis Dust.",
     "decisionUnitTitle": "Unité de décision",
+    "stakeholdersCount_one": "{{count}} partie prenante",
+    "stakeholdersCount_other": "{{count}} parties prenantes",
     "stakeholdersCount": "{{count}} parties prenantes",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influence {{value}} sur 5",
@@ -1855,6 +1861,8 @@
       "domain": "Domaine"
     },
     "meta": {
+      "employees_one": "{{count}} employé",
+      "employees_other": "{{count}} employés",
       "employees": "{{count}} employés",
       "taxId": "N° fiscal : {{taxId}}",
       "parent": "Société mère :"
@@ -1944,6 +1952,8 @@
     "allIndustries": "Tous les secteurs",
     "filterTagAriaLabel": "Filtrer par étiquette",
     "allTags": "Toutes les étiquettes",
+    "resultCount_one": "{{count}} référence",
+    "resultCount_other": "{{count}} références",
     "resultCount": "{{count}} références",
     "errorTitle": "Impossible de charger les références",
     "errorMessage": "Veuillez réessayer dans un instant.",
@@ -2231,6 +2241,8 @@
     "allIndustries": "Tous les secteurs",
     "industryLoadError": "Impossible de charger les filtres de secteur.",
     "retry": "Réessayer",
+    "resultCount_one": "{{count}} compte",
+    "resultCount_other": "{{count}} comptes",
     "resultCount": "{{count}} compte",
     "errorTitle": "Impossible de charger les comptes principaux",
     "errorMessage": "Impossible de charger les comptes principaux.",
@@ -2238,7 +2250,11 @@
     "emptyMessage": "Ajoutez des opportunités avec des valeurs pour voir les comptes principaux classés par pipeline.",
     "totalPipeline": "pipeline total",
     "won": "gagné",
+    "openDeals_one": "{{count}} affaire ouverte",
+    "openDeals_other": "{{count}} affaires ouvertes",
     "openDeals": "{{count}} affaires ouvertes",
+    "contacts_one": "{{count}} contact",
+    "contacts_other": "{{count}} contacts",
     "contacts": "{{count}} contacts",
     "sourceCurated": "Top 10 sélectionné",
     "sourceAuto": "Classement automatique",
@@ -2318,8 +2334,14 @@
       "advance": "Faites avancer la prochaine étape de la proposition avec le contexte du compte disponible et l'alignement du responsable."
     },
     "committee": {
+      "champions_one": "{{count}} champion identifié",
+      "champions_other": "{{count}} champions identifiés",
       "champions": "{{count}} champion identifié",
+      "buyers_one": "{{count}} acheteur identifié",
+      "buyers_other": "{{count}} acheteurs identifiés",
       "buyers": "{{count}} acheteur identifié",
+      "stakeholders_one": "{{count}} partie prenante identifiée",
+      "stakeholders_other": "{{count}} parties prenantes identifiées",
       "stakeholders": "{{count}} partie prenante identifiée",
       "empty": "identifier acheteur et champion"
     },
@@ -3246,7 +3268,11 @@
     "emptyFilteredTitle": "Aucun cours étiqueté « {{sector}} »",
     "emptyTitle": "Aucun cours publié pour le moment",
     "emptyMessage": "Les cours apparaissent ici dès que Mantu Academy les publie avec des étiquettes de secteur.",
+    "resultCount_one": "{{count}} cours",
+    "resultCount_other": "{{count}} cours",
     "resultCount": "{{count}} cours",
+    "resultCountInSector_one": "{{count}} cours dans {{sector}}",
+    "resultCountInSector_other": "{{count}} cours dans {{sector}}",
     "resultCountInSector": "{{count}} cours dans {{sector}}",
     "filterGroupLabel": "Filtrer par secteur",
     "allSectors": "Tous les secteurs",
@@ -3890,12 +3916,18 @@
     "noTitleOrEmail": "s.o."
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} affaire",
+    "dealCount_other": "{{count}} affaires",
+    "openCaption": "Étapes ouvertes seulement. Les affaires gagnées et perdues restent dans le taux de succès.",
+    "emptyOpen": "Aucun pipeline ouvert.",
     "heading": "Pipeline par étape"
   },
   "microsoftSignInButton": {
     "label": "Se connecter avec Microsoft"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} enregistrement",
+    "recordCountLabel_other": "{{count}} enregistrements",
     "recordCountLabel": "{{count}} enregistrements"
   },
   "alert": {
@@ -3913,6 +3945,8 @@
   },
   "oppIndustryBreakdown": {
     "title": "Pipeline par secteur",
+    "sectorCount_one": "{{count}} secteur",
+    "sectorCount_other": "{{count}} secteurs",
     "sectorCount": "{{count}} secteur"
   },
   "revenueEvolution": {

@@ -15,6 +15,13 @@ import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecif
 
 import { stageColor, stageLabel } from './dashboard-types';
 
+const CLOSED_STAGES = new Set(['closed_won', 'closed_lost']);
+
+/** Closed won and lost are outcomes. The pipeline chart is the open book. */
+export function openPipelineStages<T extends { stage: string }>(stages: readonly T[]): T[] {
+  return stages.filter((stage) => !CLOSED_STAGES.has(stage.stage));
+}
+
 // ─── PipelineByStageMini ─────────────────────────────────────────────────────
 
 export function PipelineByStageMini({
@@ -26,7 +33,8 @@ export function PipelineByStageMini({
 }) {
   const { t } = useTranslation('crm');
   if (!report || report.byStage.length === 0) return null;
-  const maxValue = Math.max(1, ...report.byStage.map((s) => s.valueSum));
+  const stages = openPipelineStages(report.byStage);
+  const maxValue = Math.max(1, ...stages.map((s) => s.valueSum));
 
   return (
     <GlassCard padding="sm" hoverable={false}>
@@ -35,9 +43,20 @@ export function PipelineByStageMini({
           {t('pipelineByStageMini.heading', 'Pipeline by stage')}
         </div>
         <div className="mt-1 text-xs text-[var(--fg-tertiary)]">{UNSPECIFIED_CURRENCY_BASIS}</div>
+        <div className="mt-1 text-xs text-[var(--fg-tertiary)]">
+          {t(
+            'pipelineByStageMini.openCaption',
+            'Open stages only. Closed won and lost stay in the win rate.',
+          )}
+        </div>
       </div>
+      {stages.length === 0 ? (
+        <p className="px-1 pb-2 text-xs text-[var(--fg-secondary)]">
+          {t('pipelineByStageMini.emptyOpen', 'No open pipeline.')}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-2">
-        {report.byStage.map((s, i) => (
+        {stages.map((s, i) => (
           <motion.div
             key={s.stage}
             initial={reduced ? { opacity: 0 } : { opacity: 0, x: 8 }}
@@ -49,7 +68,8 @@ export function PipelineByStageMini({
                 {stageLabel(s.stage)}
               </span>
               <span className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]">
-                {s.count} · {formatUnspecifiedAmount(s.valueSum)}
+                {t('pipelineByStageMini.dealCount', '{{count}} deals', { count: s.count })} ·{' '}
+                {formatUnspecifiedAmount(s.valueSum)}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-[var(--surface-sunken)] overflow-hidden">

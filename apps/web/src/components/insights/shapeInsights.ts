@@ -111,6 +111,7 @@ export function shapePipelineByStage(opportunities: readonly PipelineInput[]): P
   const rows: PipelineStageRow[] = [];
   for (const stage of stages) {
     const id = getPipelineStageBusinessKey(stage);
+    if (stage.isWon || stage.isLost) continue;
     const matched = opportunities.filter((opp) => getOpportunityStageBusinessKey(opp) === id);
     if (matched.length === 0) continue;
     rows.push({
