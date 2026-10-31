@@ -291,7 +291,7 @@
   },
   "contacts": {
     "title": "Contacts",
-    "subtitle": "{{count}} people in the decision unit.",
+    "subtitle": "{{count}} contacts on this page.",
     "actions": {
       "importCsv": {
         "label": "Import CSV",
@@ -928,7 +928,7 @@
     "errorMessage": "Please try again.",
     "retry": "Retry",
     "decisionUnitEmptyTitle": "No decision-unit members yet",
-    "decisionUnitEmptyMessage": "Add a contact from the Contacts page or sync from Dust.",
+    "decisionUnitEmptyMessage": "Link a contact to this opportunity. A job title is not a buying role.",
     "decisionUnitTitle": "Decision unit",
     "stakeholdersCount_one": "{{count}} stakeholder",
     "stakeholdersCount_other": "{{count}} stakeholders",
@@ -1867,7 +1867,7 @@
     "editTitle": "Edit {{name}}",
     "newTitle": "New contact",
     "editDescription": "Patch updates the record and writes an audit entry.",
-    "newDescription": "Add a person to the decision unit.",
+    "newDescription": "Add a contact. A job title is not a buying role.",
     "errorRequired": "Customer and name are required",
     "errorSaveFailed": "Save failed",
     "fieldCustomer": "Customer / account",

@@ -291,7 +291,7 @@
   },
   "contacts": {
     "title": "联系人",
-    "subtitle": "决策单位中有 {{count}} 人。",
+    "subtitle": "本页 {{count}} 位联系人。",
     "actions": {
       "importCsv": {
         "label": "导入 CSV",
@@ -926,7 +926,7 @@
     "errorMessage": "请重试。",
     "retry": "重试",
     "decisionUnitEmptyTitle": "暂无决策单元成员",
-    "decisionUnitEmptyMessage": "从联系人页面添加联系人或从 Dust 同步。",
+    "decisionUnitEmptyMessage": "将联系人关联到此商机。职务不是购买角色。",
     "decisionUnitTitle": "决策单元",
     "stakeholdersCount_one": "{{count}} 位干系人",
     "stakeholdersCount_other": "{{count}} 位干系人",
@@ -1851,7 +1851,7 @@
     "editTitle": "编辑 {{name}}",
     "newTitle": "新建联系人",
     "editDescription": "修补会更新记录并写入审计条目。",
-    "newDescription": "将一个人添加到决策单元。",
+    "newDescription": "添加联系人。职务不是购买角色。",
     "errorRequired": "客户和姓名为必填项",
     "errorSaveFailed": "保存失败",
     "fieldCustomer": "客户 / 账户",

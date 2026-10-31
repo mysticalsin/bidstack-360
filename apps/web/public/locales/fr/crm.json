@@ -376,7 +376,7 @@
   },
   "contacts": {
     "title": "Contacts",
-    "subtitle": "{{count}} personnes dans l'unité de décision.",
+    "subtitle": "{{count}} contacts sur cette page.",
     "actions": {
       "importCsv": {
         "label": "Importer CSV",
@@ -1011,7 +1011,7 @@
     "errorMessage": "Veuillez réessayer.",
     "retry": "Réessayer",
     "decisionUnitEmptyTitle": "Aucun membre de l'unité de décision pour l'instant",
-    "decisionUnitEmptyMessage": "Ajoutez un contact depuis la page Contacts ou synchronisez depuis Dust.",
+    "decisionUnitEmptyMessage": "Liez un contact à cette opportunité. Un intitulé de poste n'est pas un rôle d'achat.",
     "decisionUnitTitle": "Unité de décision",
     "stakeholdersCount_one": "{{count}} partie prenante",
     "stakeholdersCount_other": "{{count}} parties prenantes",
@@ -1906,7 +1906,7 @@
     "editTitle": "Modifier {{name}}",
     "newTitle": "Nouveau contact",
     "editDescription": "La mise à jour modifie l'enregistrement et crée une entrée d'audit.",
-    "newDescription": "Ajoutez une personne à l'unité de décision.",
+    "newDescription": "Ajoutez un contact. Un intitulé de poste n'est pas un rôle d'achat.",
     "errorRequired": "Le client et le nom sont obligatoires",
     "errorSaveFailed": "Échec de l'enregistrement",
     "fieldCustomer": "Client / compte",

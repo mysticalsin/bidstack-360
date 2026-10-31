@@ -291,7 +291,7 @@
   },
   "contacts": {
     "title": "Contatti",
-    "subtitle": "{{count}} persone nell'unità decisionale.",
+    "subtitle": "{{count}} contatti in questa pagina.",
     "actions": {
       "importCsv": {
         "label": "Importa CSV",
@@ -926,7 +926,7 @@
     "errorMessage": "Riprova.",
     "retry": "Riprova",
     "decisionUnitEmptyTitle": "Nessun membro dell'unità decisionale",
-    "decisionUnitEmptyMessage": "Aggiungi un contatto dalla pagina Contatti o sincronizza da Dust.",
+    "decisionUnitEmptyMessage": "Collega un contatto a questa opportunità. Un titolo non è un ruolo d'acquisto.",
     "decisionUnitTitle": "Unità decisionale",
     "stakeholdersCount_one": "{{count}} stakeholder",
     "stakeholdersCount_other": "{{count}} stakeholder",
@@ -1851,7 +1851,7 @@
     "editTitle": "Modifica {{name}}",
     "newTitle": "Nuovo contatto",
     "editDescription": "L'aggiornamento modifica il record e scrive una voce di audit.",
-    "newDescription": "Aggiungi una persona all'unità decisionale.",
+    "newDescription": "Aggiungi un contatto. Un titolo non è un ruolo d'acquisto.",
     "errorRequired": "Cliente e nome sono obbligatori",
     "errorSaveFailed": "Salvataggio non riuscito",
     "fieldCustomer": "Cliente / account",

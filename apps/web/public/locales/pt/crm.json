@@ -291,7 +291,7 @@
   },
   "contacts": {
     "title": "Contatos",
-    "subtitle": "{{count}} pessoas na unidade de decisão.",
+    "subtitle": "{{count}} contatos nesta página.",
     "actions": {
       "importCsv": {
         "label": "Importar CSV",
@@ -926,7 +926,7 @@
     "errorMessage": "Tente novamente.",
     "retry": "Tentar novamente",
     "decisionUnitEmptyTitle": "Ainda não há membros da unidade de decisão",
-    "decisionUnitEmptyMessage": "Adicione um contato pela página de Contatos ou sincronize a partir do Dust.",
+    "decisionUnitEmptyMessage": "Vincule um contato a esta oportunidade. Um cargo não é um papel de compra.",
     "decisionUnitTitle": "Unidade de decisão",
     "stakeholdersCount_one": "{{count}} parte interessada",
     "stakeholdersCount_other": "{{count}} partes interessadas",
@@ -1851,7 +1851,7 @@
     "editTitle": "Editar {{name}}",
     "newTitle": "Novo contato",
     "editDescription": "A atualização modifica o registro e grava uma entrada de auditoria.",
-    "newDescription": "Adicione uma pessoa à unidade de decisão.",
+    "newDescription": "Adicione um contato. Um cargo não é um papel de compra.",
     "errorRequired": "Cliente e nome são obrigatórios",
     "errorSaveFailed": "Falha ao salvar",
     "fieldCustomer": "Cliente / conta",

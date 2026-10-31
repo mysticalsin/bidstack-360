@@ -175,7 +175,7 @@ function DecisionUnitPanel({
         title={t('opportunityTabs.decisionUnitEmptyTitle', 'No decision-unit members yet')}
         message={t(
           'opportunityTabs.decisionUnitEmptyMessage',
-          'Add a contact from the Contacts page or sync from Dust.',
+          'Link a contact to this opportunity. A job title is not a buying role.',
         )}
       />
     );

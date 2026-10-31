@@ -41,6 +41,24 @@ function renderPanel(documents: Array<{ id: string; name: string; kind: string; 
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'Documents' }));
 }
 
+describe('OpportunityTabs decision unit', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('does not tell an empty deal to sync a buying role from Dust', async () => {
+    // Why: Dust is not connected here, and a job title is not a buying role.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OpportunityTabs oppId="opp-1" customer="Acme" documents={[]} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/Link a contact to this opportunity/)).toBeTruthy();
+    expect(screen.queryByText(/Dust/)).toBeNull();
+  });
+});
+
 describe('OpportunityTabs — DocumentsPanel send-for-signature trigger', () => {
   afterEach(() => {
     cleanup();

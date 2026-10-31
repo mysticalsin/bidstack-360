@@ -354,7 +354,7 @@
   },
   "contacts": {
     "title": "Contactos",
-    "subtitle": "{{count}} personas en la unidad de decisión.",
+    "subtitle": "{{count}} contactos en esta página.",
     "actions": {
       "importCsv": {
         "label": "Importar CSV",
@@ -989,7 +989,7 @@
     "errorMessage": "Inténtalo de nuevo.",
     "retry": "Reintentar",
     "decisionUnitEmptyTitle": "Aún no hay miembros de la unidad de decisión",
-    "decisionUnitEmptyMessage": "Agrega un contacto desde la página de Contactos o sincroniza desde Dust.",
+    "decisionUnitEmptyMessage": "Vincula un contacto a esta oportunidad. Un cargo no es un rol de compra.",
     "decisionUnitTitle": "Unidad de decisión",
     "stakeholdersCount_one": "{{count}} interesado",
     "stakeholdersCount_other": "{{count}} interesados",
@@ -1884,7 +1884,7 @@
     "editTitle": "Editar {{name}}",
     "newTitle": "Nuevo contacto",
     "editDescription": "La actualización modifica el registro y crea una entrada de auditoría.",
-    "newDescription": "Agrega una persona a la unidad de decisión.",
+    "newDescription": "Agrega un contacto. Un cargo no es un rol de compra.",
     "errorRequired": "El cliente y el nombre son obligatorios",
     "errorSaveFailed": "Error al guardar",
     "fieldCustomer": "Cliente / cuenta",
