@@ -35,6 +35,8 @@ export const PERMISSION_KEYS = [
   'leads:write',
   'mcp:read',
   'mcp:write',
+  'meetings:read',
+  'meetings:write',
   'migrations:read',
   'msa:admin',
   'msa:read',

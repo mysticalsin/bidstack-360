@@ -198,6 +198,9 @@ model Org {
   projectReferences             ProjectReference[]
   contractAgreements            ContractAgreement[]
   contractFileVersions          ContractFileVersion[]
+  meetingSourceConnections      MeetingSourceConnection[]
+  meetingIngestItems            MeetingIngestItem[]
+  meetingIntel                  MeetingIntel[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
   notificationPrefs             NotificationPref[]
@@ -330,6 +333,7 @@ model User {
   notifications          Notification[]
   contractsOwned         ContractAgreement[]   @relation("ContractOwner")
   contractVersionsAdded  ContractFileVersion[] @relation("ContractFileVersionCreatedBy")
+  meetingSourceConnections MeetingSourceConnection[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -416,6 +420,7 @@ model Company {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   contracts ContractAgreement[] @relation("CompanyContracts")
+  meetingIntel MeetingIntel[]
 
   @@index([orgId, domain])
   @@index([orgId])
@@ -663,6 +668,7 @@ model Contact {
   facts             ContactFact[]        @relation("FactSubject")
   reportedByFacts   ContactFact[]        @relation("FactReportsTo")
   ownedCommitments  CustomerCommitment[]
+  meetingAttendances MeetingIntelAttendee[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -5900,4 +5906,194 @@ model AccountEarningsDate {
   @@unique([orgId, companyId, fiscalPeriod])
   @@index([orgId, expectedAt])
   @@map("account_earnings_dates")
+}
+
+// ─── Strategic account meeting intel (2026-10-31) ───────────────────────────
+// Meetings ingested from ABC (CRM, org-level sync), Metis (each user's second
+// brain, per-user consent-scoped push) or manual entry, normalized behind one
+// adapter interface and processed by the meeting-intel BullMQ pipeline.
+// Raw transcripts are stored only when the connecting user allows it.
+// API contract: /workspace/fleet/polo-meeting-intel-api.md.
+
+enum MeetingIntelSource {
+  abc
+  metis
+  manual
+
+  @@map("meeting_intel_source")
+}
+
+enum MeetingIntelVisibility {
+  account_team
+  org
+
+  @@map("meeting_intel_visibility")
+}
+
+enum SeniorityLevel {
+  c_level
+  vp
+  director
+  manager
+  ic
+  unknown
+
+  @@map("seniority_level")
+}
+
+enum MeetingIngestStatus {
+  pending
+  processed
+  unmatched
+  skipped
+  error
+
+  @@map("meeting_ingest_status")
+}
+
+/// One per (org, user, source). For Metis it records the user's consent and
+/// holds the hash of the per-user ingest token; the raw token is shown once.
+model MeetingSourceConnection {
+  id              String             @id @default(uuid()) @db.Uuid
+  orgId           String             @map("org_id") @db.Uuid
+  userId          String             @map("user_id") @db.Uuid
+  source          MeetingIntelSource
+  /// connected | revoked | error
+  status          String             @default("connected")
+  shareSummary    Boolean            @default(true) @map("share_summary")
+  shareTranscript Boolean            @default(false) @map("share_transcript")
+  tokenHash       String?            @unique @map("token_hash") @db.VarChar(64)
+  tokenPrefix     String?            @map("token_prefix") @db.VarChar(16)
+  consentedAt     DateTime?          @map("consented_at") @db.Timestamptz(6)
+  revokedAt       DateTime?          @map("revoked_at") @db.Timestamptz(6)
+  lastSyncAt      DateTime?          @map("last_sync_at") @db.Timestamptz(6)
+  lastError       String?            @map("last_error")
+  itemsReceived   Int                @default(0) @map("items_received")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId, source])
+  @@map("meeting_source_connections")
+}
+
+/// Normalized meeting as received from an adapter, before the pipeline runs.
+/// payload is the consent-filtered NormalizedMeeting (never a raw transcript
+/// unless the connection allows it).
+model MeetingIngestItem {
+  id             String              @id @default(uuid()) @db.Uuid
+  orgId          String              @map("org_id") @db.Uuid
+  source         MeetingIntelSource
+  externalId     String              @map("external_id")
+  connectionId   String?             @map("connection_id") @db.Uuid
+  submittedById  String?             @map("submitted_by_id") @db.Uuid
+  payload        Json
+  status         MeetingIngestStatus @default(pending)
+  error          String?
+  meetingIntelId String?             @map("meeting_intel_id") @db.Uuid
+  receivedAt     DateTime            @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt    DateTime?           @map("processed_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, externalId])
+  @@index([orgId, status, receivedAt])
+  @@map("meeting_ingest_items")
+}
+
+model MeetingIntel {
+  id              String                 @id @default(uuid()) @db.Uuid
+  orgId           String                 @map("org_id") @db.Uuid
+  companyId       String                 @map("company_id") @db.Uuid
+  title           String
+  heldAt          DateTime               @map("held_at") @db.Timestamptz(6)
+  visibility      MeetingIntelVisibility @default(account_team)
+  summary         String?
+  /// Only set when the connecting user allowed transcript sharing.
+  transcriptText  String?                @map("transcript_text")
+  challenges      String[]               @default([])
+  similarProjects String[]               @default([]) @map("similar_projects")
+  opportunities   String[]               @default([])
+  nextSteps       String[]               @default([]) @map("next_steps")
+  /// sha256(org, company, UTC day, normalized title, attendee emails).
+  dedupeKey       String                 @map("dedupe_key") @db.VarChar(64)
+  createdById     String?                @map("created_by_id") @db.Uuid
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?              @map("deleted_at") @db.Timestamptz(6)
+
+  org       Org                      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company   Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sources   MeetingIntelSourceLink[]
+  attendees MeetingIntelAttendee[]
+  flags     MeetingCrossRegionFlag[]
+
+  @@unique([orgId, dedupeKey])
+  @@index([orgId, companyId, heldAt(sort: Desc)])
+  @@map("meeting_intel")
+}
+
+model MeetingIntelSourceLink {
+  id               String             @id @default(uuid()) @db.Uuid
+  orgId            String             @map("org_id") @db.Uuid
+  meetingId        String             @map("meeting_id") @db.Uuid
+  source           MeetingIntelSource
+  externalId       String             @map("external_id")
+  url              String?
+  connectionUserId String?            @map("connection_user_id") @db.Uuid
+  ingestedAt       DateTime           @default(now()) @map("ingested_at") @db.Timestamptz(6)
+
+  meeting MeetingIntel @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, externalId])
+  @@index([meetingId])
+  @@map("meeting_intel_sources")
+}
+
+model MeetingIntelAttendee {
+  id           String         @id @default(uuid()) @db.Uuid
+  orgId        String         @map("org_id") @db.Uuid
+  meetingId    String         @map("meeting_id") @db.Uuid
+  contactId    String?        @map("contact_id") @db.Uuid
+  userId       String?        @map("user_id") @db.Uuid
+  name         String
+  email        String?        @db.Citext
+  title        String?
+  seniority    SeniorityLevel @default(unknown)
+  region       String?
+  businessUnit String?        @map("business_unit")
+  isInternal   Boolean        @default(false) @map("is_internal")
+
+  meeting MeetingIntel @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  contact Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([meetingId])
+  @@index([orgId, contactId])
+  @@map("meeting_intel_attendees")
+}
+
+/// Strategic accounts: an account-team member who owns another region or BU
+/// of the same parent group learns about a meeting in this region.
+model MeetingCrossRegionFlag {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  meetingId       String    @map("meeting_id") @db.Uuid
+  recipientUserId String    @map("recipient_user_id") @db.Uuid
+  parentCompanyId String    @map("parent_company_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  ownedCompanyId  String    @map("owned_company_id") @db.Uuid
+  reason          String
+  talkingPoints   String[]  @default([]) @map("talking_points")
+  /// open | dismissed
+  status          String    @default("open")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  dismissedAt     DateTime? @map("dismissed_at") @db.Timestamptz(6)
+
+  meeting MeetingIntel @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, recipientUserId, ownedCompanyId])
+  @@index([orgId, recipientUserId, status, createdAt(sort: Desc)])
+  @@map("meeting_cross_region_flags")
 }
