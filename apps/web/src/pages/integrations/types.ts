@@ -18,6 +18,7 @@ export interface DustStatus {
   pulled24h: number;
   pushed24h: number;
   configured: boolean;
+  connectionState?: 'stub' | 'configured_unverified';
   agentsError: string | null;
   agents: Array<{ id: string; label: string; description: string | null }>;
 }
@@ -45,6 +46,7 @@ export interface IntegrationSetupGuide {
     wellKnownUrl: string;
     transport: 'streamable-http';
     configured: boolean;
+    localOnly?: boolean;
     readScopes: string[];
     writeScopes: string[];
   };
@@ -89,7 +91,7 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
   {
     group: 'crm',
     name: 'crm_search_companies',
-    desc: 'Fuzzy search the company graph by name, domain, or registry.',
+    desc: 'Search Company rows in this org. Opportunity-only text is labeled, not scored.',
   },
   {
     group: 'crm',

@@ -71,6 +71,7 @@ export function ConnectorsSection() {
     const acc: Record<CrmConnector['status'], number> = {
       healthy: 0,
       degraded: 0,
+      unverified: 0,
       down: 0,
       disabled: 0,
     };
@@ -385,7 +386,9 @@ function StatusBadge({ status }: { status: CrmConnector['status'] }) {
         ? 'amber'
         : status === 'down'
           ? 'tomato'
-          : 'gray';
+          : status === 'unverified'
+            ? 'amber'
+            : 'gray';
   const label =
     status === 'healthy'
       ? t('connectors.status.healthy', 'healthy')
@@ -393,7 +396,9 @@ function StatusBadge({ status }: { status: CrmConnector['status'] }) {
         ? t('connectors.status.degraded', 'degraded')
         : status === 'down'
           ? t('connectors.status.down', 'down')
-          : t('connectors.status.disabled', 'disabled');
+          : status === 'unverified'
+            ? t('connectors.status.unverified', 'unverified')
+            : t('connectors.status.disabled', 'disabled');
   return <Badge tone={tone}>{label}</Badge>;
 }
 

@@ -23,7 +23,8 @@ const Input = z.object({
 });
 
 export const opportunitiesList: Tool<typeof Input> = {
-  description: 'List opportunities matching filters (stage/owner/industry/search).',
+  description:
+    'List opportunities matching filters (stage/owner/industry/search). currency is null and currencyBasis is unspecified when the row has no currency. probability is win likelihood, not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -69,6 +70,12 @@ export const opportunitiesList: Tool<typeof Input> = {
       stage: o.stage,
       value: Number(o.valueMicros) / 1_000_000,
       probability: o.probability,
+      // Opportunity has no currency column. Do not label the value as EUR.
+      currency: null,
+      currencyBasis: 'unspecified' as const,
+      companyId: o.companyId,
+      health: 'not_account_health' as const,
+      healthNote: 'Probability is win likelihood for this opportunity, not account health.',
       dueDate: o.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: o.owner?.email ?? null,
       industry: o.industry,

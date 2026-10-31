@@ -12,23 +12,27 @@ import type { ProviderHealth } from '@bidstack/shared';
 import { buildConnectorCatalog } from '../../providers/open-data-connectors.js';
 import { asProviderStatus } from './dashboard.utils.js';
 
+const NOT_A_LIVE_PROBE = 'Configuration is not a live probe.';
+
 export function defaultProviderHealth(): Array<z.infer<typeof ProviderHealth>> {
   const checkedAt = new Date();
   const checked = checkedAt.toISOString();
   const coreProviders: Array<z.infer<typeof ProviderHealth>> = [
     {
       provider: 'External CRM GraphQL',
-      status: 'healthy',
-      latencyMs: 42,
+      status: 'unverified',
+      latencyMs: null,
       lastCheckedAt: checked,
-      message: 'Core CRM adapter online',
+      message: NOT_A_LIVE_PROBE,
     },
     {
       provider: 'Dust REST',
-      status: process.env.DUST_API_KEY ? 'healthy' : 'disabled',
+      status: 'unverified',
       latencyMs: null,
       lastCheckedAt: checked,
-      message: process.env.DUST_API_KEY ? 'Agent jobs enabled' : 'Missing DUST_API_KEY',
+      message: process.env.DUST_API_KEY
+        ? `DUST_API_KEY is set. ${NOT_A_LIVE_PROBE}`
+        : `Missing DUST_API_KEY. ${NOT_A_LIVE_PROBE}`,
     },
     {
       provider: 'MERX/Sovra',

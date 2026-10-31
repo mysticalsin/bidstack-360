@@ -98,6 +98,7 @@ describeDb('MCP tools', () => {
     await prisma.lead.deleteMany({ where: { orgId } });
     await prisma.contact.deleteMany({ where: { orgId } });
     await prisma.opportunity.deleteMany({ where: { orgId } });
+    await prisma.company.deleteMany({ where: { orgId } });
     await prisma.apiKey.deleteMany({ where: { orgId } });
     await prisma.user.deleteMany({ where: { orgId } });
     await prisma.org.delete({ where: { id: orgId } }).catch(() => {});
@@ -112,6 +113,19 @@ describeDb('MCP tools', () => {
     }>;
     expect(Array.isArray(out)).toBe(true);
     expect(out.some((o) => o.id === oppId)).toBe(true);
+    const row = out.find((o) => o.id === oppId) as {
+      currency: null;
+      currencyBasis: string;
+      companyId: string | null;
+      health: string;
+      probability: number;
+    };
+    // WHY: probability is win likelihood. Reporting it as account health, or
+    // the value as EUR, would make a Dust read a false forecast.
+    expect(row.currency).toBeNull();
+    expect(row.currencyBasis).toBe('unspecified');
+    expect(row.health).toBe('not_account_health');
+    expect(row.companyId).toBeNull();
   });
 
   it('opportunities.get returns a single opp', async () => {
@@ -295,23 +309,46 @@ describeDb('MCP tools', () => {
     expect(audit).toBeTruthy();
   });
 
-  it('notes.list returns notes for an account', async () => {
+  it('notes.list matches a UUID and does not resolve a company name', async () => {
+    // WHY: accountId used to be free text. Guessing a name would attach the
+    // wrong company's notes. The contract is the stored id.
+    const accountId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
     await tools['notes.create'].handler(
       {
-        accountId: 'Beta Corp',
+        accountId,
         title: 'Call notes',
         bodyMd: 'Follow up next week.',
         pinned: false,
       },
       ctx,
     );
-    const out = (await tools['notes.list'].handler(
-      { accountId: 'Beta Corp', limit: 10 },
-      ctx,
-    )) as Array<{
+    const out = (await tools['notes.list'].handler({ accountId, limit: 10 }, ctx)) as Array<{
       title: string;
     }>;
-    expect(Array.isArray(out)).toBe(true);
     expect(out.some((n) => n.title === 'Call notes')).toBe(true);
+    await expect(
+      tools['notes.list'].handler({ accountId: 'Beta Corp', limit: 10 }, ctx),
+    ).rejects.toThrow(/UUID/);
+  });
+
+  it('crm_search_companies returns a company id and does not invent confidence for text-only matches', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Canonical Search Co' },
+    });
+    const hits = (await tools.crm_search_companies.handler(
+      { query: 'Canonical Search', limit: 10 },
+      ctx,
+    )) as Array<{ id: string | null; matchKind: string; confidence: number | null }>;
+    const canonical = hits.find((hit) => hit.id === company.id);
+    expect(canonical?.matchKind).toBe('company');
+    expect(canonical?.confidence).toBeNull();
+
+    const text = (await tools.crm_search_companies.handler(
+      { query: 'TestCorp', limit: 10 },
+      ctx,
+    )) as Array<{ matchKind: string; confidence: number | null; name: string }>;
+    const onlyText = text.find((hit) => hit.name === 'TestCorp');
+    expect(onlyText?.matchKind).toBe('opportunity_text_only');
+    expect(onlyText?.confidence).toBeNull();
   });
 });

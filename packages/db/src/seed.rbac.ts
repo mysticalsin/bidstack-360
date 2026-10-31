@@ -99,6 +99,11 @@ const PERMISSION_SEEDS = [
   permission('mcp:write', 'Use MCP write tools', 'Call MCP tools that mutate data.'),
   permission('opportunities:read', 'Read opportunities', 'View opportunities and pipeline data.'),
   permission('opportunities:write', 'Manage opportunities', 'Create and update opportunities.'),
+  permission(
+    'proposals:approve',
+    'Approve proposals',
+    'Attest and approve a proposal, then submit that approved version. Not implied by proposals:write or by the Admin role.',
+  ),
   permission('proposals:read', 'Read proposals', 'View proposal workspace data.'),
   permission('proposals:write', 'Manage proposals', 'Create and update proposals.'),
   permission('reports:read', 'Read reports', 'View reports and analytics.'),
@@ -135,13 +140,18 @@ const PERMISSION_SEEDS = [
 
 export const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
 const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':read'));
+// Administrator is not the commercial approver. proposals:approve is granted
+// only to Manager (below), whose description already covers approvals.
+export const ADMIN_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => key !== 'proposals:approve',
+);
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 
 // Exported (like ALL_PERMISSION_KEYS above) so sibling tests can pin specific
 // roles' grants against the seed data instead of re-deriving them.
 export const ROLE_SEEDS = [
-  role('Admin', 'Full tenant administrator with all permissions.', ALL_PERMISSION_KEYS),
+  role('Admin', 'Full tenant administrator with all permissions.', ADMIN_PERMISSION_KEYS),
   role('Sales', 'Owns leads, accounts, contacts, opportunities, and sales activity.', [
     ...readKeys(
       'accounts',
@@ -223,6 +233,7 @@ export const ROLE_SEEDS = [
       'territories',
       'workflows',
     ),
+    'proposals:approve',
   ]),
   role(
     'Executive',

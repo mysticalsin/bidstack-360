@@ -76,8 +76,11 @@ describe('dust integration routes', () => {
     expect(res.json()).toMatchObject({
       // Per-org resolver: with no org IntegrationConfig and no DUST_* env, the
       // status is honestly "Not configured" rather than a hardcoded workspace.
+      // nextSyncAt stays null so a stub tick is not advertised as a live sync.
       workspace: 'Not configured',
       configured: false,
+      connectionState: 'stub',
+      nextSyncAt: null,
       agentsError: null,
       agents: [],
     });
@@ -89,6 +92,8 @@ describe('dust integration routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.mcp.publicUrl).toMatch(/\/mcp$/);
+    expect(body.mcp.configured).toBe(false);
+    expect(body.mcp.localOnly).toBe(true);
     expect(body.rest.authHeader).toBe('x-api-key: <BIDSTACK_API_KEY>');
     expect(body.rest.recommendedScopes).toEqual([
       'opportunities:read',

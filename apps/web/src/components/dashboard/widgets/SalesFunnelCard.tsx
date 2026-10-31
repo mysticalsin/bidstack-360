@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { springSoft } from '@/lib/motion';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecified-currency';
 
 // ─── SalesFunnelCard ─────────────────────────────────────────────────────────
 
@@ -30,7 +30,6 @@ export function SalesFunnelCard({
   pipelineValue: number;
   reduced: boolean | null;
 }) {
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const stages = [
     {
@@ -54,7 +53,7 @@ export function SalesFunnelCard({
     {
       label: t('salesFunnel.stagePipeline', 'Pipeline'),
       count: pipelineValue,
-      display: formatMoney(pipelineValue, 'EUR'),
+      display: `${formatUnspecifiedAmount(pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
       color: 'var(--tag-jade-fg)',
       bg: 'var(--tag-jade-bg)',
     },

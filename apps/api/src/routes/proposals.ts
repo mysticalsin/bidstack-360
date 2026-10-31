@@ -15,14 +15,19 @@ import { MemOSService } from '@bidstack/memos';
 import { draftProposalSection } from '../services/ai/dust-agent.service.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
-import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 
+import {
+  immutableProposalMessage,
+  proposalApprovalRoutes,
+  proposalIsImmutable,
+} from './proposals.approval.js';
 import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
 
 // DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
 
 export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   const memos = new MemOSService();
+  await server.register(proposalApprovalRoutes);
 
   // GET /api/proposals
   server.get(
@@ -278,6 +283,14 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!row) return reply.notFound('Proposal not found');
 
+      const substantive =
+        req.body.name !== undefined ||
+        req.body.status !== undefined ||
+        req.body.dueDate !== undefined;
+      if (proposalIsImmutable(row.status) && substantive) {
+        throw server.httpErrors.conflict(immutableProposalMessage());
+      }
+
       const updated = await prisma.proposal.update({
         where: { id: req.params.id },
         data: {
@@ -288,47 +301,6 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
             : {}),
         },
       });
-      // Fan-out proposal.submitted when status transitions to submitted — fire-and-forget.
-      if (req.body.status === 'submitted' && updated.status === 'submitted') {
-        void fanOutWebhookEvent(req.auth.orgId, 'proposal.submitted', {
-          id: updated.id,
-          name: updated.name,
-          opportunityId: updated.opportunityId,
-        });
-      }
-
-      // L2 MemOS win/loss crystallization — fires only on a genuine status
-      // transition to won/lost (idempotent: row.status !== req.body.status).
-      // Fire-and-forget: a MemOS failure must not block the PATCH response.
-      // WHY L2 (not L1): win/loss outcomes are policy-level insights that
-      // influence future proposal drafts via getPoliciesForScope(); L1 is for
-      // raw run traces, L2 is for derived strategic signals.
-      if (
-        (req.body.status === 'won' || req.body.status === 'lost') &&
-        row.status !== req.body.status
-      ) {
-        void memos
-          .crystallizePolicy({
-            orgId: req.auth.orgId,
-            key: `proposal:${req.params.id}:outcome`,
-            category: 'win_loss',
-            scopeType: 'opportunity',
-            scopeId: updated.opportunityId ?? undefined,
-            insight: `Proposal "${updated.name}" was marked ${req.body.status}.`,
-            confidence: 0.9,
-            evidence: {
-              proposalId: req.params.id,
-              outcome: req.body.status,
-              previousStatus: row.status,
-            },
-          })
-          .catch((err: unknown) => {
-            server.log.warn(
-              { err, proposalId: req.params.id },
-              'MemOS L2 win/loss crystallization failed — non-critical',
-            );
-          });
-      }
 
       return serializeProposal(updated);
     },
@@ -356,6 +328,12 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       if (!proposal) return reply.notFound('Proposal not found');
+      if (
+        proposalIsImmutable(proposal.status) &&
+        (req.body.title !== undefined || req.body.content !== undefined)
+      ) {
+        throw server.httpErrors.conflict(immutableProposalMessage());
+      }
 
       const section = await prisma.proposalSection.findFirst({
         where: {
@@ -405,6 +383,9 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { sections: true, opportunity: { include: { company: true, territory: true } } },
       });
       if (!proposal) return reply.notFound('Proposal not found');
+      if (proposalIsImmutable(proposal.status)) {
+        throw server.httpErrors.conflict(immutableProposalMessage());
+      }
 
       const section = proposal.sections.find((s) => s.key === req.body.sectionKey);
       if (!section) return reply.notFound('Section not found');

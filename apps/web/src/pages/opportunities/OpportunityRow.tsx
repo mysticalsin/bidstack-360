@@ -16,7 +16,10 @@ import { Badge } from '@/components/ui/Badge';
 import { DueDateChip } from '@/components/ui/DueDateChip';
 import { SavedFlash } from '@/components/ui/SavedFlash';
 import { toast } from '@/components/ui/Toast';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
 import type { usePatchOpportunity } from '@/hooks/useOpportunities';
 import { cn } from '@/lib/cn';
@@ -74,7 +77,6 @@ export const Row = memo(function Row({
    * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
   canWrite: boolean;
 }) {
-  const { formatMoney } = useFormatMoney();
   const fireConfetti = useConfetti((s) => s.fire);
 
   // Per-field flash timestamp. Bumping a field's value re-triggers the
@@ -227,7 +229,7 @@ export const Row = memo(function Row({
           align="right"
           isSaving={saving.value}
           canEdit={canWrite}
-          format={(v) => formatMoney(v, 'EUR')}
+          format={(v) => `${formatUnspecifiedAmount(v)} (${UNSPECIFIED_CURRENCY_BASIS})`}
           onSave={(next) => {
             startSave('value');
             patch.mutate(

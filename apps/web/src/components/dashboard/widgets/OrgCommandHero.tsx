@@ -27,9 +27,11 @@ import { Icon } from '@/components/ui/Icon';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
-import { formatMoney } from '@/lib/format';
 import { springSnap, springSoft } from '@/lib/motion';
-import { useCurrencyStore } from '@/stores/currency';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '../unspecified-currency';
 
 import type { Opportunity } from '@bidstack/shared';
 
@@ -61,11 +63,10 @@ function isOpenOpp(o: Opportunity): boolean {
 export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
-  const { currency, convert } = useCurrencyStore();
   const report = usePipelineReport();
   const closing = useOpportunities({ dueWithinDays: CLOSING_WINDOW_DAYS, limit: CLOSING_FETCH_LIMIT });
 
-  const money = (value: number) => formatMoney(convert(value, 'EUR'), currency);
+  const money = (value: number) => formatUnspecifiedAmount(value);
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);
   const closingValue = closingItems.reduce((acc, opp) => acc + (opp.value ?? 0), 0);
   const winRate = deriveWinRate(report.data);
@@ -94,8 +95,8 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
     >
       <HeroPanel
         summary={summary}
-        heroValue={convert(summary.pipelineValue ?? 0, 'EUR')}
-        formatValue={(n) => formatMoney(n, currency)}
+        heroValue={summary.pipelineValue ?? 0}
+        formatValue={(n) => formatUnspecifiedAmount(n)}
         winRate={winRate}
         closingCount={closingItems.length}
         t={t}
@@ -139,6 +140,9 @@ function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }
       <h2>
         <AnimatedNumber value={heroValue} format={formatValue} />
       </h2>
+      <p className="text-xs text-[var(--fg-tertiary)]">
+        {t('orgHero.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
+      </p>
       <p>{deriveFocusLine(summary, closingCount, t)}</p>
       <div
         className="command-center-actions"

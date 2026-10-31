@@ -125,6 +125,15 @@ const STUB_ROLE_OVERRIDES: Record<
     name: 'E2E Sales Manager',
     clerkUser: 'e2e_sales_manager',
   },
+  // Commercial approver. Distinct from Sales Manager and from Admin, which
+  // must not hold proposals:approve.
+  approver: {
+    systemRole: 'Manager',
+    legacyRole: 'manager',
+    email: 'e2e-approver@bidstack.local',
+    name: 'E2E Approver',
+    clerkUser: 'e2e_approver',
+  },
   'sales-manager': {
     systemRole: 'Sales Manager',
     legacyRole: 'manager',

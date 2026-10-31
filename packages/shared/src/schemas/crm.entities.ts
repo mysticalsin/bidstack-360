@@ -117,7 +117,7 @@ export const CrmDeal = z.object({
   name: z.string().min(1),
   stage: CrmDealStage,
   amountMicros: z.number().int().nonnegative(),
-  currencyCode: z.string().length(3),
+  currencyCode: z.string().length(3).nullable(),
   probability: z.number().int().min(0).max(100).nullable(),
   closeDate: z.string().date().nullable(),
   ownerId: z.string().nullable(),

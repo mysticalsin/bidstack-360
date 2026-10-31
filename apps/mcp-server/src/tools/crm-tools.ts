@@ -21,7 +21,8 @@ import {
 } from './crm-tools.helpers.js';
 
 export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
-  description: 'Search CRM companies from Twenty-backed opportunities and Polo PreSales enrichments.',
+  description:
+    'Search Company rows in the caller org. Returns the canonical company id. Opportunity customer text that does not match a company row is labeled opportunity_text_only and has no match confidence.',
   input: CompanySearchInput,
   inputJsonSchema: {
     type: 'object',
@@ -32,44 +33,74 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
-    const q = args.query?.toLowerCase();
-    // CompanyEnrichment model is pending — search falls back to Opportunity-
-    // derived companies. Restore the union when the model lands.
-    const opportunities = await prisma.opportunity.findMany({
+    const q = args.query?.trim();
+    const companies = await prisma.company.findMany({
       where: {
         orgId: ctx.orgId,
-        deletedAt: null, // skip soft-deleted (Review)
+        deletedAt: null,
         ...(q
           ? {
               OR: [
-                { customer: { contains: q, mode: 'insensitive' } },
-                { industry: { contains: q, mode: 'insensitive' } },
+                { name: { contains: q, mode: 'insensitive' } },
+                { legalName: { contains: q, mode: 'insensitive' } },
+                { domain: { contains: q, mode: 'insensitive' } },
               ],
             }
           : {}),
       },
-      select: { customer: true, industry: true, logoUrl: true, updatedAt: true },
-      distinct: ['customer'],
+      select: {
+        id: true,
+        name: true,
+        legalName: true,
+        domain: true,
+        website: true,
+        logoUrl: true,
+      },
+      orderBy: { name: 'asc' },
       take: args.limit,
     });
 
-    const items = opportunities
-      .map((item: { customer: string; logoUrl: string | null }) => ({
-        id: normalizeName(item.customer),
-        name: item.customer,
-        legalName: item.customer,
+    const companyHits = companies.map((company) => ({
+      id: company.id,
+      name: company.name,
+      legalName: company.legalName,
+      domain: company.domain,
+      website: company.website,
+      logoUrl: company.logoUrl,
+      matchKind: 'company' as const,
+      // Match quality is not a stored score. Do not invent one.
+      confidence: null,
+    }));
+
+    const remaining = args.limit - companyHits.length;
+    if (remaining <= 0) return companyHits;
+
+    const seen = new Set(companyHits.map((company) => company.id));
+    const opportunities = await prisma.opportunity.findMany({
+      where: {
+        orgId: ctx.orgId,
+        deletedAt: null,
+        ...(q ? { customer: { contains: q, mode: 'insensitive' } } : {}),
+      },
+      select: { customer: true, logoUrl: true, companyId: true },
+      distinct: ['customer'],
+      take: remaining,
+    });
+
+    const textHits = opportunities
+      .filter((row) => !row.companyId || !seen.has(row.companyId))
+      .map((row) => ({
+        id: row.companyId,
+        name: row.customer,
+        legalName: null,
         domain: null,
         website: null,
-        logoUrl: item.logoUrl,
-        confidence: 0.55,
-        source: 'twenty',
-      }))
-      .filter(
-        (item) =>
-          !q || `${item.name} ${item.legalName} ${item.domain ?? ''}`.toLowerCase().includes(q),
-      );
+        logoUrl: row.logoUrl,
+        matchKind: 'opportunity_text_only' as const,
+        confidence: null,
+      }));
 
-    return items.slice(0, args.limit);
+    return [...companyHits, ...textHits];
   },
 };
 

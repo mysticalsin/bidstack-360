@@ -10,7 +10,8 @@ const Input = z.object({
 });
 
 export const contactsList: Tool<typeof Input> = {
-  description: 'List contacts, optionally filtered by customer name.',
+  description:
+    'List contacts, optionally filtered by customer name. Includes companyId and linkState (linked or needs_review). Contacts with aiOptOut have null email and phone.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -35,6 +36,8 @@ export const contactsList: Tool<typeof Input> = {
       customer: c.customer,
       name: c.name,
       role: c.role,
+      companyId: c.companyId,
+      linkState: c.companyId ? ('linked' as const) : ('needs_review' as const),
       // Honor the per-contact AI opt-out — PII must not reach AI agents. (Review.)
       email: c.aiOptOut ? null : c.email,
       phone: c.aiOptOut ? null : c.phone,

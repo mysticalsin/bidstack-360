@@ -82,11 +82,28 @@ function normalizeMcpUrl(value: string): string {
   return trimmed.endsWith('/mcp') ? trimmed : `${trimmed}/mcp`;
 }
 
-function publicMcpUrl(): string {
-  const configured = envString('DUST_MCP_PUBLIC_URL');
-  if (configured) return normalizeMcpUrl(configured);
-  const port = envString('PORT_MCP') ?? '4001';
-  return normalizeMcpUrl(`http://localhost:${port}/mcp`);
+function isLoopbackUrl(value: string): boolean {
+  try {
+    const host = new URL(value).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch {
+    return true;
+  }
+}
+
+function publicMcpEndpoint(): { url: string; localOnly: boolean; configured: boolean } {
+  const configuredUrl = envString('DUST_MCP_PUBLIC_URL');
+  if (!configuredUrl) {
+    const port = envString('PORT_MCP') ?? '4001';
+    return {
+      url: normalizeMcpUrl(`http://localhost:${port}/mcp`),
+      localOnly: true,
+      configured: false,
+    };
+  }
+  const url = normalizeMcpUrl(configuredUrl);
+  const localOnly = isLoopbackUrl(url);
+  return { url, localOnly, configured: !localOnly };
 }
 
 // Dust status cache
@@ -128,13 +145,14 @@ async function buildDustStatus(
   return {
     workspace: creds?.workspaceId ?? 'Not configured',
     lastSyncAt: lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
-    nextSyncAt: lastSync
-      ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()
-      : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    // This handler does not probe Dust. A next-sync timestamp would advertise
+    // a live schedule, including the local stub tick.
+    nextSyncAt: null,
     lastError: lastErr?.error ?? null,
     pulled24h: pulled,
     pushed24h: pushed,
     configured,
+    connectionState: configured ? 'configured_unverified' : 'stub',
     agentsError: agentStatus.error,
     agents: agentStatus.agents,
   };
@@ -277,7 +295,8 @@ export async function probeIntegrationEndpoint(
 export function buildIntegrationSetupGuide() {
   const apiBase = publicApiBaseUrl();
   const restBase = `${apiBase}/api/v1`;
-  const mcpUrl = publicMcpUrl();
+  const mcp = publicMcpEndpoint();
+  const mcpUrl = mcp.url;
   const mcpBase = trimTrailingSlash(mcpUrl.replace(/\/mcp$/, ''));
   const receiverUrl = `${apiBase}/api/webhooks/dust`;
   const workspaceId = envString('DUST_WORKSPACE_ID');
@@ -305,7 +324,8 @@ export function buildIntegrationSetupGuide() {
       healthUrl: `${mcpBase}/health`,
       wellKnownUrl: `${mcpBase}/.well-known/mcp`,
       transport: 'streamable-http' as const,
-      configured: Boolean(envString('DUST_MCP_PUBLIC_URL')),
+      configured: mcp.configured,
+      localOnly: mcp.localOnly,
       readScopes: ['mcp', 'read'],
       writeScopes: ['mcp', 'write'],
     },
