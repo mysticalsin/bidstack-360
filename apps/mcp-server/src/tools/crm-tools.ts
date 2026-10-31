@@ -231,7 +231,7 @@ export const crmEnrichCompany: Tool<typeof EnrichCompanyInput> = {
       create: {
         orgId: ctx.orgId,
         normalizedName,
-        legalName: args.name,
+        legalName: null,
         domain,
         website,
         logoUrl: logoUrl(args.name, domain),
@@ -239,7 +239,6 @@ export const crmEnrichCompany: Tool<typeof EnrichCompanyInput> = {
         sourceAttribution: attribution as Prisma.InputJsonValue,
       },
       update: {
-        legalName: args.name,
         domain,
         website,
         logoUrl: logoUrl(args.name, domain),

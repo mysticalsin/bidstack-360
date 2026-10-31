@@ -205,7 +205,7 @@ export async function persistMeetingTechStack(
   const website = input.domain ? `https://${input.domain}/` : null;
 
   const data = {
-    legalName: existing?.legalName ?? input.companyName,
+    legalName: existing?.legalName ?? null,
     tradeName: existing?.tradeName ?? input.companyName,
     domain: existing?.domain ?? input.domain,
     website: existing?.website ?? website,

@@ -1412,7 +1412,7 @@ export async function startCompanyEnrichApollo(
         create: {
           orgId: data.orgId,
           normalizedName,
-          legalName: mapped.legalName ?? data.companyName,
+          legalName: mapped.legalName,
           tradeName: organization.name ?? data.companyName,
           domain: mapped.domain ?? data.domain ?? null,
           website: mapped.website ?? sourceUrl,
@@ -1436,7 +1436,7 @@ export async function startCompanyEnrichApollo(
           cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
         },
         update: {
-          legalName: mapped.legalName ?? data.companyName,
+          ...(mapped.legalName ? { legalName: mapped.legalName } : {}),
           tradeName: organization.name ?? data.companyName,
           domain: mapped.domain ?? data.domain ?? null,
           website: mapped.website ?? sourceUrl,
