@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { classifyCompaniesHouseFiling, classifySecFiling } from './classify.js';
+import {
+  COMPANIES_HOUSE_API,
+  fetchCompaniesHouseEvents,
+  normaliseCompaniesHouseFilings,
+  normaliseCompanyNumber,
+} from './companies-house.js';
 import { detectAccountEvents, type WatchdogStore } from './detect.js';
 import { edgarSubmissionsUrl, fetchEdgarEvents, normaliseEdgarSubmissions, type EdgarSubmissions } from './edgar.js';
 
@@ -79,15 +85,15 @@ function memoryStore() {
   const checks: Array<{ id: string; error: string | null }> = [];
   const store: WatchdogStore = {
     insertEvents: async (rs) => {
-      let n = 0;
+      const fresh: typeof rs = [];
       for (const r of rs) {
         const k = `${r.orgId}|${r.source}|${r.externalId}`;
         if (!rows.has(k)) {
           rows.set(k, r);
-          n++;
+          fresh.push(r);
         }
       }
-      return n;
+      return fresh;
     },
     notify: async (x) => {
       notes.push(x);
@@ -124,5 +130,74 @@ describe('detectAccountEvents', () => {
     expect(res.error).toBe('SEC rate limited (429)');
     expect(res.inserted).toBe(4);
     expect(m.checks).toEqual([{ id: 's1', error: 'SEC rate limited (429)' }]);
+  });
+
+  it('alerts only rows that are new this run when a prior run already stored some', async () => {
+    const m = memoryStore();
+    const all = normaliseEdgarSubmissions(FIXTURE);
+    const alertable = all.filter((e) => e.severity >= 3);
+    expect(alertable.length).toBeGreaterThan(0);
+    // Pre-seed every row except one low-severity one: a re-run must not re-alert the stored high-severity rows.
+    const low = all.find((e) => e.severity < 3)!;
+    await m.store.insertEvents(all.filter((e) => e !== low).map((e) => ({ ...e, orgId: 'o1', companyId: 'c1' })));
+    const res = await detectAccountEvents(subject, [adapter], m.store, { minAlertSeverity: 3 });
+    expect(res.inserted).toBe(1);
+    expect(res.alerted).toBe(0);
+    expect(m.notes).toHaveLength(0);
+  });
+
+  it('links notifications to the in-app account, with the filing link in the body', async () => {
+    const m = memoryStore();
+    await detectAccountEvents(subject, [adapter], m.store, { minAlertSeverity: 3 });
+    expect(m.notes[0]).toMatchObject({ url: '/accounts/c1', body: expect.stringMatching(/Source: https:\/\/www\.sec\.gov\//) });
+  });
+});
+
+const CH_FIXTURE = {
+  items: [
+    { transaction_id: 'TXINS1', type: 'LIQ02', category: 'insolvency', date: '2026-10-20', description: 'liquidation-voluntary-statement-of-affairs' },
+    { transaction_id: 'TXAP01', type: 'AP01', category: 'officers', date: '2026-10-12', description: 'appoint-person-director-company-with-name-date', description_values: { officer_name: 'Jane Doe' } },
+    { transaction_id: 'TXAA', type: 'AA', category: 'accounts', date: '2026-09-30', description: 'accounts-with-accounts-type-full' },
+    { transaction_id: 'TXCS01', type: 'CS01', category: 'confirmation-statement', date: '2026-09-01' },
+    { type: 'AA', category: 'accounts', date: '2026-08-01' },
+    { transaction_id: 'TXOLD', type: 'TM01', category: 'officers', date: '2025-01-01' },
+  ],
+};
+
+describe('Companies House adapter', () => {
+  it('pads numeric company numbers and rejects junk', () => {
+    expect(normaliseCompanyNumber('123456')).toBe('00123456');
+    expect(normaliseCompanyNumber(' sc123456 ')).toBe('SC123456');
+    expect(() => normaliseCompanyNumber('12/34')).toThrow(/Invalid/);
+  });
+
+  it('keeps material filings, drops routine noise, id-less rows and anything before since', () => {
+    const ev = normaliseCompaniesHouseFilings('123456', 'Acme Ltd', CH_FIXTURE, new Date('2026-01-01T00:00:00Z'));
+    expect(ev.map((e) => e.externalId)).toEqual(['TXINS1', 'TXAP01', 'TXAA']);
+    const ins = ev[0]!;
+    expect(ins).toMatchObject({ source: 'companies_house', kind: 'INSOLVENCY', implication: 'RISK', severity: 5, confirmed: true });
+    expect(ins.sourceUrl).toBe('https://find-and-update.company-information.service.gov.uk/company/00123456/filing-history/TXINS1');
+    expect(ev[1]!.title).toBe('Acme Ltd: Appoint person director company with name date (Jane Doe)');
+  });
+
+  it('calls the filing-history endpoint with Basic auth and maps HTTP failures honestly', async () => {
+    const calls: Array<{ url: string; auth: string | undefined }> = [];
+    const ok = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+      calls.push({ url, auth: init?.headers?.Authorization });
+      return { ok: true, status: 200, json: async () => CH_FIXTURE } as unknown as Response;
+    });
+    const ev = await fetchCompaniesHouseEvents('123456', 'Acme Ltd', { apiKey: 'test-key', fetchImpl: ok as never });
+    expect(ev).toHaveLength(4);
+    expect(calls[0]!.url.startsWith(`${COMPANIES_HOUSE_API}/company/00123456/filing-history`)).toBe(true);
+    expect(calls[0]!.auth).toBe(`Basic ${Buffer.from('test-key:').toString('base64')}`);
+
+    const status = (code: number) => (async () => ({ ok: false, status: code, json: async () => ({}) })) as never;
+    await expect(fetchCompaniesHouseEvents('123456', 'A', { apiKey: 'k', fetchImpl: status(429) })).rejects.toMatchObject({ retryable: true });
+    await expect(fetchCompaniesHouseEvents('123456', 'A', { apiKey: 'k', fetchImpl: status(401) })).rejects.toThrow(/401/);
+    await expect(fetchCompaniesHouseEvents('123456', 'A', { apiKey: 'k', fetchImpl: status(404) })).rejects.toThrow(/no company 00123456/);
+    await expect(fetchCompaniesHouseEvents('123456', 'A', { apiKey: 'k', fetchImpl: status(500) })).rejects.toThrow(/HTTP 500/);
+    const never = vi.fn();
+    await expect(fetchCompaniesHouseEvents('123456', 'A', { apiKey: '', fetchImpl: never as never })).rejects.toThrow(/not configured/);
+    expect(never).not.toHaveBeenCalled();
   });
 });
