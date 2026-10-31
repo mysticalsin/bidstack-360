@@ -14,12 +14,13 @@ import { prefetchRoute } from '@/lib/prefetch';
 import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { api } from '@/lib/api';
 import { useAppModules } from '@/hooks/useAppModules';
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
-  NAV_SECTIONS,
+  visibleNavSections,
   isNavItemVisible,
   type NavItem,
   type NavSection,
@@ -40,7 +41,8 @@ export function Sidebar() {
 
   // Hide module-gated items (agent-studio, Collaborate) unless enabled in
   // Settings → Modules; drop a section that ends up empty after filtering.
-  const sections = NAV_SECTIONS.map((s) => ({
+  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
+  const sections = visibleNavSections(quickStartVisible).map((s) => ({
     ...s,
     items: s.items.filter((it) => isNavItemVisible(it, appModules)),
   })).filter((s) => s.items.length > 0);

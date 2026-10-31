@@ -6,12 +6,15 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth, useUser, useRole } from '@/lib/auth';
+import { useOnboardingStore } from '@/stores/onboarding';
 
 export function ProfileSection() {
   const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { role } = useRole();
+  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
+  const setQuickStartVisible = useOnboardingStore((s) => s.setQuickStartVisible);
 
   const seed = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest';
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -69,6 +72,27 @@ export function ProfileSection() {
             </Badge>
           </DetailRow>
         </dl>
+      </Card>
+
+      <Card>
+        <SectionHeader
+          title={t('profile.quickStartTitle', 'Quick Start')}
+          caption={t(
+            'profile.quickStartCaption',
+            'Hidden until you turn it on. After onboarding, hide it again from here.',
+          )}
+        />
+        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 px-5 py-3">
+          <span className="text-sm text-[var(--fg-primary)]">
+            {t('profile.quickStartToggle', 'Show Quick Start in navigation')}
+          </span>
+          <input
+            type="checkbox"
+            className="size-5 accent-[var(--brand-primary)]"
+            checked={quickStartVisible}
+            onChange={(event) => setQuickStartVisible(event.target.checked)}
+          />
+        </label>
       </Card>
     </div>
   );

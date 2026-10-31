@@ -44,6 +44,14 @@ export interface NavSection {
   items: NavItem[];
 }
 
+/** Quick Start stays out of the nav until this person turns it on. */
+export function visibleNavSections(quickStartVisible: boolean): NavSection[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.to !== '/quick-start' || quickStartVisible),
+  })).filter((section) => section.items.length > 0);
+}
+
 export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'home',

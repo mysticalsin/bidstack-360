@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { useUiStore } from '@/stores/ui';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { useAccountHistory } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
@@ -18,7 +19,7 @@ import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, visibleNavSections, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -68,7 +69,8 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
 
   const badges = { openBids, overdueTasks };
   const { data: appModules } = useAppModules();
-  const sections = NAV_SECTIONS.map((s) => ({
+  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
+  const sections = visibleNavSections(quickStartVisible).map((s) => ({
     ...s,
     items: s.items.filter((it) => isNavItemVisible(it, appModules)),
   })).filter((s) => s.items.length > 0);
