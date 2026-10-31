@@ -21,6 +21,10 @@ const MIGRATION = path.resolve(
   here,
   '../../../../packages/db/prisma/migrations/20261031200000_msa_library/migration.sql',
 );
+const PRESALES_MIGRATION = path.resolve(
+  here,
+  '../../../../packages/db/prisma/migrations/20261031231000_presales_msa_write/migration.sql',
+);
 
 let orgId: string | null = null;
 
@@ -68,6 +72,7 @@ describe('seeded org grants', () => {
     ['Account Executive', ['msa:read', 'msa:write']],
     ['Customer Success', ['msa:read', 'msa:write']],
     ['Sales Manager', ['msa:read', 'msa:write']],
+    ['Presales', ['msa:read', 'msa:write']],
     ['SDR', ['msa:read']],
     ['Read-Only', ['msa:read']],
   ])('%s', async (role, expected) => {
@@ -122,5 +127,36 @@ describe('migration grant backfill', () => {
 
     expect(await grants('MSA custom')).toEqual(['msa:read', 'msa:write']);
     expect(await grants('MSA revoked')).toEqual([]);
+  });
+});
+
+describe('20261031231000_presales_msa_write', () => {
+  it('grants msa:write to system Presales roles only, never reviving a revoked grant', async () => {
+    const msaWrite = await prisma.permission.findUniqueOrThrow({ where: { key: 'msa:write' } });
+    const presales = await prisma.role.findFirstOrThrow({ where: { orgId: orgId!, name: 'Presales', isSystem: true } });
+    const custom = await prisma.role.create({ data: { orgId: orgId!, name: 'Presales copy', description: 'test', isSystem: false } });
+    // Simulate an org created before the change.
+    await prisma.rolePermission.deleteMany({ where: { roleId: presales.id, permissionId: msaWrite.id } });
+    expect(await grants('Presales')).toEqual(['msa:read']);
+
+    const sql = readFileSync(PRESALES_MIGRATION, 'utf8');
+    await prisma.$executeRawUnsafe(sql);
+    expect(await grants('Presales')).toEqual(['msa:read', 'msa:write']);
+    expect(await grants('Presales copy')).toEqual([]);
+    expect(await prisma.rolePermission.count({ where: { roleId: custom.id } })).toBe(0);
+
+    // Idempotent, and an admin's explicit revoke sticks.
+    await prisma.$executeRawUnsafe(sql);
+    await prisma.rolePermission.updateMany({
+      where: { roleId: presales.id, permissionId: msaWrite.id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    await prisma.$executeRawUnsafe(sql);
+    expect(await grants('Presales')).toEqual(['msa:read']);
+    await prisma.rolePermission.updateMany({
+      where: { roleId: presales.id, permissionId: msaWrite.id, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    });
+    expect(await grants('Presales')).toEqual(['msa:read', 'msa:write']);
   });
 });

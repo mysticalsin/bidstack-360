@@ -266,6 +266,35 @@ describe('RBAC', () => {
     }
   });
 
+  it('Presales creates agreements and uploads versions on its own, but cannot archive', async () => {
+    const id = await createMsa({ companyId: companyFr, title: `${TAG} presales` }, 'presales');
+    const up = await call({
+      method: 'POST',
+      url: `/msa/${id}/versions/upload-url`,
+      payload: { fileName: 'a.pdf', contentType: 'application/pdf', bytes: 10 },
+      role: 'presales',
+    });
+    expect(up.statusCode, up.body).toBe(200);
+    expect((await call({ method: 'DELETE', url: `/msa/${id}`, role: 'presales' })).statusCode).toBe(403);
+  });
+
+  it('Read-Only sees commercial terms (approved 2026-10-31)', async () => {
+    const id = await createMsa({
+      companyId: companyFr,
+      title: `${TAG} terms`,
+      governingLaw: 'French law',
+      paymentTerms: 'Net 45',
+      liabilityCap: { amountMicros: 2_000_000_000_000, currency: 'EUR' },
+    });
+    const res = await call({ method: 'GET', url: `/msa/${id}`, role: 'read-only' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({
+      governingLaw: 'French law',
+      paymentTerms: 'Net 45',
+      liabilityCap: { amountMicros: 2_000_000_000_000, currency: 'EUR' },
+    });
+  });
+
   it('a role without msa:read is refused every read', async () => {
     const role = await prisma.role.findFirstOrThrow({ where: { orgId: orgA.orgId, name: 'SDR' } });
     const perm = await prisma.permission.findUniqueOrThrow({ where: { key: 'msa:read' } });

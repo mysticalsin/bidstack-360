@@ -243,6 +243,7 @@ export const ROLE_SEEDS = [
         'documents',
         'files',
         'kam',
+        'msa',
         'meetings',
         'proposals',
         'tags',
