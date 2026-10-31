@@ -220,7 +220,7 @@ function seamlessProfile({
   });
 
   return {
-    legalName: company.name ?? fallbackName,
+    legalName: null,
     tradeName: company.name ?? fallbackName,
     domain: resolvedDomain,
     website: resolvedWebsite,

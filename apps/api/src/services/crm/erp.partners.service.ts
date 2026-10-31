@@ -166,7 +166,7 @@ export async function searchLocalCompanies(
       return {
         id: `external_crm:${normalizeName(row.customer)}`,
         name: row.customer,
-        legalName: row.customer,
+        legalName: null,
         domain: derivedDomain,
         website: derivedDomain ? `https://${derivedDomain}/` : null,
         vat: null,

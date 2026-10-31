@@ -192,7 +192,7 @@ export async function upsertVerifiedCompanyEnrichment({
   };
   const confidenceBps = openProfile?.confidenceBps ?? 0;
   const industryCodes = openProfile?.industryLabels ?? [];
-  const legalName = openProfile?.legalName ?? name;
+  const legalName = storedLegalName(openProfile);
   const tradeName = openProfile?.tradeName ?? name;
   const incorporationDate = openProfile?.incorporationDate
     ? new Date(openProfile.incorporationDate)
@@ -224,7 +224,7 @@ export async function upsertVerifiedCompanyEnrichment({
       cacheExpiresAt: new Date(now.getTime() + COMPANY_ENRICHMENT_CACHE_TTL_MS),
     },
     update: {
-      legalName,
+      ...(legalName ? { legalName } : {}),
       tradeName,
       domain,
       website,
@@ -265,6 +265,14 @@ export async function upsertVerifiedCompanyEnrichment({
   });
 
   return { company: serializeCompany(enrichment), domain, providers };
+}
+
+/** A search label is not a legal name. Store one only when the profile already has it. */
+export function storedLegalName(
+  profile: { legalName?: string | null } | null | undefined,
+): string | null {
+  const value = profile?.legalName?.trim();
+  return value ? value : null;
 }
 
 function mergeSourceAttribution(

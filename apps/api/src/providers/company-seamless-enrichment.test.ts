@@ -43,7 +43,8 @@ describe('fetchSeamlessCompany', () => {
       fetchImpl: mockFetch(SAMPLE),
     });
     expect(p).not.toBeNull();
-    expect(p!.legalName).toBe('Sanofi');
+    expect(p!.legalName).toBeNull();
+    expect(p!.tradeName).toBe('Sanofi');
     expect(p!.domain).toBe('sanofi.com');
     expect(p!.website).toBe('https://sanofi.com/');
     expect(p!.description).toBe('R&D-driven biopharma.');

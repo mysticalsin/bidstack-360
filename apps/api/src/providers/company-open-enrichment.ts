@@ -120,7 +120,7 @@ export async function fetchOpenCompanyProfile({
   const confidence = Math.min(1, Math.max(0, best.score));
 
   return {
-    legalName: label,
+    legalName: null,
     tradeName: label,
     domain: resolvedDomain,
     website: resolvedWebsite,

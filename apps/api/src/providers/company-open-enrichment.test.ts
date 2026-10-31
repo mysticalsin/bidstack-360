@@ -63,7 +63,7 @@ describe('company open data verification', () => {
     });
 
     expect(profile).toMatchObject({
-      legalName: 'Microsoft',
+      legalName: null,
       tradeName: 'Microsoft',
       domain: 'microsoft.com',
       website: 'https://www.microsoft.com/',
