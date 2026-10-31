@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 
 const Implication = z.enum(['OPPORTUNITY', 'RISK', 'NEUTRAL']);
 
@@ -65,7 +66,130 @@ export const AccountWatchdogResponse = z.object({
 });
 export type AccountWatchdogResponse = z.infer<typeof AccountWatchdogResponse>;
 
+// Org-wide strip for /dashboard: upcoming results in the next N days and the
+// newest unreviewed signals, limited to accounts the caller can read.
+export const WatchdogFeedResponse = z.object({
+  days: z.number().int(),
+  earnings: z.array(
+    EarningsDate.extend({ companyId: z.string(), companyName: z.string() }),
+  ),
+  alerts: z.array(
+    z.object({
+      id: z.string(),
+      companyId: z.string(),
+      companyName: z.string(),
+      title: z.string(),
+      source: z.string(),
+      occurredAt: z.string(),
+      implication: Implication,
+    }),
+  ),
+  newAlertCount: z.number().int(),
+  // Per-account weekly signal counts for the last HEAT_WEEKS weeks (oldest
+  // first) with the worst implication seen that week: RISK > NEUTRAL > OPP.
+  heat: z.array(
+    z.object({
+      companyId: z.string(),
+      companyName: z.string(),
+      weeks: z.array(z.object({ count: z.number().int(), worst: Implication.nullable() })),
+    }),
+  ),
+  heatWeekStarts: z.array(z.string()),
+});
+export type WatchdogFeedResponse = z.infer<typeof WatchdogFeedResponse>;
+
+const HEAT_WEEKS = 8;
+const WEEK_MS = 7 * 86_400_000;
+const WORST_RANK = { OPPORTUNITY: 1, NEUTRAL: 2, RISK: 3 } as const;
+
 export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
+  server.get(
+    '/watchdog/feed',
+    {
+      preHandler: [server.requirePermission('accounts:read')],
+      schema: {
+        querystring: z.object({ days: z.coerce.number().int().min(1).max(90).default(14) }),
+        response: { 200: WatchdogFeedResponse },
+      },
+    },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const { days } = req.query;
+      const scope = await getAccessScope(orgId, userId);
+      const companies = await prisma.company.findMany({
+        where: applyCompanyScope({ orgId, deletedAt: null }, scope),
+        select: { id: true, name: true },
+        take: 1000,
+      });
+      const names = new Map(companies.map((c) => [c.id, c.name]));
+      const ids = [...names.keys()];
+      const now = new Date();
+      const until = new Date(now.getTime() + days * 86_400_000);
+      const heatFrom = new Date(now.getTime() - HEAT_WEEKS * WEEK_MS);
+      const [earnings, alerts, newAlertCount, recent] = await Promise.all([
+        prisma.accountEarningsDate.findMany({
+          where: { orgId, companyId: { in: ids }, expectedAt: { gte: now, lte: until } },
+          orderBy: { expectedAt: 'asc' },
+          take: 12,
+        }),
+        prisma.accountWatchEvent.findMany({
+          where: { orgId, companyId: { in: ids }, status: 'NEW' },
+          orderBy: [{ severity: 'desc' }, { occurredAt: 'desc' }],
+          take: 5,
+        }),
+        prisma.accountWatchEvent.count({ where: { orgId, companyId: { in: ids }, status: 'NEW' } }),
+        prisma.accountWatchEvent.findMany({
+          where: { orgId, companyId: { in: ids }, occurredAt: { gte: heatFrom, lte: now } },
+          select: { companyId: true, occurredAt: true, implication: true },
+          take: 1000,
+        }),
+      ]);
+      const heatMap = new Map<string, Array<{ count: number; worst: z.infer<typeof Implication> | null }>>();
+      for (const e of recent) {
+        const idx = Math.min(HEAT_WEEKS - 1, Math.floor((e.occurredAt.getTime() - heatFrom.getTime()) / WEEK_MS));
+        let weeks = heatMap.get(e.companyId);
+        if (!weeks) {
+          weeks = Array.from({ length: HEAT_WEEKS }, () => ({ count: 0, worst: null }));
+          heatMap.set(e.companyId, weeks);
+        }
+        const cell = weeks[idx]!;
+        cell.count += 1;
+        if (!cell.worst || WORST_RANK[e.implication] > WORST_RANK[cell.worst]) cell.worst = e.implication;
+      }
+      const heat = [...heatMap.entries()]
+        .map(([companyId, weeks]) => ({ companyId, companyName: names.get(companyId) ?? '', weeks }))
+        .sort((a, b) => b.weeks.reduce((n, w) => n + w.count, 0) - a.weeks.reduce((n, w) => n + w.count, 0))
+        .slice(0, 8);
+      return {
+        days,
+        earnings: earnings.map((d) => ({
+          id: d.id,
+          companyId: d.companyId,
+          companyName: names.get(d.companyId) ?? '',
+          fiscalPeriod: d.fiscalPeriod,
+          expectedAt: d.expectedAt.toISOString(),
+          confirmed: d.confirmed,
+          source: d.source,
+          sourceUrl: d.sourceUrl,
+        })),
+        alerts: alerts.map((e) => ({
+          id: e.id,
+          companyId: e.companyId,
+          companyName: names.get(e.companyId) ?? '',
+          title: e.title,
+          source: e.source,
+          occurredAt: e.occurredAt.toISOString(),
+          implication: e.implication,
+        })),
+        newAlertCount,
+        heat,
+        heatWeekStarts: Array.from({ length: HEAT_WEEKS }, (_, i) =>
+          new Date(heatFrom.getTime() + i * WEEK_MS).toISOString(),
+        ),
+      };
+    },
+  );
+
   server.get(
     '/accounts/:companyId/watchdog',
     {
