@@ -11,7 +11,7 @@
 //  * Meeting counts and "last met" are aggregates over every in-scope meeting
 //    (any visibility), like the meeting-intel coverage map. Meeting titles and
 //    challenges in node detail follow meeting-intel visibility.
-import { Prisma, prisma } from '@bidstack/db';
+import { type Prisma, prisma } from '@bidstack/db';
 import { type OrgChartNode, type OrgChartSource, ORG_CHART_MAX_NODES } from '@bidstack/shared';
 
 import { type AccessScope, applyCompanyScope } from '../lib/access-scope.js';
