@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { mapStoredInsights } from './dashboard.cockpit.js';
+import * as dashboardDefaults from './dashboard.defaults.js';
 import { defaultQueueHealth } from './dashboard.defaults.js';
 import { defaultProviderHealth } from './dashboard.providers.js';
 import { serializeDeal } from './dashboard.queries.js';
@@ -24,6 +25,18 @@ afterEach(() => {
     if (previous === undefined) delete process.env[key];
     else process.env[key] = previous;
   }
+});
+
+describe('account catalogs are not shipped as fallbacks', () => {
+  it('does not export a sample tech stack, demo bid, risk, or compliance row', () => {
+    // WHY: these factories used to fill every account with Microsoft 365,
+    // a SAM.gov demo opportunity, and SOC 2 marked compliant.
+    const exports = dashboardDefaults as Record<string, unknown>;
+    expect(exports.defaultTechnicalStack).toBeUndefined();
+    expect(exports.defaultBidOpportunities).toBeUndefined();
+    expect(exports.defaultRisks).toBeUndefined();
+    expect(exports.defaultCompliance).toBeUndefined();
+  });
 });
 
 describe('queue health is not an invented idle snapshot', () => {
