@@ -85,7 +85,8 @@ describe('HTML import', () => {
     const bruno = body.preview.find((r: { name: string }) => r.name === 'Bruno Costa');
     expect(bruno).toMatchObject({ manager: 'Ana Silva', email: 'bruno.costa@example.com', phone: '+551155550102', hasPhoto: true, action: 'create' });
     expect(bruno.extras).toEqual(expect.arrayContaining(['location', 'tenure', 'career']));
-    expect(body.errors.some((e: { name?: string }) => e.name === 'Felipe Ortiz')).toBe(true);
+    expect(body.errors).toEqual([]);
+    expect(body.warnings.some((e: { name?: string }) => e.name === 'Felipe Ortiz')).toBe(true);
     expect(await prisma.orgChartNode.count({ where: { orgId: orgA.orgId, chart: { companyId: c.map } } })).toBe(0);
     expect(storage.objects.size).toBe(0);
   });

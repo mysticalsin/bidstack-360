@@ -120,7 +120,7 @@ export async function runPeopleImport(
   const errors = [...input.errors];
   let preview: OrgChartImportPreviewRow[] | undefined;
   const fail = (chartVersion: number | null) =>
-    reply.code(422).send({ dryRun: input.dryRun, created: 0, updated: 0, errors: [...warnings, ...errors], chartVersion, ...input.extra, ...(preview ? { preview } : {}) });
+    reply.code(422).send({ dryRun: input.dryRun, created: 0, updated: 0, errors, warnings, chartVersion, ...input.extra, ...(preview ? { preview } : {}) });
   if (errors.length || !rows.length) {
     if (!rows.length && !errors.length) errors.push({ line: 1, message: 'No rows to import' });
     return fail(null);
@@ -412,7 +412,8 @@ export async function runPeopleImport(
       dryRun: input.dryRun,
       created: result.created,
       updated: result.updated,
-      errors: warnings,
+      errors: [],
+      warnings,
       chartVersion: result.chartVersion,
       ...input.extra,
       ...(source === 'html' ? { photos: result.photos, preview } : {}),

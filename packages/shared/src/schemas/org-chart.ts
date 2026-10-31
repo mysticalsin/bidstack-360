@@ -286,6 +286,8 @@ export const OrgChartImportResult = z.object({
   updated: z.number().int(),
   /** `line` is the CSV line, or the person number for HTML imports (name included then). */
   errors: z.array(z.object({ line: z.number().int(), message: z.string(), name: z.string().optional() })),
+  /** Non-blocking notes: values left empty because they were invalid, placeholder root added. */
+  warnings: z.array(z.object({ line: z.number().int(), message: z.string(), name: z.string().optional() })).optional(),
   chartVersion: z.number().int().nullable(),
   /** HTML imports: detected layout, people found, skipped (system accounts) and a preview of every row. */
   format: z.string().optional(),
