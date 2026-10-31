@@ -210,15 +210,18 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.confidence', 'Confidence'),
-      value: `${Math.round(c.confidence * 100)}%`,
+      value:
+        sourceCount > 0
+          ? `${Math.round((c.sourceAttribution.reduce((sum, source) => sum + source.confidence, 0) / sourceCount) * 100)}%`
+          : t('businessSnapshot.value.notScored', 'Not scored'),
       source:
         sourceCount > 0
           ? {
-              label: t('businessSnapshot.source.confidence', 'Confidence'),
-              state: c.confidence >= 0.85 ? 'verified' : 'crm',
+              label: t('businessSnapshot.source.confidence', 'Receipts'),
+              state: 'crm',
               hint: t(
                 'businessSnapshot.source.confidenceHint',
-                'Confidence is derived from attached source receipts.',
+                'Average of attached source receipts. The stored company confidence is not shown.',
               ),
             }
           : {
@@ -226,7 +229,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
               state: 'crm',
               hint: t(
                 'businessSnapshot.source.crmConfidenceHint',
-                'Confidence is derived from the current account record.',
+                'No source receipts are attached, so this is not scored.',
               ),
             },
     },

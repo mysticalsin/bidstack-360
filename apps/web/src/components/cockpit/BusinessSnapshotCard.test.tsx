@@ -154,6 +154,12 @@ describe('BusinessSnapshotCard provenance', () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(sourceBadges).toHaveLength(rows.length);
+    expect(
+      screen.getByTitle(
+        'Average of attached source receipts. The stored company confidence is not shown.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('94%')).toBeNull();
     expect(screen.getByText('Manual')).toBeTruthy();
     expect(screen.getByText('External fresh')).toBeTruthy();
     expect(screen.getAllByText('Company Registry').length).toBeGreaterThan(0);
