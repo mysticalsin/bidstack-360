@@ -171,14 +171,14 @@ export function AccountsAllSegment() {
 
   const healthDistribution = useMemo(
     () => [
-      { key: 'strong', label: t('accounts.health.strong', 'Strong'), count: rows.filter((row) => row.health === 'strong').length },
-      { key: 'good', label: t('accounts.health.good', 'Good'), count: rows.filter((row) => row.health === 'good').length },
+      { key: 'strong', label: t('accounts.health.strong', 'Strong, proxy'), count: rows.filter((row) => row.health === 'strong').length },
+      { key: 'good', label: t('accounts.health.good', 'Good, proxy'), count: rows.filter((row) => row.health === 'good').length },
       {
         key: 'needs_attention',
-        label: t('accounts.health.watch', 'Watch'),
+        label: t('accounts.health.watch', 'Watch, proxy'),
         count: rows.filter((row) => row.health === 'needs_attention').length,
       },
-      { key: 'critical', label: t('accounts.health.risk', 'At risk'), count: rows.filter((row) => row.health === 'critical').length },
+      { key: 'critical', label: t('accounts.health.risk', 'At risk, proxy'), count: rows.filter((row) => row.health === 'critical').length },
     ],
     [rows, t],
   );
@@ -408,6 +408,12 @@ export function AccountsAllSegment() {
             : t('accounts.experience.complete', 'No coverage gaps in the current view.')
         }
       >
+        <p className="mb-3 text-xs text-[var(--fg-secondary)]">
+          {t(
+            'accounts.health.basis',
+            'These bands follow weighted pipeline size. They are not a measured account health score.',
+          )}
+        </p>
         <div className="account-health-bars">
           {healthDistribution.map((item) => {
             const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';

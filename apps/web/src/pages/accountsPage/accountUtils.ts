@@ -128,13 +128,14 @@ export function healthTone(h: AccountRow['health']) {
 }
 
 export function healthLabel(h: AccountRow['health']) {
+  // Pipeline size is not a health score. The word proxy has to travel with the label.
   return h === 'strong'
-    ? 'Strong'
+    ? 'Strong, proxy'
     : h === 'good'
-      ? 'Good'
+      ? 'Good, proxy'
       : h === 'needs_attention'
-        ? 'Watch'
-        : 'At risk';
+        ? 'Watch, proxy'
+        : 'At risk, proxy';
 }
 
 export function titleCase(s: string): string {
