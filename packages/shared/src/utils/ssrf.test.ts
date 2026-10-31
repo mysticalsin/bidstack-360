@@ -57,3 +57,63 @@ describe('assertPublicHttpUrl', () => {
     expect(() => assertPublicHttpUrl('not a url')).toThrow();
   });
 });
+
+describe('isPublicHostname: reserved ranges and IPv6 forms (hardening)', () => {
+  it('blocks IETF, documentation, benchmarking, multicast, reserved and broadcast IPv4', () => {
+    for (const h of [
+      '192.0.0.8',
+      '192.0.2.1',
+      '198.18.0.1',
+      '198.19.255.255',
+      '198.51.100.7',
+      '203.0.113.9',
+      '224.0.0.1',
+      '239.255.255.250',
+      '240.0.0.1',
+      '255.255.255.255',
+    ]) {
+      expect(isPublicHostname(h), h).toBe(false);
+    }
+  });
+
+  it('still allows neighbours of the reserved blocks', () => {
+    for (const h of ['192.0.1.1', '198.17.0.1', '198.20.0.1', '198.51.101.1', '203.0.114.1', '223.255.255.254']) {
+      expect(isPublicHostname(h), h).toBe(true);
+    }
+  });
+
+  it('blocks NAT64-embedded private IPv4 (64:ff9b::a9fe:a9fe = metadata)', () => {
+    expect(isPublicHostname('[64:ff9b::a9fe:a9fe]')).toBe(false);
+    expect(isPublicHostname('64:ff9b::127.0.0.1')).toBe(false);
+    expect(isPublicHostname('64:ff9b:1::1')).toBe(false);
+    expect(isPublicHostname('64:ff9b::808:808')).toBe(true); // 8.8.8.8 via NAT64
+  });
+
+  it('blocks expanded / non-canonical IPv6 loopback and mapped forms', () => {
+    for (const h of [
+      '0:0:0:0:0:0:0:1',
+      '0000:0000:0000:0000:0000:0000:0000:0001',
+      '::0:1',
+      '0:0:0:0:0:ffff:7f00:1',
+      '::127.0.0.1',
+      '::ffff:169.254.169.254',
+      'fe80::1%eth0',
+    ]) {
+      expect(isPublicHostname(h), h).toBe(false);
+    }
+  });
+
+  it('blocks multicast, site-local, documentation IPv6 and malformed literals', () => {
+    for (const h of ['ff02::1', 'fec0::1', '2001:db8::1', '100::1', '1:2:3', '::1::2', 'gggg::1']) {
+      expect(isPublicHostname(h), h).toBe(false);
+    }
+    expect(isPublicHostname('2606:4700:4700::1111')).toBe(true);
+  });
+
+  it('blocks internal-by-convention hostnames', () => {
+    for (const h of ['metadata.google.internal', 'app.localhost', 'printer.home.arpa', 'localhost.', 'metadata']) {
+      expect(isPublicHostname(h), h).toBe(false);
+    }
+    expect(isPublicHostname('internal.example.com')).toBe(true);
+  });
+});
