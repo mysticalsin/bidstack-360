@@ -1,10 +1,11 @@
 import path from 'node:path';
 import dotenvFlow from 'dotenv-flow';
+import { loadTestEnv } from '../../scripts/load-test-env.mjs';
 import { defineConfig } from 'vitest/config';
 
 // Load env from repo root so REDIS_URL is available to BullMQ probes regardless
 // of which cwd vitest is launched from.
-dotenvFlow.config({ path: path.resolve(__dirname, '../..'), silent: true });
+loadTestEnv(dotenvFlow, path.resolve(__dirname, '../..'));
 
 export default defineConfig({
   test: {

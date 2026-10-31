@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 import dotenvFlow from 'dotenv-flow';
+import { loadTestEnv } from '../../scripts/load-test-env.mjs';
 
-// Load .env from repo root before tests run so DATABASE_URL is set when
-// integration tests probe Postgres.
-dotenvFlow.config({ path: path.resolve(__dirname, '../..'), silent: true });
+// Load only connection settings (DATABASE_URL, REDIS_URL, ...) from the repo-root
+// .env files; feature flags there must not change test outcomes.
+loadTestEnv(dotenvFlow, path.resolve(__dirname, '../..'));
 
 export default defineConfig({
   test: {

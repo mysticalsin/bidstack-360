@@ -1,11 +1,12 @@
 import path from 'node:path';
 
 import dotenvFlow from 'dotenv-flow';
+import { loadTestEnv } from '../../scripts/load-test-env.mjs';
 import { defineConfig } from 'vitest/config';
 
 // Keep DB package integration tests aligned with apps/api: load the root env
 // before Prisma constructs clients, but never print secret values.
-dotenvFlow.config({ path: path.resolve(__dirname, '../..'), silent: true });
+loadTestEnv(dotenvFlow, path.resolve(__dirname, '../..'));
 
 export default defineConfig({
   test: {
