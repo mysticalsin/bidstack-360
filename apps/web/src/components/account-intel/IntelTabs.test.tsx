@@ -190,4 +190,28 @@ describe('IntelTabs source badges', () => {
       screen.getByTestId('product-product-1-field-source-currency').getAttribute('aria-label'),
     ).toBe('Currency source: Currency set by finance owner.');
   });
+
+  it('does not print 0% when an extract was not scored', () => {
+    render(
+      <SolutionsTab
+        solutions={[
+          {
+            id: 'solution-1',
+            name: 'Cloud modernization',
+            description: 'Migration and landing-zone advisory.',
+            category: 'consulting',
+            status: 'active',
+            confidenceBps: 0,
+            extractedFromDocumentId: files[0]!.id,
+          },
+        ]}
+        files={files}
+        onDelete={vi.fn()}
+        isDeleting={false}
+      />,
+    );
+
+    expect(screen.getByTestId('solution-solution-1-confidence').textContent).toContain('Not scored');
+    expect(screen.getByTestId('solution-solution-1-confidence').textContent).not.toContain('0%');
+  });
 });

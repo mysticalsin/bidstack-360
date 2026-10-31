@@ -6,7 +6,17 @@ import {
   deterministicExtract,
   extractRequirementCandidates,
   normalizeWinLoss,
+  recordedExtractionConfidence,
 } from './document-extract-analysis.js';
+
+describe('recordedExtractionConfidence', () => {
+  it('does not treat a Dust run id or a keyword extract as a measured score', () => {
+    expect(recordedExtractionConfidence()).toEqual({
+      confidenceBps: 0,
+      confidenceBasis: 'not_scored',
+    });
+  });
+});
 
 describe('bid document extraction helpers', () => {
   it('turns RFP text into source chunks and cited requirement candidates', () => {

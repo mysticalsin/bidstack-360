@@ -31,7 +31,11 @@ import { resolveOrgLlm } from '../lib/org-llm.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import type { ContractExtractionDraft } from '@bidstack/shared';
 
-import { deterministicExtract, normalizeWinLoss } from './document-extract-analysis.js';
+import {
+  deterministicExtract,
+  normalizeWinLoss,
+  recordedExtractionConfidence,
+} from './document-extract-analysis.js';
 import { writeBidWorkspaceArtifacts } from './document-extract-db.js';
 import type { ExtractionResult, WinLossSignal } from './document-extract-types.js';
 
@@ -187,6 +191,7 @@ function accountIntelExtractionMetadata(input: {
       documentId: input.documentId,
       extractor: input.dustRunId ? 'dust' : 'deterministic',
       dustRunId: input.dustRunId,
+      confidenceBasis: recordedExtractionConfidence().confidenceBasis,
     },
   };
 }
@@ -317,14 +322,14 @@ async function processJobData(
         description: s.description || null,
         category: s.category,
         extractedFromDocumentId: documentId,
-        confidenceBps: dustRunId ? 8500 : 5200,
+        confidenceBps: recordedExtractionConfidence().confidenceBps,
         metadata: extractionMetadata,
       },
       update: {
         description: s.description || null,
         category: s.category,
         extractedFromDocumentId: documentId,
-        confidenceBps: dustRunId ? 8500 : 5200,
+        confidenceBps: recordedExtractionConfidence().confidenceBps,
         metadata: extractionMetadata,
       },
     });
@@ -341,14 +346,14 @@ async function processJobData(
         description: p.description || null,
         category: p.category,
         extractedFromDocumentId: documentId,
-        confidenceBps: dustRunId ? 8500 : 5200,
+        confidenceBps: recordedExtractionConfidence().confidenceBps,
         metadata: extractionMetadata,
       },
       update: {
         description: p.description || null,
         category: p.category,
         extractedFromDocumentId: documentId,
-        confidenceBps: dustRunId ? 8500 : 5200,
+        confidenceBps: recordedExtractionConfidence().confidenceBps,
         metadata: extractionMetadata,
       },
     });
