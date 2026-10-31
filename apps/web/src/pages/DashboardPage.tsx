@@ -241,8 +241,27 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       <KpiRow cockpit={cockpit} />
       <CommandCenter cockpit={cockpit} />
 
+      {(show('revenueEvolution') || show('winLoss') || show('pipelineStage')) && (
+        <div className="mb-4 grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          {show('revenueEvolution') && <RevenueEvolutionCard cockpit={cockpit} />}
+          {show('winLoss') && <WinLossCard cockpit={cockpit} />}
+          {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
+        </div>
+      )}
+
       <section className="cockpit-grid" aria-label={t('dashboard.accountCockpitAria', 'Account cockpit')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          {(show('businessSnapshot') || show('openIssues')) && (
+            <Reveal delay={0.04}>
+              <div className="dash-row-3">
+                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
+                {show('openIssues') && (
+                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
+                )}
+              </div>
+            </Reveal>
+          )}
+
           {show('techStack') && (
             <Reveal>
               <TechStackCard cockpit={cockpit} />
@@ -252,18 +271,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('techStack') && (
             <Reveal delay={0.04}>
               <FundingEligibilityCard cockpit={cockpit} />
-            </Reveal>
-          )}
-
-          {(show('businessSnapshot') || show('openIssues') || show('pipelineStage')) && (
-            <Reveal delay={0.04}>
-              <div className="dash-row-3">
-                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
-                {show('openIssues') && (
-                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
-                )}
-                {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
-              </div>
             </Reveal>
           )}
 
@@ -315,21 +322,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
 
         <aside className="cockpit-side" aria-label={t('dashboard.cockpitDetailsAria', 'Cockpit details')}>
-          {show('healthScore') && (
-            <Reveal>
-              <HealthScoreCard cockpit={cockpit} />
-            </Reveal>
-          )}
-          {show('revenueEvolution') && (
-            <Reveal delay={0.02}>
-              <RevenueEvolutionCard cockpit={cockpit} />
-            </Reveal>
-          )}
-          {show('winLoss') && (
-            <Reveal delay={0.03}>
-              <WinLossCard cockpit={cockpit} />
-            </Reveal>
-          )}
           {show('winLossReasons') && (
             <Reveal delay={0.03}>
               <WinLossReasonsCard closedOpps={closedOpps} />
@@ -376,6 +368,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('accountIntel') && accountId && (
             <Reveal delay={0.28}>
               <AccountIntelPanel accountId={accountId} />
+            </Reveal>
+          )}
+          {show('healthScore') && (
+            <Reveal delay={0.3}>
+              <HealthScoreCard cockpit={cockpit} />
             </Reveal>
           )}
         </aside>

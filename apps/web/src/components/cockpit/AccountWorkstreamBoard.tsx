@@ -46,7 +46,7 @@ export function AccountWorkstreamBoard({
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {t(
             'accountWorkstreams.caption',
-            'Pursuit, delivery, renewal, and expansion stay separate. A closed outcome does not replace the others. Renewal and expansion appear only when the stage says so.',
+            'Four lanes. A closed outcome stays off them, and a title is not a lane.',
           )}
         </p>
       </div>
@@ -71,7 +71,7 @@ export function AccountWorkstreamBoard({
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {t(
             'accountWorkstreams.rolesCaption',
-            'An empty slot is unknown. A job title does not fill it. The buying-group diagram stays on the opportunity.',
+            'Empty means unknown. A title does not fill a role.',
           )}
         </p>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
