@@ -105,6 +105,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               country: true,
               territoryId: true,
               updatedAt: true,
+              closedAt: true,
               viewCount: true,
               bidClass: true,
               // Two scalars, no JSONB: the governance panel needs the inputs the

@@ -379,6 +379,8 @@ model Company {
   children      Company[]        @relation("CompanyHierarchy")
   contacts      Contact[]
   opportunities Opportunity[]
+  contractAgreements ContractAgreement[]
+  projectReferences  ProjectReference[]
   notes         Note[]
   files         FileAttachment[]
 
@@ -519,6 +521,10 @@ model Opportunity {
   bidClass         String?          @map("bid_class")
   fteEstimate      Float?           @map("fte_estimate")
   commitmentLevel  String?          @map("commitment_level")
+  /// When the deal entered closed_won/closed_lost. Maintained by the
+  /// opportunities_closed_at trigger (set on entering a closed stage, cleared on
+  /// reopening) so every writer stays correct. Backfilled from due date.
+  closedAt         DateTime?        @map("closed_at") @db.Timestamptz(6)
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -554,6 +560,7 @@ model Opportunity {
   @@index([orgId, ownerId], map: "opps_org_owner_idx")
   @@index([orgId, customer], map: "opps_org_customer_idx")
   @@index([orgId, companyId], map: "opps_org_company_idx")
+  @@index([orgId, closedAt], map: "opps_org_closed_at_idx")
   @@index([orgId])
   @@index([companyId])
   @@index([territoryId])
@@ -5244,6 +5251,9 @@ model ContractAgreement {
   id                 String               @id @default(uuid()) @db.Uuid
   orgId              String               @map("org_id") @db.Uuid
   accountKey         String               @map("account_key")
+  /// Resolved account link (backfilled from accountKey: id, exact name or slug,
+  /// only when exactly one company matches). accountKey stays the source of truth.
+  companyId          String?              @map("company_id") @db.Uuid
   kind               ContractKind         @default(msa)
   reference          String
   countries          String[]             @default([]) @map("countries")
@@ -5271,8 +5281,10 @@ model ContractAgreement {
 
   org        Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sourceFile FileAttachment? @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  company    Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
+  @@index([orgId, companyId], map: "contract_agreements_org_company_idx")
   @@index([orgId, status], map: "contract_agreements_org_status_idx")
   @@index([deletedAt])
   @@map("contract_agreements")
@@ -5398,6 +5410,8 @@ model ProjectReference {
   id               String                 @id @default(uuid()) @db.Uuid
   orgId            String                 @map("org_id") @db.Uuid
   accountKey       String                 @map("account_key")
+  /// Resolved account link, same rules as ContractAgreement.companyId.
+  companyId        String?                @map("company_id") @db.Uuid
   title            String
   technicalSummary String?                @map("technical_summary")
   businessSummary  String?                @map("business_summary")
@@ -5409,9 +5423,11 @@ model ProjectReference {
   updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime?              @map("deleted_at") @db.Timestamptz(6)
 
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([orgId, accountKey], map: "project_references_org_account_idx")
+  @@index([orgId, companyId], map: "project_references_org_company_idx")
   @@index([deletedAt])
   @@map("project_references")
 }

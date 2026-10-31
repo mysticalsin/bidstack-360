@@ -32,6 +32,7 @@ type SerializedOpportunity = {
   country: string | null;
   territoryId: string | null;
   updatedAt: Date;
+  closedAt?: Date | null;
   viewCount: number | null;
   bidClass?: string | null;
   fteEstimate?: number | null;
@@ -88,6 +89,7 @@ export function serializeOpportunity(
     territoryId: o.territoryId ?? null,
     territoryName: o.territory?.name ?? null,
     updatedAt: o.updatedAt.toISOString(),
+    closedAt: o.closedAt ? o.closedAt.toISOString() : null,
     taskCount: counts?.taskCount ?? 0,
     commentCount: counts?.commentCount ?? 0,
     viewCount: o.viewCount ?? 0,

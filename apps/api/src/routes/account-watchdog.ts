@@ -225,8 +225,8 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         }),
         prisma.opportunity.findMany({
           where: { orgId, companyId, stage: { in: ['closed_won', 'closed_lost'] } },
-          select: { id: true, name: true, stage: true, valueMicros: true, updatedAt: true },
-          orderBy: { updatedAt: 'desc' },
+          select: { id: true, name: true, stage: true, valueMicros: true, updatedAt: true, closedAt: true },
+          orderBy: [{ closedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
           take: 50,
         }),
       ]);
@@ -236,7 +236,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         name: o.name,
         outcome: o.stage === 'closed_won' ? ('won' as const) : ('lost' as const),
         valueMicros: o.valueMicros.toString(),
-        closedAt: o.updatedAt.toISOString(),
+        closedAt: (o.closedAt ?? o.updatedAt).toISOString(),
       }));
 
       const history = [

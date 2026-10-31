@@ -72,6 +72,8 @@ export const Opportunity = z.object({
   territoryId: z.string().uuid().nullable(),
   territoryName: z.string().nullable(),
   updatedAt: z.string().datetime(),
+  // When the bid entered a closed stage (DB trigger maintained). Null while open.
+  closedAt: z.string().datetime().nullable().optional(),
   taskCount: z.number().int().min(0).default(0),
   commentCount: z.number().int().min(0).default(0),
   viewCount: z.number().int().min(0).default(0),
