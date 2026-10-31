@@ -506,6 +506,7 @@ export function buildCockpit({
   contacts: Array<{
     id: string;
     customer: string;
+    companyId: string | null;
     name: string;
     role: string | null;
     email: string | null;
@@ -553,6 +554,14 @@ export function buildCockpit({
       opp.stage !== 'closed_won' &&
       opp.stage !== 'closed_lost',
   );
+  const accountContacts = contacts
+    .filter((contact) => contact.companyId === company.id)
+    .slice()
+    .sort((a, b) => {
+      const influenceDelta = (b.influence ?? -1) - (a.influence ?? -1);
+      if (influenceDelta !== 0) return influenceDelta;
+      return a.name.localeCompare(b.name);
+    });
   const annualRevenue = company.annualRevenueMicros
     ? formatMicrosCompact(company.annualRevenueMicros)
     : 'Not verified';
@@ -714,30 +723,27 @@ export function buildCockpit({
         : []),
     ],
     technicalStack: resolveCockpitTechnicalStack(company.technicalStack ?? [], fieldOverrides),
-    // Score on THIS company's contacts/tasks only. The org-wide dashboard path
-    // passes every org row; the single-company path passes pre-filtered rows —
-    // scoping here keeps the score identical across both entry points.
+    // Score on THIS company's contacts/tasks only. A matching customer string
+    // is not a link: historical rows keep companyId null until someone confirms
+    // them, and a contact linked to another company must not land here.
     health: computeSignalCoverage({
       company,
-      contacts: contacts.filter((c) => c.customer === company.name),
+      contacts: accountContacts,
       openDeals,
       tasks: tasks.filter((t) => t.opportunity?.customer === company.name),
     }),
-    keyContacts: contacts
-      .filter((contact) => contact.customer === company.name)
-      .slice(0, 5)
-      .map((contact) => ({
-        id: contact.id,
-        source: 'external_crm',
-        companyId: company.id,
-        name: contact.name,
-        title: contact.role,
-        email: contact.email,
-        phone: contact.phone,
-        influence: contact.influence,
-        roleInDecision: null,
-        updatedAt: contact.createdAt.toISOString(),
-      })),
+    keyContacts: accountContacts.slice(0, 5).map((contact) => ({
+      id: contact.id,
+      source: 'external_crm',
+      companyId: contact.companyId,
+      name: contact.name,
+      title: contact.role,
+      email: contact.email,
+      phone: contact.phone,
+      influence: contact.influence,
+      roleInDecision: null,
+      updatedAt: contact.createdAt.toISOString(),
+    })),
     recentActivity: buildActivities(
       tasks.filter((task) => task.opportunity?.customer === company.name),
     ).slice(0, 5),

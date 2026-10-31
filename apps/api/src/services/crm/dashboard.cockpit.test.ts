@@ -227,6 +227,7 @@ describe('buildCockpit recorded facts only', () => {
         {
           id: 'c1',
           customer: 'Acme',
+          companyId: 'mantu',
           name: 'Ada',
           role: 'CIO',
           email: 'ada@acme.com',
@@ -246,8 +247,68 @@ describe('buildCockpit recorded facts only', () => {
     expect(cockpit.compliance).toEqual([]);
     expect(cockpit.roadmap).toEqual([]);
     expect(cockpit.keyContacts[0]?.roleInDecision).toBeNull();
+    expect(cockpit.keyContacts[0]?.companyId).toBe('mantu');
     expect(JSON.stringify(cockpit)).not.toContain('Microsoft 365');
     expect(JSON.stringify(cockpit)).not.toContain('SOC 2');
+  });
+
+  it('links a person only through companyId, never a matching customer string', () => {
+    // Why: a shared display name used to stamp this account's id onto an
+    // unlinked contact, so the cockpit and the people map disagreed.
+    const contact = {
+      name: 'Ada',
+      role: 'CIO',
+      email: null,
+      phone: null,
+      influence: 4,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    const cockpit = buildCockpit({
+      company: company({ id: 'co-dnb', name: 'DNB' }),
+      companies: [],
+      opportunities: [],
+      contacts: [
+        { ...contact, id: 'linked', customer: 'DNB Bank ASA', companyId: 'co-dnb' },
+        { ...contact, id: 'name-only', customer: 'DNB', companyId: null },
+        { ...contact, id: 'other-company', customer: 'DNB', companyId: 'co-other' },
+      ],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+
+    expect(cockpit.keyContacts.map((person) => person.id)).toEqual(['linked']);
+    expect(cockpit.keyContacts[0]?.companyId).toBe('co-dnb');
+  });
+
+  it('orders linked people by recorded influence, with no influence last', () => {
+    // Why: the card says these are the key people. Alphabetical order would
+    // present a low-influence name as more important than a recorded 5.
+    const contact = {
+      customer: 'DNB',
+      companyId: 'co-dnb',
+      role: null,
+      email: null,
+      phone: null,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    const cockpit = buildCockpit({
+      company: company({ id: 'co-dnb', name: 'DNB' }),
+      companies: [],
+      opportunities: [],
+      contacts: [
+        { ...contact, id: 'ada', name: 'Ada', influence: 1 },
+        { ...contact, id: 'no-score', name: 'Bea', influence: null },
+        { ...contact, id: 'cio', name: 'Cara', influence: 5 },
+      ],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+
+    expect(cockpit.keyContacts.map((person) => person.id)).toEqual(['cio', 'ada', 'no-score']);
   });
 });
 

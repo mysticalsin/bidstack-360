@@ -372,10 +372,11 @@ export async function buildCompanyCockpit(
         take: 100,
       }),
       prismaClient.contact.findMany({
-        where: { orgId, customer: company.name },
+        where: { orgId, companyId, deletedAt: null },
         select: {
           id: true,
           customer: true,
+          companyId: true,
           name: true,
           role: true,
           email: true,
@@ -383,7 +384,7 @@ export async function buildCompanyCockpit(
           influence: true,
           createdAt: true,
         },
-        orderBy: { name: 'asc' },
+        orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
         take: 20,
       }),
       prismaClient.task.findMany({

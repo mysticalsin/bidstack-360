@@ -54,6 +54,10 @@ import { normalizeName } from './dashboard.utils.js';
 
 const DASHBOARD_ACTIVITY_LIMIT = 12;
 
+function isCompanyUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
 export type LoggerLike = {
   warn: (obj: unknown, msg?: string) => void;
 };
@@ -77,7 +81,6 @@ export async function buildDashboardSnapshot(
 
   const [
     opportunities,
-    contacts,
     tasks,
     enrichments,
     persistedInsights,
@@ -121,21 +124,6 @@ export async function buildDashboardSnapshot(
       },
       orderBy: { updatedAt: 'desc' },
       take: 100,
-    }),
-    prisma.contact.findMany({
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        customer: true,
-        name: true,
-        role: true,
-        email: true,
-        phone: true,
-        influence: true,
-        createdAt: true,
-      },
-      orderBy: { name: 'asc' },
-      take: 200,
     }),
     prisma.task.findMany({
       where: taskWhere,
@@ -342,7 +330,7 @@ export async function buildDashboardSnapshot(
       if (index >= 0) companies[index] = refreshed;
     }
   }
-  const [fieldOverrides, performance] = await Promise.all([
+  const [fieldOverrides, performance, contacts] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },
       select: { fieldKey: true, value: true },
@@ -351,6 +339,26 @@ export async function buildDashboardSnapshot(
     // Account-scoped aggregate — the org-wide `opportunities` array above is
     // a 100-row sample and must NOT back the selected account's win/loss.
     fetchAccountPerformance(orgId, selectedCompany.name, prisma, scope),
+    // People for this account only. A 200-row org sample ordered by name
+    // dropped linked contacts, and a matching customer string is not a link.
+    isCompanyUuid(selectedCompany.id)
+      ? prisma.contact.findMany({
+          where: { orgId, companyId: selectedCompany.id, deletedAt: null },
+          select: {
+            id: true,
+            customer: true,
+            companyId: true,
+            name: true,
+            role: true,
+            email: true,
+            phone: true,
+            influence: true,
+            createdAt: true,
+          },
+          orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
+          take: 20,
+        })
+      : Promise.resolve([]),
   ]);
 
   return {
