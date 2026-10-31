@@ -5,18 +5,30 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import type { IntelPayload } from '@bidstack/shared';
+
+import { financialHonesty, type FinancialHonesty } from './intel-honesty';
 
 // ── tiny utility used by all financial rows ──────────────────────────────────
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <span className="text-xs text-[var(--fg-tertiary)]">{label}</span>
-      <span className="font-medium text-[var(--fg-primary)] tabular-nums">{value}</span>
+      <span className="text-right text-xs font-medium text-[var(--fg-primary)]">{value}</span>
     </div>
   );
+}
+
+function honestyLabel(
+  t: (key: string, defaultValue: string) => string,
+  value: unknown,
+): string {
+  const label: FinancialHonesty = financialHonesty(value);
+  if (label === 'unknown') return t('intelCards.financial.unknown', 'unknown');
+  if (label === 'proxy') return t('intelCards.financial.proxy', 'proxy');
+  return t('intelCards.financial.sourceNotProbed', 'source not probed');
 }
 
 // ── cards ─────────────────────────────────────────────────────────────────────
@@ -69,31 +81,28 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
 export function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
   const f = intel.financial;
   const { t } = useTranslation('crm');
+  // The financial block has no source receipt. A stored number is a proxy;
+  // a provider name or raw object is not a query we ran.
+  const label = (value: unknown) => honestyLabel(t, value);
   return (
     <Card>
       <SectionHeader
         title={t('intelCards.financial.title', 'Financial health')}
-        caption={f?.ticker ?? t('intelCards.financial.private', 'Private')}
+        caption={t('intelCards.financial.sourceNotProbed', 'source not probed')}
       />
       <div className="p-5 space-y-3 text-sm">
-        <Row
-          label={t('intelCards.financial.marketCap', 'Market cap')}
-          value={f?.marketCap ? formatMoney(f.marketCap, 'USD') : '—'}
-        />
-        <Row
-          label={t('intelCards.financial.revenueTtm', 'Revenue (TTM)')}
-          value={f?.revenueAnnual ? formatMoney(f.revenueAnnual, 'USD') : '—'}
-        />
-        <Row
-          label={t('intelCards.financial.growth', 'Growth')}
-          value={f?.revenueGrowth != null ? `${(f.revenueGrowth * 100).toFixed(1)}%` : '—'}
-        />
+        <Row label={t('intelCards.financial.marketCap', 'Market cap')} value={label(f?.marketCap)} />
+        <Row label={t('intelCards.financial.revenueTtm', 'Revenue (TTM)')} value={label(f?.revenueAnnual)} />
+        <Row label={t('intelCards.financial.growth', 'Growth')} value={label(f?.revenueGrowth)} />
         <Row
           label={t('intelCards.financial.ebitdaMargin', 'EBITDA margin')}
-          value={f?.ebitdaMargin != null ? `${(f.ebitdaMargin * 100).toFixed(1)}%` : '—'}
+          value={label(f?.ebitdaMargin)}
         />
-        <Row label={t('intelCards.financial.creditRating', 'Credit rating')} value={f?.creditRating ?? '—'} />
-        <Row label={t('intelCards.financial.headcount', 'Headcount')} value={f?.headcount?.toLocaleString() ?? '—'} />
+        <Row
+          label={t('intelCards.financial.creditRating', 'Credit rating')}
+          value={label(f?.creditRating)}
+        />
+        <Row label={t('intelCards.financial.headcount', 'Headcount')} value={label(f?.headcount)} />
       </div>
     </Card>
   );

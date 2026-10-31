@@ -45,6 +45,7 @@ import {
   NewsCard,
 } from './opportunityDetail/IntelCards';
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
+import { recordedProbability } from './opportunityDetail/intel-honesty';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 
 export function OpportunityDetailPage() {
@@ -340,16 +341,22 @@ export function OpportunityDetailPage() {
               </Button>
             )}
             <span className="inline-flex min-h-11 items-center gap-2 text-sm text-[var(--fg-secondary)]">
-              <InlineEditNumber
-                value={data.probability}
-                onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
-                label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
-                min={0}
-                max={100}
-                step={5}
-                suffix="%"
-              />
-              <span>{t('opportunityDetail.likely', 'likely')}</span>
+              {recordedProbability(data.probability) !== null ? (
+                <>
+                  <InlineEditNumber
+                    value={data.probability}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
+                    label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
+                    min={0}
+                    max={100}
+                    step={5}
+                    suffix="%"
+                  />
+                  <span>
+                    {t('opportunityDetail.storedProbabilityProxy', 'stored probability proxy')}
+                  </span>
+                </>
+              ) : null}
               <InlineEditDate
                 value={data.dueDate}
                 onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}

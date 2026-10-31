@@ -16,10 +16,10 @@ export function IntegrationMotionRail({
   const visible = providers.length
     ? providers.slice(0, 8)
     : [
-        { name: 'ERP', status: 'healthy' },
-        { name: 'External CRM', status: 'healthy' },
+        { name: 'ERP', status: 'unverified' },
+        { name: 'External CRM', status: 'unverified' },
         { name: 'External Intelligence', status: 'disabled' },
-        { name: 'Market data', status: 'healthy' },
+        { name: 'Market data', status: 'unverified' },
       ];
   return (
     <div
@@ -41,7 +41,7 @@ export function IntegrationMotionRail({
         ))}
       </div>
       <span className="rail-caption">
-        {t('accountDashboardWidgets.railCaption', 'ERP, External CRM, verified data connectors')}
+        {t('accountDashboardWidgets.railCaption', 'ERP, External CRM, data connectors')}
       </span>
     </div>
   );

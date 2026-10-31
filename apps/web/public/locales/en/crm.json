@@ -1629,6 +1629,7 @@
     "editValueLabel": "Edit deal value (EUR)",
     "editProbabilityLabel": "Edit probability",
     "likely": "likely",
+    "storedProbabilityProxy": "stored probability proxy",
     "editDueDateLabel": "Edit due date",
     "liveCollaborationLabel": "Live collaboration"
   },
@@ -2839,6 +2840,9 @@
     "financial": {
       "title": "Financial health",
       "private": "Private",
+      "sourceNotProbed": "source not probed",
+      "unknown": "unknown",
+      "proxy": "proxy",
       "marketCap": "Market cap",
       "revenueTtm": "Revenue (TTM)",
       "growth": "Growth",
@@ -3866,7 +3870,7 @@
   "accountDashboardWidgets": {
     "railAriaLabel": "CRM integration status",
     "railLabel": "Integration activity",
-    "railCaption": "ERP, External CRM, verified data connectors"
+    "railCaption": "ERP, External CRM, data connectors"
   },
   "oppIndustryBreakdown": {
     "title": "Pipeline by industry",
