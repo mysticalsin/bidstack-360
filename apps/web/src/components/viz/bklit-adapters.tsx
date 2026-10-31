@@ -50,7 +50,7 @@ export function WinRateLine({ data }: { data: Array<{ x: string; date: Date; rat
   if (data.length < 2) return null;
   return (
     <div aria-hidden className="viz-bk">
-      <LineChart data={data as unknown as Record<string, unknown>[]} aspectRatio="2.6 / 1" margin={MARGIN} animationDuration={reduced ? 0 : 1100}>
+      <LineChart data={data as unknown as Record<string, unknown>[]} aspectRatio="2.6 / 1" margin={{ ...MARGIN, left: 32, right: 32 }} animationDuration={reduced ? 0 : 1100}>
         <Grid horizontal numTicksRows={2} strokeDasharray="0" stroke="var(--viz-line)" />
         <Line dataKey="rate" curve={curveMonotoneX} stroke={BRAND} strokeWidth={2} />
         <XAxis numTicks={data.length} tickMode="data" labels={data.map((d) => d.x)} />
@@ -70,7 +70,7 @@ export function QuarterBars({ data, format }: { data: Array<{ label: string; won
   if (!data.length) return null;
   return (
     <div aria-hidden className="viz-bk">
-      <BarChart data={data} xDataKey="label" aspectRatio="2.6 / 1" margin={{ ...MARGIN, top: 24 }} barGap={0.3}
+      <BarChart data={data} xDataKey="label" aspectRatio="2.6 / 1" margin={{ ...MARGIN, top: 24, left: 28, right: 28 }} barGap={0.3}
         animationDuration={reduced ? 0 : 900} enterTransition={reduced ? { duration: 0 } : undefined}>
         <Grid horizontal numTicksRows={3} strokeDasharray="0" stroke="var(--viz-line)" />
         <Bar dataKey="won" fill={WON} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />

@@ -178,3 +178,10 @@
 .dash-hero-pulse { display: flex; align-items: center; gap: 8px; margin-left: auto; align-self: flex-start; text-align: right; }
 .dash-hero-pulse .viz-meta { max-width: 160px; }
 .acct-health .pulse-orb { margin-right: 4px; }
+
+/* ---------- Performance card (kokonutui SmoothTab) ---------- */
+/* Inner views drop their own card chrome: one surface, no card-in-card. */
+.dash-perf .viz { background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
+.dash-perf [role='tablist'] button { min-height: 32px; }
+/* Charts draw labels outside their svg box; hide them on off-screen panels so they cannot bleed into the active one. */
+.dash-perf [role='tabpanel'][inert] svg { visibility: hidden; }

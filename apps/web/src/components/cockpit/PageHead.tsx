@@ -15,6 +15,7 @@ import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { MetricSpark } from '@/components/viz/bklit-adapters';
 import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
+import CommandButton from '@/components/kokonutui/command-button';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
@@ -177,17 +178,17 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           </button>
         ) : null}
         {linkedOpp ? (
-          <button
-            type="button"
-            className="btn btn-primary"
+          <CommandButton
+            tone="primary"
+            shortcut="shift+b"
             onClick={() => setBriefOpen(true)}
-            title={t('pageHead.generateBriefTitle', 'Generate brief for {{name}}', {
+            title={t('pageHead.generateBriefTitle', 'Generate brief for {{name}} (Shift+B)', {
               name: linkedOpp.name,
             })}
           >
             <Icon name="sparkle" size={14} />
             {t('pageHead.generateBrief', 'Generate brief')}
-          </button>
+          </CommandButton>
         ) : accountView ? (
           <CreateOpportunityDialog
             defaultCustomer={cockpit.company.name}

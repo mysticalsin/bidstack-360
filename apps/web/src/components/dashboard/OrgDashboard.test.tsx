@@ -31,6 +31,7 @@ vi.mock('./DashboardVisuals', () => ({
   ForecastCard: () => <div />,
   WinRateTrendCard: () => <div />,
   TopAccountsBarCard: () => <div />,
+  PerformanceCard: () => <div data-testid="dashboard-performance" />,
   WatchdogHeatCard: () => <div />,
   EarningsCard: () => <div />,
 }));

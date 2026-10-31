@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useOpportunityBrief } from '@/hooks/useOpportunityBrief';
+import AITextLoading from '@/components/kokonutui/ai-text-loading';
 
 interface Props {
   opportunityId: string | undefined;
@@ -42,7 +43,19 @@ export function BriefingDialog({ opportunityId, opportunityLabel, open, onOpenCh
           )}
         >
           {brief.isPending ? (
-            <LoadingSkeleton rows={6} />
+            <div className="grid gap-4" data-testid="brief-generating">
+              <AITextLoading
+                className="justify-start text-base font-medium text-[var(--fg-secondary)]"
+                label={t('briefing.generating', 'Generating brief')}
+                texts={[
+                  t('briefing.step1', 'Reading the account'),
+                  t('briefing.step2', 'Weighing the signals'),
+                  t('briefing.step3', 'Drafting the brief'),
+                ]}
+                interval={1600}
+              />
+              <LoadingSkeleton rows={6} />
+            </div>
           ) : brief.isError ? (
             <ErrorState
               title={t('briefing.errorTitle', "Couldn't generate brief")}

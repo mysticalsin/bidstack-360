@@ -2,11 +2,12 @@
 // rows (opportunities, pipeline report, forecast projection, watchdog feed).
 import { Link } from 'react-router-dom';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { ChartCard, SignalLegend, SignalShape } from '@/components/viz/ChartCard';
 import { KIND_LABEL } from '@/components/viz/viz-kinds';
 import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
+import SmoothTab from '@/components/kokonutui/smooth-tab';
 import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/bklit-adapters';
 import {
@@ -134,8 +135,9 @@ export function StatusDonutCard({ rows }: { rows: OppRow[] }) {
   );
 }
 
-export function ForecastCard({ rows, projection }: {
+export function ForecastCard({ rows, projection, headingLevel }: {
   rows: OppRow[];
+  headingLevel?: 2 | 3;
   projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
 }) {
   const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
@@ -147,7 +149,7 @@ export function ForecastCard({ rows, projection }: {
   const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
   const target = commits.length ? commits[0]! / 1e6 : null;
   return (
-    <ChartCard title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
+    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
       summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
       table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
       <QuarterBars data={data} format={fmtCompact} />
@@ -159,10 +161,10 @@ export function ForecastCard({ rows, projection }: {
   );
 }
 
-export function WinRateTrendCard({ rows }: { rows: OppRow[] }) {
+export function WinRateTrendCard({ rows, headingLevel }: { rows: OppRow[]; headingLevel?: 2 | 3 }) {
   const data = winRateByQuarter(rows);
   return (
-    <ChartCard title="Win rate over time" meta="Share of closed bids won, by close quarter"
+    <ChartCard headingLevel={headingLevel} title="Win rate over time" meta="Share of closed bids won, by close quarter"
       summary={data.map((d) => `${d.x}: ${d.rate}% (${d.won} of ${d.won + d.lost})`).join('; ') || 'No closed bids'}
       table={{ columns: ['Quarter', 'Won', 'Lost', 'Win rate'], rows: data.map((d) => [d.x, d.won, d.lost, `${d.rate}%`]) }}>
       {data.length > 1 ? <WinRateLine data={data} /> : <p className="viz-empty">Needs closed bids in two quarters.</p>}
@@ -170,10 +172,10 @@ export function WinRateTrendCard({ rows }: { rows: OppRow[] }) {
   );
 }
 
-export function TopAccountsBarCard({ rows }: { rows: OppRow[] }) {
+export function TopAccountsBarCard({ rows, headingLevel }: { rows: OppRow[]; headingLevel?: 2 | 3 }) {
   const data = accountBars(rows);
   return (
-    <ChartCard title="Top accounts" meta="Won plus open value"
+    <ChartCard headingLevel={headingLevel} title="Top accounts" meta="Won plus open value"
       summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}, open ${fmtCompact(d.open)}`).join('; ')}
       table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.open)]) }}>
       <HBars data={data} format={fmtCompact} />
@@ -210,5 +212,36 @@ export function EarningsCard({ feed }: { feed?: WatchdogFeed }) {
       table={{ columns: ['Account', 'Date'], rows: items.map((i) => [i.label, dayFmt.format(new Date(i.date))]) }}>
       {items.length ? <EarningsStrip items={items} days={feed?.days ?? 30} /> : <p className="viz-empty">No results expected in this window.</p>}
     </ChartCard>
+  );
+}
+
+/** Revenue, win rate and top accounts in one card with kokonutui SmoothTab
+ *  (MIT): one surface instead of three, each view keeps its own summary and
+ *  table toggle. */
+export function PerformanceCard({ rows, projection }: {
+  rows: OppRow[];
+  projection?: Parameters<typeof ForecastCard>[0]['projection'];
+}) {
+  const [tab, setTab] = useState('revenue');
+  const headId = useId();
+  return (
+    <section className="viz dash-perf" aria-labelledby={headId} data-testid="dashboard-performance">
+      <header className="viz-head">
+        <div style={{ minWidth: 0 }}>
+          <h2 id={headId} className="viz-title">Performance</h2>
+          <div className="viz-meta">Revenue, win rate and top accounts from your bids</div>
+        </div>
+      </header>
+      <SmoothTab
+        label="Performance views"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} /> },
+          { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} /> },
+          { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} /> },
+        ]}
+      />
+    </section>
   );
 }

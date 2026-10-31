@@ -26,8 +26,8 @@ import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { QuickLinksCard } from './widgets/SidebarCards';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
 import {
-  DashboardHero, EarningsCard, ForecastCard, FunnelCard, NeedsYou, StatusDonutCard, TopAccountsBarCard,
-  WatchdogHeatCard, WinRateTrendCard,
+  DashboardHero, EarningsCard, FunnelCard, NeedsYou, PerformanceCard, StatusDonutCard,
+  WatchdogHeatCard,
 } from './DashboardVisuals';
 import { GettingStarted } from './widgets/GettingStarted';
 
@@ -258,11 +258,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <StatusDonutCard rows={oppRows} />
         </div>
         <div className="viz-grid-2">
-          <ForecastCard rows={oppRows} projection={projection.data} />
-          <WinRateTrendCard rows={oppRows} />
-        </div>
-        <div className="viz-grid-2">
-          <TopAccountsBarCard rows={oppRows} />
+          <PerformanceCard rows={oppRows} projection={projection.data} />
           <div className="dash-stack">
             <WatchdogHeatCard feed={feed.data} />
             <EarningsCard feed={feed.data} />

@@ -57,3 +57,20 @@ SOFTWARE.
   meaning) and pauses it under `prefers-reduced-motion`
 - Licence: MIT, Copyright (c) 2026 Jakub Antalik (full text ships in
   `node_modules/thinking-orbs/LICENSE`; same MIT terms as above)
+
+## kokonutui (animated components)
+
+- Source: https://kokonutui.com, https://github.com/kokonut-labs/kokonutui, commit 4d497b7
+- Taken: `ai-text-loading`, `command-button`, `smooth-tab` into
+  `apps/web/src/components/kokonutui/`
+- Install route: `shadcn add @kokonutui/<name>` (registry in `apps/web/components.json`)
+- Polo changes: React 18 typings (no `<style href precedence>`, `inert` spread,
+  index guards), post-render ref sync and lazy platform read for the
+  react-hooks lint rules, Polo tokens instead of zinc + `dark:` variants,
+  a `tone="primary"` on CommandButton, SmoothTab without its own border
+  (it sits inside a Polo card), `document.fonts` guarded.
+- Used for: Generate brief (CommandButton, Shift+B), brief generating state
+  (AITextLoading), dashboard Performance card (SmoothTab).
+- Considered, not used: `notification-stack` for "Needs you" (it collapses items
+  behind each other, which hides work the list exists to show).
+- Licence: MIT, Copyright (c) 2025 kokonutUI (same MIT terms as above)
