@@ -15,7 +15,15 @@
  *    breakdown and potential projects are recomputed from all stored postings.
  */
 import { prisma, type Prisma } from '@bidstack/db';
-import type { FieldProvenance, HiringRegion, JobFunction, JobSeniority, PotentialProject } from '@bidstack/shared';
+import {
+  type AccountEnrichmentConfig,
+  accountEnrichmentConfigFromEnv,
+  type FieldProvenance,
+  type HiringRegion,
+  type JobFunction,
+  type JobSeniority,
+  type PotentialProject,
+} from '@bidstack/shared';
 
 import { buildHiringBreakdown, type ClassifiedPosting, classifyPosting, inferPotentialProjects } from './hiring.js';
 import { relabelProjects, resolveProjectLlm, type ProjectLlm } from './projects-llm.js';
@@ -28,30 +36,10 @@ import {
   type ProviderResult,
 } from './providers.js';
 
-export interface EnrichmentConfig {
-  ttlDays: number;
-  /** Credits per org, per provider, per calendar month (UTC). */
-  monthlyBudget: Record<EnrichmentProviderId, number>;
-  maxJobPages: number;
-}
-
-function intEnv(env: NodeJS.ProcessEnv, name: string, fallback: number, min = 0): number {
-  const raw = env[name]?.trim();
-  if (!raw) return fallback;
-  const n = Number(raw);
-  return Number.isInteger(n) && n >= min ? n : fallback;
-}
+export type EnrichmentConfig = AccountEnrichmentConfig;
 
 export function enrichmentConfigFromEnv(env: NodeJS.ProcessEnv = process.env): EnrichmentConfig {
-  const budget = intEnv(env, 'ENRICHMENT_MONTHLY_CREDIT_BUDGET', 200);
-  return {
-    ttlDays: intEnv(env, 'ENRICHMENT_TTL_DAYS', 7, 1),
-    monthlyBudget: {
-      apollo: intEnv(env, 'APOLLO_MONTHLY_CREDIT_BUDGET', budget),
-      seamless: intEnv(env, 'SEAMLESS_MONTHLY_CREDIT_BUDGET', budget),
-    },
-    maxJobPages: intEnv(env, 'ENRICHMENT_MAX_JOB_PAGES', 2),
-  };
+  return accountEnrichmentConfigFromEnv(env);
 }
 
 export interface EnrichmentDeps {

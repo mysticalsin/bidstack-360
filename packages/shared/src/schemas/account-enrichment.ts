@@ -156,3 +156,30 @@ export const EnrichmentOpportunitySignal = z.object({
   observedAt: z.string(),
 });
 export type EnrichmentOpportunitySignal = z.infer<typeof EnrichmentOpportunitySignal>;
+
+export interface AccountEnrichmentConfig {
+  ttlDays: number;
+  /** Credits per org, per provider, per calendar month (UTC). */
+  monthlyBudget: Record<EnrichmentProviderId, number>;
+  maxJobPages: number;
+}
+
+function intEnv(env: Record<string, string | undefined>, name: string, fallback: number, min = 0): number {
+  const raw = env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= min ? n : fallback;
+}
+
+/** Shared by the worker (spend) and the API (usage report). Reads tuning names only, never keys. */
+export function accountEnrichmentConfigFromEnv(env: Record<string, string | undefined>): AccountEnrichmentConfig {
+  const budget = intEnv(env, 'ENRICHMENT_MONTHLY_CREDIT_BUDGET', 200);
+  return {
+    ttlDays: intEnv(env, 'ENRICHMENT_TTL_DAYS', 7, 1),
+    monthlyBudget: {
+      apollo: intEnv(env, 'APOLLO_MONTHLY_CREDIT_BUDGET', budget),
+      seamless: intEnv(env, 'SEAMLESS_MONTHLY_CREDIT_BUDGET', budget),
+    },
+    maxJobPages: intEnv(env, 'ENRICHMENT_MAX_JOB_PAGES', 2),
+  };
+}
