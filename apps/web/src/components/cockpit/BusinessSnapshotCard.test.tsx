@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ComponentProps, ElementType, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BusinessSnapshotCard } from './BusinessSnapshotCard';
 import type { AccountCockpitSnapshot, CrmCompany } from '@bidstack/shared';
@@ -145,6 +145,8 @@ function cockpit(overrides: Partial<CrmCompany> = {}): AccountCockpitSnapshot {
   };
 }
 
+afterEach(() => cleanup());
+
 describe('BusinessSnapshotCard provenance', () => {
   it('renders a source badge for every business snapshot field', () => {
     const { container } = render(<BusinessSnapshotCard cockpit={cockpit()} />);
@@ -166,6 +168,49 @@ describe('BusinessSnapshotCard provenance', () => {
     // The card bar is the filled-field share. The account signal score is a different number.
     expect(screen.getByText(/fields on this card are filled/)).toBeTruthy();
     expect(screen.queryByText(/80\/100/)).toBeNull();
+  });
+
+  it('cites Wikidata for public facts instead of the typed profile receipt', () => {
+    render(
+      <BusinessSnapshotCard
+        cockpit={cockpit({
+          legalName: 'DNB Bank ASA',
+          incorporationDate: '2002-09-10',
+          employeeCount: 9020,
+          publicFacts: {
+            description: 'DNB Bank is a Norwegian bank.',
+            headquarters: 'Oslo, Norway',
+            chiefExecutive: 'Kjerstin Braathen',
+            stockExchange: 'Oslo Stock Exchange',
+            revenueLabel: '54,857,000,000 NOK',
+            revenueCurrency: 'NOK',
+          },
+          sourceAttribution: [
+            {
+              source: 'verified_data_source',
+              label: 'Typed company profile. Not a scored source.',
+              sourceUrl: null,
+              fetchedAt: '2026-10-31T22:00:00.000Z',
+              confidence: null,
+              providerMetadata: {},
+            },
+            {
+              source: 'wikidata',
+              label: 'Wikidata entity profile',
+              sourceUrl: 'https://www.wikidata.org/wiki/Q80788',
+              fetchedAt: '2026-10-31T21:00:00.000Z',
+              confidence: null,
+              providerMetadata: {},
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getAllByText('Wikidata').length).toBeGreaterThan(3);
+    expect(screen.queryByText(/Typed company profile/)).toBeNull();
+    expect(screen.getByText('DNB Bank ASA')).toBeTruthy();
+    expect(screen.getByText('2002-09-10')).toBeTruthy();
   });
 
   it('does not invent a headquarters from the company name', () => {

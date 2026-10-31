@@ -73,7 +73,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.legalName', 'Legal name'),
       value: c.legalName ?? notVerified,
       source: c.legalName
-        ? attributionSource(latestSource, {
+        ? fieldSource(c.sourceAttribution, latestSource, t, {
             fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
             missingHint: t(
               'businessSnapshot.source.noRegistry',
@@ -91,7 +91,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.founded', 'Founded'),
       value: c.incorporationDate ?? notVerified,
       source: c.incorporationDate
-        ? attributionSource(latestSource, {
+        ? fieldSource(c.sourceAttribution, latestSource, t, {
             fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
             missingHint: t(
               'businessSnapshot.source.noRegistry',
@@ -160,13 +160,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     {
       label: t('businessSnapshot.row.employees', 'Employees'),
       value: c.employeeCount ? c.employeeCount.toLocaleString() : notVerified,
-      source: cockpitKpiSource(cockpit.kpis, 'employeeCount', Boolean(c.employeeCount), {
-        fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
-        missingHint: t(
-          'businessSnapshot.source.missingEmployees',
-          'No headcount source is attached.',
-        ),
-      }),
+      source: employeeSource(cockpit.kpis, c, t),
     },
     {
       label: t('businessSnapshot.row.intentTopics', 'Intent topics'),
@@ -361,6 +355,34 @@ function latestAttribution(sources: SourceAttribution[]): SourceAttribution | nu
     if (!latest || source.fetchedAt > latest.fetchedAt) latest = source;
   }
   return latest;
+}
+
+function hasPublicRecord(sources: SourceAttribution[]): boolean {
+  return sources.some((item) => item.source === 'wikidata' || item.source === 'wikipedia');
+}
+
+function fieldSource(
+  sources: SourceAttribution[],
+  latest: SourceAttribution | null,
+  t: TFunction,
+  fallback: { fallbackLabel: string; missingHint: string },
+): FieldSource {
+  return hasPublicRecord(sources) ? publicSource(sources, t) : attributionSource(latest, fallback);
+}
+
+function employeeSource(
+  kpis: CockpitKpi[],
+  company: AccountCockpitSnapshot['company'],
+  t: TFunction,
+): FieldSource {
+  const overridden = kpis.some((item) => item.fieldKey === 'employeeCount' && item.overridden);
+  if (!overridden && company.employeeCount && hasPublicRecord(company.sourceAttribution)) {
+    return publicSource(company.sourceAttribution, t);
+  }
+  return cockpitKpiSource(kpis, 'employeeCount', Boolean(company.employeeCount), {
+    fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+    missingHint: t('businessSnapshot.source.missingEmployees', 'No headcount source is attached.'),
+  });
 }
 
 function publicSource(sources: SourceAttribution[], t: TFunction): FieldSource {
