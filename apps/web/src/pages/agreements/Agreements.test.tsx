@@ -104,12 +104,12 @@ describe('AgreementsPage', () => {
 });
 
 describe('AgreementDetailPage', () => {
-  it('renders trail, key terms, versions, children and timeline', async () => {
+  it('renders key terms, versions, children and timeline', async () => {
     renderAt(`/agreements/${MSA}`);
     expect(await screen.findByRole('heading', { level: 1, name: 'Master services agreement' })).toBeTruthy();
-    const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(within(trail).getByRole('link', { name: 'Agreements' }).getAttribute('href')).toBe('/agreements');
-    expect(within(trail).getByRole('link', { name: 'CI Financial' }).getAttribute('href')).toBe(`/agreements?companyId=${CI}`);
+    // The topbar owns the trail (Agreements / Detail); the page no longer repeats it.
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'CI Financial' }).getAttribute('href')).toBe(`/accounts/${CI}`);
     expect(screen.getByText('Ontario, Canada')).toBeTruthy();
     expect(within(screen.getByTestId('agreement-versions')).getAllByRole('row')).toHaveLength(1 + 3);
     expect(within(screen.getByTestId('agreement-children')).getAllByRole('link').map((a) => a.textContent)).toEqual([

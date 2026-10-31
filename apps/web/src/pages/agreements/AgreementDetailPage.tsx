@@ -141,14 +141,6 @@ export default function AgreementDetailPage() {
 
   return (
     <div className="agr" data-testid="agreement-detail">
-      <nav aria-label="Breadcrumb">
-        <ol className="drill-trail">
-          <li><Link to="/agreements">Agreements</Link></li>
-          {a.companyId ? <li><Link to={`/agreements?companyId=${a.companyId}`}>{a.companyName}</Link></li> : null}
-          {a.parent ? <li><Link to={`/agreements/${a.parent.id}`}>{a.parent.title}</Link></li> : null}
-          <li><span aria-current="page">{a.title}</span></li>
-        </ol>
-      </nav>
       <header className="agr-head">
         <div>
           <h1>{a.title}</h1>
@@ -156,6 +148,7 @@ export default function AgreementDetailPage() {
             <MsaStatusBadge status={a.status} />
             <span>{KIND_LABEL[a.kind]}</span>
             {a.companyId ? <Link to={`/accounts/${a.companyId}`}>{a.companyName}</Link> : null}
+            {a.parent ? <span>Under <Link to={`/agreements/${a.parent.id}`} data-testid="agreement-parent">{a.parent.title}</Link></span> : null}
             {a.daysToExpiry != null ? <span className="agr-days" data-u={urgency(a.daysToExpiry)}>Expires {fmtDays(a.daysToExpiry)}</span> : null}
           </div>
         </div>
