@@ -136,4 +136,56 @@ describe('SectorViewPage load resilience', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the world map and labels industry pipeline as unspecified', () => {
+    // WHY: opportunity totals have no stored currency. An industry chart that
+    // prints euros would invent a forecast the sector rollup does not have.
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    vi.mocked(useTerritoryAnalytics).mockReturnValue({
+      data: {
+        items: [
+          {
+            countryCode: 'FR',
+            countryCodeA3: 'FRA',
+            opportunityCount: 2,
+            totalValueMicros: 1_500_000_000_000,
+            avgProbability: 40,
+            territories: [],
+            ownerNames: [],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as never);
+    vi.mocked(useTerritorySegments).mockReturnValue({
+      data: {
+        items: [
+          {
+            key: 'technology',
+            label: 'technology',
+            opportunityCount: 2,
+            totalValueMicros: 1_500_000_000_000,
+            avgProbability: 40,
+            ownerNames: [],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as never);
+    renderPage();
+
+    expect(screen.getByTestId('world-map')).toBeTruthy();
+    expect(screen.getByText('currency not recorded; not a euro forecast')).toBeTruthy();
+    expect(screen.getByText(/As of/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'By industry' }));
+    expect(screen.getAllByText('Technology').length).toBeGreaterThan(0);
+    expect(screen.getByText(/unspecified/)).toBeTruthy();
+    expect(document.body.textContent ?? '').not.toMatch(/€|\$|\bEUR\b/);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'By country' }));
+    expect(screen.getByTestId('world-map')).toBeTruthy();
+  });
 });

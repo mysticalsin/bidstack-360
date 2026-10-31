@@ -102,9 +102,13 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
           aria-label={t('commandCenter.actions.ariaLabel', 'Account decision signals')}
         >
           <Badge tone={readiness >= 85 ? 'jade' : 'blue'}>
-            {t('commandCenter.badge.ready', '{{count}}% ready', { count: readiness })}
+            {t('commandCenter.badge.ready', '{{count}}% estimate', { count: readiness })}
           </Badge>
-          <Badge tone={healthTone(cockpit.health.band)}>{labelForBand(cockpit.health.band)}</Badge>
+          <Badge tone={healthTone(cockpit.health.band)}>
+            {t('commandCenter.badge.coverage', 'Coverage · {{band}}', {
+              band: labelForBand(cockpit.health.band),
+            })}
+          </Badge>
           <Badge tone={stackCount >= 12 ? 'purple' : 'gray'}>
             {t('commandCenter.badge.stackSignals', '{{count}} stack signals', { count: stackCount })}
           </Badge>
@@ -148,7 +152,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
           </strong>
         </div>
         <div>
-          <span>{t('commandCenter.footer.weightedValue.label', 'Weighted account value')}</span>
+          <span>{t('commandCenter.footer.weightedValue.label', 'Reported annual revenue')}</span>
           <strong>
             {cockpit.company.annualRevenueMicros
               ? `${formatUnspecifiedAmount(cockpit.company.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`

@@ -235,10 +235,14 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     <Card role="region" aria-label={t('businessSnapshot.region.ariaLabel', 'Business snapshot')}>
       <SectionHeader
         title={t('businessSnapshot.title', 'Business snapshot')}
-        caption={t('businessSnapshot.caption', 'Health: {{band}} - score {{score}}/100', {
-          band: labelForBand(cockpit.health.band),
-          score: cockpit.health.score,
-        })}
+        caption={t(
+          'businessSnapshot.caption',
+          'Signal coverage: {{band}} · {{score}}/100. Not measured relationship health.',
+          {
+            band: labelForBand(cockpit.health.band),
+            score: cockpit.health.score,
+          },
+        )}
       />
       <div style={{ padding: '14px 18px 18px' }}>
         <dl className="kvlist">

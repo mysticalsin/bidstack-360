@@ -2230,7 +2230,7 @@
       "ariaLabel": "Segnali decisionali dell'account"
     },
     "badge": {
-      "ready": "{{count}}% pronto",
+      "ready": "stima {{count}}%",
       "stackSignals": "{{count}} segnali di stack"
     },
     "signal": {
@@ -2274,7 +2274,7 @@
         "pending": "Pipeline in sospeso"
       },
       "weightedValue": {
-        "label": "Valore ponderato dell'account",
+        "label": "Fatturato annuo dichiarato",
         "notVerified": "Non verificato"
       },
       "ownerMap": {
@@ -3080,7 +3080,7 @@
     "coverage": "Copertura",
     "strongestBand": "Fascia di copertura più forte",
     "noSignal": "Nessun segnale",
-    "healthBands": "Fasce di salute",
+    "healthBands": "Fasce di copertura",
     "whatDrivesScore": "Cosa determina questo punteggio",
     "scoreFactors": "Fattori del punteggio",
     "nextLabel": "Successivo: ",
@@ -3722,7 +3722,7 @@
   },
   "businessSnapshot": {
     "title": "Panoramica aziendale",
-    "caption": "Salute: {{band}} - punteggio {{score}}/100",
+    "caption": "Copertura dei segnali: {{band}} · {{score}}/100. Non è salute relazionale misurata.",
     "region": {
       "ariaLabel": "Panoramica aziendale"
     },
@@ -3863,7 +3863,7 @@
   "revenueEvolution": {
     "regionLabel": "Evoluzione dei ricavi",
     "title": "Evoluzione dei ricavi",
-    "caption": "Ricavi delle trattative vinte con questo cliente per mese",
+    "caption": "Importi vinti per mese. Valuta non registrata; non è una previsione in euro.",
     "srSummary": "{{count}} mesi di ricavi da trattative vinte. Picco {{period}}.",
     "barsListLabel": "Ricavi delle trattative vinte per mese",
     "barLabel": "{{period}}: {{amount}}"
@@ -3871,7 +3871,7 @@
   "winLoss": {
     "regionLabel": "Vinte / perse",
     "title": "Vinte / perse",
-    "caption": "Trattative decise su questo account",
+    "caption": "Trattative decise su questo account. Valuta non registrata; non è una previsione in euro.",
     "winRateLabel": "tasso di vittoria",
     "wonCount": "{{count}} vinte",
     "lostCount": "{{count}} perse",

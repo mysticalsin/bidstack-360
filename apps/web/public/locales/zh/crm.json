@@ -2230,7 +2230,7 @@
       "ariaLabel": "客户决策信号"
     },
     "badge": {
-      "ready": "就绪 {{count}}%",
+      "ready": "估计 {{count}}%",
       "stackSignals": "{{count}} 个技术栈信号"
     },
     "signal": {
@@ -2274,7 +2274,7 @@
         "pending": "管道待定"
       },
       "weightedValue": {
-        "label": "加权客户价值",
+        "label": "已申报年收入",
         "notVerified": "未验证"
       },
       "ownerMap": {
@@ -3080,7 +3080,7 @@
     "coverage": "覆盖率",
     "strongestBand": "最强覆盖区间",
     "noSignal": "无信号",
-    "healthBands": "健康区间",
+    "healthBands": "覆盖区间",
     "whatDrivesScore": "影响此评分的因素",
     "scoreFactors": "评分因素",
     "nextLabel": "下一步：",
@@ -3722,7 +3722,7 @@
   },
   "businessSnapshot": {
     "title": "业务概览",
-    "caption": "健康度：{{band}} - 评分 {{score}}/100",
+    "caption": "信号覆盖：{{band}} · {{score}}/100。不是已测量的关系健康度。",
     "region": {
       "ariaLabel": "业务概览"
     },
@@ -3863,7 +3863,7 @@
   "revenueEvolution": {
     "regionLabel": "收入演变",
     "title": "收入演变",
-    "caption": "该客户每月赢单收入",
+    "caption": "每月赢单金额。未记录币种；不是欧元预测。",
     "srSummary": "{{count}} 个月的赢单收入。峰值 {{period}}。",
     "barsListLabel": "每月赢单收入",
     "barLabel": "{{period}}：{{amount}}"
@@ -3871,7 +3871,7 @@
   "winLoss": {
     "regionLabel": "赢单 / 输单",
     "title": "赢单 / 输单",
-    "caption": "此客户已决断的交易",
+    "caption": "此客户已决断的交易。未记录币种；不是欧元预测。",
     "winRateLabel": "赢单率",
     "wonCount": "{{count}} 个赢单",
     "lostCount": "{{count}} 个输单",

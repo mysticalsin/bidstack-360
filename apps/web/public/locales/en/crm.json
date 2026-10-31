@@ -2241,7 +2241,7 @@
       "ariaLabel": "Account decision signals"
     },
     "badge": {
-      "ready": "{{count}}% ready",
+      "ready": "{{count}}% estimate",
       "stackSignals": "{{count}} stack signals"
     },
     "signal": {
@@ -2285,7 +2285,7 @@
         "pending": "Pipeline pending"
       },
       "weightedValue": {
-        "label": "Weighted account value",
+        "label": "Reported annual revenue",
         "notVerified": "Not verified"
       },
       "ownerMap": {
@@ -3096,7 +3096,7 @@
     "coverage": "Coverage",
     "strongestBand": "Strongest coverage band",
     "noSignal": "No signal",
-    "healthBands": "Health bands",
+    "healthBands": "Coverage bands",
     "whatDrivesScore": "What drives this score",
     "scoreFactors": "Score factors",
     "nextLabel": "Next: ",
@@ -3738,7 +3738,7 @@
   },
   "businessSnapshot": {
     "title": "Business snapshot",
-    "caption": "Health: {{band}} - score {{score}}/100",
+    "caption": "Signal coverage: {{band}} · {{score}}/100. Not measured relationship health.",
     "region": {
       "ariaLabel": "Business snapshot"
     },
@@ -3879,7 +3879,7 @@
   "revenueEvolution": {
     "regionLabel": "Revenue evolution",
     "title": "Revenue evolution",
-    "caption": "Won-deal revenue with this client by month",
+    "caption": "Won-deal amounts by month. Currency not recorded; not a euro forecast.",
     "srSummary": "{{count}} months of won-deal revenue. Peak {{period}}.",
     "barsListLabel": "Won-deal revenue by month",
     "barLabel": "{{period}}: {{amount}}"
@@ -3887,7 +3887,7 @@
   "winLoss": {
     "regionLabel": "Win / loss",
     "title": "Win / loss",
-    "caption": "Decided deals on this account",
+    "caption": "Decided deals on this account. Currency not recorded; not a euro forecast.",
     "winRateLabel": "win rate",
     "wonCount": "{{count}} won",
     "lostCount": "{{count}} lost",

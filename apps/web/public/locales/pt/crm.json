@@ -2230,7 +2230,7 @@
       "ariaLabel": "Sinais de decisão da conta"
     },
     "badge": {
-      "ready": "{{count}}% pronto",
+      "ready": "estimativa {{count}}%",
       "stackSignals": "{{count}} sinais de stack"
     },
     "signal": {
@@ -2274,7 +2274,7 @@
         "pending": "Pipeline pendente"
       },
       "weightedValue": {
-        "label": "Valor ponderado da conta",
+        "label": "Receita anual declarada",
         "notVerified": "Não verificado"
       },
       "ownerMap": {
@@ -3080,7 +3080,7 @@
     "coverage": "Cobertura",
     "strongestBand": "Faixa de cobertura mais forte",
     "noSignal": "Sem sinal",
-    "healthBands": "Faixas de saúde",
+    "healthBands": "Faixas de cobertura",
     "whatDrivesScore": "O que determina esta pontuação",
     "scoreFactors": "Fatores da pontuação",
     "nextLabel": "Próximo: ",
@@ -3722,7 +3722,7 @@
   },
   "businessSnapshot": {
     "title": "Resumo do negócio",
-    "caption": "Saúde: {{band}} - pontuação {{score}}/100",
+    "caption": "Cobertura de sinais: {{band}} · {{score}}/100. Não é saúde de relacionamento medida.",
     "region": {
       "ariaLabel": "Resumo do negócio"
     },
@@ -3863,7 +3863,7 @@
   "revenueEvolution": {
     "regionLabel": "Evolução da receita",
     "title": "Evolução da receita",
-    "caption": "Receita de negócios ganhos com este cliente por mês",
+    "caption": "Valores ganhos por mês. Moeda não registada; não é uma previsão em euros.",
     "srSummary": "{{count}} meses de receita de negócios ganhos. Pico {{period}}.",
     "barsListLabel": "Receita de negócios ganhos por mês",
     "barLabel": "{{period}}: {{amount}}"
@@ -3871,7 +3871,7 @@
   "winLoss": {
     "regionLabel": "Ganhos / perdas",
     "title": "Ganhos / perdas",
-    "caption": "Negócios decididos nesta conta",
+    "caption": "Negócios decididos nesta conta. Moeda não registada; não é uma previsão em euros.",
     "winRateLabel": "taxa de vitória",
     "wonCount": "{{count}} ganhos",
     "lostCount": "{{count}} perdidos",

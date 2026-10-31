@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useDisplayMoneyMicros } from '@/hooks/useDisplayMoney';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -20,14 +20,14 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
   const { t } = useTranslation('crm');
   const flags = useFeatureFlags();
   const wl = cockpit.winLoss;
-  const wonValue = useDisplayMoneyMicros(wl?.wonValueMicros ?? 0, 'EUR', { compact: true });
+  const wonValue = formatUnspecifiedCompact((wl?.wonValueMicros ?? 0) / 1_000_000);
   if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0) return null;
 
   return (
     <Card role="region" aria-label={t('winLoss.regionLabel', 'Win / loss')}>
       <SectionHeader
         title={t('winLoss.title', 'Win / loss')}
-        caption={t('winLoss.caption', 'Decided deals on this account')}
+        caption={t('winLoss.caption', `Decided deals on this account. ${UNSPECIFIED_CURRENCY_BASIS}`)}
       />
       <div className="px-5 pb-5">
         <div className="flex items-end justify-between">

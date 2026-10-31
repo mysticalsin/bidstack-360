@@ -2285,7 +2285,7 @@
       "ariaLabel": "Signaux de décision du compte"
     },
     "badge": {
-      "ready": "{{count}}% prêt",
+      "ready": "estimation {{count}} %",
       "stackSignals": "{{count}} signaux de stack"
     },
     "signal": {
@@ -2329,7 +2329,7 @@
         "pending": "Pipeline en attente"
       },
       "weightedValue": {
-        "label": "Valeur pondérée du compte",
+        "label": "Chiffre d'affaires annuel déclaré",
         "notVerified": "Non vérifié"
       },
       "ownerMap": {
@@ -3135,7 +3135,7 @@
     "coverage": "Couverture",
     "strongestBand": "Bande de couverture la plus forte",
     "noSignal": "Aucun signal",
-    "healthBands": "Bandes de santé",
+    "healthBands": "Bandes de couverture",
     "whatDrivesScore": "Ce qui détermine ce score",
     "scoreFactors": "Facteurs du score",
     "nextLabel": "Suivant : ",
@@ -3777,7 +3777,7 @@
   },
   "businessSnapshot": {
     "title": "Aperçu de l'entreprise",
-    "caption": "Santé : {{band}} - score {{score}}/100",
+    "caption": "Couverture des signaux : {{band}} · {{score}}/100. Ce n'est pas une santé relationnelle mesurée.",
     "region": {
       "ariaLabel": "Aperçu de l'entreprise"
     },
@@ -3918,7 +3918,7 @@
   "revenueEvolution": {
     "regionLabel": "Évolution du chiffre d'affaires",
     "title": "Évolution du chiffre d'affaires",
-    "caption": "Chiffre d'affaires des affaires gagnées avec ce client par mois",
+    "caption": "Montants gagnés par mois. Devise non enregistrée ; ce n'est pas une prévision en euros.",
     "srSummary": "{{count}} mois de chiffre d'affaires d'affaires gagnées. Pic {{period}}.",
     "barsListLabel": "Chiffre d'affaires des affaires gagnées par mois",
     "barLabel": "{{period}} : {{amount}}"
@@ -3926,7 +3926,7 @@
   "winLoss": {
     "regionLabel": "Gagné / perdu",
     "title": "Gagné / perdu",
-    "caption": "Affaires conclues sur ce compte",
+    "caption": "Affaires conclues sur ce compte. Devise non enregistrée ; ce n'est pas une prévision en euros.",
     "winRateLabel": "taux de réussite",
     "wonCount": "{{count}} gagnées",
     "lostCount": "{{count}} perdues",

@@ -92,7 +92,13 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
               {strongest ? labelForHealth(strongest.key, t) : t('healthScore.noSignal', 'No signal')}
             </strong>
           </div>
-          <ul className="health-legend" aria-label={t('healthScore.healthBands', 'Health bands')}>
+          <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
+            {t(
+              'healthScore.notRelationshipHealth',
+              'Signal coverage only. Not measured relationship health. Weighted-pipeline bands on the account list stay labelled proxy.',
+            )}
+          </p>
+          <ul className="health-legend" aria-label={t('healthScore.healthBands', 'Coverage bands')}>
             {segments.map((segment, index) => (
               <motion.li
                 key={segment.key}

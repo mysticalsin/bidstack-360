@@ -2263,7 +2263,7 @@
       "ariaLabel": "Señales de decisión de la cuenta"
     },
     "badge": {
-      "ready": "{{count}}% listo",
+      "ready": "estimación {{count}}%",
       "stackSignals": "{{count}} señales de stack"
     },
     "signal": {
@@ -2307,7 +2307,7 @@
         "pending": "Pipeline pendiente"
       },
       "weightedValue": {
-        "label": "Valor ponderado de la cuenta",
+        "label": "Ingresos anuales declarados",
         "notVerified": "No verificado"
       },
       "ownerMap": {
@@ -3113,7 +3113,7 @@
     "coverage": "Cobertura",
     "strongestBand": "Banda de cobertura más fuerte",
     "noSignal": "Sin señal",
-    "healthBands": "Bandas de salud",
+    "healthBands": "Bandas de cobertura",
     "whatDrivesScore": "Qué determina esta puntuación",
     "scoreFactors": "Factores de la puntuación",
     "nextLabel": "Siguiente: ",
@@ -3755,7 +3755,7 @@
   },
   "businessSnapshot": {
     "title": "Resumen del negocio",
-    "caption": "Salud: {{band}} - puntuación {{score}}/100",
+    "caption": "Cobertura de señales: {{band}} · {{score}}/100. No es salud de relación medida.",
     "region": {
       "ariaLabel": "Resumen del negocio"
     },
@@ -3896,7 +3896,7 @@
   "revenueEvolution": {
     "regionLabel": "Evolución de ingresos",
     "title": "Evolución de ingresos",
-    "caption": "Ingresos de acuerdos ganados con este cliente por mes",
+    "caption": "Importes ganados por mes. Moneda no registrada; no es una previsión en euros.",
     "srSummary": "{{count}} meses de ingresos de acuerdos ganados. Máximo {{period}}.",
     "barsListLabel": "Ingresos de acuerdos ganados por mes",
     "barLabel": "{{period}}: {{amount}}"
@@ -3904,7 +3904,7 @@
   "winLoss": {
     "regionLabel": "Ganados / perdidos",
     "title": "Ganados / perdidos",
-    "caption": "Negocios decididos en esta cuenta",
+    "caption": "Negocios decididos en esta cuenta. Moneda no registrada; no es una previsión en euros.",
     "winRateLabel": "tasa de éxito",
     "wonCount": "{{count}} ganados",
     "lostCount": "{{count}} perdidos",

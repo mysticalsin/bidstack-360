@@ -36,6 +36,7 @@ import {
   WinLossReasonsCard,
   type ClosedOpp,
 } from '@/components/account-intel/WinLossReasonsCard';
+import { AccountWorkstreamBoard } from '@/components/cockpit/AccountWorkstreamBoard';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
@@ -182,6 +183,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const accountOpps = opps.data?.items.filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
+  // The opportunity list hook is capped. The cockpit snapshot already carries
+  // this account's deals, including ones outside that cap, with no currency.
+  const companyDeals = snapshot.deals.filter(
+    (deal) => deal.companyName?.toLowerCase() === cockpit.company.name.toLowerCase(),
+  );
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
@@ -206,9 +212,25 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         <AccountWorkStrip
           people={cockpit.keyContacts}
           overdueCount={overdueCount}
-          deals={(accountOpps ?? []).filter(
+          deals={companyDeals.filter(
             (deal) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost',
           )}
+        />
+      )}
+      {isAccountView && (
+        <AccountWorkstreamBoard
+          deals={companyDeals.map((deal) => ({
+            id: deal.id,
+            name: deal.name,
+            stage: deal.stage,
+            value: deal.amountMicros / 1_000_000,
+            owner: deal.ownerName,
+          }))}
+          people={cockpit.keyContacts.map((person) => ({
+            id: person.id,
+            name: person.name,
+            roleInDecision: person.roleInDecision,
+          }))}
         />
       )}
       {isAccountView && (

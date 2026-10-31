@@ -19,7 +19,7 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
@@ -76,6 +76,12 @@ export default function SectorViewPage() {
               'sectorView.subtitle',
               'Industry presence, country depth, and account-level coverage from ABC.',
             )}
+            {view.data?.generatedAt ? (
+              <span>
+                {' '}
+                {t('sectorView.asOfLabel', 'As of')} {view.data.generatedAt}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="page-actions">
@@ -210,6 +216,9 @@ export default function SectorViewPage() {
                     ? t('sectorView.geoCountryTitle', 'Pipeline by country')
                     : t('sectorView.geoIndustryTitle', 'Pipeline by industry')}
                 </h2>
+                <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+                  {t('sectorView.pipelineBasis', UNSPECIFIED_CURRENCY_BASIS)}
+                </p>
               </div>
               <div
                 role="tablist"
@@ -416,11 +425,6 @@ function SectorMetric({
 
 function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const { t } = useTranslation('crm');
-  // Use the currency-aware formatter so this figure tracks the user's selected
-  // display currency like every other money surface — the module-level
-  // formatMoneyMicros hardcoded EUR and diverged from Territories/Opportunities
-  // showing the same segment data in the chosen currency.
-  const { formatMoneyMicros } = useFormatMoney();
   if (items.length === 0) {
     return (
       <EmptyState
@@ -438,10 +442,9 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
           <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
             <span className="truncate font-medium text-[var(--fg-primary)]">{titleCase(seg.label)}</span>
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
-              {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
-                count: seg.opportunityCount,
-                value: formatMoneyMicros(seg.totalValueMicros),
-              })}
+              {t('sectorView.geoIndustryCount', '{{count}} opps', { count: seg.opportunityCount })}
+              {' · '}
+              <span>{formatUnspecifiedCompact(seg.totalValueMicros / 1_000_000)}</span>
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">

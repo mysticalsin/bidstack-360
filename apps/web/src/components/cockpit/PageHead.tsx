@@ -63,7 +63,13 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
-  const subtitleParts = [cockpit.company.industry, cockpit.company.domain].filter(Boolean);
+  const subtitleParts = [
+    cockpit.company.legalName && cockpit.company.legalName !== cockpit.company.name
+      ? cockpit.company.legalName
+      : null,
+    cockpit.company.industry,
+    cockpit.company.domain,
+  ].filter(Boolean);
   const subtitle = accountView
     ? subtitleParts.length > 0
       ? subtitleParts.join(' - ')
@@ -104,7 +110,17 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
               className="account-meta-chips"
               aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}
             >
-              <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
+              <span
+                data-tone="health"
+                title={t(
+                  'pageHead.signalCoverageHint',
+                  'Signal coverage, not measured relationship health. Account-list bands are weighted-pipeline proxies.',
+                )}
+              >
+                {t('pageHead.signalCoverage', 'Signal coverage · {{band}}', {
+                  band: labelForBand(cockpit.health.band),
+                })}
+              </span>
               <span data-tone="confidence">
                 {t('pageHead.attributionConfidence', '{{percent}}% attribution confidence', {
                   percent: confidence,
