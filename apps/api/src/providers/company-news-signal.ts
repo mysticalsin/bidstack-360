@@ -41,6 +41,22 @@ function tag(block: string, name: string): string | null {
  * newest first as served by Google News. Returns [] on any failure (keyless,
  * best-effort). `fetchImpl` is injectable for tests.
  */
+/** Public-news search metadata. Confidence is null because this feed is not a scored source. */
+export function publicNewsAttribution(fetchedAt: string, accountQuery: string) {
+  return {
+    source: 'google_news_open_web',
+    label: 'Google News',
+    sourceUrl: 'https://news.google.com/',
+    fetchedAt,
+    confidence: null,
+    providerMetadata: {
+      signalType: 'public_news',
+      confidenceBasis: 'not_scored',
+      accountQuery,
+    },
+  };
+}
+
 export async function fetchCompanyNewsSignals(
   name: string,
   fetchImpl: typeof fetch = fetch,

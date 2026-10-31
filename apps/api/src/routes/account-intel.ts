@@ -11,7 +11,7 @@ import {
   type AccountIntelFieldProvenanceSource,
 } from '@bidstack/shared';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
-import { fetchCompanyNewsSignals } from '../providers/company-news-signal.js';
+import { fetchCompanyNewsSignals, publicNewsAttribution } from '../providers/company-news-signal.js';
 import { canReadAccount } from '../lib/account-access.js';
 
 const SOLUTION_FIELD_KEYS = ['name', 'description', 'category', 'status'] as const;
@@ -297,7 +297,9 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           200: z.object({
             source: z.literal('google-news'),
             fetchedAt: z.string().datetime(),
-            sourceAttribution: SourceAttribution,
+            sourceAttribution: SourceAttribution.extend({
+              confidence: z.number().min(0).max(1).nullable(),
+            }),
             items: z.array(
               z.object({
                 title: z.string(),
@@ -321,17 +323,7 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
       return {
         source: 'google-news' as const,
         fetchedAt,
-        sourceAttribution: {
-          source: 'google_news_open_web',
-          label: 'Google News',
-          sourceUrl: 'https://news.google.com/',
-          fetchedAt,
-          confidence: 0.62,
-          providerMetadata: {
-            signalType: 'public_news',
-            accountQuery: req.params.accountId,
-          },
-        },
+        sourceAttribution: publicNewsAttribution(fetchedAt, req.params.accountId),
         items,
       };
     },
