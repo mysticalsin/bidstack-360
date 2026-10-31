@@ -519,10 +519,8 @@ function PersonPanel(props: {
             </select>
           </label>
           <label>Email<input type="email" value={node.email ?? ''} onChange={(e) => props.onPatch({ email: e.target.value.trim() || null })} maxLength={254} data-testid="orgchart-edit-email" /></label>
-          <div className="oc-form-row">
-            <label>Phone<input type="tel" value={node.phone ?? ''} placeholder="+44 20 7946 0000" onChange={(e) => props.onPatch({ phone: e.target.value || null })} onBlur={(e) => { const v = e.target.value.trim(); if (v) props.onPatch({ phone: normalizePhone(v) ?? v }); }} maxLength={32} data-testid="orgchart-edit-phone" /></label>
-            <label>LinkedIn<input type="url" value={node.linkedinUrl ?? ''} placeholder="https://www.linkedin.com/in/" onChange={(e) => props.onPatch({ linkedinUrl: e.target.value || null })} onBlur={(e) => { const v = e.target.value.trim(); if (v) props.onPatch({ linkedinUrl: normalizeLinkedinUrl(v) ?? v }); }} maxLength={300} data-testid="orgchart-edit-linkedin" /></label>
-          </div>
+          <label>Phone<input type="tel" value={node.phone ?? ''} placeholder="+44 20 7946 0000" onChange={(e) => props.onPatch({ phone: e.target.value || null })} onBlur={(e) => { const v = e.target.value.trim(); if (v) props.onPatch({ phone: normalizePhone(v) ?? v }); }} maxLength={32} data-testid="orgchart-edit-phone" /></label>
+          <label>LinkedIn<input type="url" value={node.linkedinUrl ?? ''} placeholder="https://www.linkedin.com/in/" onChange={(e) => props.onPatch({ linkedinUrl: e.target.value || null })} onBlur={(e) => { const v = e.target.value.trim(); if (v) props.onPatch({ linkedinUrl: normalizeLinkedinUrl(v) ?? v }); }} maxLength={300} data-testid="orgchart-edit-linkedin" /></label>
           {node.phone && !normalizePhone(node.phone) ? <p className="oc-hint" role="note">That phone number needs 7 to 15 digits.</p> : null}
           {node.linkedinUrl && !normalizeLinkedinUrl(node.linkedinUrl) ? <p className="oc-hint" role="note">Use a linkedin.com/in/ profile link.</p> : null}
           <label>Photo URL (https)<input type="url" value={node.photoUrl && !node.photoUrl.startsWith('/') ? node.photoUrl : ''} placeholder={node.photoUrl?.startsWith('/') ? 'Uploaded photo' : 'https://'} pattern="https://.*" onChange={(e) => props.onPatch({ photoUrl: e.target.value || null })} /></label>
@@ -595,7 +593,7 @@ function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { kind: 'csv' | 'ht
         </details>
       ) : null}
       {r.preview?.length ? (
-        <div className="oc-imp-wrap">
+        <div className="oc-imp-wrap" tabIndex={0} role="region" aria-label="People found in the file">
           <table className="oc-imp-table" data-testid="orgchart-import-preview">
             <thead><tr><th>Person</th><th>Reports to</th><th>Contact</th><th /></tr></thead>
             <tbody>
