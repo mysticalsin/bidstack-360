@@ -73,6 +73,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /api/v1/references — list references with filters
   app.get('/references', {
+    config: { permission: 'accounts:read' },
     schema: {
       querystring: z.object({
         industry: z.string().max(100).optional(),

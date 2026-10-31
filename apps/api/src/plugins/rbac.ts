@@ -25,9 +25,10 @@ declare module 'fastify' {
      *  route). Mirrors requirePermission's decision but returns a boolean. */
     hasPermission: (req: FastifyRequest, permission: PermissionKey) => Promise<boolean>;
   }
-  // WHY: route config: { permission: '...' } is a convenience annotation used
-  // by observability middleware to log which permission gate a route enforces.
-  // Augmenting FastifyContextConfig prevents TS2345 on all routes that set it.
+  // Route config: { permission: '...' } is ENFORCED by the global preHandler
+  // registered below (secure-by-default: a declared gate can never silently be
+  // decorative). Routes may still add explicit preHandler gates; the decision
+  // cache makes the repeated check free.
   interface FastifyContextConfig {
     permission?: PermissionKey;
   }
@@ -86,6 +87,25 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       // in apps/api/src/plugins/auth.ts that ensures Clerk org-admins receive the
       // seeded "Admin" Role on first sign-in.
       throw req.server.httpErrors.forbidden(`Requires permission: ${permission}`);
+    }),
+  );
+
+  // Enforce route-level `config.permission` declarations. Runs for every route
+  // (root-level hook via fastify-plugin). Public routes carry no auth context,
+  // so they are skipped; a public route must never declare a permission.
+  const requireDeclared = new Map<PermissionKey, (req: FastifyRequest) => Promise<void>>();
+  server.addHook(
+    'preHandler',
+    named('rbac:declared', async (req: FastifyRequest) => {
+      const config = req.routeOptions.config as { permission?: PermissionKey; public?: boolean };
+      const permission = config?.permission;
+      if (!permission || config.public === true) return;
+      let guard = requireDeclared.get(permission);
+      if (!guard) {
+        guard = server.requirePermission(permission);
+        requireDeclared.set(permission, guard);
+      }
+      await guard(req);
     }),
   );
 

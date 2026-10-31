@@ -20,13 +20,14 @@ const OpenDataSignalsQuery = z.object({
 export const crmConnectorRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/connectors',
-    { schema: { response: { 200: ConnectorsResponse } } },
+    { config: { permission: 'integrations:read' }, schema: { response: { 200: ConnectorsResponse } } },
     async () => ({ items: buildConnectorCatalog() }),
   );
 
   server.get(
     '/crm/open-data/signals',
     {
+      config: { permission: 'companies:read' },
       schema: {
         querystring: OpenDataSignalsQuery,
         response: { 200: OpenDataSignalsResponse },

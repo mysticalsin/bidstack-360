@@ -8,6 +8,7 @@ export const predictiveRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/predictive/scores',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         querystring: PredictiveScoreFilter,
         response: { 200: z.object({ items: z.array(PredictiveScore) }) },

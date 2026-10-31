@@ -58,6 +58,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/oauth/start
   app.get('/integrations/slack/oauth/start', {
+    config: { permission: 'integrations:write' },
     schema: {
       response: { 200: z.object({ authUrl: z.string().url() }) },
     },
@@ -272,6 +273,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/channels — list available channels for notification config
   app.get('/integrations/slack/channels', {
+    config: { permission: 'integrations:read' },
     schema: {
       response: {
         200: z.object({
@@ -301,6 +303,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/workspace — current workspace info
   app.get('/integrations/slack/workspace', {
+    config: { permission: 'integrations:read' },
     schema: {
       response: {
         200: z.object({

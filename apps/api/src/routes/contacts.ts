@@ -55,6 +55,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/contacts',
     {
+      config: { permission: 'contacts:read' },
       schema: {
         querystring: ContactFilter,
         response: { 200: ContactPage },
@@ -106,6 +107,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/contacts/:id',
     {
+      config: { permission: 'contacts:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: Contact },

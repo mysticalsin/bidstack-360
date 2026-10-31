@@ -72,6 +72,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/document-templates',
     {
+      config: { permission: 'documents:read' },
       schema: {
         querystring: z.object({
           kind: TemplateKind.optional(),
@@ -152,6 +153,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/document-templates/:id',
     {
+      config: { permission: 'documents:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: TemplateResponse },
@@ -257,6 +259,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/document-templates/:id/versions',
     {
+      config: { permission: 'documents:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: z.array(TemplateVersionResponse) },

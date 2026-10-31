@@ -68,7 +68,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
 
   server.get(
     '/dashboards',
-    { schema: { response: { 200: z.array(AnalyticsDashboard) } } },
+    { config: { permission: 'reports:read' }, schema: { response: { 200: z.array(AnalyticsDashboard) } } },
     async (req) => {
       const admin = await isOrgAdmin(req);
       const dashboards = await prisma.analyticsDashboard.findMany({
@@ -120,7 +120,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
 
   server.get(
     '/dashboards/:id',
-    { schema: { params: IdParam, response: { 200: AnalyticsDashboard } } },
+    { config: { permission: 'reports:read' }, schema: { params: IdParam, response: { 200: AnalyticsDashboard } } },
     async (req) => {
       const dashboard = await findVisibleDashboard(req, req.params.id);
       const widgets = await prisma.analyticsDashboardWidget.findMany({
@@ -200,7 +200,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
 
   server.get(
     '/dashboards/:id/widgets',
-    { schema: { params: IdParam, response: { 200: z.array(AnalyticsWidget) } } },
+    { config: { permission: 'reports:read' }, schema: { params: IdParam, response: { 200: z.array(AnalyticsWidget) } } },
     async (req) => {
       const dashboard = await findVisibleDashboard(req, req.params.id);
       const widgets = await prisma.analyticsDashboardWidget.findMany({

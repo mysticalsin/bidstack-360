@@ -63,6 +63,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/accounts/:id/health',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         params: AccountParams,
         response: { 200: HealthScoreResponse, 404: z.object({ message: z.string() }) },
@@ -84,6 +85,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/accounts/:id/renewals',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         params: AccountParams,
         response: { 200: z.array(z.record(z.unknown())) },
@@ -100,6 +102,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/accounts/:id/churn-signals',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         params: AccountParams,
         querystring: ChurnSignalsQuery,
@@ -197,6 +200,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/accounts/:id/expansion-opportunities',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         params: AccountParams,
         response: { 200: z.array(z.record(z.unknown())) },
@@ -249,6 +253,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/cs/dashboard',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         response: { 200: z.record(z.unknown()) },
       },

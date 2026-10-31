@@ -131,6 +131,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/signatures/requests',
     {
+      config: { permission: 'documents:read' },
       schema: {
         querystring: z.object({
           status: SignatureStatus.optional(),
@@ -219,6 +220,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/signatures/requests/:id',
     {
+      config: { permission: 'documents:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: {

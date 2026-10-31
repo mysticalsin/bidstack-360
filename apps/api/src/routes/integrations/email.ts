@@ -49,6 +49,7 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /email/messages?entityType=&entityId=&page=&limit=
   app.get('/email/messages', {
+    config: { permission: 'activities:read' },
     schema: {
       querystring: z.object({
         entityType: z.string().optional(),

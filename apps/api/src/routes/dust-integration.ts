@@ -331,6 +331,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/webhooks',
     {
+      config: { permission: 'integrations:read' },
       schema: {
         response: {
           200: z.object({

@@ -28,7 +28,7 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
   // GET /api/forecasts/projection
   server.get(
     '/forecasts/projection',
-    { schema: { response: { 200: ForecastProjection } } },
+    { config: { permission: 'opportunities:read' }, schema: { response: { 200: ForecastProjection } } },
     async (req) => {
       const orgId = req.auth.orgId;
       const window = buildProjectionWindow(new Date(), FORWARD_QUARTERS);

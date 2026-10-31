@@ -16,6 +16,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/companies',
     {
+      config: { permission: 'companies:read' },
       schema: {
         querystring: z.object({
           search: z.string().max(255).optional(),
@@ -83,6 +84,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/companies/:id',
     {
+      config: { permission: 'companies:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: CompanyDetail },
@@ -296,6 +298,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/companies/:id/hierarchy',
     {
+      config: { permission: 'companies:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: CompanyHierarchy },

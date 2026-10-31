@@ -33,6 +33,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/proposals',
     {
+      config: { permission: 'proposals:read' },
       schema: {
         querystring: ProposalFilter,
         response: { 200: ProposalPage },
@@ -70,6 +71,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/proposals/:id',
     {
+      config: { permission: 'proposals:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: Proposal },

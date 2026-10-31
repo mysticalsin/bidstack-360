@@ -258,6 +258,7 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/sms/messages',
     {
+      config: { permission: 'activities:read' },
       schema: {
         description: 'List SMS messages for a CRM entity',
         tags: ['sms'],
@@ -337,6 +338,7 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/sms/consent/:phoneNumber',
     {
+      config: { permission: 'contacts:read' },
       schema: {
         description: 'Check TCPA opt-out status for a phone number',
         tags: ['sms'],

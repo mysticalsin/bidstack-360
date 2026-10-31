@@ -64,6 +64,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/opportunities/export',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         summary: 'Export all opportunities as CSV (streaming)',
         tags: ['opportunities'],
