@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/ui/Icon';
+import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
+import { isRestrictedCompany } from '@/lib/restrictedCompany';
 
 interface HierarchyNode {
   id: string;
@@ -22,13 +24,19 @@ function TreeNode({
         className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-[var(--surface-sunken)] transition-colors"
         style={{ paddingLeft: `${depth * 1.25 + 0.5}rem` }}
       >
-        <Icon name="building" size={14} className="text-[var(--fg-tertiary)]" />
-        <Link
-          to={`/companies/${node.id}`}
-          className="text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
-        >
-          {node.name}
-        </Link>
+        {isRestrictedCompany(node) ? (
+          <RestrictedCompanyLabel />
+        ) : (
+          <>
+            <Icon name="building" size={14} className="text-[var(--fg-tertiary)]" />
+            <Link
+              to={`/companies/${node.id}`}
+              className="text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
+            >
+              {node.name}
+            </Link>
+          </>
+        )}
         {node.children.length > 0 && (
           <span className="text-xs text-[var(--fg-tertiary)]">({node.children.length})</span>
         )}

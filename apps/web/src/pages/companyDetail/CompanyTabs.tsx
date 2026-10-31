@@ -1,6 +1,8 @@
 // Tab panel sub-components for CompanyDetailPage.
 // Each tab receives fully resolved data — no data-fetching hooks, no mutations.
 // Display hooks (currency, i18n) are fine.
+import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
+import { isRestrictedCompany } from '@/lib/restrictedCompany';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -243,7 +245,12 @@ export function HierarchyTab({
             {t('companyTabs.hierarchy.directChildren', 'Direct Children')}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {childrenList.map((child) => (
+            {childrenList.map((child) =>
+              isRestrictedCompany(child) ? (
+                <span key={child.id} className="inline-flex items-center rounded-md bg-[var(--surface-sunken)] px-3 py-1.5">
+                  <RestrictedCompanyLabel />
+                </span>
+              ) : (
               <Link
                 key={child.id}
                 to={`/companies/${child.id}`}
@@ -252,7 +259,8 @@ export function HierarchyTab({
                 <Icon name="building" size={14} />
                 {child.name}
               </Link>
-            ))}
+              ),
+            )}
           </div>
         </div>
       )}

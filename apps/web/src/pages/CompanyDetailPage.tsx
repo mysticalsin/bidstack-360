@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
+import { isRestrictedCompany } from '@/lib/restrictedCompany';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -148,12 +150,16 @@ export function CompanyDetailPage() {
               <span className="flex items-center gap-1">
                 <Icon name="git-branch" size={12} />
                 {t('companyDetail.meta.parent', 'Parent:')}
-                <Link
-                  to={`/companies/${c.parent.id}`}
-                  className="font-medium text-[var(--brand-primary)] hover:underline"
-                >
-                  {c.parent.name}
-                </Link>
+                {isRestrictedCompany(c.parent) ? (
+                  <RestrictedCompanyLabel className="text-xs" />
+                ) : (
+                  <Link
+                    to={`/companies/${c.parent.id}`}
+                    className="font-medium text-[var(--brand-primary)] hover:underline"
+                  >
+                    {c.parent.name}
+                  </Link>
+                )}
               </span>
             )}
           </div>
