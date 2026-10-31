@@ -3526,6 +3526,7 @@
     "columnTerritory": "Territory",
     "columnStage": "Stage",
     "columnValue": "Value",
+    "columnValueTitle": "currency not recorded; not a euro forecast",
     "columnProbability": "Stage proxy",
     "columnProbabilityTitle": "Stored stage probability",
     "columnDue": "Due"

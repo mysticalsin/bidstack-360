@@ -19,7 +19,7 @@ import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, visibleNavSections, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, visibleNavSections, isNavItemVisible, navBadgeCopy, type NavItem, type NavSection } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -194,6 +194,9 @@ function MobileNavItem({
   const { t } = useTranslation('common');
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
+  const badgePhrase =
+    badgeCopy && badge > 0 ? t(badgeCopy.key, badgeCopy.fallback, { count: badge }) : null;
   const location = useLocation();
 
   const isActive = (() => {
@@ -227,12 +230,16 @@ function MobileNavItem({
       )}
       end={item.end ?? item.to === '/'}
       onClick={onNavigate}
+      aria-label={badgePhrase ? `${label}, ${badgePhrase}` : label}
       onMouseEnter={() => prefetchRoute(item.to)}
     >
       <Icon name={item.icon} size={16} />
       <span className="flex-1">{label}</span>
       {badge > 0 && (
-        <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-tertiary)]">
+        <span
+          className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-tertiary)]"
+          title={badgePhrase ?? undefined}
+        >
           {badge}
         </span>
       )}

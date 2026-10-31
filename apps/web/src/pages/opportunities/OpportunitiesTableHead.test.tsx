@@ -27,5 +27,7 @@ describe('OpportunitiesTableHead probability column', () => {
     const header = screen.getByRole('columnheader', { name: /Stage proxy/ });
     expect(header.getAttribute('title')).toBe('Stored stage probability');
     expect(screen.queryByRole('columnheader', { name: 'Probability' })).toBeNull();
+    const value = screen.getByRole('columnheader', { name: 'Value' });
+    expect(value.getAttribute('title')).toBe('currency not recorded; not a euro forecast');
   });
 });

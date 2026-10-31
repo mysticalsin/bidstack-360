@@ -22,6 +22,7 @@ import {
   MEMBER_SETTINGS,
   visibleNavSections,
   isNavItemVisible,
+  navBadgeCopy,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -231,10 +232,26 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
+              const badgePhrase =
+                badgeCopy && badge > 0
+                  ? t(badgeCopy.key, badgeCopy.fallback, { count: badge })
+                  : null;
+              const itemLabel = t(item.labelKey, item.label);
               return (
-                <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
-                  <span>{t(item.labelKey, item.label)}</span>
-                  {badge > 0 && <span className="sb-badge">{badge}</span>}
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className="sb-flyout-item"
+                  aria-label={badgePhrase ? `${itemLabel}, ${badgePhrase}` : itemLabel}
+                >
+                  <span>{itemLabel}</span>
+                  {badge > 0 && (
+                    <span className="sb-badge" title={badgePhrase ?? undefined}>
+                      {badge}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -307,6 +324,10 @@ function SidebarItem({
   const { t } = useTranslation('common');
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
+  const badgePhrase =
+    badgeCopy && badge > 0 ? t(badgeCopy.key, badgeCopy.fallback, { count: badge }) : null;
+  const accessibleName = badgePhrase ? `${label}, ${badgePhrase}` : label;
   const prefetch = () => prefetchRoute(item.to);
 
   const isActive = useMemo(() => {
@@ -335,15 +356,19 @@ function SidebarItem({
       end={item.end}
       aria-current={isActive ? 'page' : undefined}
       className={cn('sb-item', isActive && 'is-active')}
-      aria-label={label}
-      title={collapsed ? undefined : label}
+      aria-label={accessibleName}
+      title={collapsed ? undefined : accessibleName}
       onMouseEnter={prefetch}
       onFocus={prefetch}
       onTouchStart={prefetch}
     >
       <Icon name={item.icon} size={16} />
       <span>{label}</span>
-      {badge > 0 && <span className="sb-badge">{badge}</span>}
+      {badge > 0 && (
+        <span className="sb-badge" title={badgePhrase ?? undefined}>
+          {badge}
+        </span>
+      )}
     </NavLink>
   );
   // Tooltips only when the label is hidden (collapsed mode) — otherwise

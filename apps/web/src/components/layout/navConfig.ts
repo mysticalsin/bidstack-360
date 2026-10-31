@@ -15,6 +15,14 @@ import type { IconName } from '@/components/ui/Icon';
 
 export type NavBadgeKey = 'openBids' | 'overdueTasks';
 
+/** The badge number is not the list total. Open bids and overdue tasks need that said. */
+export function navBadgeCopy(badgeKey: NavBadgeKey): { key: string; fallback: string } {
+  if (badgeKey === 'openBids') {
+    return { key: 'nav.badgeOpenBids', fallback: '{{count}} open' };
+  }
+  return { key: 'nav.badgeOverdueTasks', fallback: '{{count}} overdue' };
+}
+
 /** Admin-toggled module a nav item belongs to (hidden until enabled in Settings). */
 export type NavFeatureKey = 'agentStudio' | 'appflowy' | 'serum';
 

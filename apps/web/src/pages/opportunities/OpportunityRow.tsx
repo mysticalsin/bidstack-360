@@ -201,14 +201,14 @@ export const Row = memo(function Row({
         <SavedFlash trigger={saved.stage} />
       </td>
 
-      <td className="px-5 py-3 text-right">
+      <td className="px-5 py-3 text-right" title={UNSPECIFIED_CURRENCY_BASIS}>
         <NumberCell
           value={opp.value}
           step={1000}
           min={0}
           align="right"
           isSaving={saving.value}
-          format={(v) => `${formatUnspecifiedAmount(v)} (${UNSPECIFIED_CURRENCY_BASIS})`}
+          format={(v) => `${formatUnspecifiedAmount(v)} unspecified`}
           onSave={(next) => {
             startSave('value');
             patch.mutate(
