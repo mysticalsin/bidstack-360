@@ -158,6 +158,9 @@ model Org {
   healthScores           HealthScore[]
   npsSurveys             NpsSurvey[]
   churnSignals           ChurnSignal[]
+  accountWatchSubjects   AccountWatchSubject[]
+  accountWatchEvents     AccountWatchEvent[]
+  accountEarningsDates   AccountEarningsDate[]
   expansionOpportunities ExpansionOpportunity[]
 
   // Sprint 1 — Krayin import (Tags, EmailTemplates, LeadStageRot)
@@ -391,6 +394,9 @@ model Company {
   healthScores           HealthScore[]
   npsSurveys             NpsSurvey[]
   churnSignals           ChurnSignal[]
+  accountWatchSubjects   AccountWatchSubject[]
+  accountWatchEvents     AccountWatchEvent[]
+  accountEarningsDates   AccountEarningsDate[]
   expansionOpportunities ExpansionOpportunity[]
 
   // KAM front layer (all FK to this Company as the canonical KAM account)
@@ -5706,4 +5712,122 @@ model NotificationPref {
 
   @@index([orgId])
   @@map("notification_prefs")
+}
+
+// ── Financial Watchdog (public financial events per customer account) ──
+
+enum WatchdogEventKind {
+  EARNINGS_RELEASE
+  EARNINGS_DATE
+  ANNUAL_REPORT
+  QUARTERLY_REPORT
+  FILING
+  GUIDANCE_CHANGE
+  M_AND_A
+  RESTRUCTURING
+  LEADERSHIP_CHANGE
+  INSOLVENCY
+  OTHER_DISCLOSURE
+  NEWS_SIGNAL
+
+  @@map("watchdog_event_kind")
+}
+
+enum WatchdogImplication {
+  OPPORTUNITY
+  RISK
+  NEUTRAL
+
+  @@map("watchdog_implication")
+}
+
+enum WatchdogEventStatus {
+  NEW
+  ACKNOWLEDGED
+  DISMISSED
+  ACTIONED
+
+  @@map("watchdog_event_status")
+}
+
+/// One watch per (org, account). Identifiers must be human-confirmed before the
+/// scanner uses them, so an ambiguous match never produces events.
+model AccountWatchSubject {
+  id                       String    @id @default(uuid()) @db.Uuid
+  orgId                    String    @map("org_id") @db.Uuid
+  companyId                String    @map("company_id") @db.Uuid
+  secCik                   String?   @map("sec_cik")
+  companiesHouseNumber     String?   @map("companies_house_number")
+  lei                      String?
+  ticker                   String?
+  exchange                 String?
+  irFeedUrl                String?   @map("ir_feed_url")
+  identifiersConfirmedById String?   @map("identifiers_confirmed_by_id") @db.Uuid
+  identifiersConfirmedAt   DateTime? @map("identifiers_confirmed_at") @db.Timestamptz(6)
+  enabled                  Boolean   @default(true)
+  lastCheckedAt            DateTime? @map("last_checked_at") @db.Timestamptz(6)
+  lastError                String?   @map("last_error")
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId])
+  @@index([enabled, lastCheckedAt])
+  @@map("account_watch_subjects")
+}
+
+/// A detected public financial event, summarised with what it means for us.
+model AccountWatchEvent {
+  id                   String              @id @default(uuid()) @db.Uuid
+  orgId                String              @map("org_id") @db.Uuid
+  companyId            String              @map("company_id") @db.Uuid
+  /// sec_edgar | companies_house | amf | ir_feed | gdelt | ...
+  source               String
+  /// Accession number / transaction id / URL hash — dedupe key within source.
+  externalId           String              @map("external_id")
+  kind                 WatchdogEventKind
+  occurredAt           DateTime            @map("occurred_at") @db.Timestamptz(6)
+  detectedAt           DateTime            @default(now()) @map("detected_at") @db.Timestamptz(6)
+  title                String
+  sourceUrl            String              @map("source_url")
+  summary              String
+  /// RULE | LLM
+  summarySource        String              @default("RULE") @map("summary_source")
+  implication          WatchdogImplication @default(NEUTRAL)
+  implicationRationale String?             @map("implication_rationale")
+  severity             Int                 @default(1)
+  confirmed            Boolean             @default(true)
+  status               WatchdogEventStatus @default(NEW)
+  linkedOpportunityId  String?             @map("linked_opportunity_id") @db.Uuid
+  payload              Json?
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, externalId])
+  @@index([orgId, companyId, occurredAt(sort: Desc)])
+  @@index([orgId, status, severity])
+  @@map("account_watch_events")
+}
+
+model AccountEarningsDate {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  /// e.g. FY2026-Q3
+  fiscalPeriod String   @map("fiscal_period")
+  expectedAt   DateTime @map("expected_at") @db.Timestamptz(6)
+  confirmed    Boolean  @default(false)
+  source       String
+  sourceUrl    String   @map("source_url")
+  retrievedAt  DateTime @default(now()) @map("retrieved_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, fiscalPeriod])
+  @@index([orgId, expectedAt])
+  @@map("account_earnings_dates")
 }
