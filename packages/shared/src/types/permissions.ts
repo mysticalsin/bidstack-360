@@ -43,6 +43,8 @@ export const PERMISSION_KEYS = [
   'msa:write',
   'opportunities:read',
   'opportunities:write',
+  'orgchart:read',
+  'orgchart:write',
   'products:read',
   'products:write',
   'proposals:approve',
