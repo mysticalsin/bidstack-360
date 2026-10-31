@@ -25,9 +25,12 @@ export const envSchema = z.object({
 
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
 
-  // Microsoft SSO
-  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('false'),
+  // Official sign-in is Microsoft. Google, including Gmail, stays available
+  // in this version. Unset means shown; only "false" hides a button.
+  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('true'),
   VITE_SSO_MICROSOFT_LABEL: z.string().optional(),
+  VITE_SSO_GOOGLE_ENABLED: z.enum(['true', 'false']).default('true'),
+  VITE_SSO_GOOGLE_LABEL: z.string().optional(),
 
   // ─── Demo mode (public passwordless "try the demo" door) ──────────────
   // DEMO_MODE=true arms a PUBLIC sign-in: any email → its own freshly-seeded

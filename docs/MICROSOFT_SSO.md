@@ -100,7 +100,7 @@ User is authenticated with org-scoped access
 | Symptom                                 | Cause                                           | Fix                                              |
 | --------------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
 | "Sign-in from @domain is not permitted" | Email domain not in `SSO_ALLOWED_EMAIL_DOMAINS` | Add domain to env var                            |
-| Microsoft button doesn't appear         | `VITE_SSO_MICROSOFT_ENABLED` not set to `true`  | Check `.env` and restart dev server              |
+| Microsoft button doesn't appear         | `VITE_SSO_MICROSOFT_ENABLED=false`              | Unset it or set `true`, then restart dev server  |
 | "Organization not registered"           | Clerk org doesn't map to BidStack org           | Ensure `clerk_org` column matches Clerk's org ID |
 | "User not registered"                   | First-time Microsoft sign-in                    | Auto-provisioning can be added via webhook       |
 | Infinite redirect loop                  | Misconfigured `PUBLIC_BASE_URL`                 | Ensure it matches Clerk's allowed redirect URLs  |
