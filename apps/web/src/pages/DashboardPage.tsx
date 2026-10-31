@@ -25,6 +25,8 @@ import {
 } from '@/components/cockpit';
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSection';
+import { AccountVisuals } from '@/components/account/AccountVisuals';
+import { AccountDetailsFold } from '@/components/account/AccountDetailsFold';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
 import { InfoSearchLeadsCard } from '@/components/account-intel/InfoSearchLeadsCard';
@@ -190,23 +192,10 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     .filter((o) => o.stage === 'closed_won' || o.stage === 'closed_lost')
     .map((o) => ({ id: o.id, name: o.name, outcome: o.stage === 'closed_won' ? 'won' : 'lost' }));
 
-  return (
+  // Everything below the watchdog: customise menu, KPI strip and the long
+  // cockpit grid. On the account page it folds behind "Account details".
+  const cockpitBody = (
     <>
-      {dashboard.isError && (
-        // Theme-token amber pair (not raw yellow-* utilities) so the banner
-        // follows light/dark like every other surface on this screen.
-        <div role="status" className="bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] px-4 py-1 text-sm text-center rounded-md mb-4 flex items-center justify-center gap-2">
-          <span>{t('dashboard.liveRefreshFailed', 'Warning: Live refresh failed, showing the last verified snapshot.')}</span>
-          <button type="button" onClick={() => void dashboard.refetch()} className="min-h-[44px] rounded-md px-2 font-semibold underline hover:no-underline">
-            {t('dashboard.retry', 'Retry')}
-          </button>
-        </div>
-      )}
-      <PageHead cockpit={cockpit} accountView={isAccountView} />
-      {/* Account view: one header (name, health sentence, 3 numbers), then the
-          watchdog signals, then details. The command-center hero repeated the
-          name and next move the header already carries, so it is org-only. */}
-      {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
       {isAccountView && (
         <div className="flex justify-end">
           <CockpitCustomizeMenu />
@@ -362,6 +351,34 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           )}
         </aside>
       </section>
+    </>
+  );
+
+  return (
+    <>
+      {dashboard.isError && (
+        // Theme-token amber pair (not raw yellow-* utilities) so the banner
+        // follows light/dark like every other surface on this screen.
+        <div role="status" className="bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] px-4 py-1 text-sm text-center rounded-md mb-4 flex items-center justify-center gap-2">
+          <span>{t('dashboard.liveRefreshFailed', 'Warning: Live refresh failed, showing the last verified snapshot.')}</span>
+          <button type="button" onClick={() => void dashboard.refetch()} className="min-h-[44px] rounded-md px-2 font-semibold underline hover:no-underline">
+            {t('dashboard.retry', 'Retry')}
+          </button>
+        </div>
+      )}
+      <PageHead cockpit={cockpit} accountView={isAccountView} />
+      {/* Account view: one header (name, health sentence, 3 numbers), then the
+          watchdog signals, then details. The command-center hero repeated the
+          name and next move the header already carries, so it is org-only. */}
+      {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
+      {isAccountView && cockpit.company.id ? (
+        <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} />
+      ) : null}
+      {isAccountView ? (
+        <AccountDetailsFold label={t('dashboard.accountDetails', 'Account details')}>{cockpitBody}</AccountDetailsFold>
+      ) : (
+        cockpitBody
+      )}
     </>
   );
 }

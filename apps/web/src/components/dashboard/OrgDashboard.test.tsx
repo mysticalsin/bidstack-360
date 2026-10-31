@@ -20,6 +20,21 @@ vi.mock('framer-motion', () => ({
 
 vi.mock('@/hooks/useOrgSummary', () => ({ useOrgSummary: vi.fn() }));
 vi.mock('@/hooks/usePipelineReport', () => ({ usePipelineReport: vi.fn() }));
+vi.mock('@/hooks/useForecasts', () => ({ useForecastProjection: () => ({ data: undefined }) }));
+vi.mock('@/hooks/useOpportunityRows', () => ({ useOpportunityRows: () => ({ data: { items: [] } }) }));
+vi.mock('@/hooks/useWatchdogFeed', () => ({ useWatchdogFeed: () => ({ data: undefined }) }));
+vi.mock('./DashboardVisuals', () => ({
+  DashboardHero: () => <div data-testid="dashboard-hero" />,
+  NeedsYou: () => <div data-testid="needs-you" />,
+  FunnelCard: () => <div />,
+  StatusDonutCard: () => <div />,
+  ForecastCard: () => <div />,
+  WinRateTrendCard: () => <div />,
+  TopAccountsBarCard: () => <div />,
+  WatchdogHeatCard: () => <div />,
+  EarningsCard: () => <div />,
+}));
+vi.mock('@/components/viz/viz.css', () => ({}));
 vi.mock('@/stores/currency', () => ({
   useCurrencyStore: () => ({ currency: 'EUR', convert: (v: number) => v }),
 }));
@@ -97,7 +112,7 @@ describe('OrgDashboard first-run state', () => {
     expect(screen.getByTestId('getting-started')).toBeDefined();
     // The full command center must not also render for an empty org.
     expect(screen.queryByTestId('kpi-row')).toBeNull();
-    expect(screen.queryByTestId('org-command-hero')).toBeNull();
+    expect(screen.queryByTestId('dashboard-hero')).toBeNull();
   });
 
   it('renders the command center once any record exists', () => {
@@ -110,8 +125,9 @@ describe('OrgDashboard first-run state', () => {
     renderDashboard();
 
     expect(screen.getByTestId('kpi-row')).toBeDefined();
-    // The cinematic hero band is the landing moment for any org with data.
-    expect(screen.getByTestId('org-command-hero')).toBeDefined();
+    // The visual hero + needs-you list lead the page for any org with data.
+    expect(screen.getByTestId('dashboard-hero')).toBeDefined();
+    expect(screen.getByTestId('needs-you')).toBeDefined();
     expect(screen.queryByTestId('getting-started')).toBeNull();
   });
 });

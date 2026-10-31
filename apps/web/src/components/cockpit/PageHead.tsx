@@ -11,6 +11,8 @@ import { Icon } from '@/components/ui/Icon';
 import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { Spark } from '@/components/viz/charts';
+import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
@@ -80,6 +82,12 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   const winLoss = cockpit.winLoss;
   const nextMove = deriveNextMove(cockpit, t);
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
+  // Sparklines (real rows only): open value accumulated by due date, running
+  // win rate across closed bids in close order, open risks by severity.
+  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, customer: o.customer }));
+  const openSpark = cumulativeOpen(sparkRows);
+  const winSpark = runningWinRate(sparkRows);
+  const riskSpark = (['low', 'medium', 'high', 'critical'] as const).map((sev) => openRisks.filter((r) => r.severity === sev).length);
 
   return (
     <motion.div
@@ -201,6 +209,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           <div>
             <dt>{t('pageHead.keyOpenPipeline', 'Open pipeline')}</dt>
             <dd>{formatMoney(openValue)}</dd>
+            <Spark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
               {openOpps.length === 1
                 ? t('pageHead.keyOpenDeal', '1 open deal')
@@ -210,6 +219,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           <div>
             <dt>{t('pageHead.keyWinRate', 'Win rate')}</dt>
             <dd>{winLoss && closedCount > 0 ? `${winLoss.winRate}%` : '—'}</dd>
+            <Spark values={winSpark} label={t('pageHead.sparkWin', 'Running win rate after each closed bid')} />
             <span>
               {winLoss && closedCount > 0
                 ? t('pageHead.keyWonOf', '{{won}} of {{total}} closed', {
@@ -222,6 +232,9 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           <div>
             <dt>{t('pageHead.keyOpenRisks', 'Open risks')}</dt>
             <dd>{openRisks.length}</dd>
+            {openRisks.length > 0 ? (
+              <Spark mode="bars" values={riskSpark} hotFrom={2} width={48} label={t('pageHead.sparkRisk', 'Open risks: {{low}} low, {{med}} medium, {{high}} high, {{crit}} critical', { low: riskSpark[0], med: riskSpark[1], high: riskSpark[2], crit: riskSpark[3] })} />
+            ) : null}
             <span>
               {highRisks > 0
                 ? t('pageHead.keyHighRisks', '{{count}} high', { count: highRisks })

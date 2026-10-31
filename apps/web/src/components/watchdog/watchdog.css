@@ -107,3 +107,13 @@
   .wd-row-btn, .wd-row-static { align-items: flex-start; }
   .wd-pill { margin-top: 2px; }
 }
+
+/* visuals inside the watchdog surfaces */
+.wd-strip { margin: 0 0 8px; display: grid; gap: 8px; }
+.wd-strip-cap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.wd-cal { margin-bottom: 16px; max-width: 280px; }
+.wd-years { margin: 8px 0 0; display: grid; gap: 8px; }
+.wd-track-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px 40px; align-items: start; }
+.wd-track-grid > .wd-projects { grid-column: 1 / -1; }
+.wd-track-grid > .wd-years { margin: 0; }
+@media (max-width: 1024px) { .wd-track-grid { grid-template-columns: 1fr; } }

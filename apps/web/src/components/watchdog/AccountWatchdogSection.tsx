@@ -3,12 +3,16 @@
 // timeline). Direction: Tony 13:12 BRT + /workspace/fleet/polo-DESIGN.md.
 // Density rules: top 3 signals by default, one line + one meta line per row,
 // details on click, a single tinted pill instead of severity dots.
+import '@/components/viz/viz.css';
 import './watchdog.css';
 
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useState } from 'react';
 
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { SignalLegend } from '@/components/viz/ChartCard';
+import { MiniCalendar, SignalStrip, YearBars } from '@/components/viz/charts';
+import { fmtCompact } from '@/components/viz/viz-data';
 import { useAccountWatchdog, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
 import { daysUntil } from '@/lib/format';
 
@@ -102,8 +106,33 @@ function Signals({ data }: { data: AccountWatchdog }) {
     );
   }
   const shown = all ? data.events : data.events.slice(0, TOP_SIGNALS);
+  const to = new Date();
+  // Axis spans the oldest signal (max 12 months back, min 6) up to today.
+  const oldest = Math.min(...data.events.map((e) => new Date(e.occurredAt).getTime()));
+  const floor = new Date(to.getFullYear(), to.getMonth() - 11, 1).getTime();
+  const sixAgo = new Date(to.getFullYear(), to.getMonth() - 5, 1).getTime();
+  const start = new Date(Math.max(floor, Math.min(sixAgo, oldest)));
+  const from = new Date(start.getFullYear(), start.getMonth(), 1);
+  const counts = { OPPORTUNITY: 0, NEUTRAL: 0, RISK: 0 } as Record<string, number>;
+  for (const e of data.events) counts[e.implication] = (counts[e.implication] ?? 0) + 1;
+  const sample = data.events.some((e) => /^sample:/i.test(e.title));
   return (
     <>
+      <figure
+        className="wd-strip viz-figure"
+        role="img"
+        aria-label={`Signals since ${from.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}: ${counts.OPPORTUNITY} opportunity, ${counts.NEUTRAL} watch, ${counts.RISK} risk. Listed below.`}
+      >
+        <SignalStrip
+          events={data.events.map((e) => ({ id: e.id, at: e.occurredAt, kind: e.implication, title: e.title }))}
+          from={from}
+          to={to}
+        />
+        <figcaption className="wd-strip-cap">
+          <SignalLegend />
+          {sample ? <span className="viz-sample" title='Local demo signals (titles start with "Sample:")'>Sample</span> : null}
+        </figcaption>
+      </figure>
       <ul className="wd-list" id={listId} aria-live="polite">
         {shown.map((e, i) => (
           <SignalRow key={e.id} e={e} i={i} />
@@ -122,7 +151,15 @@ function Results({ data }: { data: AccountWatchdog }) {
       </p>
     );
   }
+  const first = new Date(data.earnings[0]!.expectedAt);
   return (
+    <>
+    <div className="wd-cal viz-figure" aria-hidden>
+      <MiniCalendar
+        month={first}
+        marks={data.earnings.map((d) => ({ date: d.expectedAt, label: `${d.fiscalPeriod.replace('-', ' ')} results` }))}
+      />
+    </div>
     <ul className="wd-list">
       {data.earnings.slice(0, TOP_SIGNALS).map((d, i) => {
         const days = daysUntil(d.expectedAt);
@@ -140,6 +177,7 @@ function Results({ data }: { data: AccountWatchdog }) {
         );
       })}
     </ul>
+    </>
   );
 }
 
@@ -156,6 +194,15 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
   const wonValue = won.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonShare = total > 0n ? Number((wonValue * 1000n) / total) / 10 : 0;
   const timeline = timelineAll ? data.history : data.history.slice(0, TOP_TIMELINE);
+  const byYear = new Map<string, { won: number; lost: number }>();
+  for (const p of data.pastProjects) {
+    const y = String(new Date(p.closedAt).getUTCFullYear());
+    const cur = byYear.get(y) ?? { won: 0, lost: 0 };
+    const v = Number(BigInt(p.valueMicros) / 1_000_000n);
+    if (p.outcome === 'won') cur.won += v; else cur.lost += v;
+    byYear.set(y, cur);
+  }
+  const years = [...byYear.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([year, v]) => ({ year, ...v }));
 
   return (
     <section className="wd-surface" aria-labelledby="wd-track-h">
@@ -163,6 +210,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
       {data.pastProjects.length === 0 ? (
         <p className="wd-empty"><span>No closed projects yet</span>Won and lost bids appear here.</p>
       ) : (
+        <div className="wd-track-grid">
         <div className="wd-summary">
           <p className="wd-summary-line">
             <span className="wd-summary-big">{won.length} won, {lost} lost</span>
@@ -184,6 +232,18 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
           >
             {projectsOpen ? 'Hide projects' : `Show ${data.pastProjects.length} projects`}
           </button>
+        </div>
+          <figure
+            className="wd-years viz-figure"
+            role="img"
+            aria-label={`Won and lost value by close year: ${years.map((y) => `${y.year} won ${fmtCompact(y.won)}, lost ${fmtCompact(y.lost)}`).join('; ')}`}
+          >
+            <YearBars data={years} format={fmtCompact} />
+            <ul className="viz-legend" aria-hidden>
+              <li><i className="dash-key" style={{ background: 'color-mix(in srgb, var(--success, #177048) 75%, transparent)' }} />Won</li>
+              <li><i className="dash-key" style={{ background: 'color-mix(in srgb, var(--fg-tertiary, #6b6b6b) 30%, transparent)' }} />Lost</li>
+            </ul>
+          </figure>
           <ul id={projectsId} className="wd-list wd-projects" hidden={!projectsOpen}>
             {data.pastProjects.map((p) => (
               <li key={p.id} className="wd-row wd-row-static">

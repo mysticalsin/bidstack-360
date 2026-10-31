@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  accountBars, cumulativeOpen, cumulativeWon, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
+} from './viz-data';
+
+const row = (o: Partial<OppRow>): OppRow => ({ id: Math.random().toString(36), stage: 's1_lead', value: 100, dueDate: null, customer: 'A', ...o });
+
+const rows: OppRow[] = [
+  row({ stage: 'S1 Lead', value: 10 }),
+  row({ stage: 's4_negotiation', value: 400, dueDate: '2026-06-30T00:00:00.000Z', customer: 'B' }),
+  row({ stage: 'closed_won', value: 200, dueDate: '2026-02-03T00:00:00.000Z' }),
+  row({ stage: 'closed_won', value: 300, dueDate: '2026-04-04T00:00:00.000Z', customer: 'B' }),
+  row({ stage: 'closed_lost', value: 50, dueDate: '2026-10-01T00:00:00.000Z' }),
+];
+
+describe('viz-data', () => {
+  it('normalises stage names and sentence-cases labels', () => {
+    expect(stageKey('S1 Lead')).toBe('s1_lead');
+    expect(stageText('s3_technical_iteration')).toBe('S3 technical iteration');
+  });
+
+  it('buckets calendar dates on UTC so 1 Oct stays in Q4', () => {
+    expect(quarterOf('2026-10-01T00:00:00.000Z')).toBe('Q4 2026');
+  });
+
+  it('derives funnel, status mix and win rate from rows only', () => {
+    expect(stageFunnel(rows).map((s) => [s.label, s.value])).toEqual([['S1 lead', 10], ['S4 negotiation', 400]]);
+    expect(statusMix(rows)).toEqual({ open: 2, won: 2, lost: 1 });
+    expect(winRateByQuarter(rows)).toEqual([
+      { x: 'Q1 2026', won: 1, lost: 0, rate: 100 },
+      { x: 'Q2 2026', won: 1, lost: 0, rate: 100 },
+      { x: 'Q4 2026', won: 0, lost: 1, rate: 0 },
+    ]);
+    expect(wonByQuarter(rows)).toEqual([{ label: 'Q1 2026', won: 200 }, { label: 'Q2 2026', won: 300 }]);
+  });
+
+  it('accumulates won value by month and open value by due date', () => {
+    const won = cumulativeWon(rows);
+    expect(won.map((p) => [p.x, p.y])).toEqual([['Jan', 0], ['Feb', 200], ['Mar', 200], ['Apr', 500]]);
+    expect(cumulativeOpen(rows)).toEqual([10, 410]);
+    expect(runningWinRate(rows)).toEqual([100, 100, 67]);
+  });
+
+  it('ranks accounts by won + open and ignores lost value', () => {
+    expect(accountBars(rows)).toEqual([{ label: 'B', open: 400, won: 300 }, { label: 'A', open: 10, won: 200 }]);
+  });
+
+  it('flags open bids past their due date', () => {
+    expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
+  });
+});

@@ -3341,8 +3341,8 @@
    three size steps (title 28 / section 16 / body 14, meta 13), 8pt spacing. */
 .acct-head { flex-wrap: wrap; row-gap: 24px; padding-bottom: 32px; margin-bottom: 8px; }
 .acct-head .page-title { font-size: 28px; line-height: 1.2; }
-.acct-health { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 14px; color: var(--fg-secondary); max-width: 72ch; }
-.acct-health-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-health { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; font-size: 14px; color: var(--fg-secondary); max-width: 72ch; }
+.acct-health-text { min-width: 0; line-height: 1.45; }
 .acct-pill {
   flex: none; font-size: 12px; font-weight: 500; line-height: 1; padding: 4px 8px; border-radius: 999px;
   background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--tag-jade-fg);
@@ -3360,7 +3360,6 @@
   .acct-head { row-gap: 16px; padding-bottom: 24px; }
   .acct-head .page-title { font-size: 24px; }
   .acct-head .page-actions { justify-content: flex-start; }
-  .acct-health-text { white-space: normal; }
   .acct-keys { gap: 16px; }
   .acct-keys dd { font-size: 20px; }
 }
@@ -3375,3 +3374,15 @@
 }
 /* No glow ring on the logo: one quiet hairline is enough. */
 .acct-head .account-heading-cluster > span:first-child { box-shadow: 0 0 0 1px var(--border-subtle); }
+
+/* Account details fold (Tony 13:24 BRT) */
+.acct-fold { border-top: 1px solid var(--border-subtle); margin-top: 8px; }
+.acct-fold-h { margin: 0; font-size: 18px; font-weight: 500; }
+.acct-fold-btn { display: flex; width: 100%; align-items: center; gap: 12px; min-height: 56px; padding: 8px 0; background: none; border: 0; cursor: pointer; font: inherit; color: var(--fg-primary); text-align: left; }
+.acct-fold-btn:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; border-radius: 6px; }
+.acct-fold-meta { font-size: 13px; font-weight: 400; color: var(--fg-tertiary); margin-left: auto; }
+.acct-fold-chev { color: var(--fg-tertiary); transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
+.acct-fold-chev[data-open='true'] { transform: rotate(180deg); }
+.acct-fold-body { display: grid; gap: 16px; padding-top: 8px; }
+@media (max-width: 640px) { .acct-fold-meta { display: none; } }
+@media (prefers-reduced-motion: reduce) { .acct-fold-chev { transition: none; } }

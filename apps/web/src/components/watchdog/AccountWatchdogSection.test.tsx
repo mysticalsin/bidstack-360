@@ -40,9 +40,12 @@ describe('AccountWatchdogSection', () => {
     render(<AccountWatchdogSection companyId="c1" />);
     const rows = screen.getAllByRole('button', { name: /exit costs/ });
     expect(rows).toHaveLength(3);
-    expect(screen.getAllByText('Risk')).toHaveLength(1);
-    expect(screen.getByText('Opportunity')).toBeTruthy();
-    expect(screen.getByText('Watch')).toBeTruthy();
+    // One pill per row (the strip legend repeats the words, so scope to pills).
+    expect(screen.getAllByText('Risk', { selector: '.wd-pill' })).toHaveLength(1);
+    expect(screen.getByText('Opportunity', { selector: '.wd-pill' })).toBeTruthy();
+    expect(screen.getByText('Watch', { selector: '.wd-pill' })).toBeTruthy();
+    // The time-axis strip has a text alternative.
+    expect(screen.getByRole('img', { name: /^Signals since/ })).toBeTruthy();
     // No severity dots, no description until expanded.
     expect(screen.queryByRole('img', { name: /Severity/ })).toBeNull();
     expect(screen.getByText('Restructuring announced 1.').closest('[hidden]')).toBeTruthy();

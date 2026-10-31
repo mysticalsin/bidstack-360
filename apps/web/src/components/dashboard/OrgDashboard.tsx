@@ -1,4 +1,5 @@
 import '../../styles/org-dashboard.css';
+import '@/components/viz/viz.css';
 
 import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,25 +10,23 @@ import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
-import { Reveal } from '@/components/motion/Reveal';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
+import { useForecastProjection } from '@/hooks/useForecasts';
+import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
 import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
-import { OrgCommandHero } from './widgets/OrgCommandHero';
-import { InsightsBar } from './widgets/InsightsBar';
 import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
-import { PipelineCard } from './widgets/PipelineCard';
-import { PipelineByStageMini } from './widgets/PipelineByStageMini';
-import { AlertCard } from './widgets/AlertCard';
-import { QuickActionsCard, QuickLinksCard } from './widgets/SidebarCards';
+import { QuickLinksCard } from './widgets/SidebarCards';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
-import { TopAccountsCard } from './widgets/TopAccountsCard';
-import { SalesFunnelCard } from './widgets/SalesFunnelCard';
-import { WinRateCard } from './widgets/WinRateCard';
+import {
+  DashboardHero, EarningsCard, ForecastCard, FunnelCard, NeedsYou, StatusDonutCard, TopAccountsBarCard,
+  WatchdogHeatCard, WinRateTrendCard,
+} from './DashboardVisuals';
 import { GettingStarted } from './widgets/GettingStarted';
 
 // ─── OrgDashboard ─────────────────────────────────────────────────────────────
@@ -38,6 +37,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const reduced = useReducedMotion();
   const summary = useOrgSummary();
   const pipelineReport = usePipelineReport();
+  const opps = useOpportunityRows();
+  const projection = useForecastProjection();
+  const feed = useWatchdogFeed(30);
+  const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
 
   const s = summary.data;
   const closedWon =
@@ -232,95 +235,46 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
       </motion.div>
 
-      {/* Cinematic hero band — ports the account cockpit's command-center
-          language to portfolio level (replaces the old flat stat strip). */}
-      {s && <OrgCommandHero summary={s} />}
-
-      {/* Main cockpit grid */}
-      <section
-        className="cockpit-grid"
-        aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')}
-      >
-        {/* Main column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <Reveal>
-            <KpiRow kpis={kpis} reduced={reduced} />
-          </Reveal>
-
-          <Reveal delay={0.06}>
-            <InsightsBar
-              overdueTasks={s?.overdueTasks ?? 0}
-              stalledOpps={(s?.opportunities ?? 0) - (s?.openOpportunities ?? 0)}
-              newLeads={s?.leads ?? 0}
-              pipelineValue={s?.pipelineValue ?? 0}
-            />
-          </Reveal>
-
-          <Reveal delay={0.07}>
-            <ClosingThisWeekCard />
-          </Reveal>
-
-          <Reveal delay={0.08}>
-            <RecentActivityCard activity={s?.recentActivity ?? []} />
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <TopAccountsCard />
-          </Reveal>
-
-          <Reveal delay={0.12}>
-            <SalesFunnelCard
-              leads={s?.leads ?? 0}
-              opportunities={s?.opportunities ?? 0}
-              openOpps={s?.openOpportunities ?? 0}
-              pipelineValue={s?.pipelineValue ?? 0}
-              reduced={reduced}
-            />
-          </Reveal>
+      {/* Visual-first body (Tony 13:25 BRT): hero + needs-you, then four
+          chart rows. Everything below is derived from API rows. */}
+      <div className="dash-v" aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')} role="region">
+        <div className="viz-grid-3">
+          <DashboardHero
+            rows={oppRows}
+            openValue={pipelineReport.data?.totalValueOpen ?? s?.pipelineValue ?? 0}
+            weighted={pipelineReport.data?.weightedPipeline ?? 0}
+            openCount={s?.openOpportunities ?? 0}
+          />
+          <NeedsYou rows={oppRows} overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
+        </div>
+        <div className="viz-grid-2">
+          <FunnelCard rows={oppRows} />
+          <StatusDonutCard rows={oppRows} />
+        </div>
+        <div className="viz-grid-2">
+          <ForecastCard rows={oppRows} projection={projection.data} />
+          <WinRateTrendCard rows={oppRows} />
+        </div>
+        <div className="viz-grid-2">
+          <TopAccountsBarCard rows={oppRows} />
+          <div className="dash-stack">
+            <WatchdogHeatCard feed={feed.data} />
+            <EarningsCard feed={feed.data} />
+          </div>
         </div>
 
-        {/* Sidebar */}
-        <aside
-          className="cockpit-side"
-          aria-label={t('orgDashboard.detailsAriaLabel', 'Workspace details')}
-        >
-          <Reveal delay={0.04}>
-            <PipelineCard
-              value={s?.pipelineValue ?? 0}
-              count={s?.openOpportunities ?? 0}
-              stages={pipelineStages}
-              reduced={reduced}
-            />
-          </Reveal>
-
-          <Reveal delay={0.06}>
-            <PipelineByStageMini report={pipelineReport.data} reduced={reduced} />
-          </Reveal>
-
-          <Reveal delay={0.08}>
-            <AlertCard
-              tone="rose"
-              icon="tasks"
-              label={t('orgDashboard.overdueTasks', 'Overdue tasks')}
-              value={s?.overdueTasks ?? 0}
-              total={s?.tasks ?? 0}
-              href="/tasks?filter=overdue"
-            />
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <QuickActionsCard />
-          </Reveal>
-
-          <Reveal delay={0.14}>
-            <WinRateCard won={closedWon} lost={closedLost} reduced={reduced} />
-          </Reveal>
-
-          <Reveal delay={0.16}>
+        <details className="dash-more">
+          <summary>{t('orgDashboard.moreDetail', 'Workspace detail')}</summary>
+          <div className="dash-more-body">
+            <KpiRow kpis={kpis} reduced={reduced} />
+            <div className="viz-grid-2">
+              <ClosingThisWeekCard />
+              <RecentActivityCard activity={s?.recentActivity ?? []} />
+            </div>
             <QuickLinksCard />
-          </Reveal>
-        </aside>
-      </section>
+          </div>
+        </details>
+      </div>
     </div>
   );
 });
