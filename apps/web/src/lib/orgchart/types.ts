@@ -1,9 +1,9 @@
-// Org chart model. Mirrors the expected backend contract
-// (/workspace/fleet/polo-orgchart-api.md, not written yet); until it lands the
-// client in ./client.ts is a local mock.
+// Org chart model used by the UI. Live charts come from the org chart API
+// (/workspace/fleet/polo-orgchart-api.md, @bidstack/shared OrgChartNode) and
+// are mapped onto this shape in ./client.ts; unsaved accounts get a Sample.
 import type { SeniorityLevel } from '@bidstack/shared';
 
-export type OrgNodeSource = 'sample' | 'manual' | 'contacts' | 'meetings' | 'csv' | 'apollo';
+export type OrgNodeSource = 'sample' | 'manual' | 'contacts' | 'meetings' | 'csv' | 'apollo' | 'abc' | 'metis' | 'seed';
 
 export interface OrgNode {
   id: string;
@@ -18,6 +18,14 @@ export interface OrgNode {
   /** Our relationship owner, when set by hand. Otherwise derived from meetings. */
   ownerName: string | null;
   source: OrgNodeSource;
+  /** Server fields (live charts only). */
+  version?: number;
+  kind?: 'contact' | 'placeholder';
+  function?: string | null;
+  redacted?: boolean;
+  meetingCount?: number;
+  lastMetAt?: string | null;
+  relationshipStrength?: number | null;
 }
 
 export interface OrgChart {
@@ -28,6 +36,8 @@ export interface OrgChart {
   updatedBy: string | null;
   /** True for a generated sample structure that nobody has saved yet. */
   sample: boolean;
+  /** True when the depth limit cut nodes off (load deeper with fromNodeId). */
+  truncated?: boolean;
   nodes: OrgNode[];
 }
 
@@ -48,8 +58,22 @@ export interface PersonCoverage {
   lastMetAt: string | null;
 }
 
+/** What the chart shows per person: met coverage plus, when loaded, meetings. */
+export interface NodeCov {
+  met: boolean;
+  count: number;
+  lastMetAt: string | null;
+  meetings: Array<{ id: string; title: string; heldAt: string }>;
+  challenges: string[];
+  /** Internal attendees who met this person, most frequent first. */
+  owners: string[];
+  /** Admin-set relationship strength (1 to 5), overrides the derived one. */
+  manual: number | null;
+}
+
+/** 409 version_conflict from the API: someone changed the chart first. */
 export class OrgChartConflictError extends Error {
-  constructor(public current: Pick<OrgChart, 'version' | 'updatedAt' | 'updatedBy'>) {
-    super('Someone else saved this org chart first');
+  constructor(public current: { chartVersion: number | null; currentVersion: number | null; message: string }) {
+    super(current.message || 'Someone else changed this org chart first');
   }
 }

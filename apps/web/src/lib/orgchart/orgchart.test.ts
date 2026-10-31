@@ -1,12 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { fetchOrgChart, saveOrgChart } from './client';
-import { coverageFor, coverageFromMeetings, strengthOf } from './coverage';
-import { exportCsv, importCsv } from './csv';
+import { coverageFor, coverageFromMeetings, covFromPerson, strengthOf } from './coverage';
+import { exportCsv } from './csv';
 import { layoutTree, NODE_H } from './layout';
 import { mergePeople, sampleChart, seniorityFromTitle } from './sample';
 import * as T from './tree';
-import { OrgChartConflictError, type OrgNode, type PersonCoverage } from './types';
+import type { OrgNode, PersonCoverage } from './types';
 
 const n = (id: string, parentId: string | null, extra: Partial<OrgNode> = {}): OrgNode => ({
   id, parentId, name: id.toUpperCase(), title: null, photoUrl: null, seniority: 'unknown', region: null,
@@ -54,20 +53,14 @@ describe('layout', () => {
   });
 });
 
-describe('csv', () => {
-  it('round-trips and resolves managers by name', () => {
-    const r = importCsv('name,title,seniority,region,manager\n"Ann, CEO",Chief Executive Officer,c-level,CA,\nBob,VP Data,vp,GB,"Ann, CEO"\nCy,Analyst,ic,,Nobody\n');
-    expect(r.nodes).toHaveLength(3);
-    const ann = r.nodes.find((x) => x.name === 'Ann, CEO')!;
-    expect(r.rootId).toBe(ann.id);
-    expect(r.nodes.find((x) => x.name === 'Bob')!.parentId).toBe(ann.id);
-    expect(r.nodes.find((x) => x.name === 'Bob')!.seniority).toBe('vp');
-    expect(r.errors.some((e) => e.includes('Nobody'))).toBe(true);
-    const again = importCsv(exportCsv(r.nodes));
-    expect(again.nodes.find((x) => x.name === 'Bob')!.parentId).toBe(again.nodes.find((x) => x.name === 'Ann, CEO')!.id);
-  });
-  it('rejects a file without a name column', () => {
-    expect(importCsv('title\nCEO').errors[0]).toMatch(/name/);
+describe('csv export', () => {
+  it('writes the API import columns with managers by name, quoting commas', () => {
+    const out = exportCsv([n('a', null, { name: 'Ann, CEO', seniority: 'c_level' }), n('b', 'a', { name: 'Bob', title: 'VP Data', relationshipStrength: 4 }), n('r', 'a', { name: 'Restricted', redacted: true })]);
+    const lines = out.trim().split('\n');
+    expect(lines[0]).toBe('name,title,email,manager_name,seniority,function,region,photo_url,relationship_strength');
+    expect(lines[1]).toBe('"Ann, CEO",,,,c_level,,,,');
+    expect(lines[2]).toBe('Bob,VP Data,,"Ann, CEO",unknown,,,,4');
+    expect(lines).toHaveLength(3); // redacted people are not exported
   });
 });
 
@@ -90,10 +83,12 @@ describe('coverage and strength', () => {
     expect(p.owners[0]).toBe('Jane Smith');
   });
   it('grades strength from count and recency', () => {
-    expect(strengthOf(coverageFor(cov, { contactId: null, name: 'Michael Johnson' }), now)).toBe('strong');
+    expect(strengthOf(covFromPerson(coverageFor(cov, { contactId: null, name: 'Michael Johnson' })), now)).toBe('strong');
     expect(strengthOf(undefined, now)).toBe('none');
-    const once = { meetings: [{ id: 'x', title: '', heldAt: '2025-01-01T00:00:00Z' }], lastMetAt: '2025-01-01T00:00:00Z' } as PersonCoverage;
-    expect(strengthOf(once, now)).toBe('weak');
+    const once = { owners: [], challenges: [], meetings: [{ id: 'x', title: '', heldAt: '2025-01-01T00:00:00Z' }], lastMetAt: '2025-01-01T00:00:00Z' } as PersonCoverage;
+    expect(strengthOf(covFromPerson(once), now)).toBe('weak');
+    expect(strengthOf({ ...covFromPerson(once)!, manual: 5 }, now)).toBe('strong'); // admin-set wins
+    expect(strengthOf({ met: true, count: 3, lastMetAt: '2026-10-20T00:00:00Z', meetings: [], challenges: [], owners: [], manual: null }, now)).toBe('strong'); // API counts only
   });
 });
 
@@ -119,18 +114,5 @@ describe('sample and merge', () => {
     expect(seniorityFromTitle('Chief Risk Officer')).toBe('c_level');
     expect(seniorityFromTitle('Head of Data Protection')).toBe('director');
     expect(seniorityFromTitle('SVP Sales')).toBe('vp');
-  });
-});
-
-describe('mock client', () => {
-  beforeEach(() => localStorage.clear());
-  it('saves with a version and reports a conflict when someone saved first', async () => {
-    expect(await fetchOrgChart('co')).toBeNull();
-    const chart = { companyId: 'co', rootId: 'a', version: 0, updatedAt: null, updatedBy: null, sample: true, nodes: base };
-    const v1 = await saveOrgChart(chart, 0, 'Jane');
-    expect(v1).toMatchObject({ version: 1, sample: false, updatedBy: 'Jane' });
-    await saveOrgChart(v1, 1, 'Mark');
-    await expect(saveOrgChart(v1, 1, 'Jane')).rejects.toBeInstanceOf(OrgChartConflictError);
-    await saveOrgChart(v1, 0, 'Jane').catch((e: OrgChartConflictError) => expect(e.current).toMatchObject({ version: 2, updatedBy: 'Mark' }));
   });
 });

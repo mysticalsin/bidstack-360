@@ -13,6 +13,7 @@ vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn((k: string) 
 vi.mock('@/lib/auth', () => ({ useUser: () => ({ user: { fullName: 'Jane Smith' } }) }));
 
 import { ApiError, api } from '@/lib/api';
+import { fakeOrgChartServer } from '@/lib/orgchart/fakeOrgChartServer.testutil';
 
 import OrgChartPage from './OrgChartPage';
 
@@ -31,10 +32,16 @@ beforeAll(() => {
   // React Flow measures nodes; happy-dom has no layout.
   globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} } as never;
 });
+let srv = fakeOrgChartServer(CI);
 beforeEach(() => {
-  localStorage.clear();
   perm.write = true;
-  vi.mocked(api).mockImplementation(async (path: string) => {
+  srv = fakeOrgChartServer(CI);
+  vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string; body?: unknown }) => {
+    if (path.includes('/org-chart')) {
+      const r = srv.handle(opts?.method ?? 'GET', path, opts?.body as Record<string, unknown> | undefined);
+      if (r === undefined) throw new ApiError(`no route ${path}`, 404, {});
+      return r as never;
+    }
     if (path.startsWith(`/api/companies/${CI}`)) return { id: CI, name: 'CI Financial' } as never;
     if (path.startsWith('/api/meeting-intel?')) return { items: [{ id: 'm1', heldAt: meeting.heldAt }], nextCursor: null } as never;
     if (path.startsWith('/api/meeting-intel/m1')) return meeting as never;
@@ -67,7 +74,7 @@ describe('OrgChartPage', () => {
     const panel = await screen.findByTestId('orgchart-panel');
     expect(within(panel).getByText('Cloud cost review with the CIO')).toBeTruthy();
     expect(within(panel).getByText('Cloud cost overruns')).toBeTruthy();
-    expect(within(panel).getByText('Jane Smith')).toBeTruthy();
+    expect(within(panel).getByText('Jane Smith (from meetings)')).toBeTruthy();
   });
 
   it('is read-only without orgchart:write', async () => {
@@ -87,24 +94,51 @@ describe('OrgChartPage', () => {
     expect((await node('Michael Johnson')).dataset.dim).toBe('true');
   });
 
-  it('edit: add a report, re-parent via keyboard select, auto-fill, save; conflict toast when someone saved first', async () => {
+  it('live chart: edits stay in a draft, Save sends versioned mutations; a 409 shows the conflict banner and overwrite reapplies', async () => {
+    const ceo = srv.add({ name: 'Kurt MacAlpine', title: 'Chief Executive Officer', seniority: 'c_level' }, null);
+    const cio = srv.add({ name: 'Michael Johnson', title: 'Chief Information Officer', seniority: 'c_level', meetingCount: 2, lastMetAt: '2026-10-25T10:00:00Z' }, ceo.id);
+    const cfo = srv.add({ name: 'Amit Muni', title: 'Chief Financial Officer', seniority: 'c_level' }, ceo.id);
+    const sec = srv.add({ name: 'Sarah Patel', title: 'IT Security Manager', seniority: 'manager' }, cio.id);
     renderPage();
+    expect((await node('Michael Johnson')).dataset.met).toBe('true');
+    expect((await node('Amit Muni')).dataset.gap).toBe('true'); // unmet senior from the coverage API
+    expect(screen.queryByText('Sample')).toBeNull();
     fireEvent.click(await screen.findByTestId('orgchart-edit'));
     fireEvent.click(await node('Sarah Patel'));
     const panel = await screen.findByTestId('orgchart-panel');
-    fireEvent.change(within(panel).getByTestId('orgchart-reports-to'), { target: { value: (await screen.findAllByTestId('orgchart-node')).find((n) => n.dataset.name === 'Alex Morgan')!.closest<HTMLElement>('.react-flow__node')!.dataset.id } });
-    expect(within(panel).getByText('Alex Morgan', { selector: 'dd' })).toBeTruthy();
+    expect(await within(panel).findByTestId('orgchart-path')).toBeTruthy();
+    fireEvent.change(within(panel).getByTestId('orgchart-reports-to'), { target: { value: cfo.id } });
     fireEvent.click(within(panel).getByTestId('orgchart-add'));
     expect(await node('New person')).toBeTruthy();
-    await act(async () => { fireEvent.click(screen.getByTestId('orgchart-autofill')); });
-    expect(await node('Nora Lee')).toBeTruthy();
-    // Someone else saves first.
-    localStorage.setItem(`polo:orgchart:v1:${CI}`, JSON.stringify({ companyId: CI, rootId: null, version: 3, updatedAt: '2026-10-31T21:00:00Z', updatedBy: 'Mark Thompson', sample: false, nodes: [] }));
+    expect(screen.getByTestId('orgchart-unsaved')).toBeTruthy();
+    expect(srv.calls).toEqual([]); // nothing written until Save
+    srv.touch(sec.id, { region: 'US' }); // another admin edits Sarah first
     await act(async () => { fireEvent.click(screen.getByTestId('orgchart-save')); });
-    expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toMatch(/Mark Thompson/);
-    await act(async () => { fireEvent.click(within(screen.getByRole('alert')).getByText('Overwrite with mine')); });
-    await waitFor(() => expect(JSON.parse(localStorage.getItem(`polo:orgchart:v1:${CI}`)!).version).toBe(4));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/Someone else changed this chart/);
+    await act(async () => { fireEvent.click(within(alert).getByText('Overwrite with mine')); });
+    await waitFor(() => expect(srv.nodes.get(sec.id)!.parentId).toBe(cfo.id));
+    expect([...srv.nodes.values()].filter((n) => n.name === 'New person')).toHaveLength(1);
+    expect(srv.nodes.get(sec.id)!.region).toBe('US'); // their change kept
+    await waitFor(() => expect(screen.queryByTestId('orgchart-unsaved')).toBeNull());
+  });
+
+  it('CSV import previews a server dry run, then imports; auto-fill queues a seed job', async () => {
+    srv.add({ name: 'Kurt MacAlpine', title: 'Chief Executive Officer', seniority: 'c_level' }, null);
+    renderPage();
+    fireEvent.click(await screen.findByTestId('orgchart-edit'));
+    const file = new File(['name,title\nNora Lee,VP Cloud\nOmar Haddad,Director Data\n'], 'people.csv', { type: 'text/csv' });
+    await act(async () => { fireEvent.change(screen.getByTestId('orgchart-csv-input'), { target: { files: [file] } }); });
+    const prev = await screen.findByTestId('orgchart-csv-preview');
+    expect(prev.textContent).toMatch(/2\s*to add/);
+    expect(srv.nodes.size).toBe(1); // dry run wrote nothing
+    await act(async () => { fireEvent.click(within(prev).getByTestId('orgchart-csv-apply')); });
+    expect(await node('Nora Lee')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('orgchart-autofill'));
+    const seed = await screen.findByTestId('orgchart-seed');
+    fireEvent.click(within(seed).getByTestId('orgchart-seed-apollo'));
+    await act(async () => { fireEvent.click(within(seed).getByTestId('orgchart-seed-run')); });
+    await waitFor(() => expect(srv.calls).toContain('POST C/seed'));
   });
 
   it('keyboard: arrows move between people and Enter opens the panel', async () => {

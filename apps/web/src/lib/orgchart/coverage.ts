@@ -3,7 +3,7 @@
 import type { MeetingIntelDetail } from '@bidstack/shared';
 
 import { personKey } from './tree';
-import type { OrgNode, PersonCoverage, Strength } from './types';
+import type { NodeCov, OrgNode, PersonCoverage, Strength } from './types';
 
 export function coverageFromMeetings(meetings: MeetingIntelDetail[]): Map<string, PersonCoverage> {
   const out = new Map<string, PersonCoverage>();
@@ -42,13 +42,25 @@ export function coverageFor(cov: Map<string, PersonCoverage>, n: Pick<OrgNode, '
 }
 
 const DAY = 86_400_000;
-/** Strong: 3+ meetings in a year, or 2 within 90 days. Medium: 2+, or one within 180 days. Weak: met once, longer ago. */
-export function strengthOf(p: PersonCoverage | undefined, now: number): Strength {
-  if (!p || p.meetings.length === 0) return 'none';
-  const inYear = p.meetings.filter((m) => now - Date.parse(m.heldAt) <= 365 * DAY).length;
+
+/** Coverage from client-side meeting intel (Sample charts, and owner fallback). */
+export function covFromPerson(p: PersonCoverage | undefined): NodeCov | undefined {
+  if (!p) return undefined;
+  return { met: p.meetings.length > 0, count: p.meetings.length, lastMetAt: p.lastMetAt, meetings: p.meetings, challenges: p.challenges, owners: p.owners, manual: null };
+}
+
+/**
+ * Admin-set strength wins (1-2 weak, 3 medium, 4-5 strong). Otherwise:
+ * strong = 3+ meetings in a year, or 2 within 90 days; medium = 2+, or one
+ * within 180 days; weak = met once, longer ago.
+ */
+export function strengthOf(p: NodeCov | undefined, now: number): Strength {
+  if (p?.manual) return p.manual >= 4 ? 'strong' : p.manual === 3 ? 'medium' : 'weak';
+  if (!p || p.count === 0) return 'none';
+  const inYear = p.meetings.length ? p.meetings.filter((m) => now - Date.parse(m.heldAt) <= 365 * DAY).length : p.count;
   const days = p.lastMetAt ? (now - Date.parse(p.lastMetAt)) / DAY : Infinity;
   if (inYear >= 3 || (inYear >= 2 && days <= 90)) return 'strong';
-  if (p.meetings.length >= 2 || days <= 180) return 'medium';
+  if (p.count >= 2 || days <= 180) return 'medium';
   return 'weak';
 }
 

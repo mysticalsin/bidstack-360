@@ -1,7 +1,9 @@
 // Full-screen org chart for one account (/accounts/:accountId/org-chart).
 // Read-only for everyone; edit mode for holders of `orgchart:write`.
-// Data: saved chart (local mock until /workspace/fleet/polo-orgchart-api.md
-// lands) plus real meeting-intel coverage; unsaved charts are a labelled Sample.
+// Data: the org chart API (/workspace/fleet/polo-orgchart-api.md). Accounts
+// nobody has charted yet show a labelled Sample built from meeting attendees.
+// Edits stay in a local draft until Save, which replays them as versioned
+// per-node mutations; a 409 shows the conflict banner.
 import '@xyflow/react/dist/style.css';
 import '@/components/orgchart/orgchart.css';
 
@@ -19,18 +21,17 @@ import { PersonNode, type PersonNodeT } from '@/components/orgchart/OrgPersonNod
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompany } from '@/hooks/useCompanies';
-import { useOrgChart, useReloadOrgChart, useSaveOrgChart } from '@/hooks/useOrgChart';
-import { api } from '@/lib/api';
-import { useUser } from '@/lib/auth';
+import { OrgPhoto } from '@/components/orgchart/OrgPhoto';
+import { orgChartKey, useOrgChart, useOrgChartNode, useReloadOrgChart } from '@/hooks/useOrgChart';
 import { SENIORITY_LABEL } from '@/lib/meeting-intel/client';
-import { ORGCHART_MOCK } from '@/lib/orgchart/client';
-import { coverageFor, STRENGTH_LABEL, strengthOf } from '@/lib/orgchart/coverage';
-import { exportCsv, importCsv, type CsvImport } from '@/lib/orgchart/csv';
+import { fetchOrgChart, importOrgChartCsv, replayDraft, seedOrgChart } from '@/lib/orgchart/client';
+import { STRENGTH_LABEL, strengthOf } from '@/lib/orgchart/coverage';
+import { exportCsv } from '@/lib/orgchart/csv';
 import { layoutTree, NODE_H, NODE_W } from '@/lib/orgchart/layout';
-import { mergePeople, seniorityFromTitle } from '@/lib/orgchart/sample';
 import * as T from '@/lib/orgchart/tree';
 import { initials } from '@/lib/orgchart/tree';
-import { OrgChartConflictError, type OrgChart, type OrgNode, type PersonCoverage } from '@/lib/orgchart/types';
+import { OrgChartConflictError, type NodeCov, type OrgChart, type OrgNode } from '@/lib/orgchart/types';
+import type { OrgChartImportResult } from '@bidstack/shared';
 
 const nodeTypes = { person: PersonNode };
 type Mode = 'select' | 'pan';
@@ -49,10 +50,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   const navigate = useNavigate();
   const company = useCompany(companyId);
   const companyName = company.data?.name ?? 'Account';
-  const { chart, coverage, people, asOf, isLoading } = useOrgChart(companyId);
+  const { chart, covOf, unmetSenior, live, asOf, isLoading, error } = useOrgChart(companyId);
   const canEdit = useHasPermission('orgchart:write');
-  const { user } = useUser();
-  const save = useSaveOrgChart();
   const reload = useReloadOrgChart();
   const qc = useQueryClient();
   const rf = useReactFlow();
@@ -60,7 +59,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [baseVersion, setBaseVersion] = useState<number | null>(null);
+  const [base, setBase] = useState<OrgChart | null>(null);
+  const idMap = useRef(new Map<string, string>());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
@@ -71,7 +71,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [conflict, setConflict] = useState<OrgChartConflictError['current'] | null>(null);
-  const [csv, setCsv] = useState<CsvImport | null>(null);
+  const [csv, setCsv] = useState<{ name: string; text: string; result: OrgChartImportResult } | null>(null);
+  const [seedOpen, setSeedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -89,7 +90,6 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
     () => (q ? work.nodes.filter((n) => `${n.name} ${n.title ?? ''} ${n.region ?? ''}`.toLowerCase().includes(q)) : []),
     [q, work.nodes],
   );
-  const covOf = useCallback((n: OrgNode) => coverageFor(coverage, n), [coverage]);
 
   const toggle = useCallback((id: string) => {
     setCollapsed((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -102,16 +102,17 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
       const pos = drag?.id === n.id ? { x: drag.x, y: drag.y } : layout.get(n.id)!;
       return {
         id: n.id, type: 'person', position: pos, width: NODE_W, height: NODE_H,
-        selected: n.id === selectedId, draggable: isEditing && n.id !== work.rootId,
+        selected: n.id === selectedId, draggable: isEditing && n.id !== work.rootId && !n.redacted,
         className: dropTarget === n.id ? 'oc-drop' : undefined,
         data: {
           node: n, cov, strength: strengthOf(cov, asOf), showMet, showStrength,
+          seniorGap: live ? unmetSenior.has(n.id) : SENIOR.includes(n.seniority) && !cov?.met,
           match: q ? (hitIds.has(n.id) ? 'hit' : 'miss') : 'none',
           childCount: kids.get(n.id)?.length ?? 0, collapsed: collapsed.has(n.id), isRoot: n.id === work.rootId, onToggle: toggle,
         },
       };
     });
-  }, [visible, layout, drag, selectedId, isEditing, work.rootId, dropTarget, covOf, asOf, showMet, showStrength, q, hits, kids, collapsed, toggle]);
+  }, [visible, layout, drag, selectedId, isEditing, work.rootId, dropTarget, covOf, asOf, showMet, showStrength, q, hits, kids, collapsed, toggle, live, unmetSenior]);
 
   const rfEdges: Edge[] = useMemo(() => visible.filter((n) => n.parentId && !hidden.has(n.parentId)).map((n) => {
     const s = strengthOf(covOf(n), asOf);
@@ -122,7 +123,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
   // ---- editing ------------------------------------------------------------
   const change = (next: Draft) => {
-    if (baseVersion === null) setBaseVersion(chart?.version ?? 0);
+    if (!base && chart) setBase(chart);
     setDraft(T.normalise(next.nodes, next.rootId));
   };
   const onNodesChange = useCallback((changes: NodeChange<PersonNodeT>[]) => {
@@ -133,7 +134,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   }, []);
   const targetFor = (node: PersonNodeT) => {
     const banned = T.descendants(work.nodes, node.id);
-    return rf.getIntersectingNodes(node).find((o) => o.id !== node.id && !banned.has(o.id))?.id ?? null;
+    return rf.getIntersectingNodes(node).find((o) => o.id !== node.id && !banned.has(o.id) && !(o as PersonNodeT).data?.node.redacted)?.id ?? null;
   };
   const onNodeDrag: OnNodeDrag<PersonNodeT> = (_e, node) => setDropTarget(targetFor(node));
   const onNodeDragStop: OnNodeDrag<PersonNodeT> = (_e, node) => {
@@ -149,47 +150,59 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   const onNodeClick: NodeMouseHandler<PersonNodeT> = (_e, n) => setSelectedId(n.id);
 
   const startEdit = () => { setEditing(true); setMode('select'); };
-  const discard = () => { setDraft(null); setBaseVersion(null); setConflict(null); setCsv(null); setEditing(false); };
+  const discard = () => { setDraft(null); setBase(null); idMap.current = new Map(); setConflict(null); setCsv(null); setSeedOpen(false); setEditing(false); };
   const doSave = async (force = false) => {
-    if (!chart) return;
+    const from = base ?? chart;
+    if (!from || !draft) return;
     setBusy(true);
     try {
-      const base = force && conflict ? conflict.version : (baseVersion ?? chart.version);
-      await save({ ...chart, ...work }, base, user?.fullName ?? 'You');
-      setDraft(null); setBaseVersion(null); setConflict(null); setEditing(false);
-      toast.success('Org chart saved');
+      const r = await replayDraft(companyId, from, draft, undefined, idMap.current, force ? 'overwrite' : 'strict');
+      qc.setQueryData(orgChartKey(companyId), r.chart);
+      await reload(companyId);
+      discard();
+      toast.success('Org chart saved', {
+        description: [r.created ? `${r.created} added` : '', r.changed ? `${r.changed} change${r.changed === 1 ? '' : 's'}` : '', r.skipped.length ? `skipped: ${r.skipped.join('; ')}` : ''].filter(Boolean).join(' · ') || undefined,
+      });
     } catch (e) {
       if (e instanceof OrgChartConflictError) {
         setConflict(e.current);
-        toast.warning('Someone else saved this chart first', {
-          description: `${e.current.updatedBy ?? 'Another user'} saved ${fmtTime(e.current.updatedAt)}. Your edits are still here.`,
+        toast.warning('Someone else changed this chart first', {
+          description: 'Your edits are still here. Reload theirs, or overwrite to reapply yours on top.',
           duration: 10_000,
           action: { label: 'Reload theirs', onClick: () => { discard(); void reload(companyId); } },
         });
-      } else toast.error('Could not save the org chart');
+      } else {
+        toast.error('Could not save the org chart', { description: e instanceof Error ? e.message : undefined });
+        void reload(companyId);
+      }
     } finally {
       setBusy(false);
     }
   };
 
-  const autoFill = async () => {
+  /** After a seed or import, refetch until the chart version moves (worker jobs are async). */
+  const waitForChange = async (fromVersion: number) => {
+    for (let i = 0; i < 12; i++) {
+      const next = await qc.fetchQuery({ queryKey: orgChartKey(companyId), queryFn: () => fetchOrgChart(companyId), staleTime: 0 });
+      if ((next?.version ?? 0) !== fromVersion) return next;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    return null;
+  };
+  const runSeed = async (opts: { includeApollo: boolean; includeMeetingAttendees: boolean }) => {
     setBusy(true);
+    const before = live ? chart?.version ?? 0 : 0;
+    const beforeCount = live ? chart?.nodes.length ?? 0 : 0;
     try {
-      const res = await qc.fetchQuery({
-        queryKey: ['contacts', { customer: companyName, limit: 100 }],
-        queryFn: ({ signal }) => api<{ items: Array<{ id: string; name: string; role: string | null; email: string | null; companyId: string | null; customer: string | null }> }>(`/api/contacts?customer=${encodeURIComponent(companyName)}&limit=100`, { signal }),
-      }).catch(() => ({ items: [] }));
-      const contacts = res.items
-        .filter((c) => c.companyId === companyId || (c.customer ?? '').toLowerCase() === companyName.toLowerCase())
-        .map((c) => ({ name: c.name, title: c.role, seniority: seniorityFromTitle(c.role), region: null, contactId: c.id, reportsToContactId: null, email: c.email }));
-      const base: OrgChart = { ...(chart as OrgChart), ...work };
-      const a = mergePeople(base, people, 'meetings');
-      const b = mergePeople(a.chart, contacts, 'contacts');
-      const added = a.added + b.added;
-      if (added) change({ nodes: b.chart.nodes, rootId: b.chart.rootId });
-      toast.info(added ? `Added ${added} ${added === 1 ? 'person' : 'people'} from contacts and meetings` : 'Everyone in contacts and meetings is already on the chart', {
-        description: 'Apollo people search fills in once the org chart API is live.',
-      });
+      const res = await seedOrgChart(companyId, opts);
+      setSeedOpen(false);
+      toast.info(res.queued ? 'Auto-fill queued' : 'Auto-fill already running', { description: 'Placing people from contacts, meetings and Apollo (when configured and under budget). Existing people are never moved.' });
+      const next = await waitForChange(before);
+      await reload(companyId);
+      if (next) toast.success(`Added ${next.nodes.length - beforeCount} ${next.nodes.length - beforeCount === 1 ? 'person' : 'people'}`);
+      else toast.info('No new people yet', { description: 'Everyone found is already on the chart, or the job is still running.' });
+    } catch (e) {
+      toast.error('Could not start auto-fill', { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
     }
@@ -197,9 +210,41 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
   const onCsvFile = async (f: File | undefined) => {
     if (!f) return;
-    setCsv(importCsv(await f.text()));
-    setSelectedId(null);
     if (fileRef.current) fileRef.current.value = '';
+    setBusy(true);
+    try {
+      const text = await f.text();
+      const result = await importOrgChartCsv(companyId, text, true, live ? chart?.version : undefined);
+      setCsv({ name: f.name, text, result });
+      setSelectedId(null);
+      setSeedOpen(false);
+    } catch (e) {
+      toast.error('Could not read that CSV', { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const applyCsv = async () => {
+    if (!csv) return;
+    setBusy(true);
+    try {
+      const r = await importOrgChartCsv(companyId, csv.text, false, live ? chart?.version : undefined);
+      if (r.errors.length) { setCsv({ ...csv, result: r }); return; }
+      setCsv(null);
+      await reload(companyId);
+      setCollapsed(new Set());
+      requestAnimationFrame(fit);
+      toast.success(`Imported: ${r.created} added, ${r.updated} updated`);
+    } catch (e) {
+      if (e instanceof OrgChartConflictError) {
+        toast.warning('The chart changed while you were importing', { description: 'Reloaded. Check the preview and import again.' });
+        await reload(companyId);
+        const fresh = await importOrgChartCsv(companyId, csv.text, true).catch(() => null);
+        if (fresh) setCsv({ ...csv, result: fresh });
+      } else toast.error('Import failed', { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
   };
   const download = () => {
     const blob = new Blob([exportCsv(work.nodes)], { type: 'text/csv' });
@@ -250,8 +295,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   const resetView = () => { setCollapsed(new Set()); setQuery(''); setSelectedId(null); requestAnimationFrame(fit); };
 
   // ---- summary for the overview panel ------------------------------------
-  const metCount = work.nodes.filter((n) => covOf(n)?.meetings.length).length;
-  const seniorGaps = work.nodes.filter((n) => ['c_level', 'vp', 'director'].includes(n.seniority) && !covOf(n)?.meetings.length);
+  const metCount = work.nodes.filter((n) => covOf(n)?.met).length;
+  const seniorGaps = work.nodes.filter((n) => (live && !dirty ? unmetSenior.has(n.id) : SENIOR.includes(n.seniority) && !covOf(n)?.met));
 
   // Portalled to <body>: the route transition wrapper is transformed, which
   // would turn position:fixed into a box the size of the (empty) page.
@@ -260,8 +305,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
       <header className="oc-bar">
         <Link to={`/accounts/${companyId}`} className="oc-back" aria-label={`Back to ${companyName}`}>←</Link>
         <h1 className="oc-h1">Org chart <span>{companyName}</span></h1>
-        {chart?.sample ? <span className="oc-sample" title="Generated structure. People you have met are real; the rest are placeholders until someone saves the real chart.">Sample</span> : null}
-        {ORGCHART_MOCK ? <span className="oc-muted" title="The org chart API is not live yet; saves stay in this browser.">Local only</span> : null}
+        {chart?.sample ? <span className="oc-sample" title="Nobody has charted this account yet. People you have met are real; the rest are placeholders.">Sample</span> : null}
+        {dirty ? <span className="oc-muted" data-testid="orgchart-unsaved">Unsaved changes</span> : null}
         <div className="oc-search" role="search">
           <input
             type="search" placeholder="Search people" aria-label="Search people on the chart" value={query}
@@ -279,8 +324,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
         <div className="oc-actions">
           {!canEdit ? <span className="oc-muted" data-testid="orgchart-readonly">Read-only</span> : isEditing ? (
             <>
-              <button type="button" className="oc-btn" onClick={autoFill} disabled={busy} data-testid="orgchart-autofill">Auto-fill from contacts/Apollo</button>
-              <button type="button" className="oc-btn" onClick={() => fileRef.current?.click()}>Import CSV</button>
+              <button type="button" className="oc-btn" onClick={() => { setSeedOpen(true); setCsv(null); setSelectedId(null); }} disabled={busy || dirty} title={dirty ? 'Save or discard your edits first' : undefined} data-testid="orgchart-autofill">Auto-fill from contacts/Apollo</button>
+              <button type="button" className="oc-btn" onClick={() => fileRef.current?.click()} disabled={busy || dirty} title={dirty ? 'Save or discard your edits first' : undefined}>Import CSV</button>
               <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => void onCsvFile(e.target.files?.[0])} data-testid="orgchart-csv-input" />
               <button type="button" className="oc-btn" onClick={discard}>{dirty ? 'Discard' : 'Done'}</button>
               <button type="button" className="oc-btn oc-primary" onClick={() => void doSave()} disabled={!dirty || busy} data-testid="orgchart-save">Save chart</button>
@@ -293,7 +338,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
       {conflict ? (
         <div className="oc-conflict" role="alert">
-          <span>{conflict.updatedBy ?? 'Someone'} saved this chart {fmtTime(conflict.updatedAt)}, after you started editing.</span>
+          <span>Someone else changed this chart{conflict.chartVersion != null ? ` (now version ${conflict.chartVersion})` : ''} after you started editing. Your edits are still here.</span>
           <button type="button" className="oc-btn" onClick={() => { discard(); void reload(companyId); }}>Reload theirs</button>
           <button type="button" className="oc-btn" onClick={() => void doSave(true)}>Overwrite with mine</button>
         </div>
@@ -301,7 +346,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
       <div className="oc-body">
         <div className="oc-canvas" ref={wrapRef} onKeyDownCapture={onKeyDownCapture} aria-label={`Org chart for ${companyName}. Arrow keys move between people, Enter opens details, C collapses.`} role="application">
-          {isLoading ? <p className="oc-loading">Loading org chart…</p> : (
+          {error ? <p className="oc-loading" role="alert">The org chart could not be loaded. {error instanceof Error ? error.message : ''}</p> : isLoading ? <p className="oc-loading">Loading org chart…</p> : (
             <ReactFlow<PersonNodeT, Edge>
               nodes={rfNodes} edges={rfEdges} nodeTypes={nodeTypes}
               onNodesChange={onNodesChange} onNodeClick={onNodeClick} onNodeDrag={onNodeDrag} onNodeDragStop={onNodeDragStop}
@@ -313,7 +358,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
               ariaLabelConfig={{ 'node.a11yDescription.default': 'Arrow keys move between people. Enter opens details.' }}
             >
               <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
-              <MiniMap pannable zoomable ariaLabel="Mini map" nodeStrokeWidth={3} nodeColor={(n) => ((n as PersonNodeT).data.cov?.meetings.length ? 'var(--oc-met)' : 'var(--oc-gap)')} />
+              <MiniMap pannable zoomable ariaLabel="Mini map" nodeStrokeWidth={3} nodeColor={(n) => ((n as PersonNodeT).data.cov?.met ? 'var(--oc-met)' : 'var(--oc-gap)')} />
             </ReactFlow>
           )}
           <div className="oc-toolbar" role="toolbar" aria-label="Canvas controls">
@@ -332,10 +377,13 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
         <aside className="oc-panel" aria-label="Details">
           {csv ? (
-            <CsvPreview csv={csv} onCancel={() => setCsv(null)} onApply={() => { change({ nodes: csv.nodes, rootId: csv.rootId }); setCsv(null); setCollapsed(new Set()); requestAnimationFrame(fit); toast.success(`Imported ${csv.nodes.length} people`); }} />
+            <CsvPreview csv={csv} busy={busy} onCancel={() => setCsv(null)} onApply={() => void applyCsv()} />
+          ) : seedOpen ? (
+            <SeedPanel busy={busy} onCancel={() => setSeedOpen(false)} onRun={(o) => void runSeed(o)} />
           ) : selected ? (
             <PersonPanel
               node={selected} cov={covOf(selected)} asOf={asOf} editing={isEditing} nodes={work.nodes} rootId={work.rootId}
+              live={live && !chart?.sample && Boolean(chart?.nodes.some((n) => n.id === selected.id))}
               onClose={() => setSelectedId(null)}
               onPatch={(patch) => change({ nodes: T.update(work.nodes, selected.id, patch), rootId: work.rootId })}
               onReparent={(pid) => change({ nodes: T.reparent(work.nodes, selected.id, pid), rootId: work.rootId })}
@@ -348,7 +396,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
               <h2>Coverage</h2>
               <p className="oc-big"><strong>{metCount}</strong> of {work.nodes.length} people met</p>
               <div className="oc-cover-bar" role="img" aria-label={`${pct(metCount, work.nodes.length)} percent met`}><i style={{ width: `${pct(metCount, work.nodes.length)}%` }} /></div>
-              <p className="oc-src">From meeting intel attendees{chart?.sample ? '. Unmet names in the Sample structure are placeholders.' : '.'}</p>
+              <p className="oc-src">{chart?.sample ? 'From meeting intel attendees. Unmet names in the Sample structure are placeholders; saving keeps them as role placeholders.' : 'From the org chart API: meetings in the last 365 days.'}</p>
+              {chart?.truncated ? <p className="oc-muted">Some deeper levels are not loaded.</p> : null}
               <h3>Senior gaps</h3>
               {seniorGaps.length ? (
                 <ul className="oc-list">
@@ -374,45 +423,57 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 }
 
 function PersonPanel(props: {
-  node: OrgNode; cov: PersonCoverage | undefined; asOf: number; editing: boolean; nodes: OrgNode[]; rootId: string | null;
+  node: OrgNode; cov: NodeCov | undefined; asOf: number; editing: boolean; nodes: OrgNode[]; rootId: string | null; live: boolean;
   onClose: () => void; onPatch: (p: Partial<OrgNode>) => void; onReparent: (pid: string) => void;
   onAdd: () => void; onRemove: () => void; onSetRoot: () => void;
 }) {
-  const { node, cov, asOf, editing, nodes, rootId } = props;
+  const { node, cov, asOf, editing, nodes, rootId, live } = props;
+  const detail = useOrgChartNode(node.id, live && !node.redacted);
+  const d = detail.data;
   const s = strengthOf(cov, asOf);
   const owner = node.ownerName ?? cov?.owners[0] ?? null;
   const banned = T.descendants(nodes, node.id);
-  const managers = nodes.filter((n) => n.id !== node.id && !banned.has(n.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const managers = nodes.filter((n) => n.id !== node.id && !banned.has(n.id) && !n.redacted).sort((a, b) => a.name.localeCompare(b.name));
   const manager = nodes.find((n) => n.id === node.parentId);
+  const meetings = d ? d.meetings.map((m) => ({ id: m.id, title: m.title, heldAt: m.heldAt })) : cov?.meetings ?? [];
+  const meetingTotal = d ? Math.max(d.meetings.length, cov?.count ?? 0) : cov?.count ?? 0;
+  const challenges = d ? d.challenges.map((c) => (c.count > 1 ? `${c.text} (${c.count}×)` : c.text)) : cov?.challenges ?? [];
+  const canEditNode = editing && !node.redacted;
   return (
     <div className="oc-pp" data-testid="orgchart-panel">
       <div className="oc-pp-head">
-        <span className="oc-ava oc-ava-lg" data-ring={cov?.meetings.length ? 'met' : 'gap'} aria-hidden="true">{node.photoUrl ? <img src={node.photoUrl} alt="" /> : <span>{initials(node.name)}</span>}</span>
+        <span className="oc-ava oc-ava-lg" data-ring={cov?.met ? 'met' : 'gap'} aria-hidden="true"><OrgPhoto url={node.photoUrl} name={node.name} /></span>
         <div>
           <h2>{node.name}</h2>
-          <p className="oc-muted">{node.title ?? 'No title'}{node.region ? ` · ${node.region}` : ''}</p>
+          <p className="oc-muted">{node.redacted ? 'Outside your access' : node.title ?? 'No title'}{node.region ? ` · ${node.region}` : ''}</p>
         </div>
         <button type="button" className="oc-x" onClick={props.onClose} aria-label="Close details">×</button>
       </div>
       {node.source === 'sample' ? <p className="oc-src">Sample placeholder, not a real person.</p> : null}
+      {node.redacted ? <p className="oc-src">This person&apos;s contact sits on an account you can&apos;t see, so their details are hidden. Their place in the chart is kept.</p> : null}
       <dl className="oc-dl">
-        <div><dt>Our owner</dt><dd>{owner ?? 'Nobody yet'}</dd></div>
-        <div><dt>Relationship</dt><dd>{STRENGTH_LABEL[s]}</dd></div>
+        <div><dt>Our owner</dt><dd>{owner ?? 'Nobody yet'}{!node.ownerName && owner ? ' (from meetings)' : ''}</dd></div>
+        <div><dt>Relationship</dt><dd>{STRENGTH_LABEL[s]}{cov?.manual ? ' (set by an admin)' : ''}</dd></div>
         <div><dt>Reports to</dt><dd>{manager?.name ?? 'Top of chart'}</dd></div>
       </dl>
-      <h3>Meetings{cov?.meetings.length ? ` (${cov.meetings.length})` : ''}</h3>
-      {cov?.meetings.length ? (
+      {d && d.path.length > 1 ? <p className="oc-src" data-testid="orgchart-path">Path to the top: {d.path.map((p) => p.name).join(' › ')}</p> : null}
+      {d?.reportsToFact && !d.reportsToFact.matchesChart ? (
+        <p className="oc-hint" role="note" data-testid="orgchart-fact-hint">The CRM says {node.name} reports to {d.reportsToFact.name}, which differs from this chart.</p>
+      ) : null}
+      <h3>Meetings{meetingTotal ? ` (${meetingTotal})` : ''}</h3>
+      {detail.isLoading ? <p className="oc-muted">Loading…</p> : meetings.length ? (
         <ul className="oc-list">
-          {cov.meetings.slice(0, 6).map((m) => <li key={m.id}><Link className="oc-row" to={`/meetings/${m.id}`}><span><span className="oc-row-name">{m.title}</span><span className="oc-row-sub">{fmtDate(m.heldAt)}</span></span></Link></li>)}
+          {meetings.slice(0, 6).map((m) => <li key={m.id}><Link className="oc-row" to={`/meetings/${m.id}`}><span><span className="oc-row-name">{m.title}</span><span className="oc-row-sub">{fmtDate(m.heldAt)}</span></span></Link></li>)}
         </ul>
-      ) : <p className="oc-muted">Not met yet. A gap worth closing{['c_level', 'vp', 'director'].includes(node.seniority) ? ' at this level' : ''}.</p>}
+      ) : meetingTotal ? <p className="oc-muted">Met {meetingTotal} time{meetingTotal === 1 ? '' : 's'}; those meetings aren&apos;t visible to you.</p>
+        : <p className="oc-muted">Not met yet. A gap worth closing{SENIOR.includes(node.seniority) ? ' at this level' : ''}.</p>}
       <h3>Challenges raised</h3>
-      {cov?.challenges.length ? <ul className="oc-bullets">{cov.challenges.slice(0, 6).map((c) => <li key={c}>{c}</li>)}</ul> : <p className="oc-muted">None recorded.</p>}
+      {challenges.length ? <ul className="oc-bullets">{challenges.slice(0, 6).map((c) => <li key={c}>{c}</li>)}</ul> : <p className="oc-muted">None recorded.</p>}
 
-      {editing ? (
+      {canEditNode ? (
         <form className="oc-form" onSubmit={(e) => e.preventDefault()} aria-label={`Edit ${node.name}`}>
           <h3>Edit</h3>
-          <label>Name<input value={node.name} onChange={(e) => props.onPatch({ name: e.target.value })} /></label>
+          <label>Name<input value={node.name} onChange={(e) => props.onPatch({ name: e.target.value })} required /></label>
           <label>Title<input value={node.title ?? ''} onChange={(e) => props.onPatch({ title: e.target.value || null })} /></label>
           <div className="oc-form-row">
             <label>Seniority
@@ -420,10 +481,15 @@ function PersonPanel(props: {
                 {SENIORITY_ORDER.map((k) => <option key={k} value={k}>{SENIORITY_LABEL[k]}</option>)}
               </select>
             </label>
-            <label>Region<input value={node.region ?? ''} onChange={(e) => props.onPatch({ region: e.target.value.toUpperCase() || null })} maxLength={4} /></label>
+            <label>Region<input value={node.region ?? ''} onChange={(e) => props.onPatch({ region: e.target.value.toUpperCase() || null })} maxLength={40} /></label>
           </div>
-          <label>Our owner<input value={node.ownerName ?? ''} placeholder={cov?.owners[0] ?? ''} onChange={(e) => props.onPatch({ ownerName: e.target.value || null })} /></label>
-          <label>Photo URL<input value={node.photoUrl ?? ''} onChange={(e) => props.onPatch({ photoUrl: e.target.value || null })} /></label>
+          <label>Relationship
+            <select value={node.relationshipStrength ?? ''} onChange={(e) => props.onPatch({ relationshipStrength: e.target.value ? Number(e.target.value) : null })} data-testid="orgchart-strength">
+              <option value="">From meetings</option>
+              {[1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{v} of 5</option>)}
+            </select>
+          </label>
+          <label>Photo URL (https)<input type="url" value={node.photoUrl && !node.photoUrl.startsWith('/') ? node.photoUrl : ''} placeholder={node.photoUrl?.startsWith('/') ? 'Uploaded photo' : 'https://'} pattern="https://.*" onChange={(e) => props.onPatch({ photoUrl: e.target.value || null })} /></label>
           {node.id !== rootId ? (
             <label>Reports to
               <select value={node.parentId ?? ''} onChange={(e) => props.onReparent(e.target.value)} data-testid="orgchart-reports-to">
@@ -431,7 +497,7 @@ function PersonPanel(props: {
               </select>
             </label>
           ) : null}
-          <p className="oc-src">Or drag a person onto their new manager.</p>
+          <p className="oc-src">Or drag a person onto their new manager. Changes save together when you choose Save chart.</p>
           <div className="oc-form-actions">
             <button type="button" className="oc-btn" onClick={props.onAdd} data-testid="orgchart-add">Add report</button>
             {node.id !== rootId ? <button type="button" className="oc-btn" onClick={props.onSetRoot}>Set as root</button> : null}
@@ -443,23 +509,49 @@ function PersonPanel(props: {
   );
 }
 
-function CsvPreview({ csv, onApply, onCancel }: { csv: CsvImport; onApply: () => void; onCancel: () => void }) {
+function SeedPanel({ busy, onRun, onCancel }: { busy: boolean; onRun: (o: { includeApollo: boolean; includeMeetingAttendees: boolean }) => void; onCancel: () => void }) {
+  const [apollo, setApollo] = useState(false);
+  const [attendees, setAttendees] = useState(true);
+  return (
+    <div className="oc-pp" data-testid="orgchart-seed">
+      <h2>Auto-fill</h2>
+      <p className="oc-muted">Adds people from this account&apos;s contacts. The top of the chart is the best CEO-like title, or a CEO placeholder. People go under their CRM manager, else the nearest senior in the same function. Nobody already on the chart is moved or edited.</p>
+      <form className="oc-form" onSubmit={(e) => { e.preventDefault(); onRun({ includeApollo: apollo, includeMeetingAttendees: attendees }); }}>
+        <label className="oc-check"><input type="checkbox" checked={attendees} onChange={(e) => setAttendees(e.target.checked)} /> Include meeting attendees who aren&apos;t contacts</label>
+        <label className="oc-check"><input type="checkbox" checked={apollo} onChange={(e) => setApollo(e.target.checked)} data-testid="orgchart-seed-apollo" /> Include Apollo people search (directors and above)</label>
+        <p className="oc-src">Apollo runs only when a key is configured and this month&apos;s budget allows. Otherwise it is skipped.</p>
+        <div className="oc-form-actions">
+          <button type="button" className="oc-btn" onClick={onCancel}>Cancel</button>
+          <button type="submit" className="oc-btn oc-primary" disabled={busy} data-testid="orgchart-seed-run">Run auto-fill</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { name: string; result: OrgChartImportResult }; busy: boolean; onApply: () => void; onCancel: () => void }) {
+  const r = csv.result;
   return (
     <div className="oc-pp" data-testid="orgchart-csv-preview">
       <h2>Import CSV</h2>
-      <p className="oc-big"><strong>{csv.nodes.length}</strong> people</p>
-      <p className="oc-muted">Replaces the chart in your draft. Nothing is saved until you choose Save chart.</p>
-      {csv.errors.length ? <ul className="oc-bullets">{csv.errors.slice(0, 8).map((e) => <li key={e}>{e}</li>)}</ul> : null}
-      <p className="oc-src">Columns: name, title, seniority, region, manager (name), email, owner.</p>
+      <p className="oc-muted">{csv.name}: dry run, nothing written yet.</p>
+      <p className="oc-big"><strong>{r.created}</strong> to add · <strong>{r.updated}</strong> to update</p>
+      {r.errors.length ? (
+        <>
+          <p className="oc-hint" role="alert">{r.errors.length} row error{r.errors.length === 1 ? '' : 's'}. The import is all or nothing, so fix these first.</p>
+          <ul className="oc-bullets">{r.errors.slice(0, 8).map((e) => <li key={`${e.line}-${e.message}`}>Line {e.line}: {e.message}</li>)}</ul>
+        </>
+      ) : null}
+      <p className="oc-src">Columns: name (required), title, email, manager_email, manager_name, seniority, function, business_unit, region, photo_url, owner_email, relationship_strength, sentiment.</p>
       <div className="oc-form-actions">
         <button type="button" className="oc-btn" onClick={onCancel}>Cancel</button>
-        <button type="button" className="oc-btn oc-primary" onClick={onApply} disabled={!csv.nodes.length}>Use this chart</button>
+        <button type="button" className="oc-btn oc-primary" onClick={onApply} disabled={busy || r.errors.length > 0 || r.created + r.updated === 0} data-testid="orgchart-csv-apply">Import</button>
       </div>
     </div>
   );
 }
 
+const SENIOR: string[] = ['c_level', 'vp', 'director'];
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtTime = (iso: string | null) => (iso ? `at ${new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : 'just now');

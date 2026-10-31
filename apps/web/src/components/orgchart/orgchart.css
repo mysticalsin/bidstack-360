@@ -136,3 +136,12 @@
   .oc-search input { width: 100%; }
   .oc-search { flex: 1 1 100%; order: 5; }
 }
+/* Live API states: senior gap highlight, redacted people, hints, checkboxes */
+.oc-node[data-gap] .oc-ava { box-shadow: 0 0 0 2px var(--oc-card), 0 0 0 4px #b45309; }
+.oc-screen[data-dark] .oc-node[data-gap] .oc-ava { box-shadow: 0 0 0 2px var(--oc-card), 0 0 0 4px #f5b04c; }
+.oc-node[data-redacted] .oc-pill { border-style: dotted; }
+.oc-node[data-redacted] .oc-name { font-style: italic; }
+.oc-hint { font-size: 12px; margin: 0; padding: 8px; border-radius: 8px; background: #fff4e0; color: #7a4100; border: 1px solid #f1c27d; }
+.oc-screen[data-dark] .oc-hint { background: #3a2a10; color: #f8d9a6; border-color: #6b4a16; }
+.oc-check { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 8px; font-size: 13px; }
+.oc-check input { width: auto !important; margin-top: 2px; }

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -229,13 +230,18 @@ function dashboardSnapshot(freshness: 'fresh' | 'stale' | 'never' = 'fresh') {
   };
 }
 
+// Cards on the cockpit use React Query directly (watchdog, org chart, ...);
+// give every render a fresh client so a new card never breaks this suite.
 function renderAccountRoute() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={['/accounts/acme']}>
-      <Routes>
-        <Route path="/accounts/:accountId" element={<DashboardPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/accounts/acme']}>
+        <Routes>
+          <Route path="/accounts/:accountId" element={<DashboardPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
