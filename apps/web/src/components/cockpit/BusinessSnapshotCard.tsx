@@ -231,6 +231,11 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
             },
     },
   ];
+  const notSynced = t('businessSnapshot.value.notSynced', 'Not synced');
+  const recorded = rows.filter((row) => row.source.state !== 'missing' && row.value !== notVerified && row.value !== notSynced);
+  const missing = rows.filter((row) => !recorded.includes(row));
+  const recordedShare = rows.length === 0 ? 0 : Math.round((recorded.length / rows.length) * 100);
+
   return (
     <Card role="region" aria-label={t('businessSnapshot.region.ariaLabel', 'Business snapshot')}>
       <SectionHeader
@@ -245,34 +250,72 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         )}
       />
       <div style={{ padding: '14px 18px 18px' }}>
-        <dl className="kvlist">
-          {rows.map((row, index) => (
-            <motion.div
-              key={row.label}
-              className="kv"
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.032 }}
-            >
-              <dt>{row.label}</dt>
-              <dd>
-                <span className="kv-value">
-                  <AnimatedMetric value={row.value} />
-                </span>
-                <SourceBadge
-                  label={row.source.label}
-                  state={row.source.state}
-                  hint={row.source.hint}
-                  className="kv-source"
-                />
-              </dd>
-            </motion.div>
-          ))}
-        </dl>
+        <div className="mb-3">
+          <div className="mb-1 flex items-baseline justify-between text-xs text-[var(--fg-secondary)]">
+            <span>
+              {t('businessSnapshot.recordedCount', '{{count}} recorded', { count: recorded.length })}
+            </span>
+            <span>
+              {t('businessSnapshot.missingCount', '{{count}} not recorded', { count: missing.length })}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]" aria-hidden>
+            <span
+              className="block h-full rounded-full bg-[var(--brand-primary)]"
+              style={{ width: `${recordedShare}%` }}
+            />
+          </div>
+        </div>
+        <SnapshotRows rows={recorded} reducedMotion={reducedMotion} />
+        {missing.length > 0 ? (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm text-[var(--fg-secondary)]">
+              {t('businessSnapshot.missingSummary', '{{count}} fields not recorded', {
+                count: missing.length,
+              })}
+            </summary>
+            <SnapshotRows rows={missing} reducedMotion={reducedMotion} />
+          </details>
+        ) : null}
       </div>
     </Card>
   );
 });
+
+function SnapshotRows({
+  rows,
+  reducedMotion,
+}: {
+  rows: SnapshotRow[];
+  reducedMotion: boolean | null;
+}) {
+  return (
+    <dl className="kvlist">
+      {rows.map((row, index) => (
+        <motion.div
+          key={row.label}
+          className="kv"
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.032 }}
+        >
+          <dt>{row.label}</dt>
+          <dd>
+            <span className="kv-value">
+              <AnimatedMetric value={row.value} />
+            </span>
+            <SourceBadge
+              label={row.source.label}
+              state={row.source.state}
+              hint={row.source.hint}
+              className="kv-source"
+            />
+          </dd>
+        </motion.div>
+      ))}
+    </dl>
+  );
+}
 
 function latestAttribution(sources: SourceAttribution[]): SourceAttribution | null {
   let latest: SourceAttribution | null = null;
