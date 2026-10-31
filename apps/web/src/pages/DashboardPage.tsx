@@ -15,7 +15,6 @@ import {
   KpiSidebar,
   OpenIssuesCard,
   PageHead,
-  PipelineByStageCard,
   RecentOpportunitiesCard,
   RevenueEvolutionCard,
   WinLossCard,
@@ -36,6 +35,7 @@ import {
   WinLossReasonsCard,
   type ClosedOpp,
 } from '@/components/account-intel/WinLossReasonsCard';
+import { AccountStageBars } from '@/components/cockpit/AccountStageBars';
 import { AccountWorkstreamBoard } from '@/components/cockpit/AccountWorkstreamBoard';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
@@ -44,7 +44,6 @@ import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useOpportunities } from '@/hooks/useOpportunities';
-import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -73,7 +72,6 @@ export function DashboardPage() {
 function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
-  const report = usePipelineReport();
   const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
@@ -245,7 +243,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         <div className="mb-4 grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
           {show('revenueEvolution') && <RevenueEvolutionCard cockpit={cockpit} />}
           {show('winLoss') && <WinLossCard cockpit={cockpit} />}
-          {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
+          {show('pipelineStage') && <AccountStageBars deals={companyDeals} />}
         </div>
       )}
 
