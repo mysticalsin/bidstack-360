@@ -29,34 +29,23 @@ export function Hero() {
             <HeroBadge />
 
             <motion.h1
-              className="mb-2 text-4xl font-medium leading-[1.05] text-[#2d323c] sm:text-5xl md:text-6xl lg:text-[80px]"
+              className="mb-3 text-4xl font-medium leading-tight text-[#2d323c] sm:text-5xl"
               {...h1Anim}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              {t('hero.winBids', 'Win More Bids')}
+              {t('hero.title', 'Polo')}
             </motion.h1>
 
-            <motion.div
-              className="mt-6 flex flex-col items-center bg-white/50 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-[2rem] px-6 py-5 sm:px-10 sm:py-6 max-w-2xl"
+            <motion.p
+              className="max-w-xl text-base leading-7 text-[#1e232e]"
               {...pAnim}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              <p className="text-sm sm:text-base md:text-lg text-[#1e232e] font-medium leading-relaxed mb-4">
-                The complete operating system for enterprise presales. Manage RFPs, generate
-                proposals, and track compliance in one workspace.
-              </p>
-
-              <div className="w-12 h-[2px] bg-[rgba(30,50,90,0.15)] mb-4 rounded-full" />
-
-              <a
-                href="https://www.linkedin.com/in/tonywalteur/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-sm text-xs font-medium text-[rgba(30,50,90,0.9)] transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:text-sm"
-              >
-                {t('hero.builtBy', 'Built by Tony Walteur')}
-              </a>
-            </motion.div>
+              {t(
+                'hero.summary',
+                'Presales, account, and proposal work in one place. Sign in with Microsoft. Google and Gmail stay available in this version.',
+              )}
+            </motion.p>
           </div>
 
           <BottomLeftCard />
