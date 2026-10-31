@@ -186,43 +186,10 @@ export async function sendQuarterlyNpsSurveys(orgId: string, log: Logger): Promi
 }
 
 export async function runOrgChurnDetection(orgId: string, log: Logger): Promise<number> {
-  const latestScores = await prisma.healthScore.findMany({
-    where: { orgId },
-    distinct: ['accountId'],
-    orderBy: [{ accountId: 'asc' }, { capturedAt: 'desc' }],
-    select: { accountId: true, score: true },
-  });
-
-  let created = 0;
-  for (const score of latestScores) {
-    if (score.score >= 50) continue;
-
-    const existing = await prisma.churnSignal.findFirst({
-      where: {
-        orgId,
-        accountId: score.accountId,
-        kind: 'LOW_USAGE',
-        resolvedAt: null,
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
-    if (existing) continue;
-
-    await prisma.churnSignal.create({
-      data: {
-        orgId,
-        accountId: score.accountId,
-        kind: 'LOW_USAGE',
-        severity: score.score < 30 ? 'CRITICAL' : 'HIGH',
-        evidence: jsonObject({ healthScore: score.score, threshold: 50 }),
-      },
-    });
-    created++;
-  }
-
-  log.info({ orgId, created }, 'cs.churn: signals detected');
-  return created;
+  // A stored health score is not product usage. LOW_USAGE would name the wrong
+  // cause, and the enum has no health-drop kind without a migration.
+  log.info({ orgId, created: 0 }, 'cs.churn: health scores are not stored as usage signals');
+  return 0;
 }
 
 export async function surfaceExpansionOpportunities(orgId: string, log: Logger): Promise<number> {
@@ -251,7 +218,8 @@ export async function surfaceExpansionOpportunities(orgId: string, log: Logger):
         orgId,
         accountId: account.accountId,
         kind: 'CROSS_SELL',
-        notes: `Auto-surfaced from account health score ${account.score}.`,
+        currency: 'XXX',
+        notes: `Auto-surfaced from account health score ${account.score}. Amount is unset.`,
       },
     });
     created++;
