@@ -18,6 +18,8 @@ import {
   initialsFor,
   logoSourceLabel,
   normalizeDomain,
+  recordedConfidencePercent,
+  recordedFill,
   slugFor,
   statusLabel,
   titleFromDomain,
@@ -66,42 +68,38 @@ export function SmartCompanyDialog({ trigger }: Props) {
   });
 
   const company = createdCompany ?? lookup.data?.company ?? null;
-  const confidence = Math.round((company?.confidence ?? (normalizedDomain ? 0.72 : 0.54)) * 100);
+  const confidencePercent = recordedConfidencePercent(company?.confidence);
   const previewName = company?.name ?? displayName;
   const previewDomain = company?.domain ?? normalizedDomain;
   const previewWebsite =
     company?.website ?? (website || (previewDomain ? `https://${previewDomain}/` : null));
   const logoUrl = displayableLogoUrl(company?.logo?.url);
+  const receiptCount = company?.sourceAttribution.length ?? 0;
   const sourceItems =
-    company?.sourceAttribution.slice(0, 3).map((source) => source.label) ??
-    (previewDomain
-      ? [
-          t('smartCompany.source.domainSignal', 'Domain signal'),
-          t('smartCompany.source.logoPreview', 'Logo preview'),
-          t('smartCompany.source.openDataReady', 'Open data ready'),
-        ]
-      : [t('smartCompany.source.nameSignal', 'Name signal')]);
+    receiptCount > 0
+      ? company!.sourceAttribution.slice(0, 3).map((source) => source.label)
+      : [t('smartCompany.source.none', 'No source receipts')];
   const autofillItems = [
     {
       label: t('smartCompany.autofill.legalProfile', 'Legal profile'),
       value: company?.legalName
         ? t('smartCompany.autofill.value.verified', 'verified')
-        : previewName
-          ? t('smartCompany.autofill.value.queued', 'queued')
-          : t('smartCompany.autofill.value.waiting', 'waiting'),
-      progress: company?.legalName ? 100 : previewName ? 58 : 18,
+        : t('smartCompany.autofill.value.notRecorded', 'not recorded'),
+      progress: recordedFill(Boolean(company?.legalName)),
     },
     {
       label: t('smartCompany.autofill.domain', 'Domain'),
-      value: previewDomain ? previewDomain : t('smartCompany.autofill.value.needed', 'needed'),
-      progress: previewDomain ? 100 : 24,
+      value: previewDomain ? previewDomain : t('smartCompany.autofill.value.notRecorded', 'not recorded'),
+      progress: recordedFill(Boolean(previewDomain)),
     },
     {
       label: t('smartCompany.autofill.website', 'Website'),
-      value: previewWebsite
-        ? t('smartCompany.autofill.value.ready', 'ready')
-        : t('smartCompany.autofill.value.needed', 'needed'),
-      progress: previewWebsite ? 100 : 24,
+      value: company?.website
+        ? t('smartCompany.autofill.value.recorded', 'recorded')
+        : website
+          ? t('smartCompany.autofill.value.typed', 'typed')
+          : t('smartCompany.autofill.value.notRecorded', 'not recorded'),
+      progress: recordedFill(Boolean(company?.website || website)),
     },
     {
       label: t('smartCompany.autofill.logo', 'Logo'),
@@ -109,23 +107,16 @@ export function SmartCompanyDialog({ trigger }: Props) {
         ? logoSourceLabel(company.logo.source)
         : logoUrl
           ? t('smartCompany.autofill.value.preview', 'preview')
-          : t('smartCompany.autofill.value.fallback', 'fallback'),
-      progress: logoUrl ? 100 : company?.logo?.url ? 72 : 34,
+          : t('smartCompany.autofill.value.notRecorded', 'not recorded'),
+      progress: recordedFill(Boolean(logoUrl)),
     },
     {
       label: t('smartCompany.autofill.sourceReceipts', 'Source receipts'),
-      value: company?.sourceAttribution.length
-        ? t('smartCompany.autofill.value.live', '{{count}} live', {
-            count: company.sourceAttribution.length,
-          })
-        : previewDomain
-          ? t('smartCompany.autofill.value.ready', 'ready')
-          : t('smartCompany.autofill.value.queued', 'queued'),
-      progress: company?.sourceAttribution.length
-        ? Math.min(100, company.sourceAttribution.length * 24)
-        : previewDomain
-          ? 64
-          : 28,
+      value:
+        receiptCount === 1
+          ? t('smartCompany.autofill.value.receipt_one', '{{count}} receipt', { count: receiptCount })
+          : t('smartCompany.autofill.value.receipt_other', '{{count}} receipts', { count: receiptCount }),
+      progress: recordedFill(receiptCount > 0),
     },
   ];
 
@@ -226,10 +217,28 @@ export function SmartCompanyDialog({ trigger }: Props) {
                   )}
               </span>
             </div>
-            <div className="smart-confidence">
-              <span>{t('smartCompany.preview.confidence', 'Confidence')}</span>
+            <div
+              className="smart-confidence"
+              title={
+                confidencePercent === null
+                  ? t(
+                      'smartCompany.preview.notScoredHint',
+                      'A typed name or domain is not a confidence score.',
+                    )
+                  : t('smartCompany.preview.storedHint', 'Stored company confidence.')
+              }
+            >
+              <span>
+                {confidencePercent === null
+                  ? t('smartCompany.preview.confidence', 'Confidence')
+                  : t('smartCompany.preview.storedConfidence', 'Stored')}
+              </span>
               <strong>
-                <AnimatedMetric value={`${confidence}%`} />
+                {confidencePercent === null ? (
+                  t('smartCompany.preview.notScored', 'Not scored')
+                ) : (
+                  <AnimatedMetric value={`${confidencePercent}%`} />
+                )}
               </strong>
             </div>
           </motion.div>
@@ -289,12 +298,14 @@ export function SmartCompanyDialog({ trigger }: Props) {
                       : statusLabel(lookup.data?.match)}
                   </strong>
                 </div>
-                <motion.span
-                  className="smart-live-dot"
-                  aria-hidden
-                  animate={reducedMotion ? undefined : { scale: [1, 1.22, 1] }}
-                  transition={{ duration: 1.8, repeat: Infinity }}
-                />
+                {lookup.isFetching ? (
+                  <motion.span
+                    className="smart-live-dot is-busy"
+                    aria-hidden
+                    animate={reducedMotion ? undefined : { scale: [1, 1.22, 1] }}
+                    transition={{ duration: 1.8, repeat: Infinity }}
+                  />
+                ) : null}
               </div>
               <div className="smart-source-pills">
                 {sourceItems.map((source, index) => (

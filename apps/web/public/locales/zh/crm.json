@@ -3465,6 +3465,8 @@
     "qualityWarningDetail": "{{total}} 个客户中有 {{classified}} 个带有 ABC 行业分类——在 ABC 覆盖率提高之前，请将这些划分视为方向性参考。",
     "accountCountOne": "{{count}} 个客户",
     "accountCountOther": "{{count}} 个客户",
+    "geoIndustryMeta_one": "{{count}} 个商机 · {{value}}",
+    "geoIndustryMeta_other": "{{count}} 个商机 · {{value}}",
     "fteValue": "{{value}} 全职当量",
     "fteUnknown": "全职当量未知",
     "fteUnknownTooltip": "该行业中没有客户的已知员工人数",

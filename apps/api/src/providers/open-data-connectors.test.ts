@@ -109,7 +109,10 @@ describe('open data connectors', () => {
       title: 'Apple Inc. is mapped to AAPL',
       metadata: { cik: '0000320193', ticker: 'AAPL' },
     });
+    expect(signal?.confidence).toBeNull();
     expect(signal?.sourceAttribution[0]?.source).toBe('sec_edgar');
+    expect(signal?.sourceAttribution[0]?.confidence).toBeNull();
+    expect(signal?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
   });
 
   it('maps USAspending awards into funding signals', async () => {
@@ -137,7 +140,11 @@ describe('open data connectors', () => {
       title: 'Mantu award signal',
       metadata: { awardId: 'CONT_A', awardAmount: 1250000 },
     });
+    expect(signals[0]?.summary).toContain('1,250,000 USD reported by USAspending');
+    expect(signals[0]?.summary).not.toContain('$');
+    expect(signals[0]?.confidence).toBeNull();
     expect(signals[0]?.sourceAttribution[0]?.source).toBe('usaspending');
+    expect(signals[0]?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
   });
 
   it('keeps widget data visible when public APIs are unavailable', async () => {

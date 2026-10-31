@@ -3465,6 +3465,8 @@
     "qualityWarningDetail": "{{classified}} de {{total}} contas têm uma classificação de setor ABC — trate estas divisões como indicativas até a cobertura do ABC melhorar.",
     "accountCountOne": "{{count}} conta",
     "accountCountOther": "{{count}} contas",
+    "geoIndustryMeta_one": "{{count}} oport. · {{value}}",
+    "geoIndustryMeta_other": "{{count}} oport. · {{value}}",
     "fteValue": "{{value}} FTE",
     "fteUnknown": "FTE desconhecido",
     "fteUnknownTooltip": "Nenhuma conta deste setor tem um número de funcionários conhecido",

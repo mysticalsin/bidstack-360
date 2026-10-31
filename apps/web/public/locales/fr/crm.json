@@ -3520,6 +3520,8 @@
     "qualityWarningDetail": "{{classified}} comptes sur {{total}} portent une classification de secteur ABC — considérez ces répartitions comme indicatives tant que la couverture ABC ne s'améliore pas.",
     "accountCountOne": "{{count}} compte",
     "accountCountOther": "{{count}} comptes",
+    "geoIndustryMeta_one": "{{count}} opp. · {{value}}",
+    "geoIndustryMeta_other": "{{count}} opp. · {{value}}",
     "fteValue": "{{value}} ETP",
     "fteUnknown": "ETP inconnu",
     "fteUnknownTooltip": "Aucun compte de ce secteur n'a un effectif connu",

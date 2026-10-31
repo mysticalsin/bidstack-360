@@ -48,6 +48,12 @@ describe('count labels', () => {
     expect(t.t('connectors.header.sourcesBadge', { ns: 'integrations', count: 1 })).toBe('1 source');
     expect(t.t('pipelineByStageMini.dealCount', { count: 1 })).toBe('1 deal');
     expect(t.t('oppIndustryBreakdown.sectorCount', { count: 2 })).toBe('2 sectors');
+    expect(t.t('sectorView.geoIndustryMeta', { count: 1, value: '2.7M unspecified' })).toBe(
+      '1 opp · 2.7M unspecified',
+    );
+    expect(t.t('sectorView.geoIndustryMeta', { count: 3, value: '8M unspecified' })).toBe(
+      '3 opps · 8M unspecified',
+    );
     expect(t.t('customObjectNavItem.recordCountLabel', { count: 1 })).toBe('1 record');
   });
 

@@ -1000,7 +1000,12 @@
         "ready": "ready",
         "preview": "preview",
         "fallback": "fallback",
-        "live": "{{count}} live"
+        "live": "{{count}} live",
+        "notRecorded": "not recorded",
+        "typed": "typed",
+        "recorded": "recorded",
+        "receipt_one": "{{count}} receipt",
+        "receipt_other": "{{count}} receipts"
       },
       "mapLabel": "Autofill readiness map"
     },
@@ -1012,13 +1017,17 @@
     },
     "dialog": {
       "title": "Add company",
-      "description": "Prefill the account from verified sources, logo providers, and the verified data cache."
+      "description": "Match an existing account, or start from the name and domain you type."
     },
     "preview": {
       "companyFallback": "Company",
       "namePlaceholder": "Company preview",
       "domainPrompt": "Add a domain for logo and registry matching",
-      "confidence": "Confidence"
+      "confidence": "Confidence",
+      "storedConfidence": "Stored",
+      "notScored": "Not scored",
+      "notScoredHint": "A typed name or domain is not a confidence score.",
+      "storedHint": "Stored company confidence."
     },
     "field": {
       "companyOrDomain": "Company or domain",
@@ -3488,6 +3497,8 @@
     "qualityWarningDetail": "{{classified}} of {{total}} accounts carry an ABC sector classification — treat these splits as directional until ABC coverage improves.",
     "accountCountOne": "{{count}} account",
     "accountCountOther": "{{count}} accounts",
+    "geoIndustryMeta_one": "{{count}} opp · {{value}}",
+    "geoIndustryMeta_other": "{{count}} opps · {{value}}",
     "fteValue": "{{value}} FTE",
     "fteUnknown": "FTE unknown",
     "fteUnknownTooltip": "No account in this sector has a known headcount",

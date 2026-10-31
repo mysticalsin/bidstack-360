@@ -3465,6 +3465,8 @@
     "qualityWarningDetail": "{{classified}} account su {{total}} hanno una classificazione di settore ABC — considera queste suddivisioni come indicative finché la copertura ABC non migliora.",
     "accountCountOne": "{{count}} account",
     "accountCountOther": "{{count}} account",
+    "geoIndustryMeta_one": "{{count}} opp. · {{value}}",
+    "geoIndustryMeta_other": "{{count}} opp. · {{value}}",
     "fteValue": "{{value}} FTE",
     "fteUnknown": "FTE sconosciuto",
     "fteUnknownTooltip": "Nessun account in questo settore ha un organico noto",

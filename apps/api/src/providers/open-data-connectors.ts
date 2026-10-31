@@ -1,5 +1,11 @@
 import type { CrmConnector, OpenDataSignal, SourceAttribution } from '@bidstack/shared';
 
+type UnscoredAttribution = Omit<SourceAttribution, 'confidence'> & { confidence: null };
+type UnscoredOpenDataSignal = Omit<OpenDataSignal, 'confidence' | 'sourceAttribution'> & {
+  confidence: null;
+  sourceAttribution: UnscoredAttribution[];
+};
+
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 interface OpenSignalInput {
@@ -34,7 +40,7 @@ export async function buildOpenDataSignals({
   ticker,
   now = new Date(),
   fetchImpl = fetch,
-}: OpenSignalInput): Promise<OpenDataSignal[]> {
+}: OpenSignalInput): Promise<UnscoredOpenDataSignal[]> {
   const signals: OpenDataSignal[] = [];
   const normalizedQuery = query?.trim();
   const normalizedTicker = ticker?.trim().toUpperCase();
@@ -302,7 +308,7 @@ export async function fetchSecTickerSignal(
   ticker: string,
   now = new Date(),
   fetchImpl: FetchLike = fetch,
-): Promise<OpenDataSignal | null> {
+): Promise<UnscoredOpenDataSignal | null> {
   const rows = await fetchJson<Record<string, SecTickerRow>>(
     'https://www.sec.gov/files/company_tickers.json',
     fetchImpl,
@@ -319,15 +325,14 @@ export async function fetchSecTickerSignal(
     summary: `SEC EDGAR resolves ${ticker} to CIK ${cik}; this can feed legal entity and public-company verification.`,
     url: `https://data.sec.gov/submissions/CIK${cik}.json`,
     observedAt: now.toISOString(),
-    confidence: 0.93,
+    confidence: null,
     sourceAttribution: [
       attribution({
         source: 'sec_edgar',
         label: 'SEC EDGAR company tickers',
         sourceUrl: 'https://www.sec.gov/files/company_tickers.json',
         fetchedAt: now,
-        confidence: 0.93,
-        providerMetadata: { cik, ticker },
+        providerMetadata: { cik, ticker, confidenceBasis: 'not_scored' },
       }),
     ],
     metadata: { cik, ticker, companyTitle: match.title },
@@ -338,7 +343,7 @@ export async function fetchUsaSpendingSignals(
   query: string,
   now = new Date(),
   fetchImpl: FetchLike = fetch,
-): Promise<OpenDataSignal[]> {
+): Promise<UnscoredOpenDataSignal[]> {
   const endDate = now.toISOString().slice(0, 10);
   const response = await fetchJson<{ results?: UsaSpendingAwardRow[] }>(
     'https://api.usaspending.gov/api/v2/search/spending_by_award/',
@@ -374,8 +379,8 @@ export async function fetchUsaSpendingSignals(
     const amount = row['Award Amount'] ?? row.AwardAmount ?? null;
     const amountSummary =
       typeof amount === 'number'
-        ? `$${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-        : 'undisclosed value';
+        ? `${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} USD reported by USAspending`
+        : 'amount not disclosed by USAspending';
 
     return {
       id: `usaspending:${awardId}`,
@@ -384,15 +389,14 @@ export async function fetchUsaSpendingSignals(
       summary: `${agency} reported ${amountSummary} tied to "${query}".`,
       url: 'https://www.usaspending.gov/search/',
       observedAt: now.toISOString(),
-      confidence: 0.86,
+      confidence: null,
       sourceAttribution: [
         attribution({
           source: 'usaspending',
           label: 'USAspending award search',
           sourceUrl: 'https://api.usaspending.gov/api/v2/search/spending_by_award/',
           fetchedAt: now,
-          confidence: 0.86,
-          providerMetadata: { awardId, query },
+          providerMetadata: { awardId, query, confidenceBasis: 'not_scored' },
         }),
       ],
       metadata: {
@@ -407,7 +411,7 @@ export async function fetchUsaSpendingSignals(
   });
 }
 
-function tradingViewWidgetSignal(symbol: string, now: Date): OpenDataSignal {
+function tradingViewWidgetSignal(symbol: string, now: Date): UnscoredOpenDataSignal {
   return {
     id: `tradingview-widget:${symbol}`,
     provider: 'TradingView Widgets',
@@ -416,15 +420,14 @@ function tradingViewWidgetSignal(symbol: string, now: Date): OpenDataSignal {
       'TradingView can render an official market widget in the CRM; raw quote data must come from a licensed market-data API.',
     url: 'https://www.tradingview.com/widget-docs/',
     observedAt: now.toISOString(),
-    confidence: 0.8,
+    confidence: null,
     sourceAttribution: [
       attribution({
         source: 'tradingview_widgets',
         label: 'TradingView official widget documentation',
         sourceUrl: 'https://www.tradingview.com/widget-docs/',
         fetchedAt: now,
-        confidence: 0.8,
-        providerMetadata: { symbol },
+        providerMetadata: { symbol, confidenceBasis: 'not_scored' },
       }),
     ],
     metadata: { symbol, integrationMode: 'official_widget' },
@@ -463,22 +466,20 @@ function attribution({
   label,
   sourceUrl,
   fetchedAt,
-  confidence,
   providerMetadata,
 }: {
   source: string;
   label: string;
   sourceUrl: string;
   fetchedAt: Date;
-  confidence: number;
   providerMetadata: Record<string, unknown>;
-}): SourceAttribution {
+}): UnscoredAttribution {
   return {
     source,
     label,
     sourceUrl,
     fetchedAt: fetchedAt.toISOString(),
-    confidence,
+    confidence: null,
     providerMetadata,
   };
 }

@@ -3487,11 +3487,13 @@ select:focus-visible {
   margin-top: 3px;
 }
 .smart-live-dot {
-  background: var(--success);
+  background: var(--fg-tertiary);
   border-radius: 999px;
-  box-shadow: 0 0 0 4px var(--tag-jade-bg);
   height: 9px;
   width: 9px;
+}
+.smart-live-dot.is-busy {
+  background: var(--fg-secondary);
 }
 .smart-source-pills,
 .smart-alternatives {
