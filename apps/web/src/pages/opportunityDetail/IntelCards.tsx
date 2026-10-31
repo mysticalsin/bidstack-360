@@ -83,7 +83,11 @@ export function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
     <Card>
       <SectionHeader
         title={t('intelCards.financial.title', 'Financial health')}
-        caption={t('intelCards.financial.sourceNotProbed', 'source not probed')}
+        caption={
+          f
+            ? t('intelCards.financial.sourceNotProbed', 'source not probed')
+            : undefined
+        }
       />
       <div className="p-5 space-y-3 text-sm">
         <Row label={t('intelCards.financial.marketCap', 'Market cap')} value={label(f?.marketCap)} />
@@ -156,7 +160,11 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
     <Card>
       <SectionHeader
         title={t('intelCards.triggers.title', 'Buying triggers')}
-        caption={t('intelCards.triggers.proxyCaption', 'Weighted signal proxy')}
+        caption={
+          intel.triggers?.length
+            ? t('intelCards.triggers.proxyCaption', 'Weighted signal proxy')
+            : undefined
+        }
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {(intel.triggers ?? []).map((trigger) => (
