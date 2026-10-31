@@ -14,7 +14,8 @@ import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/component
 import { SignalLegend } from '@/components/viz/ChartCard';
 import { MiniCalendar, SignalStrip, YearBars } from '@/components/viz/charts';
 import { fmtCompact } from '@/components/viz/viz-data';
-import { useAccountWatchdog, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
+import { useAccountWatchdog, useSetWatchEventStatus, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useMeetingWatchdogFeed } from '@/hooks/useMeetingIntel';
 import { mergeMeetingSignals } from '@/lib/meeting-intel/watchdog';
 import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
@@ -71,7 +72,11 @@ const INTERNAL_LINK: Record<string, string> = {
 
 type WatchEvent = AccountWatchdog['events'][number];
 
-function SignalRow({ e, i }: { e: WatchEvent; i: number }) {
+/** Server-stored watch events can be dismissed; signals merged in the browser (meeting flags, Sample) cannot. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isStored = (e: WatchEvent) => UUID.test(e.id) && !/^sample:/i.test(e.title);
+
+function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: (e: WatchEvent) => void }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
@@ -103,6 +108,11 @@ function SignalRow({ e, i }: { e: WatchEvent; i: number }) {
             Open source <ExternalLink size={13} strokeWidth={1.5} aria-hidden />
           </a>
         )}
+        {onDismiss ? (
+          <button type="button" className="wd-more wd-dismiss" onClick={() => onDismiss(e)} aria-label={`Dismiss signal: ${e.title}`}>
+            Dismiss
+          </button>
+        ) : null}
       </div>
     </li>
   );
@@ -111,14 +121,41 @@ function SignalRow({ e, i }: { e: WatchEvent; i: number }) {
 function Signals({ data }: { data: AccountWatchdog }) {
   const [all, setAll] = useState(false);
   const listId = useId();
+  const canDismiss = useHasPermission('accounts:write');
+  const setStatus = useSetWatchEventStatus(data.companyId);
+  const [undo, setUndo] = useState<WatchEvent | null>(null);
+  const dismiss = (e: WatchEvent) => {
+    setUndo(e);
+    setStatus.mutate({ eventId: e.id, status: 'DISMISSED' });
+  };
+  const undoBar = undo ? (
+    <p className="wd-row-meta wd-undo" role="status">
+      Dismissed “{undo.title}”.{' '}
+      <button
+        type="button"
+        className="wd-more"
+        onClick={() => {
+          setStatus.mutate({ eventId: undo.id, status: 'NEW' });
+          setUndo(null);
+        }}
+      >
+        Undo
+      </button>
+    </p>
+  ) : setStatus.isError ? (
+    <p className="wd-row-meta" role="alert">Couldn&apos;t update the signal. Try again.</p>
+  ) : null;
   if (data.events.length === 0) {
     return (
+      <>
+      {undoBar}
       <p className="wd-empty">
         <span>Nothing new in public filings</span>
         {data.monitoring.identifiers.length > 0
           ? `Watching ${data.monitoring.identifiers.join(' · ')}.`
           : 'Add a ticker, SEC CIK or Companies House number to start watching.'}
       </p>
+      </>
     );
   }
   const shown = all ? data.events : data.events.slice(0, TOP_SIGNALS);
@@ -151,10 +188,11 @@ function Signals({ data }: { data: AccountWatchdog }) {
       </figure>
       <ul className="wd-list" id={listId} aria-live="polite">
         {shown.map((e, i) => (
-          <SignalRow key={e.id} e={e} i={i} />
+          <SignalRow key={e.id} e={e} i={i} onDismiss={canDismiss && isStored(e) ? dismiss : undefined} />
         ))}
       </ul>
       <ShowMore total={data.events.length} shown={TOP_SIGNALS} open={all} onToggle={() => setAll((v) => !v)} noun="signals" controls={listId} />
+      {undoBar}
     </>
   );
 }

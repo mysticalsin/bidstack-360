@@ -5,9 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccountWatchdog } from '@/hooks/useAccountWatchdog';
 
 const state: { data?: AccountWatchdog; isLoading: boolean; isError: boolean } = { isLoading: false, isError: false };
+const mutate = vi.fn();
 vi.mock('@/hooks/useAccountWatchdog', () => ({
   useAccountWatchdog: () => ({ ...state, refetch: vi.fn() }),
+  useSetWatchEventStatus: () => ({ mutate, isError: false }),
 }));
+const perms = { write: true };
+vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => perms.write }));
 const mi: { data?: { items: unknown[] } } = {};
 vi.mock('@/hooks/useMeetingIntel', () => ({ useMeetingWatchdogFeed: () => mi }));
 const enr: { data?: unknown } = {};
@@ -111,5 +115,23 @@ describe('AccountWatchdogSection', () => {
     const link = screen.getByRole('link', { name: 'See the evidence postings' });
     expect(link.getAttribute('href')).toMatch(/^\/accounts\/c1#enrichment-project-/);
     enr.data = undefined;
+  });
+
+  it('dismisses a stored signal with undo; browser-merged and read-only rows have no Dismiss', () => {
+    mutate.mockClear();
+    const id = '11111111-2222-4333-8444-555555555555';
+    state.data = { ...base, events: [{ ...ev(1), id }, ev(2)] };
+    render(<AccountWatchdogSection companyId="c1" />);
+    fireEvent.click(screen.getAllByRole('button', { name: /exit costs/ })[0]!);
+    expect(screen.getAllByRole('button', { name: /^Dismiss signal/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /^Dismiss signal: 8-K Item 2.05 exit costs 1/ }));
+    expect(mutate).toHaveBeenCalledWith({ eventId: id, status: 'DISMISSED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(mutate).toHaveBeenLastCalledWith({ eventId: id, status: 'NEW' });
+    cleanup();
+    perms.write = false;
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.queryByRole('button', { name: /^Dismiss signal/ })).toBeNull();
+    perms.write = true;
   });
 });

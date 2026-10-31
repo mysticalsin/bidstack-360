@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
@@ -50,5 +50,30 @@ export function useAccountWatchdog(companyId: string | undefined) {
     queryFn: ({ signal }) =>
       api<AccountWatchdog>(`/api/accounts/${encodeURIComponent(companyId!)}/watchdog`, { signal }),
     staleTime: 5 * 60_000,
+  });
+}
+
+export type WatchEventStatus = 'NEW' | 'ACKNOWLEDGED' | 'DISMISSED';
+
+/** Dismiss / restore a stored signal (PATCH …/watchdog/events/:id). Optimistic: the row leaves the list at once. */
+export function useSetWatchEventStatus(companyId: string) {
+  const qc = useQueryClient();
+  const key = ['account-watchdog', companyId];
+  return useMutation({
+    mutationFn: ({ eventId, status }: { eventId: string; status: WatchEventStatus }) =>
+      api<{ id: string; status: string }>(
+        `/api/accounts/${encodeURIComponent(companyId)}/watchdog/events/${encodeURIComponent(eventId)}`,
+        { method: 'PATCH', body: { status } },
+      ),
+    onMutate: async ({ eventId, status }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<AccountWatchdog>(key);
+      if (prev && status === 'DISMISSED') qc.setQueryData<AccountWatchdog>(key, { ...prev, events: prev.events.filter((e) => e.id !== eventId) });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
   });
 }
