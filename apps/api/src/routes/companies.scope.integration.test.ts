@@ -20,6 +20,7 @@ let userId: string | null = null;
 let restoreAuth: (() => void) | null = null;
 let frId = '';
 let deId = '';
+let hierarchyRootId = '';
 
 beforeAll(async () => {
   const org = await createIsolatedOrg('companies-scope');
@@ -67,11 +68,52 @@ describe('/companies honours the access scope', () => {
     ).toBe(404);
   });
 
+  it('hierarchy under an in-scope company only names in-scope companies', async () => {
+    // DE parent > FR root > { FR child, DE leaf, DE branch > FR grandchild }
+    const mk = (name: string, countryCode: string, parentId?: string) =>
+      prisma.company.create({ data: { orgId: orgId!, name: `${TAG} ${name}`, countryCode, parentId } });
+    const parent = await mk('Holding DE', 'DE');
+    const root = await mk('Root FR', 'FR', parent.id);
+    const child = await mk('Child FR', 'FR', root.id);
+    const leaf = await mk('Leaf DE', 'DE', root.id);
+    const branch = await mk('Branch DE', 'DE', root.id);
+    const grandchild = await mk('Grandchild FR', 'FR', branch.id);
+    hierarchyRootId = root.id;
+
+    const res = await server.inject({ method: 'GET', url: `/api/v1/companies/${root.id}/hierarchy` });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.body).not.toContain('Holding DE');
+    expect(res.body).not.toContain('Leaf DE');
+    expect(res.body).not.toContain('Branch DE');
+    expect(res.body).not.toContain(leaf.id);
+
+    const body = res.json() as {
+      ancestors: Array<{ id: string; name: string }>;
+      directChildren: Array<{ id: string; name: string }>;
+      tree: { id: string; name: string; children: Array<{ id: string; name: string; children: Array<{ id: string; name: string }> }> };
+    };
+    expect(body.ancestors).toEqual([{ id: parent.id, name: 'Restricted company' }]);
+    expect(body.tree.name).toBe(`${TAG} Root FR`);
+    const kids = new Map(body.tree.children.map((k) => [k.id, k]));
+    expect([...kids.keys()].sort()).toEqual([child.id, branch.id].sort());
+    expect(kids.get(child.id)?.name).toBe(`${TAG} Child FR`);
+    // The out-of-scope branch stays only as a nameless link to the FR grandchild.
+    expect(kids.get(branch.id)?.name).toBe('Restricted company');
+    expect(kids.get(branch.id)?.children.map((g) => [g.id, g.name])).toEqual([
+      [grandchild.id, `${TAG} Grandchild FR`],
+    ]);
+    expect(body.directChildren.map((d) => d.id).sort()).toEqual([child.id, branch.id].sort());
+  });
+
   it('an unrestricted caller still sees both', async () => {
     await prisma.userGroupMember.deleteMany({ where: { orgId: orgId!, userId: userId! } });
     invalidateAccessScope(orgId!, userId!);
     const res = await server.inject({ method: 'GET', url: `/api/v1/companies?search=${TAG}` });
-    const ids = (res.json() as { items: Array<{ id: string }> }).items.map((c) => c.id).sort();
-    expect(ids).toEqual([frId, deId].sort());
+    const ids = (res.json() as { items: Array<{ id: string }> }).items.map((c) => c.id);
+    expect(ids).toEqual(expect.arrayContaining([frId, deId]));
+    const tree = await server.inject({ method: 'GET', url: `/api/v1/companies/${hierarchyRootId}/hierarchy` });
+    expect(tree.body).toContain(`${TAG} Holding DE`);
+    expect(tree.body).toContain(`${TAG} Leaf DE`);
+    expect(tree.body).not.toContain('Restricted company');
   });
 });

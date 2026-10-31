@@ -13,6 +13,9 @@ import {
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 
+/** Shown instead of the name of a company outside the caller's access scope. */
+const RESTRICTED_COMPANY_NAME = 'Restricted company';
+
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/companies',
@@ -338,6 +341,27 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         take: ORG_COMPANY_CAP,
       });
 
+      // Access scope inside the tree. The root passed the scope check, but its
+      // parents and children may not have: a restricted user must not learn
+      // their names. Out-of-scope nodes are omitted unless an in-scope company
+      // sits below them, in which case they stay as a nameless placeholder so
+      // the tree stays connected. Out-of-scope ancestors are kept (they place
+      // the root) but redacted. Unrestricted callers skip the extra query.
+      const visible: Set<string> | null = scope.unrestricted
+        ? null
+        : new Set(
+            (
+              await prisma.company.findMany({
+                where: applyCompanyScope({ orgId: req.auth.orgId, deletedAt: null }, scope),
+                select: { id: true },
+                take: ORG_COMPANY_CAP,
+              })
+            ).map((c) => c.id),
+          );
+      const isVisible = (id: string): boolean => visible === null || visible.has(id);
+      const shownName = (node: { id: string; name: string }): string =>
+        isVisible(node.id) ? node.name : RESTRICTED_COMPANY_NAME;
+
       // Pre-group children by parentId for O(n) tree assembly.
       type FlatNode = (typeof allNodes)[number];
       const childrenByParent = new Map<string, FlatNode[]>();
@@ -364,30 +388,31 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         seenAncestors.add(ancestorId);
         const ancestor = byId.get(ancestorId);
         if (!ancestor) break;
-        ancestors.unshift({ id: ancestor.id, name: ancestor.name });
+        ancestors.unshift({ id: ancestor.id, name: shownName(ancestor) });
         ancestorId = ancestor.parentId;
       }
-
-      // Direct children: already grouped and sorted by the orderBy above.
-      const directChildren = (childrenByParent.get(root.id) ?? []).map((n) => ({
-        id: n.id,
-        name: n.name,
-      }));
 
       // Build full tree recursively in-memory — zero additional DB calls.
       // A visited-set skips any node already placed, so a corrupt parentId
       // cycle can never recurse forever / blow the stack (each node has one
       // parent, so a re-encounter is always a back-edge cycle, never a DAG).
+      // Returns null for an out-of-scope subtree with nothing in scope below.
       const placed = new Set<string>();
-      function buildTree(id: string, name: string, parentId: string | null): CompanyHierarchyNode {
-        placed.add(id);
-        const kids = childrenByParent.get(id) ?? [];
+      function buildTree(node: FlatNode, parentId: string | null): CompanyHierarchyNode | null {
+        placed.add(node.id);
+        const kids = childrenByParent.get(node.id) ?? [];
         const children = kids
           .filter((k) => !placed.has(k.id))
-          .map((k): CompanyHierarchyNode => buildTree(k.id, k.name, id));
-        return { id, name, parentId, children };
+          .map((k) => buildTree(k, node.id))
+          .filter((k): k is CompanyHierarchyNode => k !== null);
+        if (!isVisible(node.id) && children.length === 0) return null;
+        return { id: node.id, name: shownName(node), parentId, children };
       }
-      const tree = buildTree(root.id, root.name, root.parentId);
+      // The root is in scope (checked above), so it is never pruned.
+      const tree = buildTree(root, root.parentId) as CompanyHierarchyNode;
+
+      // Direct children: the root's pruned children, in the orderBy order.
+      const directChildren = tree.children.map((n) => ({ id: n.id, name: n.name }));
 
       return { ancestors, directChildren, tree };
     },
