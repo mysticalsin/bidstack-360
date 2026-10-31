@@ -45,6 +45,8 @@ describe('buildOpportunityBrief', () => {
 
     expect(brief).toContain('Source-grounded account brief');
     expect(brief).toContain('Payments Modernization');
+    expect(brief).toContain('unspecified');
+    expect(brief).not.toMatch(/EUR|€/);
     expect(brief).toContain('Validate margin model');
     expect(brief).toContain('Avery Sponsor');
     expect(brief).not.toMatch(/stub|DUST_API_KEY|DUST_AGENT_EXEC_BRIEF/i);

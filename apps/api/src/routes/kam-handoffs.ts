@@ -91,7 +91,7 @@ export const kamHandoffRoutes: FastifyPluginAsyncZod = async (server) => {
             id: opportunity.id,
             code: opportunity.code,
             valueMicros: Number(opportunity.valueMicros),
-            currency: 'EUR',
+            currency: 'unspecified',
           }
         : null,
     };
