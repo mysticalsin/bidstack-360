@@ -266,6 +266,35 @@ describe('RBAC', () => {
     }
   });
 
+  it('Presales creates agreements and uploads versions on its own, but cannot archive', async () => {
+    const id = await createMsa({ companyId: companyFr, title: `${TAG} presales` }, 'presales');
+    const up = await call({
+      method: 'POST',
+      url: `/msa/${id}/versions/upload-url`,
+      payload: { fileName: 'a.pdf', contentType: 'application/pdf', bytes: 10 },
+      role: 'presales',
+    });
+    expect(up.statusCode, up.body).toBe(200);
+    expect((await call({ method: 'DELETE', url: `/msa/${id}`, role: 'presales' })).statusCode).toBe(403);
+  });
+
+  it('Read-Only sees commercial terms (approved 2026-10-31)', async () => {
+    const id = await createMsa({
+      companyId: companyFr,
+      title: `${TAG} terms`,
+      governingLaw: 'French law',
+      paymentTerms: 'Net 45',
+      liabilityCap: { amountMicros: 2_000_000_000_000, currency: 'EUR' },
+    });
+    const res = await call({ method: 'GET', url: `/msa/${id}`, role: 'read-only' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({
+      governingLaw: 'French law',
+      paymentTerms: 'Net 45',
+      liabilityCap: { amountMicros: 2_000_000_000_000, currency: 'EUR' },
+    });
+  });
+
   it('a role without msa:read is refused every read', async () => {
     const role = await prisma.role.findFirstOrThrow({ where: { orgId: orgA.orgId, name: 'SDR' } });
     const perm = await prisma.permission.findUniqueOrThrow({ where: { key: 'msa:read' } });
@@ -436,6 +465,23 @@ describe('files and versions', () => {
     expect(dl.headers['x-content-type-options']).toBe('nosniff');
     expect(String(dl.headers['content-disposition'])).toContain('attachment');
     expect(dl.body).toContain('%PDF-');
+    // CORS for the web PDF preview: allowed origin echoed, others get nothing.
+    const webOrigin = 'http://localhost:5173';
+    const fromWeb = await server.inject({ method: 'GET', url: `${url.pathname}${url.search}`, headers: { origin: webOrigin } });
+    expect(fromWeb.statusCode).toBe(200);
+    expect(fromWeb.headers['access-control-allow-origin']).toBe(webOrigin);
+    expect(String(fromWeb.headers['access-control-expose-headers'])).toContain('Content-Disposition');
+    expect(fromWeb.headers['cross-origin-resource-policy']).toBe('cross-origin');
+    const fromEvil = await server.inject({ method: 'GET', url: `${url.pathname}${url.search}`, headers: { origin: 'https://evil.example' } });
+    expect(fromEvil.headers['access-control-allow-origin']).toBeUndefined();
+    expect(fromEvil.headers['access-control-expose-headers']).toBeUndefined();
+    const preflight = await server.inject({
+      method: 'OPTIONS',
+      url: `${url.pathname}${url.search}`,
+      headers: { origin: webOrigin, 'access-control-request-method': 'GET' },
+    });
+    expect(preflight.statusCode).toBeLessThan(300);
+    expect(preflight.headers['access-control-allow-origin']).toBe(webOrigin);
 
     const t = url.searchParams.get('t')!;
     const tampered = await server.inject({ method: 'GET', url: `/api/v1/msa/download?t=${encodeURIComponent(t.slice(0, -4) + 'AAAA')}` });

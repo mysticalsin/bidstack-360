@@ -138,6 +138,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'documents',
       'leads',
       'migrations',
+      'meetings',
       'msa',
       'opportunities',
       'products',

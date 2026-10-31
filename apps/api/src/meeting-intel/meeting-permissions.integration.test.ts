@@ -50,9 +50,12 @@ describe('meetings permission keys', () => {
   it('matrix follows kam on every role', () => {
     for (const role of Object.keys(RBAC_MATRIX) as Array<keyof typeof RBAC_MATRIX>) {
       const keys = RBAC_MATRIX[role];
-      expect(keys.includes('meetings:read'), role).toBe(keys.includes('kam:read'));
+      // Account Executive reads meetings without kam:read (approved 2026-10-31).
+      const aeRead = role === 'Account Executive';
+      expect(keys.includes('meetings:read'), role).toBe(aeRead || keys.includes('kam:read'));
       expect(keys.includes('meetings:write'), role).toBe(keys.includes('kam:write'));
     }
+    expect(RBAC_MATRIX['Account Executive']).toContain('meetings:read');
   });
 });
 
@@ -69,7 +72,7 @@ describe('seeded org grants', () => {
     expect(roles.length).toBeGreaterThan(3);
     for (const r of roles) {
       const keys = new Set(r.permissions.map((p) => p.permission.key));
-      expect(keys.has('meetings:read'), r.name).toBe(keys.has('kam:read'));
+      expect(keys.has('meetings:read'), r.name).toBe(r.name === 'Account Executive' || keys.has('kam:read'));
       expect(keys.has('meetings:write'), r.name).toBe(keys.has('kam:write'));
     }
     expect(await grants('Admin')).toEqual(['meetings:read', 'meetings:write']);
@@ -106,5 +109,32 @@ describe('migration grant backfill', () => {
 
     expect(await grants('Meetings custom')).toEqual(['meetings:read', 'meetings:write']);
     expect(await grants('Meetings revoked')).toEqual([]);
+  });
+});
+
+describe('20261031230000_ae_meetings_read', () => {
+  const AE_MIGRATION = MIGRATION.replace('20261031220000_meeting_intel', '20261031230000_ae_meetings_read');
+
+  it('grants meetings:read to system Account Executive roles only, never reviving a revoked grant', async () => {
+    const mRead = await prisma.permission.findUniqueOrThrow({ where: { key: 'meetings:read' } });
+    const ae = await prisma.role.findFirstOrThrow({ where: { orgId: orgId!, name: 'Account Executive', isSystem: true } });
+    await prisma.rolePermission.deleteMany({ where: { roleId: ae.id, permissionId: mRead.id } });
+    const customAe = await prisma.role.create({
+      data: { orgId: orgId!, name: 'AE custom copy', description: 'test', isSystem: false },
+    });
+    const sql = readFileSync(AE_MIGRATION, 'utf8');
+    await prisma.$executeRawUnsafe(sql);
+    expect(await grants('Account Executive')).toContain('meetings:read');
+    expect(await grants('AE custom copy')).toEqual([]);
+    // Idempotent, and an explicit revocation (soft delete) stays revoked.
+    await prisma.rolePermission.updateMany({ where: { roleId: ae.id, permissionId: mRead.id }, data: { deletedAt: new Date() } });
+    await prisma.$executeRawUnsafe(sql);
+    expect(await grants('Account Executive')).not.toContain('meetings:read');
+    await prisma.rolePermission.updateMany({
+      where: { roleId: ae.id, permissionId: mRead.id, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    });
+    expect(await grants('Account Executive')).toContain('meetings:read');
+    await prisma.role.delete({ where: { id: customAe.id } });
   });
 });

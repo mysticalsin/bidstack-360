@@ -201,6 +201,9 @@ model Org {
   meetingSourceConnections      MeetingSourceConnection[]
   meetingIngestItems            MeetingIngestItem[]
   meetingIntel                  MeetingIntel[]
+  companyFirmographics          CompanyFirmographics[]
+  companyJobPostings            CompanyJobPosting[]
+  enrichmentCreditUsage         EnrichmentCreditUsage[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
   notificationPrefs             NotificationPref[]
@@ -422,6 +425,8 @@ model Company {
 
   contracts ContractAgreement[] @relation("CompanyContracts")
   meetingIntel MeetingIntel[]
+  firmographics CompanyFirmographics?
+  jobPostings   CompanyJobPosting[]
 
   @@index([orgId, domain])
   @@index([orgId])
@@ -6108,4 +6113,93 @@ model MeetingCrossRegionFlag {
   @@unique([meetingId, recipientUserId, ownedCompanyId])
   @@index([orgId, recipientUserId, status, createdAt(sort: Desc)])
   @@map("meeting_cross_region_flags")
+}
+
+/// Account enrichment (2026-10-31): firmographics per CRM company from Apollo
+/// (first) and Seamless (second). One row per company. `provenance` maps each
+/// field to {source, fetchedAt}; `providerStatus` keeps the last run per
+/// provider (status, credits, at, error, pendingRequestId). `hiring` and
+/// `projects` are derived from company_job_postings at each refresh.
+/// Separate from company_enrichments, which is the name-keyed verification
+/// snapshot used by company search and create.
+model CompanyFirmographics {
+  id                 String    @id @default(uuid()) @db.Uuid
+  orgId              String    @map("org_id") @db.Uuid
+  companyId          String    @unique @map("company_id") @db.Uuid
+  /// ok | partial | pending | not_found | not_configured | budget_exceeded | error
+  status             String    @default("pending")
+  annualRevenueUsd   BigInt?   @map("annual_revenue_usd")
+  revenueRange       String?   @map("revenue_range")
+  employeeCount      Int?      @map("employee_count")
+  employeeRange      String?   @map("employee_range")
+  headcountGrowth6m  Float?    @map("headcount_growth_6m")
+  headcountGrowth12m Float?    @map("headcount_growth_12m")
+  headcountGrowth24m Float?    @map("headcount_growth_24m")
+  industry           String?
+  industries         String[]  @default([])
+  locations          Json      @default("[]")
+  techStack          String[]  @default([]) @map("tech_stack")
+  departmentHeadcount Json?    @map("department_headcount")
+  providerIds        Json      @default("{}") @map("provider_ids")
+  provenance         Json      @default("{}")
+  providerStatus     Json      @default("{}") @map("provider_status")
+  hiring             Json?
+  projects           Json      @default("[]")
+  fetchedAt          DateTime? @map("fetched_at") @db.Timestamptz(6)
+  expiresAt          DateTime? @map("expires_at") @db.Timestamptz(6)
+  requestedById      String?   @map("requested_by_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, expiresAt])
+  @@map("company_firmographics")
+}
+
+/// Open roles at a CRM company, from a provider (Apollo job postings today).
+/// Classified at write time (function, seniority, skills, region).
+model CompanyJobPosting {
+  id         String    @id @default(uuid()) @db.Uuid
+  orgId      String    @map("org_id") @db.Uuid
+  companyId  String    @map("company_id") @db.Uuid
+  source     String
+  externalId String    @map("external_id")
+  title      String
+  url        String?
+  city       String?
+  state      String?
+  country    String?
+  region     String
+  function   String
+  seniority  String
+  skills     String[]  @default([])
+  postedAt   DateTime? @map("posted_at") @db.Timestamptz(6)
+  lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  fetchedAt  DateTime  @map("fetched_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, source, externalId])
+  @@index([orgId, companyId, function])
+  @@map("company_job_postings")
+}
+
+/// One row per paid provider call, written before the call. The budget guard
+/// sums the current calendar month (UTC) per org and provider.
+model EnrichmentCreditUsage {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  provider  String
+  operation String
+  credits   Int
+  companyId String?  @map("company_id") @db.Uuid
+  at        DateTime @default(now()) @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, provider, at])
+  @@map("enrichment_credit_usage")
 }

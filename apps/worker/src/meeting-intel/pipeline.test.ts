@@ -4,7 +4,7 @@ import { prisma } from '@bidstack/db';
 import type { MeetingIntelJob, NormalizedMeeting } from '@bidstack/shared';
 
 import { type AdapterRegistry, defaultAdapters, type PullContext } from './adapters.js';
-import { processIngestItem, type PipelineDeps, storeIngestItems, syncConnection } from './pipeline.js';
+import { accountTeams, processIngestItem, type PipelineDeps, storeIngestItems, syncConnection } from './pipeline.js';
 
 const stamp = Date.now();
 const HELD = '2026-10-20T14:00:00.000Z';
@@ -181,5 +181,20 @@ describe('meeting intel pipeline', () => {
     expect((await prisma.meetingSourceConnection.findUniqueOrThrow({ where: { id: abcConn } })).lastError).toBe('not_configured');
     expect((await syncConnection({ orgId: orgB, connectionId: metisConn }, deps)).outcome).toBe('skipped');
     expect(await processIngestItem({ orgId: orgB, itemId: (await prisma.meetingIngestItem.findFirstOrThrow({ where: { orgId: orgA } })).id }, deps)).toEqual({ outcome: 'skipped' });
+  });
+});
+
+describe('account team (pinned definition)', () => {
+  it('is key account owner + director sponsor + open-opportunity owners only', async () => {
+    const mk = async (k: string) =>
+      (await prisma.user.create({ data: { orgId: orgA, clerkUser: `user_mi_t_${k}_${stamp}`, email: `t${k}.${stamp}@polo.test`, name: k } })).id;
+    const [kam, sponsor, open, won, lost] = await Promise.all(['kam', 'sp', 'open', 'won', 'lost'].map(mk));
+    const co = (await prisma.company.create({ data: { orgId: orgA, name: `Team pin ${stamp}`, keyAccountOwnerId: kam, directorSponsorId: sponsor } })).id;
+    for (const [stage, ownerId] of [['s4_negotiation', open], ['closed_won', won], ['closed_lost', lost]] as const) {
+      await prisma.opportunity.create({ data: { orgId: orgA, code: `T-${stage}-${stamp}`, customer: 'Pin', name: stage, stage, ownerId, companyId: co } });
+    }
+    const teams = await accountTeams(orgA, [co]);
+    expect([...teams.get(co)!].sort()).toEqual([kam, sponsor, open].sort());
+    expect((await accountTeams(orgB, [co])).get(co)!.size).toBe(0);
   });
 });

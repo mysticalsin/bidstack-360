@@ -150,6 +150,13 @@ const STUB_ROLE_OVERRIDES: Record<
     name: 'E2E Account Executive',
     clerkUser: 'e2e_account_executive',
   },
+  presales: {
+    systemRole: 'Presales',
+    legacyRole: 'member',
+    email: 'e2e-presales@bidstack.local',
+    name: 'E2E Presales',
+    clerkUser: 'e2e_presales',
+  },
   sdr: {
     systemRole: 'SDR',
     legacyRole: 'member',

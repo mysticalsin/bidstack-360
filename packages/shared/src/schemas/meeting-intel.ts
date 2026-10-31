@@ -109,6 +109,30 @@ export const MeetingIntelDetail = MeetingIntelRow.extend({
 });
 export type MeetingIntelDetail = z.infer<typeof MeetingIntelDetail>;
 
+/** How the caller reached a meeting; audited on every view. */
+/**
+ * Account team (pinned, Tony 2026-10-31): key account owner + director sponsor
+ * + owners of opportunities in these open stages. Shared by api and worker.
+ */
+export const ACCOUNT_TEAM_OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
+
+export const MeetingIntelAccess = z.enum(['visible', 'admin_override', 'flag']);
+export type MeetingIntelAccess = z.infer<typeof MeetingIntelAccess>;
+
+/**
+ * GET /meeting-intel/flags/:id/meeting. A flag grants its recipient this one
+ * meeting (never the account). When the account is outside the recipient's
+ * scope the account, title, people, summary, transcript and source URLs are
+ * redacted and only the learnings (lists, seniority, region) remain.
+ */
+export const FlagMeetingDetail = MeetingIntelDetail.extend({
+  companyId: z.string().uuid().nullable(),
+  companyRestricted: z.boolean(),
+  access: MeetingIntelAccess,
+  flagId: z.string().uuid(),
+});
+export type FlagMeetingDetail = z.infer<typeof FlagMeetingDetail>;
+
 export const MeetingIntelListQuery = z.object({
   companyId: z.string().uuid().optional(),
   /** Includes meetings on every descendant of this company (group view). */
