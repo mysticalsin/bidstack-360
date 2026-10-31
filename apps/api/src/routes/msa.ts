@@ -37,11 +37,14 @@ import {
   MsaListQuery,
   MsaListResponse,
   MsaPatch,
+  MsaSearchQuery,
+  MsaSearchResponse,
   MsaTimelineResponse,
   MsaUploadUrlRequest,
   MsaUploadUrlResponse,
   MsaVersionFinalize,
   type MsaFileVersion,
+  type MsaSearchHit,
   type MsaSummaryRow,
   type MsaTimelineEvent,
 } from '@bidstack/shared';
@@ -51,6 +54,7 @@ import { userHasPermission } from '../lib/rbac-decision-cache.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
+import { enqueueMsaTextExtract } from '../queues/msa-text-extract.js';
 import { issueMsaDownloadToken, MSA_DOWNLOAD_TTL_SECONDS, openMsaDownloadToken } from '../msa/download-token.js';
 
 const DAY_MS = 86_400_000;
@@ -770,7 +774,100 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         sha256,
         contentType: detected,
       });
+      await enqueueMsaTextExtract({ orgId: req.auth.orgId, contractId: row.id, versionId });
       return reply.code(201).send({ id: versionId, versionNo, sha256 });
+    },
+  );
+
+  // ── Re-run text extraction (e.g. after a failure or a Redis outage) ──────
+  server.post(
+    '/msa/:id/versions/:versionId/reextract',
+    {
+      config: { permission: 'msa:write' },
+      schema: {
+        params: z.object({ id: z.string().uuid(), versionId: z.string().uuid() }),
+        response: { 202: z.object({ queued: z.boolean() }) },
+      },
+    },
+    async (req, reply) => {
+      const { row } = await loadVisible(req, req.params.id);
+      await assertCanEdit(req, row);
+      const v = await prisma.contractFileVersion.findFirst({
+        where: { id: req.params.versionId, contractId: row.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!v) throw server.httpErrors.notFound('Version not found');
+      await prisma.contractFileVersion.updateMany({
+        where: { id: v.id, orgId: req.auth.orgId },
+        data: { extractionStatus: 'pending', extractionError: null },
+      });
+      const jobId = await enqueueMsaTextExtract({ orgId: req.auth.orgId, contractId: row.id, versionId: v.id });
+      await audit(req, 'msa.version.reextract', row.id, { versionId: v.id });
+      return reply.code(202).send({ queued: jobId !== null });
+    },
+  );
+
+  // ── Full-text search over extracted text ──────────────────────────────────
+  server.get(
+    '/msa/search',
+    {
+      config: { permission: 'msa:read' },
+      schema: { querystring: MsaSearchQuery, response: { 200: MsaSearchResponse } },
+    },
+    async (req) => {
+      const { q, companyId, limit } = req.query;
+      const orgId = req.auth.orgId;
+      const scope = await scopeOf(req);
+      // Rank inside the org with the GIN expression index, over-fetch, then
+      // apply the (possibly restricted) company scope through Prisma so the
+      // scope logic lives in one place.
+      const candidates = await prisma.$queryRaw<Array<{ version_id: string; contract_id: string; rank: number }>>`
+        SELECT v.id AS version_id, v.contract_id, ts_rank(to_tsvector('simple', coalesce(v.extracted_text, '')), query)::float8 AS rank
+        FROM contract_file_versions v
+        JOIN contract_agreements c ON c.id = v.contract_id AND c.org_id = v.org_id AND c.deleted_at IS NULL
+        CROSS JOIN plainto_tsquery('simple', ${q}) AS query
+        WHERE v.org_id = ${orgId}::uuid
+          AND v.deleted_at IS NULL
+          AND to_tsvector('simple', coalesce(v.extracted_text, '')) @@ query
+          ${companyId ? Prisma.sql`AND c.company_id = ${companyId}::uuid` : Prisma.empty}
+        ORDER BY rank DESC, v.created_at DESC
+        LIMIT ${Math.min(limit * 5, 250)}`;
+      const contractIds = [...new Set(candidates.map((c) => c.contract_id))];
+      const visible = contractIds.length
+        ? await prisma.contractAgreement.findMany({
+            where: { AND: [msaScopeWhere(orgId, scope), { id: { in: contractIds } }] },
+            select: { id: true, title: true, reference: true, companyId: true, kind: true, status: true },
+            take: contractIds.length,
+          })
+        : [];
+      const byId = new Map(visible.map((c) => [c.id, c]));
+      const hits = candidates.filter((c) => byId.has(c.contract_id)).slice(0, limit);
+      const snippets = hits.length
+        ? await prisma.$queryRaw<Array<{ id: string; version_no: number; snippet: string }>>`
+            SELECT v.id, v.version_no,
+              ts_headline('simple', coalesce(v.extracted_text, ''), plainto_tsquery('simple', ${q}),
+                'StartSel=[[, StopSel=]], MaxWords=30, MinWords=10, MaxFragments=2, FragmentDelimiter= ... ') AS snippet
+            FROM contract_file_versions v
+            WHERE v.org_id = ${orgId}::uuid AND v.id IN (${Prisma.join(hits.map((h) => Prisma.sql`${h.version_id}::uuid`))})`
+        : [];
+      const snip = new Map(snippets.map((s) => [s.id, s]));
+      const items = hits.map((h) => {
+        const c = byId.get(h.contract_id)!;
+        const s = snip.get(h.version_id);
+        return {
+          contractId: c.id,
+          versionId: h.version_id,
+          versionNo: s?.version_no ?? 0,
+          title: c.title ?? c.reference,
+          companyId: c.companyId,
+          kind: c.kind as MsaSearchHit['kind'],
+          status: c.status as MsaSearchHit['status'],
+          rank: Number(h.rank),
+          snippet: s?.snippet ?? '',
+        };
+      });
+      await audit(req, 'msa.search', null, { q: q.slice(0, 200), companyId: companyId ?? null, hits: items.length });
+      return { items };
     },
   );
 

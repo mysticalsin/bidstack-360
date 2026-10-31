@@ -15,6 +15,7 @@ import { startCompanyEnrichApollo } from './queues/company-enrich-apollo.js';
 import { startDustPoller } from './queues/dust-poll.js';
 import { startWebhookProcessor } from './queues/webhook-processor.js';
 import { startDocumentExtract } from './queues/document-extract.js';
+import { startMsaTextExtract } from './queues/msa-text-extract.js';
 import { startCalendarSync } from './queues/calendar-sync.js';
 import { startEmailSync } from './queues/email-sync.js';
 import { startSmsWorker } from './queues/sms.js';
@@ -144,6 +145,7 @@ await Promise.all([
   startWebhookProcessor(connection, log, workers, queues),
   startCompanyEnrichApollo(connection, log, workers, queues),
   startDocumentExtract(connection, log, workers, queues),
+  startMsaTextExtract(connection, log, workers, queues),
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
@@ -195,7 +197,7 @@ for (const worker of workers) {
 const queueDepthCollector = startQueueDepthCollector(queues, log);
 
 log.info(
-  'Polo PreSales worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
+  'Polo PreSales worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + msa-text-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
