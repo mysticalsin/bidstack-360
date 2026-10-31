@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { mapStoredInsights } from './dashboard.cockpit.js';
+import { defaultQueueHealth } from './dashboard.defaults.js';
 import { defaultProviderHealth } from './dashboard.providers.js';
 import { serializeDeal } from './dashboard.queries.js';
 import { asProviderStatus, formatMicrosCompact } from './dashboard.utils.js';
@@ -23,6 +24,12 @@ afterEach(() => {
     if (previous === undefined) delete process.env[key];
     else process.env[key] = previous;
   }
+});
+
+describe('queue health is not an invented idle snapshot', () => {
+  it('returns no rows when nothing has been checked', () => {
+    expect(defaultQueueHealth()).toEqual([]);
+  });
 });
 
 describe('dashboard insights are stored rows only', () => {

@@ -37,7 +37,6 @@ import {
 } from './dashboard.cockpit.js';
 import {
   DEFAULT_WIDGETS,
-  defaultQueueHealth,
   defaultReleaseScore,
 } from './dashboard.defaults.js';
 import {
@@ -363,7 +362,7 @@ export async function buildDashboardSnapshot(
     providerHealth: providerRows.length
       ? mergeProviderHealth(providerRows.map(serializeProviderHealth))
       : defaultProviderHealth(),
-    queueHealth: queueRows.length ? queueRows.map(serializeQueueHealth) : defaultQueueHealth(),
+    queueHealth: queueRows.map(serializeQueueHealth),
     releaseScore: releaseScoreRow ? serializeReleaseScore(releaseScoreRow) : defaultReleaseScore(),
   };
 }

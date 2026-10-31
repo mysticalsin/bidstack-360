@@ -268,34 +268,9 @@ export function defaultCompliance(): z.infer<typeof AccountCockpitSnapshot>['com
 
 // ─── Queue health fallbacks ───────────────────────────────────────────────────
 
+/** No stored queue check is not an idle queue. Callers should return []. */
 export function defaultQueueHealth(): Array<z.infer<typeof QueueHealth>> {
-  const checked = new Date().toISOString();
-  return [
-    {
-      queueName: 'data_verification',
-      waiting: 0,
-      active: 0,
-      failed: 0,
-      completed: 0,
-      lastCheckedAt: checked,
-    },
-    {
-      queueName: 'dust-runs',
-      waiting: 0,
-      active: 0,
-      failed: 0,
-      completed: 0,
-      lastCheckedAt: checked,
-    },
-    {
-      queueName: 'bid-import',
-      waiting: 0,
-      active: 0,
-      failed: 0,
-      completed: 0,
-      lastCheckedAt: checked,
-    },
-  ];
+  return [];
 }
 
 // ─── Release score fallback ───────────────────────────────────────────────────

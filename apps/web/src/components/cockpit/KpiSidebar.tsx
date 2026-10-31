@@ -25,6 +25,7 @@ export const KpiSidebar = memo(function KpiSidebar({
 }: Props & { account?: boolean }) {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
+  const queuesChecked = snapshot.queueHealth.length > 0;
   const queueWaiting = snapshot.queueHealth.reduce((acc, q) => acc + q.waiting + q.active, 0);
   const providers = snapshot.providerHealth.length;
   const healthyProviders = snapshot.providerHealth.filter((p) => p.status === 'healthy').length;
@@ -74,9 +75,13 @@ export const KpiSidebar = memo(function KpiSidebar({
         />
         <PulseRow
           label={t('kpiSidebar.queueBacklog', 'Queue backlog')}
-          value={queueWaiting.toString()}
-          tone={queueWaiting > 50 ? 'rose' : queueWaiting > 0 ? 'amber' : 'jade'}
-          progress={Math.min(100, queueWaiting * 2)}
+          value={
+            queuesChecked
+              ? queueWaiting.toString()
+              : t('kpiSidebar.queueNotChecked', 'not checked')
+          }
+          tone={queuesChecked ? (queueWaiting > 50 ? 'rose' : queueWaiting > 0 ? 'amber' : 'jade') : 'amber'}
+          progress={queuesChecked ? Math.min(100, queueWaiting * 2) : 0}
           index={2}
           reducedMotion={Boolean(reducedMotion)}
         />
