@@ -23,8 +23,12 @@ function permission(key: string, name: string, description: string) {
   return { key, name, description };
 }
 
+// orgchart:read follows companies:read on every seeded role: whoever can read
+// an account can read its org chart (Tony Walteur, 2026-10-31 18:57 BRT).
+// orgchart:write is Admin-only (Admin gets every key via ADMIN_PERMISSION_KEYS).
 function role(name: string, description: string, permissionKeys: readonly string[]) {
-  return { name, description, permissionKeys: Array.from(new Set(permissionKeys)) };
+  const keys = permissionKeys.includes('companies:read') ? [...permissionKeys, 'orgchart:read'] : permissionKeys;
+  return { name, description, permissionKeys: Array.from(new Set(keys)) };
 }
 
 function readKeys(...resources: string[]) {
@@ -111,6 +115,16 @@ const PERMISSION_SEEDS = [
     'meetings:write',
     'Manage meeting intel',
     'Enter meetings manually, connect meeting sources, change visibility and dismiss flags.',
+  ),
+  permission(
+    'orgchart:read',
+    'Read org charts',
+    'View account org charts, node details with meeting intel, and the coverage overlay.',
+  ),
+  permission(
+    'orgchart:write',
+    'Edit org charts',
+    'Add, edit, move and remove org chart nodes, set the root, import CSV and run auto-seed.',
   ),
   permission(
     'msa:admin',

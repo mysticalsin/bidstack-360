@@ -57,3 +57,30 @@ export async function enqueueAccountEnrichment(job: EnrichJob): Promise<string |
     return null;
   }
 }
+
+// ── Org chart seed (same queue, admin request only) ─────────────────────────
+type SeedJob = Extract<AccountEnrichmentJob, { kind: 'orgchart_seed' }>;
+type SeedEnqueue = (job: SeedJob) => Promise<string | null>;
+let seedOverride: SeedEnqueue | null = null;
+
+export function __setOrgChartSeedEnqueueForTest(fn: SeedEnqueue | null): void {
+  seedOverride = fn;
+}
+
+/** Same account within the same minute collapses to one job. */
+export function orgChartSeedJobId(job: SeedJob, now = Date.now()): string {
+  return `${job.orgId}--orgchart-seed--${job.companyId}--${Math.floor(now / 60_000)}`;
+}
+
+/** Fail-open like enqueueAccountEnrichment: null means not queued. */
+export async function enqueueOrgChartSeed(job: SeedJob): Promise<string | null> {
+  if (seedOverride) return seedOverride(job);
+  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
+  try {
+    const queued = await getQueue().add('account-enrichment.orgchart-seed', job, { jobId: orgChartSeedJobId(job), attempts: 1 });
+    return queued.id ?? null;
+  } catch (err) {
+    log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue org chart seed');
+    return null;
+  }
+}

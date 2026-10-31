@@ -7,6 +7,8 @@
 // @bidstack/shared free of a runtime bullmq dependency — only apps that
 // actually enqueue/process jobs need bullmq installed.
 
+import type { OrgChartSeedJob } from './schemas/org-chart.js';
+
 /**
  * Default job options applied to every job enqueued in a BullMQ queue.
  * Deliberately excludes the bullmq `JobsOptions` type so this package
@@ -127,6 +129,7 @@ export type MeetingIntelJob =
  * projects per CRM company from Apollo then Seamless.
  *   'account-enrichment.enrich'  refresh one company (TTL cache, credit budget)
  *   'account-enrichment.sweep'   repeatable, only when ENRICHMENT_AUTO_REFRESH=true
+ *   'account-enrichment.orgchart-seed'  seed one account's org chart on request
  */
 export const ACCOUNT_ENRICHMENT: QueueConfig = {
   name: 'account-enrichment',
@@ -140,7 +143,10 @@ export const ACCOUNT_ENRICHMENT: QueueConfig = {
 
 export type AccountEnrichmentJob =
   | { kind: 'enrich'; orgId: string; companyId: string; force?: boolean; requestedById?: string | null }
-  | { kind: 'sweep' };
+  | { kind: 'sweep' }
+  // Org chart auto-seed (contacts, meeting attendees, optional Apollo people
+  // search). Only enqueued by an admin; never swept.
+  | OrgChartSeedJob;
 
 export interface MsaTextExtractJob {
   orgId: string;

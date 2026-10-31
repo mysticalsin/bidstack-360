@@ -3,6 +3,8 @@
  *   account-enrichment.enrich  refresh one company (see account-enrichment/job.ts)
  *   account-enrichment.sweep   repeatable (daily), only when ENRICHMENT_AUTO_REFRESH=true:
  *                              enqueue expired key accounts, capped by ENRICHMENT_SWEEP_LIMIT
+ *   account-enrichment.orgchart-seed  seed one account's org chart (admin request only,
+ *                              see org-chart/seed.ts); never swept
  */
 import { type Job, Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -16,6 +18,7 @@ import {
   EnrichmentRateLimitedError,
   runAccountEnrichment,
 } from '../account-enrichment/job.js';
+import { runOrgChartSeed } from '../org-chart/seed.js';
 
 const SWEEP_EVERY_MS = 24 * 60 * 60_000;
 
@@ -44,6 +47,11 @@ export async function startAccountEnrichment(
           await queue.add('account-enrichment.enrich', { kind: 'enrich', ...d }, { jobId: enrichJobId(d.orgId, d.companyId) });
         }
         return { enqueued: due.length };
+      }
+      if (data.kind === 'orgchart_seed') {
+        const res = await runOrgChartSeed(data, deps);
+        log.info({ jobId: job.id, orgId: data.orgId, companyId: data.companyId, ...res }, 'org chart seed finished');
+        return res;
       }
       try {
         const res = await runAccountEnrichment(data, deps);

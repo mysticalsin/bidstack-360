@@ -202,6 +202,8 @@ model Org {
   meetingIngestItems            MeetingIngestItem[]
   meetingIntel                  MeetingIntel[]
   companyFirmographics          CompanyFirmographics[]
+  orgCharts                     OrgChart[]
+  orgChartNodes                 OrgChartNode[]
   companyJobPostings            CompanyJobPosting[]
   enrichmentCreditUsage         EnrichmentCreditUsage[]
   winLossRecords                WinLossRecord[]
@@ -337,6 +339,7 @@ model User {
   contractsOwned         ContractAgreement[]   @relation("ContractOwner")
   contractVersionsAdded  ContractFileVersion[] @relation("ContractFileVersionCreatedBy")
   meetingSourceConnections MeetingSourceConnection[]
+  orgChartNodesOwned       OrgChartNode[]            @relation("OrgChartNodeOwner")
 
   @@index([orgId])
   @@index([deletedAt])
@@ -427,6 +430,7 @@ model Company {
   meetingIntel MeetingIntel[]
   firmographics CompanyFirmographics?
   jobPostings   CompanyJobPosting[]
+  orgChart      OrgChart?
 
   @@index([orgId, domain])
   @@index([orgId])
@@ -680,6 +684,7 @@ model Contact {
   reportedByFacts   ContactFact[]        @relation("FactReportsTo")
   ownedCommitments  CustomerCommitment[]
   meetingAttendances MeetingIntelAttendee[]
+  orgChartNodes      OrgChartNode[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -6202,4 +6207,82 @@ model EnrichmentCreditUsage {
 
   @@index([orgId, provider, at])
   @@map("enrichment_credit_usage")
+}
+
+/// Account org chart (2026-10-31): one chart per CRM company, rooted at the
+/// CEO, edited by admins (orgchart:write). Nodes are contacts or placeholder
+/// roles. Separate from Contact.reportsToContactId, which stays the
+/// evidence-backed reports-to cache of the people map: the chart is the
+/// curated view and never writes facts. Exactly one live root per chart and
+/// unique live contact / external ref per chart are partial unique indexes in
+/// migration 20261031235000_org_chart.
+model OrgChart {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  companyId   String   @unique @map("company_id") @db.Uuid
+  /// Bumped on every structural change (add, move, remove, root, import, seed).
+  version     Int      @default(1)
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  nodes   OrgChartNode[]
+
+  @@index([orgId])
+  @@map("org_charts")
+}
+
+model OrgChartNode {
+  id                   String         @id @default(uuid()) @db.Uuid
+  orgId                String         @map("org_id") @db.Uuid
+  chartId              String         @map("chart_id") @db.Uuid
+  /// null = placeholder role (e.g. "VP Data, vacant" or an Apollo prospect).
+  contactId            String?        @map("contact_id") @db.Uuid
+  /// null = the root (CEO). One live root per chart.
+  parentId             String?        @map("parent_id") @db.Uuid
+  kind                 String         @default("contact") @db.VarChar(16)
+  name                 String
+  title                String?
+  seniority            SeniorityLevel @default(unknown)
+  function             String?        @db.VarChar(40)
+  businessUnit         String?        @map("business_unit")
+  region               String?        @db.VarChar(40)
+  /// External https photo (enrichment or pasted). Ignored when photoStorageKey is set.
+  photoUrl             String?        @map("photo_url")
+  /// Uploaded photo (S3/local storage key, image only, size-capped).
+  photoStorageKey      String?        @map("photo_storage_key")
+  photoContentType     String?        @map("photo_content_type") @db.VarChar(40)
+  relationshipStrength Int?           @map("relationship_strength") @db.SmallInt
+  sentiment            Sentiment?
+  ownerUserId          String?        @map("owner_user_id") @db.Uuid
+  sortOrder            Int            @default(0) @map("sort_order")
+  /// manual | csv | contacts | abc | metis | apollo | seed
+  source               String         @default("manual") @db.VarChar(16)
+  /// Provider id for seeded prospects (Apollo person id, meeting attendee email).
+  externalRef          String?        @map("external_ref") @db.VarChar(160)
+  /// How the manager link was set: manual | reports_to | inferred | root
+  placement            String         @default("manual") @db.VarChar(16)
+  /// { field: { source, at, byUserId? } }
+  provenance           Json           @default("{}")
+  version              Int            @default(1)
+  createdById          String?        @map("created_by_id") @db.Uuid
+  updatedById          String?        @map("updated_by_id") @db.Uuid
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  org      Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  chart    OrgChart       @relation(fields: [chartId], references: [id], onDelete: Cascade)
+  contact  Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  parent   OrgChartNode?  @relation("OrgChartTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children OrgChartNode[] @relation("OrgChartTree")
+  owner    User?          @relation("OrgChartNodeOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, chartId])
+  @@index([parentId])
+  @@index([orgId, contactId])
+  @@index([deletedAt])
+  @@map("org_chart_nodes")
 }
