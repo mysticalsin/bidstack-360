@@ -1,0 +1,74 @@
+/* Financial watchdog — polo-DESIGN.md §1–8. One easing curve, transform/opacity only. */
+.wd {
+  --wd-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --wd-line: var(--border-subtle, #e2e2e2);
+  --wd-card: var(--surface-card, #fff);
+  --wd-ink: var(--fg-primary, #171717);
+  --wd-muted: var(--fg-secondary, #6b6b6b);
+  --wd-pos: #16a34a;
+  --wd-neg: #dc2626;
+  --wd-watch: #a6712d;
+  display: grid;
+  gap: 16px;
+}
+[data-theme='dark'] .wd { --wd-pos: #4cc38a; --wd-neg: #e5484d; --wd-watch: #d6a35c; }
+.wd-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 900px) { .wd-grid { grid-template-columns: 1fr; } }
+.wd-card {
+  background: var(--wd-card);
+  border: 1px solid var(--wd-line);
+  border-radius: 12px;
+  padding: 16px 20px;
+  min-width: 0;
+}
+.wd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.wd-title { font-size: 15px; font-weight: 500; color: var(--wd-ink); display: flex; gap: 8px; align-items: center; }
+.wd-sub { font-size: 12px; color: var(--wd-muted); margin: 0 0 12px; }
+.wd-list { list-style: none; margin: 0; padding: 0; }
+.wd-item {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--wd-line);
+}
+.wd-item:first-child { border-top: 0; }
+.wd-item-title { font-size: 14px; color: var(--wd-ink); font-weight: 500; line-height: 1.35; }
+.wd-item-meta { font-size: 12px; color: var(--wd-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.wd-item-sum { font-size: 13px; color: var(--wd-muted); margin-top: 4px; line-height: 1.45; }
+.wd-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.wd-tag[data-kind='OPPORTUNITY'] { color: var(--wd-pos); }
+.wd-tag[data-kind='RISK'] { color: var(--wd-neg); }
+.wd-tag[data-kind='NEUTRAL'] { color: var(--wd-watch); }
+.wd-sev { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+.wd-sev i { width: 4px; height: 4px; border-radius: 50%; background: var(--wd-line); }
+.wd-sev i[data-on='true'] { background: currentColor; }
+.wd-link { color: inherit; text-decoration: underline; text-decoration-color: var(--wd-line); text-underline-offset: 2px; }
+.wd-link:hover { text-decoration-color: currentColor; }
+.wd-date {
+  width: 44px; flex: none; text-align: center; border: 1px solid var(--wd-line); border-radius: 8px;
+  padding: 4px 0; font-variant-numeric: tabular-nums;
+}
+.wd-date b { display: block; font-size: 17px; font-weight: 500; color: var(--wd-ink); line-height: 1.1; }
+.wd-date span { font-size: 11px; color: var(--wd-muted); }
+.wd-cal { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--wd-line); }
+.wd-cal:first-child { border-top: 0; }
+.wd-count { margin-left: auto; font-size: 12px; color: var(--wd-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wd-empty { font-size: 13px; color: var(--wd-muted); padding: 12px 0 4px; }
+.wd-empty strong { display: block; color: var(--wd-ink); font-weight: 500; margin-bottom: 2px; }
+.wd-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--wd-line); margin: -4px 0 8px; }
+.wd-tab {
+  min-height: 36px; padding: 0 10px; font-size: 13px; color: var(--wd-muted); background: none; border: 0;
+  border-bottom: 2px solid transparent; cursor: pointer; transition: color 150ms var(--wd-ease), border-color 150ms var(--wd-ease);
+}
+.wd-tab[aria-selected='true'] { color: var(--wd-ink); border-bottom-color: var(--brand-primary, #006b4f); }
+.wd-tab:focus-visible, .wd-link:focus-visible { outline: 2px solid var(--brand-primary, #006b4f); outline-offset: 2px; border-radius: 4px; }
+@media (pointer: coarse) { .wd-tab { min-height: 44px; } }
+.wd-num { font-variant-numeric: tabular-nums; }
+.wd-skel { height: 44px; border-radius: 8px; background: var(--surface-sunken, #f4f4f4); margin: 8px 0; }
+
+/* Motion — arrive once, ≤6 staggered, transform/opacity only. */
+.wd-arrive { animation: wd-arrive 360ms var(--wd-ease) both; animation-delay: calc(var(--i, 0) * 50ms); }
+@keyframes wd-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.wd-panel { animation: wd-fade 150ms var(--wd-ease) both; }
+@keyframes wd-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .wd-arrive { animation-name: wd-fade; animation-duration: 150ms; animation-delay: 0ms; }
+}

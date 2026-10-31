@@ -24,6 +24,7 @@ import {
   UpsellFilesCard,
 } from '@/components/cockpit';
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
+import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSection';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
 import { InfoSearchLeadsCard } from '@/components/account-intel/InfoSearchLeadsCard';
@@ -209,6 +210,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       )}
       <KpiRow cockpit={cockpit} />
       <CommandCenter cockpit={cockpit} />
+      {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
 
       <div className="mt-1 flex flex-col gap-1">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
