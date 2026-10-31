@@ -58,7 +58,7 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
         aria-hidden
       />
       <span>
-        {t('intelCards.dataFreshness', 'Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register', {
+        {t('intelCards.dataFreshnessUnverified', 'Intel refreshed {{date}}. Sources are not verified.', {
           date: intel.refreshedAt ? formatDate(intel.refreshedAt) : '—',
         })}
       </span>
@@ -115,15 +115,17 @@ export function WinPredictionCard({ intel }: { intel: IntelPayload }) {
     <Card>
       <SectionHeader
         title={t('intelCards.winPrediction.title', 'Win prediction')}
-        caption={t('intelCards.winPrediction.modelCaption', 'Model {{version}}', { version: wp.modelVersion })}
+        caption={t('intelCards.winPrediction.proxyCaption', 'Proxy · model {{version}}', {
+          version: wp.modelVersion,
+        })}
       />
       <div className="p-5 space-y-3">
         <div className="flex items-baseline gap-2">
-          <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
+          <div className="text-2xl font-medium tabular-nums text-[var(--fg-primary)]">
             {wp.probability}%
           </div>
           <div className="text-xs text-[var(--fg-tertiary)]">
-            {t('intelCards.winPrediction.probability', 'probability')}
+            {t('intelCards.winPrediction.proxy', 'proxy, not a measured win rate')}
           </div>
         </div>
         <ul className="space-y-1.5">
@@ -150,7 +152,7 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
     <Card>
       <SectionHeader
         title={t('intelCards.triggers.title', 'Buying triggers')}
-        caption={t('intelCards.triggers.caption', 'Weighted signals')}
+        caption={t('intelCards.triggers.proxyCaption', 'Weighted signal proxy')}
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {(intel.triggers ?? []).map((trigger) => (
@@ -164,9 +166,11 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
             </div>
             <div
               className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] tabular-nums"
-              aria-label={t('intelCards.triggers.weightAria', 'Weight {{weight}}/10', { weight: trigger.weight })}
+              aria-label={t('intelCards.triggers.weightAria', 'Proxy weight {{weight}}/10', {
+                weight: trigger.weight,
+              })}
             >
-              {trigger.weight}/10
+              {t('intelCards.triggers.weightValue', '{{weight}}/10 proxy', { weight: trigger.weight })}
             </div>
           </li>
         ))}
@@ -190,7 +194,9 @@ export function CompetitorRadarCard({ intel }: { intel: IntelPayload }) {
           <li key={c.vendor} className="px-5 py-3">
             <div className="flex items-center justify-between mb-1.5">
               <div className="text-sm font-medium text-[var(--fg-primary)]">{c.vendor}</div>
-              <div className="text-xs tabular-nums text-[var(--fg-tertiary)]">{c.score}/100</div>
+              <div className="text-xs tabular-nums text-[var(--fg-tertiary)]">
+                {t('intelCards.competitors.proxyScore', '{{score}}/100 proxy', { score: c.score })}
+              </div>
             </div>
             <div className="h-1.5 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
               <div className="h-full bg-[var(--brand-primary)]" style={{ width: `${c.score}%` }} />

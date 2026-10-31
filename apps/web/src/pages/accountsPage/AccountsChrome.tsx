@@ -29,7 +29,7 @@ export function SegmentHeader({
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">{title}</h1>
+          <h1 className="text-[28px] font-medium tracking-normal text-[var(--fg-primary)]">{title}</h1>
           {titleAccessory}
         </div>
         {subtitle ? <div className="mt-1 text-sm text-[var(--fg-secondary)]">{subtitle}</div> : null}
@@ -61,16 +61,10 @@ export function StatTile({
         // Machined feel: a hairline inner top-highlight over the ambient xs
         // shadow, and a gentle GPU-safe lift on hover. Motion is transform/
         // shadow only and disabled under prefers-reduced-motion.
-        'shadow-[inset_0_1px_0_rgba(255,255,255,0.05),var(--shadow-xs)]',
-        'transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]',
-        'hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),var(--shadow-sm)]',
-        'motion-reduce:transition-none motion-reduce:hover:translate-y-0',
       )}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-        {label}
-      </div>
-      <div className="mt-2 truncate text-xl font-bold leading-tight tabular-nums text-[var(--fg-primary)]">
+      <div className="text-sm text-[var(--fg-secondary)]">{label}</div>
+      <div className="mt-2 truncate text-2xl font-medium leading-tight tabular-nums text-[var(--fg-primary)]">
         {value}
       </div>
       {sublabel ? (
@@ -111,10 +105,8 @@ export function InsightPanel({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-            {eyebrow}
-          </p>
-          <div className="mt-1 truncate text-lg font-semibold text-[var(--fg-primary)]">
+          <p className="text-sm text-[var(--fg-secondary)]">{eyebrow}</p>
+          <div className="mt-1 truncate text-lg font-medium text-[var(--fg-primary)]">
             {heading}
           </div>
           {sub ? <div className="mt-1 text-sm text-[var(--fg-secondary)]">{sub}</div> : null}

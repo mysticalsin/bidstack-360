@@ -21,6 +21,7 @@ import { DueDateChip, daysUntilDueUtc } from '@/components/ui/DueDateChip';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { springSoft } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
+
 import { formatUnspecifiedAmount } from '../unspecified-currency';
 
 const CLOSING_WINDOW_DAYS = 7;
@@ -96,7 +97,7 @@ export function ClosingThisWeekCard() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-[var(--fg-primary)]">{opp.name}</div>
                   <div className="truncate text-xs text-[var(--fg-tertiary)]">
-                    {opp.customer} · {formatUnspecifiedAmount(opp.value ?? 0)}
+                    {opp.customer} · {formatUnspecifiedAmount(opp.value)}
                   </div>
                 </div>
                 <DueDateChip dueDate={opp.dueDate} size="sm" />

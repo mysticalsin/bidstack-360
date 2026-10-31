@@ -11,9 +11,9 @@ import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 /**
  * Demo sign-in (VITE_AUTH_MODE=demo) rendered as the full branded login.
  *
- * Same cinematic background as the production Hero, but the SSO buttons are
- * swapped for the passwordless flow: POST an email to /api/v1/demo/session,
- * store the signed Bearer token, then enter the app. Each email gets its own
+ * Same plain light surface as the production Hero. SSO buttons are swapped
+ * for the passwordless flow: POST an email to /api/v1/demo/session, store the
+ * signed Bearer token, then enter the app. Each email gets its own
  * freshly-seeded workspace.
  */
 interface DemoSessionResponse {
@@ -22,9 +22,6 @@ interface DemoSessionResponse {
   orgId: string;
 }
 
-// Mirrors the production Hero background.
-const VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
 const LINKEDIN_URL = 'https://www.linkedin.com/in/tonywalteur/';
 
 export function DemoSignIn() {
@@ -70,23 +67,6 @@ export function DemoSignIn() {
   return (
     <div className="flex h-dvh w-full items-center justify-center bg-[#f0f0f0]">
       <section className="relative flex h-full w-full flex-col overflow-hidden">
-        {/* Cinematic background */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="absolute inset-0 z-0 h-full w-full object-cover object-[65%] lg:object-center"
-        >
-          <source src={VIDEO_URL} type="video/mp4" />
-        </video>
-        {/* Legibility scrim — keeps text/controls AA-contrast over any video frame */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.62),rgba(255,255,255,0.22)_58%,rgba(255,255,255,0.12))]"
-        />
-
         <div className="relative z-10 flex h-full flex-col">
           {/* Header: real logo + author attribution */}
           <header className="flex items-center justify-between gap-4 px-6 py-5 md:px-10">

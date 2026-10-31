@@ -7,9 +7,6 @@ import { HeroBadge } from './HeroBadge';
 import { BottomLeftCard } from './BottomLeftCard';
 import { BottomRightCorner } from './BottomRightCorner';
 
-const VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
-
 export function Hero() {
   const { t } = useTranslation('auth');
   const reducedMotion = useReducedMotion();
@@ -22,19 +19,7 @@ export function Hero() {
 
   return (
     <div className="w-full h-dvh flex items-center justify-center bg-[#f0f0f0]">
-      <section className="relative w-full h-full overflow-hidden shadow-none flex flex-col items-center bg-white/10 group">
-        {/* Video Background */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="absolute inset-0 w-full h-full object-cover object-[65%] lg:object-center z-0"
-        >
-          <source src={VIDEO_URL} type="video/mp4" />
-        </video>
-
+      <section className="relative w-full h-full overflow-hidden shadow-none flex flex-col items-center bg-[#f0f0f0]">
         {/* Content Layer */}
         <div className="relative z-10 w-full h-full flex flex-col items-center">
           <Navbar />

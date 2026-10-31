@@ -3,10 +3,10 @@ import { Hero } from '@/components/login';
 import { DemoSignIn } from '@/components/login/DemoSignIn';
 
 /**
- * Polo PreSales glassmorphism login page.
+ * Polo PreSales login page.
  *
- * Full-screen video background with glassmorphism cards, minimal navbar,
- * and integrated Microsoft/Google SSO authentication.
+ * Plain light surface, transparent lockup, minimal navbar, and integrated
+ * Microsoft/Google SSO authentication.
  *
  * In the public demo deployment (VITE_AUTH_MODE=demo) we swap the SSO Hero for
  * the passwordless demo sign-in card — Microsoft/Google SSO isn't wired there.

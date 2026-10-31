@@ -33,7 +33,7 @@
 }
 .pulse-row > strong {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .pulse-row-jade {
@@ -93,7 +93,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand-primary), var(--info));
+  background: var(--brand-primary);
   transform-origin: left center;
 }
 
@@ -314,7 +314,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-source-rail {
   display: grid;
@@ -370,7 +370,7 @@
   color: var(--fg-secondary);
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-source-value {
   grid-area: value;
@@ -397,7 +397,7 @@
   color: var(--brand-primary);
   padding: 0 12px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
   white-space: nowrap;
   transition:
     background-color 0.14s,
@@ -492,7 +492,7 @@
   color: var(--fg-secondary);
   padding: 0 12px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
   transition:
     background-color 0.14s,
     border-color 0.14s,
@@ -592,8 +592,8 @@
 .tech-stack-empty-lanes small {
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-stack-empty-actions {
   display: inline-flex;
@@ -685,8 +685,8 @@
 .tech-stack-add-launchpad-lanes small {
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-stack-add-launchpad-actions {
   display: inline-flex;
@@ -745,7 +745,7 @@
   color: var(--fg-tertiary);
   padding: 0 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   white-space: nowrap;
 }
 .tech-editor-provider-metrics span[data-tone='ready'] {
@@ -776,7 +776,7 @@
   color: var(--fg-secondary);
   padding: 0 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   text-align: left;
   transition:
     background-color 0.14s,
@@ -803,8 +803,8 @@
 .tech-editor-provider-chip small {
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-editor-provider-chip:not(:disabled):hover,
 .tech-editor-provider-chip[data-active='true'] {
@@ -878,7 +878,7 @@
   white-space: nowrap;
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-source-map-provider {
   display: inline-flex;
@@ -914,7 +914,7 @@
   padding: 0 8px;
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-review-breakdown strong {
   color: var(--fg-primary);
@@ -936,7 +936,7 @@
 .tech-editor-count {
   color: var(--fg-tertiary);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   white-space: nowrap;
 }
 .tech-editor-category-input,
@@ -955,7 +955,7 @@
   width: 100%;
   padding: 0 10px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-vendor-input,
 .tech-editor-vendor-textarea,
@@ -1084,7 +1084,7 @@
   color: var(--fg-tertiary);
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-review-filters {
   display: flex;
@@ -1148,7 +1148,7 @@
   color: var(--success);
   padding: 0 9px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   transition:
     background-color 0.14s,
     border-color 0.14s,
@@ -1239,7 +1239,7 @@
   padding: 0 8px;
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-trusted-breakdown span[data-provider='apollo'] {
   border-color: color-mix(in srgb, var(--brand-primary) 28%, var(--border-subtle));
@@ -1357,7 +1357,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 .tech-editor-source-suggestion > small {
   min-width: 0;
@@ -1366,8 +1366,8 @@
   white-space: nowrap;
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-editor-source-confidence {
   min-width: 38px;
@@ -1389,7 +1389,7 @@
   font-size: 10px;
   font-weight: 850;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .tech-editor-source-overflow {
@@ -1404,7 +1404,7 @@
   color: var(--fg-tertiary);
   padding: 6px 10px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   text-align: center;
 }
 .tech-editor-source-empty {
@@ -1462,7 +1462,7 @@
   display: block;
   color: var(--fg-primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 .tech-editor-composer-header small,
 .tech-editor-shelf-header small,
@@ -1596,8 +1596,8 @@
   grid-column: 2;
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-editor-source-first-chip em,
 .tech-editor-source-first-next {
@@ -1611,7 +1611,7 @@
 }
 .tech-editor-source-first-next {
   color: var(--fg-tertiary);
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-source-first-chip[data-tone='ready'] em {
   color: var(--success);
@@ -1637,7 +1637,7 @@
   padding: 0 8px;
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-source-first-meta span[data-tone='ready'] {
   border-color: color-mix(in srgb, var(--success) 24%, var(--border-subtle));
@@ -1663,7 +1663,7 @@
   color: var(--success);
   font-size: 10px;
   font-weight: 900;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .tech-editor-source-proof > div {
@@ -1686,7 +1686,7 @@
   padding: 0 8px;
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-source-proof > div > span[data-provider='apollo'] {
   border-color: color-mix(in srgb, var(--brand-primary) 24%, var(--border-subtle));
@@ -1788,7 +1788,7 @@
   font-size: 10px;
   font-weight: 850;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .tech-editor-guided-steps span[data-state='ready'],
@@ -1952,7 +1952,7 @@
   font-size: 10px;
   font-weight: 850;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .tech-editor-verification-steps span[data-state='active'] {
@@ -2033,7 +2033,7 @@
   color: var(--fg-primary);
   font-size: 11px;
   font-weight: 900;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-intake-review-header small {
   color: var(--fg-tertiary);
@@ -2093,8 +2093,8 @@
 .tech-editor-intake-review-detail {
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-editor-intake-review-badge {
   border: 1px solid var(--border-subtle);
@@ -2104,7 +2104,7 @@
   padding: 4px 7px;
   font-size: 10px;
   font-weight: 900;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-intake-review-card[data-status='source'] .tech-editor-intake-review-badge {
   border-color: color-mix(in srgb, var(--success) 24%, var(--border-subtle));
@@ -2126,7 +2126,7 @@
   color: var(--fg-tertiary);
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-intake-summary {
   display: grid;
@@ -2149,7 +2149,7 @@
   font-size: 10px;
   font-weight: 850;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-intake-summary span[data-tone='ready'] {
   border-color: color-mix(in srgb, var(--success) 24%, var(--border-subtle));
@@ -2208,8 +2208,8 @@
   align-items: center;
   color: var(--fg-tertiary);
   font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-editor-quick-row > div {
   min-width: 0;
@@ -2272,7 +2272,7 @@
   color: var(--success);
   font-size: 10px;
   font-weight: 900;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .tech-editor-source-match-row > div {
@@ -2323,7 +2323,7 @@
   color: var(--fg-tertiary);
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-source-match-chip strong {
   color: var(--success);
@@ -2403,8 +2403,8 @@
 .tech-editor-drop-cue small {
   color: var(--fg-tertiary);
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 500;
+  text-transform: none;
 }
 .tech-editor-file-button {
   min-height: 44px;
@@ -2486,7 +2486,7 @@
   color: var(--fg-tertiary);
   padding: 5px 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 .tech-editor-add-status span,
 .tech-editor-add-status small {
@@ -2500,7 +2500,7 @@
 }
 .tech-editor-add-status small {
   color: var(--brand-primary);
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-item {
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -2518,7 +2518,7 @@
   align-self: flex-start;
   padding: 5px 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 .tech-editor-auto-category {
   background: var(--surface-sunken);
@@ -2546,7 +2546,7 @@
   color: var(--success);
   font-size: 10px;
   font-weight: 900;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .tech-editor-staged-strip > div {
@@ -2586,7 +2586,7 @@
   color: var(--fg-tertiary);
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-staged-more {
   display: inline-flex;
@@ -2623,13 +2623,13 @@
 }
 .tech-editor-preview-name {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 .tech-editor-preview-chip small {
   color: var(--fg-tertiary);
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-preview-more {
   min-height: 34px;
@@ -2642,7 +2642,7 @@
   padding: 0 8px;
   font-size: 10px;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .tech-editor-stack-shell {
   border: 1px solid var(--border-subtle);
@@ -2671,7 +2671,7 @@
 .tech-editor-stack-header > span {
   color: var(--fg-tertiary);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 .tech-suggestions {
   display: flex;
@@ -3007,21 +3007,14 @@
   position: relative;
 }
 .mesh-hero::after {
-  content: '';
-  position: absolute;
-  inset: -40% auto -40% -30%;
-  width: 42%;
-  background: linear-gradient(90deg, transparent, rgba(47, 96, 255, 0.16), transparent);
-  transform: skewX(-18deg);
-  animation: bs-mesh-scan 3.2s ease-in-out infinite;
-  pointer-events: none;
+  content: none;
 }
 .mesh-kicker {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-tertiary);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-secondary);
 }
 .mesh-hero strong {
   display: block;
@@ -3045,7 +3038,7 @@
 }
 .mesh-stat span {
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 500;
   color: var(--brand-primary);
   line-height: 1;
 }
