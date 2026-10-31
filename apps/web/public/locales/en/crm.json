@@ -2291,7 +2291,8 @@
       },
       "source": {
         "label": "Source receipts",
-        "detail": "{{count}} attribution receipts on this account, not a coverage percent"
+        "detail": "{{count}} attribution receipts. Not a coverage percent.",
+        "detailWithLogo": "{{attribution}} attribution receipt and 1 stored logo. Not a coverage percent."
       },
       "decision": {
         "label": "Influence map",
