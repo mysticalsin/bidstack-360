@@ -17,7 +17,8 @@ export type OrgChartNodeKind = z.infer<typeof OrgChartNodeKind>;
 export const OrgChartPlacement = z.enum(['manual', 'reports_to', 'inferred', 'root']);
 export type OrgChartPlacement = z.infer<typeof OrgChartPlacement>;
 
-export const ORG_CHART_MAX_NODES = 2000;
+// Capped at the API query guard limit (findMany take <= 1000).
+export const ORG_CHART_MAX_NODES = 1000;
 export const ORG_CHART_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 export const ORG_CHART_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const OrgChartPhotoType = z.enum(ORG_CHART_PHOTO_TYPES);
