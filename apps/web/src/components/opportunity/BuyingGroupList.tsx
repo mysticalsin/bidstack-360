@@ -1,18 +1,14 @@
 import { useTranslation } from 'react-i18next';
+import { useReducedMotion } from 'framer-motion';
 
+import { SankeyChart, SankeyLink, SankeyNode } from '@/components/charts/sankey';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import type { ConnectionStanding } from '@bidstack/shared';
 
-const STANDING_LABEL: Record<ConnectionStanding, string> = {
-  unknown: 'Unknown',
-  evidenced: 'Evidenced',
-  stale: 'Stale',
-  conflicted: 'Conflicted',
-  needs_review: 'Needs review',
-};
+import { shapeBuyingGroup, STANDING_LABEL } from './shapeBuyingGroup';
 
 function standingClass(standing: ConnectionStanding): string {
   if (standing === 'evidenced') return 'text-[var(--brand-primary)]';
@@ -23,8 +19,10 @@ function standingClass(standing: ConnectionStanding): string {
 /** Contacts already linked to this opportunity. Standing is evidence, not a score. */
 export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
   const { t } = useTranslation('crm');
+  const reduced = useReducedMotion();
   const people = usePeopleMap({ opportunityId });
   const rows = people.data?.people ?? [];
+  const diagram = shapeBuyingGroup(rows);
 
   return (
     <Card>
@@ -60,6 +58,28 @@ export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
             'Link a contact on this deal. A job title is not a buying role.',
           )}
         />
+      ) : null}
+      {diagram ? (
+        <div className="overflow-x-auto px-4 pb-2" aria-hidden="true">
+          <div className="min-w-[640px]">
+            <SankeyChart
+              data={{ nodes: diagram.nodes, links: diagram.links }}
+              aspectRatio={`2 / ${Math.max(1, rows.length * 0.55)}`}
+              nodePadding={18}
+              animationDuration={reduced ? 0 : 400}
+              margin={{ top: 16, right: 160, bottom: 16, left: 140 }}
+            >
+              <SankeyLink useGradient={false} stroke="var(--chart-1)" strokeOpacity={0.4} />
+              <SankeyNode
+                showValueLabels={false}
+                labelOrientation="horizontal"
+                getNodeColor={(_node, index) =>
+                  index === 0 ? 'var(--chart-1)' : 'var(--fg-tertiary)'
+                }
+              />
+            </SankeyChart>
+          </div>
+        </div>
       ) : null}
       {people.isSuccess && rows.length > 0 ? (
         <ul className="divide-y divide-[var(--border-subtle)]">
