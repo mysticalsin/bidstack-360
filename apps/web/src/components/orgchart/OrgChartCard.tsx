@@ -12,12 +12,13 @@ import { OrgPhoto } from './OrgPhoto';
 const SENIOR = ['c_level', 'vp', 'director'];
 
 export function OrgChartCard({ companyId }: { companyId: string }) {
-  const { chart, covOf, isLoading, error } = useOrgChart(companyId);
+  const { chart, covOf, unmetSenior, live, isLoading, error } = useOrgChart(companyId);
   const nodes = chart?.nodes ?? [];
   const root = nodes.find((n) => n.id === chart?.rootId);
   const reports = root ? (childrenOf(nodes).get(root.id) ?? []) : [];
   const met = nodes.filter((n) => covOf(n)?.met).length;
-  const gaps = nodes.filter((n) => SENIOR.includes(n.seniority) && !covOf(n)?.met).length;
+  // Live charts use the API's senior-gap list so the card matches the full page.
+  const gaps = live ? unmetSenior.size : nodes.filter((n) => SENIOR.includes(n.seniority) && !covOf(n)?.met).length;
   return (
     <section className="en-section oc-card" aria-labelledby="oc-card-h" data-testid="account-orgchart-card" style={{ marginBottom: 24 }}>
       <div className="en-head">
