@@ -13,4 +13,11 @@ describe('PulseOrb', () => {
     expect(el?.getAttribute('aria-hidden')).toBe('true');
     expect(el?.getAttribute('data-tone')).toBe('watch');
   });
+  it('draws the nearest tuned preset and scales it into any display size', () => {
+    const { container } = render(<PulseOrb tone="calm" size={48} bold />);
+    const el = container.querySelector<HTMLElement>('.pulse-orb');
+    expect(el?.style.width).toBe('48px');
+    expect(el?.className).toContain('pulse-orb--bold');
+    expect(container.querySelector<HTMLElement>('.pulse-orb-draw')?.style.transform).toContain('scale(0.75)');
+  });
 });

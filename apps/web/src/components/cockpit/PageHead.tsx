@@ -14,7 +14,7 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
-import { MetricSpark } from '@/components/viz/bklit-adapters';
+import { MetricSpark } from '@/components/viz/lazy-bklit';
 import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
 import CommandButton from '@/components/kokonutui/command-button';
 import { useOpportunities } from '@/hooks/useOpportunities';
@@ -120,11 +120,13 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           {accountView ? null : <div className="page-sub">{subtitle}</div>}
           {accountView ? (
             <p className="acct-health" aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}>
-              <PulseOrb tone={toneForBand(cockpit.health.band)} size={32} />
-              <span className="acct-pill" data-band={cockpit.health.band}>
-                {labelForBand(cockpit.health.band)}
+              <PulseOrb tone={toneForBand(cockpit.health.band)} size={48} bold />
+              <span className="acct-health-body">
+                <span className="acct-pill" data-band={cockpit.health.band}>
+                  {labelForBand(cockpit.health.band)}
+                </span>
+                <span className="acct-health-text" title={nextMove}>{nextMove}</span>
               </span>
-              <span className="acct-health-text" title={nextMove}>{nextMove}</span>
             </p>
           ) : null}
         </div>

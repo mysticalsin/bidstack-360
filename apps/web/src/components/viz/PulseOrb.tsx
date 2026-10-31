@@ -16,12 +16,32 @@ const TONE: Record<PulseTone, { state: OrbState; color: string; speed: number }>
   thinking: { state: 'composing', color: '#006b4f', speed: 1 },
 };
 
-export function PulseOrb({ tone, size = 32, className }: { tone: PulseTone; size?: OrbSize; className?: string }) {
+/** Nearest tuned preset at or above the requested display size. */
+function presetFor(px: number): OrbSize {
+  return px > 32 ? 64 : px > 20 ? 32 : 20;
+}
+
+/**
+ * `size` is the on-screen size in CSS px (any value). The library only tunes
+ * 20/32/64, so we draw the nearest preset at or above it and scale it into
+ * the box. `bold` thickens the dots and adds a soft tinted halo for contrast
+ * on light surfaces.
+ */
+export function PulseOrb({ tone, size = 32, bold = false, className }: { tone: PulseTone; size?: number; bold?: boolean; className?: string }) {
   const reduced = useReducedMotion() ?? false;
   const t = TONE[tone];
+  const preset = presetFor(size);
+  const scale = size / preset;
   return (
-    <span aria-hidden className={['pulse-orb', className].filter(Boolean).join(' ')} data-tone={tone}>
-      <ThinkingOrb state={t.state} size={size} theme="auto" color={t.color} speed={t.speed} paused={reduced} />
+    <span
+      aria-hidden
+      className={['pulse-orb', bold && 'pulse-orb--bold', className].filter(Boolean).join(' ')}
+      data-tone={tone}
+      style={{ width: size, height: size, '--orb-tint': t.color } as React.CSSProperties}
+    >
+      <span className="pulse-orb-draw" style={{ transform: `translate(-50%, -50%) scale(${scale})` }}>
+        <ThinkingOrb state={t.state} size={preset} theme="auto" color={t.color} speed={t.speed} paused={reduced} dotSize={bold ? 2.4 : 1} dots={bold ? 1.1 : 1} />
+      </span>
     </span>
   );
 }

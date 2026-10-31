@@ -20,10 +20,12 @@ import { RingCenter } from '@/components/charts/ring-center';
 import { RingChart } from '@/components/charts/ring-chart';
 import { ChartTooltip } from '@/components/charts/tooltip';
 import { XAxis } from '@/components/charts/x-axis';
+import { YAxis } from '@/components/viz/PoloYAxis';
 
 const BRAND = 'var(--brand-primary, #006b4f)';
 const WON = 'var(--success, #177048)';
 const MUTED = 'color-mix(in srgb, var(--fg-tertiary, #6b6b6b) 45%, transparent)';
+const RATE_TICKS = [0, 50, 100];
 const MARGIN = { top: 16, right: 12, bottom: 28, left: 12 };
 
 type Fmt = (v: number) => string;
@@ -50,8 +52,9 @@ export function WinRateLine({ data }: { data: Array<{ x: string; date: Date; rat
   if (data.length < 2) return null;
   return (
     <div aria-hidden className="viz-bk">
-      <LineChart data={data as unknown as Record<string, unknown>[]} aspectRatio="2.6 / 1" margin={{ ...MARGIN, left: 32, right: 32 }} animationDuration={reduced ? 0 : 1100}>
-        <Grid horizontal numTicksRows={2} strokeDasharray="0" stroke="var(--viz-line)" />
+      <LineChart data={data as unknown as Record<string, unknown>[]} aspectRatio="2.6 / 1" margin={{ ...MARGIN, left: 44, right: 32 }} yScaleDomainMax={100} animationDuration={reduced ? 0 : 1100}>
+        <Grid horizontal rowTickValues={RATE_TICKS} strokeDasharray="0" stroke="var(--viz-line)" />
+        <YAxis ticks={RATE_TICKS.filter((t) => t > 0)} format={(n) => `${n}%`} />
         <Line dataKey="rate" curve={curveMonotoneX} stroke={BRAND} strokeWidth={2} fadeEdges={false} />
         <XAxis numTicks={data.length} tickMode="data" labels={data.map((d) => d.x)} />
         <ChartTooltip rows={(p) => [

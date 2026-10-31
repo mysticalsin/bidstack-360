@@ -10,7 +10,7 @@ import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
 import SmoothTab from '@/components/kokonutui/smooth-tab';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
-import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/bklit-adapters';
+import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/lazy-bklit';
 import {
   accountBars, cumulativeWon, fmtCompact, pastDueOpen, stageFunnel, statusMix, winRateByQuarter, wonByQuarter,
   type OppRow,
@@ -51,8 +51,8 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed }: {
         </div>
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
+            <PulseOrb tone={pulse} size={96} bold />
             <span className="viz-meta">{pulseText}</span>
-            <PulseOrb tone={pulse} size={64} />
           </div>
         ) : null}
       </div>

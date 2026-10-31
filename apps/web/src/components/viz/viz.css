@@ -112,9 +112,13 @@
 /* ---------- /dashboard layout ---------- */
 .dash-v { display: grid; gap: 24px; }
 .dash-stack { display: grid; gap: 24px; align-content: start; min-width: 0; }
-.dash-hero { gap: 12px; }
+.dash-hero { gap: 12px; position: relative;
+  background:
+    radial-gradient(120% 100% at 100% 0%, color-mix(in srgb, var(--brand-primary) 10%, transparent), transparent 62%),
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-primary) 3%, var(--surface-card, #fff)), var(--surface-card, #fff) 70%);
+  border-color: color-mix(in srgb, var(--brand-primary) 18%, var(--border-default)); }
 .dash-hero-figs { display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-end; }
-.dash-hero-num { font-size: 40px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--viz-ink); font-variant-numeric: tabular-nums; }
+.dash-hero-num { font-size: 48px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--viz-ink); font-variant-numeric: tabular-nums; }
 .dash-hero-num--won { font-size: 24px; color: var(--viz-pos); }
 .dash-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 .dash-needs-list { list-style: none; margin: 0; padding: 0; display: grid; }
@@ -134,7 +138,7 @@
 .dash-more-body { display: grid; gap: 24px; padding-top: 8px; }
 @media (max-width: 640px) {
   .dash-v { gap: 16px; }
-  .dash-hero-num { font-size: 32px; }
+  .dash-hero-num { font-size: 40px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-needs-list li { animation: viz-fade 120ms linear both; }
@@ -174,10 +178,11 @@
 .page-sub-info:hover, .page-sub-info:focus-visible { color: var(--fg-primary); background: var(--surface-sunken, #f4f4f4); }
 
 /* ---------- thinking-orbs pulse ---------- */
-.pulse-orb { display: inline-grid; place-items: center; flex: none; line-height: 0; }
-.dash-hero-pulse { display: flex; align-items: center; gap: 8px; margin-left: auto; align-self: flex-start; text-align: right; }
+.pulse-orb { position: relative; display: inline-block; flex: none; line-height: 0; }
+.pulse-orb-draw { position: absolute; left: 50%; top: 50%; line-height: 0; transform-origin: center; }
+.pulse-orb--bold { border-radius: 50%; background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--orb-tint) 16%, transparent) 0 58%, transparent 72%); }
+.dash-hero-pulse { display: grid; justify-items: center; gap: 8px; margin-left: auto; align-self: flex-start; text-align: center; }
 .dash-hero-pulse .viz-meta { max-width: 160px; }
-.acct-health .pulse-orb { margin-right: 4px; }
 
 /* ---------- Performance card (kokonutui SmoothTab) ---------- */
 /* Inner views drop their own card chrome: one surface, no card-in-card. */
@@ -185,3 +190,4 @@
 .dash-perf [role='tablist'] button { min-height: 32px; }
 /* Charts draw labels outside their svg box; hide them on off-screen panels so they cannot bleed into the active one. */
 .dash-perf [role='tabpanel'][inert] svg { visibility: hidden; }
+.viz-bk-reserve { width: 100%; }
