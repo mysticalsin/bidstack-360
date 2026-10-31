@@ -10,6 +10,8 @@ import { springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
+import { SIGNAL_COVERAGE_WEIGHTS } from './_tokens';
+
 const ORDER = ['strong', 'good', 'needs_attention', 'critical'] as const;
 
 interface Props {
@@ -38,8 +40,8 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
         title={t('healthScore.title', 'Signal coverage')}
         caption={t(
           'healthScore.signalsScored',
-          '{{count}} factor bands on this account. Recorded-field proxy, not a measured health score.',
-          { count: total },
+          '{{count}} factors. {{weights}} The number beside a band is how many factors landed there.',
+          { count: total, weights: SIGNAL_COVERAGE_WEIGHTS },
         )}
         action={
           <Badge tone={badgeTone(cockpit.health.band)}>
@@ -53,9 +55,11 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
           initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={springSoft}
-          aria-label={t('healthScore.gaugeLabel', 'Account signal coverage {{score}} out of 100', {
-            score: cockpit.health.score,
-          })}
+          aria-label={t(
+            'healthScore.gaugeLabel',
+            'Weighted signal mix {{score}} out of 100. {{weights}}',
+            { score: cockpit.health.score, weights: SIGNAL_COVERAGE_WEIGHTS },
+          )}
           role="img"
         >
           <svg className="health-gauge" viewBox="0 0 180 180" aria-hidden>
@@ -81,7 +85,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
             />
           </svg>
           <div className="health-core">
-            <span>{t('healthScore.coverage', 'Coverage')}</span>
+            <span>{t('healthScore.coverage', 'Signal mix')}</span>
             <strong>
               <AnimatedMetric value={cockpit.health.score.toLocaleString()} />
             </strong>
@@ -91,7 +95,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
         </motion.div>
         <div className="health-summary">
           <div className="health-summary-head">
-            <span>{t('healthScore.strongestBand', 'Strongest coverage band')}</span>
+            <span>{t('healthScore.strongestBand', 'Most factors')}</span>
             <strong>
               {strongest ? labelForHealth(strongest.key, t) : t('healthScore.noSignal', 'No signal')}
             </strong>
@@ -99,7 +103,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
           <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
             {t(
               'healthScore.notRelationshipHealth',
-              'Signal coverage only. Not measured relationship health. Weighted-pipeline bands on the account list stay labelled proxy.',
+              'Bands: 75+ strong, 50+ good, 25+ watch, below 25 at risk. Not measured relationship health.',
             )}
           </p>
           <ul className="health-legend" aria-label={t('healthScore.healthBands', 'Coverage bands')}>

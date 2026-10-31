@@ -51,8 +51,11 @@ export function severityShort(s: RiskItem['severity']): string {
   return s === 'critical' ? 'C' : s === 'high' ? 'H' : s === 'medium' ? 'M' : 'L';
 }
 
+/** Weights in computeSignalCoverage. The account-list health band is a different scale. */
+export const SIGNAL_COVERAGE_WEIGHTS =
+  'Weighted mix: firmographics 30%, contacts 25%, engagement 20%, open-deal completeness 25%. Not measured relationship health.';
+
 export function labelForBand(b: AccountCockpitSnapshot['health']['band']): string {
-  // The cockpit score is recorded-field coverage, not relationship health.
   return b === 'strong'
     ? 'Strong, proxy'
     : b === 'good'

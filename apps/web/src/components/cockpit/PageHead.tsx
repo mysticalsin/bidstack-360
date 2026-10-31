@@ -18,7 +18,7 @@ import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
-import { labelForBand } from './_tokens';
+import { labelForBand, SIGNAL_COVERAGE_WEIGHTS } from './_tokens';
 
 function readableLabel(value: string | null): string | null {
   if (!value) return null;
@@ -118,10 +118,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             >
               <span
                 data-tone="health"
-                title={t(
-                  'pageHead.signalCoverageHint',
-                  'Signal coverage, not measured relationship health. Account-list bands are weighted-pipeline proxies.',
-                )}
+                title={t('pageHead.signalCoverageHint', SIGNAL_COVERAGE_WEIGHTS)}
               >
                 {t('pageHead.signalCoverage', 'Signal coverage · {{band}}', {
                   band: labelForBand(cockpit.health.band),
