@@ -51,6 +51,12 @@ for (const route of ROUTES) {
 
     // Give lazy chunks a moment to render
     await page.waitForTimeout(500);
+    // Let entry animations finish: axe samples colours at one instant, so a
+    // label mid fade-in (opacity < 1) reads as a contrast failure that the
+    // settled page does not have.
+    await page
+      .waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, { timeout: 5_000 })
+      .catch(() => undefined);
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa', 'best-practice'])

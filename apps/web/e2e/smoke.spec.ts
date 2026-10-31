@@ -3,7 +3,7 @@ import { test, expect } from './fixtures.js';
 test('dashboard loads with KPI cards', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/dashboard');
   await expect(
-    page.getByRole('heading', { level: 1, name: /workspace command center/i }),
+    page.getByRole('heading', { level: 1, name: 'Dashboard' }),
   ).toBeVisible({
     timeout: 10_000,
   });

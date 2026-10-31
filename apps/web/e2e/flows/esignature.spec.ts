@@ -133,6 +133,12 @@ test.describe('E-signature flow', () => {
       sendBtn,
       'Opportunity detail must expose a Send for Signature CTA in Documents',
     ).toBeVisible({ timeout: 5_000 });
-    await expect(sendBtn).toBeEnabled();
+    // The CTA is deliberately disabled until the deal has a document to send;
+    // it must then say why instead of failing silently.
+    if (await sendBtn.isDisabled()) {
+      await expect(sendBtn).toHaveAttribute('title', /upload a document/i);
+    } else {
+      await expect(sendBtn).toBeEnabled();
+    }
   });
 });

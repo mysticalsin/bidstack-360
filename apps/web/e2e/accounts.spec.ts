@@ -98,15 +98,22 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
     'cockpit h1 must match the clicked company — guards against wrong-account renders',
   ).toBeVisible({ timeout: 10_000 });
 
-  // 5b. KPI grid region must mount. Count may be 0 for accounts without
-  //     enrichment data — the region presence is the load-bearing assertion.
+  // 5b. The account header carries the next-action layer: health pill + next
+  //     move and the key numbers. (The org-level command-center hero is not
+  //     repeated on the account page since 443847be.)
+  await expect(
+    page.getByLabel('Key numbers'),
+    'account header must show its key numbers',
+  ).toBeVisible();
+
+  // 5c. Everything else folds behind "Account details"; open it, then the KPI
+  //     region must mount. Count may be 0 for accounts without enrichment data.
+  const fold = page.getByRole('button', { name: /^Account details/ });
+  await expect(fold, 'account details fold must be present').toBeVisible();
+  await fold.click();
+  await expect(fold).toHaveAttribute('aria-expanded', 'true');
   const kpiGrid = page.getByRole('region', { name: /account metrics/i });
   await expect(kpiGrid, 'account metrics region must mount').toBeVisible();
-
-  await expect(
-    page.getByRole('region', { name: /polo presales command center/i }),
-    'command center must render the presales next-action layer',
-  ).toBeVisible();
 
   // 6. Technical Stack Overview: ≥1 stack pill (with logo OR text label).
   const stackSection = page.getByRole('region', { name: /technical stack overview/i });
