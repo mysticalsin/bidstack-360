@@ -11,6 +11,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { parseTrustProxy } from '@bidstack/shared/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -114,9 +115,10 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
     },
-    trustProxy: process.env.TRUSTED_PROXIES
-      ? process.env.TRUSTED_PROXIES.split(',').map((s) => s.trim())
-      : false,
+    // Same parser as the api: a bare hop count such as TRUSTED_PROXIES=2 used
+    // to become the allowlist ['2'], which trusts no proxy, so every client
+    // shared the ingress IP and one rate-limit bucket.
+    trustProxy: parseTrustProxy(process.env.TRUSTED_PROXIES),
   });
 
   await server.register(sensible);
