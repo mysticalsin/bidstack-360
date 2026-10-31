@@ -77,7 +77,8 @@ describe('company open data verification', () => {
       'wikidata',
       'wikipedia',
     ]);
-    expect(profile?.confidenceBps).toBeGreaterThanOrEqual(9000);
+    expect(profile?.confidenceBps).toBe(10_000);
+    expect(profile?.sourceAttribution.find((item) => item.source === 'wikipedia')?.confidence).toBeNull();
   });
 
   it('rejects ambiguous non-company name matches instead of fabricating a profile', async () => {
@@ -195,6 +196,7 @@ describe('company open data verification', () => {
       logoSource: 'favicon',
     });
     expect(profile.sourceAttribution[0]?.source).toBe('favicon');
+    expect(profile.sourceAttribution[0]?.confidence).toBeNull();
   });
 });
 

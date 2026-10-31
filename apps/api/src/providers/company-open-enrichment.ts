@@ -117,7 +117,7 @@ export async function fetchOpenCompanyProfile({
     wikimediaImageUrl ?? summary?.thumbnail?.source ?? summary?.originalimage?.source ?? null;
   const pageUrl = summary?.content_urls?.desktop?.page ?? entity.sitelinks?.enwiki?.url ?? null;
   const industryLabels = claimEntityIds(entity, PROPERTY.industry);
-  const confidence = Math.min(0.94, Math.max(0.68, best.score));
+  const confidence = Math.min(1, Math.max(0, best.score));
 
   return {
     legalName: label,
@@ -157,8 +157,8 @@ export async function fetchOpenCompanyProfile({
               label: 'Wikipedia summary and media',
               sourceUrl: pageUrl,
               fetchedAt: now,
-              confidence: Math.max(0.6, confidence - 0.08),
-              providerMetadata: { wikipediaTitle },
+              confidence: null,
+              providerMetadata: { wikipediaTitle, confidenceBasis: 'not_scored' },
             }),
           ]
         : []),
@@ -207,8 +207,8 @@ export function faviconProfile({
             label: `${name} website favicon fallback`,
             sourceUrl: resolvedWebsite ?? `https://${resolvedDomain}/`,
             fetchedAt: now,
-            confidence: 0.58,
-            providerMetadata: { domain: resolvedDomain },
+            confidence: null,
+            providerMetadata: { domain: resolvedDomain, confidenceBasis: 'not_scored' },
           }),
         ]
       : [],
