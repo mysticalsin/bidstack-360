@@ -2,10 +2,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import { msaClient, uploadMsaVersion, type UploadStage } from '@/lib/msa/client';
-import type { MsaCreate, MsaListQuery, MsaSummaryRow } from '@/lib/msa/types';
+import type { MsaCreate, MsaListQuery, MsaSearchResponse, MsaSummaryRow } from '@/lib/msa/types';
 
 export function useMsaList(q: MsaListQuery) {
   return useQuery({ queryKey: ['msa', 'list', q], queryFn: ({ signal }) => msaClient.list(q, signal) });
+}
+
+/** Full-text search inside uploaded files. Off for Sample data and for queries under 2 characters. */
+export function useMsaSearch(q: string, opts: { companyId?: string; enabled: boolean }) {
+  const term = q.trim();
+  const qs = new URLSearchParams({ q: term, limit: '20' });
+  if (opts.companyId) qs.set('companyId', opts.companyId);
+  return useQuery({
+    queryKey: ['msa', 'search', term, opts.companyId ?? null],
+    queryFn: ({ signal }) => api<MsaSearchResponse>(`/api/msa/search?${qs.toString()}`, { signal }),
+    enabled: opts.enabled && term.length >= 2 && term.length <= 200,
+    staleTime: 30_000,
+  });
 }
 
 export function useMsaDetail(id: string | undefined) {
@@ -35,7 +48,7 @@ export function useMsaDownloadUrl(id: string | undefined, versionId: string | un
     queryKey: ['msa', 'download', id, versionId],
     queryFn: () => msaClient.downloadUrl(id!, versionId!),
     enabled: Boolean(id && versionId && enabled),
-    staleTime: 4 * 60_000,
+    staleTime: 100_000, // signed links live 120 s
     refetchOnWindowFocus: false,
     retry: false,
   });

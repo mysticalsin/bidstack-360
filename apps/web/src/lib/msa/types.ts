@@ -126,3 +126,17 @@ export interface MsaAccountSummary {
   nextNoticeDeadline: MsaDateRef | null;
   expiringWithin90Days: number;
 }
+
+export interface MsaSearchHit {
+  contractId: string;
+  versionId: string;
+  versionNo: number;
+  title: string;
+  companyId: string | null;
+  kind: MsaKind;
+  status: MsaStatus;
+  rank: number;
+  /** Matches are wrapped in [[ and ]]. */
+  snippet: string;
+}
+export interface MsaSearchResponse { items: MsaSearchHit[] }

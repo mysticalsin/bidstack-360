@@ -67,3 +67,17 @@ export function actionLabel(action: string, detail: Record<string, unknown> = {}
   if (action === 'msa.version.upload' && typeof detail.versionNo === 'number') return `${base} (v${detail.versionNo})`;
   return base;
 }
+
+/** Splits a search snippet ("a [[b]] c") into plain and matched parts; never HTML. */
+export function snippetParts(snippet: string): Array<{ text: string; hit: boolean }> {
+  const out: Array<{ text: string; hit: boolean }> = [];
+  const re = /\[\[(.*?)\]\]/g;
+  let last = 0;
+  for (let m = re.exec(snippet); m; m = re.exec(snippet)) {
+    if (m.index > last) out.push({ text: snippet.slice(last, m.index), hit: false });
+    out.push({ text: m[1] ?? '', hit: true });
+    last = m.index + m[0].length;
+  }
+  if (last < snippet.length) out.push({ text: snippet.slice(last), hit: false });
+  return out;
+}

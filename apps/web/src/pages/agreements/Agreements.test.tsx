@@ -1,7 +1,7 @@
 import type * as ApiModule from '@/lib/api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/api', async (orig) => {
@@ -31,6 +31,12 @@ function Where() {
   return <output data-testid="where">{l.pathname + l.search}</output>;
 }
 
+function MsaRedirect() {
+  const { id } = useParams();
+  const { search } = useLocation();
+  return <Navigate to={`/agreements/${id ?? ''}${search}`} replace />;
+}
+
 function renderAt(path: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -39,6 +45,7 @@ function renderAt(path: string) {
         <Routes>
           <Route path="/agreements" element={<AgreementsPage />} />
           <Route path="/agreements/:id" element={<AgreementDetailPage />} />
+          <Route path="/msa/:id" element={<MsaRedirect />} />
           <Route path="/accounts/:id" element={<AgreementsSummaryCard companyId={CI} companyName="CI Financial" />} />
         </Routes>
         <Where />
@@ -155,3 +162,53 @@ describe('AgreementsSummaryCard', () => {
     expect(within(card).getByText('Sample')).toBeTruthy();
   });
 });
+
+describe('live API wiring', () => {
+  const liveDetail = () => ({ ...(sampleDetail(MSA) as MsaDetail) });
+
+  it('searches inside documents and links a hit to that version', async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/msa/search')) {
+        return { items: [{ contractId: MSA, versionId: 'v2', versionNo: 2, title: 'Master services agreement', companyId: CI, kind: 'msa', status: 'active', rank: 0.5, snippet: 'the [[liability]] cap is' }] };
+      }
+      return { items: sampleRows(), nextCursor: null, total: sampleRows().length };
+    });
+    renderAt('/agreements?q=liability');
+    const hits = await screen.findByTestId('agreements-doc-hits', {}, { timeout: 2000 });
+    await waitFor(() => expect(hits.querySelector('mark')?.textContent).toBe('liability'));
+    expect(hits.querySelector('a')?.getAttribute('href')).toBe(`/agreements/${MSA}?version=v2`);
+    expect(vi.mocked(api).mock.calls.some(([p]) => String(p).startsWith('/api/msa/search?q=liability'))).toBe(true);
+  });
+
+  it('previews a PDF from a local blob, and falls back to Download when the file host blocks it', async () => {
+    const detail = liveDetail();
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (path.endsWith('/timeline')) return { items: [] };
+      if (path.endsWith('/download-url')) return { url: 'http://files.example/dl?t=1', expiresAt: new Date(Date.now() + 120_000).toISOString(), fileName: 'f.pdf', sha256: 'x' };
+      return detail;
+    });
+    const createUrl = vi.fn(() => 'blob:preview');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() }));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('%PDF-1.4', { status: 200 })));
+    renderAt(`/agreements/${MSA}`);
+    fireEvent.click(await screen.findByRole('button', { name: /Preview/ }));
+    const frame = await screen.findByTestId('agreement-viewer-frame');
+    expect(frame.getAttribute('src')).toBe('blob:preview');
+    expect(screen.getByTestId('agreement-download').getAttribute('href')).toBe('blob:preview');
+    cleanup();
+
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    renderAt(`/agreements/${MSA}`);
+    fireEvent.click(await screen.findByRole('button', { name: /Preview/ }));
+    await screen.findByTestId('agreement-viewer-fallback');
+    expect(screen.getByTestId('agreement-download').getAttribute('href')).toBe('http://files.example/dl?t=1');
+    vi.unstubAllGlobals();
+  });
+
+  it('sends reminder links (/msa/:id) to the agreement page', async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith('/timeline') ? { items: [] } : liveDetail()));
+    renderAt(`/msa/${MSA}?reminder=notice&term=2027-01-13`);
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(`/agreements/${MSA}?reminder=notice&term=2027-01-13`));
+  });
+});
+

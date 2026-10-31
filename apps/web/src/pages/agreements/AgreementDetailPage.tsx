@@ -4,8 +4,8 @@
 import '@/components/drill/drill.css';
 import '@/components/agreements/agreements.css';
 
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
@@ -19,12 +19,41 @@ import { ApiError } from '@/lib/api';
 import { actionLabel, fmtBytes, fmtDate, fmtDays, fmtMoneyMicros, KIND_LABEL, urgency } from '@/lib/msa/labels';
 import type { MsaDetail, MsaFileVersion } from '@/lib/msa/types';
 
+function usePdfBlob(url: string | undefined, enabled: boolean) {
+  // The download response is `attachment` with a sandbox CSP, so an iframe on
+  // the raw URL would just download. Fetch the bytes once and preview a local
+  // blob instead; this needs CORS on the download host, so fall back to links.
+  const [state, setState] = useState<{ src: string | null; failed: boolean }>({ src: null, failed: false });
+  useEffect(() => {
+    if (!enabled || !url) return;
+    let revoked: string | null = null;
+    const ctrl = new AbortController();
+    fetch(url, { signal: ctrl.signal, credentials: 'omit' })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' });
+        revoked = URL.createObjectURL(blob);
+        setState({ src: revoked, failed: false });
+      })
+      .catch((err: unknown) => {
+        if (!(err instanceof DOMException && err.name === 'AbortError')) setState({ src: null, failed: true });
+      });
+    return () => {
+      ctrl.abort();
+      if (revoked) URL.revokeObjectURL(revoked);
+    };
+  }, [url, enabled]);
+  return state;
+}
+
 function Viewer({ agreement, version, sample }: { agreement: MsaDetail; version: MsaFileVersion | null; sample: boolean }) {
-  // Download links are audited on every request, so the preview only loads
-  // when asked for, and the signed URL is reused until it expires.
+  // Download links are audited on every request, so nothing loads until asked
+  // for, and the signed URL is reused while it is valid.
   const [want, setWant] = useState<'preview' | 'download' | null>(null);
   const isPdf = version?.contentType === 'application/pdf';
   const link = useMsaDownloadUrl(agreement.id, version?.id, Boolean(want) && !sample);
+  const url = link.data?.url;
+  const preview = usePdfBlob(url, want === 'preview' && isPdf);
   if (!version) return <div className="agr-viewer-empty">No file uploaded yet.</div>;
   if (sample) {
     return (
@@ -35,17 +64,18 @@ function Viewer({ agreement, version, sample }: { agreement: MsaDetail; version:
       </div>
     );
   }
-  const url = link.data?.url;
+  const href = preview.src ?? url;
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      {want === 'preview' && isPdf && url ? (
-        <iframe className="agr-viewer" src={url} title={`Preview of ${version.fileName}`} />
+      {preview.src ? (
+        <iframe className="agr-viewer" src={preview.src} title={`Preview of ${version.fileName}`} data-testid="agreement-viewer-frame" />
       ) : (
         <div className="agr-viewer-empty">
           <Icon name="file" size={24} />
           <span><strong style={{ fontWeight: 500 }}>{version.fileName}</strong> · v{version.versionNo} · {fmtBytes(version.bytes)}</span>
-          {link.isFetching ? <span>Preparing a secure link…</span> : null}
+          {link.isFetching || (want === 'preview' && url && !preview.failed) ? <span>Preparing a secure link…</span> : null}
           {link.isError ? <span className="agr-error" role="alert">Couldn&apos;t get a download link. {link.error instanceof Error ? link.error.message : ''}</span> : null}
+          {preview.failed ? <span data-testid="agreement-viewer-fallback">Preview isn&apos;t available from this file server. Use Download to open it.</span> : null}
           {!want ? (
             <div className="agr-actions" style={{ justifyContent: 'center' }}>
               {isPdf ? <Button variant="primary" onClick={() => setWant('preview')}><Icon name="eye" size={16} /> Preview</Button> : null}
@@ -55,11 +85,10 @@ function Viewer({ agreement, version, sample }: { agreement: MsaDetail; version:
           {!isPdf ? <span>Word files can&apos;t be previewed in the browser; download to open.</span> : null}
         </div>
       )}
-      {url ? (
+      {href ? (
         <div className="agr-actions" style={{ justifyContent: 'flex-start' }}>
-          <a className="drill-more" href={url} target="_blank" rel="noopener noreferrer">Open in new tab</a>
-          <a className="drill-more" href={url} download={version.fileName}>Download</a>
-          <span className="agr-caption" style={{ fontSize: 12 }}>Link valid until {new Date(link.data!.expiresAt).toLocaleTimeString()}</span>
+          <a className="drill-more" href={href} download={version.fileName} data-testid="agreement-download">Download</a>
+          {!preview.src && link.data ? <span className="agr-caption" style={{ fontSize: 12 }}>Link valid until {new Date(link.data.expiresAt).toLocaleTimeString()}</span> : null}
         </div>
       ) : null}
     </div>
@@ -71,7 +100,9 @@ export default function AgreementDetailPage() {
   const detail = useMsaDetail(id);
   const timeline = useMsaTimeline(id);
   const canWrite = useHasPermission('msa:write');
-  const [versionId, setVersionId] = useState<string | null>(null);
+  const [search] = useSearchParams();
+  // ?version= comes from a document-search hit.
+  const [versionId, setVersionId] = useState<string | null>(() => search.get('version'));
   const [uploadOpen, setUploadOpen] = useState(false);
   const [childOpen, setChildOpen] = useState(false);
   // Fixed per mount: splits the timeline into past events and upcoming dates.

@@ -50,8 +50,8 @@ export function AgreementsSummaryCard({ companyId, companyName }: { companyId: s
             ) : <span><span className="v">–</span><span className="l">No notice due</span></span>}
           </div>
           <p className="agr-caption" style={{ fontSize: 13 }}>
-            <Link to={`${base}&kind=sow`}>{s.childCounts.sow} SOWs</Link> · <Link to={`${base}&kind=amendment`}>{s.childCounts.amendment} amendments</Link>
-            {s.childCounts.addendum ? <> · <Link to={`${base}&kind=addendum`}>{s.childCounts.addendum} addenda</Link></> : null}
+            <Link to={`${base}&kind=sow`}>{s.childCounts.sow} {s.childCounts.sow === 1 ? 'SOW' : 'SOWs'}</Link> · <Link to={`${base}&kind=amendment`}>{s.childCounts.amendment} {s.childCounts.amendment === 1 ? 'amendment' : 'amendments'}</Link>
+            {s.childCounts.addendum ? <> · <Link to={`${base}&kind=addendum`}>{s.childCounts.addendum} {s.childCounts.addendum === 1 ? 'addendum' : 'addenda'}</Link></> : null}
           </p>
         </>
       )}

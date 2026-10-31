@@ -8,7 +8,7 @@
  */
 import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
 import { PageTransition } from '@/components/motion/PageTransition';
 
@@ -70,6 +70,12 @@ import { opsRouteElements } from './OpsRoutes';
 export { RequireAuth, RequireAdmin };
 
 // ─── Route tree ───────────────────────────────────────────────────────────────
+
+function MsaReminderRedirect() {
+  const { id } = useParams();
+  const { search } = useLocation();
+  return <Navigate to={`/agreements/${id ?? ''}${search}`} replace />;
+}
 
 export function AppRoutes() {
   const location = useLocation();
@@ -168,6 +174,8 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
+          {/* MSA reminder notifications link to /msa/<id>?reminder=… */}
+          <Route path="/msa/:id" element={<MsaReminderRedirect />} />
           <Route
             path="/agreements/:id"
             element={

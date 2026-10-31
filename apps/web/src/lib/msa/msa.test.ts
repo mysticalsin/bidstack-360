@@ -148,3 +148,14 @@ describe('sample data + filterRows (mirrors the API list semantics)', () => {
     expect([urgency(-1), urgency(10), urgency(90), urgency(null)]).toEqual(['overdue', 'soon', 'later', 'none']);
   });
 });
+
+describe('snippetParts', () => {
+  it('splits [[matches]] without producing HTML', async () => {
+    const { snippetParts } = await import('./labels');
+    expect(snippetParts('a [[b]] c [[<i>]]')).toEqual([
+      { text: 'a ', hit: false }, { text: 'b', hit: true }, { text: ' c ', hit: false }, { text: '<i>', hit: true },
+    ]);
+    expect(snippetParts('plain')).toEqual([{ text: 'plain', hit: false }]);
+  });
+});
+

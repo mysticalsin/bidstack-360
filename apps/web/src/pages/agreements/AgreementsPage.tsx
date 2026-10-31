@@ -8,6 +8,7 @@ import '@/components/agreements/agreements.css';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { DocumentHits } from '@/components/agreements/DocumentHits';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
@@ -161,6 +162,7 @@ export default function AgreementsPage() {
               </div>
             )}
           </section>
+          <DocumentHits q={params.get('q') ?? ''} companyId={params.get('companyId') ?? undefined} enabled={!sample} />
         </>
       )}
       <UploadDialog open={newOpen} onOpenChange={setNewOpen} target={{ mode: 'new', companyId: params.get('companyId') ?? undefined }} disabledReason={disabledReason} />
