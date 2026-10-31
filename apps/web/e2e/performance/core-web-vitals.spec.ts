@@ -331,8 +331,14 @@ test('navigation: LCP stays under budget after client-side route change', async 
   await page.goto('/dashboard', { waitUntil: 'load' });
   await waitForPageIdle(page);
 
-  // Soft-navigate to leads list
-  const leadsLink = page.getByRole('link', { name: /leads/i }).first();
+  // Soft-navigate to leads list. Leads lives in the Pipeline rail section, which
+  // starts collapsed; open it first (not part of the timed navigation).
+  const nav = page.getByRole('navigation', { name: 'Primary navigation' });
+  const leadsLink = nav.getByRole('link', { name: /^leads/i }).first();
+  if (!(await leadsLink.isVisible())) {
+    await nav.getByRole('button', { name: /^pipeline$/i, expanded: false }).click();
+  }
+  await leadsLink.waitFor({ state: 'visible' });
   const t0 = Date.now();
   await leadsLink.click();
   await page

@@ -67,7 +67,12 @@ async function waitForOfflineAppShell(page: Page) {
             )
             .forEach((link) => addSameOriginPath(link.getAttribute('href')));
 
-          const matches = await Promise.all([...paths].map((path) => cache.match(path)));
+          // ignoreVary mirrors the worker's own lookup (STATIC_CACHE_MATCH_OPTIONS):
+          // the preview server sends Vary: Origin, so module chunks cached from
+          // a CORS-mode modulepreload only match with ignoreVary.
+          const matches = await Promise.all(
+            [...paths].map((path) => cache.match(path, { ignoreVary: true })),
+          );
           return matches.every(Boolean);
         }, APP_SHELL_CACHE_NAME),
       {
@@ -113,7 +118,13 @@ test.describe('PWA offline behaviour', () => {
       .or(page.locator('[data-testid="offline-banner"]'));
 
     // Give the SW time to detect — some apps delay the banner.
-    const visible = await offlineIndicator.isVisible({ timeout: 8_000 }).catch(() => false);
+    // isVisible() does not wait; waitFor does. .first(): the regex can match
+    // both the pill label and its retry message.
+    const visible = await offlineIndicator
+      .first()
+      .waitFor({ state: 'visible', timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false);
     await context.setOffline(false);
 
     test.skip(
