@@ -1,11 +1,13 @@
 # Brand assets — Polo PreSales
 
 The canonical logo is delivered as **inline SVG** by the React `PoloPreSalesLogo`
-component (`apps/web/src/components/brand/PoloPreSalesLogo.tsx`). Because it is
-vector, it stays crisp at every size, inherits the page font, and adapts to
-light/dark via the `tone` prop — no raster round-trip required. The standalone
-SVG files below exist for surfaces that need a plain asset URL (email, OG,
-external docs).
+component (`apps/web/src/components/brand/PoloPreSalesLogo.tsx`). It is a
+compass-pin (teal/silver ring, gold four-point star) stacked above the word
+"Polo" on a dark navy field. The accessible name stays "Polo PreSales".
+Because it is vector, it stays crisp at every size and adapts via the `tone`
+prop (`default` is the full-color lockup; `mono` / `inverse` use `currentColor`).
+The standalone SVG files below exist for surfaces that need a plain asset URL
+(email, OG, external docs).
 
 | Slot                        | File (this directory)      | Used by                                    |
 | --------------------------- | -------------------------- | ------------------------------------------ |
@@ -18,17 +20,16 @@ external docs).
 These are the brand hex values baked into the logo SVG/component. They are **not**
 CSS variables — the live UI accent is driven by `--brand-primary` (see below).
 
-| Color   | Hex       | Role                                        |
-| ------- | --------- | ------------------------------------------- |
-| Ink     | `#0A0A2E` | "Polo" wordmark, headings                   |
-| Violet  | `#7A1FD6` | "PreSales" wordmark, primary accent (light) |
-| Indigo  | `#3F16E8` | Gradient start (mark)                       |
-| Magenta | `#E4069F` | Gradient end / signal dots (accent only)    |
+| Color | Hex       | Role                                      |
+| ----- | --------- | ----------------------------------------- |
+| Navy  | `#071422` | Lockup field and star center              |
+| Teal  | `#14B8D2` | Pin ring, lower left                      |
+| Silver| `#F8FBFE` | Pin ring, upper right, and "Polo"        |
+| Gold  | `#E0A44A` | Four-point compass star                   |
 
-The mark gradient runs indigo → violet → magenta. Violet clears WCAG AA
-(~7.0:1 on white); magenta is an accent/large-text color only (4.35:1).
-Dark mode lifts the accent to `#8B6DFF`. The live UI accent is driven by
-`--brand-primary` in `apps/web/src/index.css`.
+The pin gradient runs silver (upper right) to teal (lower left). "Polo" is a
+silver word with a warm edge on the right. The live UI accent is still driven
+by `--brand-primary` in `apps/web/src/index.css` and is separate from this mark.
 
 ## Regenerating raster derivatives
 
@@ -37,7 +38,7 @@ generator scripts live in the branding scratchpad. Mirror the SVGs into
 `apps/marketing/public/brand/` for the marketing site (the two apps deploy
 independently, so they are copied rather than symlinked).
 
-Assets (favicon, marketing OG card) were regenerated 2026-07-09 from the
-outlined mark/wordmark source (`PoloPreSalesLogo.tsx`'s `MARK_PATH` /
-`POLO_WORD_PATH` / `PRESALES_WORD_PATH`) — no font-file dependency at
-render time.
+The in-app lockup and these SVGs share one geometry: `PIN_PATH`, `STAR_PATH`,
+and outlined Poppins Bold `POLO_WORD_PATH` in `PoloPreSalesLogo.tsx`. No
+font file is required at render time. Favicon and marketing OG card are
+separate surfaces and were not regenerated with this mark.

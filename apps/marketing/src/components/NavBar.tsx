@@ -57,7 +57,7 @@ export function NavBar() {
             variant="full"
             title=""
             tone={theme === 'dark' ? 'inverse' : 'default'}
-            className="h-7 w-auto"
+            className="h-16 w-auto"
           />
         </Link>
 

@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { springSoft } from '@/lib/motion';
-import { formatMoney } from '@/lib/format';
+import { formatUnspecifiedAmount } from '../unspecified-currency';
 
 import { stageColor, stageLabel } from './dashboard-types';
 
@@ -20,17 +20,13 @@ import { stageColor, stageLabel } from './dashboard-types';
 export function PipelineByStageMini({
   report,
   reduced,
-  currency,
-  convert,
 }: {
   report: { byStage: Array<{ stage: string; count: number; valueSum: number }> } | undefined;
   reduced: boolean | null;
-  currency: string;
-  convert: (amount: number, from: string) => number;
 }) {
   const { t } = useTranslation('crm');
   if (!report || report.byStage.length === 0) return null;
-  const maxValue = Math.max(1, ...report.byStage.map((s) => convert(s.valueSum, 'EUR')));
+  const maxValue = Math.max(1, ...report.byStage.map((s) => s.valueSum));
 
   return (
     <GlassCard padding="sm" hoverable={false}>
@@ -50,7 +46,7 @@ export function PipelineByStageMini({
                 {stageLabel(s.stage)}
               </span>
               <span className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]">
-                {s.count} · {formatMoney(convert(s.valueSum, 'EUR'), currency)}
+                {s.count} · {formatUnspecifiedAmount(s.valueSum)}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-[var(--surface-sunken)] overflow-hidden">

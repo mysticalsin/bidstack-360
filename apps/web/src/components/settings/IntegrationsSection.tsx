@@ -143,10 +143,10 @@ export function IntegrationsSection() {
               action={
                 <div className="flex items-center gap-2">
                   {status.data ? (
-                    <Badge tone={status.data.configured ? 'jade' : 'amber'}>
-                      {status.data.configured
-                        ? t('integrations.statusConfigured', 'Configured')
-                        : t('integrations.statusNotConfigured', 'Not configured')}
+                    <Badge tone="amber">
+                      {status.data.connectionState === 'configured_unverified'
+                        ? t('integrations.statusUnverifiedConfigured', 'Configured, unverified')
+                        : t('integrations.statusUnverified', 'Unverified / not connected')}
                     </Badge>
                   ) : null}
                   {isAdmin ? (
@@ -191,6 +191,12 @@ export function IntegrationsSection() {
                 value={status.data?.pushed24h.toString() ?? t('integrations.notAvailable', 'n/a')}
               />
             </div>
+            <p className="mx-5 mb-5 text-sm leading-6 text-[var(--fg-secondary)]">
+              {t(
+                'integrations.mcpRegistration',
+                'Dust cloud registers External MCP at a public HTTPS URL ending in /mcp, with a bearer API key scoped mcp and read, over streamable HTTP. localhost is not reachable by Dust cloud. This screen does not report a live connection until that URL and a Dust API key exist.',
+              )}
+            </p>
             {status.data?.lastError ? (
               <div className="mx-5 mb-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">
                 {status.data.lastError}
@@ -257,7 +263,7 @@ function ApolloAccountIntelCard({
 }: {
   status:
     | {
-        status: 'healthy' | 'degraded' | 'down' | 'disabled';
+        status: 'healthy' | 'degraded' | 'down' | 'disabled' | 'unverified';
         message?: string | null;
         capabilities: string[];
         docsUrl: string;

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
+import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -12,8 +13,7 @@ import { Reveal } from '@/components/motion/Reveal';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { springSoft } from '@/lib/motion';
-import { formatMoney } from '@/lib/format';
-import { useCurrencyStore } from '@/stores/currency';
+import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
 import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
@@ -38,7 +38,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const reduced = useReducedMotion();
   const summary = useOrgSummary();
   const pipelineReport = usePipelineReport();
-  const { currency, convert } = useCurrencyStore();
 
   const s = summary.data;
   const closedWon =
@@ -200,9 +199,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
       >
         <div>
           <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">{greeting}</div>
-          <h1 className="page-title gradient-text">
-            {t('orgDashboard.pageTitle', 'Workspace Command Center')}
-          </h1>
+          <div className="flex items-center gap-3">
+            <PoloPreSalesLogo variant="mark" className="h-8 w-8 shrink-0" />
+            <h1 className="page-title">{t('orgDashboard.pageTitle', 'Dashboard')}</h1>
+          </div>
           <div className="page-sub">
             {t(
               'orgDashboard.pageSubtitle',
@@ -210,9 +210,11 @@ export const OrgDashboard = memo(function OrgDashboard() {
               {
                 companies: s?.companies ?? 0,
                 openDeals: s?.openOpportunities ?? 0,
-                pipeline: formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency),
+                pipeline: formatUnspecifiedAmount(s?.pipelineValue ?? 0),
               },
             )}
+            {' · '}
+            {UNSPECIFIED_CURRENCY_BASIS}
           </div>
         </div>
         <div className="page-actions">
@@ -281,21 +283,15 @@ export const OrgDashboard = memo(function OrgDashboard() {
         >
           <Reveal delay={0.04}>
             <PipelineCard
-              value={convert(s?.pipelineValue ?? 0, 'EUR')}
+              value={s?.pipelineValue ?? 0}
               count={s?.openOpportunities ?? 0}
-              currency={currency}
               stages={pipelineStages}
               reduced={reduced}
             />
           </Reveal>
 
           <Reveal delay={0.06}>
-            <PipelineByStageMini
-              report={pipelineReport.data}
-              reduced={reduced}
-              currency={currency}
-              convert={convert}
-            />
+            <PipelineByStageMini report={pipelineReport.data} reduced={reduced} />
           </Reveal>
 
           <Reveal delay={0.08}>

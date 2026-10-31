@@ -169,8 +169,13 @@ export async function checkDailyCap(
       };
     }
   } catch (err) {
-    // Fail open — Redis unreachable shouldn't block AI features, but log loudly.
-    log.warn({ err }, 'ai-assistant: Redis cap check failed, allowing request (fail-open)');
+    // Paid AI work fails closed when the budget store is down. Allowing the
+    // call would spend money with no recorded cap.
+    log.warn({ err }, 'ai-assistant: Redis cap check failed, denying request (fail-closed)');
+    return {
+      allowed: false,
+      reason: 'AI budget state is unavailable.',
+    };
   }
 
   return { allowed: true };

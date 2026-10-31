@@ -52,7 +52,10 @@ export function serializeDeal(opportunity: {
   ownerId: string | null;
   owner: { name: string | null; email: string } | null;
   updatedAt: Date;
+  /** Opportunity has no currency column. Callers must not invent one. */
+  currencyCode?: string | null;
 }): z.infer<typeof CrmDeal> {
+  const recorded = opportunity.currencyCode?.trim();
   return {
     id: opportunity.id,
     source: 'external_crm',
@@ -61,7 +64,7 @@ export function serializeDeal(opportunity: {
     name: opportunity.name,
     stage: mapDealStage(opportunity.pipelineStage?.key ?? opportunity.stage),
     amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
-    currencyCode: 'EUR',
+    currencyCode: recorded && recorded.length === 3 ? recorded : null,
     probability: opportunity.probability,
     closeDate: opportunity.dueDate ? opportunity.dueDate.toISOString().slice(0, 10) : null,
     ownerId: opportunity.ownerId,

@@ -1413,7 +1413,7 @@
     "greetingMorning": "Good morning",
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
-    "pageTitle": "Workspace Command Center",
+    "pageTitle": "Dashboard",
     "pageSubtitle": "{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline",
     "allAccounts": "All accounts",
     "opportunities": "Opportunities",

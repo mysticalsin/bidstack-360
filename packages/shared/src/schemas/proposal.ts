@@ -46,10 +46,26 @@ export const ProposalCreate = z.object({
   dueDate: z.string().date().optional(),
 });
 
+/**
+ * Ordinary PATCH may only move a working copy between draft and review.
+ * approved / submitted / won / lost are transitions with their own routes
+ * (approve, submit) so a proposals:write caller cannot mint a false approval.
+ */
+export const ProposalMutableStatus = z.enum(['draft', 'review']);
+
 export const ProposalPatch = z.object({
   name: z.string().min(1).max(255).optional(),
-  status: ProposalStatus.optional(),
+  status: ProposalMutableStatus.optional(),
   dueDate: z.string().date().optional().nullable(),
+});
+
+export const ProposalApprove = z.object({
+  attestation: z.string().trim().min(1).max(2000),
+});
+
+export const ProposalSubmitResult = Proposal.extend({
+  /** Queued, no subscribers, or the outbox could not be confirmed. Never "delivered". */
+  delivery: z.enum(['enqueued', 'no_subscribers', 'outcome_unknown']),
 });
 
 export const ProposalSectionPatch = z.object({
