@@ -13,6 +13,7 @@ import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
+import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { MetricSpark } from '@/components/viz/bklit-adapters';
 import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
 import CommandButton from '@/components/kokonutui/command-button';
@@ -212,7 +213,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
         <dl className="acct-keys" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
           <div>
             <dt>{t('pageHead.keyOpenPipeline', 'Open pipeline')}</dt>
-            <dd>{formatMoney(openValue)}</dd>
+            <dd><AnimatedNumber value={openValue} format={formatMoney} /></dd>
             <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
               {openOpps.length === 1
@@ -222,7 +223,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           </div>
           <div>
             <dt>{t('pageHead.keyWinRate', 'Win rate')}</dt>
-            <dd>{winLoss && closedCount > 0 ? `${winLoss.winRate}%` : '—'}</dd>
+            <dd>{winLoss && closedCount > 0 ? <AnimatedNumber value={winLoss.winRate} format={(n) => `${Math.round(n)}%`} /> : '—'}</dd>
             <MetricSpark values={winSpark} label={t('pageHead.sparkWin', 'Running win rate after each closed bid')} />
             <span>
               {winLoss && closedCount > 0

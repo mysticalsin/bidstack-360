@@ -74,3 +74,44 @@ SOFTWARE.
 - Considered, not used: `notification-stack` for "Needs you" (it collapses items
   behind each other, which hides work the list exists to show).
 - Licence: MIT, Copyright (c) 2025 kokonutUI (same MIT terms as above)
+
+## motion-primitives (the MIT origin of the 21st.dev listings used)
+
+- Source: https://github.com/ibelick/motion-primitives, commit 120f64f
+  (also listed on https://21st.dev; vendored from origin because the 21st
+  install route needs an API key)
+- Taken: `animated-number`, `border-trail` into
+  `apps/web/src/components/motion-primitives/`
+- Polo changes: no `motion.create()` in render, `format` prop, count-up from 0,
+  sr-only final value with aria-hidden digits, instant under reduced motion;
+  BorderTrail uses the brand token, is aria-hidden and is not rendered under
+  reduced motion.
+- Used for: dashboard hero numbers and account header key numbers
+  (AnimatedNumber); the brief "generating" panel (BorderTrail).
+- Considered, not used: `animated-group` (the Needs-you list already staggers
+  with a CSS `--i` delay; a second motion layer adds weight, not clarity).
+- Licence: MIT
+
+```
+MIT License
+
+Copyright (c) 2024 ibelick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

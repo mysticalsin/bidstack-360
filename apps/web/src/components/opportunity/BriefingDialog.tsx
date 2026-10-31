@@ -11,6 +11,7 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useOpportunityBrief } from '@/hooks/useOpportunityBrief';
 import AITextLoading from '@/components/kokonutui/ai-text-loading';
+import { BorderTrail } from '@/components/motion-primitives/border-trail';
 
 interface Props {
   opportunityId: string | undefined;
@@ -43,7 +44,8 @@ export function BriefingDialog({ opportunityId, opportunityLabel, open, onOpenCh
           )}
         >
           {brief.isPending ? (
-            <div className="grid gap-4" data-testid="brief-generating">
+            <div className="relative grid gap-4 rounded-md p-4" data-testid="brief-generating">
+              <BorderTrail size={72} className="opacity-60" />
               <AITextLoading
                 className="justify-start text-base font-medium text-[var(--fg-secondary)]"
                 label={t('briefing.generating', 'Generating brief')}

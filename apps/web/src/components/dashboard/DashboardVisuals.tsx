@@ -8,6 +8,7 @@ import { ChartCard, SignalLegend, SignalShape } from '@/components/viz/ChartCard
 import { KIND_LABEL } from '@/components/viz/viz-kinds';
 import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
 import SmoothTab from '@/components/kokonutui/smooth-tab';
+import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/bklit-adapters';
 import {
@@ -41,11 +42,11 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed }: {
     >
       <div className="dash-hero-figs">
         <div>
-          <div className="dash-hero-num">{fmtCompact(openValue)}</div>
+          <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
           <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
         </div>
         <div>
-          <div className="dash-hero-num dash-hero-num--won">{fmtCompact(wonTotal)}</div>
+          <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
           <div className="viz-meta">Won this year</div>
         </div>
         {pulse ? (
