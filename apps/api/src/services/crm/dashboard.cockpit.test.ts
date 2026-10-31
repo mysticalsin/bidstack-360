@@ -82,6 +82,32 @@ describe('computeSignalCoverage', () => {
     expect(total).toBe(4);
   });
 
+  it('names only the firmographic fields that are missing', () => {
+    const health = computeSignalCoverage({
+      company: company({ industry: 'financial_services' }),
+      contacts: [],
+      openDeals: [],
+      tasks: [],
+    });
+    const action = health.factors?.find((factor) => factor.key === 'firmographics')?.recommendedAction ?? '';
+    expect(action).toContain('headcount');
+    expect(action).not.toMatch(/missing: industry|fill industry/i);
+  });
+
+  it('does not call a recent task an empty activity list', () => {
+    const health = computeSignalCoverage({
+      company: company(),
+      contacts: [],
+      openDeals: [],
+      tasks: [
+        { status: 'open', dueDate: new Date(Date.now() - 86_400_000), createdAt: new Date() },
+      ],
+    });
+    const action = health.factors?.find((factor) => factor.key === 'engagement')?.recommendedAction ?? '';
+    expect(action).toContain('1 task in the last 30 days');
+    expect(action).not.toMatch(/No recent activity/i);
+  });
+
   it('does not score an incomplete open deal as pipeline coverage', () => {
     // Why: an open deal used to add 40 points before owner, date, or probability existed.
     const missing = computeSignalCoverage({

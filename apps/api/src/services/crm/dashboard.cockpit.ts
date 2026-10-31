@@ -39,6 +39,31 @@ const COCKPIT_COMPLIANCE_LIMIT = 6;
 
 type HealthBandValue = z.infer<typeof SignalFactor>['band'];
 
+function firmographicAction(company: z.infer<typeof CrmCompany>): string {
+  const missing: string[] = [];
+  if (!company.industry) missing.push('industry');
+  if (!company.employeeCount) missing.push('headcount');
+  if (!company.annualRevenueMicros) missing.push('revenue');
+  if ((company.technicalStack?.length ?? 0) === 0) missing.push('tech stack');
+  if (company.strategicIntel?.freshness !== 'fresh') missing.push('external-source freshness');
+  if (missing.length === 0) return 'Recorded firmographics are on file.';
+  return `Still missing: ${missing.join(', ')}.`;
+}
+
+function engagementAction(recent: number, openCount: number, onTrack: number): string {
+  const recentLabel = recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
+  if (recent === 0 && openCount === 0) {
+    return 'No tasks in the last 30 days and no open follow-ups.';
+  }
+  if (recent === 0) return 'No tasks in the last 30 days.';
+  const overdue = openCount - onTrack;
+  if (overdue > 0) {
+    const overdueLabel = overdue === 1 ? '1 open follow-up is past its due date' : `${overdue} open follow-ups are past their due date`;
+    return `${recentLabel}. ${overdueLabel}.`;
+  }
+  return `${recentLabel}. Open follow-ups are inside their due dates.`;
+}
+
 function bandFor(score: number): HealthBandValue {
   if (score >= 75) return 'strong';
   if (score >= 50) return 'good';
@@ -143,6 +168,9 @@ export function computeSignalCoverage(input: {
     'Open deals carrying probability, owner, and an expected close date.',
     openDeals.length > 0 ? Math.round((complete / openDeals.length) * 100) : 0,
   );
+
+  firmographics.recommendedAction = firmographicAction(company);
+  engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
   // Weights: external intel is the cockpit's backbone; the rest split evenly.
