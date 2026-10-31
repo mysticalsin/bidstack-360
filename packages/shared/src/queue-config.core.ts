@@ -122,6 +122,26 @@ export type MeetingIntelJob =
   /** Manual entries created by the API: raise cross-region flags only. */
   | { kind: 'flags'; orgId: string; meetingId: string };
 
+/**
+ * Account enrichment (2026-10-31): firmographics, open jobs and potential
+ * projects per CRM company from Apollo then Seamless.
+ *   'account-enrichment.enrich'  refresh one company (TTL cache, credit budget)
+ *   'account-enrichment.sweep'   repeatable, only when ENRICHMENT_AUTO_REFRESH=true
+ */
+export const ACCOUNT_ENRICHMENT: QueueConfig = {
+  name: 'account-enrichment',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+export type AccountEnrichmentJob =
+  | { kind: 'enrich'; orgId: string; companyId: string; force?: boolean; requestedById?: string | null }
+  | { kind: 'sweep' };
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;
