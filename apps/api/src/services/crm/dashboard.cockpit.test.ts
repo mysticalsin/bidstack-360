@@ -82,6 +82,24 @@ describe('computeSignalCoverage', () => {
     expect(total).toBe(4);
   });
 
+  it('does not score an incomplete open deal as pipeline coverage', () => {
+    // Why: an open deal used to add 40 points before owner, date, or probability existed.
+    const missing = computeSignalCoverage({
+      company: company(),
+      contacts: [],
+      openDeals: [{ probability: 0, dueDate: null, owner: null }],
+      tasks: [],
+    });
+    const complete = computeSignalCoverage({
+      company: company(),
+      contacts: [],
+      openDeals: [{ probability: 40, dueDate: new Date('2026-09-15'), owner: { name: 'Jane' } }],
+      tasks: [],
+    });
+    expect(missing.factors?.find((factor) => factor.key === 'pipeline')?.score).toBe(0);
+    expect(complete.factors?.find((factor) => factor.key === 'pipeline')?.score).toBe(100);
+  });
+
   it('stale Apollo data scores firmographics lower than fresh data', () => {
     const base = {
       contacts: [],

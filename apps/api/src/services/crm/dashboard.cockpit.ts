@@ -141,8 +141,7 @@ export function computeSignalCoverage(input: {
     'pipeline',
     'Pipeline data quality',
     'Open deals carrying probability, owner, and an expected close date.',
-    (openDeals.length > 0 ? 40 : 0) +
-      (openDeals.length > 0 ? Math.round((complete / openDeals.length) * 60) : 0),
+    openDeals.length > 0 ? Math.round((complete / openDeals.length) * 100) : 0,
   );
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
