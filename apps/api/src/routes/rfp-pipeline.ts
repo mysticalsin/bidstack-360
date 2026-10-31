@@ -90,8 +90,13 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!opportunity) throw server.httpErrors.notFound('Opportunity not found');
 
       // Per-org upload rate limit.
-      const withinLimit = await checkRfpUploadRateLimit(orgId);
-      if (!withinLimit) {
+      const quota = await checkRfpUploadRateLimit(orgId);
+      if (!quota.allowed && quota.reason === 'unavailable') {
+        throw server.httpErrors.serviceUnavailable(
+          'RFP upload quota could not be checked, so the upload was refused.',
+        );
+      }
+      if (!quota.allowed) {
         throw server.httpErrors.tooManyRequests(
           `RFP upload limit: ${RFP_UPLOAD_RATE_LIMIT_MAX} uploads per hour per organisation`,
         );
