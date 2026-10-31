@@ -25,7 +25,7 @@
   min-width: 0;
 }
 @media (max-width: 640px) { .wd-surface { padding: 16px; } }
-.wd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.wd-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 16px; }
 .wd-h { margin: 0; font-size: 18px; font-weight: 500; color: var(--wd-ink); letter-spacing: -0.01em; }
 .wd-sub-h { margin: 32px 0 8px; font-size: 13px; font-weight: 400; color: var(--wd-muted); }
 
@@ -117,3 +117,5 @@
 .wd-track-grid > .wd-projects { grid-column: 1 / -1; }
 .wd-track-grid > .wd-years { margin: 0; }
 @media (max-width: 1024px) { .wd-track-grid { grid-template-columns: 1fr; } }
+.wd-dismiss { justify-self: start; margin-top: 8px; }
+.wd-undo { display: flex; align-items: center; gap: 8px; margin-top: 8px; }

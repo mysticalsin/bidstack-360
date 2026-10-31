@@ -94,35 +94,48 @@ const monthFmt = new Intl.DateTimeFormat('en-GB', { month: 'short' });
 export function SignalStrip({ events, from, to }: {
   events: Array<{ id: string; at: string; kind: string; title: string }>; from: Date; to: Date;
 }) {
-  const W = 400, H = 56, pad = 8;
+  // Room for MAX_LANES stacked markers above the axis, all inside the viewBox,
+  // so a busy day never spills into the card header. Extra markers on the
+  // same day collapse into a "+N" count (the list below has every signal).
+  const W = 400, H = 64, pad = 8, AXIS = 44, LANE = 11, MAX_LANES = 3;
   const t0 = from.getTime(), t1 = to.getTime();
   const x = (t: number) => pad + ((t - t0) / Math.max(1, t1 - t0)) * (W - pad * 2);
   const months: Date[] = [];
   const m = new Date(from.getFullYear(), from.getMonth() + 1, 1);
   while (m.getTime() <= t1) { months.push(new Date(m)); m.setMonth(m.getMonth() + 1); }
-  // Stack same-day markers so none overlap.
   const lanes = new Map<number, number>();
+  const overflow = new Map<number, { px: number; n: number }>();
+  const placed: Array<{ e: (typeof events)[number]; px: number; lane: number }> = [];
+  for (const e of events) {
+    const t = new Date(e.at).getTime();
+    if (t < t0 || t > t1) continue;
+    const px = x(t);
+    const bucket = Math.round(px / 10);
+    const lane = lanes.get(bucket) ?? 0;
+    lanes.set(bucket, lane + 1);
+    if (lane < MAX_LANES) placed.push({ e, px, lane });
+    else overflow.set(bucket, { px, n: (overflow.get(bucket)?.n ?? 0) + 1 });
+  }
   return (
     <svg className="viz-svg" viewBox={`0 0 ${W} ${H}`}>
-      <line className="axis" x1={pad} x2={W - pad} y1={36} y2={36} />
+      <line className="axis" x1={pad} x2={W - pad} y1={AXIS} y2={AXIS} />
       {months.map((d) => (
         <g key={d.toISOString()}>
-          <line className="axis" x1={x(d.getTime())} x2={x(d.getTime())} y1={33} y2={39} />
-          <text className="tick" x={x(d.getTime())} y={53} textAnchor="middle">{monthFmt.format(d)}</text>
+          <line className="axis" x1={x(d.getTime())} x2={x(d.getTime())} y1={AXIS - 3} y2={AXIS + 3} />
+          <text className="tick" x={x(d.getTime())} y={H - 3} textAnchor="middle">{monthFmt.format(d)}</text>
         </g>
       ))}
-      {events.filter((e) => { const t = new Date(e.at).getTime(); return t >= t0 && t <= t1; }).map((e, i) => {
-        const px = x(new Date(e.at).getTime());
-        const bucket = Math.round(px / 10);
-        const lane = lanes.get(bucket) ?? 0;
-        lanes.set(bucket, lane + 1);
-        return (
-          <g key={e.id}>
-            <title>{`${KIND_LABEL[e.kind] ?? e.kind}: ${e.title}`}</title>
-            <SignalShape kind={e.kind} x={px} y={24 - lane * 12} r={5} i={i} />
-          </g>
-        );
-      })}
+      {placed.map(({ e, px, lane }, i) => (
+        <g key={e.id}>
+          <title>{`${KIND_LABEL[e.kind] ?? e.kind}: ${e.title}`}</title>
+          <SignalShape kind={e.kind} x={px} y={AXIS - 12 - lane * LANE} r={5} i={i} />
+        </g>
+      ))}
+      {[...overflow.values()].map((o) => (
+        <text key={o.px} className="tick" x={o.px + 24 > W ? o.px - 8 : o.px + 8} y={AXIS - 12 - (MAX_LANES - 1) * LANE + 3} textAnchor={o.px + 24 > W ? 'end' : 'start'}>
+          +{o.n}
+        </text>
+      ))}
     </svg>
   );
 }
