@@ -8,6 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import type { PermissionKey } from '@bidstack/shared';
 import { getOrgPresence, getEntityPresence } from '../services/presence.service.js';
 import { publish } from '../services/realtime.service.js';
 
@@ -17,6 +18,22 @@ const entityParamsSchema = z.object({
   type: z.string().regex(/^[a-z_]+$/, 'entityType must be lowercase letters/underscores'),
   id: z.string().uuid(),
 });
+
+/**
+ * An edit lock blocks every other user from editing the record for the lock
+ * TTL, so acquiring or releasing one requires write access to the locked
+ * resource. Unknown entity types are rejected rather than lockable by anyone.
+ */
+const LOCK_WRITE_PERMISSION: Record<string, PermissionKey> = {
+  opportunity: 'opportunities:write',
+  lead: 'leads:write',
+  contact: 'contacts:write',
+  company: 'companies:write',
+  account: 'accounts:write',
+  task: 'tasks:write',
+  proposal: 'proposals:write',
+  service_case: 'service-desk:write',
+};
 
 const lockBodySchema = z.object({
   sessionId: z.string().min(1).max(128),
@@ -52,6 +69,9 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
     async (req, reply) => {
       const { orgId, userId } = req.auth;
       const { type: entityType, id: entityId } = req.params;
+      const lockPermission = LOCK_WRITE_PERMISSION[entityType];
+      if (!lockPermission) throw server.httpErrors.badRequest(`Unsupported entity type: ${entityType}`);
+      await server.requirePermission(lockPermission)(req);
       const { sessionId } = req.body;
 
       const expiresAt = new Date(Date.now() + LOCK_TTL_MINUTES * 60 * 1_000);
@@ -115,6 +135,9 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
     async (req, reply) => {
       const { orgId, userId } = req.auth;
       const { type: entityType, id: entityId } = req.params;
+      const lockPermission = LOCK_WRITE_PERMISSION[entityType];
+      if (!lockPermission) throw server.httpErrors.badRequest(`Unsupported entity type: ${entityType}`);
+      await server.requirePermission(lockPermission)(req);
 
       const existing = await prisma.entityEditLock.findFirst({
         where: { orgId, entityType, entityId },
@@ -152,6 +175,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
   app.get(
     '/presence/org',
     {
+      config: { permission: 'comments:read' },
       schema: {
         response: {
           200: z.object({
@@ -176,6 +200,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
   app.get(
     '/presence/entity/:type/:id',
     {
+      config: { permission: 'comments:read' },
       schema: {
         params: entityParamsSchema,
         response: {

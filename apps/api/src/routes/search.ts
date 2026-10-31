@@ -2,8 +2,9 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, Prisma } from '@bidstack/db';
-import { SearchResponse } from '@bidstack/shared';
+import { SearchResponse, type PermissionKey } from '@bidstack/shared';
 
+import { countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
 
 const VALID_TYPES = [
@@ -22,6 +23,25 @@ const VALID_TYPES = [
 ] as const;
 
 type ValidType = (typeof VALID_TYPES)[number];
+
+/**
+ * Read permission required to see each result type. Global search must never
+ * be a side door around the per-resource RBAC gates (e.g. an SDR, who has no
+ * opportunities:read, must not find deals by typing their name).
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const TYPE_PERMISSION: Record<ValidType, PermissionKey> = {
+  opportunity: 'opportunities:read',
+  lead: 'leads:read',
+  contact: 'contacts:read',
+  company: 'companies:read',
+  task: 'tasks:read',
+  note: 'activities:read',
+  proposal: 'proposals:read',
+  rfp_requirement: 'proposals:read',
+  reference: 'accounts:read',
+};
 
 /**
  * Token-AND retrieval clause: a row matches only when EVERY query token appears
@@ -63,12 +83,16 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { q, types, limit: perTypeLimit } = req.query;
-      const requestedTypes = types
+      const askedTypes = types
         ? types
             .split(',')
             .map((t) => t.trim())
             .filter((t): t is ValidType => VALID_TYPES.includes(t as ValidType))
         : [...VALID_TYPES];
+      const allowed = await Promise.all(
+        askedTypes.map((t) => server.hasPermission(req, TYPE_PERMISSION[t])),
+      );
+      const requestedTypes = askedTypes.filter((_, i) => allowed[i]);
 
       const totalCap = 30;
       const tokens = tokenize(q);
@@ -103,6 +127,21 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                     ' AND ',
                   )
                 : Prisma.sql`TRUE`;
+            // Access-group visibility (ADR-7): mirror applyOpportunityScope in
+            // SQL so a country-restricted user cannot discover out-of-scope
+            // deals through search (list/detail are already scoped).
+            const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+            let scopeCond = Prisma.sql`TRUE`;
+            if (!scope.unrestricted) {
+              const variants = countryVariantsForScope(scope);
+              const ownerCond = UUID_RE.test(scope.userId)
+                ? Prisma.sql`owner_id = ${scope.userId}::uuid`
+                : Prisma.sql`FALSE`;
+              scopeCond =
+                variants.length > 0
+                  ? Prisma.sql`(${ownerCond} OR country = ANY(${variants}::text[]) OR territory_id IN (SELECT t.id FROM territories t WHERE t.country_codes && ${variants}::text[]))`
+                  : ownerCond;
+            }
             const opps = await prisma.$queryRaw<
               Array<{ id: string; code: string; customer: string; name: string; updated_at: Date }>
             >`
@@ -111,6 +150,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               WHERE org_id = ${req.auth.orgId}::uuid
                 AND deleted_at IS NULL
                 AND (${tokenConds})
+                AND (${scopeCond})
               ORDER BY updated_at DESC
               LIMIT ${perTypeLimit}
             `;
