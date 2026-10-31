@@ -52,11 +52,13 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: `${formatUnspecifiedAmount(summary.pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: `${formatUnspecifiedAmount(summary.pipelineValue)}`,
+          basis: true,
         },
         {
           label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: `${formatUnspecifiedAmount(weighted)}`,
+          basis: true,
         },
       ]
     : [
@@ -68,15 +70,18 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))}`,
+          basis: true,
         },
         {
           label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: `${formatUnspecifiedAmount(weighted)}`,
+          basis: true,
         },
         {
           label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))}`,
+          basis: true,
         },
       ];
   return (
@@ -93,8 +98,17 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {kpi.label}
           </div>
-          <div className="mt-1 text-lg font-bold tabular-nums text-[var(--fg-primary)]">
+          {/* One line each, so the card height never depends on which values
+              have arrived (the summary swap used to rewrap and shift the page:
+              CLS 0.064 against the 0.05 budget). */}
+          <div className="mt-1 truncate text-lg font-bold tabular-nums text-[var(--fg-primary)]">
             {kpi.value}
+          </div>
+          <div
+            className="truncate text-xs text-[var(--fg-tertiary)]"
+            title={'basis' in kpi && kpi.basis ? UNSPECIFIED_CURRENCY_BASIS : undefined}
+          >
+            {'basis' in kpi && kpi.basis ? UNSPECIFIED_CURRENCY_BASIS : '\u00a0'}
           </div>
         </div>
       ))}
