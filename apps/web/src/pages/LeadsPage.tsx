@@ -34,10 +34,11 @@ const STATUS_OPTIONS: { value: LeadStatus | ''; label: string }[] = [
   { value: 'converted', label: 'Converted' },
 ];
 
-/** An empty lead list has no average. Zero would read as a measured fit score. */
+/** The lead column defaults to 0, which means not scored. Those zeros do not enter the average. */
 export function averageLeadScoreLabel(scores: number[]): string {
-  if (scores.length === 0) return '—';
-  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length).toLocaleString();
+  const scored = scores.filter((score) => score > 0);
+  if (scored.length === 0) return '—';
+  return Math.round(scored.reduce((sum, score) => sum + score, 0) / scored.length).toLocaleString();
 }
 
 const PRIORITY_OPTIONS: { value: LeadPriority | ''; label: string }[] = [

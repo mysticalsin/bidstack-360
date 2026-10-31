@@ -111,7 +111,9 @@ export function LeadRow({
         />
       </td>
       <td className="px-4 py-3">
-        <span className="font-mono text-xs">{lead.score}</span>
+        <span className="font-mono text-xs">
+          {lead.score > 0 ? lead.score : t('leadRow.notScored', 'Not scored')}
+        </span>
       </td>
       <td className="px-4 py-3 text-[var(--fg-secondary)] capitalize">{lead.source}</td>
       <td className="px-4 py-3 text-[var(--fg-secondary)]">{lead.ownerName ?? '—'}</td>

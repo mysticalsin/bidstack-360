@@ -7,7 +7,9 @@ describe('averageLeadScoreLabel', () => {
     expect(averageLeadScoreLabel([])).toBe('—');
   });
 
-  it('averages the scores that are on the list', () => {
+  it('averages the scores that are on the list and skips the unscored default', () => {
     expect(averageLeadScoreLabel([80, 60])).toBe('70');
+    expect(averageLeadScoreLabel([0, 0])).toBe('—');
+    expect(averageLeadScoreLabel([0, 80])).toBe('80');
   });
 });
