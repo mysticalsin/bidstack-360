@@ -706,9 +706,11 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
               <div className="mt-3 space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={confidenceTone(extraction.data.confidenceBps)}>
-                    {t('contractAgreements.extractionConfidence', '{{pct}}% confidence', {
-                      pct: ((extraction.data.confidenceBps ?? 0) / 100).toFixed(0),
-                    })}
+                    {extraction.data.confidenceBps == null
+                      ? t('contractAgreements.extractionNotScored', 'Not scored')
+                      : t('contractAgreements.extractionConfidence', '{{pct}}% confidence', {
+                          pct: (extraction.data.confidenceBps / 100).toFixed(0),
+                        })}
                   </Badge>
                   <Badge tone={extraction.data.source === 'llm' ? 'purple' : 'gray'}>
                     {extraction.data.source === 'llm'

@@ -12,7 +12,6 @@ import type {
   RateCardUnit,
 } from '@bidstack/shared';
 
-const DETERMINISTIC_CONFIDENCE_BPS = 5200;
 
 // Minimal country-name → ISO-2 map for the names that commonly appear in MSAs.
 const COUNTRY_TO_ISO: Record<string, string> = {
@@ -163,7 +162,8 @@ export function extractContractFields(text: string): ContractExtractionDraft {
     expiryDate: dates.expiryDate,
     rateReviewSchedule: detectRateSchedule(text),
     rateCard: detectRateCard(text),
-    confidenceBps: DETERMINISTIC_CONFIDENCE_BPS,
+    confidenceBps: null,
+    method: 'deterministic' as const,
     warnings: [] as string[],
   };
   if (!draft.reference) draft.warnings.push('No contract reference detected — enter it manually.');

@@ -51,7 +51,8 @@ describe('extractContractFieldsLLM', () => {
     expect(draft!.rateCard).toEqual([
       { role: 'Senior Consultant', rateMicros: 850_000_000, unit: 'day', currency: 'EUR' },
     ]);
-    expect(draft!.confidenceBps).toBe(8500);
+    expect(draft!.confidenceBps).toBeNull();
+    expect(draft!.method).toBe('llm');
     expect(draft!.warnings[0]).toContain('review');
   });
 

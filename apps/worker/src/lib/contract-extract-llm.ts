@@ -18,7 +18,6 @@
 import { ContractExtractionDraft } from '@bidstack/shared';
 import { completeChat, coerceJsonObject, type ResolvedLlm } from './llm-provider.js';
 
-const LLM_CONFIDENCE_BPS = 8500;
 // Bound the prompt so a huge contract can't blow the model's context / our cost.
 // Key terms + the rate table usually sit in the first pages; annex-only rate
 // cards are a known limitation surfaced as a warning.
@@ -156,7 +155,8 @@ export async function extractContractFieldsLLM(
     expiryDate: toIsoDate(parsed.expiryDate),
     rateReviewSchedule: schedule && SCHEDULE_VALUES.has(schedule) ? schedule : null,
     rateCard: normalizeRateCard(parsed.rateCard),
-    confidenceBps: LLM_CONFIDENCE_BPS,
+    confidenceBps: null,
+    method: 'llm' as const,
     warnings: [
       `AI-assisted extraction (${llm.kind}) — review every field before saving.`,
     ] as string[],

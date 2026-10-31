@@ -125,7 +125,8 @@ function buildFieldSources(
       source: isLlm ? 'derived:llm' : 'derived:deterministic',
       label: isLlm ? 'AI reviewed' : 'Rules reviewed',
       hint: `Human-reviewed ${isLlm ? 'AI' : 'rules'} extraction from ${sourceFileName ?? 'the source document'}. Saved ${row.updatedAt.toISOString().slice(0, 10)}.`,
-      confidence: extractedDraft.confidenceBps / 10_000,
+      confidence:
+        extractedDraft.confidenceBps == null ? null : extractedDraft.confidenceBps / 10_000,
       sourceFileId: row.sourceFileId,
       sourceFileName,
       sourceExtractionId: row.sourceExtractionId,
@@ -208,6 +209,8 @@ function extractionSource(
   draft: z.infer<typeof ContractExtractionDraft> | null,
 ): z.infer<typeof ContractExtractionResult>['source'] {
   if (!draft) return 'unknown';
+  if (draft.method === 'llm' || draft.method === 'deterministic') return draft.method;
+  if (draft.confidenceBps == null) return 'unknown';
   return draft.confidenceBps >= 8000 ? 'llm' : 'deterministic';
 }
 
