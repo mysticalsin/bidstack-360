@@ -197,6 +197,7 @@ model Org {
   governanceActions             GovernanceAction[]
   projectReferences             ProjectReference[]
   contractAgreements            ContractAgreement[]
+  contractFileVersions          ContractFileVersion[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
   notificationPrefs             NotificationPref[]
@@ -324,9 +325,11 @@ model User {
   groupMemberships UserGroupMember[]
 
   // Wave A — pre-sales governance assignments
-  crossSellAssignments   CrossSellAction[]  @relation("CrossSellAssignee")
-  governanceActionsOwned GovernanceAction[] @relation("GovernanceActionOwner")
+  crossSellAssignments   CrossSellAction[]     @relation("CrossSellAssignee")
+  governanceActionsOwned GovernanceAction[]    @relation("GovernanceActionOwner")
   notifications          Notification[]
+  contractsOwned         ContractAgreement[]   @relation("ContractOwner")
+  contractVersionsAdded  ContractFileVersion[] @relation("ContractFileVersionCreatedBy")
 
   @@index([orgId])
   @@index([deletedAt])
@@ -411,6 +414,8 @@ model Company {
   customerCommitments CustomerCommitment[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  contracts ContractAgreement[] @relation("CompanyContracts")
 
   @@index([orgId, domain])
   @@index([orgId])
@@ -1406,11 +1411,12 @@ model FileAttachment {
   uploadedByUserId String?  @map("uploaded_by_user_id") @db.Uuid
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  org                Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  uploader           User?               @relation(fields: [uploadedByUserId], references: [id])
-  company            Company?            @relation(fields: [companyId], references: [id])
+  org                Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  uploader           User?                 @relation(fields: [uploadedByUserId], references: [id])
+  company            Company?              @relation(fields: [companyId], references: [id])
   documentVersions   DocumentVersion[]
-  contractAgreements ContractAgreement[] @relation("ContractSourceFile")
+  contractAgreements ContractAgreement[]   @relation("ContractSourceFile")
+  contractVersions   ContractFileVersion[] @relation("ContractFileVersionFile")
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -5269,13 +5275,73 @@ model ContractAgreement {
   updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt          DateTime?            @map("deleted_at") @db.Timestamptz(6)
 
-  org        Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sourceFile FileAttachment? @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  // MSA library (2026-10-31). The agreement is the MSA record; SOWs,
+  // amendments and addenda are child rows linked by parentId. companyId is the
+  // canonical account link (accountKey stays for the legacy account card).
+  companyId            String?  @map("company_id") @db.Uuid
+  parentId             String?  @map("parent_id") @db.Uuid
+  title                String?  @db.VarChar(300)
+  counterparty         String?  @db.VarChar(300)
+  autoRenew            Boolean  @default(false) @map("auto_renew")
+  noticePeriodDays     Int?     @map("notice_period_days")
+  governingLaw         String?  @map("governing_law") @db.VarChar(200)
+  liabilityCapMicros   BigInt?  @map("liability_cap_micros")
+  liabilityCapCurrency String?  @map("liability_cap_currency") @db.VarChar(3)
+  paymentTerms         String?  @map("payment_terms") @db.VarChar(500)
+  ownerId              String?  @map("owner_id") @db.Uuid
+  tags                 String[] @default([])
+
+  org          Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceFile   FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  company      Company?              @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
+  parent       ContractAgreement?    @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     ContractAgreement[]   @relation("ContractHierarchy")
+  owner        User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  fileVersions ContractFileVersion[]
 
   @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
   @@index([orgId, status], map: "contract_agreements_org_status_idx")
+  @@index([orgId, companyId], map: "contract_agreements_org_company_idx")
+  @@index([orgId, parentId], map: "contract_agreements_org_parent_idx")
+  @@index([orgId, expiryDate], map: "contract_agreements_org_expiry_idx")
   @@index([deletedAt])
   @@map("contract_agreements")
+}
+
+// One uploaded file version of a contract (MSA, SOW, amendment, addendum).
+// Bytes live in object storage via the FileAttachment row (the same signed-size
+// upload as /files); this row adds the version number, the server-computed
+// SHA-256 and the extracted text that backs full-text search. The FTS GIN
+// index on to_tsvector('simple', extracted_text) is raw SQL in the migration.
+model ContractFileVersion {
+  id               String    @id @default(uuid()) @db.Uuid
+  orgId            String    @map("org_id") @db.Uuid
+  contractId       String    @map("contract_id") @db.Uuid
+  versionNo        Int       @map("version_no")
+  fileAttachmentId String    @map("file_attachment_id") @db.Uuid
+  fileName         String    @map("file_name") @db.VarChar(255)
+  contentType      String    @map("content_type") @db.VarChar(100)
+  bytes            Int
+  sha256           String    @db.VarChar(64)
+  note             String?   @db.VarChar(1000)
+  extractionStatus String    @default("pending") @map("extraction_status") @db.VarChar(20)
+  extractionError  String?   @map("extraction_error") @db.VarChar(500)
+  extractedText    String?   @map("extracted_text")
+  extractedAt      DateTime? @map("extracted_at") @db.Timestamptz(6)
+  createdById      String?   @map("created_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org            Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contract       ContractAgreement @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  fileAttachment FileAttachment    @relation("ContractFileVersionFile", fields: [fileAttachmentId], references: [id], onDelete: Restrict)
+  createdBy      User?             @relation("ContractFileVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([contractId, versionNo], map: "contract_file_versions_contract_version_uq")
+  @@index([orgId, contractId], map: "contract_file_versions_org_contract_idx")
+  @@index([orgId, sha256], map: "contract_file_versions_org_sha_idx")
+  @@index([deletedAt])
+  @@map("contract_file_versions")
 }
 
 enum ContractKind {
@@ -5284,6 +5350,8 @@ enum ContractKind {
   sow
   nda
   other
+  amendment
+  addendum
 
   @@map("contract_kind")
 }
@@ -5302,6 +5370,8 @@ enum ContractStatus {
   pending
   expired
   terminated
+  draft
+  in_negotiation
 
   @@map("contract_status")
 }
