@@ -39,6 +39,13 @@ import { extractLeadFeatures, extractOpportunityFeatures } from './scoring/featu
 
 const log = pino({ name: 'service:predictive-scoring', level: process.env.LOG_LEVEL ?? 'info' });
 
+/** Same floor as the trainer. A shorter count was a synthetic fit, not this org's deals. */
+export const MIN_REAL_TRAINING_SAMPLES = 50;
+
+export function isRealTrainingSampleCount(sampleCount: number): boolean {
+  return Number.isFinite(sampleCount) && sampleCount >= MIN_REAL_TRAINING_SAMPLES;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export interface ScoreFactor {
@@ -149,7 +156,8 @@ async function loadActiveModel(
   const cached = await redis.get(cacheKey);
   if (cached) {
     try {
-      return JSON.parse(cached) as ModelArtifact;
+      const artifact = JSON.parse(cached) as ModelArtifact;
+      if (isRealTrainingSampleCount(artifact.sampleCount)) return artifact;
     } catch {
       // Corrupted cache entry — fall through to DB lookup
     }
@@ -160,10 +168,10 @@ async function loadActiveModel(
     orderBy: { trainedAt: 'desc' },
   });
 
-  if (!dbModel) return null;
+  if (!dbModel || !isRealTrainingSampleCount(dbModel.sampleCount)) return null;
 
   const artifact = await loadModelFromS3(dbModel.modelArtifactS3Key);
-  if (!artifact) return null;
+  if (!artifact || !isRealTrainingSampleCount(artifact.sampleCount)) return null;
 
   await redis.setex(cacheKey, MODEL_CACHE_TTL_S, JSON.stringify(artifact));
   return artifact;

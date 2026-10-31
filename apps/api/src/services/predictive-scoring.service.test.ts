@@ -16,10 +16,20 @@ import { describe, expect, it } from 'vitest';
 import {
   basisPointsToPercent,
   degradationPercentPoints,
+  isRealTrainingSampleCount,
   probabilityToBasisPoints,
   unscoredLeadScore,
   unscoredOpportunityScore,
 } from './predictive-scoring.service.js';
+
+describe('isRealTrainingSampleCount', () => {
+  it('rejects a stored model whose sample count is below the real-history floor', () => {
+    // Why: older runs saved synthetic fits with the real closed-record count, under 50.
+    expect(isRealTrainingSampleCount(0)).toBe(false);
+    expect(isRealTrainingSampleCount(49)).toBe(false);
+    expect(isRealTrainingSampleCount(50)).toBe(true);
+  });
+});
 
 describe('unscored model fallback', () => {
   it('does not invent a 50% win probability when no model is trained', () => {
