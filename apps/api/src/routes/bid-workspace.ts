@@ -210,7 +210,12 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!opportunity) return reply.notFound('Opportunity not found');
 
       const file = await prisma.fileAttachment.findFirst({
-        where: { id: req.body.fileAttachmentId, orgId: req.auth.orgId, deletedAt: null },
+        where: {
+          id: req.body.fileAttachmentId,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
       });
       if (!file) return reply.notFound('File attachment not found');
       if (opportunity.companyId && file.companyId && opportunity.companyId !== file.companyId) {

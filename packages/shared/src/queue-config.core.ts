@@ -87,6 +87,27 @@ export const DOCUMENT_EXTRACT: QueueConfig = {
 };
 
 /**
+ * MSA library text extraction: reads one contract file version, extracts its
+ * text in the sandbox and stores it for full-text search. No LLM involved.
+ */
+export const MSA_TEXT_EXTRACT: QueueConfig = {
+  name: 'msa-text-extract',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Payload of an `msa-text-extract` job. Ids only; the worker re-reads the row. */
+export interface MsaTextExtractJob {
+  orgId: string;
+  contractId: string;
+  versionId: string;
+}
+
+/**
  * Calendar push — fires when an event is created/updated/deleted locally.
  * Short backoff because conflicts (412/etag mismatch) need fast resolution.
  */

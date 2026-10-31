@@ -114,7 +114,12 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const file = await prisma.fileAttachment.findFirst({
-        where: { id: data.fileAttachmentId, orgId, deletedAt: null },
+        where: {
+          id: data.fileAttachmentId,
+          orgId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
         select: { id: true, contentType: true, bytes: true, storageKey: true, name: true },
       });
       if (!file) throw server.httpErrors.notFound('File attachment not found');

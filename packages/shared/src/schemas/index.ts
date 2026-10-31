@@ -45,6 +45,7 @@ export * from './opportunity-filters.js';
 export * from './notification.js';
 export * from './rbac.js';
 export * from './contract-agreement.js';
+export * from './msa.js';
 export * from './win-loss.js';
 export * from './tenant-export.js';
 export * from './erasure.js';

@@ -46,6 +46,7 @@ const ALL_READ: PermissionKey[] = [
   'leads:read',
   'mcp:read',
   'migrations:read',
+  'msa:read',
   'opportunities:read',
   'products:read',
   'proposals:read',
@@ -74,6 +75,7 @@ const ALL_WRITE: PermissionKey[] = [
   'kam:write',
   'leads:write',
   'mcp:write',
+  'msa:write',
   'opportunities:write',
   'products:write',
   'proposals:write',
@@ -101,7 +103,8 @@ function write(...res: string[]): PermissionKey[] {
  * Each entry lists the permissions granted to that role.
  */
 export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> = {
-  Admin: [...ALL_READ, ...ALL_WRITE],
+  // msa:admin (archive MSAs and file versions, edit any MSA) is Admin-only.
+  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin'],
 
   'Sales Manager': [
     ...ALL_READ,
@@ -112,6 +115,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'contacts',
       'kam',
       'leads',
+      'msa',
       'opportunities',
       'reports',
       'sales-orders',
@@ -131,6 +135,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'documents',
       'leads',
       'migrations',
+      'msa',
       'opportunities',
       'products',
       'proposals',
@@ -146,6 +151,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'contacts',
       'kam',
       'leads',
+      'msa',
       'opportunities',
       'proposals',
       'sales-orders',
@@ -161,6 +167,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'companies',
       'contacts',
       'leads',
+      'msa',
       'opportunities',
       'proposals',
       'reports',
@@ -177,12 +184,22 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'companies',
       'contacts',
       'leads',
+      'msa',
       'opportunities',
       'reports',
       'service-desk',
       'tasks',
     ),
-    ...write('accounts', 'activities', 'comments', 'contacts', 'kam', 'service-desk', 'tasks'),
+    ...write(
+      'accounts',
+      'activities',
+      'comments',
+      'contacts',
+      'kam',
+      'msa',
+      'service-desk',
+      'tasks',
+    ),
   ],
 
   'Read-Only': ALL_READ.filter((k) => !k.startsWith('mcp:') && k !== 'audit-log:read'),
@@ -207,6 +224,7 @@ export const MATRIX_RESOURCES = [
   'mcp',
   // Data-migration jobs (migrations:read, added on polo/backend-hardening).
   'migrations',
+  'msa',
   'opportunities',
   'products',
   'proposals',

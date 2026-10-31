@@ -60,9 +60,10 @@ export interface StorageAdapter {
   // collide on a chosen accountId. See files.ts for the only call site.
   newKey(orgId: string, accountId: string, name: string): string;
   // Returns a download URL or a readable stream depending on driver.
+  // expiresInSeconds bounds the S3 presigned URL lifetime (default 900).
   getDownload(
     key: string,
-    opts: { filename: string; contentType: string },
+    opts: { filename: string; contentType: string; expiresInSeconds?: number },
   ): Promise<DownloadResult>;
   // Hard-delete the underlying object. Idempotent: missing keys do not throw.
   delete(key: string): Promise<void>;
@@ -288,7 +289,7 @@ class S3Storage implements StorageAdapter {
 
   async getDownload(
     key: string,
-    opts: { filename: string; contentType: string },
+    opts: { filename: string; contentType: string; expiresInSeconds?: number },
   ): Promise<DownloadResult> {
     const cmd = new (asSdk(this.mod).GetObjectCommand)({
       Bucket: this.bucket,
@@ -297,7 +298,7 @@ class S3Storage implements StorageAdapter {
       ResponseContentType: opts.contentType,
     });
     const url: string = await asSdk(this.signer).getSignedUrl(this.client, cmd, {
-      expiresIn: 900,
+      expiresIn: opts.expiresInSeconds ?? 900,
     });
     return { kind: 'redirect', url };
   }

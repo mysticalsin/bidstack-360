@@ -350,6 +350,8 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
+          // MSA library files are served only through /msa (msa:read).
+          contractVersions: { none: {} },
           ...(req.query.companyId
             ? { OR: [{ companyId: req.query.companyId }, { accountId }] }
             : { accountId }),
@@ -368,7 +370,12 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
     { schema: { params: z.object({ id: z.string().uuid() }) } },
     async (req, reply) => {
       const row = await prisma.fileAttachment.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: {
+          id: req.params.id,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
       });
       if (!row) throw server.httpErrors.notFound('File not found');
       await ensureAccountVisible({
@@ -416,7 +423,12 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
     { schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } } },
     async (req, reply) => {
       const row = await prisma.fileAttachment.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: {
+          id: req.params.id,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
       });
       if (!row) throw server.httpErrors.notFound('File not found');
       await ensureAccountVisible({
