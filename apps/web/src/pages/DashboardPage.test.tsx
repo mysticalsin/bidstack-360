@@ -90,6 +90,9 @@ vi.mock('@/components/dashboard/OrgDashboard', () => ({
 vi.mock('@/components/account/AccountVisuals', () => ({
   AccountVisuals: () => <section data-testid="account-visuals" />,
 }));
+vi.mock('@/components/meetings/WhoWeMetCard', () => ({
+  WhoWeMetCard: () => <section data-testid="account-who-we-met-card" />,
+}));
 vi.mock('@/components/agreements/AgreementsSummaryCard', () => ({
   AgreementsSummaryCard: () => <section data-testid="account-agreements-card" />,
 }));
