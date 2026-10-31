@@ -95,6 +95,9 @@ export const envSchema = z.object({
   STORAGE_SCAN_REQUIRED: z.enum(['true', 'false']).default('false'),
 
   TRUSTED_PROXIES: z.string().optional().or(z.literal('')),
+  // Azure Front Door profile id; when set, requests without a matching
+  // X-Azure-FDID header are rejected (see lib/front-door-guard.ts).
+  AZURE_FRONT_DOOR_ID: z.string().optional().or(z.literal('')),
   BIDSTACK_JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
   JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
 

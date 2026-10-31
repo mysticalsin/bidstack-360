@@ -23,6 +23,7 @@ import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
 import { privacyLogHooks, privacyLogSerializers } from './lib/logger.js';
+import { registerFrontDoorGuard } from './lib/front-door-guard.js';
 import { parseTrustProxy } from './lib/trust-proxy.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
@@ -89,6 +90,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
+
+  // First hook: drop traffic that bypassed Front Door before any other work.
+  registerFrontDoorGuard(server, config.AZURE_FRONT_DOOR_ID);
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
