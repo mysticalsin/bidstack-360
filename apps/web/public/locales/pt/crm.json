@@ -3442,7 +3442,12 @@
     "routeIntegrations": "Integrações",
     "routeAuditLog": "Registro de auditoria",
     "routeSettings": "Configurações",
-    "routeLogin": "Entrar"
+    "routeLogin": "Entrar",
+    "routeAgreements": "Contratos",
+    "agreementDetail": "Detalhe do contrato",
+    "routeMeetings": "Reuniões",
+    "routeMeetingFlags": "Alertas entre regiões",
+    "meetingDetail": "Detalhe da reunião"
   },
   "sectorView": {
     "title": "Visão por setor",
@@ -3637,7 +3642,8 @@
     "sectionIntegrations": "Integrações",
     "sectionWebhooks": "Webhooks",
     "sectionAuditLog": "Registro de auditoria",
-    "sectionDeveloper": "Acesso de desenvolvedor"
+    "sectionDeveloper": "Acesso de desenvolvedor",
+    "sectionMeetingSources": "Fontes de reuniões"
   },
   "override": {
     "title": "A pontuação está abaixo do limite de proposta",

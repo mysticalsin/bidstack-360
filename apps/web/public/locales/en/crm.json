@@ -3454,7 +3454,12 @@
     "routeIntegrations": "Integrations",
     "routeAuditLog": "Audit Log",
     "routeSettings": "Settings",
-    "routeLogin": "Sign in"
+    "routeLogin": "Sign in",
+    "routeAgreements": "Agreements",
+    "agreementDetail": "Agreement detail",
+    "routeMeetings": "Meetings",
+    "routeMeetingFlags": "Cross-region flags",
+    "meetingDetail": "Meeting detail"
   },
   "sectorView": {
     "title": "Sector view",
@@ -3649,7 +3654,8 @@
     "sectionIntegrations": "Integrations",
     "sectionWebhooks": "Webhooks",
     "sectionAuditLog": "Audit log",
-    "sectionDeveloper": "Developer access"
+    "sectionDeveloper": "Developer access",
+    "sectionMeetingSources": "Meeting sources"
   },
   "override": {
     "title": "Score is below the bid threshold",

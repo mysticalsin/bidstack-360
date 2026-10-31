@@ -3442,7 +3442,12 @@
     "routeIntegrations": "集成",
     "routeAuditLog": "审计日志",
     "routeSettings": "设置",
-    "routeLogin": "登录"
+    "routeLogin": "登录",
+    "routeAgreements": "协议",
+    "agreementDetail": "协议详情",
+    "routeMeetings": "会议",
+    "routeMeetingFlags": "跨区域提示",
+    "meetingDetail": "会议详情"
   },
   "sectorView": {
     "title": "行业视图",
@@ -3637,7 +3642,8 @@
     "sectionIntegrations": "集成",
     "sectionWebhooks": "Webhook",
     "sectionAuditLog": "审计日志",
-    "sectionDeveloper": "开发者访问"
+    "sectionDeveloper": "开发者访问",
+    "sectionMeetingSources": "会议来源"
   },
   "override": {
     "title": "评分低于投标阈值",

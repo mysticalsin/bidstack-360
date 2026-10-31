@@ -635,7 +635,8 @@
     "itemIntegrations": "Integrations",
     "itemWebhooks": "Webhooks",
     "itemDeveloper": "Developer access",
-    "itemAuditLog": "Audit log"
+    "itemAuditLog": "Audit log",
+    "itemMeetingSources": "Meeting sources"
   },
   "team": {
     "title": "Team",

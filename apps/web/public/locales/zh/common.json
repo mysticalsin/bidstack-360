@@ -56,7 +56,9 @@
     "agentStudio": "智能体工作室",
     "calendar": "日历",
     "customObjects": "自定义对象",
-    "analyticsReports": "分析与报告"
+    "analyticsReports": "分析与报告",
+    "agreements": "协议",
+    "meetings": "会议"
   },
   "crumbs": {
     "portfolio": "投资组合",
@@ -357,7 +359,9 @@
     "settings": "设置",
     "auditLog": "审计日志",
     "login": "登录",
-    "ariaLabel": "面包屑导航"
+    "ariaLabel": "面包屑导航",
+    "agreements": "协议",
+    "meetings": "会议"
   },
   "progressRing": {
     "ariaLabelPercentComplete": "完成 {{percent}}%"

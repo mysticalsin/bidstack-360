@@ -641,7 +641,8 @@
     "itemIntegrations": "集成",
     "itemWebhooks": "Webhook",
     "itemDeveloper": "开发者访问",
-    "itemAuditLog": "审计日志"
+    "itemAuditLog": "审计日志",
+    "itemMeetingSources": "会议来源"
   },
   "team": {
     "title": "团队",

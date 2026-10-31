@@ -57,7 +57,8 @@
     "calendar": "Calendar",
     "customObjects": "Custom Objects",
     "analyticsReports": "Analytics & Reports",
-    "agreements": "Agreements"
+    "agreements": "Agreements",
+    "meetings": "Meetings"
   },
   "crumbs": {
     "portfolio": "Portfolio",
@@ -148,9 +149,7 @@
     "titleSuffix": "Polo PreSales"
   },
   "routeAnnouncer": {
-    "nowOn": "Now on {{title}}",
-    "routeAgreements": "Agreements",
-    "agreementDetail": "Agreement detail"
+    "nowOn": "Now on {{title}}"
   },
   "footer": {
     "createdBy": "Created by Tony Walteur",
@@ -361,7 +360,8 @@
     "auditLog": "Audit log",
     "login": "Sign in",
     "ariaLabel": "Breadcrumb",
-    "agreements": "Agreements"
+    "agreements": "Agreements",
+    "meetings": "Meetings"
   },
   "progressRing": {
     "ariaLabelPercentComplete": "{{percent}}% complete"

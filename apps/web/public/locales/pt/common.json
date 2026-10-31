@@ -56,7 +56,9 @@
     "agentStudio": "Estúdio de agentes",
     "calendar": "Calendário",
     "customObjects": "Objetos personalizados",
-    "analyticsReports": "Análises e relatórios"
+    "analyticsReports": "Análises e relatórios",
+    "agreements": "Contratos",
+    "meetings": "Reuniões"
   },
   "crumbs": {
     "portfolio": "Carteira",
@@ -357,7 +359,9 @@
     "settings": "Configurações",
     "auditLog": "Registro de auditoria",
     "login": "Entrar",
-    "ariaLabel": "Trilha de navegação"
+    "ariaLabel": "Trilha de navegação",
+    "agreements": "Contratos",
+    "meetings": "Reuniões"
   },
   "progressRing": {
     "ariaLabelPercentComplete": "{{percent}}% concluído"

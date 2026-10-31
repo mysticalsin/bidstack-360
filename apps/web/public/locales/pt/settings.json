@@ -641,7 +641,8 @@
     "itemIntegrations": "Integrações",
     "itemWebhooks": "Webhooks",
     "itemDeveloper": "Acesso de desenvolvedor",
-    "itemAuditLog": "Registro de auditoria"
+    "itemAuditLog": "Registro de auditoria",
+    "itemMeetingSources": "Fontes de reuniões"
   },
   "team": {
     "title": "Equipe",
