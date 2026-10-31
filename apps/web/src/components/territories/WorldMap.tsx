@@ -237,6 +237,8 @@ interface WorldMapProps {
   className?: string;
   onCountryClick?: (item: TerritoryAnalyticsItem) => void;
   selectedCountryCode?: string | null;
+  /** Opportunities do not store a currency. Only pass true when the micros are known EUR. */
+  currencyKnown?: boolean;
 }
 
 export const WorldMap = memo(function WorldMap({
@@ -244,14 +246,22 @@ export const WorldMap = memo(function WorldMap({
   className,
   onCountryClick,
   selectedCountryCode,
+  currencyKnown = false,
 }: WorldMapProps) {
   const { t } = useTranslation('crm');
   const theme = useThemeStore((s) => s.theme);
-  // Currency-aware formatter so the legend, per-country aria-label, and hover
-  // tooltip track the user's selected display currency like every other money
-  // surface — the module-level formatMoneyMicros hardcoded EUR and diverged
-  // from the KPI tiles/other panels on Territories & Sector View.
   const { formatMoneyMicros } = useFormatMoney();
+  const formatAmount = (micros: number | string) => {
+    if (!currencyKnown) {
+      const major = Number(micros) / 1_000_000;
+      const compact = new Intl.NumberFormat('en', {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(Number.isFinite(major) ? major : 0);
+      return `${compact} unspecified`;
+    }
+    return formatMoneyMicros(typeof micros === 'string' ? micros : String(micros));
+  };
   const [hovered, setHovered] = useState<{
     item: TerritoryAnalyticsItem;
     x: number;
@@ -346,7 +356,7 @@ export const WorldMap = memo(function WorldMap({
   const legendItems = Array.from({ length: legendSteps }, (_, i) => {
     const t = i / (legendSteps - 1);
     const value = Math.round(maxValue * t);
-    return { color: interpolateBrand(t), label: formatMoneyMicros(String(value)) };
+    return { color: interpolateBrand(t), label: formatAmount(value) };
   });
 
   return (
@@ -440,7 +450,7 @@ export const WorldMap = memo(function WorldMap({
                 const countryLabel = item
                   ? t('worldMap.country.ariaLabel', '{{country}}: {{value}}', {
                       country: item.countryCode,
-                      value: formatMoneyMicros(item.totalValueMicros),
+                      value: formatAmount(item.totalValueMicros),
                     })
                   : undefined;
 
@@ -658,7 +668,7 @@ export const WorldMap = memo(function WorldMap({
             </span>
             <span className="text-[var(--border-subtle)]">·</span>
             <span className="font-semibold text-[var(--brand-primary)]">
-              {formatMoneyMicros(hovered.item.totalValueMicros)}
+              {formatAmount(hovered.item.totalValueMicros)}
             </span>
           </div>
           <div className="text-[10px] font-medium tabular-nums text-[var(--fg-tertiary)] mt-0.5">

@@ -55,12 +55,20 @@ beforeEach(() => {
 });
 
 describe('WorldMap currency display', () => {
-  it('renders the pipeline legend in the user-selected currency, converted from EUR', () => {
-    render(<WorldMap data={[item]} />);
+  it('renders the pipeline legend in the user-selected currency when the amount is known EUR', () => {
+    render(<WorldMap data={[item]} currencyKnown />);
 
     // maxValue = €1,000,000 → at USD rate 2.0 the top legend bracket is $2M.
     // The pre-fix code hardcoded 'EUR' and would render '€1M' regardless.
     expect(screen.getByText(/\$2M/)).toBeDefined();
     expect(screen.queryByText(/€1M/)).toBeNull();
+  });
+
+  it('does not invent a dollar amount when the pipeline currency was not recorded', () => {
+    // Why: opportunity amounts have no currency. The map must not convert
+    // them into the header currency and present that as pipeline.
+    render(<WorldMap data={[item]} />);
+    expect(screen.queryByText(/\$2M/)).toBeNull();
+    expect(screen.getAllByText(/unspecified/).length).toBeGreaterThan(0);
   });
 });
