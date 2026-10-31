@@ -169,8 +169,11 @@ describe('BusinessSnapshotCard provenance', () => {
   });
 
   it('does not invent a headquarters from the company name', () => {
-    render(<BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: 'DNB Bank' })} />);
+    render(
+      <BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: null })} />,
+    );
     expect(screen.queryByText('Oslo, Norway')).toBeNull();
     expect(screen.queryByText('OSL:DNB')).toBeNull();
+    expect(screen.queryByText('DNB Bank')).toBeNull();
   });
 });

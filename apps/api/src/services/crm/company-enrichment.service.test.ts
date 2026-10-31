@@ -295,6 +295,7 @@ describe('unscored company shells', () => {
       [],
     ).filter((row) => row.name === 'Northwind');
 
+    expect(company?.legalName).toBeNull();
     expect(company?.confidence).toBeNull();
     expect(company?.sourceAttribution[0]?.confidence).toBeNull();
     expect(company?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
@@ -306,6 +307,7 @@ describe('unscored company shells', () => {
 
   it('does not invent Mantu headcount or revenue on the placeholder account', () => {
     const mantu = fallbackCompany('Mantu');
+    expect(mantu.legalName).toBeNull();
     expect(mantu.confidence).toBeNull();
     expect(mantu.employeeCount).toBeNull();
     expect(mantu.annualRevenueMicros).toBeNull();

@@ -60,7 +60,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
   const rows: SnapshotRow[] = [
     {
       label: t('businessSnapshot.row.legalName', 'Legal name'),
-      value: c.legalName ?? c.name,
+      value: c.legalName ?? notVerified,
       source: c.legalName
         ? attributionSource(latestSource, {
             fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
@@ -69,14 +69,12 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
               'No registry attribution is attached.',
             ),
           })
-        : {
-            label: t('businessSnapshot.source.crm', 'CRM'),
-            state: 'crm',
-            hint: t(
-              'businessSnapshot.source.crmNameHint',
-              'Name is carried by the Polo PreSales account record.',
+        : missingSource(
+            t(
+              'businessSnapshot.source.missingLegalName',
+              'No legal name is on file. The account name is not a legal name.',
             ),
-          },
+          ),
     },
     {
       label: t('businessSnapshot.row.founded', 'Founded'),
