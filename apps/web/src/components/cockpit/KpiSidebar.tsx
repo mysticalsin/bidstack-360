@@ -21,7 +21,8 @@ export const KpiSidebar = memo(function KpiSidebar({
   snapshot,
   overdueCount,
   tasksLoading,
-}: Props) {
+  account = false,
+}: Props & { account?: boolean }) {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const queueWaiting = snapshot.queueHealth.reduce((acc, q) => acc + q.waiting + q.active, 0);
@@ -34,13 +35,23 @@ export const KpiSidebar = memo(function KpiSidebar({
   return (
     <Card>
       <SectionHeader
-        title={t('kpiSidebar.title', 'Platform status')}
-        caption={t(
-          'kpiSidebar.caption',
-          'Catalog and stored samples for this workspace. Not a live integration probe.',
-        )}
+        title={
+          account
+            ? t('kpiSidebar.accountTitle', 'Tasks on this account')
+            : t('kpiSidebar.title', 'Platform status')
+        }
+        caption={
+          account
+            ? t('kpiSidebar.accountCaption', 'Open work for this account. Not a workspace health probe.')
+            : t(
+                'kpiSidebar.caption',
+                'Catalog and stored samples for this workspace. Not a live integration probe.',
+              )
+        }
       />
       <div className="pulse-stack">
+        {account ? null : (
+        <>
         <PulseRow
           label={
             releaseUnset
@@ -69,6 +80,8 @@ export const KpiSidebar = memo(function KpiSidebar({
           index={2}
           reducedMotion={Boolean(reducedMotion)}
         />
+        </>
+        )}
         <PulseRow
           label={t('kpiSidebar.overdueTasks', 'Overdue tasks')}
           value={tasksLoading ? '...' : overdueCount.toString()}

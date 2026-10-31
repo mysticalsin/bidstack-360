@@ -336,6 +336,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                 snapshot={snapshot}
                 overdueCount={overdueCount}
                 tasksLoading={tasks.isLoading}
+                account
               />
             </Reveal>
           )}

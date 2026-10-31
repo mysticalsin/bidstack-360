@@ -176,10 +176,10 @@ describe('TechStackCard provenance', () => {
     render(<TechStackCard cockpit={cockpit()} />);
 
     expect(screen.getByText('Azure')).toBeTruthy();
-    expect(screen.getAllByText('Apollo').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByLabelText('Azure source: enrichment:apollo. Confidence 91%.')).toBeTruthy();
-    expect(screen.getAllByText('Manual').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByLabelText('Snowflake source: manual. Confidence 100%.')).toBeTruthy();
+    expect(screen.queryByText('Apollo')).toBeNull();
+    expect(screen.getByText('Azure source: enrichment:apollo. Confidence 91%.')).toBeTruthy();
+    expect(screen.queryByText('Manual')).toBeNull();
+    expect(screen.getByText('Snowflake source: manual. Confidence 100%.')).toBeTruthy();
   });
 
   it('saves edited stack entries as manual data', async () => {

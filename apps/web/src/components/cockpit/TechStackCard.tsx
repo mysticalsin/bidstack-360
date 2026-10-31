@@ -238,7 +238,7 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
         caption={
           technicalStack.isFetching
             ? t('techStack.captionSyncing', 'Syncing stack intelligence')
-            : t('techStack.caption', 'From discovery & verification')
+            : t('techStack.caption', 'Products recorded on this account')
         }
         action={
           isEditing ? (
@@ -565,12 +565,9 @@ function ReadOnlyStackCategory({
           >
             <TechLogo name={item.name} size={14} />
             <span className="tech-pill-name">{item.name}</span>
-            <SourceBadge
-              label={sourceLabelForTechItem(item)}
-              state={sourceStateForTechItem(item)}
-              hint={`${item.name} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
-              className="tech-pill-source"
-            />
+            <span className="sr-only">
+              {`${item.name} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
+            </span>
           </motion.span>
         ))}
       </div>
