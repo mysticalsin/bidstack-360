@@ -62,31 +62,12 @@ export function labelForBand(b: AccountCockpitSnapshot['health']['band']): strin
         : 'At risk, proxy';
 }
 
-// Static fixtures used by the BusinessSnapshotCard when the company row's
-// fields are sparse (older seed data, accounts without verified data).
-// These dictionaries belong in the seeder long-term; for now they live with
-// the card that consumes them so the dashboard isn't reaching into an
-// unrelated module for a literal lookup.
-export function headquartersFor(companyName: string): string | null {
-  const normalized = companyName.toLowerCase();
-  if (normalized.includes('mantu')) return 'Paris, France';
-  if (normalized.includes('rush')) return 'Chicago, United States';
-  if (normalized.includes('dnb')) return 'Oslo, Norway';
-  if (normalized.includes('mapfre')) return 'Madrid, Spain';
-  if (normalized.includes('mahle')) return 'Stuttgart, Germany';
-  if (normalized.includes('aritzia')) return 'Vancouver, Canada';
-  if (normalized.includes('nos')) return 'Lisbon, Portugal';
+/** A trade name is not a headquarters and not a ticker. */
+export function headquartersFor(_companyName: string): string | null {
   return null;
 }
 
-export function tickerForCompany(companyName: string): string | null {
-  const normalized = companyName.toLowerCase();
-  if (normalized.includes('apple')) return 'AAPL';
-  if (normalized.includes('microsoft')) return 'MSFT';
-  if (normalized.includes('dnb')) return 'OSL:DNB';
-  if (normalized.includes('aritzia')) return 'TSX:ATZ';
-  if (normalized.includes('mapfre')) return 'BME:MAP';
-  if (normalized.includes('ci financial')) return 'TSX:CIX';
+export function tickerForCompany(_companyName: string): string | null {
   return null;
 }
 

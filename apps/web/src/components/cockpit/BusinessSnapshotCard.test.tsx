@@ -167,4 +167,10 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.getByText(/fields on this card are filled/)).toBeTruthy();
     expect(screen.queryByText(/80\/100/)).toBeNull();
   });
+
+  it('does not invent a headquarters from the company name', () => {
+    render(<BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: 'DNB Bank' })} />);
+    expect(screen.queryByText('Oslo, Norway')).toBeNull();
+    expect(screen.queryByText('OSL:DNB')).toBeNull();
+  });
 });
