@@ -30,7 +30,10 @@ import {
   type ComponentType,
 } from 'react';
 
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
+
+const ORG_ADMIN_PERMISSION = 'settings:write';
 import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
 
 interface AuthUser {
@@ -510,8 +513,25 @@ export function useRole(): { role: string | null } {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useIsAdmin(): boolean {
+  return useOrgAdminStatus().isAdmin;
+}
+
+/**
+ * Org-admin status decided by RBAC `settings:write`, the same permission the
+ * API uses for owner-or-admin overrides and the org-wide RFP view
+ * (apps/api/src/lib/org-admin.ts). The legacy User.role column is ignored, so a
+ * revoked Admin loses admin UI and an RBAC-granted Admin gains it, matching
+ * what the API will actually allow. `isLoading` lets route guards wait instead
+ * of redirecting before the capability manifest arrives.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOrgAdminStatus(): { isAdmin: boolean; isLoading: boolean } {
   const ctx = useAuthCtx();
-  return ctx.role === 'admin';
+  const caps = useCapabilities({ enabled: ctx.isLoaded && ctx.isSignedIn });
+  return {
+    isAdmin: caps.data?.permissions.includes(ORG_ADMIN_PERMISSION) ?? false,
+    isLoading: ctx.isSignedIn && caps.isLoading,
+  };
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

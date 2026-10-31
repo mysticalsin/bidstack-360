@@ -7,7 +7,7 @@
  */
 import { Navigate } from 'react-router-dom';
 
-import { useAuth, useIsAdmin } from '@/lib/auth';
+import { useAuth, useOrgAdminStatus } from '@/lib/auth';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -27,8 +27,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const isAdmin = useIsAdmin();
-  if (!isLoaded) {
+  const { isAdmin, isLoading } = useOrgAdminStatus();
+  if (!isLoaded || (isSignedIn && isLoading)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <LoadingSkeleton rows={3} />

@@ -18,8 +18,9 @@ const CAPABILITIES_KEY = ['me', 'capabilities'] as const;
  * role grants. Prefer gating UI on a specific permission via useHasPermission
  * over the binary useIsAdmin() so the product reflects the real RBAC model.
  */
-export function useCapabilities() {
+export function useCapabilities(opts: { enabled?: boolean } = {}) {
   return useQuery({
+    enabled: opts.enabled ?? true,
     queryKey: CAPABILITIES_KEY,
     queryFn: ({ signal }) => api<CapabilityManifest>('/api/me/capabilities', { signal }),
     // Authorization rarely changes within a session; cache generously but allow
