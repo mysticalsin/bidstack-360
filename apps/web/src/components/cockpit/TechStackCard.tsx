@@ -1057,7 +1057,7 @@ function TechStackEditor({
                     <TechLogo name={suggestion.item.name} size={13} />
                     <span>{suggestion.item.name}</span>
                     <small>{sourceLabelForTechItem(suggestion.item)}</small>
-                    <strong>{confidencePercentLabel(suggestion.item.confidence)}</strong>
+                    <strong>{confidencePercentLabel(suggestion.item.confidence, suggestion.item.source)}</strong>
                   </button>
                 ))}
               </div>
@@ -1333,7 +1333,7 @@ function TechStackEditor({
                     <span className="tech-editor-source-name">{suggestion.item.name}</span>
                     <small>{suggestion.label}</small>
                     <strong className="tech-editor-source-confidence">
-                      {confidencePercentLabel(suggestion.item.confidence)}
+                      {confidencePercentLabel(suggestion.item.confidence, suggestion.item.source)}
                     </strong>
                     <span className="tech-editor-source-transport">
                       {sourceTransportLabelForTechItem(suggestion.item, providerTransportById)}
@@ -3409,12 +3409,18 @@ function providerRowsFromReviewBreakdown(
   return providerRows;
 }
 
-function confidencePercentLabel(confidence: number | null): string {
+function recordedByUser(source: string): boolean {
+  return source.toLowerCase().includes('manual');
+}
+
+function confidencePercentLabel(confidence: number | null, source?: string): string {
+  if (source && recordedByUser(source)) return 'Recorded by you';
   if (confidence == null) return 'Not scored';
   return `${Math.round(confidence * 100)}%`;
 }
 
 function confidencePhrase(name: string, source: string, confidence: number | null): string {
+  if (recordedByUser(source)) return `${name} source: ${source}. Recorded by you.`;
   if (confidence == null) return `${name} source: ${source}. Not scored.`;
   return `${name} source: ${source}. Confidence ${Math.round(confidence * 100)}%.`;
 }

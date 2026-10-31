@@ -179,7 +179,7 @@ describe('TechStackCard provenance', () => {
     expect(screen.queryByText('Apollo')).toBeNull();
     expect(screen.getByText('Azure source: enrichment:apollo. Confidence 91%.')).toBeTruthy();
     expect(screen.queryByText('Manual')).toBeNull();
-    expect(screen.getByText('Snowflake source: manual. Confidence 100%.')).toBeTruthy();
+    expect(screen.getByText('Snowflake source: manual. Recorded by you.')).toBeTruthy();
   });
 
   it('saves edited stack entries as manual data', async () => {
