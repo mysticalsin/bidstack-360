@@ -4,16 +4,10 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
-import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import type { BadgeTone } from '@/components/ui/Badge';
 import { springSnap, springSoft } from '@/lib/motion';
-import {
-  formatUnspecifiedAmount,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
-
-import { labelForBand } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -38,8 +32,6 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     (risk) => risk.severity === 'critical' || risk.severity === 'high',
   ).length;
   const proofCount = cockpit.company.sourceAttribution.length + (cockpit.company.logo ? 1 : 0);
-  const stackCount = cockpit.technicalStack.reduce((acc, row) => acc + row.items.length, 0);
-  const primaryKpi = cockpit.kpis[0];
 
   const signals: CommandSignal[] = [
     {
@@ -87,48 +79,26 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
 
   return (
     <motion.section
-      className="command-center"
+      className="command-center command-center-graphic"
       role="region"
       aria-label={t('commandCenter.region.ariaLabel', 'Polo PreSales command center')}
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={springSoft}
     >
-      <div className="command-center-hero">
-        <div className="command-center-kicker">
-          <span>{t('commandCenter.nextLabel', 'Next')}</span>
-        </div>
-        <h2>{nextMove}</h2>
-        <div
-          className="command-center-actions"
-          aria-label={t('commandCenter.actions.ariaLabel', 'Account decision signals')}
-        >
-          <Badge tone={readiness >= 85 ? 'jade' : 'blue'}>
-            {t('commandCenter.badge.ready', '{{count}}% readiness proxy', { count: readiness })}
-          </Badge>
-          <Badge tone={healthTone(cockpit.health.band)}>
-            {t('commandCenter.badge.coverage', 'Coverage · {{band}}', {
-              band: labelForBand(cockpit.health.band),
-            })}
-          </Badge>
-          <Badge tone={stackCount >= 12 ? 'purple' : 'gray'}>
-            {t('commandCenter.badge.stackSignals', '{{count}} stack signals', { count: stackCount })}
-          </Badge>
-        </div>
-      </div>
-
+      <p className="command-center-next">{nextMove}</p>
       <div className="command-center-metrics">
         {signals.map((signal, index) => (
           <motion.div
             key={signal.label}
             className="command-signal"
+            data-tone={signal.tone}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.045 }}
           >
             <div className="command-signal-head">
               <span>{signal.label}</span>
-              <Badge tone={signal.tone}>{signal.detail}</Badge>
             </div>
             <strong>
               <AnimatedMetric value={signal.value} />
@@ -140,35 +110,9 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
                 transition={{ ...springSnap, delay: reducedMotion ? 0 : 0.14 + index * 0.04 }}
               />
             </span>
+            <span className="command-signal-detail">{signal.detail}</span>
           </motion.div>
         ))}
-      </div>
-
-      <div className="command-center-footer">
-        <div>
-          <span>{t('commandCenter.footer.primarySignal.label', 'Primary commercial signal')}</span>
-          <strong>
-            {primaryKpi
-              ? `${primaryKpi.label}: ${primaryKpi.value}`
-              : t('commandCenter.footer.primarySignal.pending', 'Pipeline pending')}
-          </strong>
-        </div>
-        <div>
-          <span>{t('commandCenter.footer.weightedValue.label', 'Reported annual revenue')}</span>
-          <strong>
-            {cockpit.company.annualRevenueMicros
-              ? `${formatUnspecifiedAmount(cockpit.company.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
-              : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
-          </strong>
-        </div>
-        <div>
-          <span>{t('commandCenter.footer.ownerMap.label', 'Decision owner map')}</span>
-          <strong>
-            {t('commandCenter.footer.ownerMap.contacts', '{{count}} contacts mapped', {
-              count: committee.contacts,
-            })}
-          </strong>
-        </div>
       </div>
     </motion.section>
   );
@@ -278,13 +222,6 @@ function riskPenaltyFor(risk: RiskItem): number {
   if (risk.severity === 'high') return 9;
   if (risk.severity === 'medium') return 4;
   return 1;
-}
-
-function healthTone(band: AccountCockpitSnapshot['health']['band']): BadgeTone {
-  if (band === 'strong') return 'jade';
-  if (band === 'good') return 'blue';
-  if (band === 'needs_attention') return 'amber';
-  return 'tomato';
 }
 
 function clamp(value: number): number {

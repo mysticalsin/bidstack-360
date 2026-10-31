@@ -12,7 +12,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 
 import type { AccountCockpitSnapshot, CockpitKpi } from '@bidstack/shared';
 
-import { KPI_TONE_BG, KPI_TONE_FG, iconForKpi } from './_tokens';
+import { KPI_TONE_FG, iconForKpi } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -67,7 +67,6 @@ function KpiBlock({
   companyKey: string;
   editable?: boolean;
 }) {
-  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   if (kpis.length === 0) return null;
   const cols = Math.min(6, Math.max(3, kpis.length));
@@ -85,47 +84,27 @@ function KpiBlock({
         </h3>
         <span className="text-[11px] text-[var(--fg-tertiary)]">{caption}</span>
       </div>
-      <div className={`kpi-grid ${colsClass}`}>
+      <div className={`kpi-grid kpi-grid-compact ${colsClass}`}>
         {kpis.map((kpi) => (
           <GlassCard
             key={kpi.label}
-            className="flex gap-3"
+            className="kpi-chip"
+            padding="none"
+            hoverable={false}
             variants={reduced ? undefined : staggerChild}
             transition={springSnap}
+            style={{ borderTop: `3px solid ${KPI_TONE_FG[kpi.tone]}` }}
           >
-            <div
-              className="kpi-icon"
-              style={{ background: KPI_TONE_BG[kpi.tone], color: KPI_TONE_FG[kpi.tone] }}
-              aria-hidden
-            >
-              <Icon name={iconForKpi(kpi.label)} size={18} />
+            <div className="kpi-chip-label">
+              <Icon name={iconForKpi(kpi.label)} size={14} />
+              <span>{kpi.label}</span>
             </div>
-            <div className="kpi-text" style={{ flex: 1, minWidth: 0 }}>
-              <div className="kpi-label">{kpi.label}</div>
-              <div className="kpi-value">
-                <KpiValue raw={kpi.value} reduced={reduced} />
-              </div>
-              {kpi.detail ? <div className="kpi-sub">{kpi.detail}</div> : null}
+            <div className="kpi-value">
+              <KpiValue raw={kpi.value} reduced={reduced} />
             </div>
-            <div
-              style={{
-                color: KPI_TONE_FG[kpi.tone],
-                alignSelf: 'flex-start',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: 2,
-              }}
-            >
-              <SourceBadge
-                label={kpi.overridden ? t('kpiRow.manuallyOverridden', 'Manually overridden') : (kpi.sourceLabel ?? t('kpiRow.internal', 'Internal'))}
-                state={kpi.sourceState ?? 'crm'}
-                hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'Polo PreSales internal data')}
-              />
-              {(editable || kpi.overridden) && kpi.fieldKey ? (
-                <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />
-              ) : null}
-            </div>
+            {(editable || kpi.overridden) && kpi.fieldKey ? (
+              <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />
+            ) : null}
           </GlassCard>
         ))}
       </div>
@@ -239,34 +218,6 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         {save.isPending ? '…' : t('kpiRow.btnSave', 'Save')}
       </button>
     </form>
-  );
-}
-
-function SourceBadge({
-  label,
-  state,
-  hint,
-}: {
-  label: string;
-  state: NonNullable<CockpitKpi['sourceState']>;
-  hint: string;
-}) {
-  const className =
-    state === 'apollo_fresh'
-      ? 'bg-[var(--success-tint)] text-[var(--success)]'
-      : state === 'apollo_stale' || state === 'missing'
-        ? 'bg-[var(--warning-tint)] text-[var(--warning)]'
-        : state === 'verified'
-          ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
-          : 'bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]';
-  return (
-    <span
-      className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${className}`}
-      aria-label={hint}
-      title={hint}
-    >
-      {label}
-    </span>
   );
 }
 

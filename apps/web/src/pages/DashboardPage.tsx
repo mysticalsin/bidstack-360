@@ -241,14 +241,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       <KpiRow cockpit={cockpit} />
       <CommandCenter cockpit={cockpit} />
 
-      <div className="mt-1 flex flex-col gap-1">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-          {t('dashboard.portfolioIntelTitle', 'Portfolio sales intelligence')}
-        </h2>
-        <p className="text-xs text-[var(--fg-tertiary)]">
-          {t('dashboard.portfolioIntelSubtitle', 'Pipeline, risks, contacts, and records for this account.')}
-        </p>
-      </div>
       <section className="cockpit-grid" aria-label={t('dashboard.accountCockpitAria', 'Account cockpit')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {show('techStack') && (

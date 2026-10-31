@@ -156,14 +156,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
               )}
             </div>
           ) : null}
-          {accountView ? (
-            <p className="mt-1 max-w-xl text-xs text-[var(--fg-tertiary)]">
-              {t(
-                'pageHead.healthBasis',
-                'The signal band is a recorded-field proxy on this account, not a measured health score.',
-              )}
-            </p>
-          ) : null}
         </div>
       </div>
       <div className="page-actions">
