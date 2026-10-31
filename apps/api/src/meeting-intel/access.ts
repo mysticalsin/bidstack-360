@@ -3,15 +3,18 @@
 // A meeting is readable when ALL of these hold:
 //   1. same org, not deleted;
 //   2. its company is inside the caller's access scope (applyCompanyScope);
-//   3. visibility = 'org', OR the caller is on the account team: key account
-//      owner, director sponsor, owner of an open opportunity on the company,
-//      the person who logged or shared the meeting, or an internal attendee.
+//   3. visibility = 'org', OR the caller logged/shared it, attended it, or is
+//      on the account team. Account team (pinned): key account owner +
+//      director sponsor + owners of an open opportunity on the company.
+// Admins may also read team-only meetings inside their scope (admin_override,
+// audited). A cross-region flag grants its recipient that one meeting only.
 // Anything else answers 404, like a missing row.
 import { Prisma, prisma } from '@bidstack/db';
+import { ACCOUNT_TEAM_OPEN_STAGES } from '@bidstack/shared';
 
 import { applyCompanyScope, type AccessScope } from '../lib/access-scope.js';
 
-export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
+export const OPEN_STAGES = ACCOUNT_TEAM_OPEN_STAGES;
 export const RESTRICTED_COMPANY = 'Restricted company';
 const MAX_GROUP = 500;
 

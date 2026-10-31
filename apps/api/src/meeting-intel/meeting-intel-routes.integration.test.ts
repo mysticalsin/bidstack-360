@@ -11,6 +11,7 @@ import type { MeetingIntelJob } from '@bidstack/shared';
 
 import { invalidateAccessScope } from '../lib/access-scope.js';
 import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
+import { isOnAccountTeam } from './access.js';
 import { __setMeetingIntelEnqueueForTest } from '../queues/meeting-intel.js';
 import { buildServer } from '../server.js';
 import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../test-support/isolated-org.js';
@@ -141,11 +142,13 @@ describe('RBAC', () => {
 });
 
 describe('list and detail', () => {
-  it('shows org meetings and account-team meetings the caller is on, never other orgs', async () => {
+  it('admin sees team-only meetings too (audited as admin_override), never other orgs', async () => {
     const res = await call({ method: 'GET', url: '/meeting-intel' });
     expect(res.statusCode, res.body).toBe(200);
     const ids = (res.json() as { items: Array<{ id: string }> }).items.map((i) => i.id);
-    expect(ids.sort()).toEqual([m.fr, m.deOrg].sort());
+    expect(ids.sort()).toEqual([m.fr, m.deOrg, m.deTeam].sort());
+    const listAudit = await prisma.auditLog.findFirstOrThrow({ where: { orgId: orgA.orgId, action: 'meeting_intel.list' }, orderBy: { at: 'desc' } });
+    expect(listAudit.diff).toMatchObject({ access: 'admin_override', adminOverrideIds: [m.deTeam] });
     const row = (res.json() as { items: Array<Record<string, unknown>> }).items.find((i) => i.id === m.fr)!;
     expect(row).toMatchObject({ topSeniority: 'c_level', attendeeCount: 2, sources: ['abc'], companyName: `${TAG} Acme France` });
     const audit = await prisma.auditLog.findFirst({ where: { orgId: orgA.orgId, action: 'meeting_intel.list' } });
@@ -166,9 +169,17 @@ describe('list and detail', () => {
     expect(d.attendees.find((a) => a.name === 'Marie Curie')!.reportsToContactId).toBeTruthy();
     expect(d.sourceLinks[0]).toMatchObject({ source: 'abc', url: 'https://abc.example/fr' });
     expect(d.transcript).toBeNull();
-    expect((await call({ method: 'GET', url: `/meeting-intel/${m.deTeam}` })).statusCode).toBe(404);
     expect((await call({ method: 'GET', url: `/meeting-intel/${m.other}` })).statusCode).toBe(404);
-    expect(await prisma.auditLog.count({ where: { orgId: orgA.orgId, action: 'meeting_intel.view', targetId: m.fr } })).toBe(1);
+    const views = await prisma.auditLog.findMany({ where: { orgId: orgA.orgId, action: 'meeting_intel.view', targetId: m.fr }, take: 5 });
+    expect(views.map((v) => (v.diff as { access: string }).access)).toEqual(['visible']);
+    // Admin override on a team-only meeting is allowed and audited.
+    expect((await call({ method: 'GET', url: `/meeting-intel/${m.deTeam}` })).statusCode).toBe(200);
+    const over = await prisma.auditLog.findFirstOrThrow({ where: { orgId: orgA.orgId, action: 'meeting_intel.view', targetId: m.deTeam } });
+    expect(over.diff).toMatchObject({ access: 'admin_override' });
+    // ...but the override never crosses the admin's access scope.
+    await withScope(adminId, ['FR'], async () => {
+      expect((await call({ method: 'GET', url: `/meeting-intel/${m.deTeam}` })).statusCode).toBe(404);
+    });
   });
 
   it('a user outside the account team only sees org-visible meetings', async () => {
@@ -208,13 +219,19 @@ describe('rollups', () => {
   });
 
   it('challenge rollup merges case variants and skips meetings the caller cannot open', async () => {
+    clearRbacDecisionCacheForTest();
+    const asSm = await call({ method: 'GET', url: `/meeting-intel/accounts/${c.root}/challenges?windowDays=1095`, role: 'sales-manager' });
+    expect(asSm.statusCode, asSm.body).toBe(200);
+    const smItems = (asSm.json() as { items: Array<{ challenge: string; mentions: number }> }).items;
+    expect(smItems.map((i) => i.challenge)).not.toContain('Secret reorg');
+    expect(smItems.find((i) => i.challenge.toLowerCase() === 'legacy erp')!.mentions).toBe(1);
     const res = await call({ method: 'GET', url: `/meeting-intel/accounts/${c.root}/challenges?windowDays=1095` });
     expect(res.statusCode, res.body).toBe(200);
     const items = (res.json() as { items: Array<{ challenge: string; mentions: number; regions: string[]; meetingIds: string[] }> }).items;
     const erp = items.find((i) => i.challenge.toLowerCase() === 'legacy erp')!;
     expect(erp.mentions).toBe(2);
     expect(erp.regions).toEqual(['DE', 'FR']);
-    expect(items.map((i) => i.challenge)).not.toContain('Secret reorg');
+    expect(items.map((i) => i.challenge)).toContain('Secret reorg'); // admin override
   });
 });
 
@@ -243,6 +260,77 @@ describe('cross-region flags', () => {
     expect((await call({ method: 'POST', url: `/meeting-intel/flags/${flagId}/dismiss` })).statusCode).toBe(204);
     expect(((await call({ method: 'GET', url: '/meeting-intel/flags' })).json() as { items: unknown[] }).items).toHaveLength(0);
     expect(((await call({ method: 'GET', url: '/meeting-intel/flags?status=all' })).json() as { items: unknown[] }).items).toHaveLength(1);
+  });
+});
+
+describe('account team definition (pinned)', () => {
+  it('is key account owner + director sponsor + open-opportunity owners, nothing else', async () => {
+    const mkUser = async (k: string) =>
+      (await prisma.user.create({ data: { orgId: orgA.orgId, clerkUser: `user_${TAG}_${k}`, email: `${TAG}.${k}@example.test`, name: k } })).id;
+    const sponsor = await mkUser('sponsor');
+    const openOwner = await mkUser('open');
+    const closedOwner = await mkUser('closed');
+    const creatorOnly = await mkUser('creator');
+    await prisma.company.update({ where: { id: c.de! }, data: { directorSponsorId: sponsor } });
+    const opp = (stage: string, ownerId: string, code: string) =>
+      prisma.opportunity.create({ data: { orgId: orgA.orgId, code: `${TAG}-${code}`, customer: 'Acme', name: code, stage: stage as never, ownerId, companyId: c.de } });
+    await opp('s3_technical_iteration', openOwner, 'open');
+    await opp('closed_won', closedOwner, 'won');
+    await opp('closed_lost', closedOwner, 'lost');
+    await prisma.meetingIntel.update({ where: { id: m.deOrg! }, data: { createdById: creatorOnly } });
+    expect(await isOnAccountTeam(orgA.orgId, deUser, c.de!)).toBe(true); // key account owner
+    expect(await isOnAccountTeam(orgA.orgId, sponsor, c.de!)).toBe(true);
+    expect(await isOnAccountTeam(orgA.orgId, openOwner, c.de!)).toBe(true);
+    expect(await isOnAccountTeam(orgA.orgId, closedOwner, c.de!)).toBe(false);
+    expect(await isOnAccountTeam(orgA.orgId, creatorOnly, c.de!)).toBe(false); // authorship is not membership
+    expect(await isOnAccountTeam(orgA.orgId, adminId, c.de!)).toBe(false);
+    expect(await isOnAccountTeam(orgB.orgId, deUser, c.de!)).toBe(false);
+  });
+});
+
+describe('flag-granted meeting access', () => {
+  let aeId = '';
+  let aeFlag = '';
+  beforeAll(async () => {
+    clearRbacDecisionCacheForTest();
+    expect((await call({ method: 'GET', url: '/meeting-intel', role: 'account-executive' })).statusCode).toBe(200); // AE has meetings:read
+    aeId = (await prisma.user.findFirstOrThrow({ where: { email: 'e2e-account-executive@bidstack.local', orgId: orgA.orgId } })).id;
+    aeFlag = (
+      await prisma.meetingCrossRegionFlag.create({
+        data: { orgId: orgA.orgId, meetingId: m.deTeam!, recipientUserId: aeId, parentCompanyId: c.root!, companyId: c.de!, ownedCompanyId: c.fr!, reason: 'r', talkingPoints: [] },
+      })
+    ).id;
+  });
+
+  it('opens the full team-only meeting through the flag only, and audits it', async () => {
+    expect((await call({ method: 'GET', url: `/meeting-intel/${m.deTeam}`, role: 'account-executive' })).statusCode).toBe(404);
+    const res = await call({ method: 'GET', url: `/meeting-intel/flags/${aeFlag}/meeting`, role: 'account-executive' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ id: m.deTeam, companyId: c.de, companyName: `${TAG} Acme Germany`, access: 'flag', companyRestricted: false, challenges: ['Secret reorg'] });
+    expect((res.json() as { attendees: Array<{ name: string }> }).attendees[0]!.name).toBe('Hans');
+    const a = await prisma.auditLog.findFirstOrThrow({ where: { orgId: orgA.orgId, userId: aeId, action: 'meeting_intel.view', targetId: m.deTeam } });
+    expect(a.diff).toMatchObject({ access: 'flag', flagId: aeFlag, companyRestricted: false });
+    // The flag grants the meeting, not the account: other team-only meetings stay hidden.
+    const list = (await call({ method: 'GET', url: `/meeting-intel?companyId=${c.de}`, role: 'account-executive' })).json() as { items: Array<{ id: string }> };
+    expect(list.items.map((i) => i.id)).not.toContain(m.deTeam);
+  });
+
+  it('redacts account and people when the account is outside the recipient scope', async () => {
+    await withScope(aeId, ['FR'], async () => {
+      const res = await call({ method: 'GET', url: `/meeting-intel/flags/${aeFlag}/meeting`, role: 'account-executive' });
+      expect(res.statusCode, res.body).toBe(200);
+      const body = res.json() as Record<string, unknown>;
+      expect(body).toMatchObject({ companyId: null, companyName: 'Restricted company', companyRestricted: true, summary: null, transcript: null });
+      const text = JSON.stringify(body);
+      for (const leak of ['Acme Germany', 'Hans', `${TAG} deTeam`, 'abc.example']) expect(text).not.toContain(leak);
+      expect(body.challenges).toEqual(['Secret reorg']);
+    });
+  });
+
+  it('nobody else can use the flag', async () => {
+    clearRbacDecisionCacheForTest();
+    expect((await call({ method: 'GET', url: `/meeting-intel/flags/${aeFlag}/meeting`, role: 'sales-manager' })).statusCode).toBe(404);
+    expect((await call({ method: 'GET', url: `/meeting-intel/flags/${aeFlag}/meeting` })).statusCode).toBe(404);
   });
 });
 

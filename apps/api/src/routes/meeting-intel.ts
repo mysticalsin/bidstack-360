@@ -30,6 +30,8 @@ import {
   classifySeniority,
   CoverageMapResponse,
   CrossRegionFlagOut,
+  FlagMeetingDetail,
+  type MeetingIntelAccess,
   crossRegionTalkingPoints,
   emailDomain,
   MeetingIngestResult,
@@ -49,8 +51,8 @@ import {
   seniorityRank,
 } from '@bidstack/shared';
 
-import { getAccessScope } from '../lib/access-scope.js';
-import { userHasPermission } from '../lib/rbac-decision-cache.js';
+import { type AccessScope, getAccessScope } from '../lib/access-scope.js';
+import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 import {
   companiesInScope,
   groupCompanyIds,
@@ -116,30 +118,78 @@ function toRow(r: RowRecord): MeetingIntelRow {
   };
 }
 
-async function loadVisible(req: FastifyRequest, id: string) {
+const DETAIL_INCLUDE = {
+  ...ROW_INCLUDE,
+  attendees: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      title: true,
+      seniority: true,
+      region: true,
+      businessUnit: true,
+      isInternal: true,
+      contactId: true,
+      contact: { select: { reportsToContactId: true } },
+    },
+    orderBy: [{ isInternal: 'asc' }, { name: 'asc' }],
+  },
+} satisfies Prisma.MeetingIntelInclude;
+type DetailRecord = Prisma.MeetingIntelGetPayload<{ include: typeof DETAIL_INCLUDE }>;
+
+/** Admins see team-only meetings too, still limited by access scope, and audited as admin_override. */
+async function callerIsAdmin(req: FastifyRequest): Promise<boolean> {
+  return userHasAnyRole(req.auth.orgId, req.auth.userId, ['Admin']);
+}
+
+async function loadVisible(
+  req: FastifyRequest,
+  id: string,
+  opts: { allowAdmin?: boolean } = {},
+): Promise<{ row: DetailRecord | null; scope: AccessScope; access: MeetingIntelAccess }> {
   const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
   const row = await prisma.meetingIntel.findFirst({
     where: { AND: [{ id }, visibleMeetingWhere(req.auth.orgId, scope)] },
-    include: {
-      ...ROW_INCLUDE,
-      attendees: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          title: true,
-          seniority: true,
-          region: true,
-          businessUnit: true,
-          isInternal: true,
-          contactId: true,
-          contact: { select: { reportsToContactId: true } },
-        },
-        orderBy: [{ isInternal: 'asc' }, { name: 'asc' }],
-      },
-    },
+    include: DETAIL_INCLUDE,
   });
-  return { row, scope };
+  if (row || opts.allowAdmin === false || !(await callerIsAdmin(req))) return { row, scope, access: 'visible' };
+  const viaAdmin = await prisma.meetingIntel.findFirst({
+    where: { AND: [{ id }, scopedMeetingWhere(req.auth.orgId, scope)] },
+    include: DETAIL_INCLUDE,
+  });
+  return { row: viaAdmin, scope, access: 'admin_override' };
+}
+
+function toDetail(row: DetailRecord): MeetingIntelDetail {
+  return {
+    ...toRow(row),
+    summary: row.summary,
+    transcript: row.transcriptText,
+    similarProjects: row.similarProjects,
+    opportunities: row.opportunities,
+    attendees: row.attendees.map(({ contact, ...a }) => ({ ...a, reportsToContactId: contact?.reportsToContactId ?? null })),
+    sourceLinks: row.sources.map((s) => ({ source: s.source, externalId: s.externalId, url: s.url, ingestedAt: s.ingestedAt.toISOString() })),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** List/rollup base filter: admins get every in-scope meeting, others the visible ones. */
+async function readableWhere(req: FastifyRequest, scope: AccessScope) {
+  const admin = await callerIsAdmin(req);
+  return { admin, where: admin ? scopedMeetingWhere(req.auth.orgId, scope) : visibleMeetingWhere(req.auth.orgId, scope) };
+}
+
+/** Ids in `ids` the caller could not see without the admin override. */
+async function overrideIds(orgId: string, scope: AccessScope, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const normal = await prisma.meetingIntel.findMany({
+    where: { AND: [{ id: { in: ids } }, visibleMeetingWhere(orgId, scope)] },
+    select: { id: true },
+    take: ids.length,
+  });
+  const seen = new Set(normal.map((r) => r.id));
+  return ids.filter((id) => !seen.has(id));
 }
 
 function connectionToken(): { token: string; hash: string; prefix: string } {
@@ -194,7 +244,8 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
       const q = req.query;
       const orgId = req.auth.orgId;
       const scope = await getAccessScope(orgId, req.auth.userId);
-      const and: Prisma.MeetingIntelWhereInput[] = [visibleMeetingWhere(orgId, scope)];
+      const base = await readableWhere(req, scope);
+      const and: Prisma.MeetingIntelWhereInput[] = [base.where];
       if (q.companyId) and.push({ companyId: q.companyId });
       if (q.groupId) and.push({ companyId: { in: await groupCompanyIds(orgId, q.groupId) } });
       if (q.source) and.push({ sources: { some: { source: q.source } } });
@@ -219,9 +270,11 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const more = rows.length > q.limit;
       const items = rows.slice(0, q.limit).map(toRow);
+      const viaAdmin = base.admin ? await overrideIds(orgId, scope, items.map((i) => i.id)) : [];
       await audit(req, 'meeting_intel.list', null, {
         filters: { companyId: q.companyId ?? null, groupId: q.groupId ?? null, source: q.source ?? null, q: q.q ?? null },
         returned: items.length,
+        ...(viaAdmin.length ? { access: 'admin_override', adminOverrideIds: viaAdmin } : {}),
       });
       return { items, nextCursor: more ? q.cursor + q.limit : null };
     },
@@ -231,19 +284,10 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/meeting-intel/:id',
     { config: { permission: 'meetings:read' }, schema: { params: idParam, response: { 200: MeetingIntelDetail } } },
     async (req) => {
-      const { row } = await loadVisible(req, req.params.id);
+      const { row, access } = await loadVisible(req, req.params.id);
       if (!row) throw server.httpErrors.notFound('Meeting not found');
-      await audit(req, 'meeting_intel.view', row.id, { transcript: row.transcriptText !== null });
-      return {
-        ...toRow(row),
-        summary: row.summary,
-        transcript: row.transcriptText,
-        similarProjects: row.similarProjects,
-        opportunities: row.opportunities,
-        attendees: row.attendees.map(({ contact, ...a }) => ({ ...a, reportsToContactId: contact?.reportsToContactId ?? null })),
-        sourceLinks: row.sources.map((s) => ({ source: s.source, externalId: s.externalId, url: s.url, ingestedAt: s.ingestedAt.toISOString() })),
-        createdAt: row.createdAt.toISOString(),
-      };
+      await audit(req, 'meeting_intel.view', row.id, { access, transcript: row.transcriptText !== null });
+      return toDetail(row);
     },
   );
 
@@ -324,7 +368,7 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   async function loadEditable(req: FastifyRequest, id: string) {
-    const { row } = await loadVisible(req, id);
+    const { row } = await loadVisible(req, id, { allowAdmin: false });
     if (!row) throw server.httpErrors.notFound('Meeting not found');
     const can = row.createdById === req.auth.userId || (await isOnAccountTeam(req.auth.orgId, req.auth.userId, row.companyId));
     if (!can) throw server.httpErrors.forbidden('Only the account team or the author can change this meeting');
@@ -432,11 +476,12 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { orgId, scope, inScope } = await loadGroup(req, req.params.groupId);
+      const { scope, inScope } = await loadGroup(req, req.params.groupId);
       const since = new Date(Date.now() - req.query.windowDays * DAY_MS);
-      // Challenges come only from meetings the caller can open.
+      // Challenges come only from meetings the caller can open (admins: all in scope).
+      const base = await readableWhere(req, scope);
       const meetings = await prisma.meetingIntel.findMany({
-        where: { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: inScope }, heldAt: { gte: since } }] },
+        where: { AND: [base.where, { companyId: { in: inScope }, heldAt: { gte: since } }] },
         select: { id: true, heldAt: true, challenges: true, company: { select: { countryCode: true } } },
         orderBy: { heldAt: 'desc' },
         take: 1000,
@@ -458,7 +503,10 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         .sort((a, b) => b.mentions - a.mentions || b.last.getTime() - a.last.getTime())
         .slice(0, req.query.limit)
         .map((e) => ({ challenge: e.challenge, mentions: e.mentions, regions: [...e.regions].sort(), lastMentionedAt: e.last.toISOString(), meetingIds: e.ids }));
-      await audit(req, 'meeting_intel.challenges.view', req.params.groupId, { returned: items.length });
+      await audit(req, 'meeting_intel.challenges.view', req.params.groupId, {
+        returned: items.length,
+        ...(base.admin ? { access: 'admin_override' } : {}),
+      });
       return { groupId: req.params.groupId, items };
     },
   );
@@ -552,6 +600,47 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         };
       }
       return { items: out };
+    },
+  );
+
+  // A flag grants its recipient this one meeting, whatever its visibility,
+  // and never the account. Redacted when the account is outside their scope.
+  server.get(
+    '/meeting-intel/flags/:id/meeting',
+    { config: { permission: 'meetings:read' }, schema: { params: idParam, response: { 200: FlagMeetingDetail } } },
+    async (req) => {
+      const orgId = req.auth.orgId;
+      const flag = await prisma.meetingCrossRegionFlag.findFirst({
+        where: { id: req.params.id, orgId, recipientUserId: req.auth.userId },
+        select: { id: true, meetingId: true },
+      });
+      if (!flag) throw server.httpErrors.notFound('Flag not found');
+      const row = await prisma.meetingIntel.findFirst({ where: { id: flag.meetingId, orgId, deletedAt: null }, include: DETAIL_INCLUDE });
+      if (!row) throw server.httpErrors.notFound('Meeting not found');
+      const scope = await getAccessScope(orgId, req.auth.userId);
+      const restricted = !(await companiesInScope(orgId, scope, [row.companyId])).has(row.companyId);
+      const d = toDetail(row);
+      await audit(req, 'meeting_intel.view', row.id, { access: 'flag', flagId: flag.id, companyRestricted: restricted });
+      if (!restricted) return { ...d, companyRestricted: false, access: 'flag' as const, flagId: flag.id };
+      return {
+        ...d,
+        companyId: null,
+        companyName: RESTRICTED_COMPANY,
+        title: 'Meeting at a restricted account',
+        summary: null,
+        transcript: null,
+        attendees: d.attendees.map((a) => ({
+          ...a,
+          name: a.isInternal ? 'Colleague' : 'Restricted contact',
+          email: null,
+          contactId: null,
+          reportsToContactId: null,
+        })),
+        sourceLinks: d.sourceLinks.map((l) => ({ ...l, externalId: 'restricted', url: null })),
+        companyRestricted: true,
+        access: 'flag' as const,
+        flagId: flag.id,
+      };
     },
   );
 

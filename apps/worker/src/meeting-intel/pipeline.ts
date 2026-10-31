@@ -24,6 +24,7 @@ import {
   NormalizedMeeting,
   type SeniorityLevel,
   seniorityRank,
+  ACCOUNT_TEAM_OPEN_STAGES,
 } from '@bidstack/shared';
 
 import { type AccountHint, type AdapterRegistry, defaultAdapters, SourceNotConfiguredError } from './adapters.js';
@@ -355,7 +356,7 @@ async function findDuplicate(
 
 // ─── cross-region flags ─────────────────────────────────────────────────────
 
-const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
+const OPEN_STAGES = ACCOUNT_TEAM_OPEN_STAGES;
 
 /** Account team of a company: key account owner, director sponsor, open-deal owners. */
 export async function accountTeams(orgId: string, companyIds: string[]): Promise<Map<string, Set<string>>> {
