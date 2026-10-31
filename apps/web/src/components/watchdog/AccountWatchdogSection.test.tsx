@@ -10,6 +10,10 @@ vi.mock('@/hooks/useAccountWatchdog', () => ({
 }));
 const mi: { data?: { items: unknown[] } } = {};
 vi.mock('@/hooks/useMeetingIntel', () => ({ useMeetingWatchdogFeed: () => mi }));
+const enr: { data?: unknown } = {};
+vi.mock('@/hooks/useCompanyEnrichment', () => ({ useCompanyEnrichment: () => enr }));
+
+import { mockEnrichment } from '@/lib/enrichment/mock';
 
 import { AccountWatchdogSection } from './AccountWatchdogSection';
 
@@ -94,5 +98,18 @@ describe('AccountWatchdogSection', () => {
     fireEvent.click(row);
     expect(screen.getByRole('link', { name: 'Open flag and talking points' }).getAttribute('href')).toBe('/meeting-intel/flags/f1');
     mi.data = undefined;
+  });
+
+  it('shows inferred potential projects as sample opportunity signals linking to their evidence', () => {
+    state.data = base;
+    enr.data = mockEnrichment('c1');
+    render(<MemoryRouter><AccountWatchdogSection companyId="c1" /></MemoryRouter>);
+    const rows = screen.getAllByRole('button', { name: /Sample: Potential project:/ });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Hiring signals ·/).length).toBe(rows.length);
+    fireEvent.click(rows[0]!);
+    const link = screen.getByRole('link', { name: 'See the evidence postings' });
+    expect(link.getAttribute('href')).toMatch(/^\/accounts\/c1#enrichment-project-/);
+    enr.data = undefined;
   });
 });
