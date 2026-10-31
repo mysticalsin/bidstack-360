@@ -2158,7 +2158,7 @@
     "clear": "clear",
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",
-    "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "bidsInFlight": "{{count}} on this page · click any cell to edit inline.",
     "exportingLabel": "Exporting opportunities…",
     "exportLabel": "Export visible opportunities as CSV",
     "exporting": "Exporting…",

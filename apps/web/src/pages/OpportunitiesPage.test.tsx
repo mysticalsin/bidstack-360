@@ -133,6 +133,9 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByRole('heading', { name: /Opportunities/i })).toBeTruthy();
     expect(screen.getByText('Acme Upgrade')).toBeTruthy();
     expect(screen.getByText('OP-0001')).toBeTruthy();
+    // The list includes closed rows. The subtitle counts the page, not bids still in flight.
+    expect(screen.getByText('{{count}} on this page · click any cell to edit inline.')).toBeTruthy();
+    expect(screen.queryByText(/in flight/i)).toBeNull();
   });
 
   // A1 (bid clock): the "Due ≤ 7d" quick filter must actually reach the API

@@ -2135,7 +2135,7 @@
     "clear": "cancella",
     "stageOpportunities": "opportunità {{stage}}",
     "clearFilter": "cancella filtro",
-    "bidsInFlight": "{{count}} offerte in corso · fai clic su una cella per modificare in linea.",
+    "bidsInFlight": "{{count}} in questa pagina · fai clic su una cella per modificare in linea.",
     "exportingLabel": "Esportazione delle opportunità…",
     "exportLabel": "Esporta le opportunità visibili come CSV",
     "exporting": "Esportazione…",

@@ -2135,7 +2135,7 @@
     "clear": "清除",
     "stageOpportunities": "{{stage}}商机",
     "clearFilter": "清除筛选",
-    "bidsInFlight": "{{count}} 个进行中的投标 · 点击任意单元格即可行内编辑。",
+    "bidsInFlight": "本页 {{count}} 条 · 点击任意单元格即可行内编辑。",
     "exportingLabel": "正在导出商机…",
     "exportLabel": "将可见商机导出为 CSV",
     "exporting": "正在导出…",

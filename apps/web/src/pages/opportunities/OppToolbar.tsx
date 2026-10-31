@@ -177,7 +177,7 @@ export function OppPageHeader({
             </>
           ) : (
             <>
-              {t('oppToolbar.bidsInFlight', '{{count}} bids in flight · click any cell to edit inline.', {
+              {t('oppToolbar.bidsInFlight', '{{count}} on this page · click any cell to edit inline.', {
                 count: itemCount,
               })}
             </>
