@@ -345,8 +345,7 @@ export async function buildCompanyCockpit(
     : { companyId: company.id, deletedAt: null };
 
   // Step 2: load company-specific data in parallel (filtered by company)
-  const [opportunities, contacts, tasks, riskRows, complianceRows, performance, fieldOverrides] =
-    await Promise.all([
+  const [opportunities, contacts, tasks, performance, fieldOverrides] = await Promise.all([
       prismaClient.opportunity.findMany({
         where: opportunityWhere,
         select: {
@@ -403,36 +402,6 @@ export async function buildCompanyCockpit(
         orderBy: { createdAt: 'desc' },
         take: 50,
       }),
-      // WHY: risks and compliance can't be cheaply filtered at DB layer — risks may have
-      // casing variations and compliance uses JSON attribution metadata. Load the full org
-      // set (take: 50) and let buildCockpit's in-memory filter select the right rows.
-      prismaClient.riskRegisterItem.findMany({
-        where: { orgId },
-        select: {
-          id: true,
-          title: true,
-          severity: true,
-          owner: true,
-          mitigation: true,
-          dueDate: true,
-          status: true,
-          companyName: true,
-        },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-        take: 50,
-      }),
-      prismaClient.complianceCheck.findMany({
-        where: { orgId },
-        select: {
-          id: true,
-          label: true,
-          status: true,
-          owner: true,
-          sourceAttribution: true,
-        },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-        take: 50,
-      }),
       fetchAccountPerformance(orgId, company.id, prismaClient, scope),
       // WHY: folded into the Promise.all (was a 7th serial query after it) so the
       // cockpit's per-company reads all run in parallel. company.name is already
@@ -443,6 +412,42 @@ export async function buildCompanyCockpit(
         take: 10,
       }),
     ]);
+
+  const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
+  const [riskRows, complianceRows] =
+    accountOpportunityIds.length === 0
+      ? [[], []]
+      : await Promise.all([
+          prismaClient.riskRegisterItem.findMany({
+            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+            select: {
+              id: true,
+              opportunityId: true,
+              title: true,
+              severity: true,
+              owner: true,
+              mitigation: true,
+              dueDate: true,
+              status: true,
+              companyName: true,
+            },
+            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+            take: 50,
+          }),
+          prismaClient.complianceCheck.findMany({
+            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+            select: {
+              id: true,
+              opportunityId: true,
+              label: true,
+              status: true,
+              owner: true,
+              sourceAttribution: true,
+            },
+            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+            take: 50,
+          }),
+        ]);
 
   return buildCockpit({
     company,

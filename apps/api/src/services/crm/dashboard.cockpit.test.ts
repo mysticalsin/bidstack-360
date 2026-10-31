@@ -374,6 +374,79 @@ describe('buildCockpit recorded facts only', () => {
     expect(cockpit.recentActivity.map((activity) => activity.dealId)).toEqual(['linked']);
     expect(cockpit.recentActivity[0]?.companyId).toBe('co-dnb');
   });
+
+  it('keeps a risk or compliance row only when its opportunity is linked to the account', () => {
+    // Why: a company name, including one buried in attribution metadata, used
+    // to put another account's issue on this cockpit.
+    const cockpit = buildCockpit({
+      company: company({ id: 'co-dnb', name: 'DNB' }),
+      companies: [],
+      opportunities: [
+        {
+          id: 'linked-deal',
+          customer: 'DNB Bank ASA',
+          companyId: 'co-dnb',
+          name: 'Treasury',
+          stage: 's2_sent',
+          pipelineStage: null,
+          valueMicros: 1n,
+          probability: 40,
+          dueDate: null,
+          owner: null,
+        },
+      ],
+      contacts: [],
+      tasks: [],
+      risks: [
+        {
+          id: 'risk-linked',
+          opportunityId: 'linked-deal',
+          title: 'Data residency',
+          severity: 'high',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'open',
+          companyName: 'Someone else',
+        },
+        {
+          id: 'risk-name',
+          opportunityId: null,
+          title: 'Name match',
+          severity: 'critical',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'open',
+          companyName: 'DNB',
+        },
+      ],
+      compliance: [
+        {
+          id: 'check-name',
+          opportunityId: null,
+          label: 'SOC 2',
+          status: 'blocked',
+          owner: null,
+          sourceAttribution: [{ providerMetadata: { companyName: 'DNB' } }],
+        },
+        {
+          id: 'check-linked',
+          opportunityId: 'linked-deal',
+          label: 'DPA',
+          status: 'in_progress',
+          owner: null,
+          sourceAttribution: [],
+        },
+      ],
+      fieldOverrides: [],
+    });
+
+    expect(cockpit.risks.map((risk) => risk.id)).toEqual(['risk-linked']);
+    expect(cockpit.compliance.map((check) => check.id)).toEqual(['check-linked']);
+    expect(JSON.stringify(cockpit)).not.toContain('SOC 2');
+    expect(JSON.stringify(cockpit)).not.toContain('Name match');
+  });
 });
 
 describe('buildCockpit win/loss + revenue derivation', () => {

@@ -526,6 +526,7 @@ export function buildCockpit({
   }>;
   risks: Array<{
     id: string;
+    opportunityId: string | null;
     title: string;
     severity: string;
     owner: string | null;
@@ -536,6 +537,7 @@ export function buildCockpit({
   }>;
   compliance: Array<{
     id: string;
+    opportunityId: string | null;
     label: string;
     status: string;
     owner: string | null;
@@ -564,14 +566,13 @@ export function buildCockpit({
   const annualRevenue = company.annualRevenueMicros
     ? formatMicrosCompact(company.annualRevenueMicros)
     : 'Not verified';
+  const accountOpportunityIds = new Set(companyOpps.map((opp) => opp.id));
   const companyRisks = risks.filter(
-    (risk) => risk.companyName && normalizeName(risk.companyName) === normalizeName(company.name),
+    (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),
   );
   const visibleRisks = uniqueBy(companyRisks, riskKey).slice(0, COCKPIT_RISK_LIMIT);
-  const companyCompliance = compliance.filter((check) =>
-    parseAttribution(check.sourceAttribution).some(
-      (source) => record(source.providerMetadata).companyName === company.name,
-    ),
+  const companyCompliance = compliance.filter(
+    (check) => check.opportunityId != null && accountOpportunityIds.has(check.opportunityId),
   );
   const visibleCompliance = uniqueBy(companyCompliance, complianceKey).slice(
     0,

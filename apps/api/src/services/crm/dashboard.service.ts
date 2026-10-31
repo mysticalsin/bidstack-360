@@ -86,8 +86,6 @@ export async function buildDashboardSnapshot(
     persistedInsights,
     widgets,
     bidRows,
-    riskRows,
-    complianceRows,
     providerRows,
     queueRows,
     releaseScoreRow,
@@ -216,33 +214,6 @@ export async function buildDashboardSnapshot(
         sourceAttribution: true,
       },
       orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.riskRegisterItem.findMany({
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        title: true,
-        severity: true,
-        owner: true,
-        mitigation: true,
-        dueDate: true,
-        status: true,
-        companyName: true,
-      },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.complianceCheck.findMany({
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        label: true,
-        status: true,
-        owner: true,
-        sourceAttribution: true,
-      },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
       take: 50,
     }),
     prisma.providerHealth.findMany({
@@ -416,6 +387,41 @@ export async function buildDashboardSnapshot(
         })
       : Promise.resolve([]),
   ]);
+  const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
+  const [riskRows, complianceRows] =
+    accountOpportunityIds.length === 0
+      ? [[], []]
+      : await Promise.all([
+          prisma.riskRegisterItem.findMany({
+            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+            select: {
+              id: true,
+              opportunityId: true,
+              title: true,
+              severity: true,
+              owner: true,
+              mitigation: true,
+              dueDate: true,
+              status: true,
+              companyName: true,
+            },
+            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+            take: 50,
+          }),
+          prisma.complianceCheck.findMany({
+            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+            select: {
+              id: true,
+              opportunityId: true,
+              label: true,
+              status: true,
+              owner: true,
+              sourceAttribution: true,
+            },
+            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+            take: 50,
+          }),
+        ]);
 
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
   const snapshotDeals = [

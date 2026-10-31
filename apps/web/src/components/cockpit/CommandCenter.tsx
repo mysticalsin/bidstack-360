@@ -27,6 +27,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit, t);
   const committee = deriveCommittee(cockpit, t);
+  const recordedRisks = cockpit.risks.length;
   const openRisks = cockpit.risks.filter((risk) => risk.status !== 'mitigated').length;
   const criticalRisks = cockpit.risks.filter(
     (risk) => risk.severity === 'critical' || risk.severity === 'high',
@@ -74,14 +75,20 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     },
     {
       label: t('commandCenter.signal.risk.label', 'Open risk load'),
-      value: criticalRisks
-        ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
-        : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
-      detail: criticalRisks
-        ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
-        : t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up'),
-      progress: riskLoadProgress(openRisks, criticalRisks),
-      tone: criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
+      value: recordedRisks === 0
+        ? t('commandCenter.signal.risk.valueNone', 'None recorded')
+        : criticalRisks
+          ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
+          : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
+      detail: recordedRisks === 0
+        ? t('commandCenter.signal.risk.detailNone', 'no risk rows on this account')
+        : criticalRisks
+          ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+          : openRisks
+            ? t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up')
+            : t('commandCenter.signal.risk.detailNoneOpen', 'recorded register has no open risks'),
+      progress: recordedRisks === 0 ? null : riskLoadProgress(openRisks, criticalRisks),
+      tone: recordedRisks === 0 ? 'amber' : criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
     },
   ];
 
