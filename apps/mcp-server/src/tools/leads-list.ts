@@ -21,7 +21,8 @@ const Input = z.object({
 });
 
 export const leadsList: Tool<typeof Input> = {
-  description: 'List leads matching filters (status/priority/source/search).',
+  description:
+    'List leads matching filters (status/priority/source/search). score 0 has scoreBasis not_scored; a positive score is stored.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -74,6 +75,7 @@ export const leadsList: Tool<typeof Input> = {
       source: l.source,
       status: l.status,
       score: l.score,
+      scoreBasis: l.score > 0 ? ('stored' as const) : ('not_scored' as const),
       priority: l.priority,
       owner: l.owner?.email ?? null,
       convertedToOpportunityId: l.convertedToOpportunityId,

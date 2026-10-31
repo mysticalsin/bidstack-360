@@ -104,6 +104,7 @@ export const leadsCreate: Tool<typeof Input> = {
       companyName: created.companyName,
       status: created.status,
       score: created.score,
+      scoreBasis: created.score > 0 ? ('stored' as const) : ('not_scored' as const),
       priority: created.priority,
       owner: created.owner?.email ?? null,
       createdAt: created.createdAt.toISOString(),

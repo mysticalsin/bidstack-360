@@ -164,11 +164,11 @@ interface DraftCitation {
 
 function formatMoneyMicros(valueMicros: bigint | number): string {
   const value = Number(valueMicros) / 1_000_000;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
+  const amount = new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(value) ? value : 0);
+  return `${amount} unspecified`;
 }
 
 function formatDate(value: Date | null): string {

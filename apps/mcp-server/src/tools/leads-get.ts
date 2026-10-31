@@ -10,7 +10,7 @@ const Input = z.object({
 
 export const leadsGet: Tool<typeof Input> = {
   description:
-    'Fetch one lead with full BANT qualification (budget, authority, need, timeline), score, and intel.',
+    'Fetch one lead with full BANT qualification (budget, authority, need, timeline), score, and intel. score 0 has scoreBasis not_scored.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -37,6 +37,7 @@ export const leadsGet: Tool<typeof Input> = {
       source: lead.source,
       status: lead.status,
       score: lead.score,
+      scoreBasis: lead.score > 0 ? ('stored' as const) : ('not_scored' as const),
       priority: lead.priority,
       owner: lead.owner?.email ?? null,
       notes: lead.notes,

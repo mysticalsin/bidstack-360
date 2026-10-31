@@ -64,6 +64,8 @@ describe('proposal.draft grounded builder', () => {
 
     expect(result.markdown).toContain('Source-grounded MCP draft');
     expect(result.markdown).toContain('Payments Modernization');
+    expect(result.markdown).toContain('unspecified');
+    expect(result.markdown).not.toMatch(/EUR|€/);
     expect(result.markdown).toContain('Core banking transformation reference');
     expect(result.markdown).toContain('Confirm legal assumptions');
     expect(result.markdown).not.toMatch(/stub|DUST_API_KEY|ANTHROPIC_API_KEY/i);
