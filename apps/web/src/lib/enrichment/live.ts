@@ -102,9 +102,17 @@ export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects |
         growth12m: f.headcountGrowth12m == null ? null : Math.round(f.headcountGrowth12m * 1000) / 10,
       })
     : null;
-  const locs = f.locations
+  // Apollo often gives only a country for subsidiaries: one entry per place, HQ first.
+  const seen = new Set<string>();
+  const locs = [...f.locations]
+    .sort((a, b) => Number(b.kind === 'hq') - Number(a.kind === 'hq'))
     .map((l) => ({ city: l.city ?? l.state ?? l.country ?? '', country: l.country ?? '', hq: l.kind === 'hq' }))
-    .filter((l) => l.city);
+    .filter((l) => {
+      const k = `${l.city}|${l.country}`.toLowerCase();
+      if (!l.city || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   const roles = (h?.postings ?? []).map(role);
   const hiringSources = [...new Set((h?.postings ?? []).map((p) => label(PROVIDER_LABEL, p.source)))];
   const projects: PotentialProject[] = (pr?.projects ?? [])
@@ -140,7 +148,7 @@ export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects |
     firmographics: {
       revenue,
       headcount,
-      industry: f.industry ? src(['industry', 'industries'], f.industry) : null,
+      industry: f.industry ? src(['industry', 'industries'], f.industry.charAt(0).toUpperCase() + f.industry.slice(1)) : null,
       locations: locs.length ? src(['locations'], locs) : null,
     },
     hiring: {

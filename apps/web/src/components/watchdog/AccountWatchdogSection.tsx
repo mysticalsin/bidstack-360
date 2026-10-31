@@ -326,7 +326,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
                 <time dateTime={h.at}>{shortFmt.format(new Date(h.at))}</time>
                 <span className="wd-row-main">
                   <span className="wd-row-title">{h.title}</span>
-                  <span className="wd-row-meta">{h.type === 'filing' ? 'Public filing' : 'Bid'} · {h.detail}</span>
+                  <span className="wd-row-meta">{h.type === 'filing' ? (/^enrichment\b/.test(h.detail) ? 'Hiring signal' : 'Public filing') : 'Bid'} · {h.detail}</span>
                 </span>
               </li>
             ))}

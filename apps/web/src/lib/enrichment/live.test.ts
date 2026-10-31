@@ -8,7 +8,7 @@ const f = {
   companyId: 'c1', status: 'ok', stale: false, fetchedAt: at, domain: 'example.com',
   annualRevenueUsd: 2_500_000_000, revenueRange: null, employeeCount: 4200, employeeRange: '1001-5000',
   headcountGrowth12m: 0.0834, industry: 'Financial services', industries: [],
-  locations: [{ kind: 'hq', city: 'Toronto', state: 'Ontario', country: 'Canada' }, { kind: 'office', city: null, state: null, country: 'United States' }],
+  locations: [{ kind: 'hq', city: 'Toronto', state: 'Ontario', country: 'Canada' }, { kind: 'subsidiary', city: null, state: null, country: 'United States' }, { kind: 'subsidiary', city: null, state: null, country: 'United States' }],
   providers: { apollo: { status: 'ok' } },
   provenance: { employeeCount: { source: 'apollo', fetchedAt: at }, industry: { source: 'apollo', fetchedAt: at } },
 } as unknown as Firmographics;
