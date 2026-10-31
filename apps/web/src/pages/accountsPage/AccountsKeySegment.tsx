@@ -18,7 +18,7 @@ import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
-  formatUnspecifiedAmount,
+  formatUnspecifiedCompact,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
@@ -187,11 +187,18 @@ export function AccountsKeySegment() {
               leadingIndustry
                 ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
                     count: leadingIndustry.count,
-                    pipeline: formatUnspecifiedAmount(leadingIndustry.pipeline),
+                    pipeline: formatUnspecifiedCompact(leadingIndustry.pipeline),
                   })
                 : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
             }
           >
+            <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'keyAccounts.industryBarBasis',
+                'Bar length is this industry’s share of unspecified pipeline on loaded strategic accounts. {{basis}}',
+                { basis: UNSPECIFIED_CURRENCY_BASIS },
+              )}
+            </p>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {industryBreakdown.map((item) => (
                 <button
@@ -206,7 +213,11 @@ export function AccountsKeySegment() {
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
-                    <span className="font-medium text-[var(--fg-tertiary)]">{item.count}</span>
+                    <span className="text-right font-medium tabular-nums text-[var(--fg-tertiary)]">
+                      {t('keyAccounts.industryAccountCount', '{{count}} accounts', { count: item.count })}
+                      {' · '}
+                      {formatUnspecifiedCompact(item.pipeline)}
+                    </span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                     <motion.span
@@ -256,7 +267,7 @@ export function AccountsKeySegment() {
             />
             <StatTile
               label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
-              value={formatUnspecifiedAmount(totalPipeline)}
+              value={formatUnspecifiedCompact(totalPipeline)}
               sublabel={UNSPECIFIED_CURRENCY_BASIS}
             />
             <StatTile
@@ -349,9 +360,11 @@ export function AccountsKeySegment() {
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">
-                              {formatUnspecifiedAmount(account.totalValue)}
+                              {formatUnspecifiedCompact(account.totalValue)}
                             </span>{' '}
-                            {t('keyAccounts.metricPipeline', 'pipeline')}
+                            {t('keyAccounts.metricPipeline', 'pipeline · {{basis}}', {
+                              basis: UNSPECIFIED_CURRENCY_BASIS,
+                            })}
                           </span>
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">

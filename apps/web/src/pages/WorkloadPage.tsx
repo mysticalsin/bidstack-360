@@ -16,7 +16,10 @@ import {
   ErrorState,
   LoadingSkeleton,
 } from '@/components/ui/StateMessages';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useWorkload } from '@/hooks/useWorkload';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
@@ -99,8 +102,17 @@ export function WorkloadPage() {
             >
               {tile.value}
             </div>
+            {tile.key === 'weighted' ? (
+              <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
+                {t(
+                  'workload.weightedBasis',
+                  'Weighted open pipeline across these desks. {{basis}}',
+                  { basis: UNSPECIFIED_CURRENCY_BASIS },
+                )}
+              </p>
+            ) : null}
           </div>
-        ))}
+      ))}
       </motion.div>
 
       <motion.div variants={reducedMotion ? undefined : staggerChild}>

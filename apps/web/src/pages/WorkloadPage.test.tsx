@@ -114,10 +114,10 @@ describe('WorkloadPage', () => {
     expect(screen.getByTestId('workload-kpi-bids').textContent).toBe('13');
     expect(screen.getByTestId('workload-kpi-over').textContent).toBe('1');
     expect(screen.getByTestId('workload-kpi-unassigned').textContent).toBe('3');
-    // WHY: opportunities do not store a currency. 14_000_000 micros is 14
-    // major units and must not render as dollars or euros.
+    // Why: 14_000_000 micros is 14 major units. A currency symbol or the raw
+    // micros integer would invent a forecast.
     const weighted = screen.getByTestId('workload-kpi-weighted').textContent ?? '';
-    expect(weighted).toMatch(/unspecified/);
+    expect(weighted).toMatch(/14 unspecified/);
     expect(weighted).not.toMatch(/[$€£]/);
     expect(weighted).not.toContain('14000000');
   });
@@ -173,7 +173,11 @@ describe('WorkloadPage', () => {
 
     fireEvent.click(screen.getByLabelText("Show Alice Bidlead's live bids"));
 
+    // Why: opportunity.value is already major units. Multiplying by 1e6
+    // and formatting as micros turned 5 into a fake 5,000,000 currency figure.
     const link = screen.getByText(/Nordbahn AG/).closest('a');
+    expect(link?.textContent).toMatch(/5 unspecified/);
+    expect(link?.textContent).not.toMatch(/[$€]|5M/);
     expect(link?.getAttribute('href')).toBe(
       '/opportunities/44444444-4444-4444-8444-444444444444',
     );

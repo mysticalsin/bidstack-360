@@ -23,7 +23,10 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -282,6 +285,15 @@ export function PipelinePage() {
           ))}
         </div>
       )}
+      {!isLoading && data ? (
+        <p className="text-xs text-[var(--fg-tertiary)]">
+          {t(
+            'pipeline.amountBasis',
+            'Pipeline amounts are unspecified opportunity value on this board. {{basis}}. Win rate is recorded closed-won ÷ closed deals in this view.',
+            { basis: UNSPECIFIED_CURRENCY_BASIS },
+          )}
+        </p>
+      ) : null}
 
       {isError ? (
         <ErrorState

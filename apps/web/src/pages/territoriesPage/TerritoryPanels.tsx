@@ -17,17 +17,19 @@ export function KpiTile({
   label,
   value,
   tone,
+  detail,
 }: {
   label: string;
   value: string;
   tone: 'blue' | 'jade' | 'amber' | 'purple';
+  detail?: string;
 }) {
   const config = {
     blue: {
       dot: 'var(--brand-primary)',
       bg: 'var(--brand-primary-tint)',
       fg: 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]',
-      icon: 'dollar' as IconName,
+      icon: 'briefcase' as IconName,
     },
     jade: {
       dot: '#059669',
@@ -68,6 +70,11 @@ export function KpiTile({
           <div className="text-xl font-extrabold text-[var(--fg-primary)] tabular-nums tracking-tight">
             {value}
           </div>
+          {detail ? (
+            <p className="max-w-[16rem] text-[10px] font-medium normal-case tracking-normal text-[var(--fg-tertiary)]">
+              {detail}
+            </p>
+          ) : null}
         </div>
         <div
           className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
@@ -139,7 +146,7 @@ export function CountryDetailPanel({
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
-                <Icon name="dollar" size={10} />
+                <Icon name="briefcase" size={10} />
                 {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">

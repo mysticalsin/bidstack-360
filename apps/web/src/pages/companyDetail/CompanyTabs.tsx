@@ -19,7 +19,10 @@ import {
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 
 function RecordedFact({ value, unknownLabel }: { value: string | null; unknownLabel: string }) {
   if (!value) {
@@ -99,11 +102,6 @@ export function OpportunityTab({
     dueDate: string | null;
   }>;
 }) {
-  // WHY useFormatMoney instead of bare formatMoneyMicros('CAD'): the hook
-  // converts from the org base currency (CAD) to the user's selected display
-  // currency and respects the currency store, so the value column stays
-  // consistent with every other money figure in the app.
-  const { formatMoneyMicros } = useFormatMoney();
   const { t } = useTranslation('crm');
   if (opportunities.length === 0)
     return (
@@ -123,8 +121,17 @@ export function OpportunityTab({
             <TableHead>{t('companyTabs.opportunities.colCode', 'Code')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colName', 'Name')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colStage', 'Stage')}</TableHead>
-            <TableHead>{t('companyTabs.opportunities.colValue', 'Value')}</TableHead>
-            <TableHead>{t('companyTabs.opportunities.colProbability', 'Probability')}</TableHead>
+            <TableHead>
+              {t('companyTabs.opportunities.colValue', 'Value · {{basis}}', {
+                basis: UNSPECIFIED_CURRENCY_BASIS,
+              })}
+            </TableHead>
+            <TableHead>
+              {t(
+                'companyTabs.opportunities.colProbability',
+                'Stored probability, not a measured win rate',
+              )}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -140,9 +147,13 @@ export function OpportunityTab({
                 <Badge tone="gray">{o.stage}</Badge>
               </TableCell>
               <TableCell className="font-medium text-[var(--fg-primary)]">
-                {formatMoneyMicros(o.valueMicros)}
+                {formatUnspecifiedCompact(Number(o.valueMicros) / 1_000_000)}
               </TableCell>
-              <TableCell>{o.probability}%</TableCell>
+              <TableCell>
+                {t('companyTabs.opportunities.probabilityValue', '{{percent}}% stored', {
+                  percent: o.probability,
+                })}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

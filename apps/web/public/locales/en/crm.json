@@ -405,30 +405,30 @@
       "retry": "Retry"
     },
     "stats": {
-      "regionLabel": "Account source coverage",
+      "regionLabel": "Accounts in this view",
       "accounts": {
         "label": "Accounts",
-        "detail": "portfolio"
+        "detail": "count of companies in this view"
       },
       "openDeals": {
         "label": "Open deals",
-        "detail": "External CRM pipeline"
+        "detail": "count of open opportunities on accounts in this view"
       },
       "weightedPipeline": {
         "label": "Weighted pipeline",
-        "detail": "bid and presales"
+        "detail": "currency not recorded; not a euro forecast"
       },
       "logoCoverage": {
         "label": "Logo coverage",
         "detail": "brand assets"
       },
       "enrichedProfiles": {
-        "label": "Enriched profiles",
-        "detail": "verified data cache"
+        "label": "Verified-cache profiles",
+        "detail": "accounts tagged verified_data in this view, not a live enrichment"
       },
       "sourcesHealthy": {
-        "label": "Sources healthy",
-        "detail": "API mesh"
+        "label": "Catalog rows marked healthy",
+        "detail": "configuration status, not a live probe"
       }
     },
     "filters": {
@@ -526,12 +526,13 @@
     "zoomOut": "Zoom Out",
     "resetView": "Reset View",
     "legend": {
-      "pipeline": "Pipeline"
+      "pipeline": "Unspecified pipeline",
+      "basis": "Heat is opportunity value by country. Currency not recorded; not a euro forecast."
     },
     "tooltip": {
       "opportunityCount": "{{count}} opps",
       "opportunityCount_one": "{{count}} opp",
-      "avgProbability": "Avg probability {{probability}}%"
+      "avgProbability": "Stored avg probability {{probability}}%, not a measured win rate"
     }
   },
   "territoryPanels": {
@@ -1179,8 +1180,12 @@
     "sectionTitleRegion": "Global Opportunity Map",
     "sectionTitleIndustry": "Opportunities by Industry",
     "sectionTitleAccount": "Opportunities by Account",
-    "sectionCaptionRegion": "Heat intensity = total pipeline value. Click a country for details.",
-    "sectionCaptionSegment": "Ranked by total pipeline value across all opportunities.",
+    "sectionCaptionRegion": "Heat is unspecified pipeline by country. Currency not recorded; not a euro forecast.",
+    "sectionCaptionSegment": "Bar length is share of the largest segment. Amounts are unspecified opportunity value.",
+    "kpiPipelineBasis": "currency not recorded; not a euro forecast",
+    "kpiProbabilityBasis": "stored average on these opportunities, not a measured win rate",
+    "kpiCountriesBasis": "countries with at least one opportunity in this view",
+    "kpiOpportunitiesBasis": "opportunity count in this territory view",
     "breakdownTablistLabel": "Breakdown dimension",
     "tabRegion": "Region",
     "tabIndustry": "Industry",
@@ -2060,7 +2065,8 @@
     "dashboardSubtitle": "Today: {{date}} - {{company}} cockpit",
     "dashboardTitle": "Dashboard",
     "accountStatusSummaryLabel": "Account status summary",
-    "attributionConfidence": "{{percent}}% attribution confidence",
+    "attributionConfidence": "{{percent}}% recorded confidence on this account",
+    "healthBasis": "The signal band is a recorded-field proxy on this account, not a measured health score.",
     "refreshed": "Refreshed {{time}}",
     "externalFreshness": "External {{freshness}} - {{time}}",
     "externalNotSynced": "External source not synced",
@@ -2241,21 +2247,21 @@
       "ariaLabel": "Account decision signals"
     },
     "badge": {
-      "ready": "{{count}}% ready",
+      "ready": "{{count}}% readiness proxy",
       "stackSignals": "{{count}} stack signals"
     },
     "signal": {
       "readiness": {
-        "label": "Bid readiness estimate",
-        "detailReady": "ready for exec review",
-        "detailFocus": "needs presales focus"
+        "label": "Bid readiness proxy",
+        "detail": "weighted mix of recorded signals on this account, not a measured score"
       },
       "source": {
-        "label": "Source coverage",
-        "detail": "{{count}} attributed source"
+        "label": "Source receipts",
+        "detail": "{{count}} attribution receipts on this account, not a coverage percent"
       },
       "decision": {
-        "label": "Decision coverage"
+        "label": "Influence map",
+        "value": "{{score}}/5 proxy"
       },
       "risk": {
         "label": "Open risk load",
@@ -3091,7 +3097,7 @@
   "healthScore": {
     "regionLabel": "Account signal coverage",
     "title": "Signal coverage",
-    "signalsScored": "{{count}} account signals scored",
+    "signalsScored": "{{count}} factor bands on this account. Recorded-field proxy, not a measured health score.",
     "gaugeLabel": "Account signal coverage {{score}} out of 100",
     "coverage": "Coverage",
     "strongestBand": "Strongest coverage band",
@@ -3101,10 +3107,10 @@
     "scoreFactors": "Score factors",
     "nextLabel": "Next: ",
     "band": {
-      "strong": "Strong",
-      "good": "Good",
-      "needsAttention": "Needs attention",
-      "critical": "Critical"
+      "strong": "Strong, proxy",
+      "good": "Good, proxy",
+      "needsAttention": "Watch, proxy",
+      "critical": "At risk, proxy"
     }
   },
   "objectSettingsForm": {
@@ -3488,7 +3494,7 @@
     "emptyTitle": "No data yet",
     "oppCountOne": "{{count}} opp",
     "oppCountOther": "{{count}} opps",
-    "avgProbability": "{{percent}}% avg probability",
+    "avgProbability": "{{percent}}% stored avg probability",
     "overflowOne": "+ {{count}} more {{noun}} not shown",
     "overflowIndustryOther": "+ {{count}} more {{noun}} segments not shown",
     "overflowOther": "+ {{count}} more {{noun}}s not shown"
@@ -3653,9 +3659,11 @@
   },
   "kpiSidebar": {
     "title": "Platform status",
-    "caption": "Latest available Polo PreSales metrics",
-    "releaseScore": "Release score",
-    "providersHealthy": "Providers healthy",
+    "caption": "Catalog and stored samples for this workspace. Not a live integration probe.",
+    "releaseScore": "Release score, stored rubric",
+    "releaseScoreUnset": "Release score unset",
+    "releaseScoreNone": "no stored score",
+    "providersHealthy": "Providers marked healthy",
     "queueBacklog": "Queue backlog",
     "overdueTasks": "Overdue tasks"
   },
@@ -3738,7 +3746,7 @@
   },
   "businessSnapshot": {
     "title": "Business snapshot",
-    "caption": "Health: {{band}} - score {{score}}/100",
+    "caption": "Signal band: {{band}}. Score {{score}}/100 is recorded-field coverage on this account, not a measured health score.",
     "region": {
       "ariaLabel": "Business snapshot"
     },
@@ -3837,7 +3845,7 @@
   },
   "forecastChart": {
     "title": "Forecast Breakdown",
-    "caption": "Stacked by category across periods"
+    "caption": "Stacked by category. Currency not recorded; not a euro forecast."
   },
   "techStack": {
     "regionLabel": "Technical Stack Overview",
@@ -3865,12 +3873,12 @@
   "pipelineByStage": {
     "regionLabel": "Portfolio pipeline by stage",
     "title": "Portfolio pipeline",
-    "caption": "All-account pipeline by stage"
+    "caption": "Org-wide stages, not this account alone. Bar length is unspecified pipeline share. Currency not recorded; not a euro forecast."
   },
   "accountDashboardWidgets": {
-    "railAriaLabel": "CRM integration status",
-    "railLabel": "Integration activity",
-    "railCaption": "ERP, External CRM, data connectors"
+    "railAriaLabel": "Connector catalog status",
+    "railLabel": "Connector catalog",
+    "railCaption": "Configuration status, not a live probe"
   },
   "oppIndustryBreakdown": {
     "title": "Pipeline by industry",
@@ -3879,7 +3887,7 @@
   "revenueEvolution": {
     "regionLabel": "Revenue evolution",
     "title": "Revenue evolution",
-    "caption": "Won-deal revenue with this client by month",
+    "caption": "Won-deal amounts by month on this account. Currency not recorded; not a euro forecast.",
     "srSummary": "{{count}} months of won-deal revenue. Peak {{period}}.",
     "barsListLabel": "Won-deal revenue by month",
     "barLabel": "{{period}}: {{amount}}"
@@ -3887,7 +3895,7 @@
   "winLoss": {
     "regionLabel": "Win / loss",
     "title": "Win / loss",
-    "caption": "Decided deals on this account",
+    "caption": "Decided deals on this account. Win rate is won ÷ decided. Currency not recorded; not a euro forecast.",
     "winRateLabel": "win rate",
     "wonCount": "{{count}} won",
     "lostCount": "{{count}} lost",

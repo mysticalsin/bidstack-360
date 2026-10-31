@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { defaultProviderHealth } from './dashboard.providers.js';
 import { serializeDeal } from './dashboard.queries.js';
-import { asProviderStatus } from './dashboard.utils.js';
+import { asProviderStatus, formatMicrosCompact } from './dashboard.utils.js';
 
 const ENV_KEYS = [
   'APOLLO_API_KEY',
@@ -63,6 +63,16 @@ describe('provider health is not a configured-means-healthy probe', () => {
   it('keeps unverified as its own status instead of folding it into degraded', () => {
     expect(asProviderStatus('unverified')).toBe('unverified');
     expect(asProviderStatus('not-a-status')).toBe('degraded');
+  });
+});
+
+describe('company revenue is not printed as dollars', () => {
+  it('keeps a compact revenue figure unspecified when no currency was stored', () => {
+    // Why: annualRevenueMicros has no currency column. "$2.0M" on the account
+    // cockpit was a dollar sign beside an unspecified amount.
+    const label = formatMicrosCompact(2_000_000_000_000);
+    expect(label).toBe('2M unspecified');
+    expect(label).not.toMatch(/[$€]|EUR|USD/);
   });
 });
 

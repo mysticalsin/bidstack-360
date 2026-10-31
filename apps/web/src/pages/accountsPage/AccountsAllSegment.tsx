@@ -371,12 +371,13 @@ export function AccountsAllSegment() {
           sublabel={t('accounts.stats.weightedPipeline.detail', UNSPECIFIED_CURRENCY_BASIS)}
         />
         <StatTile
-          label={t('accounts.stats.coverage.label', 'Avg coverage')}
+          label={t('accounts.stats.coverage.label', 'Profile fields filled')}
           value={`${avgCoverage}%`}
-          sublabel={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
-            logos: logoCoverage,
-            tech: techAccounts,
-          })}
+          sublabel={t(
+            'accounts.stats.coverage.detail',
+            'proxy · share of 6 list fields on accounts in this view ({{logos}} with a logo, {{tech}} with a stack)',
+            { logos: logoCoverage, tech: techAccounts },
+          )}
         />
         <StatTile
           label={t('accounts.stats.enrichedProfiles.label', 'Enriched profiles')}
@@ -384,9 +385,12 @@ export function AccountsAllSegment() {
           sublabel={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
         />
         <StatTile
-          label={t('accounts.stats.sourcesHealthy.label', 'Sources healthy')}
+          label={t('accounts.stats.sourcesHealthy.label', 'Catalog rows marked healthy')}
           value={`${healthyProviders}/${providerCount}`}
-          sublabel={t('accounts.stats.sourcesHealthy.detail', 'API mesh')}
+          sublabel={t(
+            'accounts.stats.sourcesHealthy.detail',
+            'configuration status, not a live probe',
+          )}
         />
       </section>
       <IntegrationMotionRail
@@ -411,7 +415,7 @@ export function AccountsAllSegment() {
         <p className="mb-3 text-xs text-[var(--fg-secondary)]">
           {t(
             'accounts.health.basis',
-            'These bands follow weighted pipeline size. They are not a measured account health score.',
+            'Bands follow weighted pipeline size on accounts in this view, not a measured health score.',
           )}
         </p>
         <div className="account-health-bars">

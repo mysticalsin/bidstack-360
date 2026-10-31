@@ -8,7 +8,7 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { usePipelineReport } from '@/hooks/usePipelineReport';
 import { formatStage } from '@/lib/format';
-import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 interface Props {
@@ -23,7 +23,11 @@ export const PipelineByStageCard = memo(function PipelineByStageCard({ report }:
     <Card role="region" aria-label={t('pipelineByStage.regionLabel', 'Portfolio pipeline by stage')}>
       <SectionHeader
         title={t('pipelineByStage.title', 'Portfolio pipeline')}
-        caption={t('pipelineByStage.caption', UNSPECIFIED_CURRENCY_BASIS)}
+        caption={t(
+          'pipelineByStage.caption',
+          'Org-wide stages, not this account alone. Bar length is unspecified pipeline share. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
       />
       <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {!report ? (
@@ -41,10 +45,10 @@ export const PipelineByStageCard = memo(function PipelineByStageCard({ report }:
                 <Badge tone="purple">{formatStage(s.stage)}</Badge>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
-                    <AnimatedMetric value={s.count.toLocaleString()} />
+                    <AnimatedMetric value={`${s.count.toLocaleString()} deals`} />
                   </div>
                   <div style={{ fontSize: 10.5, color: 'var(--fg-tertiary)' }}>
-                    <AnimatedMetric value={formatUnspecifiedAmount(s.valueSum)} />
+                    <AnimatedMetric value={formatUnspecifiedCompact(s.valueSum)} />
                   </div>
                 </div>
               </div>

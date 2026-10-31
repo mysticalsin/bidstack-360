@@ -18,7 +18,10 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Icon } from '@/components/ui/Icon';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import {
@@ -222,21 +225,34 @@ export function TerritoriesPage() {
           <KpiTile
             label={t('territories.kpiTotalPipeline', 'Total Pipeline')}
             value={formatMoneyMicros(totals.totalValueMicros, 'EUR')}
+            detail={t('territories.kpiPipelineBasis', UNSPECIFIED_CURRENCY_BASIS)}
             tone="blue"
           />
           <KpiTile
             label={t('territories.kpiCountriesActive', 'Countries Active')}
             value={String(totals.totalCountries)}
+            detail={t(
+              'territories.kpiCountriesBasis',
+              'countries with at least one opportunity in this view',
+            )}
             tone="jade"
           />
           <KpiTile
             label={t('territories.kpiOpportunities', 'Opportunities')}
             value={String(totals.totalOpportunities)}
+            detail={t(
+              'territories.kpiOpportunitiesBasis',
+              'opportunity count in this territory view',
+            )}
             tone="amber"
           />
           <KpiTile
             label={t('territories.kpiAvgProbability', 'Avg Probability')}
             value={`${totals.avgProbability}%`}
+            detail={t(
+              'territories.kpiProbabilityBasis',
+              'stored average on these opportunities, not a measured win rate',
+            )}
             tone="purple"
           />
         </motion.section>

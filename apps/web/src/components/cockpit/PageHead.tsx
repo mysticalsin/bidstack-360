@@ -106,7 +106,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             >
               <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
               <span data-tone="confidence">
-                {t('pageHead.attributionConfidence', '{{percent}}% attribution confidence', {
+                {t('pageHead.attributionConfidence', '{{percent}}% recorded confidence on this account', {
                   percent: confidence,
                 })}
               </span>
@@ -139,6 +139,14 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
                 </span>
               )}
             </div>
+          ) : null}
+          {accountView ? (
+            <p className="mt-1 max-w-xl text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'pageHead.healthBasis',
+                'The signal band is a recorded-field proxy on this account, not a measured health score.',
+              )}
+            </p>
           ) : null}
         </div>
       </div>

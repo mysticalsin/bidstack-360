@@ -44,7 +44,7 @@ export function ForecastProjection() {
         title={t('forecastProjection.title', 'Weighted pipeline projection')}
         caption={t(
           'forecastProjection.caption',
-          'Open opportunities × stage win-probability, by close-date quarter.',
+          'Open opportunities × stored stage probability, by close-date quarter. Currency not recorded; not a euro forecast.',
         )}
       />
 

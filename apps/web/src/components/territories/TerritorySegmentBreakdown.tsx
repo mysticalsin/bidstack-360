@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
 
 export function TerritorySegmentBreakdown({
@@ -77,6 +78,13 @@ export function TerritorySegmentBreakdown({
 
   return (
     <div className="p-4">
+      <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
+        {t(
+          'territorySegmentBreakdown.basis',
+          'Scope: {{noun}} segments in this view. Bar length is share of the largest. Amount is opportunity value. {{basis}}. Probability is the stored average, not a measured win rate.',
+          { noun: dimensionNoun[dimension], basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
+      </p>
       <ul className="space-y-2">
         {shown.map((s) => {
           const widthPct = Math.max(2, Math.round((s.totalValueMicros / maxValue) * 100));
@@ -113,9 +121,11 @@ export function TerritorySegmentBreakdown({
                 </span>
                 <span aria-hidden>·</span>
                 <span>
-                  {t('territorySegmentBreakdown.avgProbability', '{{percent}}% avg probability', {
-                    percent: s.avgProbability,
-                  })}
+                  {t(
+                    'territorySegmentBreakdown.avgProbability',
+                    '{{percent}}% stored avg probability',
+                    { percent: s.avgProbability },
+                  )}
                 </span>
                 {s.ownerNames.length > 0 ? (
                   <>

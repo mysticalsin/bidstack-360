@@ -27,26 +27,36 @@ export const KpiSidebar = memo(function KpiSidebar({
   const queueWaiting = snapshot.queueHealth.reduce((acc, q) => acc + q.waiting + q.active, 0);
   const providers = snapshot.providerHealth.length;
   const healthyProviders = snapshot.providerHealth.filter((p) => p.status === 'healthy').length;
+  const release = snapshot.releaseScore;
+  const releaseUnset =
+    release.functional === 0 && release.code === 0 && release.design === 0 && release.infra === 0;
 
   return (
     <Card>
       <SectionHeader
         title={t('kpiSidebar.title', 'Platform status')}
-        caption={t('kpiSidebar.caption', 'Latest available Polo PreSales metrics')}
+        caption={t(
+          'kpiSidebar.caption',
+          'Catalog and stored samples for this workspace. Not a live integration probe.',
+        )}
       />
       <div className="pulse-stack">
         <PulseRow
-          label={t('kpiSidebar.releaseScore', 'Release score')}
-          value={`${snapshot.releaseScore.total}/100`}
-          tone={snapshot.releaseScore.passed ? 'jade' : 'amber'}
-          progress={snapshot.releaseScore.total}
+          label={
+            releaseUnset
+              ? t('kpiSidebar.releaseScoreUnset', 'Release score unset')
+              : t('kpiSidebar.releaseScore', 'Release score, stored rubric')
+          }
+          value={releaseUnset ? t('kpiSidebar.releaseScoreNone', 'no stored score') : `${release.total}/100`}
+          tone={releaseUnset ? 'amber' : release.passed ? 'jade' : 'amber'}
+          progress={releaseUnset ? 0 : release.total}
           index={0}
           reducedMotion={Boolean(reducedMotion)}
         />
         <PulseRow
-          label={t('kpiSidebar.providersHealthy', 'Providers healthy')}
+          label={t('kpiSidebar.providersHealthy', 'Providers marked healthy')}
           value={`${healthyProviders}/${providers}`}
-          tone={healthyProviders === providers ? 'jade' : 'amber'}
+          tone="amber"
           progress={providers ? (healthyProviders / providers) * 100 : 0}
           index={1}
           reducedMotion={Boolean(reducedMotion)}

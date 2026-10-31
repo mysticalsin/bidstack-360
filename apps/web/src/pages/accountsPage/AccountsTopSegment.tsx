@@ -15,7 +15,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import {
-  formatUnspecifiedAmount,
+  formatUnspecifiedCompact,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
@@ -176,7 +176,7 @@ export function AccountsTopSegment() {
             sub={
               leader
                 ? t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
-                    pipeline: formatUnspecifiedAmount(leader.totalValue),
+                    pipeline: formatUnspecifiedCompact(leader.totalValue),
                     deals: leader.openDeals,
                   })
                 : t('topAccounts.leaderEmpty', 'Add opportunity value to create a ranking.')
@@ -193,10 +193,14 @@ export function AccountsTopSegment() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatTile
                 label={t('topAccounts.statPipeline', 'Pipeline')}
-                value={formatUnspecifiedAmount(totalPipeline)}
+                value={formatUnspecifiedCompact(totalPipeline)}
                 sublabel={UNSPECIFIED_CURRENCY_BASIS}
               />
-              <StatTile label={t('topAccounts.statWon', 'Won')} value={formatUnspecifiedAmount(wonPipeline)} />
+              <StatTile
+                label={t('topAccounts.statWon', 'Won')}
+                value={formatUnspecifiedCompact(wonPipeline)}
+                sublabel={UNSPECIFIED_CURRENCY_BASIS}
+              />
               <StatTile label={t('topAccounts.statOpenDeals', 'Open deals')} value={openDeals.toLocaleString()} />
               <StatTile label={t('topAccounts.statContacts', 'Contacts')} value={contactCount.toLocaleString()} />
             </div>
@@ -207,6 +211,13 @@ export function AccountsTopSegment() {
             heading={t('topAccounts.industryMixTitle', 'Pipeline by industry')}
             aside={industry ? <Badge tone="blue">{industry}</Badge> : null}
           >
+            <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'topAccounts.industryBarBasis',
+                'Bar length is this industry’s share of unspecified pipeline on the loaded top accounts. {{basis}}',
+                { basis: UNSPECIFIED_CURRENCY_BASIS },
+              )}
+            </p>
             <div className="space-y-2">
               {industryBreakdown.map((item) => (
                 <button
@@ -229,7 +240,7 @@ export function AccountsTopSegment() {
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
-                    <span className="font-medium tabular-nums text-[var(--fg-secondary)]">{formatUnspecifiedAmount(item.pipeline)}</span>
+                    <span className="font-medium tabular-nums text-[var(--fg-secondary)]">{formatUnspecifiedCompact(item.pipeline)}</span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                     <motion.span
@@ -356,14 +367,14 @@ export function AccountsTopSegment() {
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--fg-secondary)]">
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
-                          {formatUnspecifiedAmount(account.totalValue)}
+                          {formatUnspecifiedCompact(account.totalValue)}
                         </span>{' '}
                         {t('topAccounts.totalPipeline', 'total pipeline')}
                       </span>
                       <span>·</span>
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
-                          {formatUnspecifiedAmount(account.wonValue)}
+                          {formatUnspecifiedCompact(account.wonValue)}
                         </span>{' '}
                         {t('topAccounts.won', 'won')}
                       </span>

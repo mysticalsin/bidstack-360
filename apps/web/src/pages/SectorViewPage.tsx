@@ -19,7 +19,7 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
@@ -323,6 +323,13 @@ export default function SectorViewPage() {
                   </div>
                 </div>
 
+                <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
+                  {t(
+                    'sectorView.coverageBasis',
+                    'Percents are accounts in {{sector}} with the field filled. Not a measured coverage score.',
+                    { sector: titleCase(selectedSector.sector) },
+                  )}
+                </p>
                 <div className="sector-coverage-grid">
                   <CoverageBar
                     label={t('sectorView.coverageFte', 'FTE coverage')}
@@ -416,11 +423,6 @@ function SectorMetric({
 
 function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const { t } = useTranslation('crm');
-  // Use the currency-aware formatter so this figure tracks the user's selected
-  // display currency like every other money surface — the module-level
-  // formatMoneyMicros hardcoded EUR and diverged from Territories/Opportunities
-  // showing the same segment data in the chosen currency.
-  const { formatMoneyMicros } = useFormatMoney();
   if (items.length === 0) {
     return (
       <EmptyState
@@ -433,6 +435,13 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const max = Math.max(1, ...sorted.map((s) => s.totalValueMicros));
   return (
     <div className="space-y-2.5">
+      <p className="text-xs text-[var(--fg-tertiary)]">
+        {t(
+          'sectorView.industryBarBasis',
+          'Bar length is share of the largest industry. Count is opportunities. Amount is unspecified pipeline. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
+      </p>
       {sorted.map((seg) => (
         <div key={seg.key}>
           <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
@@ -440,7 +449,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatMoneyMicros(seg.totalValueMicros),
+                value: formatUnspecifiedCompact(seg.totalValueMicros / 1_000_000),
               })}
             </span>
           </div>
@@ -489,7 +498,11 @@ function SectorButton({
         <span style={{ width }} />
       </span>
       <span className="sector-radar-fte">
-        {sector.fteVolume != null ? sector.fteVolume.toLocaleString() : t('sectorView.fteUnknown', 'FTE unknown')}
+        {sector.fteVolume != null
+          ? t('sectorView.fteRecorded', '{{fte}} FTE · recorded headcount · this sector', {
+              fte: sector.fteVolume.toLocaleString(),
+            })
+          : t('sectorView.fteUnknown', 'FTE unknown')}
       </span>
     </button>
   );
@@ -532,7 +545,11 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
         <Badge tone={account.source === 'verified_data' ? 'jade' : 'gray'}>
           {sourceLabel(account.source)}
         </Badge>
-        <small>{t('sectorView.accountConfidence', '{{value}}% confidence', { value: Math.round(account.confidence * 100) })}</small>
+        <small>
+          {t('sectorView.accountConfidence', '{{value}}% recorded confidence on this account', {
+            value: Math.round(account.confidence * 100),
+          })}
+        </small>
       </span>
       <Icon name="chevron-right" size={16} aria-hidden />
     </Link>

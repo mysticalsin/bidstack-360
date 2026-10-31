@@ -2,7 +2,10 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useDisplayMoneyMicros } from '@/hooks/useDisplayMoney';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -28,7 +31,11 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
     <Card role="region" aria-label={t('revenueEvolution.regionLabel', 'Revenue evolution')}>
       <SectionHeader
         title={t('revenueEvolution.title', 'Revenue evolution')}
-        caption={t('revenueEvolution.caption', 'Won-deal revenue with this client by month')}
+        caption={t(
+          'revenueEvolution.caption',
+          'Won-deal amounts by month on this account. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
       />
       <p className="sr-only">
         {t('revenueEvolution.srSummary', '{{count}} months of won-deal revenue. Peak {{period}}.', {
@@ -51,7 +58,7 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
 
 function RevenueBar({ period, micros, max }: { period: string; micros: number; max: number }) {
   const { t } = useTranslation('crm');
-  const formatted = useDisplayMoneyMicros(micros, 'EUR', { compact: true });
+  const formatted = formatUnspecifiedCompact(micros / 1_000_000);
   return (
     <li
       className="flex flex-1 flex-col items-center gap-1"
