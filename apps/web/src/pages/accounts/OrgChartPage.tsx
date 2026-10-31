@@ -24,14 +24,17 @@ import { useCompany } from '@/hooks/useCompanies';
 import { OrgPhoto } from '@/components/orgchart/OrgPhoto';
 import { orgChartKey, useOrgChart, useOrgChartNode, useReloadOrgChart } from '@/hooks/useOrgChart';
 import { SENIORITY_LABEL } from '@/lib/meeting-intel/client';
-import { fetchOrgChart, importOrgChartCsv, replayDraft, seedOrgChart } from '@/lib/orgchart/client';
+import { fetchOrgChart, importOrgChartCsv, importOrgChartHtml, replayDraft, seedOrgChart } from '@/lib/orgchart/client';
+import { recencyOf, recencyTitle } from '@/lib/orgchart/recency';
+import { ContactLinks } from '@/components/orgchart/ContactLinks';
+import { ProfileDetails } from '@/components/orgchart/ProfileDetails';
 import { STRENGTH_LABEL, strengthOf } from '@/lib/orgchart/coverage';
 import { exportCsv } from '@/lib/orgchart/csv';
 import { layoutTree, NODE_H, NODE_W } from '@/lib/orgchart/layout';
 import * as T from '@/lib/orgchart/tree';
 import { initials } from '@/lib/orgchart/tree';
 import { OrgChartConflictError, type NodeCov, type OrgChart, type OrgNode } from '@/lib/orgchart/types';
-import type { OrgChartImportResult } from '@bidstack/shared';
+import { normalizeLinkedinUrl, normalizePhone, type OrgChartImportResult } from '@bidstack/shared';
 
 const nodeTypes = { person: PersonNode };
 type Mode = 'select' | 'pan';
@@ -71,10 +74,11 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [conflict, setConflict] = useState<OrgChartConflictError['current'] | null>(null);
-  const [csv, setCsv] = useState<{ name: string; text: string; result: OrgChartImportResult } | null>(null);
+  const [csv, setCsv] = useState<{ kind: 'csv' | 'html'; name: string; text: string; result: OrgChartImportResult } | null>(null);
   const [seedOpen, setSeedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const htmlRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const work: Draft = draft ?? { nodes: chart?.nodes ?? [], rootId: chart?.rootId ?? null };
@@ -105,7 +109,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
         selected: n.id === selectedId, draggable: isEditing && n.id !== work.rootId && !n.redacted,
         className: dropTarget === n.id ? 'oc-drop' : undefined,
         data: {
-          node: n, cov, strength: strengthOf(cov, asOf), showMet, showStrength,
+          node: n, cov, strength: strengthOf(cov, asOf), showMet, showStrength, asOf,
           seniorGap: live ? unmetSenior.has(n.id) : SENIOR.includes(n.seniority) && !cov?.met,
           match: q ? (hitIds.has(n.id) ? 'hit' : 'miss') : 'none',
           childCount: kids.get(n.id)?.length ?? 0, collapsed: collapsed.has(n.id), isRoot: n.id === work.rootId, onToggle: toggle,
@@ -208,18 +212,25 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
     }
   };
 
-  const onCsvFile = async (f: File | undefined) => {
+  const runImport = (kind: 'csv' | 'html', text: string, dryRun: boolean, chartVersion?: number) =>
+    kind === 'html' ? importOrgChartHtml(companyId, text, dryRun, chartVersion) : importOrgChartCsv(companyId, text, dryRun, chartVersion);
+  const onImportFile = async (kind: 'csv' | 'html', f: File | undefined) => {
     if (!f) return;
-    if (fileRef.current) fileRef.current.value = '';
+    const input = kind === 'html' ? htmlRef.current : fileRef.current;
+    if (input) input.value = '';
+    if (kind === 'html' && f.size > HTML_MAX) {
+      toast.error('That HTML file is too large', { description: 'The limit is 5 MB.' });
+      return;
+    }
     setBusy(true);
     try {
       const text = await f.text();
-      const result = await importOrgChartCsv(companyId, text, true, live ? chart?.version : undefined);
-      setCsv({ name: f.name, text, result });
+      const result = await runImport(kind, text, true, live ? chart?.version : undefined);
+      setCsv({ kind, name: f.name, text, result });
       setSelectedId(null);
       setSeedOpen(false);
     } catch (e) {
-      toast.error('Could not read that CSV', { description: e instanceof Error ? e.message : undefined });
+      toast.error(`Could not read that ${kind === 'html' ? 'HTML file' : 'CSV'}`, { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
     }
@@ -228,18 +239,18 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
     if (!csv) return;
     setBusy(true);
     try {
-      const r = await importOrgChartCsv(companyId, csv.text, false, live ? chart?.version : undefined);
+      const r = await runImport(csv.kind, csv.text, false, live ? chart?.version : undefined);
       if (r.errors.length) { setCsv({ ...csv, result: r }); return; }
       setCsv(null);
       await reload(companyId);
       setCollapsed(new Set());
       requestAnimationFrame(fit);
-      toast.success(`Imported: ${r.created} added, ${r.updated} updated`);
+      toast.success(`Imported: ${r.created} added, ${r.updated} updated`, r.photos ? { description: `${r.photos} photo${r.photos === 1 ? '' : 's'} saved` } : undefined);
     } catch (e) {
       if (e instanceof OrgChartConflictError) {
         toast.warning('The chart changed while you were importing', { description: 'Reloaded. Check the preview and import again.' });
         await reload(companyId);
-        const fresh = await importOrgChartCsv(companyId, csv.text, true).catch(() => null);
+        const fresh = await runImport(csv.kind, csv.text, true).catch(() => null);
         if (fresh) setCsv({ ...csv, result: fresh });
       } else toast.error('Import failed', { description: e instanceof Error ? e.message : undefined });
     } finally {
@@ -326,7 +337,9 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
             <>
               <button type="button" className="oc-btn" onClick={() => { setSeedOpen(true); setCsv(null); setSelectedId(null); }} disabled={busy || dirty} title={dirty ? 'Save or discard your edits first' : undefined} data-testid="orgchart-autofill">Auto-fill from contacts/Apollo</button>
               <button type="button" className="oc-btn" onClick={() => fileRef.current?.click()} disabled={busy || dirty} title={dirty ? 'Save or discard your edits first' : undefined}>Import CSV</button>
-              <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => void onCsvFile(e.target.files?.[0])} data-testid="orgchart-csv-input" />
+              <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => void onImportFile('csv', e.target.files?.[0])} data-testid="orgchart-csv-input" />
+              <button type="button" className="oc-btn" onClick={() => htmlRef.current?.click()} disabled={busy || dirty} title={dirty ? 'Save or discard your edits first' : 'A people map or directory page saved as HTML'} data-testid="orgchart-html-import">Import HTML</button>
+              <input ref={htmlRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => void onImportFile('html', e.target.files?.[0])} data-testid="orgchart-html-input" />
               <button type="button" className="oc-btn" onClick={discard}>{dirty ? 'Discard' : 'Done'}</button>
               <button type="button" className="oc-btn oc-primary" onClick={() => void doSave()} disabled={!dirty || busy} data-testid="orgchart-save">Save chart</button>
             </>
@@ -408,7 +421,9 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
               ) : <p className="oc-muted">Every director and above has been met.</p>}
               <h3>Legend</h3>
               <ul className="oc-legend">
-                <li><i className="oc-lg-met" /> Met (ring); unmet people are dimmed</li>
+                <li><span className="oc-recency oc-lg-badge" data-r="recent">Met recently</span> Within 30 days (green ring)</li>
+                <li><span className="oc-recency oc-lg-badge" data-r="warm">Met 6 wk ago</span> 31 to 90 days (amber ring)</li>
+                <li><i className="oc-lg-met oc-lg-stale" /> Met longer ago (grey ring); unmet people are dimmed</li>
                 <li><span className="oc-meter" data-s="strong"><i data-on /><i data-on /><i data-on /></span> Relationship: meetings and how recent</li>
               </ul>
               <p className="oc-muted oc-kbd">Keys: arrows move, Enter opens, C collapses, Esc closes.</p>
@@ -460,6 +475,10 @@ function PersonPanel(props: {
       </div>
       {node.source === 'sample' ? <p className="oc-src">Sample placeholder, not a real person.</p> : null}
       {node.redacted ? <p className="oc-src">This person&apos;s contact sits on an account you can&apos;t see, so their details are hidden. Their place in the chart is kept.</p> : null}
+      {!node.redacted ? <ContactLinks node={node} /> : null}
+      {cov?.met && cov.lastMetAt ? (
+        <p className="oc-recency-line" data-r={recencyOf(cov.lastMetAt, asOf)} data-testid="orgchart-panel-recency"><i aria-hidden="true" />{recencyTitle(cov.lastMetAt)}</p>
+      ) : null}
       <dl className="oc-dl">
         <div><dt>Our owner</dt><dd>{owner ?? 'Nobody yet'}{!node.ownerName && owner ? ' (from meetings)' : ''}</dd></div>
         <div><dt>Relationship</dt><dd>{STRENGTH_LABEL[s]}{cov?.manual ? ' (set by an admin)' : ''}</dd></div>
@@ -478,6 +497,7 @@ function PersonPanel(props: {
         : <p className="oc-muted">Not met yet. A gap worth closing{SENIOR.includes(node.seniority) ? ' at this level' : ''}.</p>}
       <h3>Challenges raised</h3>
       {challenges.length ? <ul className="oc-bullets">{challenges.slice(0, 6).map((c) => <li key={c}>{c}</li>)}</ul> : <p className="oc-muted">None recorded.</p>}
+      {node.profile && !node.redacted ? <ProfileDetails profile={node.profile} fn={node.function ?? null} /> : null}
 
       {canEditNode ? (
         <form className="oc-form" onSubmit={(e) => e.preventDefault()} aria-label={`Edit ${node.name}`}>
@@ -498,6 +518,13 @@ function PersonPanel(props: {
               {[1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{v} of 5</option>)}
             </select>
           </label>
+          <label>Email<input type="email" value={node.email ?? ''} onChange={(e) => props.onPatch({ email: e.target.value.trim() || null })} maxLength={254} data-testid="orgchart-edit-email" /></label>
+          <div className="oc-form-row">
+            <label>Phone<input type="tel" value={node.phone ?? ''} placeholder="+44 20 7946 0000" onChange={(e) => props.onPatch({ phone: e.target.value || null })} onBlur={(e) => { const v = e.target.value.trim(); if (v) props.onPatch({ phone: normalizePhone(v) ?? v }); }} maxLength={32} data-testid="orgchart-edit-phone" /></label>
+            <label>LinkedIn<input type="url" value={node.linkedinUrl ?? ''} placeholder="https://www.linkedin.com/in/" onChange={(e) => props.onPatch({ linkedinUrl: e.target.value || null })} onBlur={(e) => { const v = e.target.value.trim(); if (v) props.onPatch({ linkedinUrl: normalizeLinkedinUrl(v) ?? v }); }} maxLength={300} data-testid="orgchart-edit-linkedin" /></label>
+          </div>
+          {node.phone && !normalizePhone(node.phone) ? <p className="oc-hint" role="note">That phone number needs 7 to 15 digits.</p> : null}
+          {node.linkedinUrl && !normalizeLinkedinUrl(node.linkedinUrl) ? <p className="oc-hint" role="note">Use a linkedin.com/in/ profile link.</p> : null}
           <label>Photo URL (https)<input type="url" value={node.photoUrl && !node.photoUrl.startsWith('/') ? node.photoUrl : ''} placeholder={node.photoUrl?.startsWith('/') ? 'Uploaded photo' : 'https://'} pattern="https://.*" onChange={(e) => props.onPatch({ photoUrl: e.target.value || null })} /></label>
           {node.id !== rootId ? (
             <label>Reports to
@@ -538,20 +565,56 @@ function SeedPanel({ busy, onRun, onCancel }: { busy: boolean; onRun: (o: { incl
   );
 }
 
-function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { name: string; result: OrgChartImportResult }; busy: boolean; onApply: () => void; onCancel: () => void }) {
+const CSV_COLUMNS = 'name (required), title, email, phone, linkedin_url, manager_email, manager_name, seniority, function, business_unit, region, photo_url, owner_email, relationship_strength, sentiment';
+
+function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { kind: 'csv' | 'html'; name: string; result: OrgChartImportResult }; busy: boolean; onApply: () => void; onCancel: () => void }) {
   const r = csv.result;
+  const html = csv.kind === 'html';
+  const warnings = r.warnings ?? [];
+  const issue = (e: { line: number; name?: string; message: string }) => (e.name ? `${e.name}: ${e.message}` : html ? e.message : `Line ${e.line}: ${e.message}`);
   return (
-    <div className="oc-pp" data-testid="orgchart-csv-preview">
-      <h2>Import CSV</h2>
+    <div className="oc-pp" data-testid="orgchart-csv-preview" data-kind={csv.kind}>
+      <h2>{html ? 'Import HTML' : 'Import CSV'}</h2>
       <p className="oc-muted">{csv.name}: dry run, nothing written yet.</p>
+      {html && r.found !== undefined ? (
+        <p className="oc-src" data-testid="orgchart-import-found">
+          Found {r.found} {r.found === 1 ? 'person' : 'people'}{r.skipped ? `, skipped ${r.skipped} system account${r.skipped === 1 ? '' : 's'}` : ''}{r.photos ? `, ${r.photos} with a photo` : ''}. Scripts in the file are never run.
+        </p>
+      ) : null}
       {r.errors.length ? null : <p className="oc-big"><strong>{r.created}</strong> to add · <strong>{r.updated}</strong> to update</p>}
       {r.errors.length ? (
         <>
-          <p className="oc-hint" role="alert">{r.errors.length} row error{r.errors.length === 1 ? '' : 's'}. The import is all or nothing, so fix these first.</p>
-          <ul className="oc-bullets">{r.errors.slice(0, 8).map((e) => <li key={`${e.line}-${e.message}`}>Line {e.line}: {e.message}</li>)}</ul>
+          <p className="oc-hint" role="alert">{r.errors.length} {html ? 'problem' : 'row error'}{r.errors.length === 1 ? '' : 's'}. The import is all or nothing, so fix these first.</p>
+          <ul className="oc-bullets">{r.errors.slice(0, 8).map((e) => <li key={`${e.line}-${e.message}`}>{issue(e)}</li>)}</ul>
         </>
       ) : null}
-      <p className="oc-src">Columns: name (required), title, email, manager_email, manager_name, seniority, function, business_unit, region, photo_url, owner_email, relationship_strength, sentiment.</p>
+      {warnings.length ? (
+        <details className="oc-imp-warn" data-testid="orgchart-import-warnings">
+          <summary>{warnings.length} value{warnings.length === 1 ? '' : 's'} will be left empty or adjusted</summary>
+          <ul className="oc-bullets">{warnings.slice(0, 20).map((e) => <li key={`${e.line}-${e.message}`}>{issue(e)}</li>)}</ul>
+        </details>
+      ) : null}
+      {r.preview?.length ? (
+        <div className="oc-imp-wrap">
+          <table className="oc-imp-table" data-testid="orgchart-import-preview">
+            <thead><tr><th>Person</th><th>Reports to</th><th>Contact</th><th /></tr></thead>
+            <tbody>
+              {r.preview.slice(0, 200).map((p) => (
+                <tr key={p.line}>
+                  <td>{p.name}<span className="oc-row-sub">{p.title ?? 'No title'}</span></td>
+                  <td>{p.manager ?? 'Top of chart'}</td>
+                  <td>{[p.email ? 'Email' : '', p.phone ? 'Phone' : '', p.linkedinUrl ? 'LinkedIn' : '', p.hasPhoto ? 'Photo' : ''].filter(Boolean).join(', ') || 'None'}{p.extras.length ? <span className="oc-row-sub">+ {p.extras.join(', ')}</span> : null}</td>
+                  <td>{p.action === 'update' ? 'Update' : 'New'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {r.preview.length > 200 ? <p className="oc-src">Showing 200 of {r.preview.length}.</p> : null}
+        </div>
+      ) : null}
+      <p className="oc-src">{html
+        ? 'Reads people maps (embedded JSON), schema.org Person markup, hCards and tables with a header row: name, title, manager, email, phone, LinkedIn and photo, plus department, location, tenure and profile details.'
+        : `Columns: ${CSV_COLUMNS}.`}</p>
       <div className="oc-form-actions">
         <button type="button" className="oc-btn" onClick={onCancel}>Cancel</button>
         <button type="button" className="oc-btn oc-primary" onClick={onApply} disabled={busy || r.errors.length > 0 || r.created + r.updated === 0} data-testid="orgchart-csv-apply">Import</button>
@@ -560,6 +623,7 @@ function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { name: string; res
   );
 }
 
+const HTML_MAX = 5 * 1024 * 1024;
 const SENIOR: string[] = ['c_level', 'vp', 'director'];
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;

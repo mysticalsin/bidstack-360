@@ -154,4 +154,48 @@ describe('OrgChartPage', () => {
     fireEvent.keyDown(first, { key: 'ArrowUp' });
     await waitFor(() => expect(document.activeElement).toBe(ceo));
   });
+  it('HTML import: server dry run preview with warnings, then import; people show contact links, recency and profile', async () => {
+    srv.add({ name: 'Kurt MacAlpine', title: 'Chief Executive Officer', seniority: 'c_level' }, null);
+    renderPage();
+    fireEvent.click(await screen.findByTestId('orgchart-edit'));
+    const html = '<ul><li data-name="Nora Lee" data-title="VP Cloud" data-email="nora@example.com" data-phone="+14165550100" data-linkedin="https://www.linkedin.com/in/nora-example"></li>'
+      + '<li data-name="Omar Haddad" data-title="Director Data" data-manager="Nora Lee" data-linkedin="https://www.linkedin.com/posts/x"></li></ul>';
+    const file = new File([html], 'people.html', { type: 'text/html' });
+    await act(async () => { fireEvent.change(screen.getByTestId('orgchart-html-input'), { target: { files: [file] } }); });
+    const prev = await screen.findByTestId('orgchart-csv-preview');
+    expect(prev.dataset.kind).toBe('html');
+    expect(within(prev).getByTestId('orgchart-import-found').textContent).toMatch(/Found 2 people/);
+    expect(within(prev).getByTestId('orgchart-import-preview').textContent).toMatch(/Nora Lee.*Omar Haddad/s);
+    expect(within(prev).getByTestId('orgchart-import-warnings').textContent).toMatch(/Omar Haddad: LinkedIn/);
+    expect(srv.nodes.size).toBe(1); // dry run wrote nothing
+    await act(async () => { fireEvent.click(within(prev).getByTestId('orgchart-csv-apply')); });
+    expect(srv.calls).toContain('POST C/import-html');
+    const nora = await node('Nora Lee');
+    expect(within(nora).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['mailto:nora@example.com', 'https://www.linkedin.com/in/nora-example', 'tel:+14165550100']);
+    fireEvent.click(nora);
+    const panel = await screen.findByTestId('orgchart-panel');
+    expect(within(within(panel).getByTestId('orgchart-contact')).getByText('nora@example.com').getAttribute('href')).toBe('mailto:nora@example.com');
+  });
+
+  it('live chart: recent meetings get a green badge, older ones amber; the panel shows imported profile and edits contact fields', async () => {
+    const now = Date.now();
+    const ceo = srv.add({ name: 'Ana Silva', title: 'Chief Executive Officer', seniority: 'c_level', meetingCount: 1, lastMetAt: new Date(now - 3 * 86_400_000).toISOString(),
+      email: 'ana@example.com', function: 'OPS', profile: { location: 'Example City, Brazil', tenure: 'At Example Corp since 2010', themes: ['data'] } }, null);
+    srv.add({ name: 'Bruno Costa', title: 'Director of Operations', seniority: 'director', meetingCount: 1, lastMetAt: new Date(now - 50 * 86_400_000).toISOString() }, ceo.id);
+    renderPage();
+    expect(within(await node('Ana Silva')).getByTestId('orgchart-recency').textContent).toBe('Met recently');
+    expect(within(await node('Bruno Costa')).getByTestId('orgchart-recency').dataset.r).toBe('warm');
+    fireEvent.click(screen.getByTestId('orgchart-edit'));
+    fireEvent.click(await node('Ana Silva'));
+    const panel = await screen.findByTestId('orgchart-panel');
+    expect(within(panel).getByTestId('orgchart-panel-recency').textContent).toMatch(/Last met/);
+    expect(within(panel).getByTestId('orgchart-profile').textContent).toMatch(/Example City, Brazil/);
+    fireEvent.change(within(panel).getByTestId('orgchart-edit-phone'), { target: { value: '+55 11 5555-0101' } });
+    fireEvent.blur(within(panel).getByTestId('orgchart-edit-phone'));
+    fireEvent.change(within(panel).getByTestId('orgchart-edit-linkedin'), { target: { value: 'br.linkedin.com/in/ana-example' } });
+    fireEvent.blur(within(panel).getByTestId('orgchart-edit-linkedin'));
+    await act(async () => { fireEvent.click(screen.getByTestId('orgchart-save')); });
+    await waitFor(() => expect(srv.nodes.get(ceo.id)!.phone).toBe('+551155550101'));
+    expect(srv.nodes.get(ceo.id)!.linkedinUrl).toBe('https://www.linkedin.com/in/ana-example');
+  });
 });

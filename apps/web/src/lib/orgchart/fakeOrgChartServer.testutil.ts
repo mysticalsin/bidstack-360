@@ -30,7 +30,8 @@ export function fakeOrgChartServer(companyId: string) {
   const make = (b: Record<string, unknown>, parentId: string | null): Raw => ({
     id: uuid(), chartId, parentId, contactId: (b.contactId as string) ?? null, kind: b.contactId ? 'contact' : 'placeholder',
     name: String(b.name ?? 'Unnamed'), title: (b.title as string) ?? null, seniority: (b.seniority as SeniorityLevel) ?? 'unknown',
-    function: null, businessUnit: null, region: (b.region as string) ?? null, photoUrl: (b.photoUrl as string) ?? null,
+    function: (b.function as string) ?? null, businessUnit: null, region: (b.region as string) ?? null, photoUrl: (b.photoUrl as string) ?? null,
+    email: (b.email as string) ?? null, phone: (b.phone as string) ?? null, linkedinUrl: (b.linkedinUrl as string) ?? null, profile: (b.profile as Raw['profile']) ?? null,
     relationshipStrength: (b.relationshipStrength as number) ?? null, sentiment: null, owner: null, sortOrder: nodes.size,
     source: (b.source as Raw['source']) ?? 'manual', placement: parentId ? 'manual' : 'root', provenance: {}, version: 1,
     meetingCount: Number(b.meetingCount ?? 0), lastMetAt: (b.lastMetAt as string) ?? null, redacted: false, updatedAt: new Date().toISOString(),
@@ -78,6 +79,25 @@ export function fakeOrgChartServer(companyId: string) {
         if (nr.id === old.id) return mut(nr);
         nr.parentId = null; old.parentId = nr.id; bump(old); bump(nr); version -= 1;
         return mut(nr);
+      }
+      if (method === 'POST' && p === `${C}/import-html`) {
+        // Stand-in parser: one person per element with data-name (the real one is server side).
+        const html = String(body?.html ?? '');
+        const attr = (tag: string, k: string) => new RegExp(`data-${k}="([^"]*)"`).exec(tag)?.[1] ?? null;
+        const tags = html.match(/<[^>]*data-name="[^"]*"[^>]*>/g) ?? [];
+        const people = tags.map((t, i) => ({ line: i + 1, name: attr(t, 'name')!, title: attr(t, 'title'), email: attr(t, 'email'), phone: attr(t, 'phone'), linkedinUrl: attr(t, 'linkedin'), manager: attr(t, 'manager') }));
+        if (!people.length) throw new ApiError('Import has errors', 422, { dryRun: Boolean(body?.dryRun), created: 0, updated: 0, errors: [{ line: 1, message: 'No people found in this HTML.' }], chartVersion: version });
+        const preview = people.map((x) => ({ ...x, hasPhoto: false, action: 'create' as const, extras: [] }));
+        const warnings = people.filter((x) => x.linkedinUrl && !x.linkedinUrl.includes('linkedin.com/in/')).map((x) => ({ line: x.line, name: x.name, message: 'LinkedIn is not a linkedin.com profile URL (left empty)' }));
+        if (!body?.dryRun) {
+          const ids = new Map<string, string>();
+          for (const x of people) {
+            const parent = x.manager ? ids.get(x.manager) ?? root()?.id ?? null : root()?.id ?? null;
+            const n = s.add({ name: x.name, title: x.title, email: x.email, phone: x.phone, linkedinUrl: warnings.some((w) => w.name === x.name) ? null : x.linkedinUrl, source: 'html' }, parent);
+            ids.set(x.name, n.id);
+          }
+        }
+        return { dryRun: Boolean(body?.dryRun), created: people.length, updated: 0, errors: [], warnings, chartVersion: version, format: 'table', found: people.length, skipped: 0, photos: 0, preview };
       }
       if (method === 'POST' && p === `${C}/import`) {
         const rows = String(body?.csv ?? '').trim().split('\n').slice(1).filter(Boolean);

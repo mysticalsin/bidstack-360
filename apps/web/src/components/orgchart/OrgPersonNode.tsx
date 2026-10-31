@@ -1,12 +1,15 @@
-// One person on the org chart: avatar (met ring), name pill, title, seniority
-// and region chips, relationship meter and a collapse toggle.
+// One person on the org chart: avatar (ring coloured by meeting recency, with
+// a "Met recently" badge), name pill, title, seniority and region chips,
+// relationship meter, contact links (email, LinkedIn, phone) and a collapse toggle.
 import { SENIORITY_LABEL } from '@/lib/meeting-intel/client';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 
 import { STRENGTH_BARS, STRENGTH_LABEL } from '@/lib/orgchart/coverage';
+import { recencyBadge, recencyOf, recencyTitle } from '@/lib/orgchart/recency';
 import type { NodeCov, OrgNode, Strength } from '@/lib/orgchart/types';
 
+import { ContactLinks } from './ContactLinks';
 import { OrgPhoto } from './OrgPhoto';
 
 export interface PersonData extends Record<string, unknown> {
@@ -21,6 +24,8 @@ export interface PersonData extends Record<string, unknown> {
   childCount: number;
   collapsed: boolean;
   isRoot: boolean;
+  /** Reference "now" for meeting recency (keeps render pure). */
+  asOf?: number;
   onToggle: (id: string) => void;
 }
 export type PersonNodeT = Node<PersonData, 'person'>;
@@ -31,10 +36,15 @@ const SHORT_SEN: Record<string, string> = { c_level: 'C-level', vp: 'VP', direct
 function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
   const { node, cov, strength, showMet, showStrength, match, childCount, collapsed, onToggle, seniorGap } = data;
   const met = Boolean(cov?.met);
+  const now = data.asOf ?? 0;
+  const lastMetAt = cov?.lastMetAt ?? null;
+  const recency = met ? recencyOf(lastMetAt, now) : 'never';
+  const badge = showMet && met ? recencyBadge(lastMetAt, now) : null;
+  const ring = !showMet ? undefined : recency === 'recent' ? 'met' : recency === 'warm' ? 'warm' : met ? 'stale' : 'gap';
   const sen = SHORT_SEN[node.seniority];
   const label = [
     node.name, node.title, sen && SENIORITY_LABEL[node.seniority], node.region,
-    met ? `met ${cov!.count} time${cov!.count === 1 ? '' : 's'}` : seniorGap ? 'senior gap, not met yet' : 'not met yet',
+    met ? `met ${cov!.count} time${cov!.count === 1 ? '' : 's'}${lastMetAt ? `, ${recencyTitle(lastMetAt).toLowerCase()}` : ''}` : seniorGap ? 'senior gap, not met yet' : 'not met yet',
     node.redacted ? 'restricted' : '',
     `relationship ${STRENGTH_LABEL[strength].toLowerCase()}`,
     childCount ? `${childCount} direct report${childCount === 1 ? '' : 's'}${collapsed ? ', collapsed' : ''}` : '',
@@ -43,6 +53,7 @@ function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
     <div
       className="oc-node"
       data-met={met}
+      data-recency={recency}
       data-dim={(showMet && !met) || match === 'miss' ? 'true' : undefined}
       data-hit={match === 'hit' || undefined}
       data-selected={selected || undefined}
@@ -54,10 +65,13 @@ function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
       aria-label={label}
     >
       <Handle type="target" position={Position.Top} className="oc-handle" isConnectable={false} />
-      <div className="oc-ava" data-ring={showMet ? (met ? 'met' : 'gap') : undefined} aria-hidden="true">
+      <div className="oc-ava" data-ring={ring} aria-hidden="true" title={showMet ? recencyTitle(lastMetAt) : undefined}>
         <OrgPhoto url={node.photoUrl} name={node.name} />
-        {showMet && met ? <i className="oc-met-dot" /> : null}
+        {showMet && met && recency !== 'stale' ? <i className="oc-met-dot" data-r={recency} aria-hidden="true" /> : null}
       </div>
+      {badge ? (
+        <span className="oc-recency" data-r={recency} title={recencyTitle(lastMetAt)} data-testid="orgchart-recency">{badge}</span>
+      ) : null}
       <div className="oc-pill">
         <span className="oc-name">{node.name}</span>
       </div>
@@ -71,6 +85,7 @@ function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
           </span>
         ) : null}
       </span>
+      {!node.redacted ? <ContactLinks node={node} compact /> : null}
       {childCount ? (
         <button
           type="button"

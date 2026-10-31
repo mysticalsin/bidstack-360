@@ -4,7 +4,7 @@ import dagre from '@dagrejs/dagre';
 import type { OrgNode } from './types';
 
 export const NODE_W = 184;
-export const NODE_H = 120;
+export const NODE_H = 140;
 
 export function layoutTree(nodes: OrgNode[]): Map<string, { x: number; y: number }> {
   const g = new dagre.graphlib.Graph();

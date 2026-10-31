@@ -28,7 +28,7 @@ const call = <T,>(p: Promise<T>) => p.catch(asConflict);
 export function toOrgNode(n: OrgChartNode): OrgNode {
   return {
     id: n.id, parentId: n.parentId, name: n.name, title: n.title, photoUrl: n.photoUrl, seniority: n.seniority, region: n.region,
-    contactId: n.contactId, email: null, ownerName: n.owner?.name ?? null, source: n.source, version: n.version, kind: n.kind,
+    contactId: n.contactId, email: n.email ?? null, phone: n.phone ?? null, linkedinUrl: n.linkedinUrl ?? null, profile: n.profile ?? null, ownerName: n.owner?.name ?? null, source: n.source, version: n.version, kind: n.kind,
     function: n.function, redacted: n.redacted, meetingCount: n.meetingCount, lastMetAt: n.lastMetAt, relationshipStrength: n.relationshipStrength,
   };
 }
@@ -54,6 +54,13 @@ export const importOrgChartCsv = (companyId: string, csv: string, dryRun: boolea
       if (e instanceof ApiError && e.status === 422 && e.body && typeof e.body === 'object' && 'errors' in e.body) return e.body as OrgChartImportResult;
       throw e;
     });
+/** HTML people export: same dry run then commit flow as CSV; parsed server side, never in the browser. */
+export const importOrgChartHtml = (companyId: string, html: string, dryRun: boolean, chartVersion?: number) =>
+  call(api<OrgChartImportResult>(`${C(companyId)}/import-html`, { method: 'POST', body: { html, dryRun, ...(chartVersion !== undefined ? { chartVersion } : {}) } }))
+    .catch((e: unknown) => {
+      if (e instanceof ApiError && e.status === 422 && e.body && typeof e.body === 'object' && 'errors' in e.body) return e.body as OrgChartImportResult;
+      throw e;
+    });
 export const seedOrgChart = (companyId: string, opts: { includeApollo: boolean; includeMeetingAttendees: boolean }) =>
   api<{ queued: boolean; jobId: string | null }>(`${C(companyId)}/seed`, { method: 'POST', body: opts });
 
@@ -76,7 +83,8 @@ export const apiOps: OrgChartOps = {
   fetch: (companyId) => fetchOrgChart(companyId),
 };
 
-const FIELDS = ['name', 'title', 'seniority', 'region', 'photoUrl', 'relationshipStrength'] as const;
+const FIELDS = ['name', 'title', 'seniority', 'region', 'photoUrl', 'relationshipStrength', 'email', 'phone', 'linkedinUrl'] as const;
+const CONTACT_FIELDS: readonly string[] = ['email', 'phone', 'linkedinUrl'];
 type Field = (typeof FIELDS)[number];
 const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v ?? null);
 
@@ -86,8 +94,11 @@ function fieldsOf(n: OrgNode, sampleSave: boolean): Record<string, unknown> {
     const v = blank(n[f]);
     if (v !== null) out[f] = v;
   }
-  // Sample people are invented: save them as role placeholders, never as names.
-  if (sampleSave && n.source === 'sample') out.name = n.title || 'Unknown role';
+  // Sample people are invented: save them as role placeholders, never as names or contact details.
+  if (sampleSave && n.source === 'sample') {
+    out.name = n.title || 'Unknown role';
+    for (const f of CONTACT_FIELDS) delete out[f];
+  }
   if (n.contactId && !sampleSave) out.contactId = n.contactId;
   if (sampleSave && n.contactId && n.source !== 'sample') out.contactId = n.contactId;
   return out;
