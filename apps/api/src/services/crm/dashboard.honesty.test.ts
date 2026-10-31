@@ -141,5 +141,28 @@ describe('deal currency is omitted when the opportunity has none', () => {
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
     expect(deal.currencyCode).toBeNull();
+    expect(deal.companyId).toBeNull();
+    expect(deal.companyName).toBe('Acme');
+  });
+
+  it('keeps the company id only when the opportunity row stores one', () => {
+    // Why: the customer name used to be normalized into companyId, so a deal
+    // with no company link still looked attached to an account.
+    const deal = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5b',
+      customer: 'DNB',
+      companyId: 'c0000000-0000-4000-8000-000000000008',
+      name: 'Renewal',
+      stage: 's1_lead',
+      pipelineStage: null,
+      valueMicros: 1_000_000,
+      probability: 40,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(deal.companyId).toBe('c0000000-0000-4000-8000-000000000008');
+    expect(deal.companyName).toBe('DNB');
   });
 });

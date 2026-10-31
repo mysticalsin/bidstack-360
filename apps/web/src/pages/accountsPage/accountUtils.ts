@@ -34,10 +34,7 @@ const COVERAGE_NEXT_ACTIONS: Record<string, string> = {
 };
 
 export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow {
-  const matched = deals.filter(
-    (d) =>
-      d.companyId === company.id || d.companyName?.toLowerCase() === company.name.toLowerCase(),
-  );
+  const matched = deals.filter((d) => d.companyId === company.id);
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
   const pipelineMicros = open.reduce(
     (acc, d) => acc + Math.round(d.amountMicros * ((d.probability ?? 50) / 100)),

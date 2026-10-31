@@ -36,6 +36,7 @@ import { canReadAccount } from '../../lib/account-access.js';
 export function serializeDeal(opportunity: {
   id: string;
   customer: string;
+  companyId?: string | null;
   name: string;
   stage: string;
   pipelineStage: {
@@ -59,7 +60,7 @@ export function serializeDeal(opportunity: {
   return {
     id: opportunity.id,
     source: 'external_crm',
-    companyId: normalizeName(opportunity.customer),
+    companyId: opportunity.companyId ?? null,
     companyName: opportunity.customer,
     name: opportunity.name,
     stage: mapDealStage(opportunity.pipelineStage?.key ?? opportunity.stage),
@@ -337,11 +338,11 @@ export async function buildCompanyCockpit(
   }
 
   const opportunityWhere = scope
-    ? applyOpportunityScope({ orgId, customer: company.name, deletedAt: null }, scope)
-    : { orgId, customer: company.name, deletedAt: null };
+    ? applyOpportunityScope({ orgId, companyId: company.id, deletedAt: null }, scope)
+    : { orgId, companyId: company.id, deletedAt: null };
   const taskOpportunityWhere = scope
-    ? applyOpportunityScope({ customer: company.name, deletedAt: null }, scope)
-    : { customer: company.name, deletedAt: null };
+    ? applyOpportunityScope({ companyId: company.id, deletedAt: null }, scope)
+    : { companyId: company.id, deletedAt: null };
 
   // Step 2: load company-specific data in parallel (filtered by company)
   const [opportunities, contacts, tasks, riskRows, complianceRows, performance, fieldOverrides] =
@@ -351,6 +352,7 @@ export async function buildCompanyCockpit(
         select: {
           id: true,
           customer: true,
+          companyId: true,
           name: true,
           stage: true,
           valueMicros: true,
@@ -395,7 +397,7 @@ export async function buildCompanyCockpit(
           status: true,
           createdAt: true,
           dueDate: true,
-          opportunity: { select: { id: true, customer: true, name: true } },
+          opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
           assignee: { select: { name: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -431,7 +433,7 @@ export async function buildCompanyCockpit(
         orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
         take: 50,
       }),
-      fetchAccountPerformance(orgId, company.name, prismaClient, scope),
+      fetchAccountPerformance(orgId, company.id, prismaClient, scope),
       // WHY: folded into the Promise.all (was a 7th serial query after it) so the
       // cockpit's per-company reads all run in parallel. company.name is already
       // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
@@ -464,17 +466,34 @@ export async function buildCompanyCockpit(
  * (the cockpit's opportunity list is take-capped for display; aggregates must
  * not be). Sums are BigInt in SQL, returned as Number micros at the edge.
  */
+function isCompanyUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+const EMPTY_ACCOUNT_PERFORMANCE: AccountPerformance = {
+  winLoss: {
+    wonCount: 0,
+    lostCount: 0,
+    wonValueMicros: 0,
+    lostValueMicros: 0,
+    winRate: null,
+  },
+  revenueEvolution: [],
+};
+
 export async function fetchAccountPerformance(
   orgId: string,
-  customer: string,
+  companyId: string,
   prismaClient: PrismaClient,
   scope?: AccessScope,
 ): Promise<AccountPerformance> {
+  // A customer string is not a company. Placeholder accounts use a slug id.
+  if (!isCompanyUuid(companyId)) return EMPTY_ACCOUNT_PERFORMANCE;
   const byStageWhere: Prisma.OpportunityWhereInput = scope
     ? applyOpportunityScope(
         {
           orgId,
-          customer,
+          companyId,
           deletedAt: null,
           stage: { in: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
         },
@@ -482,7 +501,7 @@ export async function fetchAccountPerformance(
       )
     : {
         orgId,
-        customer,
+        companyId,
         deletedAt: null,
         stage: { in: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
       };
@@ -493,7 +512,7 @@ export async function fetchAccountPerformance(
       _sum: { valueMicros: true },
       _count: { _all: true },
     }),
-    fetchRevenueRows(orgId, customer, prismaClient, scope),
+    fetchRevenueRows(orgId, companyId, prismaClient, scope),
   ]);
 
   const won = byStage.find((r) => r.stage === OpportunityStage.closed_won);
@@ -530,7 +549,7 @@ function sumGroupValueMicros(
 
 async function fetchRevenueRows(
   orgId: string,
-  customer: string,
+  companyId: string,
   prismaClient: PrismaClient,
   scope?: AccessScope,
 ): Promise<Array<{ period: string; revenue: bigint | number | null }>> {
@@ -555,7 +574,7 @@ async function fetchRevenueRows(
       FROM opportunities o
       LEFT JOIN territories t ON t.id = o.territory_id
       WHERE o.org_id = ${orgId}::uuid
-        AND o.customer = ${customer}
+        AND o.company_id = ${companyId}::uuid
         AND o.stage = 'closed_won'
         AND o.deleted_at IS NULL
         AND o.due_date IS NOT NULL
@@ -574,7 +593,7 @@ async function fetchRevenueRows(
            SUM(value_micros) AS revenue
     FROM opportunities
     WHERE org_id = ${orgId}::uuid
-      AND customer = ${customer}
+      AND company_id = ${companyId}::uuid
       AND stage = 'closed_won'
       AND deleted_at IS NULL
       AND due_date IS NOT NULL

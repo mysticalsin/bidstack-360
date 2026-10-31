@@ -99,6 +99,18 @@ describe('accountUtils', () => {
     expect(segmentMatches(row, 'watch')).toBe(true);
   });
 
+  it('does not attach a deal that only shares the account name', () => {
+    // Why: a customer string used to count as this account's pipeline, so an
+    // unlinked deal with the same name inflated open deals and the proxy band.
+    const row = deriveAccount(company(), [
+      deal({ id: 'unlinked', companyId: null, companyName: 'Acme', amountMicros: 5_000_000_000_000 }),
+      deal({ id: 'other', companyId: 'co-other', companyName: 'Acme' }),
+    ]);
+    expect(row.openDeals).toBe(0);
+    expect(row.totalDeals).toBe(0);
+    expect(row.pipelineMicros).toBe(0);
+  });
+
   it('keeps the pipeline band from reading as a measured health score', () => {
     // Why: the list only has weighted pipeline size. Calling that Strong
     // without a proxy mark is the misleading health the safety gate forbids.

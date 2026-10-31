@@ -177,11 +177,9 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  // The global opportunity list is capped. This snapshot already carries the
-  // account's deals, including ones outside that cap.
-  const companyDeals = snapshot.deals.filter(
-    (deal) => deal.companyName?.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  // A matching customer name is not a link. The snapshot deals for this
+  // account are the rows whose companyId points here.
+  const companyDeals = snapshot.deals.filter((deal) => deal.companyId === cockpit.company.id);
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.

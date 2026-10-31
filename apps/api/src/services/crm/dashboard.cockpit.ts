@@ -299,7 +299,7 @@ export function buildActivities(
     id: string;
     title: string;
     status: string;
-    opportunity?: { id: string; customer: string; name: string } | null;
+    opportunity?: { id: string; customer: string; name: string; companyId: string | null } | null;
     assignee?: { name: string | null; email: string } | null;
     createdAt: Date;
   }>,
@@ -310,7 +310,7 @@ export function buildActivities(
     subject: task.title,
     body: `Task is ${task.status.replace('_', ' ')}.`,
     kind: 'task',
-    companyId: task.opportunity ? normalizeName(task.opportunity.customer) : null,
+    companyId: task.opportunity?.companyId ?? null,
     dealId: task.opportunity?.id ?? null,
     personId: null,
     actorName: task.assignee?.name ?? task.assignee?.email ?? null,
@@ -488,6 +488,7 @@ export function buildCockpit({
   opportunities: Array<{
     id: string;
     customer: string;
+    companyId: string | null;
     name: string;
     stage: string;
     pipelineStage: {
@@ -519,7 +520,7 @@ export function buildCockpit({
     title: string;
     status: string;
     dueDate: Date | null;
-    opportunity: { customer: string; id: string; name: string } | null;
+    opportunity: { customer: string; companyId: string | null; id: string; name: string } | null;
     assignee: { name: string | null; email: string } | null;
     createdAt: Date;
   }>;
@@ -542,10 +543,8 @@ export function buildCockpit({
   }>;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
-  const companyOpps = opportunities.filter((opp) => {
-    const opportunityCompanyKey = normalizeName(opp.customer);
-    return opp.customer === company.name || opportunityCompanyKey === company.id;
-  });
+  const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
+  const accountTasks = tasks.filter((task) => task.opportunity?.companyId === company.id);
   const openDeals = companyOpps.filter(
     (opp) =>
       !opp.pipelineStage?.isWon &&
@@ -730,7 +729,7 @@ export function buildCockpit({
       company,
       contacts: accountContacts,
       openDeals,
-      tasks: tasks.filter((t) => t.opportunity?.customer === company.name),
+      tasks: accountTasks,
     }),
     keyContacts: accountContacts.slice(0, 5).map((contact) => ({
       id: contact.id,
@@ -744,9 +743,7 @@ export function buildCockpit({
       roleInDecision: null,
       updatedAt: contact.createdAt.toISOString(),
     })),
-    recentActivity: buildActivities(
-      tasks.filter((task) => task.opportunity?.customer === company.name),
-    ).slice(0, 5),
+    recentActivity: buildActivities(accountTasks).slice(0, 5),
     risks: visibleRisks.map(serializeRisk),
     compliance: visibleCompliance.map(serializeCompliance),
     roadmap: [],

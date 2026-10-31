@@ -310,6 +310,70 @@ describe('buildCockpit recorded facts only', () => {
 
     expect(cockpit.keyContacts.map((person) => person.id)).toEqual(['cio', 'ada', 'no-score']);
   });
+
+  it('counts a deal and its tasks only when the opportunity companyId matches', () => {
+    // Why: a shared customer string used to pull another company's deal and
+    // its tasks onto this account, and the activity then wore this account's id.
+    const cockpit = buildCockpit({
+      company: company({ id: 'co-dnb', name: 'DNB' }),
+      companies: [],
+      opportunities: [
+        {
+          id: 'linked',
+          customer: 'DNB Bank ASA',
+          companyId: 'co-dnb',
+          name: 'Treasury',
+          stage: 's2_sent',
+          pipelineStage: null,
+          valueMicros: 1n,
+          probability: 40,
+          dueDate: null,
+          owner: null,
+        },
+        {
+          id: 'name-only',
+          customer: 'DNB',
+          companyId: null,
+          name: 'Unlinked',
+          stage: 's2_sent',
+          pipelineStage: null,
+          valueMicros: 1n,
+          probability: 40,
+          dueDate: null,
+          owner: null,
+        },
+      ],
+      contacts: [],
+      tasks: [
+        {
+          id: 'task-linked',
+          title: 'Call the treasurer',
+          status: 'open',
+          dueDate: null,
+          createdAt: new Date('2026-06-02T00:00:00.000Z'),
+          opportunity: { id: 'linked', customer: 'Other label', companyId: 'co-dnb', name: 'Treasury' },
+          assignee: null,
+        },
+        {
+          id: 'task-name',
+          title: 'Chase the name match',
+          status: 'open',
+          dueDate: null,
+          createdAt: new Date('2026-06-03T00:00:00.000Z'),
+          opportunity: { id: 'name-only', customer: 'DNB', companyId: null, name: 'Unlinked' },
+          assignee: null,
+        },
+      ],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+
+    const projects = cockpit.kpis.find((kpi) => kpi.label === 'Projects');
+    expect(projects?.value).toBe('1');
+    expect(cockpit.recentActivity.map((activity) => activity.dealId)).toEqual(['linked']);
+    expect(cockpit.recentActivity[0]?.companyId).toBe('co-dnb');
+  });
 });
 
 describe('buildCockpit win/loss + revenue derivation', () => {
@@ -329,6 +393,7 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     return {
       id: 'o',
       customer: 'Acme',
+      companyId: 'mantu',
       name: 'deal',
       stage: 'qualified',
       pipelineStage: null,

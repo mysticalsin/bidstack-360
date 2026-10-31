@@ -99,6 +99,7 @@ export async function buildDashboardSnapshot(
         id: true,
         code: true,
         customer: true,
+        companyId: true,
         name: true,
         stage: true,
         pipelineStageId: true,
@@ -132,7 +133,7 @@ export async function buildDashboardSnapshot(
         title: true,
         status: true,
         createdAt: true,
-        opportunity: { select: { id: true, customer: true, name: true } },
+        opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
         assignee: { select: { name: true, email: true } },
         dueDate: true,
       },
@@ -330,7 +331,16 @@ export async function buildDashboardSnapshot(
       if (index >= 0) companies[index] = refreshed;
     }
   }
-  const [fieldOverrides, performance, contacts] = await Promise.all([
+  const accountOpportunityWhere = isCompanyUuid(selectedCompany.id)
+    ? scope
+      ? applyOpportunityScope(
+          { orgId, companyId: selectedCompany.id, deletedAt: null },
+          scope,
+        )
+      : { orgId, companyId: selectedCompany.id, deletedAt: null }
+    : null;
+  const [fieldOverrides, performance, contacts, accountOpportunities, accountTasks] =
+    await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },
       select: { fieldKey: true, value: true },
@@ -338,7 +348,7 @@ export async function buildDashboardSnapshot(
     }),
     // Account-scoped aggregate — the org-wide `opportunities` array above is
     // a 100-row sample and must NOT back the selected account's win/loss.
-    fetchAccountPerformance(orgId, selectedCompany.name, prisma, scope),
+    fetchAccountPerformance(orgId, selectedCompany.id, prisma, scope),
     // People for this account only. A 200-row org sample ordered by name
     // dropped linked contacts, and a matching customer string is not a link.
     isCompanyUuid(selectedCompany.id)
@@ -359,16 +369,68 @@ export async function buildDashboardSnapshot(
           take: 20,
         })
       : Promise.resolve([]),
+    accountOpportunityWhere
+      ? prisma.opportunity.findMany({
+          where: accountOpportunityWhere,
+          select: {
+            id: true,
+            customer: true,
+            companyId: true,
+            name: true,
+            stage: true,
+            valueMicros: true,
+            probability: true,
+            dueDate: true,
+            ownerId: true,
+            updatedAt: true,
+            owner: { select: { name: true, email: true } },
+            pipelineStage: {
+              select: {
+                key: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+        })
+      : Promise.resolve([]),
+    accountOpportunityWhere
+      ? prisma.task.findMany({
+          where: { orgId, deletedAt: null, opportunity: accountOpportunityWhere },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            dueDate: true,
+            opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
+            assignee: { select: { name: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        })
+      : Promise.resolve([]),
   ]);
+
+  const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
+  const snapshotDeals = [
+    ...deals.filter((deal) => deal.companyId !== selectedCompany.id),
+    ...accountDeals,
+  ];
 
   return {
     generatedAt: new Date().toISOString(),
     cockpit: buildCockpit({
       company: selectedCompany,
       companies,
-      opportunities,
+      opportunities: accountOpportunities,
       contacts,
-      tasks,
+      tasks: accountTasks,
       risks: riskRows,
       compliance: complianceRows,
       fieldOverrides,
@@ -376,7 +438,7 @@ export async function buildDashboardSnapshot(
       performance,
     }),
     companies,
-    deals,
+    deals: snapshotDeals,
     activities,
     insights,
     widgets: dashboardWidgets,
