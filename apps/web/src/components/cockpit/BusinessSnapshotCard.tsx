@@ -14,7 +14,7 @@ import { springSoft } from '@/lib/motion';
 import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
-import { headquartersFor, labelForBand } from './_tokens';
+import { headquartersFor } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -252,10 +252,11 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         title={t('businessSnapshot.title', 'Business snapshot')}
         caption={t(
           'businessSnapshot.caption',
-          'Signal band: {{band}}. Score {{score}}/100 is recorded-field coverage on this account, not a measured health score.',
+          '{{recorded}} of {{total}} fields on this card are filled. The bar is {{share}}% of those fields.',
           {
-            band: labelForBand(cockpit.health.band),
-            score: cockpit.health.score,
+            recorded: recorded.length,
+            total: rows.length,
+            share: recordedShare,
           },
         )}
       />

@@ -3798,7 +3798,7 @@
   },
   "businessSnapshot": {
     "title": "Business snapshot",
-    "caption": "Signal band: {{band}}. Score {{score}}/100 is recorded-field coverage on this account, not a measured health score.",
+    "caption": "{{recorded}} of {{total}} fields on this card are filled. The bar is {{share}}% of those fields.",
     "region": {
       "ariaLabel": "Business snapshot"
     },

@@ -163,5 +163,8 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.getByText('Manual')).toBeTruthy();
     expect(screen.getByText('External fresh')).toBeTruthy();
     expect(screen.getAllByText('Company Registry').length).toBeGreaterThan(0);
+    // The card bar is the filled-field share. The account signal score is a different number.
+    expect(screen.getByText(/fields on this card are filled/)).toBeTruthy();
+    expect(screen.queryByText(/80\/100/)).toBeNull();
   });
 });
