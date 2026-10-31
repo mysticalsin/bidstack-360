@@ -49,7 +49,7 @@ export function HiringNowCard({ companyId }: { companyId: string }) {
             <span className="en-big">{roles.length}</span>
             <span className="en-meta">open roles · {fresh} posted in the last 30 days</span>
           </div>
-          <CountBars rows={byFn.slice(0, TOP_FUNCTIONS)} label={`Top ${TOP_FUNCTIONS} functions by open roles`} />
+          {open ? null : <CountBars rows={byFn.slice(0, TOP_FUNCTIONS)} label={`Top ${TOP_FUNCTIONS} functions by open roles`} />}
           <SourceNote source={source} asOf={asOf} />
         </>
       )}
