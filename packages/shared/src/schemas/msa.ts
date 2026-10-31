@@ -127,7 +127,7 @@ const MsaWritableFields = {
   effectiveDate: IsoDate.nullable().optional(),
   expiryDate: IsoDate.nullable().optional(),
   autoRenew: z.boolean().default(false),
-  noticePeriodDays: z.number().int().min(0).max(3650).nullable().optional(),
+  noticePeriodDays: z.number().int().min(0).max(730).nullable().optional(),
   governingLaw: z.string().trim().max(200).nullable().optional(),
   liabilityCap: MsaLiabilityCap.nullable().optional(),
   paymentTerms: z.string().trim().max(500).nullable().optional(),
