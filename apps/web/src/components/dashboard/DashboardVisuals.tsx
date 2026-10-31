@@ -6,7 +6,8 @@ import { useState } from 'react';
 
 import { ChartCard, SignalLegend, SignalShape } from '@/components/viz/ChartCard';
 import { KIND_LABEL } from '@/components/viz/viz-kinds';
-import { Donut, EarningsStrip, HBars, HeatStrip, RateLine, StageBars, TargetBars, TrendArea } from '@/components/viz/charts';
+import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
+import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/bklit-adapters';
 import {
   accountBars, cumulativeWon, fmtCompact, pastDueOpen, stageFunnel, statusMix, winRateByQuarter, wonByQuarter,
   type OppRow,
@@ -40,7 +41,7 @@ export function DashboardHero({ rows, openValue, weighted, openCount }: {
           <div className="viz-meta">Won this year</div>
         </div>
       </div>
-      {trend.length > 1 ? <TrendArea data={trend} format={fmtCompact} height={176} /> : null}
+      <HeroArea data={trend} format={fmtCompact} />
       <div className="viz-caption">Won value to date, by close month</div>
     </ChartCard>
   );
@@ -85,7 +86,7 @@ export function FunnelCard({ rows }: { rows: OppRow[] }) {
     <ChartCard title="Pipeline by stage" meta="Open value per stage"
       summary={data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids'}
       table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, fmtCompact(d.value)]) }}>
-      {data.length ? <StageBars data={data} format={fmtCompact} /> : <p className="viz-empty">No open bids.</p>}
+      {data.length ? <StageFunnel data={data} format={fmtCompact} /> : <p className="viz-empty">No open bids.</p>}
     </ChartCard>
   );
 }
@@ -94,7 +95,7 @@ export function StatusDonutCard({ rows }: { rows: OppRow[] }) {
   const m = statusMix(rows);
   const total = m.open + m.won + m.lost;
   const data = [
-    { label: 'Open', value: m.open, color: 'color-mix(in srgb, var(--brand-primary, #006b4f) 40%, transparent)' },
+    { label: 'Open', value: m.open, color: 'color-mix(in srgb, var(--brand-primary, #006b4f) 55%, transparent)' },
     { label: 'Won', value: m.won, color: 'var(--success, #177048)' },
     { label: 'Lost', value: m.lost, color: 'color-mix(in srgb, var(--fg-tertiary, #6b6b6b) 45%, transparent)' },
   ].filter((d) => d.value > 0);
@@ -102,7 +103,20 @@ export function StatusDonutCard({ rows }: { rows: OppRow[] }) {
     <ChartCard title="Bids by status" meta={`${total} bids`}
       summary={`Open ${m.open}, won ${m.won}, lost ${m.lost}.`}
       table={{ columns: ['Status', 'Bids'], rows: data.map((d) => [d.label, d.value]) }}>
-      <Donut data={data} center={String(total)} centerLabel="bids" />
+      <div className="dash-rings">
+        <StatusRings data={data} total={total} />
+        <ul className="viz-legend dash-rings-legend">
+          {data.map((d, i) => (
+            <li key={d.label}>
+              <span className="dash-rings-key">
+                <svg width="10" height="10" aria-hidden>{i % 3 === 0 ? <circle cx="5" cy="5" r="4" fill={d.color} /> : i % 3 === 1 ? <rect x="1" y="1" width="8" height="8" fill={d.color} /> : <path d="M5 1 L9 9 L1 9 Z" fill={d.color} />}</svg>
+                {d.label}
+              </span>
+              <span className="dash-rings-num">{d.value}<span className="viz-meta"> · {Math.round((d.value / total) * 100)}%</span></span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </ChartCard>
   );
 }
@@ -120,10 +134,10 @@ export function ForecastCard({ rows, projection }: {
   const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
   const target = commits.length ? commits[0]! / 1e6 : null;
   return (
-    <ChartCard title="Revenue and forecast" meta={target ? 'Against your commit target' : 'No target set yet · add a commit forecast to compare'}
+    <ChartCard title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
       summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
       table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
-      <TargetBars data={data} format={fmtCompact} target={target} />
+      <QuarterBars data={data} format={fmtCompact} />
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'var(--success, #177048)' }} />Won</li>
         <li><i className="dash-key" style={{ background: 'color-mix(in srgb, var(--brand-primary, #006b4f) 70%, transparent)' }} />Weighted forecast</li>
@@ -138,7 +152,7 @@ export function WinRateTrendCard({ rows }: { rows: OppRow[] }) {
     <ChartCard title="Win rate over time" meta="Share of closed bids won, by close quarter"
       summary={data.map((d) => `${d.x}: ${d.rate}% (${d.won} of ${d.won + d.lost})`).join('; ') || 'No closed bids'}
       table={{ columns: ['Quarter', 'Won', 'Lost', 'Win rate'], rows: data.map((d) => [d.x, d.won, d.lost, `${d.rate}%`]) }}>
-      {data.length ? <RateLine data={data} /> : <p className="viz-empty">No closed bids yet.</p>}
+      {data.length > 1 ? <WinRateLine data={data} /> : <p className="viz-empty">Needs closed bids in two quarters.</p>}
     </ChartCard>
   );
 }

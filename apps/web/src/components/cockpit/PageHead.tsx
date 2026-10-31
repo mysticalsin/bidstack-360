@@ -13,6 +13,7 @@ import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
+import { MetricSpark } from '@/components/viz/bklit-adapters';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
@@ -84,7 +85,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
   // Sparklines (real rows only): open value accumulated by due date, running
   // win rate across closed bids in close order, open risks by severity.
-  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, customer: o.customer }));
+  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer }));
   const openSpark = cumulativeOpen(sparkRows);
   const winSpark = runningWinRate(sparkRows);
   const riskSpark = (['low', 'medium', 'high', 'critical'] as const).map((sev) => openRisks.filter((r) => r.severity === sev).length);
@@ -209,7 +210,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           <div>
             <dt>{t('pageHead.keyOpenPipeline', 'Open pipeline')}</dt>
             <dd>{formatMoney(openValue)}</dd>
-            <Spark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
+            <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
               {openOpps.length === 1
                 ? t('pageHead.keyOpenDeal', '1 open deal')
@@ -219,7 +220,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           <div>
             <dt>{t('pageHead.keyWinRate', 'Win rate')}</dt>
             <dd>{winLoss && closedCount > 0 ? `${winLoss.winRate}%` : '—'}</dd>
-            <Spark values={winSpark} label={t('pageHead.sparkWin', 'Running win rate after each closed bid')} />
+            <MetricSpark values={winSpark} label={t('pageHead.sparkWin', 'Running win rate after each closed bid')} />
             <span>
               {winLoss && closedCount > 0
                 ? t('pageHead.keyWonOf', '{{won}} of {{total}} closed', {

@@ -68,7 +68,11 @@ export function winRateByQuarter(rows: OppRow[]) {
   }
   return [...by.entries()]
     .sort((a, b) => a[1].t - b[1].t)
-    .map(([x, v]) => ({ x, won: v.won, lost: v.lost, rate: Math.round((v.won / (v.won + v.lost)) * 100) }));
+    .map(([x, v]) => {
+      const t = new Date(v.t);
+      const date = new Date(t.getUTCFullYear(), Math.floor(t.getUTCMonth() / 3) * 3, 1);
+      return { x, date, won: v.won, lost: v.lost, rate: Math.round((v.won / (v.won + v.lost)) * 100) };
+    });
 }
 
 /** Won value per close quarter (actuals), oldest first. */
@@ -95,7 +99,8 @@ export function cumulativeWon(rows: OppRow[]) {
   let run = 0;
   return Array.from({ length: lastMonth + 1 }, (_, m) => {
     run += won.filter((r) => { const d = new Date(r.at); return d.getUTCFullYear() === year && d.getUTCMonth() === m; }).reduce((n, r) => n + r.v, 0);
-    return { x: monFmt.format(new Date(Date.UTC(year, m, 1))), y: run };
+    const date = new Date(year, m, 1); // local midnight, for axis display only
+    return { x: monFmt.format(date), date, y: run };
   });
 }
 
@@ -129,8 +134,10 @@ export function runningWinRate(rows: OppRow[]) {
 /** Cumulative open value by due date (sparkline). */
 export function cumulativeOpen(rows: OppRow[]) {
   const open = rows.filter((o) => !isClosed(o)).sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+  if (!open.length) return [];
+  // Starts at 0 so a single open bid still draws a rising line.
   let run = 0;
-  return open.map((o) => (run += o.value ?? 0));
+  return [0, ...open.map((o) => (run += o.value ?? 0))];
 }
 
 const compact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });

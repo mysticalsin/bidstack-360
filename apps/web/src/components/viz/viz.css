@@ -149,3 +149,24 @@
 .rel-map .rel-edge[data-dashed='true'] { stroke-dasharray: 3 4; animation: none; stroke-dashoffset: 0; }
 .acct-visuals { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); align-items: start; }
 @media (max-width: 1024px) { .acct-visuals { grid-template-columns: 1fr; } }
+
+/* ---------- bklit charts inside Polo cards ---------- */
+.viz-bk { width: 100%; color: var(--viz-muted); font-size: 12px; }
+.viz-bk svg text { fill: var(--viz-muted); font-size: 12px; }
+.viz-bk-ring { display: grid; place-items: center; }
+.viz-bk-spark { display: inline-block; width: 88px; height: 24px; vertical-align: middle; }
+.dash-rings { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: center; }
+.dash-rings-legend { display: grid; gap: 12px; }
+.dash-rings-legend li { display: flex; justify-content: space-between; gap: 16px; }
+.dash-rings-key { display: inline-flex; align-items: center; gap: 8px; }
+.dash-rings-num { color: var(--viz-ink); font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .dash-rings { grid-template-columns: 1fr; justify-items: center; } .dash-rings-legend { width: 100%; } }
+/* bklit reads shadcn variables; scope Polo values so nothing falls back to black. */
+.viz-bk, .viz-bk-spark {
+  --border: var(--viz-line);
+  --foreground: var(--viz-ink);
+  --muted-foreground: var(--viz-muted);
+  --background: var(--bg-surface, #fff);
+  --popover: var(--bg-surface, #fff);
+  --popover-foreground: var(--viz-ink);
+}

@@ -28,7 +28,10 @@ describe('viz-data', () => {
   it('derives funnel, status mix and win rate from rows only', () => {
     expect(stageFunnel(rows).map((s) => [s.label, s.value])).toEqual([['S1 lead', 10], ['S4 negotiation', 400]]);
     expect(statusMix(rows)).toEqual({ open: 2, won: 2, lost: 1 });
-    expect(winRateByQuarter(rows)).toEqual([
+    const wr = winRateByQuarter(rows);
+    // Each quarter carries its start date for the time axis.
+    expect(wr.map((q) => [q.date.getFullYear(), q.date.getMonth()])).toEqual([[2026, 0], [2026, 3], [2026, 9]]);
+    expect(wr.map(({ date: _d, ...q }) => q)).toEqual([
       { x: 'Q1 2026', won: 1, lost: 0, rate: 100 },
       { x: 'Q2 2026', won: 1, lost: 0, rate: 100 },
       { x: 'Q4 2026', won: 0, lost: 1, rate: 0 },
@@ -39,7 +42,7 @@ describe('viz-data', () => {
   it('accumulates won value by month and open value by due date', () => {
     const won = cumulativeWon(rows);
     expect(won.map((p) => [p.x, p.y])).toEqual([['Jan', 0], ['Feb', 200], ['Mar', 200], ['Apr', 500]]);
-    expect(cumulativeOpen(rows)).toEqual([10, 410]);
+    expect(cumulativeOpen(rows)).toEqual([0, 10, 410]);
     expect(runningWinRate(rows)).toEqual([100, 100, 67]);
   });
 
