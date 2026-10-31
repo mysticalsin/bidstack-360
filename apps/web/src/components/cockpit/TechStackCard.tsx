@@ -413,7 +413,7 @@ type AcceptedSourceSummaryItem = {
 };
 
 type ProviderReviewSummaryItem = ProviderReviewBreakdownItem & {
-  averageConfidence: number;
+  averageConfidence: number | null;
   topVendor: string;
 };
 
@@ -1278,8 +1278,12 @@ function TechStackEditor({
                     <strong>{summary.count}</strong>
                     <small>{summary.label}</small>
                   </span>
-                  <span>{summary.averageConfidence}% avg</span>
-                  <small>Top {summary.topVendor}</small>
+                  <span>
+                    {summary.averageConfidence == null
+                      ? 'Not scored'
+                      : `${summary.averageConfidence}% avg`}
+                  </span>
+                  {summary.topVendor ? <small>Top {summary.topVendor}</small> : null}
                 </button>
               ))}
             </div>
@@ -2764,12 +2768,13 @@ function buildProviderReviewSummaries(
 ): ProviderReviewSummaryItem[] {
   const buckets: Record<
     ProviderReviewBreakdownItem['id'],
-    { label: string; count: number; confidenceTotal: number; topVendor: string; topConfidence: number }
+    { label: string; count: number; scoredCount: number; confidenceTotal: number; topVendor: string; topConfidence: number }
   > = {
-    apollo: { label: 'Apollo', count: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
+    apollo: { label: 'Apollo', count: 0, scoredCount: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
     seamless: {
       label: 'Seamless',
       count: 0,
+      scoredCount: 0,
       confidenceTotal: 0,
       topVendor: '',
       topConfidence: -1,
@@ -2777,6 +2782,7 @@ function buildProviderReviewSummaries(
     tech_intel: {
       label: 'Tech Intel',
       count: 0,
+      scoredCount: 0,
       confidenceTotal: 0,
       topVendor: '',
       topConfidence: -1,
@@ -2784,11 +2790,12 @@ function buildProviderReviewSummaries(
     open_data: {
       label: 'Open data',
       count: 0,
+      scoredCount: 0,
       confidenceTotal: 0,
       topVendor: '',
       topConfidence: -1,
     },
-    other: { label: 'Other', count: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
+    other: { label: 'Other', count: 0, scoredCount: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
   };
 
   for (const suggestion of suggestions) {
@@ -2796,6 +2803,7 @@ function buildProviderReviewSummaries(
     const bucket = buckets[providerId];
     bucket.count += 1;
     if (suggestion.item.confidence != null) {
+      bucket.scoredCount += 1;
       bucket.confidenceTotal += suggestion.item.confidence;
       if (suggestion.item.confidence > bucket.topConfidence) {
         bucket.topConfidence = suggestion.item.confidence;
@@ -2810,7 +2818,9 @@ function buildProviderReviewSummaries(
       label: bucket.label,
       count: bucket.count,
       averageConfidence:
-        bucket.count > 0 ? Math.round((bucket.confidenceTotal / bucket.count) * 100) : 0,
+        bucket.scoredCount > 0
+          ? Math.round((bucket.confidenceTotal / bucket.scoredCount) * 100)
+          : null,
       topVendor: bucket.topVendor,
     }))
     .filter((item) => item.count > 0);

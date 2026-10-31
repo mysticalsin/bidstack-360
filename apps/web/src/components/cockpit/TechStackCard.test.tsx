@@ -182,6 +182,41 @@ describe('TechStackCard provenance', () => {
     expect(screen.getByText('Snowflake source: manual. Recorded by you.')).toBeTruthy();
   });
 
+  it('does not average unscored provider suggestions as 0%', () => {
+    // WHY: a name list with no score used to show "0% avg", which reads as a measured zero.
+    hookMocks.technicalStackState = {
+      companyKey: 'acme-north',
+      manualStack: [],
+      providerStack: [
+        {
+          label: 'Cloud',
+          items: [{ name: 'AWS', source: 'enrichment:apollo', confidence: null }],
+        },
+      ],
+      effectiveStack: [],
+      suggestions: [
+        {
+          id: 'cloud:aws',
+          label: 'Cloud',
+          item: { name: 'AWS', source: 'enrichment:apollo', confidence: null },
+          providerUpdatedAt: '2026-06-16T12:00:00.000Z',
+        },
+      ],
+      updatedAt: null,
+    };
+
+    render(<TechStackCard cockpit={cockpit()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Review all' }));
+
+    const scorecards = screen.getByLabelText('Source review scorecards');
+    const apolloScorecard = within(scorecards).getByRole('button', {
+      name: 'Review Apollo source scorecard',
+    });
+    expect(apolloScorecard.textContent).toContain('Not scored');
+    expect(apolloScorecard.textContent).not.toContain('0% avg');
+    expect(apolloScorecard.textContent).not.toContain('Top');
+  });
+
   it('saves edited stack entries as manual data', async () => {
     render(<TechStackCard cockpit={cockpit()} />);
 
