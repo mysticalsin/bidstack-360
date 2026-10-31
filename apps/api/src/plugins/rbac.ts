@@ -33,18 +33,28 @@ declare module 'fastify' {
   }
 }
 
+/**
+ * Give each guard a stable, greppable function name ("rbac:permission(leads:read)")
+ * so route census tooling (printRoutes({ includeHooks: true })) can prove that
+ * every route is covered by an RBAC gate. Behaviour is unchanged.
+ */
+function named<T extends (...args: never[]) => unknown>(name: string, fn: T): T {
+  Object.defineProperty(fn, 'name', { value: name });
+  return fn;
+}
+
 const plugin: FastifyPluginAsync = fp(async (server) => {
   server.decorate(
     'requireHumanActor',
     (message = 'Requires a user session') =>
-      async (req: FastifyRequest) => {
+      named('rbac:human', async (req: FastifyRequest) => {
         if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
           throw req.server.httpErrors.forbidden(message);
         }
-      },
+      }),
   );
 
-  server.decorate('requireRole', (...allowed: string[]) => async (req: FastifyRequest) => {
+  server.decorate('requireRole', (...allowed: string[]) => named(`rbac:role(${allowed.join('|')})`, async (req: FastifyRequest) => {
     if (req.auth.role === 'api') {
       throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
     }
@@ -52,11 +62,11 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     if (!allowedByDb) {
       throw req.server.httpErrors.forbidden(`Requires one of: ${allowed.join(', ')}`);
     }
-  });
+  }));
 
   server.decorate(
     'requirePermission',
-    (permission: PermissionKey) => async (req: FastifyRequest) => {
+    (permission: PermissionKey) => named(`rbac:permission(${permission})`, async (req: FastifyRequest) => {
       if (req.auth.role === 'api') {
         if (apiKeyScopeSatisfiesPermission(req.auth.scopes, permission)) return;
         const legacyDetail = allowLegacyRestApiKeyScopes()
@@ -76,7 +86,7 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       // in apps/api/src/plugins/auth.ts that ensures Clerk org-admins receive the
       // seeded "Admin" Role on first sign-in.
       throw req.server.httpErrors.forbidden(`Requires permission: ${permission}`);
-    },
+    }),
   );
 
   server.decorate(
