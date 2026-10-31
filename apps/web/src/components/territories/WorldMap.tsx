@@ -200,7 +200,26 @@ const A3_TO_NUMERIC: Record<string, string> = {
   YEM: '887',
   ZMB: '894',
   ZWE: '716',
+  // Present on the world-atlas countries-110m sheet.
+  ATA: '010',
+  ATF: '260',
+  CIV: '384',
+  COD: '180',
+  ESH: '732',
+  FLK: '238',
+  GRL: '304',
+  NCL: '540',
+  PRI: '630',
+  PSE: '275',
+  SWZ: '748',
+  VUT: '548',
 };
+
+export function countriesMissingFromMap<T extends { countryCodeA3: string; opportunityCount: number }>(
+  data: readonly T[],
+): T[] {
+  return data.filter((item) => item.opportunityCount > 0 && !A3_TO_NUMERIC[item.countryCodeA3]);
+}
 
 const REGIONAL_PRESETS = [
   { label: 'Global', coordinates: [0, 10] as [number, number], zoom: 1 },
@@ -276,6 +295,8 @@ export const WorldMap = memo(function WorldMap({
     }
     return map;
   }, [data]);
+
+  const notDrawn = useMemo(() => countriesMissingFromMap(data), [data]);
 
   const maxCount = useMemo(
     () => (data.length > 0 ? Math.max(...data.map((d) => d.opportunityCount)) : 1),
@@ -502,6 +523,23 @@ export const WorldMap = memo(function WorldMap({
             'Shade is the number of opportunities recorded in that country.',
           )}
         </span>
+        {notDrawn.length > 0 ? (
+          <p className="text-[var(--fg-secondary)]">
+            {t(
+              'worldMap.legend.notDrawn',
+              'Not drawn: {{list}}. This sheet has no shape for that code.',
+              {
+                list: notDrawn
+                  .map((item) =>
+                    item.opportunityCount === 1
+                      ? `${item.countryCode}, 1 opportunity`
+                      : `${item.countryCode}, ${item.opportunityCount} opportunities`,
+                  )
+                  .join('; '),
+              },
+            )}
+          </p>
+        ) : null}
         <div className="flex items-center gap-1">
           {legendItems.map((l, i) => (
             <div
