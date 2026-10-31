@@ -33,7 +33,7 @@ describe('AccountWorkstreamBoard', () => {
     );
 
     const chart = screen.getByRole('img', { name: /Pursuit, 2\.7M unspecified/ });
-    expect(chart.textContent).toMatch(/Delivery/);
+    expect(chart.getAttribute('aria-label')).toMatch(/Delivery, Not recorded/);
     expect(chart.textContent).toMatch(/Not recorded/);
     const dealLink = screen.getByRole('link', { name: /Pursuit · screening/ });
     expect(dealLink.getAttribute('href')).toBe('/opportunities/deal-1');

@@ -1,6 +1,10 @@
+import { useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { Bar } from '@/components/charts/bar';
+import { BarChart } from '@/components/charts/bar-chart';
+import { BarYAxis } from '@/components/charts/bar-y-axis';
 import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 
 import {
@@ -30,6 +34,7 @@ export function AccountWorkstreamBoard({
   people: BuyingRolePerson[];
 }) {
   const { t } = useTranslation('crm');
+  const reducedMotion = useReducedMotion();
   const grouped = groupWorkstreams(deals);
   const roles = buyingRoleSlots(people);
   const diagramDeal = grouped.pursuit[0] ?? grouped.delivery[0] ?? grouped.renewal[0] ?? grouped.expansion[0];
@@ -39,7 +44,6 @@ export function AccountWorkstreamBoard({
     deals: grouped[lane],
     value: grouped[lane].reduce((sum, deal) => sum + deal.value, 0),
   }));
-  const maxLane = Math.max(1, ...laneTotals.map((row) => row.value));
   const chartLabel = laneTotals
     .map((row) => {
       const name = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
@@ -68,23 +72,37 @@ export function AccountWorkstreamBoard({
         </p>
       </div>
       <div className="deal-chart" role="img" aria-label={chartLabel}>
-        {laneTotals.map((row) => {
-          const title = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
-          const width = row.value > 0 ? Math.max(2, Math.round((row.value / maxLane) * 100)) : 0;
-          return (
-            <div key={row.lane} className="deal-chart-row">
-              <span className="deal-chart-lane">{title}</span>
-              <div className="deal-chart-track" aria-hidden>
-                {width > 0 ? <span className="deal-chart-fill" style={{ width: `${width}%` }} /> : null}
-              </div>
-              <span className="deal-chart-value">
-                {row.value > 0
-                  ? formatUnspecifiedCompact(row.value)
-                  : t('accountWorkstreams.notRecorded', 'Not recorded')}
-              </span>
-            </div>
-          );
-        })}
+        <BarChart
+          data={laneTotals.map((row) => ({
+            lane: t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane)),
+            value: row.value,
+          }))}
+          xDataKey="lane"
+          orientation="horizontal"
+          aspectRatio="4 / 1"
+          animationDuration={reducedMotion ? 0 : 450}
+          enterTransition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.2, 0, 0, 1] }}
+          margin={{ top: 8, right: 8, bottom: 8, left: 96 }}
+          barGap={0.55}
+        >
+          <Bar
+            dataKey="value"
+            fill="var(--brand-primary)"
+            lineCap="butt"
+            fadedOpacity={1}
+            animate={!reducedMotion}
+          />
+          <BarYAxis />
+        </BarChart>
+        <ul className="deal-chart-values">
+          {laneTotals.map((row) => (
+            <li key={row.lane}>
+              {row.value > 0
+                ? formatUnspecifiedCompact(row.value)
+                : t('accountWorkstreams.notRecorded', 'Not recorded')}
+            </li>
+          ))}
+        </ul>
       </div>
       <ul className="deal-chart-deals">
         {laneTotals.flatMap((row) =>

@@ -3319,36 +3319,22 @@
   gap: 16px;
 }
 .deal-chart {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  align-items: stretch;
   gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 148px;
   min-height: 168px;
   padding-top: 8px;
 }
-.deal-chart-row {
+.deal-chart-values {
   display: grid;
+  grid-template-rows: repeat(4, 1fr);
   align-items: center;
-  gap: 12px;
-  grid-template-columns: 96px minmax(0, 1fr) 148px;
-  min-height: 36px;
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
 }
-.deal-chart-lane {
-  color: var(--fg-primary);
-  font-size: 13px;
-  font-weight: 500;
-}
-.deal-chart-track {
-  background: color-mix(in srgb, var(--fg-primary) 8%, transparent);
-  border-radius: 4px;
-  height: 8px;
-}
-.deal-chart-fill {
-  background: var(--brand-primary);
-  border-radius: 4px;
-  display: block;
-  height: 8px;
-}
-.deal-chart-value {
+.deal-chart-values li {
   color: var(--fg-secondary);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -3434,11 +3420,10 @@
   font-size: 12px;
 }
 @media (max-width: 720px) {
-  .deal-chart-row {
-    grid-template-columns: 88px minmax(0, 1fr);
+  .deal-chart {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .deal-chart-value {
-    grid-column: 2;
+  .deal-chart-values li {
     text-align: left;
   }
   .role-route {
