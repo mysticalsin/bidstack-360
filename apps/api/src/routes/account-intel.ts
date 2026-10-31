@@ -355,7 +355,13 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Verify the document exists and belongs to this org/account
       const file = await prisma.fileAttachment.findFirst({
-        where: { id: documentId, orgId: req.auth.orgId, accountId, deletedAt: null },
+        where: {
+          id: documentId,
+          orgId: req.auth.orgId,
+          accountId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
       });
       if (!file) throw server.httpErrors.notFound('Document not found');
       await ensureAccountVisible({

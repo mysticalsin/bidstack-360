@@ -23,6 +23,20 @@ import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
 import { canReadAccount } from '../lib/account-access.js';
 
+// The MSA library (routes/msa.ts) adds kinds and statuses the legacy account
+// card does not know. Map them onto the closest legacy value so this response
+// keeps validating: amendment/addendum -> other, draft/in_negotiation -> pending.
+const LEGACY_KINDS = new Set(['msa', 'framework', 'sow', 'nda', 'other']);
+const LEGACY_STATUSES = new Set(['active', 'pending', 'expired', 'terminated']);
+export function legacyKind(kind: string): z.infer<typeof ContractAgreement>['kind'] {
+  return (LEGACY_KINDS.has(kind) ? kind : 'other') as z.infer<typeof ContractAgreement>['kind'];
+}
+export function legacyStatus(status: string): z.infer<typeof ContractAgreement>['status'] {
+  return (LEGACY_STATUSES.has(status) ? status : 'pending') as z.infer<
+    typeof ContractAgreement
+  >['status'];
+}
+
 interface DbRow {
   id: string;
   accountKey: string;
@@ -168,7 +182,7 @@ function serialize(
   return {
     id: row.id,
     accountKey: row.accountKey,
-    kind: row.kind as z.infer<typeof ContractAgreement>['kind'],
+    kind: legacyKind(row.kind),
     reference: row.reference,
     countries: row.countries,
     globalRebateBps: row.globalRebateBps,
@@ -182,7 +196,7 @@ function serialize(
       typeof ContractAgreement
     >['rateReviewSchedule'],
     nextRateReviewAt: row.nextRateReviewAt?.toISOString() ?? null,
-    status: row.status as z.infer<typeof ContractAgreement>['status'],
+    status: legacyStatus(row.status),
     notes: row.notes,
     sourceFileId: row.sourceFileId,
     sourceFileName: row.sourceFile?.name ?? null,
@@ -277,7 +291,12 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
     expectedAccountKey?: string;
   }): Promise<SourceFileRow> {
     const file = await prisma.fileAttachment.findFirst({
-      where: { id: input.fileId, orgId: input.orgId, deletedAt: null },
+      where: {
+        id: input.fileId,
+        orgId: input.orgId,
+        deletedAt: null,
+        contractVersions: { none: {} },
+      },
       select: {
         id: true,
         accountId: true,
@@ -658,7 +677,12 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
     },
     async (req) => {
       const file = await prisma.fileAttachment.findFirst({
-        where: { id: req.body.fileId, orgId: req.auth.orgId, deletedAt: null },
+        where: {
+          id: req.body.fileId,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
         select: {
           id: true,
           accountId: true,
@@ -720,7 +744,12 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
       });
       if (!row) throw server.httpErrors.notFound('Extraction not found');
       const file = await prisma.fileAttachment.findFirst({
-        where: { id: row.documentId, orgId: req.auth.orgId, deletedAt: null },
+        where: {
+          id: row.documentId,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          contractVersions: { none: {} },
+        },
         select: { id: true, accountId: true, companyId: true, name: true },
       });
       await ensureAccountVisible({
