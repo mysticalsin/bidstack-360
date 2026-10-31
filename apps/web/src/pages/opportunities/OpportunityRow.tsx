@@ -8,6 +8,7 @@
  * schedule timer re-renders only this span, not the whole row.
  */
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
@@ -93,6 +94,7 @@ export const Row = memo(function Row({
   const endSave = (field: 'stage' | 'value' | 'probability' | 'dueDate') =>
     setSaving((s) => ({ ...s, [field]: false }));
 
+  const { t } = useTranslation('crm');
   const savedToast = (field: string) => toast.success(`${field} updated`, { duration: 2200 });
   const errorToast = (err: unknown) =>
     toast.error('Update failed', {
@@ -228,7 +230,10 @@ export const Row = memo(function Row({
         <SavedFlash trigger={saved.value} />
       </td>
 
-      <td className="px-5 py-3 text-right">
+      <td
+        className="px-5 py-3 text-right"
+        title={t('opportunitiesTableHead.columnProbabilityTitle', 'Stored stage probability')}
+      >
         <NumberCell
           value={opp.probability}
           min={0}
@@ -244,7 +249,7 @@ export const Row = memo(function Row({
               {
                 onSuccess: () => {
                   endSave('probability');
-                  savedToast('Probability');
+                  savedToast(t('opportunitiesTableHead.columnProbability', 'Stage proxy'));
                   flash('probability');
                 },
                 onError: (err) => {

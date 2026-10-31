@@ -3492,7 +3492,8 @@
     "columnTerritory": "地区",
     "columnStage": "阶段",
     "columnValue": "金额",
-    "columnProbability": "概率",
+    "columnProbability": "阶段代理",
+    "columnProbabilityTitle": "已记录的阶段概率",
     "columnDue": "到期"
   },
   "territorySegmentBreakdown": {

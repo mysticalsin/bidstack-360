@@ -97,6 +97,10 @@ export function OpportunitiesTableHead({
         <th
           scope="col"
           aria-sort={getSortableHeaderAriaSort('probability', sortState)}
+          title={t(
+            'opportunitiesTableHead.columnProbabilityTitle',
+            'Stored stage probability',
+          )}
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader
@@ -105,7 +109,7 @@ export function OpportunitiesTableHead({
             onChange={setSortState}
             align="right"
           >
-            {t('opportunitiesTableHead.columnProbability', 'Probability')}
+            {t('opportunitiesTableHead.columnProbability', 'Stage proxy')}
           </SortableHeader>
         </th>
         <th

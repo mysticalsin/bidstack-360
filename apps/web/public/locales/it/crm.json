@@ -3492,7 +3492,8 @@
     "columnTerritory": "Territorio",
     "columnStage": "Fase",
     "columnValue": "Valore",
-    "columnProbability": "Probabilità",
+    "columnProbability": "Proxy di fase",
+    "columnProbabilityTitle": "Probabilità di fase registrata",
     "columnDue": "Scadenza"
   },
   "territorySegmentBreakdown": {

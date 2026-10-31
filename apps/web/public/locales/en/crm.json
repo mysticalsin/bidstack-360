@@ -3524,7 +3524,8 @@
     "columnTerritory": "Territory",
     "columnStage": "Stage",
     "columnValue": "Value",
-    "columnProbability": "Probability",
+    "columnProbability": "Stage proxy",
+    "columnProbabilityTitle": "Stored stage probability",
     "columnDue": "Due"
   },
   "territorySegmentBreakdown": {

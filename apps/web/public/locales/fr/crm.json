@@ -3547,7 +3547,8 @@
     "columnTerritory": "Territoire",
     "columnStage": "Étape",
     "columnValue": "Valeur",
-    "columnProbability": "Probabilité",
+    "columnProbability": "Proxy d'étape",
+    "columnProbabilityTitle": "Probabilité d'étape enregistrée",
     "columnDue": "Échéance"
   },
   "territorySegmentBreakdown": {
