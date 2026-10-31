@@ -75,7 +75,7 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
 
   await expectAccountCockpitReady(page, company.name);
   if (company.domain) {
-    await expect(page.getByText(company.domain, { exact: false })).toBeVisible();
+    await expect(page.getByText(company.domain, { exact: false }).first()).toBeVisible();
   }
 
   // Top level: simple, every number drills in.
@@ -92,7 +92,8 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
     timeout: 15_000,
   });
   await expect(page.getByText('Portfolio sales intelligence')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Source coverage')).toBeVisible({ timeout: 15_000 });
+  // 'Source coverage' lives in the org-only command center; the account's own
+  // coverage is the 'Account signal coverage' region above.
 
   const horizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,

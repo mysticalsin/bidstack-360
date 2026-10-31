@@ -124,8 +124,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             <p className="acct-health" aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}>
               <PulseOrb tone={toneForBand(cockpit.health.band)} size={48} bold />
               <span className="acct-health-body">
-                <span className="acct-pill" data-band={cockpit.health.band}>
-                  {labelForBand(cockpit.health.band)}
+                <span className="acct-health-tags">
+                  <span className="acct-pill" data-band={cockpit.health.band}>
+                    {labelForBand(cockpit.health.band)}
+                  </span>
+                  {cockpit.company.domain ? <span className="acct-domain">{cockpit.company.domain}</span> : null}
                 </span>
                 <span className="acct-health-text" title={nextMove}>{nextMove}</span>
               </span>

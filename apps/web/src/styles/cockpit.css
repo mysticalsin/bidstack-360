@@ -3345,6 +3345,8 @@
 .acct-health-text { min-width: 0; line-height: 1.45; }
 .acct-health:has(.pulse-orb) { align-items: center; gap: 16px; }
 .acct-health-body { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.acct-health-tags { display: inline-flex; align-items: center; gap: 8px; }
+.acct-domain { font-size: 12px; color: var(--text-muted, var(--muted)); }
 .acct-pill {
   flex: none; font-size: 12px; font-weight: 500; line-height: 1; padding: 4px 8px; border-radius: 999px;
   background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--tag-jade-fg);
