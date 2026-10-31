@@ -14,6 +14,7 @@ import { TopAccountsSection } from '@/components/settings/TopAccountsSection';
 import { DeveloperAccessSection } from '@/components/settings/DeveloperAccessSection';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 import { IntegrationsSection } from '@/components/settings/IntegrationsSection';
+import { MeetingSourcesSection } from '@/components/settings/MeetingSourcesSection';
 import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { AuditLogSection } from '@/components/settings/AuditLogSection';
 import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
@@ -42,6 +43,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   'rfp-analytics': ['sectionRfpAnalytics', 'RFP Analytics'],
   modules: ['sectionModules', 'Modules'],
   integrations: ['sectionIntegrations', 'Integrations'],
+  'meeting-sources': ['sectionMeetingSources', 'Meeting sources'],
   webhooks: ['sectionWebhooks', 'Webhooks'],
   'audit-log': ['sectionAuditLog', 'Audit log'],
   developer: ['sectionDeveloper', 'Developer access'],
@@ -119,6 +121,7 @@ export function SettingsPage() {
     'rfp-analytics': <RfpAnalyticsSection />,
     modules: <ModulesSection />,
     integrations: <IntegrationsSection />,
+    'meeting-sources': <MeetingSourcesSection />,
     webhooks: <WebhooksSection />,
     'audit-log': <AuditLogSection />,
     developer: <DeveloperAccessSection />,

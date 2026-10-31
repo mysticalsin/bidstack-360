@@ -86,6 +86,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/sector-view', label: 'Sector View', labelKey: 'nav.sectorView', icon: 'globe' },
       { to: '/cross-sell', label: 'Cross-sell', labelKey: 'nav.crossSell', icon: 'git-branch' },
       { to: '/contacts', label: 'Contacts', labelKey: 'nav.contacts', icon: 'contacts' },
+      // Meeting intel: who we met at each account, what they raised, and
+      // cross-region flags for sister accounts.
+      { to: '/meetings', label: 'Meetings', labelKey: 'nav.meetings', icon: 'messageCircle' },
       { to: '/references', label: 'Reference Library', labelKey: 'nav.references', icon: 'book' },
     ],
   },

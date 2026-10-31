@@ -22,6 +22,7 @@ export type SettingsSection =
   | 'rfp-analytics'
   | 'modules'
   | 'integrations'
+  | 'meeting-sources'
   | 'webhooks'
   | 'audit-log'
   | 'developer';
@@ -46,6 +47,7 @@ const GROUPS: Group[] = [
     items: [
       { id: 'appearance', label: 'Appearance & Language', icon: 'palette' },
       { id: 'notifications', label: 'Notifications', icon: 'bell' },
+      { id: 'meeting-sources', label: 'Meeting sources', icon: 'contacts' },
       { id: 'security', label: 'Profile & Security', icon: 'shield' },
     ],
   },
@@ -128,6 +130,8 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemRfpAnalytics', 'RFP Analytics');
       case 'integrations':
         return t('settingsLayout.itemIntegrations', 'Integrations');
+      case 'meeting-sources':
+        return t('settingsLayout.itemMeetingSources', 'Meeting sources');
       case 'webhooks':
         return t('settingsLayout.itemWebhooks', 'Webhooks');
       case 'developer':

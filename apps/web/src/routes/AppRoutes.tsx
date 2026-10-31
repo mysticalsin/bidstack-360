@@ -20,6 +20,9 @@ import {
   AccountsPage,
   AgreementDetailPage,
   AgreementsPage,
+  MeetingDetailPage,
+  MeetingFlagsPage,
+  MeetingsPage,
   AgentStudioPage,
   AnalyticsDashboardPage,
   CalendarPage,
@@ -181,6 +184,39 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <AgreementDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/meetings"
+            element={
+              <RequireAuth>
+                <MeetingsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/meetings/flags"
+            element={
+              <RequireAuth>
+                <MeetingFlagsPage />
+              </RequireAuth>
+            }
+          />
+          {/* Cross-region flag notifications link to /meeting-intel/flags/<id>. */}
+          <Route
+            path="/meeting-intel/flags/:flagId"
+            element={
+              <RequireAuth>
+                <MeetingFlagsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/meetings/:id"
+            element={
+              <RequireAuth>
+                <MeetingDetailPage />
               </RequireAuth>
             }
           />
