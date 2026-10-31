@@ -34,12 +34,14 @@ export function OppIndustryBreakdown() {
           <Icon name="globe" size={15} ariaHidden />
           {t('oppIndustryBreakdown.title', 'Pipeline by industry')}
           {totals ? (
-            <span className="text-xs font-normal text-[var(--fg-tertiary)]">
+            <span
+              className="text-xs font-normal text-[var(--fg-tertiary)]"
+              title={UNSPECIFIED_CURRENCY_BASIS}
+            >
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatUnspecifiedCompact(totals.totalValueMicros / 1_000_000)}{' '}
-              {t('oppIndustryBreakdown.basis', UNSPECIFIED_CURRENCY_BASIS)}
+              · {formatUnspecifiedCompact(totals.totalValueMicros / 1_000_000)}
             </span>
           ) : null}
         </span>
