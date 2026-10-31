@@ -33,14 +33,9 @@ export const UNGATED_ALLOWLIST: Record<string, string> = {
   'POST /api/v1/settings/microsoft/disconnect': 'Disconnects the caller’s own account (User row).',
   'GET /api/v1/integrations/status': 'Caller’s own integration token statuses.',
   'GET /api/v1/integrations/gmail/oauth/start': 'Per-user mailbox OAuth for the caller.',
-  'GET /api/v1/integrations/gmail/oauth/callback': 'Per-user OAuth callback, CSRF state bound to the caller.',
   'DELETE /api/v1/integrations/gmail/disconnect': 'Revokes the caller’s own token.',
   'GET /api/v1/integrations/microsoft/mail/oauth/start': 'Per-user mailbox OAuth for the caller.',
-  'GET /api/v1/integrations/microsoft/mail/oauth/callback':
-    'Per-user OAuth callback, CSRF state bound to the caller.',
   'DELETE /api/v1/integrations/microsoft/mail/disconnect': 'Revokes the caller’s own token.',
-  'GET /api/v1/integrations/slack/oauth/callback':
-    'Completes an install the caller started (start requires integrations:write); CSRF state bound to the caller.',
   'POST /api/v1/ai-assistant/sessions/:sessionId/feedback':
     'Session lookup is scoped to orgId + userId = caller.',
   'GET /api/v1/crew-runs': 'Owner-or-admin scoped list (crews.ts).',
