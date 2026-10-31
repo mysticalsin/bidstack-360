@@ -21,6 +21,7 @@ import {
   AgreementDetailPage,
   AgreementsPage,
   MeetingDetailPage,
+  OrgChartPage,
   MeetingFlagsPage,
   MeetingsPage,
   AgentStudioPage,
@@ -166,6 +167,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/accounts/:accountId/org-chart"
+            element={
+              <RequireAuth>
+                <OrgChartPage />
               </RequireAuth>
             }
           />

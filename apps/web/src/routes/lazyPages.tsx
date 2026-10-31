@@ -40,6 +40,7 @@ export const AgreementsPage = lazy(() => import('@/pages/agreements/AgreementsPa
 export const AgreementDetailPage = lazy(() => import('@/pages/agreements/AgreementDetailPage'));
 export const MeetingsPage = lazy(() => import('@/pages/meetings/MeetingsPage'));
 export const MeetingDetailPage = lazy(() => import('@/pages/meetings/MeetingDetailPage'));
+export const OrgChartPage = lazy(() => import('@/pages/accounts/OrgChartPage'));
 export const MeetingFlagsPage = lazy(() => import('@/pages/meetings/MeetingFlagsPage'));
 export const CompaniesPage = lazy(() =>
   import('@/pages/CompaniesPage').then((m) => ({ default: m.CompaniesPage })),

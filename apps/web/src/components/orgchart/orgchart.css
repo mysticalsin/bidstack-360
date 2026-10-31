@@ -1,0 +1,119 @@
+/* Org chart: full-screen canvas, light by default with a dark canvas option.
+   8pt rhythm, two weights (400/500), borders over shadows. */
+.oc-screen {
+  --oc-canvas: var(--surface-sunken, #f6f7f9); --oc-dot: color-mix(in srgb, var(--fg-tertiary, #8a8f98) 45%, transparent);
+  --oc-card: var(--surface-card, #fff); --oc-fg: var(--fg-primary, #111); --oc-fg2: var(--fg-secondary, #555); --oc-fg3: var(--fg-tertiary, #888);
+  --oc-line: var(--border-subtle, #e3e5e8); --oc-met: #1f9d63; --oc-gap: #c3c7cd; --oc-edge: #b9bec6; --oc-accent: var(--brand-primary, #2f5bea);
+  position: fixed; inset: 0; z-index: 60; display: grid; grid-template-rows: auto auto minmax(0, 1fr); background: var(--surface-page, #fff); color: var(--oc-fg);
+}
+.oc-screen[data-dark] { --oc-canvas: #14161a; --oc-dot: #2e333b; --oc-card: #1d2026; --oc-fg: #eef0f3; --oc-fg2: #b4b9c2; --oc-fg3: #868c96; --oc-line: #2c3038; --oc-edge: #4a505a; --oc-gap: #4a505a; }
+.oc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-card); }
+.oc-back { min-width: 32px; min-height: 32px; display: inline-grid; place-items: center; border-radius: 8px; color: var(--fg-primary); text-decoration: none; font-size: 18px; }
+.oc-back:hover { background: var(--surface-sunken); }
+.oc-h1 { font-size: 16px; font-weight: 500; margin: 0; }
+.oc-h1 span { color: var(--fg-secondary); font-weight: 400; margin-left: 8px; }
+.oc-muted { font-size: 13px; color: var(--fg-secondary); margin: 0; }
+.oc-screen .oc-pp .oc-muted { color: var(--oc-fg2); }
+.oc-search { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.oc-search input { width: 200px; min-height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-page, #fff); color: var(--fg-primary); font: inherit; font-size: 13px; }
+.oc-toggles, .oc-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.oc-tog, .oc-btn { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--fg-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.oc-tog[aria-pressed='true'] { background: color-mix(in srgb, var(--oc-accent) 12%, transparent); border-color: color-mix(in srgb, var(--oc-accent) 40%, transparent); color: var(--oc-accent); }
+.oc-btn:hover, .oc-tog:hover { background: var(--surface-sunken); }
+.oc-btn:disabled { opacity: .5; cursor: default; }
+.oc-primary { background: var(--oc-accent); border-color: var(--oc-accent); color: #fff; font-weight: 500; }
+.oc-primary:hover { background: color-mix(in srgb, var(--oc-accent) 88%, #000); }
+.oc-danger { color: var(--danger, #c0392b); }
+.oc-screen :is(button, a, input, select):focus-visible { outline: 2px solid var(--focus-ring-color, var(--oc-accent)); outline-offset: 2px; }
+.oc-conflict { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; background: var(--tag-amber-bg, #fff4dc); color: var(--tag-amber-fg, #7a4b00); font-size: 13px; }
+.oc-body { display: grid; grid-template-columns: minmax(0, 1fr) 336px; min-height: 0; }
+.oc-canvas { position: relative; min-height: 0; background: var(--oc-canvas); }
+.oc-canvas .react-flow { --xy-background-color: var(--oc-canvas); --xy-background-pattern-dots-color-default: var(--oc-dot); --xy-minimap-background-color: var(--oc-card); --xy-node-border-radius: 16px; }
+.oc-loading { padding: 24px; color: var(--oc-fg2); }
+
+/* Node: avatar above a name pill, title and chips below. */
+.oc-node { width: 184px; height: 120px; display: grid; justify-items: center; align-content: start; gap: 4px; text-align: center; transition: opacity 150ms; }
+.oc-node[data-dim] { opacity: .45; }
+.oc-node[data-hit] .oc-pill { box-shadow: 0 0 0 2px var(--oc-accent); }
+.react-flow__node-person { background: transparent; border: 0; padding: 0; border-radius: 16px; }
+.react-flow__node-person:focus-visible { outline: 2px solid var(--oc-accent); outline-offset: 4px; }
+.react-flow__node-person.selected .oc-pill, .oc-node[data-selected] .oc-pill { border-color: var(--oc-accent); box-shadow: 0 0 0 1px var(--oc-accent); }
+.react-flow__node-person.oc-drop .oc-pill { box-shadow: 0 0 0 3px color-mix(in srgb, var(--oc-accent) 45%, transparent); }
+.oc-ava { position: relative; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--oc-accent) 14%, var(--oc-card)); color: var(--oc-accent); font-size: 15px; font-weight: 500; border: 2px solid var(--oc-card); box-shadow: 0 0 0 2px var(--oc-line); overflow: visible; }
+.oc-ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.oc-ava[data-ring='met'] { box-shadow: 0 0 0 2px var(--oc-met); }
+.oc-ava[data-ring='gap'] { box-shadow: 0 0 0 2px var(--oc-gap); outline: 1px dashed var(--oc-gap); outline-offset: 3px; }
+.oc-met-dot { position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--oc-met); border: 2px solid var(--oc-card); }
+.oc-node[data-sample] .oc-ava { background: var(--oc-card); color: var(--oc-fg3); }
+.oc-pill { max-width: 176px; padding: 4px 12px; border-radius: 999px; background: var(--oc-card); border: 1px solid var(--oc-line); }
+.oc-name { display: block; font-size: 13px; font-weight: 500; color: var(--oc-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-title { max-width: 176px; font-size: 12px; color: var(--oc-fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-chips { display: flex; gap: 4px; align-items: center; justify-content: center; }
+.oc-chip { font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 999px; background: var(--oc-card); border: 1px solid var(--oc-line); color: var(--oc-fg2); }
+.oc-chip[data-sen='c_level'] { color: var(--oc-accent); border-color: color-mix(in srgb, var(--oc-accent) 35%, transparent); }
+.oc-meter { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; padding-left: 2px; }
+.oc-meter i { width: 3px; border-radius: 1px; background: var(--oc-gap); }
+.oc-meter i:nth-child(1) { height: 5px; } .oc-meter i:nth-child(2) { height: 8px; } .oc-meter i:nth-child(3) { height: 11px; }
+.oc-meter i[data-on] { background: var(--oc-met); }
+.oc-meter[data-s='weak'] i[data-on] { background: #d89a1e; }
+.oc-collapse { position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg2); font: inherit; font-size: 11px; cursor: pointer; }
+.oc-handle { opacity: 0; pointer-events: none; }
+.oc-canvas .react-flow__edge-path { stroke: var(--oc-edge); stroke-width: 1.5; }
+.oc-canvas .oc-edge-strong .react-flow__edge-path { stroke: var(--oc-met); stroke-width: 2.5; }
+.oc-canvas .oc-edge-medium .react-flow__edge-path { stroke: color-mix(in srgb, var(--oc-met) 60%, var(--oc-edge)); stroke-width: 2; }
+.oc-canvas .react-flow__minimap { border: 1px solid var(--oc-line); border-radius: 8px; overflow: hidden; }
+
+/* Floating toolbar */
+.oc-toolbar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 12px; background: var(--oc-card); border: 1px solid var(--oc-line); box-shadow: 0 4px 16px rgb(0 0 0 / 0.08); }
+.oc-toolbar button { min-width: 32px; min-height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--oc-fg); font: inherit; font-size: 13px; cursor: pointer; }
+.oc-toolbar button:hover { background: color-mix(in srgb, var(--oc-fg) 8%, transparent); }
+.oc-toolbar button[aria-pressed='true'] { background: color-mix(in srgb, var(--oc-accent) 14%, transparent); color: var(--oc-accent); }
+.oc-zoom { font-variant-numeric: tabular-nums; min-width: 56px !important; }
+.oc-sep { width: 1px; height: 20px; background: var(--oc-line); margin: 0 4px; }
+
+/* Side panel */
+.oc-panel { border-left: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg); overflow-y: auto; }
+.oc-pp { padding: 24px; display: grid; gap: 8px; align-content: start; }
+.oc-pp h2 { font-size: 16px; font-weight: 500; margin: 0; }
+.oc-pp h3 { font-size: 13px; font-weight: 500; margin: 16px 0 0; color: var(--oc-fg2); }
+.oc-pp-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.oc-ava-lg { width: 56px; height: 56px; font-size: 17px; }
+.oc-x { min-width: 32px; min-height: 32px; border: 0; background: none; color: var(--oc-fg2); font-size: 20px; border-radius: 8px; cursor: pointer; }
+.oc-big { font-size: 14px; margin: 0; color: var(--oc-fg2); } .oc-big strong { font-size: 24px; font-weight: 500; color: var(--oc-fg); margin-right: 4px; }
+.oc-cover-bar { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--oc-fg) 8%, transparent); overflow: hidden; }
+.oc-cover-bar i { display: block; height: 100%; background: var(--oc-met); border-radius: 4px; }
+.oc-dl { display: grid; gap: 8px; margin: 8px 0 0; }
+.oc-dl > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.oc-dl dt { color: var(--oc-fg3); } .oc-dl dd { margin: 0; }
+.oc-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.oc-row { width: 100%; display: flex; gap: 8px; align-items: center; text-align: left; padding: 8px; margin: 0 -8px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-decoration: none; cursor: pointer; }
+.oc-row:hover { background: color-mix(in srgb, var(--oc-fg) 6%, transparent); }
+.oc-row-name { display: block; font-size: 13px; font-weight: 500; } .oc-row-sub { display: block; font-size: 12px; color: var(--oc-fg2); }
+.oc-mini { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11px; box-shadow: 0 0 0 2px var(--oc-gap); color: var(--oc-fg2); }
+.oc-bullets { margin: 0; padding-left: 16px; font-size: 13px; display: grid; gap: 4px; }
+.oc-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 12px; color: var(--oc-fg2); }
+.oc-legend li { display: flex; align-items: center; gap: 8px; }
+.oc-lg-met { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 2px var(--oc-met); }
+.oc-kbd { margin-top: 8px; font-size: 12px; }
+.oc-form { display: grid; gap: 8px; border-top: 1px solid var(--oc-line); margin-top: 16px; padding-top: 8px; }
+.oc-form label { display: grid; gap: 4px; font-size: 12px; color: var(--oc-fg2); }
+.oc-form input, .oc-form select { min-height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg); font: inherit; font-size: 13px; }
+.oc-form-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 8px; }
+.oc-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.oc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.oc-sr:focus { position: fixed; width: auto; height: auto; clip: auto; top: 8px; right: 8px; z-index: 70; }
+@media (max-width: 900px) {
+  .oc-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .oc-panel { max-height: 40vh; border-left: 0; border-top: 1px solid var(--oc-line); }
+  .oc-search { margin-left: 0; } .oc-search input { width: 160px; }
+  .oc-canvas .react-flow__minimap { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .oc-node { transition: none; } }
+
+/* Account page card */
+.oc-card-tree { display: grid; justify-items: center; gap: 12px; padding: 8px 0; }
+.oc-card-root, .oc-card-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.oc-card-p { display: grid; justify-items: center; gap: 4px; width: 88px; text-align: center; }
+.oc-card-p .oc-ava { width: 40px; height: 40px; font-size: 13px; }
+.oc-card-p span.n { font-size: 12px; font-weight: 500; color: var(--fg-primary); max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-card-p span.t { font-size: 11px; color: var(--fg-secondary); max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

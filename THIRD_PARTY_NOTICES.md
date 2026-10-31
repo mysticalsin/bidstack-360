@@ -120,7 +120,7 @@ SOFTWARE.
 
 - Source: https://github.com/xyflow/xyflow (npm @xyflow/react)
 - Used for: account org chart canvas (pan/zoom, nodes, curved edges, mini-map), apps/web/src/pages/accounts/OrgChartPage.tsx
-- Dependencies: zustand (MIT), classcat (MIT), d3-zoom/d3-drag/d3-selection/d3-interpolate (ISC)
+- Dependencies: zustand (MIT), classcat (MIT), d3-zoom/d3-drag/d3-selection/d3-interpolate/d3-timer/d3-color v3 (ISC), d3-ease (BSD-3-Clause). All permissive; no copyleft.
 - Licence: MIT, Copyright (c) 2019-2025 webkid GmbH (same MIT terms as above)
 - Note: the "React Flow" attribution badge is hidden via proOptions; the MIT licence allows this (xyflow asks commercial users to consider a Pro subscription, it is not a licence condition).
 

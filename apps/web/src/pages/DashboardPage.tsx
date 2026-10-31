@@ -28,6 +28,7 @@ import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSec
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
 import { WhoWeMetCard } from '@/components/meetings/WhoWeMetCard';
+import { OrgChartCard } from '@/components/orgchart/OrgChartCard';
 import { FirmographicsStrip } from '@/components/enrichment/FirmographicsStrip';
 import { HiringNowCard } from '@/components/enrichment/HiringNowCard';
 import { PotentialProjectsCard } from '@/components/enrichment/PotentialProjectsCard';
@@ -389,6 +390,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         <>
           <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} onDrill={setDrill} />
           <WhoWeMetCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
+          <OrgChartCard companyId={cockpit.company.id} />
           <AgreementsSummaryCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
           <OppDrill
             rows={(oppRows.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === cockpit.company.name.toLowerCase())}
