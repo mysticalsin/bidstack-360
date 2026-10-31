@@ -223,7 +223,7 @@ export const AccountCockpitSnapshot = z.object({
       lostCount: z.number().int().nonnegative(),
       wonValueMicros: z.number().int().nonnegative(),
       lostValueMicros: z.number().int().nonnegative(),
-      winRate: z.number().int().min(0).max(100),
+      winRate: z.number().int().min(0).max(100).nullable(),
     })
     .optional(),
   technicalStack: z.array(TechnicalStackCategory),

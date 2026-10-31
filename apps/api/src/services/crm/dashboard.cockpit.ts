@@ -171,7 +171,7 @@ export interface AccountPerformance {
     lostCount: number;
     wonValueMicros: number;
     lostValueMicros: number;
-    winRate: number;
+    winRate: number | null;
   };
   revenueEvolution: Array<{ period: string; revenueMicros: number }>;
 }
@@ -211,7 +211,7 @@ export function deriveAccountPerformance(
       lostCount: lostOpps.length,
       wonValueMicros: wonOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
       lostValueMicros: lostOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
-      winRate: decided > 0 ? Math.round((wonOpps.length / decided) * 100) : 0,
+      winRate: decided > 0 ? Math.round((wonOpps.length / decided) * 100) : null,
     },
     revenueEvolution: [...revenueByMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))

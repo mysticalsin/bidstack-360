@@ -507,7 +507,7 @@ export async function fetchAccountPerformance(
       lostCount,
       wonValueMicros: sumGroupValueMicros(won),
       lostValueMicros: sumGroupValueMicros(lost),
-      winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : 0,
+      winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
     },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
     // oldest-first.

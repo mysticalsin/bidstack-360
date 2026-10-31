@@ -270,10 +270,10 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     ]);
   });
 
-  it('emits empty revenue + zero win rate for an account with no closed deals', () => {
+  it('emits empty revenue and no win rate for an account with no closed deals', () => {
     const cockpit = buildCockpit(baseArgs([opp({ stage: 'qualified' })]));
     expect(cockpit.revenueEvolution).toEqual([]);
-    expect(cockpit.winLoss?.winRate).toBe(0);
+    expect(cockpit.winLoss?.winRate).toBeNull();
     expect(cockpit.winLoss?.wonCount).toBe(0);
   });
 });

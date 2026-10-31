@@ -21,7 +21,9 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
   const flags = useFeatureFlags();
   const wl = cockpit.winLoss;
   const wonValue = formatUnspecifiedCompact((wl?.wonValueMicros ?? 0) / 1_000_000);
-  if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0) return null;
+  if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0 || wl.winRate == null) {
+    return null;
+  }
 
   return (
     <Card role="region" aria-label={t('winLoss.regionLabel', 'Win / loss')}>
