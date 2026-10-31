@@ -7,9 +7,22 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
-import { Contact, ContactCreate, ContactFilter, ContactPage, ContactPatch } from '@bidstack/shared';
+import {
+  Contact,
+  ContactCreate,
+  ContactFilter,
+  ContactPage,
+  ContactPatch,
+  type ContactLinkState,
+} from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+
+function linkStateFor(companyId: string | null): ContactLinkState {
+  // Reads do not invent a link. A historical row with a null companyId stays
+  // needs_review even if a unique company name would match today.
+  return companyId ? 'linked' : 'needs_review';
+}
 
 function serializeContact(c: {
   id: string;
@@ -21,6 +34,7 @@ function serializeContact(c: {
   influence: number | null;
   sentiment: PrismaSentiment | null;
   createdAt: Date;
+  companyId: string | null;
 }): z.infer<typeof Contact> {
   return {
     id: c.id,
@@ -32,6 +46,8 @@ function serializeContact(c: {
     influence: c.influence,
     sentiment: c.sentiment,
     createdAt: c.createdAt.toISOString(),
+    companyId: c.companyId,
+    linkState: linkStateFor(c.companyId),
   };
 }
 
@@ -72,6 +88,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
           influence: true,
           sentiment: true,
           createdAt: true,
+          companyId: true,
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
@@ -117,10 +134,32 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const created = await prisma.$transaction(async (tx) => {
+        let companyId: string | null;
+        if (req.body.companyId) {
+          const company = await tx.company.findFirst({
+            where: { id: req.body.companyId, orgId: req.auth.orgId, deletedAt: null },
+            select: { id: true },
+          });
+          if (!company) throw server.httpErrors.notFound('Company not found');
+          companyId = company.id;
+        } else {
+          const matches = await tx.company.findMany({
+            where: {
+              orgId: req.auth.orgId,
+              deletedAt: null,
+              name: { equals: req.body.customer, mode: 'insensitive' },
+            },
+            select: { id: true },
+            take: 2,
+          });
+          // One exact name is safe to link. Zero or many stay needs_review.
+          companyId = matches.length === 1 ? matches[0]!.id : null;
+        }
         const contact = await tx.contact.create({
           data: {
             orgId: req.auth.orgId,
             customer: req.body.customer,
+            companyId,
             name: req.body.name,
             role: req.body.role,
             email: req.body.email,

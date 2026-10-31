@@ -15,7 +15,10 @@ import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportun
 import { ImportOpportunitiesDialog } from '@/components/opportunity/ImportOpportunitiesDialog';
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 import { Button } from '@/components/ui/Button';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
@@ -35,7 +38,6 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  */
 export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
   const { t } = useTranslation('crm');
-  const { formatMoney } = useFormatMoney();
   const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
   const kpis = summary
@@ -50,11 +52,11 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: formatMoney(summary.pipelineValue, 'EUR'),
+          value: `${formatUnspecifiedAmount(summary.pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
         },
         {
           label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: formatMoney(weighted, 'EUR'),
+          value: `${formatUnspecifiedAmount(weighted)} (${UNSPECIFIED_CURRENCY_BASIS})`,
         },
       ]
     : [
@@ -66,21 +68,15 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: formatMoney(
-            opps.reduce((acc, o) => acc + o.value, 0),
-            'EUR',
-          ),
+          value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))} (${UNSPECIFIED_CURRENCY_BASIS})`,
         },
         {
           label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: formatMoney(weighted, 'EUR'),
+          value: `${formatUnspecifiedAmount(weighted)} (${UNSPECIFIED_CURRENCY_BASIS})`,
         },
         {
           label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: formatMoney(
-            openOpps.reduce((acc, o) => acc + o.value, 0),
-            'EUR',
-          ),
+          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))} (${UNSPECIFIED_CURRENCY_BASIS})`,
         },
       ];
   return (
@@ -142,9 +138,7 @@ export function OppPageHeader({
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h1 className="gradient-text text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
-          {t('oppToolbar.title', 'Opportunities')}
-        </h1>
+        <h1 className="page-title">{t('oppToolbar.title', 'Opportunities')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {search ? (
             <>

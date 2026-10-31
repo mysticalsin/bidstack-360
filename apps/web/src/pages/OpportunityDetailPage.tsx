@@ -31,7 +31,8 @@ import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { formatDate, formatMoney, formatStage } from '@/lib/format';
+import { formatDate, formatStage } from '@/lib/format';
+import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
 
 import {
@@ -347,10 +348,15 @@ export function OpportunityDetailPage() {
                   <InlineEditNumber
                     value={data.value}
                     onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
-                    label={t('opportunityDetail.editValueLabel', 'Edit deal value (EUR)')}
+                    label={t(
+                      'opportunityDetail.editValueLabel',
+                      'Edit deal value (currency not recorded)',
+                    )}
                     min={0}
                     step={1000}
-                    display={(v) => formatMoney(v, 'EUR')}
+                    display={(v) =>
+                      `${formatUnspecifiedAmount(v)} (currency not recorded; not a euro forecast)`
+                    }
                   />
                 </div>
                 <div className="flex items-center justify-end gap-2 text-xs text-[var(--fg-tertiary)] mt-1">

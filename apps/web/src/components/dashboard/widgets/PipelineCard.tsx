@@ -12,7 +12,10 @@ import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { springSoft } from '@/lib/motion';
-import { formatMoney } from '@/lib/format';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '../unspecified-currency';
 
 import {
   type PipelineStagePoint,
@@ -26,13 +29,11 @@ import {
 export function PipelineCard({
   value,
   count,
-  currency,
   stages,
   reduced,
 }: {
   value: number;
   count: number;
-  currency: string;
   stages: PipelineStagePoint[];
   reduced: boolean | null;
 }) {
@@ -58,8 +59,9 @@ export function PipelineCard({
         {t('pipeline.heading', 'Open pipeline')}
       </div>
       <div className="mt-2 text-3xl font-bold tabular-nums text-[var(--fg-primary)]">
-        {formatMoney(value, currency)}
+        {formatUnspecifiedAmount(value)}
       </div>
+      <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{UNSPECIFIED_CURRENCY_BASIS}</p>
       <div className="mt-1 text-xs text-[var(--fg-secondary)]">
         {count === 1
           ? t('pipeline.openCount_one', '{{count}} open opportunity', { count })

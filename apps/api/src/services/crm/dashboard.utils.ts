@@ -88,7 +88,11 @@ export function asComplianceStatus(
 }
 
 export function asProviderStatus(value: string): z.infer<typeof ProviderHealth>['status'] {
-  return value === 'healthy' || value === 'degraded' || value === 'disabled' || value === 'down'
+  return value === 'healthy' ||
+    value === 'degraded' ||
+    value === 'disabled' ||
+    value === 'down' ||
+    value === 'unverified'
     ? value
     : 'degraded';
 }
