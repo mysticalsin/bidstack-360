@@ -97,6 +97,7 @@ Dust docs: Spaces > Tools > Add Tool > Add MCP Server. Streamable HTTP is the tr
 
 - URL: the public HTTPS URL ending in `/mcp` (`DUST_MCP_PUBLIC_URL` plus `/mcp` when the origin has no path).
 - Auth: Bearer token. Paste a Polo API key with scopes `mcp` and `read`. Dust sends `Authorization: Bearer`.
-- Do not choose Automatic OAuth. Polo’s MCP server has no Dust OAuth callback.
+- Do not choose Automatic OAuth or Static OAuth. Polo’s MCP server has no Dust OAuth callback. Dust’s finalize URLs are `https://app.dust.tt/oauth/mcp/finalize` and `https://app.dust.tt/oauth/mcp_static/finalize`.
+- **localhost cannot be registered with Dust cloud.** A loopback URL stays local-only and `mcp.configured` stays false.
 
 Dust discovers tools through `tools/list`. Keep the Dust API key server-side. Agents call Polo with the Polo bearer, not with the Dust key.

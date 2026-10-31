@@ -10,6 +10,7 @@ function guide(overrides: Partial<IntegrationSetupGuide['dust'] & IntegrationSet
       configured: overrides.configured ?? false,
       workspaceId: null,
       dataSourceConfigured: false,
+      spaceConfigured: false,
       webhookReceiverUrl: 'http://localhost/webhooks/dust',
     },
     mcp: {

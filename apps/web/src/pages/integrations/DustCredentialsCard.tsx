@@ -44,6 +44,7 @@ export function DustCredentialsCard() {
     const apiKey = String(fd.get('apiKey') ?? '').trim();
     const workspaceId = String(fd.get('workspaceId') ?? '').trim();
     const baseUrl = String(fd.get('baseUrl') ?? '').trim();
+    const spaceId = String(fd.get('spaceId') ?? '').trim();
     const dataSourceId = String(fd.get('dataSourceId') ?? '').trim();
     if (!apiKey || !workspaceId) {
       setError(t('dustCredentials.errorBothRequired', 'API key and workspace ID are both required.'));
@@ -54,13 +55,14 @@ export function DustCredentialsCard() {
         apiKey,
         workspaceId,
         baseUrl: baseUrl || undefined,
+        spaceId: spaceId || undefined,
         dataSourceId: dataSourceId || undefined,
       });
       setOpen(false);
-      toast.success(t('dustCredentials.toastConnectedTitle', 'Dust connected'), {
+      toast.success(t('dustCredentials.toastSavedTitle', 'Dust API key saved'), {
         description: t(
-          'dustCredentials.toastConnectedDescription',
-          'Credentials validated and saved. AI features now use your workspace.',
+          'dustCredentials.toastSavedDescription',
+          'Dust accepted the key. Polo stays unverified until Dust is given a public HTTPS URL ending in /mcp with Bearer token. localhost cannot be registered.',
         ),
       });
     } catch (err) {
@@ -141,7 +143,7 @@ export function DustCredentialsCard() {
                   }
                   description={t(
                     'dustCredentials.dialogDescription',
-                    'We validate the keys against Dust before saving. The API key is encrypted at rest and never shown again.',
+                    'We check the API key with Dust before saving. A saved key is not a live Dust cloud connection. Dust still needs a public HTTPS URL ending in /mcp and Bearer token. localhost cannot be registered. The API key is encrypted at rest and never shown again.',
                   )}
                 >
                   <form onSubmit={onSubmit} className="space-y-4">
@@ -151,14 +153,34 @@ export function DustCredentialsCard() {
                       type="password"
                       placeholder="sk-…"
                       required
-                      hint={t('dustCredentials.fieldApiKeyHint', 'From Dust → Settings → API Keys.')}
+                      hint={t(
+                        'dustCredentials.fieldApiKeyHint',
+                        'Admin > Developers > API keys. Read-only lists agents. Add the Space on the key before uploading documents.',
+                      )}
                     />
                     <Field
                       label={t('dustCredentials.fieldWorkspaceIdLabel', 'Workspace ID')}
                       name="workspaceId"
                       defaultValue={data?.workspaceId ?? ''}
-                      placeholder="w-…"
+                      placeholder="id from /w/<id>"
                       required
+                      hint={t(
+                        'dustCredentials.fieldWorkspaceIdHint',
+                        'The id in https://dust.tt/w/<id> or https://eu.dust.tt/w/<id>. Not the workspace display name.',
+                      )}
+                    />
+                    <Field
+                      label={t('dustCredentials.fieldSpaceIdLabel', 'Space ID')}
+                      name="spaceId"
+                      defaultValue={data?.spaceId ?? ''}
+                      placeholder={t(
+                        'dustCredentials.fieldSpaceIdPlaceholder',
+                        'Optional — space sId for document sync',
+                      )}
+                      hint={t(
+                        'dustCredentials.fieldSpaceIdHint',
+                        'The space sId from GET /v1/w/<workspace>/spaces. Not the space name.',
+                      )}
                     />
                     <Field
                       label={t('dustCredentials.fieldDataSourceIdLabel', 'Data source ID')}
@@ -175,7 +197,7 @@ export function DustCredentialsCard() {
                       defaultValue={data?.baseUrl ?? ''}
                       placeholder={t(
                         'dustCredentials.fieldBaseUrlPlaceholder',
-                        'Optional — defaults to https://dust.tt/api',
+                        'Optional — https://dust.tt/api, or https://eu.dust.tt/api for EU',
                       )}
                     />
                     {error ? (
@@ -253,10 +275,10 @@ function ConfiguredView({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={fromEnv ? 'amber' : 'jade'}>
+        <Badge tone="amber">
           {fromEnv
             ? t('dustCredentials.badgePlatformDefault', 'Platform default')
-            : t('dustCredentials.badgeConnected', 'Connected')}
+            : t('dustCredentials.badgeSaved', 'API key saved')}
         </Badge>
         {data.apiKeyMasked ? (
           <code className="rounded bg-[var(--surface-card)] px-2 py-0.5 font-mono text-xs text-[var(--fg-secondary)]">
@@ -274,6 +296,7 @@ function ConfiguredView({
       ) : null}
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Detail label={t('dustCredentials.detailWorkspaceId', 'Workspace ID')} value={data.workspaceId} />
+        <Detail label={t('dustCredentials.detailSpaceId', 'Space ID')} value={data.spaceId} />
         <Detail
           label={t('dustCredentials.detailDataSourceId', 'Data source ID')}
           value={data.dataSourceId}

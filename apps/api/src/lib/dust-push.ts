@@ -89,7 +89,7 @@ function serializeOpportunityToMarkdown(opp: {
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushOpportunityToDust(oppId: string, orgId: string): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log);
-  if (!dust || !creds?.dataSourceId) return; // a data source is required to push documents
+  if (!dust || !creds?.dataSourceId || !creds.spaceId) return; // space + data source required
 
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: oppId, orgId } });
@@ -126,7 +126,7 @@ export async function pushOpportunityToDust(oppId: string, orgId: string): Promi
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushLeadToDust(leadId: string, orgId: string): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log);
-  if (!dust || !creds?.dataSourceId) return; // a data source is required to push documents
+  if (!dust || !creds?.dataSourceId || !creds.spaceId) return; // space + data source required
 
   try {
     const lead = await prisma.lead.findUnique({ where: { id: leadId, orgId } });

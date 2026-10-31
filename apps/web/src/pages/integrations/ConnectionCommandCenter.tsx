@@ -219,6 +219,17 @@ export function ConnectionCommandCenter({
       badge: t('connectionCommandCenter.readiness.badgeUnverified', 'Unverified'),
       tone: 'amber' as const,
     },
+    {
+      label: t('connectionCommandCenter.readiness.dustSpace.label', 'Dust space'),
+      value: guide.dust.spaceConfigured
+        ? t('connectionCommandCenter.readiness.dustSpace.configured', 'Space id set, unverified')
+        : t(
+            'connectionCommandCenter.readiness.dustSpace.missing',
+            'Missing — document sync needs the space sId',
+          ),
+      badge: t('connectionCommandCenter.readiness.badgeUnverified', 'Unverified'),
+      tone: 'amber' as const,
+    },
   ];
 
   return (

@@ -139,8 +139,8 @@ Outbound email + calendar sync. Both are OAuth apps Mantu registers in its own t
 ## 8. AI providers — Dust + direct models — **RECOMMENDED**
 
 The RFP/agent automation runs on **Dust** (Mantu's AI workspace) and/or direct model keys.
-- **Dust:** `DUST_API_KEY`, `DUST_WORKSPACE_ID`, `DUST_DATA_SOURCE_ID`, `DUST_WEBHOOK_SECRET`,
-  `DUST_BASE_URL`, `DUST_MCP_PUBLIC_URL`.
+- **Dust:** `DUST_API_KEY`, `DUST_WORKSPACE_ID`, `DUST_SPACE_ID`, `DUST_DATA_SOURCE_ID`, `DUST_WEBHOOK_SECRET`,
+  `DUST_BASE_URL`, `DUST_MCP_PUBLIC_URL`. Leave them empty until a real key and a public HTTPS MCP URL exist. localhost cannot be registered with Dust cloud.
 - **Direct provider keys** are added per-org in Settings → Integrations → AI & Agents (encrypted with
   `INTEGRATION_TOKEN_KEY`), so individual tenants can bring their own model keys under Mantu AI governance.
 - [ ] Decide the Mantu AI-governance posture (Dust tenant vs direct keys) and provision the Dust workspace.

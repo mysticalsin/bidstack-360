@@ -13,6 +13,8 @@ export interface DustCredentials {
   apiKey: string;
   workspaceId: string;
   baseUrl?: string;
+  /** Space `sId` that owns the data source. Not the space display name. */
+  spaceId?: string;
   dataSourceId?: string;
   /** Purpose -> Dust agent id (e.g. { crew, sectionDraft, qaReview, default }). */
   agentIds: Record<string, string>;
@@ -29,6 +31,47 @@ function asRecord(v: unknown): Record<string, unknown> {
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;
 }
+/**
+ * Workspace id is the path segment in https://dust.tt/w/<id> or
+ * https://eu.dust.tt/w/<id>. A display name (whitespace) is not an id.
+ * Returns null when the value cannot be used as that path segment.
+ */
+export function canonicalDustWorkspaceId(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  let id = trimmed;
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.toLowerCase();
+    if (host === 'dust.tt' || host === 'eu.dust.tt' || host === 'app.dust.tt') {
+      const parts = url.pathname.split('/').filter(Boolean);
+      const index = parts.indexOf('w');
+      const segment = index >= 0 ? parts[index + 1] : undefined;
+      if (!segment) return null;
+      id = decodeURIComponent(segment);
+    } else if (trimmed.includes('://')) {
+      return null;
+    }
+  } catch {
+    // Not a URL. Keep the trimmed string and reject display names below.
+  }
+  if (!id || /\s/.test(id) || id.includes('/') || id.includes('@') || id.includes('://')) {
+    return null;
+  }
+  return id;
+}
+
+/** Space sId. A display name is dropped so document calls are not built from it. */
+export function canonicalDustSpaceId(raw: string | undefined | null): string | undefined {
+  if (!raw) return undefined;
+  const id = raw.trim();
+  if (!id || /\s/.test(id) || id.includes('/') || id.includes('@') || id.includes('://')) {
+    return undefined;
+  }
+  return id;
+}
+
 function asStringMap(v: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, val] of Object.entries(asRecord(v))) {
@@ -49,7 +92,7 @@ export function dustCredentialsFromConfigRow(
 ): DustCredentials | null {
   if (!row) return null;
   const cfg = asRecord(row.config);
-  const workspaceId = str(cfg.workspaceId);
+  const workspaceId = canonicalDustWorkspaceId(str(cfg.workspaceId));
   const encrypted = str(asRecord(row.credentials).encrypted);
   if (!workspaceId || !encrypted) return null;
 
@@ -66,6 +109,7 @@ export function dustCredentialsFromConfigRow(
     apiKey,
     workspaceId,
     baseUrl: str(cfg.baseUrl),
+    spaceId: canonicalDustSpaceId(str(cfg.spaceId)),
     dataSourceId: str(cfg.dataSourceId),
     agentIds: asStringMap(cfg.agentIds),
     source: 'org',
@@ -78,12 +122,13 @@ export function dustCredentialsFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): DustCredentials | null {
   const apiKey = str(env.DUST_API_KEY);
-  const workspaceId = str(env.DUST_WORKSPACE_ID);
+  const workspaceId = canonicalDustWorkspaceId(env.DUST_WORKSPACE_ID);
   if (!apiKey || !workspaceId) return null;
   return {
     apiKey,
     workspaceId,
     baseUrl: str(env.DUST_BASE_URL),
+    spaceId: canonicalDustSpaceId(env.DUST_SPACE_ID),
     dataSourceId: str(env.DUST_DATA_SOURCE_ID),
     agentIds: {},
     source: 'env',

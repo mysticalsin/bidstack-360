@@ -38,6 +38,7 @@ export interface IntegrationSetupGuide {
     configured: boolean;
     workspaceId: string | null;
     dataSourceConfigured: boolean;
+    spaceConfigured: boolean;
     webhookReceiverUrl: string;
   };
   mcp: {

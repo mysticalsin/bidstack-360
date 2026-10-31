@@ -317,6 +317,7 @@ export function buildIntegrationSetupGuide() {
       configured: Boolean(envString('DUST_API_KEY') && workspaceId),
       workspaceId,
       dataSourceConfigured: Boolean(envString('DUST_DATA_SOURCE_ID')),
+      spaceConfigured: Boolean(envString('DUST_SPACE_ID')),
       webhookReceiverUrl: receiverUrl,
     },
     mcp: {

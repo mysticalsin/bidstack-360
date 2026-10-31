@@ -50,6 +50,8 @@ export const envSchema = z.object({
   DUST_API_KEY: z.string().min(1).optional().or(z.literal('')),
   DUST_WORKSPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_DATA_SOURCE_ID: z.string().min(1).optional().or(z.literal('')),
+  // Space sId that owns the data source. Not the space display name.
+  DUST_SPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_AGENT_EXEC_BRIEF: z.string().optional(),
   DUST_WEBHOOK_SECRET: z.string().min(1).optional().or(z.literal('')),
   DUST_BASE_URL: z.string().url().optional().or(z.literal('')),
