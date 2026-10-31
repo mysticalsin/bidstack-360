@@ -14,6 +14,7 @@ import { useCalls } from '@/hooks/useCalls';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
+import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
@@ -56,6 +57,7 @@ export function OpportunityTabs({
   return (
     <Tabs defaultValue="decision-unit">
       <TabsList aria-label={t('opportunityTabs.sectionsAriaLabel', 'Opportunity sections')}>
+        <TabsTrigger value="people">{t('opportunityTabs.tabPeople', 'People')}</TabsTrigger>
         <TabsTrigger value="decision-unit">
           {t('opportunityTabs.tabDecisionUnit', 'Decision unit')}
         </TabsTrigger>
@@ -68,6 +70,12 @@ export function OpportunityTabs({
         <TabsTrigger value="activity">{t('opportunityTabs.tabActivity', 'Activity')}</TabsTrigger>
       </TabsList>
 
+      <TabsContent value="people">
+        <AccountPeopleSection
+          opportunityId={oppId}
+          deals={[{ id: oppId, name: customer }]}
+        />
+      </TabsContent>
       <TabsContent value="decision-unit">
         <DecisionUnitPanel customer={customer} intelDecisionUnit={intelDecisionUnit} />
       </TabsContent>

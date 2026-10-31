@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useKamAccounts } from '@/hooks/useKamAccounts';
+import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import {
   KamAccountHero,
@@ -81,6 +82,7 @@ export default function KamAccountPage() {
               <KamTodoCard companyId={active.id} />
             </div>
           </div>
+          <AccountPeopleSection companyId={active.id} deals={[]} />
         </div>
       ) : null}
 
