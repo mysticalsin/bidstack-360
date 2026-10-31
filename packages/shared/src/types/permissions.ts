@@ -39,6 +39,7 @@ export const PERMISSION_KEYS = [
   'opportunities:write',
   'products:read',
   'products:write',
+  'proposals:approve',
   'proposals:read',
   'proposals:write',
   'reports:read',

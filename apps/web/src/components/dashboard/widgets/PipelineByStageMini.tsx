@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { springSoft } from '@/lib/motion';
-import { formatMoney } from '@/lib/format';
+import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecified-currency';
 
 import { stageColor, stageLabel } from './dashboard-types';
 
@@ -20,22 +20,21 @@ import { stageColor, stageLabel } from './dashboard-types';
 export function PipelineByStageMini({
   report,
   reduced,
-  currency,
-  convert,
 }: {
   report: { byStage: Array<{ stage: string; count: number; valueSum: number }> } | undefined;
   reduced: boolean | null;
-  currency: string;
-  convert: (amount: number, from: string) => number;
 }) {
   const { t } = useTranslation('crm');
   if (!report || report.byStage.length === 0) return null;
-  const maxValue = Math.max(1, ...report.byStage.map((s) => convert(s.valueSum, 'EUR')));
+  const maxValue = Math.max(1, ...report.byStage.map((s) => s.valueSum));
 
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
-        {t('pipelineByStageMini.heading', 'Pipeline by stage')}
+      <div className="px-1 pb-2 pt-1">
+        <div className="text-sm text-[var(--fg-secondary)]">
+          {t('pipelineByStageMini.heading', 'Pipeline by stage')}
+        </div>
+        <div className="mt-1 text-xs text-[var(--fg-tertiary)]">{UNSPECIFIED_CURRENCY_BASIS}</div>
       </div>
       <div className="flex flex-col gap-2">
         {report.byStage.map((s, i) => (
@@ -50,7 +49,7 @@ export function PipelineByStageMini({
                 {stageLabel(s.stage)}
               </span>
               <span className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]">
-                {s.count} · {formatMoney(convert(s.valueSum, 'EUR'), currency)}
+                {s.count} · {formatUnspecifiedAmount(s.valueSum)}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-[var(--surface-sunken)] overflow-hidden">

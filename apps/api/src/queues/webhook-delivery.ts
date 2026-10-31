@@ -24,6 +24,22 @@ interface DeliveryJob {
   payload: Record<string, unknown>;
 }
 
+export type WebhookFanOutResult =
+  | { delivery: 'enqueued'; count: number }
+  | { delivery: 'no_subscribers' }
+  | { delivery: 'outcome_unknown' };
+
+/** BullMQ job ids cannot contain `:`. A stable key lets a retry dedupe. */
+export function webhookDeliveryJobId(
+  event: string,
+  subscriptionId: string,
+  idempotencyKey?: string,
+): string {
+  const safe = (value: string) => value.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const suffix = idempotencyKey ? safe(idempotencyKey) : String(Date.now());
+  return `${safe(event)}_${safe(subscriptionId)}_${suffix}`;
+}
+
 let queueSingleton: Queue<DeliveryJob> | null = null;
 let connectionSingleton: IORedis | null = null;
 
@@ -60,7 +76,8 @@ export async function fanOutWebhookEvent(
   orgId: string,
   event: string,
   payload: Record<string, unknown>,
-): Promise<void> {
+  options?: { idempotencyKey?: string },
+): Promise<WebhookFanOutResult> {
   try {
     // findMany is inside try/catch — a DB error here must NOT propagate to the
     // void caller; an unhandled rejection would trigger process.exit(1) in main.ts.
@@ -70,24 +87,26 @@ export async function fanOutWebhookEvent(
       take: 1000,
     });
 
-    if (subs.length === 0) return;
+    if (subs.length === 0) return { delivery: 'no_subscribers' };
 
     const queue = getQueue();
     // BullMQ forbids colons in job IDs (Redis uses `:` as key namespace separator).
     // Sanitize the event name and use underscores throughout.
-    const safeEvent = event.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const jobs = subs.map((sub) => ({
       name: `${event}:${sub.id}`,
       data: { subscriptionId: sub.id, event, payload } satisfies DeliveryJob,
       opts: {
-        jobId: `${safeEvent}_${sub.id}_${Date.now()}`,
+        jobId: webhookDeliveryJobId(event, sub.id, options?.idempotencyKey),
         ...WEBHOOK_DELIVERY.defaultJobOptions,
       },
     }));
     await queue.addBulk(jobs);
     log.info({ orgId, event, count: subs.length }, 'webhook delivery jobs enqueued');
+    return { delivery: 'enqueued', count: subs.length };
   } catch (err) {
-    // Fail open — log and continue; don't throw into the calling route handler.
+    // Callers that ignore the result stay fail-open. Callers that must not
+    // claim delivery (proposal submit) read `outcome_unknown`.
     log.error({ err, orgId, event }, 'failed to enqueue webhook delivery jobs');
+    return { delivery: 'outcome_unknown' };
   }
 }

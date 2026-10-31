@@ -103,7 +103,13 @@ export const BidOpportunity = z.object({
 });
 export type BidOpportunity = z.infer<typeof BidOpportunity>;
 
-export const ProviderStatus = z.enum(['healthy', 'degraded', 'disabled', 'down']);
+export const ProviderStatus = z.enum([
+  'healthy',
+  'degraded',
+  'disabled',
+  'down',
+  'unverified',
+]);
 export type ProviderStatus = z.infer<typeof ProviderStatus>;
 
 export const ProviderHealth = z.object({

@@ -39,7 +39,7 @@ export function Navbar() {
     >
       {/* Left Side (logo) */}
       <div className="flex-1 hidden md:flex flex-col items-start justify-center">
-        <PoloPreSalesLogo variant="full" className="h-14 md:h-16 lg:h-20 w-auto -ml-2" />
+        <PoloPreSalesLogo variant="full" className="h-20 md:h-24 lg:h-28 w-auto -ml-2" />
       </div>
 
       {/* Center Menu */}
@@ -60,7 +60,7 @@ export function Navbar() {
 
       {/* Mobile Logo */}
       <div className="md:hidden flex flex-col items-start justify-center">
-        <PoloPreSalesLogo variant="full" className="h-10 w-auto -ml-1" />
+        <PoloPreSalesLogo variant="full" className="h-16 w-auto -ml-1" />
       </div>
 
       {/* Right Side — Auth Buttons */}

@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
@@ -33,7 +36,6 @@ interface SnapshotRow {
 // avoids re-render churn when sibling cards refetch).
 export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const c = cockpit.company;
   const headquarters = headquartersFor(c.name);
@@ -113,7 +115,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
       value: c.annualRevenueMicros
-        ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
+        ? `${formatUnspecifiedAmount(c.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
         : notVerified,
       source: cockpitKpiSource(
         cockpit.kpis,

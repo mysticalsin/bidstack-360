@@ -9,7 +9,10 @@ import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/compo
 import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
@@ -47,7 +50,6 @@ const SNAPSHOT_ACCOUNT_CAP = 200;
 
 export function AccountsAllSegment() {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const dashboard = useCrmDashboard();
   const autopopulate = useAutopopulateSalesCompanies();
   const reducedMotion = useReducedMotion();
@@ -272,7 +274,7 @@ export function AccountsAllSegment() {
                   })}{' '}
               · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
+                amount: `${formatUnspecifiedAmount(totalPipeline / 1_000_000)} (${UNSPECIFIED_CURRENCY_BASIS})`,
               })}
             </>
           }
@@ -365,8 +367,8 @@ export function AccountsAllSegment() {
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
-          value={formatMoneyMicros(totalPipeline, 'EUR')}
-          sublabel={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
+          value={formatUnspecifiedAmount(totalPipeline / 1_000_000)}
+          sublabel={t('accounts.stats.weightedPipeline.detail', UNSPECIFIED_CURRENCY_BASIS)}
         />
         <StatTile
           label={t('accounts.stats.coverage.label', 'Avg coverage')}

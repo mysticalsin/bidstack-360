@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { usePipelineReport } from '@/hooks/usePipelineReport';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
+import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 interface Props {
@@ -17,14 +17,13 @@ interface Props {
 
 export const PipelineByStageCard = memo(function PipelineByStageCard({ report }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const maxValue = report ? Math.max(1, ...report.byStage.map((stage) => stage.valueSum)) : 1;
   return (
     <Card role="region" aria-label={t('pipelineByStage.regionLabel', 'Portfolio pipeline by stage')}>
       <SectionHeader
         title={t('pipelineByStage.title', 'Portfolio pipeline')}
-        caption={t('pipelineByStage.caption', 'All-account pipeline by stage')}
+        caption={t('pipelineByStage.caption', UNSPECIFIED_CURRENCY_BASIS)}
       />
       <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {!report ? (
@@ -45,7 +44,7 @@ export const PipelineByStageCard = memo(function PipelineByStageCard({ report }:
                     <AnimatedMetric value={s.count.toLocaleString()} />
                   </div>
                   <div style={{ fontSize: 10.5, color: 'var(--fg-tertiary)' }}>
-                    <AnimatedMetric value={formatMoney(s.valueSum, 'EUR')} />
+                    <AnimatedMetric value={formatUnspecifiedAmount(s.valueSum)} />
                   </div>
                 </div>
               </div>

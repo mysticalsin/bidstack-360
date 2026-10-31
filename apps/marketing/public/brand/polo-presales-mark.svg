@@ -1,1 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Polo PreSales mark"><defs><linearGradient id="g" x1="12" y1="6" x2="40" y2="44" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3F16E8"/><stop offset=".5" stop-color="#7A1FD6"/><stop offset="1" stop-color="#E4069F"/></linearGradient></defs><path fill="url(#g)" fill-rule="evenodd" clip-rule="evenodd" d="M13 40.5 V11 C13 8.79 14.79 7 17 7 H29 C36.73 7 42 11.9 42 19 C42 26.1 36.73 31 29 31 H20 V40.5 C20 42.43 18.43 44 16.5 44 C14.57 44 13 42.43 13 40.5 Z M20 11.5 V26.5 L34 19 Z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="56 12 208 292" fill="none" role="img" aria-label="Polo PreSales mark">
+  <title>Polo PreSales</title>
+  <defs>
+    <linearGradient id="pin" x1="248" y1="22" x2="70" y2="292" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FBFE"/>
+      <stop offset="0.32" stop-color="#E4EBF1"/>
+      <stop offset="0.58" stop-color="#7ED4E3"/>
+      <stop offset="1" stop-color="#14B8D2"/>
+    </linearGradient>
+    <linearGradient id="star" x1="118" y1="60" x2="202" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF4D4"/>
+      <stop offset="0.45" stop-color="#F3D48A"/>
+      <stop offset="1" stop-color="#E0A44A"/>
+    </linearGradient>
+  </defs>
+  <path d="M 94.70 183.62 A 94.00 94.00 0 1 1 225.30 183.62 C 183.37 224.10 163.74 281.14 160.00 292.00 C 156.26 281.14 136.63 224.10 94.70 183.62 ZM 160 55.00 A 55 55 0 1 0 160 165.00 A 55 55 0 1 0 160 55.00 Z" fill="url(#pin)" fill-rule="evenodd"/>
+  <path d="M 160 60 L 171 99 L 208 110 L 171 121 L 160 160 L 149 121 L 112 110 L 149 99 Z" fill="url(#star)"/>
+  <circle cx="160" cy="110" r="6" fill="#071422"/>
+</svg>
