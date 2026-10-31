@@ -87,6 +87,9 @@ vi.mock('@/components/dashboard/OrgDashboard', () => ({
   OrgDashboard: () => <div data-testid="org-dashboard" />,
 }));
 
+vi.mock('@/components/watchdog/AccountWatchdogSection', () => ({
+  AccountWatchdogSection: () => <section data-testid="account-watchdog" />,
+}));
 vi.mock('@/components/files/FilesPanel', () => ({
   FilesPanel: () => <div data-testid="files-panel" />,
 }));

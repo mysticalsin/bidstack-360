@@ -203,14 +203,17 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
       )}
       <PageHead cockpit={cockpit} accountView={isAccountView} />
+      {/* Account view: one header (name, health sentence, 3 numbers), then the
+          watchdog signals, then details. The command-center hero repeated the
+          name and next move the header already carries, so it is org-only. */}
+      {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
       {isAccountView && (
         <div className="flex justify-end">
           <CockpitCustomizeMenu />
         </div>
       )}
       <KpiRow cockpit={cockpit} />
-      <CommandCenter cockpit={cockpit} />
-      {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
+      {!isAccountView && <CommandCenter cockpit={cockpit} />}
 
       <div className="mt-1 flex flex-col gap-1">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)]">

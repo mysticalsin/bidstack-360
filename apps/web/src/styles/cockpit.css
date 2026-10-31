@@ -3335,3 +3335,43 @@
   display: block;
   height: 100%;
 }
+
+/* ---------- Account header (Tony 13:12 direction) ----------
+   One header: name, one health sentence, three numbers. Two weights (400/500),
+   three size steps (title 28 / section 16 / body 14, meta 13), 8pt spacing. */
+.acct-head { flex-wrap: wrap; row-gap: 24px; padding-bottom: 32px; margin-bottom: 8px; }
+.acct-head .page-title { font-size: 28px; line-height: 1.2; }
+.acct-health { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 14px; color: var(--fg-secondary); max-width: 72ch; }
+.acct-health-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-pill {
+  flex: none; font-size: 12px; font-weight: 500; line-height: 1; padding: 4px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--tag-jade-fg);
+}
+.acct-pill[data-band='needs_attention'] { background: color-mix(in srgb, var(--warning) 12%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg-primary)); }
+.acct-pill[data-band='at_risk'] { background: color-mix(in srgb, var(--danger, #bb5355) 10%, transparent); color: color-mix(in srgb, var(--danger, #bb5355) 80%, var(--fg-primary)); }
+.btn-quiet { background: transparent; color: var(--fg-secondary); border-color: transparent; padding-inline: 10px; }
+.btn-quiet:hover { background: var(--surface-sunken); color: var(--fg-primary); }
+.acct-keys { flex-basis: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin: 0; }
+.acct-keys > div { display: grid; gap: 4px; min-width: 0; }
+.acct-keys dt { font-size: 13px; color: var(--fg-tertiary); font-weight: 400; }
+.acct-keys dd { margin: 0; font-size: 24px; font-weight: 500; color: var(--fg-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.acct-keys span { font-size: 13px; color: var(--fg-tertiary); }
+@media (max-width: 640px) {
+  .acct-head { row-gap: 16px; padding-bottom: 24px; }
+  .acct-head .page-title { font-size: 24px; }
+  .acct-head .page-actions { justify-content: flex-start; }
+  .acct-health-text { white-space: normal; }
+  .acct-keys { gap: 16px; }
+  .acct-keys dd { font-size: 20px; }
+}
+.acct-head .account-heading-cluster { flex: 1 1 420px; }
+.acct-head .page-actions { flex: none; align-items: center; }
+@media (max-width: 720px) {
+  .acct-head .account-heading-cluster { flex: none; }
+  .acct-head .page-actions { gap: 4px 8px; }
+  .acct-head .page-actions .btn-quiet { flex: none; padding-inline: 8px; }
+  .acct-head .page-actions .btn-primary { flex: 1 1 100%; justify-content: center; }
+  .acct-health { flex-wrap: wrap; align-items: flex-start; }
+}
+/* No glow ring on the logo: one quiet hairline is enough. */
+.acct-head .account-heading-cluster > span:first-child { box-shadow: 0 0 0 1px var(--border-subtle); }

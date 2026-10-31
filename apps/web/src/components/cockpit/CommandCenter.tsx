@@ -193,7 +193,7 @@ function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
   );
 }
 
-function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): string {
+export function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): string {
   const blocker = cockpit.compliance.find((item) => item.status === 'blocked');
   if (blocker)
     return t('commandCenter.nextMove.unblock', 'Unblock {{label}} before the bid gate.', {

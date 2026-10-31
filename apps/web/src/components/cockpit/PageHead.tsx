@@ -10,13 +10,15 @@ import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import { Icon } from '@/components/ui/Icon';
 import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities } from '@/hooks/useOpportunities';
-import { formatDate, relativeTime } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
+import { deriveNextMove } from './CommandCenter';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -63,20 +65,25 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
-  const subtitleParts = [cockpit.company.industry, cockpit.company.domain].filter(Boolean);
-  const subtitle = accountView
-    ? subtitleParts.length > 0
-      ? subtitleParts.join(' - ')
-      : t('pageHead.companyProfileIncomplete', 'Company profile incomplete')
-    : t('pageHead.dashboardSubtitle', 'Today: {{date}} - {{company}} cockpit', {
-        date: formatDate(new Date().toISOString()),
-        company: cockpit.company.name,
-      });
-  const confidence = Math.round(cockpit.company.confidence * 100);
+  const subtitle = t('pageHead.dashboardSubtitle', 'Today: {{date}} - {{company}} cockpit', {
+    date: formatDate(new Date().toISOString()),
+    company: cockpit.company.name,
+  });
+  const { formatMoney } = useFormatMoney();
+  const accountOpps = (opps.data?.items ?? []).filter(
+    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+  );
+  const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
+  const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
+  const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
+  const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
+  const winLoss = cockpit.winLoss;
+  const nextMove = deriveNextMove(cockpit, t);
+  const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
 
   return (
     <motion.div
-      className="page-head motion-page-head cockpit-page-head"
+      className={`page-head motion-page-head cockpit-page-head${accountView ? ' acct-head' : ''}`}
       initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
       animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
       transition={springSoft}
@@ -90,7 +97,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           companyId={cockpit.company.id}
           logo={cockpit.company.logo}
           domain={cockpit.company.domain}
-          size={52}
+          size={accountView ? 40 : 52}
           priority
           brief={<CompanyBrief cockpit={cockpit} />}
         />
@@ -98,47 +105,14 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           <h1 className="page-title">
             {accountView ? cockpit.company.name : t('pageHead.dashboardTitle', 'Dashboard')}
           </h1>
-          <div className="page-sub">{subtitle}</div>
+          {accountView ? null : <div className="page-sub">{subtitle}</div>}
           {accountView ? (
-            <div
-              className="account-meta-chips"
-              aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}
-            >
-              <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
-              <span data-tone="confidence">
-                {t('pageHead.attributionConfidence', '{{percent}}% attribution confidence', {
-                  percent: confidence,
-                })}
+            <p className="acct-health" aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}>
+              <span className="acct-pill" data-band={cockpit.health.band}>
+                {labelForBand(cockpit.health.band)}
               </span>
-              <span data-tone="muted">
-                {t('pageHead.refreshed', 'Refreshed {{time}}', {
-                  time: relativeTime(cockpit.company.updatedAt),
-                })}
-              </span>
-              {cockpit.company.strategicIntel?.lastSyncedAt ? (
-                <span
-                  data-tone={
-                    cockpit.company.strategicIntel.freshness === 'fresh' ? 'linked' : 'warning'
-                  }
-                >
-                  {t('pageHead.externalFreshness', 'External {{freshness}} - {{time}}', {
-                    freshness: cockpit.company.strategicIntel.freshness,
-                    time: relativeTime(cockpit.company.strategicIntel.lastSyncedAt),
-                  })}
-                </span>
-              ) : (
-                <span data-tone="warning">
-                  {t('pageHead.externalNotSynced', 'External source not synced')}
-                </span>
-              )}
-              {linkedOpp ? (
-                <span data-tone="linked">{t('pageHead.opportunityLinked', 'Opportunity linked')}</span>
-              ) : (
-                <span data-tone="warning">
-                  {t('pageHead.noOpportunityLinked', 'No opportunity linked')}
-                </span>
-              )}
-            </div>
+              <span className="acct-health-text" title={nextMove}>{nextMove}</span>
+            </p>
           ) : null}
         </div>
       </div>
@@ -146,7 +120,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
         {accountView && accountId ? (
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-quiet"
             onClick={() => toggleFavorite(accountId, cockpit.company.name)}
             aria-pressed={isStarred}
             title={
@@ -162,7 +136,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
         ) : null}
         <button
           type="button"
-          className="btn btn-secondary"
+          className={accountView ? 'btn btn-quiet' : 'btn btn-secondary'}
           onClick={handleEnrich}
           disabled={enrich.isPending}
           title={t('pageHead.enrichTitle', 'Refresh available data sources')}
@@ -183,7 +157,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
         {accountView ? (
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-quiet"
             onClick={() => window.print()}
             title={t('pageHead.printTitle', 'Print the cockpit as a one-page brief')}
           >
@@ -221,6 +195,41 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           />
         ) : null}
       </div>
+
+      {accountView ? (
+        <dl className="acct-keys" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
+          <div>
+            <dt>{t('pageHead.keyOpenPipeline', 'Open pipeline')}</dt>
+            <dd>{formatMoney(openValue)}</dd>
+            <span>
+              {openOpps.length === 1
+                ? t('pageHead.keyOpenDeal', '1 open deal')
+                : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
+            </span>
+          </div>
+          <div>
+            <dt>{t('pageHead.keyWinRate', 'Win rate')}</dt>
+            <dd>{winLoss && closedCount > 0 ? `${winLoss.winRate}%` : '—'}</dd>
+            <span>
+              {winLoss && closedCount > 0
+                ? t('pageHead.keyWonOf', '{{won}} of {{total}} closed', {
+                    won: winLoss.wonCount,
+                    total: closedCount,
+                  })
+                : t('pageHead.keyNoClosed', 'No closed bids yet')}
+            </span>
+          </div>
+          <div>
+            <dt>{t('pageHead.keyOpenRisks', 'Open risks')}</dt>
+            <dd>{openRisks.length}</dd>
+            <span>
+              {highRisks > 0
+                ? t('pageHead.keyHighRisks', '{{count}} high', { count: highRisks })
+                : t('pageHead.keyNoHighRisks', 'None high')}
+            </span>
+          </div>
+        </dl>
+      ) : null}
 
       {linkedOpp ? (
         <BriefingDialog
