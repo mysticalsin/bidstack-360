@@ -1,6 +1,8 @@
 // Contractual management per account — MSAs / framework agreements, countries
 // covered, global rebate (bps), rate re-evaluation schedule. Pre-sales-owned,
 // org-scoped, audited. Mirrors the cross-sell action log route pattern.
+// Same rows as the MSA library (routes/msa.ts), so every route here also
+// needs msa:read / msa:write on top of accounts:read / accounts:write.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -370,7 +372,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/contract-agreements',
     {
-      preHandler: [server.requirePermission('accounts:read')],
+      preHandler: [server.requirePermission('accounts:read'), server.requirePermission('msa:read')],
       schema: { querystring: ContractAgreementFilter, response: { 200: ContractAgreementPage } },
     },
     async (req) => {
@@ -404,7 +406,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
   server.post(
     '/contract-agreements',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), server.requirePermission('msa:write')],
       schema: { body: ContractAgreementCreate, response: { 201: ContractAgreement } },
     },
     async (req, reply) => {
@@ -478,7 +480,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
   server.patch(
     '/contract-agreements/:id',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), server.requirePermission('msa:write')],
       schema: { params: IdParam, body: ContractAgreementPatch, response: { 200: ContractAgreement } },
     },
     async (req) => {
@@ -548,7 +550,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
   server.delete(
     '/contract-agreements/:id',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), server.requirePermission('msa:write')],
       schema: { params: IdParam, response: { 204: z.null() } },
     },
     async (req, reply) => {
@@ -588,7 +590,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
   server.post(
     '/contract-agreements/extractions/:id/approve',
     {
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), server.requirePermission('msa:write')],
       schema: {
         params: IdParam,
         body: ContractExtractionApproval,
@@ -669,7 +671,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
     '/contract-agreements/extract',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: [server.requirePermission('accounts:write')],
+      preHandler: [server.requirePermission('accounts:write'), server.requirePermission('msa:write')],
       schema: {
         body: z.object({ fileId: z.string().uuid() }),
         response: { 200: ContractExtractionResult },
@@ -726,7 +728,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/contract-agreements/extractions/:id',
     {
-      preHandler: [server.requirePermission('accounts:read')],
+      preHandler: [server.requirePermission('accounts:read'), server.requirePermission('msa:read')],
       schema: { params: IdParam, response: { 200: ContractExtractionResult } },
     },
     async (req) => {
