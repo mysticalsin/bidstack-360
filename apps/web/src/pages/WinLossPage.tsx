@@ -50,7 +50,8 @@ export default function WinLossPage() {
     [from, to, ownerId],
   );
   const analysis = useWinLossAnalysis(filter);
-  const users = useUsers({ limit: 200 });
+  // Closed deals keep their owner after the person leaves: filter by them too.
+  const users = useUsers({ limit: 200, includeDeleted: true });
 
   const data = analysis.data;
   const rates = useMemo(() => quarterWinRates(data), [data]);
@@ -79,7 +80,10 @@ export default function WinLossPage() {
   const ownerOptions = useMemo<SelectOption[]>(
     () => [
       { value: '', label: t('winLoss.allOwners', 'All owners') },
-      ...(users.data ?? []).map((u) => ({ value: u.id, label: u.name ?? u.email })),
+      ...(users.data ?? []).map((u) => ({
+        value: u.id,
+        label: u.deletedAt ? t('winLoss.formerOwner', '{{name}} (former)', { name: u.name ?? u.email }) : (u.name ?? u.email),
+      })),
     ],
     [users.data, t],
   );

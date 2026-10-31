@@ -51,7 +51,9 @@ export function useOwnerLabel(): OwnerLabel {
   const { t } = useTranslation('rfp');
   // The roster route caps at 200 (useUsers.ts:48-53); an owner outside that page
   // resolves to "Unknown owner" rather than to an em-dash.
-  const users = useUsers({ limit: 200 });
+  // Include former members so a proposal owned by someone who left still
+  // shows their name instead of "Unknown owner".
+  const users = useUsers({ limit: 200, includeDeleted: true });
   const byId = useMemo(
     () => new Map((users.data ?? []).map((user) => [user.id, user.name ?? user.email])),
     [users.data],

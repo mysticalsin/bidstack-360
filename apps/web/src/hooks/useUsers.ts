@@ -8,6 +8,8 @@ interface OrgUser {
   email: string;
   role: string;
   createdAt: string;
+  /** Set only when the list was fetched with includeDeleted (former member). */
+  deletedAt?: string | null;
 }
 
 // PresenceEntry mirrors the server-side shape from presence.service.ts.
@@ -31,6 +33,9 @@ interface UsersPageParams {
   cursor?: string;
   /** Route caps at 200; default 100 matches the API default. */
   limit?: number;
+  /** Include former (soft-deleted) members, flagged by deletedAt. For views
+   *  that name historic owners; never for pickers that assign work. */
+  includeDeleted?: boolean;
   enabled?: boolean;
 }
 
@@ -38,6 +43,7 @@ function usersPath(params: UsersPageParams): string {
   const qs = new URLSearchParams();
   if (params.cursor) qs.set('cursor', params.cursor);
   if (params.limit) qs.set('limit', String(params.limit));
+  if (params.includeDeleted) qs.set('includeDeleted', 'true');
   return `/api/users${qs.toString() ? `?${qs.toString()}` : ''}`;
 }
 
