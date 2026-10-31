@@ -115,3 +115,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## React Flow (@xyflow/react 12.12.0, @xyflow/system 0.0.83)
+
+- Source: https://github.com/xyflow/xyflow (npm @xyflow/react)
+- Used for: account org chart canvas (pan/zoom, nodes, curved edges, mini-map), apps/web/src/pages/accounts/OrgChartPage.tsx
+- Dependencies: zustand (MIT), classcat (MIT), d3-zoom/d3-drag/d3-selection/d3-interpolate (ISC)
+- Licence: MIT, Copyright (c) 2019-2025 webkid GmbH (same MIT terms as above)
+- Note: the "React Flow" attribution badge is hidden via proOptions; the MIT licence allows this (xyflow asks commercial users to consider a Pro subscription, it is not a licence condition).
+
+## dagre (@dagrejs/dagre 3.1.3, @dagrejs/graphlib 4.0.6)
+
+- Source: https://github.com/dagrejs/dagre
+- Used for: top-down tree layout of the org chart, apps/web/src/lib/orgchart/layout.ts
+- Licence: MIT, Copyright (c) 2012-2014 Chris Pettitt (same MIT terms as above)
