@@ -1,8 +1,8 @@
 /**
  * Account watchdog worker (financial public-filing monitor).
  *
- * Queue: account.watchdog. One repeatable scan (every 6 h) walks enabled
- * AccountWatchSubjects, oldest-checked first, and for each one runs the
+ * Queue: account.watchdog. One repeatable scan (every 6 h) walks enabled,
+ * identifier-confirmed AccountWatchSubjects, oldest-checked first, and for each one runs the
  * configured source adapters (SEC EDGAR when secCik + SEC_USER_AGENT are set,
  * Companies House when companiesHouseNumber + COMPANIES_HOUSE_API_KEY are set).
  * Events persist idempotently on (orgId, source, externalId); only events that
@@ -142,6 +142,9 @@ export async function runWatchdogScan(deps: WatchdogScanDeps = {}): Promise<Watc
   const subjects = await db.accountWatchSubject.findMany({
     where: {
       enabled: true,
+      // Monitoring starts only after a human confirmed the identifiers map to
+      // this account (the API reports enabled=false until then, too).
+      identifiersConfirmedAt: { not: null },
       ...(deps.orgId ? { orgId: deps.orgId } : {}),
       OR: [{ lastCheckedAt: null }, { lastCheckedAt: { lt: new Date(now.getTime() - MIN_RECHECK_MS) } }],
     },

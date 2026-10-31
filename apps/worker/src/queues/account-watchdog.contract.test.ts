@@ -57,12 +57,15 @@ beforeAll(async () => {
       { orgId, code: `WD-2-${stamp}`, customer: 'Acme', companyId, name: 'Old deal', stage: 'closed_lost', ownerId: closedOwner },
     ],
   });
-  subjectId = (await prisma.accountWatchSubject.create({ data: { orgId, companyId, companiesHouseNumber: '123456', enabled: true } })).id;
+  subjectId = (await prisma.accountWatchSubject.create({ data: { orgId, companyId, companiesHouseNumber: '123456', enabled: true, identifiersConfirmedAt: new Date() } })).id;
   const bare = await prisma.company.create({ data: { orgId, name: 'No Ids Ltd' } });
-  unconfiguredSubjectId = (await prisma.accountWatchSubject.create({ data: { orgId, companyId: bare.id, enabled: true } })).id;
+  unconfiguredSubjectId = (await prisma.accountWatchSubject.create({ data: { orgId, companyId: bare.id, enabled: true, identifiersConfirmedAt: new Date() } })).id;
+  // Unconfirmed identifiers: never polled (could be the wrong legal entity).
+  const unconfirmed = await prisma.company.create({ data: { orgId, name: 'Unconfirmed Ltd' } });
+  await prisma.accountWatchSubject.create({ data: { orgId, companyId: unconfirmed.id, companiesHouseNumber: '777777', enabled: true } });
   // A subject in another org must not be touched by an org-scoped scan.
   const otherCo = await prisma.company.create({ data: { orgId: otherOrgId, name: 'Other Org Co' } });
-  await prisma.accountWatchSubject.create({ data: { orgId: otherOrgId, companyId: otherCo.id, companiesHouseNumber: '654321', enabled: true } });
+  await prisma.accountWatchSubject.create({ data: { orgId: otherOrgId, companyId: otherCo.id, companiesHouseNumber: '654321', enabled: true, identifiersConfirmedAt: new Date() } });
 });
 
 afterAll(async () => {
