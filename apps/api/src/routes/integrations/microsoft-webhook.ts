@@ -21,7 +21,7 @@
  *  expose it publicly. The clientState secret provides the verification layer.
  */
 
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
@@ -40,6 +40,23 @@ const NotificationValueItem = z.object({
 const NotificationBody = z.object({
   value: z.array(NotificationValueItem),
 });
+
+// Graph tokens are opaque but short; cap what we are willing to reflect.
+const MAX_VALIDATION_TOKEN_LENGTH = 4096;
+
+function sendValidationToken(
+  reply: FastifyReply,
+  token: string,
+): FastifyReply {
+  if (token.length > MAX_VALIDATION_TOKEN_LENGTH) {
+    return reply.status(400).send('validationToken too long');
+  }
+  return reply
+    .header('Content-Type', 'text/plain; charset=utf-8')
+    .header('X-Content-Type-Options', 'nosniff')
+    .status(200)
+    .send(token);
+}
 
 export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
@@ -67,7 +84,7 @@ export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
         return reply.status(400).send('validationToken query parameter is required');
       }
       server.log.info('Graph webhook validation handshake received');
-      return reply.header('Content-Type', 'text/plain').status(200).send(validationToken);
+      return sendValidationToken(reply, validationToken);
     },
   );
 
@@ -81,6 +98,17 @@ export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
       // Graph sends no Clerk JWT — notifications are authenticated by the
       // per-subscription clientState check in the handler.
       config: { public: true },
+      // Graph's notificationUrl validation is a POST with ?validationToken and
+      // an empty text/plain body. Answer it before body validation, otherwise
+      // the NotificationBody schema rejects it and Graph refuses to create
+      // the subscription.
+      preValidation: async (req, reply) => {
+        const token = (req.query as { validationToken?: unknown } | undefined)?.validationToken;
+        if (typeof token === 'string' && token.length > 0) {
+          server.log.info('Graph webhook validation handshake received (POST)');
+          return sendValidationToken(reply, token);
+        }
+      },
       schema: {
         body: NotificationBody,
         response: {
