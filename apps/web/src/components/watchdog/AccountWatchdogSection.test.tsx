@@ -1,4 +1,5 @@
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AccountWatchdog } from '@/hooks/useAccountWatchdog';
@@ -7,6 +8,8 @@ const state: { data?: AccountWatchdog; isLoading: boolean; isError: boolean } = 
 vi.mock('@/hooks/useAccountWatchdog', () => ({
   useAccountWatchdog: () => ({ ...state, refetch: vi.fn() }),
 }));
+const mi: { data?: { items: unknown[] } } = {};
+vi.mock('@/hooks/useMeetingIntel', () => ({ useMeetingWatchdogFeed: () => mi }));
 
 import { AccountWatchdogSection } from './AccountWatchdogSection';
 
@@ -75,5 +78,21 @@ describe('AccountWatchdogSection', () => {
     fireEvent.click(toggle);
     expect(screen.getByText('Data pilot').closest('[hidden]')).toBeNull();
     expect(screen.getByText(/Bid · Closed won/)).toBeTruthy();
+  });
+
+  it('folds cross-region meeting flags for this account into signals (task 5)', () => {
+    state.data = base;
+    mi.data = { items: [
+      { kind: 'MEETING_CROSS_REGION', externalId: 'f1', companyId: 'c1', occurredAt: '2026-10-30T00:00:00Z', title: 'Data residency workshop took place at CI Financial Europe', summary: 'Ask your CA contacts.', implication: 'OPPORTUNITY', url: '/meeting-intel/flags/f1' },
+      { kind: 'MEETING_CROSS_REGION', externalId: 'f2', companyId: 'other', occurredAt: '2026-10-30T00:00:00Z', title: 'Not mine', summary: '', implication: 'OPPORTUNITY', url: '/meeting-intel/flags/f2' },
+    ] };
+    render(<MemoryRouter><AccountWatchdogSection companyId="c1" /></MemoryRouter>);
+    const row = screen.getByRole('button', { name: /Data residency workshop/ });
+    expect(screen.queryByText('Not mine')).toBeNull();
+    expect(screen.getByText(/Meeting intel ·/)).toBeTruthy();
+    expect(screen.getByText('Opportunity', { selector: '.wd-pill' })).toBeTruthy();
+    fireEvent.click(row);
+    expect(screen.getByRole('link', { name: 'Open flag and talking points' }).getAttribute('href')).toBe('/meeting-intel/flags/f1');
+    mi.data = undefined;
   });
 });

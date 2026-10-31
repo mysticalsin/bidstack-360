@@ -7,13 +7,16 @@ import '@/components/viz/viz.css';
 import './watchdog.css';
 
 import { ChevronDown, ExternalLink } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { SignalLegend } from '@/components/viz/ChartCard';
 import { MiniCalendar, SignalStrip, YearBars } from '@/components/viz/charts';
 import { fmtCompact } from '@/components/viz/viz-data';
 import { useAccountWatchdog, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
+import { useMeetingWatchdogFeed } from '@/hooks/useMeetingIntel';
+import { mergeMeetingSignals } from '@/lib/meeting-intel/watchdog';
 import { daysUntil } from '@/lib/format';
 
 const PILL: Record<WatchImplication, string> = {
@@ -28,6 +31,7 @@ const SOURCE: Record<string, string> = {
   amf: 'AMF',
   ir_feed: 'Investor relations',
   gdelt: 'News',
+  meeting_intel: 'Meeting intel',
 };
 
 const TOP_SIGNALS = 3;
@@ -84,9 +88,13 @@ function SignalRow({ e, i }: { e: WatchEvent; i: number }) {
       <div id={`${id}-d`} className="wd-detail" data-open={open} hidden={!open}>
         <p>{e.summary}</p>
         {e.implicationRationale ? <p className="wd-row-meta">{e.implicationRationale}</p> : null}
-        <a className="wd-link" href={e.sourceUrl} target="_blank" rel="noreferrer">
-          Open source <ExternalLink size={13} strokeWidth={1.5} aria-hidden />
-        </a>
+        {e.sourceUrl.startsWith('/') ? (
+          <Link className="wd-link" to={e.sourceUrl}>Open flag and talking points</Link>
+        ) : (
+          <a className="wd-link" href={e.sourceUrl} target="_blank" rel="noreferrer">
+            Open source <ExternalLink size={13} strokeWidth={1.5} aria-hidden />
+          </a>
+        )}
       </div>
     </li>
   );
@@ -285,7 +293,12 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
 }
 
 export function AccountWatchdogSection({ companyId }: { companyId: string }) {
-  const q = useAccountWatchdog(companyId);
+  const raw = useAccountWatchdog(companyId);
+  // Task 5: cross-region meeting flags (GET /meeting-intel/flags?format=watchdog)
+  // join this account's signals as OPPORTUNITY rows. Optional: no access = none.
+  const meetings = useMeetingWatchdogFeed(Boolean(raw.data));
+  const data = useMemo(() => (raw.data ? mergeMeetingSignals(raw.data, meetings.data?.items, companyId) : undefined), [raw.data, meetings.data, companyId]);
+  const q = { ...raw, data };
   const checked = q.data?.monitoring.lastCheckedAt;
   const fresh = q.data?.events.filter((e) => e.status === 'NEW').length ?? 0;
   return (
