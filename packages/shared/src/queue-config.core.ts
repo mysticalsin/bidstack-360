@@ -101,6 +101,27 @@ export const MSA_TEXT_EXTRACT: QueueConfig = {
 };
 
 /** Payload of an `msa-text-extract` job. Ids only; the worker re-reads the row. */
+/**
+ * Meeting intel pipeline (2026-10-31). One queue, two job names:
+ *   'meeting-intel.sync'    pull one source connection (ABC org-level, Metis per user)
+ *   'meeting-intel.process' match, enrich, dedupe and flag one ingest item
+ */
+export const MEETING_INTEL: QueueConfig = {
+  name: 'meeting-intel',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+export type MeetingIntelJob =
+  | { kind: 'sync'; orgId: string; connectionId: string }
+  | { kind: 'process'; orgId: string; itemId: string }
+  /** Manual entries created by the API: raise cross-region flags only. */
+  | { kind: 'flags'; orgId: string; meetingId: string };
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;

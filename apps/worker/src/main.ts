@@ -36,6 +36,7 @@ import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
 import { startAccountWatchdog } from './queues/account-watchdog.js';
 import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startMsaReminders } from './queues/msa-reminders.js';
+import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
 import { startTaskKamAlerts } from './queues/task-kam-alerts.js';
@@ -164,6 +165,8 @@ await Promise.all([
   startAccountWatchdog(connection, log, workers, queues),
   // MSA renewal / expiry reminders (90/60/30 days + notice deadline)
   startMsaReminders(connection, log, workers, queues),
+  // Strategic account meeting intel: source sync, match/dedupe pipeline, cross-region flags
+  startMeetingIntel(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),
