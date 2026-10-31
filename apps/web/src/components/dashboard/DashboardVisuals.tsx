@@ -45,6 +45,7 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
       table={{ columns: ['Month', 'Won to date'], rows: trend.map((p) => [p.x, fmtCompact(p.y)]) }}
       className="dash-hero"
+      interactive={Boolean(onDrill)}
     >
       <div className="dash-hero-figs">
         <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
