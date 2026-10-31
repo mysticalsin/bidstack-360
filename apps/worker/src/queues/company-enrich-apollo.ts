@@ -25,7 +25,6 @@ export const QUEUE_NAME = COMPANY_ENRICH_APOLLO.name;
 const APOLLO_ENDPOINT = 'https://api.apollo.io/api/v1/organizations/enrich';
 const APOLLO_PEOPLE_SEARCH_ENDPOINT = 'https://api.apollo.io/api/v1/mixed_people/api_search';
 const GDELT_DOC_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc';
-const APOLLO_CONFIDENCE_BPS = 8500;
 const APOLLO_TIMEOUT_MS = 10_000;
 const APOLLO_CONCURRENCY = 5;
 const APOLLO_COMPANY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -135,7 +134,7 @@ export interface MappedEnrichment {
   industryCodes: string[];
   formerNames: string[];
   strategicIntel: ApolloStrategicIntel;
-  technicalStack: Array<{ name: string; source: string; confidence: number }>;
+  technicalStack: Array<{ name: string; source: string; confidence: number | null }>;
 }
 
 type ApolloSyncMode =
@@ -162,7 +161,7 @@ interface ApolloStrategicSignal {
   detail: string | null;
   observedAt: string;
   source: string;
-  confidence: number;
+  confidence: number | null;
   url: string | null;
   metadata: Record<string, unknown>;
 }
@@ -299,7 +298,7 @@ function buildApolloStrategicIntel({
       label: topic,
       detail: 'Company-level buying intent topic from Apollo.',
       observedAt,
-      confidence: 0.78,
+      confidence: null,
     }),
   );
   const signals = [
@@ -420,7 +419,7 @@ function signal({
   detail = null,
   observedAt,
   source = 'apollo_io',
-  confidence = 0.75,
+  confidence = null,
   url = null,
   metadata = {},
 }: Omit<ApolloStrategicSignal, 'source' | 'detail' | 'confidence' | 'url' | 'metadata'> &
@@ -434,7 +433,7 @@ function signal({
     detail,
     observedAt,
     source,
-    confidence: Math.max(0, Math.min(1, confidence)),
+    confidence: confidence == null ? null : Math.max(0, Math.min(1, confidence)),
     url: validUrl(url),
     metadata: sanitizeApolloPayload(metadata) as Record<string, unknown>,
   };
@@ -478,7 +477,7 @@ function extractHiringSignals(
         label: title,
         detail: department ? `Hiring in ${department}` : 'Open job posting detected.',
         observedAt: stringDate(postedAt) ?? observedAt,
-        confidence: 0.76,
+        confidence: null,
         url: firstString(row, ['url', 'job_url', 'source_url']),
         metadata: row,
       });
@@ -493,7 +492,7 @@ function extractHiringSignals(
       label,
       detail: 'Headcount movement returned by Apollo.',
       observedAt,
-      confidence: 0.68,
+      confidence: null,
     }),
   );
 
@@ -517,7 +516,7 @@ function extractLeadershipSignals(
         detail: change ?? 'Executive or senior leadership signal returned by Apollo.',
         observedAt:
           stringDate(firstString(row, ['observed_at', 'updated_at', 'created_at'])) ?? observedAt,
-        confidence: 0.72,
+        confidence: null,
         url: firstString(row, ['linkedin_url', 'url', 'source_url']),
         metadata: row,
       });
@@ -540,7 +539,7 @@ function extractRevenueSignals(
         label: 'Annual revenue returned',
         detail: 'Apollo returned company annual revenue.',
         observedAt,
-        confidence: 0.78,
+        confidence: null,
         metadata: { annualRevenueMicros: Number(annualRevenueMicros) },
       }),
     );
@@ -554,7 +553,7 @@ function extractRevenueSignals(
         label: 'Funding total returned',
         detail: 'Apollo returned total funding data.',
         observedAt: stringDate(org.latest_funding_round_date) ?? observedAt,
-        confidence: 0.75,
+        confidence: null,
         metadata: { totalFunding },
       }),
     );
@@ -577,12 +576,12 @@ function extractNewsSignals(
   ];
   const crossCheckRows = rowsFromUnknown(newsCrossCheck);
   const rows = [
-    ...apolloRows.map((row) => ({ row, source: 'apollo_io' as const, confidence: 0.7 })),
-    ...crossCheckRows.map((row) => ({ row, source: 'gdelt_news' as const, confidence: 0.66 })),
+    ...apolloRows.map((row) => ({ row, source: 'apollo_io' as const })),
+    ...crossCheckRows.map((row) => ({ row, source: 'gdelt_news' as const })),
   ];
 
   return rows
-    .map(({ row, source, confidence }, index) => {
+    .map(({ row, source }, index) => {
       const title = firstString(row, [
         'title',
         'headline',
@@ -619,7 +618,7 @@ function extractNewsSignals(
         detail,
         observedAt: observed,
         source,
-        confidence: kind === 'funding' ? Math.max(confidence, 0.74) : confidence,
+        confidence: null,
         url: firstString(row, ['url', 'source_url', 'article_url', 'link']),
         metadata: row,
       });
@@ -1383,7 +1382,7 @@ export async function startCompanyEnrichApollo(
               : 'Apollo MCP company intelligence',
           sourceUrl,
           fetchedAt: nowIso,
-          confidence: 0.85,
+          confidence: null,
           providerMetadata: {
             transport: syncMode.startsWith('apollo_mcp') ? 'mcp_streamable_http' : 'rest_api',
             endpoint: syncMode.startsWith('apollo_mcp') ? '/mcp' : APOLLO_ENDPOINT,
@@ -1426,7 +1425,7 @@ export async function startCompanyEnrichApollo(
           employeeCount: mapped.employeeCount,
           annualRevenueMicros: mapped.annualRevenueMicros,
           status: 'active',
-          confidenceBps: APOLLO_CONFIDENCE_BPS,
+          confidenceBps: 0,
           sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
           providerMetadata: {
             apollo: apolloMetadata,
@@ -1449,7 +1448,7 @@ export async function startCompanyEnrichApollo(
           employeeCount: mapped.employeeCount,
           annualRevenueMicros: mapped.annualRevenueMicros,
           status: 'active',
-          confidenceBps: APOLLO_CONFIDENCE_BPS,
+          confidenceBps: 0,
           sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
           providerMetadata: {
             apollo: apolloMetadata,
@@ -1482,7 +1481,6 @@ export async function startCompanyEnrichApollo(
           industry: mapped.industry ?? undefined,
           employeeCount: mapped.employeeCount ?? undefined,
           source: 'apollo_io',
-          confidence: APOLLO_CONFIDENCE_BPS / 10_000,
           enrichedAt: new Date(nowIso),
         },
       });
