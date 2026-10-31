@@ -2001,7 +2001,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "Cargando modelos...",
-    "modelTableEmpty": "Aún no se han entrenado modelos de {{entityType}}. Haz clic en \"Reentrenar ahora\" para entrenar el primer modelo.",
+    "modelTableEmpty": "No hay un modelo de {{entityType}} guardado. El entrenamiento necesita al menos 50 registros cerrados de esta organización.",
     "modelTableCaption": "Historial del modelo predictivo de {{entityType}}",
     "colVersion": "Versión",
     "colAccuracyMetrics": "Métricas de precisión",

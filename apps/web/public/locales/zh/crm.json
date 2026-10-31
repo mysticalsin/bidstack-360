@@ -1968,7 +1968,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "正在加载模型...",
-    "modelTableEmpty": "尚未训练任何 {{entityType}} 模型。点击\"立即重新训练\"以训练第一个模型。",
+    "modelTableEmpty": "未保存 {{entityType}} 模型。训练至少需要本组织 50 条已关闭记录。",
     "modelTableCaption": "{{entityType}} 预测模型历史记录",
     "colVersion": "版本",
     "colAccuracyMetrics": "准确率指标",

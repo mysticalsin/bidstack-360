@@ -7,8 +7,8 @@
  *   - Logistic regression is sufficient for the CRM scoring signal quality (< 1M
  *     samples per org); gradient boosting adds complexity without meaningful gain
  *     at this scale.
- *   - Each org with ≥ 50 closed deals gets its own per-org model.
- *     Orgs below that threshold use a global baseline trained on synthetic data.
+ *   - Each org with at least 50 closed records gets its own model.
+ *     Fewer closed records stores no model. Synthetic rows are not a substitute.
  *
  * Model artifact format:
  *   { weights: number[], bias: number, featureNames: string[], version: string,
@@ -38,8 +38,6 @@ import {
   normaliseColumns,
   computeMetrics,
   MIN_SAMPLES,
-  buildSyntheticLeadSamples,
-  buildSyntheticOppSamples,
 } from './trainer.helpers.js';
 
 // Re-export types so callers (predictive-retrain.ts) get them from this file
@@ -101,8 +99,8 @@ export async function trainOrgModel(
   log.info({ orgId, entityType }, 'starting model training');
 
   // ── Collect closed entities for labeling ──────────────────────────────────
-  let X: number[][] = [];
-  let y: number[] = [];
+  const X: number[][] = [];
+  const y: number[] = [];
   let featureNames: string[] = [];
   let sampleCount: number;
 
@@ -128,12 +126,8 @@ export async function trainOrgModel(
     sampleCount = X.length;
 
     if (sampleCount < MIN_SAMPLES) {
-      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — using synthetic baseline');
-      const syn = buildSyntheticLeadSamples(featureNames.length || 24);
-      X = syn.X;
-      y = syn.y;
-      featureNames =
-        featureNames.length > 0 ? featureNames : Array.from({ length: 24 }, (_, i) => `f${i}`);
+      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — no model stored');
+      return null;
     }
   } else {
     // opportunity
@@ -161,12 +155,8 @@ export async function trainOrgModel(
     sampleCount = X.length;
 
     if (sampleCount < MIN_SAMPLES) {
-      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — using synthetic baseline');
-      const syn = buildSyntheticOppSamples(featureNames.length || 12);
-      X = syn.X;
-      y = syn.y;
-      featureNames =
-        featureNames.length > 0 ? featureNames : Array.from({ length: 12 }, (_, i) => `f${i}`);
+      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — no model stored');
+      return null;
     }
   }
 

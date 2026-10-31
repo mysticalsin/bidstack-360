@@ -2023,7 +2023,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "Chargement des modèles...",
-    "modelTableEmpty": "Aucun modèle {{entityType}} entraîné pour le moment. Cliquez sur « Réentraîner maintenant » pour entraîner le premier modèle.",
+    "modelTableEmpty": "Aucun modèle {{entityType}} n'est enregistré. L'entraînement exige au moins 50 dossiers clos de cette organisation.",
     "modelTableCaption": "Historique du modèle prédictif {{entityType}}",
     "colVersion": "Version",
     "colAccuracyMetrics": "Métriques de précision",

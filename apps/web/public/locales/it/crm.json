@@ -1968,7 +1968,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "Caricamento modelli...",
-    "modelTableEmpty": "Nessun modello {{entityType}} ancora addestrato. Fai clic su \"Riaddestra ora\" per addestrare il primo modello.",
+    "modelTableEmpty": "Nessun modello {{entityType}} è registrato. L'addestramento richiede almeno 50 record chiusi di questa organizzazione.",
     "modelTableCaption": "Cronologia del modello predittivo {{entityType}}",
     "colVersion": "Versione",
     "colAccuracyMetrics": "Metriche di accuratezza",
