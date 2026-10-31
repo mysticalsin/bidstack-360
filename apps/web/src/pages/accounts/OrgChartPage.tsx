@@ -338,7 +338,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
       {conflict ? (
         <div className="oc-conflict" role="alert">
-          <span>Someone else changed this chart{conflict.chartVersion != null ? ` (now version ${conflict.chartVersion})` : ''} after you started editing. Your edits are still here.</span>
+          <span>Someone else saved changes to this chart after you started editing. Your edits are still here.</span>
           <button type="button" className="oc-btn" onClick={() => { discard(); void reload(companyId); }}>Reload theirs</button>
           <button type="button" className="oc-btn" onClick={() => void doSave(true)}>Overwrite with mine</button>
         </div>
@@ -422,6 +422,13 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   );
 }
 
+function draftPath(nodes: OrgNode[], id: string): string[] {
+  const by = new Map(nodes.map((n) => [n.id, n]));
+  const out: string[] = [];
+  for (let n = by.get(id); n && out.length < 64; n = n.parentId ? by.get(n.parentId) : undefined) out.unshift(n.name);
+  return out;
+}
+
 function PersonPanel(props: {
   node: OrgNode; cov: NodeCov | undefined; asOf: number; editing: boolean; nodes: OrgNode[]; rootId: string | null; live: boolean;
   onClose: () => void; onPatch: (p: Partial<OrgNode>) => void; onReparent: (pid: string) => void;
@@ -439,6 +446,8 @@ function PersonPanel(props: {
   const meetingTotal = d ? Math.max(d.meetings.length, cov?.count ?? 0) : cov?.count ?? 0;
   const challenges = d ? d.challenges.map((c) => (c.count > 1 ? `${c.text} (${c.count}×)` : c.text)) : cov?.challenges ?? [];
   const canEditNode = editing && !node.redacted;
+  // While editing, the path follows the draft so it matches Reports to.
+  const path = editing ? draftPath(nodes, node.id) : (d?.path.map((p) => p.name) ?? []);
   return (
     <div className="oc-pp" data-testid="orgchart-panel">
       <div className="oc-pp-head">
@@ -456,7 +465,7 @@ function PersonPanel(props: {
         <div><dt>Relationship</dt><dd>{STRENGTH_LABEL[s]}{cov?.manual ? ' (set by an admin)' : ''}</dd></div>
         <div><dt>Reports to</dt><dd>{manager?.name ?? 'Top of chart'}</dd></div>
       </dl>
-      {d && d.path.length > 1 ? <p className="oc-src" data-testid="orgchart-path">Path to the top: {d.path.map((p) => p.name).join(' › ')}</p> : null}
+      {path.length > 1 ? <p className="oc-src" data-testid="orgchart-path">Path to the top: {path.join(' › ')}</p> : null}
       {d?.reportsToFact && !d.reportsToFact.matchesChart ? (
         <p className="oc-hint" role="note" data-testid="orgchart-fact-hint">The CRM says {node.name} reports to {d.reportsToFact.name}, which differs from this chart.</p>
       ) : null}
@@ -535,7 +544,7 @@ function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { name: string; res
     <div className="oc-pp" data-testid="orgchart-csv-preview">
       <h2>Import CSV</h2>
       <p className="oc-muted">{csv.name}: dry run, nothing written yet.</p>
-      <p className="oc-big"><strong>{r.created}</strong> to add · <strong>{r.updated}</strong> to update</p>
+      {r.errors.length ? null : <p className="oc-big"><strong>{r.created}</strong> to add · <strong>{r.updated}</strong> to update</p>}
       {r.errors.length ? (
         <>
           <p className="oc-hint" role="alert">{r.errors.length} row error{r.errors.length === 1 ? '' : 's'}. The import is all or nothing, so fix these first.</p>

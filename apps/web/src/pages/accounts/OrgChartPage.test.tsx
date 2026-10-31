@@ -115,7 +115,7 @@ describe('OrgChartPage', () => {
     srv.touch(sec.id, { region: 'US' }); // another admin edits Sarah first
     await act(async () => { fireEvent.click(screen.getByTestId('orgchart-save')); });
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toMatch(/Someone else changed this chart/);
+    expect(alert.textContent).toMatch(/Someone else saved changes to this chart/);
     await act(async () => { fireEvent.click(within(alert).getByText('Overwrite with mine')); });
     await waitFor(() => expect(srv.nodes.get(sec.id)!.parentId).toBe(cfo.id));
     expect([...srv.nodes.values()].filter((n) => n.name === 'New person')).toHaveLength(1);
