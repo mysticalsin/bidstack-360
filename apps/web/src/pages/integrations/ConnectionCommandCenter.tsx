@@ -80,7 +80,7 @@ function ConnectionPathPanel({
     <div role="tabpanel" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="text-xs font-medium text-[var(--fg-tertiary)]">
             {t(`connectionCommandCenter.path.${path.key}.eyebrow`, path.eyebrow)}
           </div>
           <h3 className="mt-1 text-xl font-semibold text-[var(--fg-primary)]">
@@ -254,7 +254,7 @@ export function ConnectionCommandCenter({
               key={item.label}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
+              <div className="text-xs font-medium text-[var(--fg-secondary)]">
                 {item.label}
               </div>
               <div className="mt-2 flex items-center justify-between gap-2">
@@ -293,7 +293,7 @@ export function ConnectionCommandCenter({
                   </span>
                   <span>
                     <span
-                      className={`block text-[10px] font-semibold uppercase tracking-wider ${
+                      className={`block text-xs font-medium ${
                         isActive ? 'text-[var(--fg-secondary)]' : 'text-[var(--fg-tertiary)]'
                       }`}
                     >

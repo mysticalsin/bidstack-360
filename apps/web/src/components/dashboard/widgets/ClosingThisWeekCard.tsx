@@ -18,10 +18,10 @@ import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { DueDateChip, daysUntilDueUtc } from '@/components/ui/DueDateChip';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { springSoft } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
+import { formatUnspecifiedAmount } from '../unspecified-currency';
 
 const CLOSING_WINDOW_DAYS = 7;
 const DISPLAY_LIMIT = 6;
@@ -33,7 +33,6 @@ function isOpenOpp(o: Opportunity): boolean {
 
 export function ClosingThisWeekCard() {
   const { t } = useTranslation('crm');
-  const { formatMoney } = useFormatMoney();
   const closing = useOpportunities({ dueWithinDays: CLOSING_WINDOW_DAYS, limit: 25 });
 
   const items = (closing.data?.items ?? [])
@@ -97,7 +96,7 @@ export function ClosingThisWeekCard() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-[var(--fg-primary)]">{opp.name}</div>
                   <div className="truncate text-xs text-[var(--fg-tertiary)]">
-                    {opp.customer} · {formatMoney(opp.value, 'EUR')}
+                    {opp.customer} · {formatUnspecifiedAmount(opp.value ?? 0)}
                   </div>
                 </div>
                 <DueDateChip dueDate={opp.dueDate} size="sm" />

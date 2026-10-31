@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 
-import { type KpiTone, TONE_BG, TONE_FG, TONE_GLOW } from './dashboard-types';
+import { type KpiTone, TONE_BG, TONE_FG } from './dashboard-types';
 
 // ─── AlertCard ───────────────────────────────────────────────────────────────
 
@@ -44,17 +44,17 @@ export function AlertCard({
           style={{
             background: TONE_BG[tone],
             color: TONE_FG[tone],
-            boxShadow: `0 0 12px ${TONE_GLOW[tone]}`,
+            boxShadow: 'none',
           }}
         >
           <Icon name={icon} size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="text-xs font-medium text-[var(--fg-tertiary)]">
             {label}
           </div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
-            <span className="text-xl font-bold tabular-nums" style={{ color: TONE_FG[tone] }}>
+            <span className="text-xl font-medium tabular-nums text-[var(--fg-primary)]">
               {value}
             </span>
             <span className="text-xs text-[var(--fg-secondary)]">

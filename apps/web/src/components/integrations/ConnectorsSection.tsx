@@ -187,7 +187,7 @@ function ConnectorStat({
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        <span className="text-xs font-medium text-[var(--fg-tertiary)]">
           {label}
         </span>
         <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">

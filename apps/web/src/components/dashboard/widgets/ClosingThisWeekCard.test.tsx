@@ -57,10 +57,6 @@ vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: useOpportunitiesMock,
 }));
 
-vi.mock('@/hooks/useFormatMoney', () => ({
-  useFormatMoney: () => ({ formatMoney: (v: number) => `€${v}` }),
-}));
-
 function renderCard() {
   return render(
     <MemoryRouter>

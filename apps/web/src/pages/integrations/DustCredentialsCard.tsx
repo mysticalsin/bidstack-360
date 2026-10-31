@@ -300,7 +300,7 @@ function ConfiguredView({
 function Detail({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <dt className="text-xs font-medium text-[var(--fg-tertiary)]">
         {label}
       </dt>
       <dd className="mt-0.5 truncate font-mono text-sm text-[var(--fg-primary)]">{value ?? '—'}</dd>
@@ -325,7 +325,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <span className="mb-1 block text-xs font-medium text-[var(--fg-tertiary)]">
         {label}
       </span>
       <input

@@ -31,12 +31,12 @@ export function WinRateCard({
 
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
+      <div className="px-1 pb-2 pt-1 text-xs font-medium text-[var(--fg-tertiary)]">
         {t('winRate.heading', 'Win rate')}
       </div>
       <div className="flex items-center gap-3">
         {total === 0 ? (
-          <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-dashed border-[var(--border-default)] text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-dashed border-[var(--border-default)] px-1 text-center text-[11px] font-medium text-[var(--fg-tertiary)]">
             {t('winRate.emptyNoClosedBids', 'No closed bids')}
           </div>
         ) : (

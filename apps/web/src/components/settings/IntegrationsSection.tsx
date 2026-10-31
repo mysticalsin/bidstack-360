@@ -347,7 +347,7 @@ function ApolloAccountIntelCard({
                 key={label}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2"
               >
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                <div className="text-xs font-medium text-[var(--fg-tertiary)]">
                   {label}
                 </div>
                 <div className="mt-1 text-sm font-medium text-[var(--fg-primary)]">{value}</div>
@@ -363,7 +363,7 @@ function ApolloAccountIntelCard({
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              <div className="text-xs font-medium text-[var(--fg-tertiary)]">
                 {t('integrations.mcpApiEnvironment', 'MCP/API environment')}
               </div>
               <p className="mt-1 text-xs text-[var(--fg-secondary)]">

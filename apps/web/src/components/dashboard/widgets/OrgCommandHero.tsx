@@ -86,7 +86,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
 
   return (
     <motion.section
-      className="command-center"
+      className="command-center command-center-quiet"
       role="region"
       aria-label={t('orgHero.region.ariaLabel', 'Workspace command center')}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
@@ -128,11 +128,6 @@ interface HeroPanelProps {
 function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }: HeroPanelProps) {
   return (
     <div className="command-center-hero">
-      <div className="command-center-orbit" aria-hidden>
-        <span />
-        <span />
-        <span />
-      </div>
       <div className="command-center-kicker">
         <Icon name="target" size={14} />
         <span>{t('orgHero.kicker', 'Open pipeline, portfolio-wide')}</span>

@@ -2,7 +2,6 @@ import { useReducedMotion } from 'framer-motion';
 
 import { PieChart } from '@/components/charts/pie-chart';
 import { PieSlice } from '@/components/charts/pie-slice';
-import { CHART_COLORS } from '@/components/charts/chartTokens';
 import { useInsightCompanies } from '@/hooks/useInsightsData';
 
 import { InsightFrame } from './InsightFrame';
@@ -10,6 +9,7 @@ import { CountTable } from './PipelineStageChart';
 import {
   accountDistributionIsEmpty,
   insightErrorText,
+  insightSeriesColor,
   shapeAccountDistribution,
 } from './shapeInsights';
 
@@ -48,7 +48,7 @@ export function AccountDistributionChart() {
               data={slices.map((slice, index) => ({
                 label: slice.label,
                 value: slice.count,
-                color: CHART_COLORS[index % CHART_COLORS.length],
+                color: insightSeriesColor(index, 0),
               }))}
               padAngle={0.02}
               hoverOffset={6}

@@ -18,6 +18,7 @@ import {
   InlineEditSelect,
   InlineEditText,
 } from '@/components/opportunity/InlineEdit';
+import { BuyingGroupList } from '@/components/opportunity/BuyingGroupList';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
 import { PresenceAvatars } from '@/components/presence/PresenceAvatars';
 import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
@@ -163,7 +164,7 @@ export function OpportunityDetailPage() {
     <div className="space-y-6">
       <GlassCard
         padding="lg"
-        className="border-none bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-sunken-alpha)] shadow-2xl"
+        className="border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-none"
       >
         <header>
           <div className="mb-4 flex items-center justify-between gap-4">
@@ -338,13 +339,13 @@ export function OpportunityDetailPage() {
                 options={stageOptions}
                 label={t('opportunityDetail.changeStageLabel', 'Change stage')}
                 display={(v) => (
-                  <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
+                  <Badge tone={stageTone(v)} className="px-4 py-1 text-xs">
                     {formatStage(v)}
                   </Badge>
                 )}
               />
               <div className="text-right border-l border-[var(--border-subtle)] pl-4">
-                <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
+                <div className="text-3xl font-medium tabular-nums text-[var(--fg-primary)]">
                   <InlineEditNumber
                     value={data.value}
                     onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
@@ -414,6 +415,8 @@ export function OpportunityDetailPage() {
       </div>
 
       <NewsCard intel={intel} />
+
+      <BuyingGroupList opportunityId={data.id} />
 
       <OpportunityTabs
         oppId={data.id}

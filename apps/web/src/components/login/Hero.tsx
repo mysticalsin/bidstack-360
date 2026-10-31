@@ -44,7 +44,7 @@ export function Hero() {
             <HeroBadge />
 
             <motion.h1
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-[80px] font-medium text-[#2d323c] drop-shadow-md mb-2 tracking-tight leading-[1.05]"
+              className="mb-2 text-4xl font-medium leading-[1.05] text-[#2d323c] sm:text-5xl md:text-6xl lg:text-[80px]"
               {...h1Anim}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
@@ -67,7 +67,7 @@ export function Hero() {
                 href="https://www.linkedin.com/in/tonywalteur/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs sm:text-sm font-bold tracking-wider text-[rgba(30,50,90,0.9)] hover:text-black uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                className="rounded-sm text-xs font-medium text-[rgba(30,50,90,0.9)] transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:text-sm"
               >
                 {t('hero.builtBy', 'Built by Tony Walteur')}
               </a>

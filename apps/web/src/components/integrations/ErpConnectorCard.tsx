@@ -357,7 +357,7 @@ export function ErpConnectorCard() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <div className="text-xs font-medium text-[var(--fg-tertiary)]">
         {label}
       </div>
       <div className="mt-1 truncate text-sm font-semibold tabular-nums text-[var(--fg-primary)]">

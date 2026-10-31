@@ -3119,6 +3119,28 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Org dashboard only. Account cockpit keeps the shared command-center rules. */
+.command-center-quiet .command-center-hero {
+  background: var(--surface-card);
+  box-shadow: none;
+}
+.command-center-quiet .command-center-kicker,
+.command-center-quiet .command-signal-head > span,
+.command-center-quiet .command-center-footer span {
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.command-center-quiet h2,
+.command-center-quiet .command-signal strong {
+  font-weight: 500;
+}
+.command-center-quiet .command-progress span {
+  background: var(--brand-primary);
+  box-shadow: none;
+}
 .section-kicker {
   align-items: baseline;
   color: var(--fg-primary);

@@ -93,7 +93,7 @@ export function DemoSignIn() {
             <PoloPreSalesLogo
               variant="full"
               title={t('demoSignIn.logoAlt', 'Polo PreSales')}
-              className="h-20 w-auto drop-shadow-sm sm:h-24 md:h-28"
+              className="h-20 w-auto sm:h-24 md:h-28"
             />
             <a
               href={LINKEDIN_URL}

@@ -35,27 +35,27 @@ export function SalesFunnelCard({
     {
       label: t('salesFunnel.stageLeads', 'Leads'),
       count: leads,
-      color: 'var(--tag-purple-fg)',
-      bg: 'var(--tag-purple-bg)',
+      color: 'var(--fg-secondary)',
+      bg: 'var(--surface-sunken)',
     },
     {
       label: t('salesFunnel.stageOpportunities', 'Opportunities'),
       count: opportunities,
-      color: 'var(--tag-amber-fg)',
-      bg: 'var(--tag-amber-bg)',
+      color: 'var(--fg-secondary)',
+      bg: 'var(--surface-sunken)',
     },
     {
       label: t('salesFunnel.stageOpenDeals', 'Open Deals'),
       count: openOpps,
-      color: 'var(--tag-teal-fg)',
-      bg: 'var(--tag-teal-bg)',
+      color: 'var(--fg-secondary)',
+      bg: 'var(--surface-sunken)',
     },
     {
       label: t('salesFunnel.stagePipeline', 'Pipeline'),
       count: pipelineValue,
       display: `${formatUnspecifiedAmount(pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
-      color: 'var(--tag-jade-fg)',
-      bg: 'var(--tag-jade-bg)',
+      color: 'var(--brand-primary)',
+      bg: 'var(--brand-primary-tint)',
     },
   ];
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useReducedMotion } from 'framer-motion';
 
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '@/components/charts/sankey';
@@ -6,24 +7,41 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useCompany } from '@/hooks/useCompanies';
 import { useInsightCompanies } from '@/hooks/useInsightsData';
+import { api } from '@/lib/api';
 
 import { InsightFrame } from './InsightFrame';
 import { CountTable } from './PipelineStageChart';
 import { insightErrorText, shapeCompanyRelationships } from './shapeInsights';
 
+function useFirstLinkedCompanyId(ids: string[]) {
+  return useQuery({
+    queryKey: ['insights', 'relationship-start', ids],
+    enabled: ids.length > 0,
+    staleTime: 30_000,
+    queryFn: async ({ signal }) => {
+      for (const id of ids) {
+        const detail = await api<{ contacts?: unknown[] }>(`/api/companies/${id}`, { signal });
+        if ((detail.contacts?.length ?? 0) > 0) return id;
+      }
+      return ids[0] ?? null;
+    },
+  });
+}
+
 export function RelationshipDiagram() {
   const reduced = useReducedMotion();
   const companies = useInsightCompanies();
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [manualId, setManualId] = useState<string | null>(null);
   const items = companies.data?.items ?? [];
-  const selectedId = pickedId ?? items[0]?.id ?? null;
+  const start = useFirstLinkedCompanyId(manualId ? [] : items.map((item) => item.id));
+  const selectedId = manualId ?? start.data ?? null;
   const company = useCompany(selectedId ?? undefined);
   const contacts = company.data?.contacts ?? [];
   const diagram = company.data ? shapeCompanyRelationships(company.data.name, contacts) : null;
 
-  const frameStatus = companies.isPending
+  const frameStatus = companies.isPending || (!manualId && start.isPending)
     ? 'loading'
-    : companies.isError
+    : companies.isError || start.isError
       ? 'error'
       : items.length === 0
         ? 'empty'
@@ -35,7 +53,10 @@ export function RelationshipDiagram() {
       caption="Each band is one contact linked to the company. Width is that link, not revenue."
       status={frameStatus}
       errorMessage={insightErrorText(companies.error)}
-      onRetry={() => void companies.refetch()}
+      onRetry={() => {
+        void companies.refetch();
+        void start.refetch();
+      }}
       emptyTitle="No companies yet"
       emptyMessage="Add a company before mapping the people on it."
       emptyIcon="contacts"
@@ -46,7 +67,7 @@ export function RelationshipDiagram() {
             Company
             <select
               value={selectedId ?? ''}
-              onChange={(event) => setPickedId(event.target.value)}
+              onChange={(event) => setManualId(event.target.value)}
               className="min-h-11 rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
             >
               {items.map((item) => (
@@ -93,8 +114,14 @@ export function RelationshipDiagram() {
                   animationDuration={reduced ? 0 : 500}
                   margin={{ top: 24, right: 180, bottom: 24, left: 180 }}
                 >
-                  <SankeyLink />
-                  <SankeyNode showValueLabels={false} labelOrientation="horizontal" />
+                  <SankeyLink useGradient={false} stroke="var(--chart-1)" strokeOpacity={0.45} />
+                  <SankeyNode
+                    showValueLabels={false}
+                    labelOrientation="horizontal"
+                    getNodeColor={(_node, index) =>
+                      index === 0 ? 'var(--chart-1)' : 'var(--fg-tertiary)'
+                    }
+                  />
                   <SankeyTooltip
                     formatValue={(value) => (value === 1 ? '1 contact' : `${value} contacts`)}
                   />

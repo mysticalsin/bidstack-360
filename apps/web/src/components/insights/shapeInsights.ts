@@ -132,6 +132,25 @@ export function pipelineIsEmpty(visual: PipelineVisual): boolean {
   return visual.opportunityCount === 0 || visual.stages.length === 0;
 }
 
+/** Index of the series that should carry the single accent. Ties keep the earlier row. */
+export function leadStageIndex(stages: ReadonlyArray<{ count: number }>): number {
+  return stages.reduce(
+    (best, stage, index, all) => (stage.count > (all[best]?.count ?? -1) ? index : best),
+    0,
+  );
+}
+
+/**
+ * One accent on the leading series. Other series are neutral steps so a chart
+ * does not become a hue gradient.
+ */
+export function insightSeriesColor(index: number, leadIndex: number): string {
+  if (index === leadIndex) return 'var(--chart-1)';
+  const steps = [62, 46, 34, 24, 16];
+  const mix = steps[Math.min(Math.abs(index - leadIndex) - 1, steps.length - 1)] ?? 16;
+  return `color-mix(in srgb, var(--fg-primary) ${mix}%, var(--surface-card))`;
+}
+
 const UNSPECIFIED_INDUSTRY = 'Unspecified';
 
 export function shapeAccountDistribution(

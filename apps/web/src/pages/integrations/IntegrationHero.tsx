@@ -37,7 +37,7 @@ function IntegrationMetricCard({
     <Card className="min-h-[128px] border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex h-full flex-col justify-between gap-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          <span className="text-xs font-medium text-[var(--fg-tertiary)]">
             {label}
           </span>
           <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
@@ -75,17 +75,16 @@ export function IntegrationHero({
   const { t } = useTranslation('integrations');
   return (
     <section className="relative overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-6 shadow-[var(--shadow-soft)]">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)]/35 to-transparent" />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="blue">{t('integrationHero.eyebrowBadge', 'Integration fabric')}</Badge>
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            <span className="text-xs font-medium text-[var(--fg-tertiary)]">
               {t('integrationHero.eyebrowChannels', 'MCP, REST, webhooks, Dust')}
             </span>
           </div>
           <div>
-            <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
+            <h1 className="text-3xl font-medium text-[var(--text-primary)]">
               {t('integrationHero.title', 'Integrations')}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
@@ -106,10 +105,10 @@ export function IntegrationHero({
               className={cn(
                 'size-2 rounded-full',
                 summary.postureTone === 'jade'
-                  ? 'bg-[var(--tag-jade-fg)] shadow-[0_0_0_4px_var(--tag-jade-bg)]'
+                  ? 'bg-[var(--tag-jade-fg)]'
                   : summary.postureTone === 'tomato'
-                    ? 'bg-[var(--tag-tomato-fg)] shadow-[0_0_0_4px_var(--tag-tomato-bg)]'
-                    : 'bg-[var(--tag-amber-fg)] shadow-[0_0_0_4px_var(--tag-amber-bg)]',
+                    ? 'bg-[var(--tag-tomato-fg)]'
+                    : 'bg-[var(--tag-amber-fg)]',
               )}
             />
             {isLoading

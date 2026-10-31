@@ -55,7 +55,7 @@ export interface SankeyLinkProps {
   strokeOpacity?: number;
   /** Opacity when another link/node is hovered. Default: 0.1 */
   fadedOpacity?: number;
-  /** Use gradient from source to target color. Default: true */
+  /** Use gradient from source to target color. Default: false */
   useGradient?: boolean;
   /** Custom function to get node color (for gradient) */
   getNodeColor?: (
@@ -173,7 +173,7 @@ export function SankeyLink({
   stroke,
   strokeOpacity = 0.5,
   fadedOpacity = 0.1,
-  useGradient = true,
+  useGradient = false,
   getNodeColor,
   getLinkColor,
   patterns,

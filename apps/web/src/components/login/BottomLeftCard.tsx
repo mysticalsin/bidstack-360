@@ -22,7 +22,7 @@ export function BottomLeftCard() {
         <span className="text-2xl md:text-3xl font-normal text-[rgba(30,50,90,0.9)] tracking-tight">
           98/100
         </span>
-        <span className="text-[10px] md:text-[12px] font-normal text-[rgba(30,50,90,0.6)] uppercase tracking-wider">
+        <span className="text-xs font-normal text-[rgba(30,50,90,0.6)]">
           {t('bottomLeft.qualityScoreLabel', 'Quality Score')}
         </span>
       </div>
