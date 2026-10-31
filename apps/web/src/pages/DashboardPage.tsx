@@ -35,6 +35,7 @@ import {
   WinLossReasonsCard,
   type ClosedOpp,
 } from '@/components/account-intel/WinLossReasonsCard';
+import { recentItemsFromDeals } from '@/components/cockpit/RecentOpportunitiesCard';
 import { AccountStageBars } from '@/components/cockpit/AccountStageBars';
 import { AccountWorkstreamBoard } from '@/components/cockpit/AccountWorkstreamBoard';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
@@ -43,7 +44,6 @@ import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { useOpportunities } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -72,7 +72,6 @@ export function DashboardPage() {
 function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
-  const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
   // any early returns below. The visit-tracker reads the resolved company
@@ -178,20 +177,21 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  const accountOpps = opps.data?.items.filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
-  // The opportunity list hook is capped. The cockpit snapshot already carries
-  // this account's deals, including ones outside that cap, with no currency.
+  // The global opportunity list is capped. This snapshot already carries the
+  // account's deals, including ones outside that cap.
   const companyDeals = snapshot.deals.filter(
     (deal) => deal.companyName?.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
-  const closedOpps: ClosedOpp[] = (accountOpps ?? [])
-    .filter((o) => o.stage === 'closed_won' || o.stage === 'closed_lost')
-    .map((o) => ({ id: o.id, name: o.name, outcome: o.stage === 'closed_won' ? 'won' : 'lost' }));
+  const closedOpps: ClosedOpp[] = companyDeals
+    .filter((deal) => deal.stage === 'closed_won' || deal.stage === 'closed_lost')
+    .map((deal) => ({
+      id: deal.id,
+      name: deal.name,
+      outcome: deal.stage === 'closed_won' ? 'won' : 'lost',
+    }));
 
   return (
     <>
@@ -275,9 +275,8 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('recentOpportunities') && (
             <Reveal delay={0.12}>
               <RecentOpportunitiesCard
-                opps={opps}
                 accountName={cockpit.company.name}
-                items={accountOpps}
+                items={recentItemsFromDeals(companyDeals)}
               />
             </Reveal>
           )}

@@ -13,10 +13,38 @@ import { formatStage } from '@/lib/format';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
+export interface RecentOpportunityItem {
+  id: string;
+  code?: string | null;
+  name: string;
+  customer?: string | null;
+  value: number;
+  stage?: string | null;
+}
+
+/** Snapshot deals are micros. The card prints major units, once. */
+export function recentItemsFromDeals(
+  deals: ReadonlyArray<{
+    id: string;
+    name: string;
+    stage: string;
+    amountMicros: number;
+    companyName: string | null;
+  }>,
+): RecentOpportunityItem[] {
+  return deals.map((deal) => ({
+    id: deal.id,
+    name: deal.name,
+    customer: deal.companyName,
+    value: deal.amountMicros / 1_000_000,
+    stage: deal.stage,
+  }));
+}
+
 interface Props {
-  opps: ReturnType<typeof useOpportunities>;
+  opps?: ReturnType<typeof useOpportunities>;
   accountName?: string;
-  items?: NonNullable<ReturnType<typeof useOpportunities>['data']>['items'];
+  items?: RecentOpportunityItem[];
 }
 
 export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
@@ -26,7 +54,8 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
 }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
-  const visibleItems = items ?? opps.data?.items ?? [];
+  const visibleItems = items ?? opps?.data?.items ?? [];
+  const loading = items ? false : (opps?.isLoading ?? false);
   const accountScoped = Boolean(accountName);
   return (
     <Card
@@ -66,7 +95,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
           </Link>
         }
       />
-      {opps.isLoading ? (
+      {loading ? (
         <LoadingSkeleton rows={3} />
       ) : visibleItems.length === 0 ? (
         <EmptyState
@@ -96,7 +125,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
             >
               <Link to={`/opportunities/${o.id}`} className="proto-row-link">
                 <div className="proto-row-main">
-                  <span className="proto-row-code">{o.code}</span>
+                  {o.code ? <span className="proto-row-code">{o.code}</span> : null}
                   <span className="proto-row-name">{o.name}</span>
                   {!accountScoped ? <span className="proto-row-meta">{o.customer}</span> : null}
                 </div>
