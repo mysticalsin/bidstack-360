@@ -76,7 +76,8 @@ describe('mapApolloOrganization', () => {
       former_names: ['Amaris Consulting'],
     });
 
-    expect(mapped.legalName).toBe('Mantu Group SA');
+    // The organization label stays off the legal-name field.
+    expect(mapped.legalName).toBeNull();
     // domain is normalized — lowercased, www-stripped
     expect(mapped.domain).toBe('mantu.com');
     expect(mapped.website).toBe('https://mantu.com/');

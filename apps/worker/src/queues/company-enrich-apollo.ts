@@ -227,7 +227,8 @@ export function mapApolloOrganization(
   });
 
   return {
-    legalName: org.name ?? null,
+    // Apollo `name` is the organization label, not a legal-name field.
+    legalName: null,
     domain: normalizeDomain(org.primary_domain ?? null),
     website: org.website_url ?? null,
     industry: org.industry ?? null,
