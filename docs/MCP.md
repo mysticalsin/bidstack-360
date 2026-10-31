@@ -79,7 +79,7 @@ Read-only keys should be tested by minting a key with `["mcp","read"]` and confi
 
 `notes.list` `accountId` is a UUID (`Company.id` or the stored note account id). A company name is not resolved. `tasks.list` accepts `accountId` as `Task.accountId` (company UUID). `crm_search_companies` searches the Company table and returns that id; opportunity customer text that is not a company row is `matchKind: opportunity_text_only` with `confidence: null`. `opportunities.list` returns `currency: null`, `currencyBasis: unspecified`, `companyId`, and `health: not_account_health` because probability is not account health.
 
-Dust cloud cannot call `localhost`. Register External MCP only at a public HTTPS `${DUST_MCP_PUBLIC_URL}/mcp` with a bearer key scoped `mcp` and `read`. Until that URL and `DUST_API_KEY` / `DUST_WORKSPACE_ID` exist, Polo stays in stub / unverified mode.
+Dust cloud cannot call `localhost`. In Dust, open Spaces > Tools > Add Tool > Add MCP Server and paste the public HTTPS URL that ends in `/mcp`. Choose Bearer token and use a Polo key scoped `mcp` and `read`. Until that URL and `DUST_API_KEY` / `DUST_WORKSPACE_ID` exist, Polo stays in stub / unverified mode.
 
 ## Release Evidence
 
@@ -93,10 +93,10 @@ The command requires a non-local `BIDSTACK_MCP_CONNECTIVITY_TARGET`, a bearer to
 
 ## Registering with Dust
 
-Dust -> Workspace -> Tools -> External MCP:
+Dust docs: Spaces > Tools > Add Tool > Add MCP Server. Streamable HTTP is the transport Dust tries first. Do not register the legacy `/mcp/sse` URL.
 
-- URL: `${DUST_MCP_PUBLIC_URL}/mcp`
-- Auth: bearer token from the API key creation response.
-- Transport: Streamable HTTP.
+- URL: the public HTTPS URL ending in `/mcp` (`DUST_MCP_PUBLIC_URL` plus `/mcp` when the origin has no path).
+- Auth: Bearer token. Paste a Polo API key with scopes `mcp` and `read`. Dust sends `Authorization: Bearer`.
+- Do not choose Automatic OAuth. Polo’s MCP server has no Dust OAuth callback.
 
-Dust discovers tools through `tools/list`. Keep Claude/Dust provider keys server-side; agents should use BidStack MCP/API keys rather than embedding provider secrets in browser-visible configuration.
+Dust discovers tools through `tools/list`. Keep the Dust API key server-side. Agents call Polo with the Polo bearer, not with the Dust key.

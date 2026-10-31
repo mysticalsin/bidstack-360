@@ -16,19 +16,16 @@
 
 ## Setup checklist
 
-1. Get a Dust workspace API key from `https://dust.tt/w/<workspace>/admin/api-keys`
-2. Set in `.env`:
-   ```
-   DUST_API_KEY=dust_…
-   DUST_WORKSPACE_ID=mantu-presales
-   DUST_DATA_SOURCE_ID=ds_bidstack_opportunities
-   DUST_AGENT_EXEC_BRIEF=agt_…
-   DUST_WEBHOOK_SECRET=whsec_…
-   DUST_MCP_PUBLIC_URL=https://mcp.bidstack.mantu.com
-   ```
-3. Restart `pnpm dev` — the worker logs will switch from `dust.poll tick.stub` to `pulled N from dust`.
-4. Register the MCP server in Dust → Workspace → Tools → External MCP. The URL must be public HTTPS and end in `/mcp` (`${DUST_MCP_PUBLIC_URL}/mcp`). Transport is streamable HTTP. Mint a Polo API key with scopes `mcp` and `read` (add `write` only for mutations) and send it as `Authorization: Bearer`. Dust cloud cannot reach `localhost` or `127.0.0.1`. A loopback `DUST_MCP_PUBLIC_URL` stays local-only and `mcp.configured` stays false.
-5. Configure Dust webhooks → point at `${PUBLIC_API_URL}/webhooks/dust`, sign with `${DUST_WEBHOOK_SECRET}`. Subscribe to `document.created`, `document.updated`, `agent.run.completed`, `conversation.message.created`.
+Dust’s current admin UI (docs.dust.tt, MCP servers and API keys) is the contract. Polo is ready once those values are set. It does not open Dust’s login for you.
+
+1. In Dust, open **Admin > Developers > API keys** and create a key. Read-only is enough for Polo to list agents. Uploading deal text needs a key that can write to the Space that owns the data source. Copy it once. For an EU workspace, set `DUST_BASE_URL=https://eu.dust.tt/api`. The default base is `https://dust.tt/api`.
+2. Copy the workspace id from the browser URL: `https://dust.tt/w/<id>` or `https://eu.dust.tt/w/<id>`. That id is `DUST_WORKSPACE_ID`. A display name is not an id.
+3. Create the data source in Dust, then set `DUST_DATA_SOURCE_ID` to its id. Polo upserts deal markdown at `/v1/w/<id>/data_sources/<dataSourceId>/documents` with `Authorization: Bearer <DUST_API_KEY>`.
+4. Publish the MCP server on public HTTPS. Set `DUST_MCP_PUBLIC_URL` to that origin. Polo’s endpoint is that origin plus `/mcp`.
+5. In Dust, go to **Spaces > Tools > Add Tool > Add MCP Server**. Paste the URL that ends in `/mcp`. Choose **Bearer token**, not Automatic OAuth. Polo does not speak Dust’s OAuth callback. Mint a Polo API key (`POST /api/integrations/api-keys`) with scopes `mcp` and `read`, and paste that secret as the bearer. Dust sends it as `Authorization`. Add `write` only if agents should create or change records.
+6. Restart the API and worker. With the API key and workspace id set, status moves from `stub` to `configured_unverified` until a live Dust call succeeds. A loopback `DUST_MCP_PUBLIC_URL` stays local-only and `mcp.configured` stays false. Dust cloud cannot reach `localhost`.
+
+Dust’s documented webhooks are inbound: another system calls Dust. Polo does not require a Dust outbound subscription for Dust to read the CRM. The MCP server is that read path. Polo still accepts a signed `POST /webhooks/dust` when `DUST_WEBHOOK_SECRET` is set, for a sender you control. There is no Dust admin screen that subscribes `document.created` to that URL.
 
 Do not commit `DUST_API_KEY`, `DUST_WORKSPACE_ID`, or `DUST_MCP_PUBLIC_URL`. They belong in the environment secret store. This repository does not invent a public URL.
 

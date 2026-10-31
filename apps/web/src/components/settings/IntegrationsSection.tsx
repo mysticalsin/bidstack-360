@@ -194,7 +194,7 @@ export function IntegrationsSection() {
             <p className="mx-5 mb-5 text-sm leading-6 text-[var(--fg-secondary)]">
               {t(
                 'integrations.mcpRegistration',
-                'Dust cloud registers External MCP at a public HTTPS URL ending in /mcp, with a bearer API key scoped mcp and read, over streamable HTTP. localhost is not reachable by Dust cloud. This screen does not report a live connection until that URL and a Dust API key exist.',
+                'In Dust, open Spaces, Tools, Add Tool, Add MCP Server. Paste the public HTTPS URL that ends in /mcp, choose Bearer token, and use a Polo key scoped mcp and read. Do not use Automatic OAuth. localhost is not reachable by Dust. This screen stays unverified until that URL and a Dust API key exist.',
               )}
             </p>
             {status.data?.lastError ? (
