@@ -533,9 +533,14 @@
       "pipeline": "Opportunities",
       "basis": "Shade is the number of opportunities recorded in that country."
     },
+    "country": {
+      "ariaLabel_one": "{{country}}: {{count}} opportunity",
+      "ariaLabel_other": "{{country}}: {{count}} opportunities"
+    },
     "tooltip": {
-      "opportunityCount": "{{count}} opps",
-      "opportunityCount_one": "{{count}} opp",
+      "opportunityCount": "{{count}} opportunities",
+      "opportunityCount_one": "{{count}} opportunity",
+      "opportunityCount_other": "{{count}} opportunities",
       "avgProbability": "Stored avg probability {{probability}}%, not a measured win rate"
     }
   },

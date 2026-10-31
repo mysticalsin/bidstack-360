@@ -362,10 +362,15 @@ export const WorldMap = memo(function WorldMap({
                 // Keyboard a11y: countries with data are focusable buttons that
                 // surface their name + value to assistive tech and on focus.
                 const countryLabel = item
-                  ? t('worldMap.country.ariaLabel', '{{country}}: {{count}} opportunities', {
-                      country: item.countryCode,
-                      count: item.opportunityCount,
-                    })
+                  ? item.opportunityCount === 1
+                    ? t('worldMap.country.ariaLabel_one', '{{country}}: {{count}} opportunity', {
+                        country: item.countryCode,
+                        count: item.opportunityCount,
+                      })
+                    : t('worldMap.country.ariaLabel_other', '{{country}}: {{count}} opportunities', {
+                        country: item.countryCode,
+                        count: item.opportunityCount,
+                      })
                   : undefined;
 
                 return (
@@ -539,9 +544,13 @@ export const WorldMap = memo(function WorldMap({
           </div>
           <div className="mt-1 flex items-center gap-2 text-[11px] tabular-nums text-[var(--fg-secondary)]">
             <span>
-              {t('worldMap.tooltip.opportunityCount', '{{count}} opps', {
-                count: hovered.item.opportunityCount,
-              })}
+              {hovered.item.opportunityCount === 1
+                ? t('worldMap.tooltip.opportunityCount_one', '{{count}} opportunity', {
+                    count: hovered.item.opportunityCount,
+                  })
+                : t('worldMap.tooltip.opportunityCount_other', '{{count}} opportunities', {
+                    count: hovered.item.opportunityCount,
+                  })}
             </span>
             <span className="text-[var(--border-subtle)]">·</span>
             <span className="font-semibold text-[var(--brand-primary)]">
