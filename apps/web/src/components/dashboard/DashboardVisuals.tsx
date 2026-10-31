@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { ChartCard, SignalLegend, SignalShape } from '@/components/viz/ChartCard';
 import { KIND_LABEL } from '@/components/viz/viz-kinds';
 import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
+import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/bklit-adapters';
 import {
   accountBars, cumulativeWon, fmtCompact, pastDueOpen, stageFunnel, statusMix, winRateByQuarter, wonByQuarter,
@@ -17,9 +18,15 @@ import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount }: {
-  rows: OppRow[]; openValue: number; weighted: number; openCount: number;
+export function DashboardHero({ rows, openValue, weighted, openCount, feed }: {
+  rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed;
 }) {
+  const fresh = feed?.newAlertCount ?? 0;
+  const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
+  const pulse = feed ? (risks > 0 ? 'alert' : fresh > 0 ? 'watch' : 'calm') : null;
+  const pulseText = !feed ? '' : fresh > 0
+    ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
+    : 'Watchdog: all quiet';
   const trend = cumulativeWon(rows);
   const wonTotal = trend.at(-1)?.y ?? 0;
   return (
@@ -40,6 +47,12 @@ export function DashboardHero({ rows, openValue, weighted, openCount }: {
           <div className="dash-hero-num dash-hero-num--won">{fmtCompact(wonTotal)}</div>
           <div className="viz-meta">Won this year</div>
         </div>
+        {pulse ? (
+          <div className="dash-hero-pulse" data-testid="dashboard-pulse">
+            <span className="viz-meta">{pulseText}</span>
+            <PulseOrb tone={pulse} size={64} />
+          </div>
+        ) : null}
       </div>
       <HeroArea data={trend} format={fmtCompact} />
       <div className="viz-caption">Won value to date, by close month</div>

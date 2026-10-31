@@ -249,6 +249,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
             openValue={pipelineReport.data?.totalValueOpen ?? s?.pipelineValue ?? 0}
             weighted={pipelineReport.data?.weightedPipeline ?? 0}
             openCount={s?.openOpportunities ?? 0}
+            feed={feed.data}
           />
           <NeedsYou rows={oppRows} overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
         </div>

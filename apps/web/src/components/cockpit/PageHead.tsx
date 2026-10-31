@@ -14,6 +14,7 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { MetricSpark } from '@/components/viz/bklit-adapters';
+import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
@@ -117,6 +118,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           {accountView ? null : <div className="page-sub">{subtitle}</div>}
           {accountView ? (
             <p className="acct-health" aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}>
+              <PulseOrb tone={toneForBand(cockpit.health.band)} size={32} />
               <span className="acct-pill" data-band={cockpit.health.band}>
                 {labelForBand(cockpit.health.band)}
               </span>

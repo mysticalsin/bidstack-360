@@ -45,3 +45,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## thinking-orbs (animated orbs)
+
+- Source: https://orbs.jakubantalik.com, https://github.com/Jakubantalik/Libraries.dev (`packages/thinking-orbs`)
+- Taken: npm package `thinking-orbs@^0.3.2` (dependency, not vendored source),
+  wrapped by `apps/web/src/components/viz/PulseOrb.tsx` as the watchdog /
+  account-health pulse (dashboard hero, account header)
+- Polo changes: none to the package; the wrapper maps health to orb state and a
+  Polo token colour, hides it from assistive tech (adjacent text carries the
+  meaning) and pauses it under `prefers-reduced-motion`
+- Licence: MIT, Copyright (c) 2026 Jakub Antalik (full text ships in
+  `node_modules/thinking-orbs/LICENSE`; same MIT terms as above)

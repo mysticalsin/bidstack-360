@@ -172,3 +172,9 @@
 }
 .page-sub-info { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 4px; vertical-align: middle; border-radius: 999px; color: var(--fg-tertiary); background: none; border: 0; cursor: help; }
 .page-sub-info:hover, .page-sub-info:focus-visible { color: var(--fg-primary); background: var(--surface-sunken, #f4f4f4); }
+
+/* ---------- thinking-orbs pulse ---------- */
+.pulse-orb { display: inline-grid; place-items: center; flex: none; line-height: 0; }
+.dash-hero-pulse { display: flex; align-items: center; gap: 8px; margin-left: auto; align-self: flex-start; text-align: right; }
+.dash-hero-pulse .viz-meta { max-width: 160px; }
+.acct-health .pulse-orb { margin-right: 4px; }
