@@ -12,6 +12,7 @@ import {
 } from '@xyflow/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { PersonNode, type PersonNodeT } from '@/components/orgchart/OrgPersonNode';
@@ -252,12 +253,14 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
   const metCount = work.nodes.filter((n) => covOf(n)?.meetings.length).length;
   const seniorGaps = work.nodes.filter((n) => ['c_level', 'vp', 'director'].includes(n.seniority) && !covOf(n)?.meetings.length);
 
-  return (
+  // Portalled to <body>: the route transition wrapper is transformed, which
+  // would turn position:fixed into a box the size of the (empty) page.
+  return createPortal(
     <div className="oc-screen" data-dark={dark || undefined} data-testid="orgchart-page">
       <header className="oc-bar">
         <Link to={`/accounts/${companyId}`} className="oc-back" aria-label={`Back to ${companyName}`}>←</Link>
         <h1 className="oc-h1">Org chart <span>{companyName}</span></h1>
-        {chart?.sample ? <span className="en-sample" title="Generated structure. People you have met are real; the rest are placeholders until someone saves the real chart.">Sample</span> : null}
+        {chart?.sample ? <span className="oc-sample" title="Generated structure. People you have met are real; the rest are placeholders until someone saves the real chart.">Sample</span> : null}
         {ORGCHART_MOCK ? <span className="oc-muted" title="The org chart API is not live yet; saves stay in this browser.">Local only</span> : null}
         <div className="oc-search" role="search">
           <input
@@ -318,12 +321,12 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
             <button type="button" className="oc-zoom" onClick={() => void rf.zoomTo(1)} aria-label={`Zoom ${Math.round(zoom * 100)} percent, reset to 100`}>{Math.round(zoom * 100)}%</button>
             <button type="button" onClick={() => void rf.zoomIn()} aria-label="Zoom in">+</button>
             <span className="oc-sep" />
-            <button type="button" aria-pressed={mode === 'select'} onClick={() => setMode('select')} title="Select (drag to box-select)">Select</button>
-            <button type="button" aria-pressed={mode === 'pan'} onClick={() => setMode('pan')} title="Pan (drag the canvas)">Pan</button>
+            <button type="button" className="oc-wide" aria-pressed={mode === 'select'} onClick={() => setMode('select')} title="Select (drag to box-select)">Select</button>
+            <button type="button" className="oc-wide" aria-pressed={mode === 'pan'} onClick={() => setMode('pan')} title="Pan (drag the canvas)">Pan</button>
             <span className="oc-sep" />
             <button type="button" onClick={fit}>Fit</button>
             <button type="button" onClick={resetView}>Reset</button>
-            <button type="button" onClick={download}>Export CSV</button>
+            <button type="button" className="oc-wide" onClick={download}>Export CSV</button>
           </div>
         </div>
 
@@ -345,7 +348,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
               <h2>Coverage</h2>
               <p className="oc-big"><strong>{metCount}</strong> of {work.nodes.length} people met</p>
               <div className="oc-cover-bar" role="img" aria-label={`${pct(metCount, work.nodes.length)} percent met`}><i style={{ width: `${pct(metCount, work.nodes.length)}%` }} /></div>
-              <p className="en-src">From meeting intel attendees{chart?.sample ? '. Unmet names in the Sample structure are placeholders.' : '.'}</p>
+              <p className="oc-src">From meeting intel attendees{chart?.sample ? '. Unmet names in the Sample structure are placeholders.' : '.'}</p>
               <h3>Senior gaps</h3>
               {seniorGaps.length ? (
                 <ul className="oc-list">
@@ -365,7 +368,8 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
         </aside>
       </div>
       <button type="button" className="oc-sr" onClick={() => navigate(`/accounts/${companyId}`)}>Close org chart</button>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -390,7 +394,7 @@ function PersonPanel(props: {
         </div>
         <button type="button" className="oc-x" onClick={props.onClose} aria-label="Close details">×</button>
       </div>
-      {node.source === 'sample' ? <p className="en-src">Sample placeholder, not a real person.</p> : null}
+      {node.source === 'sample' ? <p className="oc-src">Sample placeholder, not a real person.</p> : null}
       <dl className="oc-dl">
         <div><dt>Our owner</dt><dd>{owner ?? 'Nobody yet'}</dd></div>
         <div><dt>Relationship</dt><dd>{STRENGTH_LABEL[s]}</dd></div>
@@ -427,7 +431,7 @@ function PersonPanel(props: {
               </select>
             </label>
           ) : null}
-          <p className="en-src">Or drag a person onto their new manager.</p>
+          <p className="oc-src">Or drag a person onto their new manager.</p>
           <div className="oc-form-actions">
             <button type="button" className="oc-btn" onClick={props.onAdd} data-testid="orgchart-add">Add report</button>
             {node.id !== rootId ? <button type="button" className="oc-btn" onClick={props.onSetRoot}>Set as root</button> : null}
@@ -446,7 +450,7 @@ function CsvPreview({ csv, onApply, onCancel }: { csv: CsvImport; onApply: () =>
       <p className="oc-big"><strong>{csv.nodes.length}</strong> people</p>
       <p className="oc-muted">Replaces the chart in your draft. Nothing is saved until you choose Save chart.</p>
       {csv.errors.length ? <ul className="oc-bullets">{csv.errors.slice(0, 8).map((e) => <li key={e}>{e}</li>)}</ul> : null}
-      <p className="en-src">Columns: name, title, seniority, region, manager (name), email, owner.</p>
+      <p className="oc-src">Columns: name, title, seniority, region, manager (name), email, owner.</p>
       <div className="oc-form-actions">
         <button type="button" className="oc-btn" onClick={onCancel}>Cancel</button>
         <button type="button" className="oc-btn oc-primary" onClick={onApply} disabled={!csv.nodes.length}>Use this chart</button>

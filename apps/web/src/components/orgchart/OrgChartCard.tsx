@@ -16,7 +16,7 @@ export function OrgChartCard({ companyId }: { companyId: string }) {
   const met = nodes.filter((n) => coverageFor(coverage, n)?.meetings.length).length;
   const gaps = nodes.filter((n) => ['c_level', 'vp', 'director'].includes(n.seniority) && !coverageFor(coverage, n)?.meetings.length).length;
   return (
-    <section className="en-section" aria-labelledby="oc-card-h" data-testid="account-orgchart-card" style={{ marginBottom: 24 }}>
+    <section className="en-section oc-card" aria-labelledby="oc-card-h" data-testid="account-orgchart-card" style={{ marginBottom: 24 }}>
       <div className="en-head">
         <h2 id="oc-card-h">Org chart</h2>
         {chart?.sample ? <span className="en-sample">Sample</span> : null}

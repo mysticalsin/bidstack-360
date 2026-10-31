@@ -96,6 +96,9 @@ vi.mock('@/components/enrichment/PotentialProjectsCard', () => ({ PotentialProje
 vi.mock('@/components/meetings/WhoWeMetCard', () => ({
   WhoWeMetCard: () => <section data-testid="account-who-we-met-card" />,
 }));
+vi.mock('@/components/orgchart/OrgChartCard', () => ({
+  OrgChartCard: () => <section data-testid="account-orgchart-card" />,
+}));
 vi.mock('@/components/agreements/AgreementsSummaryCard', () => ({
   AgreementsSummaryCard: () => <section data-testid="account-agreements-card" />,
 }));

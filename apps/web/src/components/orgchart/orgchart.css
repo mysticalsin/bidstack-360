@@ -1,13 +1,19 @@
 /* Org chart: full-screen canvas, light by default with a dark canvas option.
    8pt rhythm, two weights (400/500), borders over shadows. */
-.oc-screen {
+.oc-screen, .oc-card {
   --oc-canvas: var(--surface-sunken, #f6f7f9); --oc-dot: color-mix(in srgb, var(--fg-tertiary, #8a8f98) 45%, transparent);
   --oc-card: var(--surface-card, #fff); --oc-fg: var(--fg-primary, #111); --oc-fg2: var(--fg-secondary, #555); --oc-fg3: var(--fg-tertiary, #888);
   --oc-line: var(--border-subtle, #e3e5e8); --oc-met: #1f9d63; --oc-gap: #c3c7cd; --oc-edge: #b9bec6; --oc-accent: var(--brand-primary, #2f5bea);
-  position: fixed; inset: 0; z-index: 60; display: grid; grid-template-rows: auto auto minmax(0, 1fr); background: var(--surface-page, #fff); color: var(--oc-fg);
 }
+.oc-screen {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--surface-page, #fff); color: var(--oc-fg);
+}
+.oc-screen[data-dark] .oc-chip[data-sen='c_level'] { color: #7fd1a8; border-color: #2f6b4f; }
+.oc-screen[data-dark] .oc-ava { color: #a8e3c6; background: #1f3a2e; }
+.oc-screen[data-dark] .oc-toolbar button[aria-pressed='true'] { color: #a8e3c6; background: #1f3a2e; }
+.oc-screen[data-dark] .oc-node[data-dim] .oc-ava, .oc-screen[data-dark] .oc-node[data-sample] .oc-ava { background: var(--oc-card); color: var(--oc-fg2); }
 .oc-screen[data-dark] { --oc-canvas: #14161a; --oc-dot: #2e333b; --oc-card: #1d2026; --oc-fg: #eef0f3; --oc-fg2: #b4b9c2; --oc-fg3: #868c96; --oc-line: #2c3038; --oc-edge: #4a505a; --oc-gap: #4a505a; }
-.oc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-card); }
+.oc-bar { color: var(--fg-primary); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-card); }
 .oc-back { min-width: 32px; min-height: 32px; display: inline-grid; place-items: center; border-radius: 8px; color: var(--fg-primary); text-decoration: none; font-size: 18px; }
 .oc-back:hover { background: var(--surface-sunken); }
 .oc-h1 { font-size: 16px; font-weight: 500; margin: 0; }
@@ -26,14 +32,17 @@
 .oc-danger { color: var(--danger, #c0392b); }
 .oc-screen :is(button, a, input, select):focus-visible { outline: 2px solid var(--focus-ring-color, var(--oc-accent)); outline-offset: 2px; }
 .oc-conflict { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; background: var(--tag-amber-bg, #fff4dc); color: var(--tag-amber-fg, #7a4b00); font-size: 13px; }
-.oc-body { display: grid; grid-template-columns: minmax(0, 1fr) 336px; min-height: 0; }
+.oc-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 336px; min-height: 0; }
 .oc-canvas { position: relative; min-height: 0; background: var(--oc-canvas); }
 .oc-canvas .react-flow { --xy-background-color: var(--oc-canvas); --xy-background-pattern-dots-color-default: var(--oc-dot); --xy-minimap-background-color: var(--oc-card); --xy-node-border-radius: 16px; }
 .oc-loading { padding: 24px; color: var(--oc-fg2); }
 
 /* Node: avatar above a name pill, title and chips below. */
-.oc-node { width: 184px; height: 120px; display: grid; justify-items: center; align-content: start; gap: 4px; text-align: center; transition: opacity 150ms; }
-.oc-node[data-dim] { opacity: .45; }
+.oc-node { position: relative; width: 184px; height: 120px; display: grid; justify-items: center; align-content: start; gap: 4px; text-align: center; }
+.oc-node[data-dim] .oc-ava { background: var(--oc-card); color: var(--oc-fg2); }
+.oc-node[data-dim] .oc-pill { border-style: dashed; background: color-mix(in srgb, var(--oc-card) 70%, transparent); }
+.oc-node[data-dim] .oc-name { font-weight: 400; color: var(--oc-fg2); }
+.oc-node[data-dim] .oc-chip { background: transparent; }
 .oc-node[data-hit] .oc-pill { box-shadow: 0 0 0 2px var(--oc-accent); }
 .react-flow__node-person { background: transparent; border: 0; padding: 0; border-radius: 16px; }
 .react-flow__node-person:focus-visible { outline: 2px solid var(--oc-accent); outline-offset: 4px; }
@@ -44,7 +53,7 @@
 .oc-ava[data-ring='met'] { box-shadow: 0 0 0 2px var(--oc-met); }
 .oc-ava[data-ring='gap'] { box-shadow: 0 0 0 2px var(--oc-gap); outline: 1px dashed var(--oc-gap); outline-offset: 3px; }
 .oc-met-dot { position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--oc-met); border: 2px solid var(--oc-card); }
-.oc-node[data-sample] .oc-ava { background: var(--oc-card); color: var(--oc-fg3); }
+.oc-node[data-sample] .oc-ava { background: var(--oc-card); color: var(--oc-fg2); }
 .oc-pill { max-width: 176px; padding: 4px 12px; border-radius: 999px; background: var(--oc-card); border: 1px solid var(--oc-line); }
 .oc-name { display: block; font-size: 13px; font-weight: 500; color: var(--oc-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .oc-title { max-width: 176px; font-size: 12px; color: var(--oc-fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -56,7 +65,7 @@
 .oc-meter i:nth-child(1) { height: 5px; } .oc-meter i:nth-child(2) { height: 8px; } .oc-meter i:nth-child(3) { height: 11px; }
 .oc-meter i[data-on] { background: var(--oc-met); }
 .oc-meter[data-s='weak'] i[data-on] { background: #d89a1e; }
-.oc-collapse { position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg2); font: inherit; font-size: 11px; cursor: pointer; }
+.oc-collapse { position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg2); font: inherit; font-size: 11px; cursor: pointer; }
 .oc-handle { opacity: 0; pointer-events: none; }
 .oc-canvas .react-flow__edge-path { stroke: var(--oc-edge); stroke-width: 1.5; }
 .oc-canvas .oc-edge-strong .react-flow__edge-path { stroke: var(--oc-met); stroke-width: 2.5; }
@@ -97,7 +106,7 @@
 .oc-kbd { margin-top: 8px; font-size: 12px; }
 .oc-form { display: grid; gap: 8px; border-top: 1px solid var(--oc-line); margin-top: 16px; padding-top: 8px; }
 .oc-form label { display: grid; gap: 4px; font-size: 12px; color: var(--oc-fg2); }
-.oc-form input, .oc-form select { min-height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg); font: inherit; font-size: 13px; }
+.oc-form input, .oc-form select { width: 100%; min-width: 0; box-sizing: border-box; min-height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--oc-line); background: var(--oc-card); color: var(--oc-fg); font: inherit; font-size: 13px; }
 .oc-form-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 8px; }
 .oc-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .oc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -108,7 +117,6 @@
   .oc-search { margin-left: 0; } .oc-search input { width: 160px; }
   .oc-canvas .react-flow__minimap { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .oc-node { transition: none; } }
 
 /* Account page card */
 .oc-card-tree { display: grid; justify-items: center; gap: 12px; padding: 8px 0; }
@@ -117,3 +125,14 @@
 .oc-card-p .oc-ava { width: 40px; height: 40px; font-size: 13px; }
 .oc-card-p span.n { font-size: 12px; font-weight: 500; color: var(--fg-primary); max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-card-p span.t { font-size: 11px; color: var(--fg-secondary); max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Standalone route: enrichment.css may not be loaded here. */
+.oc-src { font-size: 12px; color: var(--oc-fg3); margin: 0; overflow-wrap: anywhere; }
+.oc-sample { font-size: 12px; padding: 0 8px; min-height: 24px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--tag-amber-bg, #fff4dc); color: var(--tag-amber-fg, #7a4b00); }
+@media (max-width: 640px) {
+  .oc-toolbar .oc-wide { display: none; }
+  .oc-toolbar { bottom: 8px; }
+  .oc-bar { gap: 8px; }
+  .oc-search input { width: 100%; }
+  .oc-search { flex: 1 1 100%; order: 5; }
+}

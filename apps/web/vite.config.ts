@@ -153,6 +153,24 @@ export default defineConfig(({ command, mode }) => {
             ) {
               return 'motion';
             }
+            // Org chart canvas (lazy route only). React Flow pulls d3-zoom@3 /
+            // d3-drag@3 / d3-selection@3 and zustand/traditional; left in
+            // 'vendor' they create vendor->charts (d3-interpolate@3) and
+            // vendor->state edges that close cycles and crash at boot with a
+            // TDZ ReferenceError. Own chunk: flow -> charts/state/vendor only.
+            if (
+              normalized.includes('/@xyflow/') ||
+              normalized.includes('/@dagrejs/') ||
+              normalized.includes('/classcat/') ||
+              normalized.includes('/d3-zoom@3.') ||
+              normalized.includes('/d3-drag@3.') ||
+              normalized.includes('/d3-selection@3.') ||
+              normalized.includes('/d3-dispatch@3.') ||
+              normalized.includes('/d3-transition@3.') ||
+              normalized.includes('/d3-transition@2.0.0_d3-selection@3.')
+            ) {
+              return 'flow';
+            }
             if (normalized.includes('/node_modules/react-dom/')) return 'react-dom';
             // Exact-match React core packages only — avoid matching @clerk/clerk-react,
             // react-router, react-dom, @types/react, etc.
