@@ -23,7 +23,7 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
   const sourceCount = company.sourceAttribution.length;
   const averageConfidence = sourceCount
     ? company.sourceAttribution.reduce((acc, source) => acc + source.confidence, 0) / sourceCount
-    : company.confidence;
+    : null;
   const latestFetch = latestFetchedAt(company.sourceAttribution) ?? company.updatedAt;
 
   const checks: Array<{ label: string; value: string; tone: BadgeTone }> = [
@@ -58,7 +58,13 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
         <div className="data-trust-score">
           <span>{t('dataTrust.attributionConfidence', 'Attribution confidence')}</span>
           <strong>
-            <AnimatedMetric value={`${Math.round(averageConfidence * 100)}%`} />
+            <AnimatedMetric
+              value={
+                averageConfidence === null
+                  ? t('dataTrust.notScored', 'Not scored')
+                  : `${Math.round(averageConfidence * 100)}%`
+              }
+            />
           </strong>
           <small>
             {t('dataTrust.attributedSources', '{{count}} attributed sources', {
