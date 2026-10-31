@@ -1071,7 +1071,7 @@
     "labelSource": "Origem",
     "bantHeading": "Qualificação BANT",
     "labelBudget": "Orçamento",
-    "placeholderBudget": "ex. € 500 mil",
+    "placeholderBudget": "Valor e moeda, se conhecidos",
     "labelAuthority": "Autoridade",
     "placeholderAuthority": "Tomador de decisão",
     "labelNeed": "Necessidade",

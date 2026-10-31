@@ -1156,7 +1156,7 @@
     "labelSource": "Source",
     "bantHeading": "Qualification BANT",
     "labelBudget": "Budget",
-    "placeholderBudget": "ex. 500 000 €",
+    "placeholderBudget": "Montant et devise, si connus",
     "labelAuthority": "Autorité",
     "placeholderAuthority": "Décideur",
     "labelNeed": "Besoin",

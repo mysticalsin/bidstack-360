@@ -79,8 +79,11 @@ export function RfpAnalyticsSection() {
         <KpiTile
           label={t('rfpAnalytics.kpiPipelineLabel', 'Pipeline value')}
           value={q.isLoading ? '…' : formatLinkedOpportunityValue(q.data?.totalValueMicros ?? '0')}
-          detail={t('rfpAnalytics.kpiPipelineDetail', 'linked opportunity value')}
-          icon="dollar"
+          detail={t(
+            'rfpAnalytics.kpiPipelineDetail',
+            'linked opportunity value; currency not recorded',
+          )}
+          icon="growth"
         />
         <KpiTile
           label={t('rfpAnalytics.kpiWinRateLabel', 'Win rate')}
@@ -151,7 +154,10 @@ export function RfpAnalyticsSection() {
             {t('rfpAnalytics.byOwnerTitle', 'By owner')}
           </h3>
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            {t('rfpAnalytics.byOwnerSubtitle', 'Who owns what, and the pipeline value behind it.')}
+            {t(
+              'rfpAnalytics.byOwnerSubtitle',
+              'Who owns what. Amounts are linked opportunity value; currency is not recorded.',
+            )}
           </p>
         </div>
         {q.isLoading ? (

@@ -49,8 +49,7 @@ import {
 
 export function TerritoriesPage() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number, _currency?: string) =>
-    formatUnspecifiedCompact(micros / 1_000_000);
+  const formatMoneyMicros = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
   const territories = useTerritories();
   const rules = useLeadRoutingRules();
   const analytics = useTerritoryAnalytics();
@@ -224,7 +223,7 @@ export function TerritoriesPage() {
         >
           <KpiTile
             label={t('territories.kpiTotalPipeline', 'Total Pipeline')}
-            value={formatMoneyMicros(totals.totalValueMicros, 'EUR')}
+            value={formatMoneyMicros(totals.totalValueMicros)}
             detail={t('territories.kpiPipelineBasis', UNSPECIFIED_CURRENCY_BASIS)}
             tone="blue"
           />

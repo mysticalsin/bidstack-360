@@ -24,7 +24,7 @@ export function TerritorySegmentBreakdown({
   isError: boolean;
   errorMessage?: string;
   onRetry: () => void;
-  formatMoneyMicros: (micros: number, currency: string) => string;
+  formatMoneyMicros: (micros: number) => string;
 }) {
   const { t } = useTranslation('crm');
 
@@ -98,7 +98,7 @@ export function TerritorySegmentBreakdown({
                   {s.label}
                 </span>
                 <span className="shrink-0 text-sm font-semibold text-[var(--fg-primary)]">
-                  {formatMoneyMicros(s.totalValueMicros, 'EUR')}
+                  {formatMoneyMicros(s.totalValueMicros)}
                 </span>
               </div>
               {/* Value bar */}

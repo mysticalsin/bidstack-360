@@ -11,7 +11,7 @@ import { CATEGORIES, CATEGORY_COLOR, CATEGORY_LABELS, type ChartDatum } from './
 interface ForecastChartProps {
   chartData: ChartDatum[];
   maxTotal: number;
-  formatMoneyMicros: (micros: number, currency: string) => string;
+  formatMoneyMicros: (micros: number) => string;
 }
 
 export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: ForecastChartProps) {
@@ -38,7 +38,7 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
                       className="flex w-12 flex-col-reverse overflow-hidden rounded-md"
                       style={{ height: `${Math.max(heightPct, 0)}%` }}
                       role="img"
-                      aria-label={`${d.period}: ${formatMoneyMicros(total, 'EUR')}`}
+                      aria-label={`${d.period}: ${formatMoneyMicros(total)}`}
                     >
                       {CATEGORIES.map((cat) => {
                         const val = d[cat === 'best_case' ? 'bestCase' : cat];
@@ -51,7 +51,7 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
                               backgroundColor: CATEGORY_COLOR[cat],
                               minHeight: val > 0 ? 2 : 0,
                             }}
-                            title={`${CATEGORY_LABELS[cat]}: ${formatMoneyMicros(val, 'EUR')}`}
+                            title={`${CATEGORY_LABELS[cat]}: ${formatMoneyMicros(val)}`}
                           />
                         );
                       })}

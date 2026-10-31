@@ -25,12 +25,11 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
-type FormatMoney = (micros: number, currency?: string) => string;
+type FormatMoney = (micros: number) => string;
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number, _currency?: string) =>
-    formatUnspecifiedCompact(micros / 1_000_000);
+  const formatMoneyMicros = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -119,7 +118,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
             {c.key === 'weighted' && period.manualCommitMicros !== null ? (
               <Badge tone="amber">
                 {t('forecastProjection.override', 'Manual commit')}:{' '}
-                {formatMoneyMicros(period.manualCommitMicros, 'EUR')}
+                {formatMoneyMicros(period.manualCommitMicros)}
               </Badge>
             ) : null}
           </div>
@@ -128,7 +127,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
               c.accent ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-primary)]'
             }`}
           >
-            {formatMoneyMicros(c.value, 'EUR')}
+            {formatMoneyMicros(c.value)}
           </div>
         </div>
       ))}
@@ -166,13 +165,13 @@ function ProjectionOwnerTable({ period, formatMoneyMicros, t }: SubProps) {
                 <span className="text-sm font-medium text-[var(--fg-primary)]">{o.ownerName}</span>
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.openMicros, 'EUR')}
+                {formatMoneyMicros(o.openMicros)}
               </TableCell>
               <TableCell className="text-right tabular-nums font-semibold text-[var(--fg-primary)]">
-                {formatMoneyMicros(o.weightedMicros, 'EUR')}
+                {formatMoneyMicros(o.weightedMicros)}
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.wonMicros, 'EUR')}
+                {formatMoneyMicros(o.wonMicros)}
               </TableCell>
             </TableRow>
           ))}

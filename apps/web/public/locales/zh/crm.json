@@ -1071,7 +1071,7 @@
     "labelSource": "来源",
     "bantHeading": "BANT 资格评估",
     "labelBudget": "预算",
-    "placeholderBudget": "例如 €500K",
+    "placeholderBudget": "如已知，填写金额和币种",
     "labelAuthority": "决策权",
     "placeholderAuthority": "决策者",
     "labelNeed": "需求",

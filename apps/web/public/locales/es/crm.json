@@ -1134,7 +1134,7 @@
     "labelSource": "Fuente",
     "bantHeading": "Cualificación BANT",
     "labelBudget": "Presupuesto",
-    "placeholderBudget": "p. ej. 500 000 €",
+    "placeholderBudget": "Importe y moneda, si se conocen",
     "labelAuthority": "Autoridad",
     "placeholderAuthority": "Responsable de la decisión",
     "labelNeed": "Necesidad",

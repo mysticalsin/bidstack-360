@@ -1082,7 +1082,7 @@
     "labelSource": "Source",
     "bantHeading": "BANT qualification",
     "labelBudget": "Budget",
-    "placeholderBudget": "e.g. €500K",
+    "placeholderBudget": "Amount and currency, if known",
     "labelAuthority": "Authority",
     "placeholderAuthority": "Decision maker",
     "labelNeed": "Need",

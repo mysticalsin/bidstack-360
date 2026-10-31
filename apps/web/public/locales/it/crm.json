@@ -1071,7 +1071,7 @@
     "labelSource": "Fonte",
     "bantHeading": "Qualificazione BANT",
     "labelBudget": "Budget",
-    "placeholderBudget": "es. 500.000 €",
+    "placeholderBudget": "Importo e valuta, se noti",
     "labelAuthority": "Autorità",
     "placeholderAuthority": "Decisore",
     "labelNeed": "Esigenza",

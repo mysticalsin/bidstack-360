@@ -33,8 +33,7 @@ import {
 
 export function ForecastsPage() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number, _currency?: string) =>
-    formatUnspecifiedCompact(micros / 1_000_000);
+  const formatMoneyMicros = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
   const reducedMotion = useReducedMotion();
   const forecasts = useForecasts();
   // Owner picker (NewForecastDialog): no server-side user search exists, so
@@ -244,7 +243,7 @@ export function ForecastsPage() {
                 k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
               }`}
             >
-              {formatMoneyMicros(totals[k.key], 'EUR')}
+              {formatMoneyMicros(totals[k.key])}
             </div>
           </div>
         ))}

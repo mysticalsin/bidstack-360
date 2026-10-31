@@ -46,7 +46,7 @@ interface ForecastListProps {
     micros: number,
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
-  formatMoneyMicros: (micros: number, currency: string) => string;
+  formatMoneyMicros: (micros: number) => string;
 }
 
 export function ForecastList({
@@ -198,7 +198,7 @@ export function ForecastList({
                                   { category: CATEGORY_LABELS[cat], period: row.period },
                                 )}
                               >
-                                {formatMoneyMicros(val, 'EUR')}
+                                {formatMoneyMicros(val)}
                               </button>
                             )}
                           </TableCell>
@@ -206,10 +206,7 @@ export function ForecastList({
                       })}
                       <TableCell className="text-right">
                         <span className="text-sm font-semibold tabular-nums text-[var(--fg-primary)]">
-                          {formatMoneyMicros(
-                            row.pipeline + row.bestCase + row.commit + row.closed,
-                            'EUR',
-                          )}
+                          {formatMoneyMicros(row.pipeline + row.bestCase + row.commit + row.closed)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -283,7 +280,7 @@ export function ForecastList({
                               { category: CATEGORY_LABELS[cat], period: row.period },
                             )}
                           >
-                            {formatMoneyMicros(val, 'EUR')}
+                            {formatMoneyMicros(val)}
                           </button>
                         )}
                       </div>
@@ -293,10 +290,7 @@ export function ForecastList({
                 <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                   <span className="text-xs font-semibold text-[var(--fg-primary)]">
                     {t('forecastList.totalLabel', 'Total:')}{' '}
-                    {formatMoneyMicros(
-                      row.pipeline + row.bestCase + row.commit + row.closed,
-                      'EUR',
-                    )}
+                    {formatMoneyMicros(row.pipeline + row.bestCase + row.commit + row.closed)}
                   </span>
                   <button
                     type="button"

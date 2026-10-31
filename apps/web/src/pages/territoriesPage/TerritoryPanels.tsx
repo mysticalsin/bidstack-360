@@ -94,7 +94,7 @@ export function CountryDetailPanel({
   onClear,
 }: {
   selected: TerritoryAnalyticsItem | null;
-  formatMoneyMicros: (micros: number, currency: string) => string;
+  formatMoneyMicros: (micros: number) => string;
   globalTotals?: { totalValueMicros: number } | null;
   onClear?: () => void;
 }) {
@@ -150,7 +150,7 @@ export function CountryDetailPanel({
                 {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
-                {formatMoneyMicros(selected.totalValueMicros, 'EUR')}
+                {formatMoneyMicros(selected.totalValueMicros)}
               </div>
             </div>
           </div>

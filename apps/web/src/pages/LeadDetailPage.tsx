@@ -316,7 +316,7 @@ export function LeadDetailPage() {
                   type="text"
                   serverValue={l.budget ?? ''}
                   commit={(v) => update.mutate({ budget: v || null })}
-                  placeholder={t('leadDetail.placeholderBudget', 'e.g. €500K')}
+                  placeholder={t('leadDetail.placeholderBudget', 'Amount and currency, if known')}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
