@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { presentOpportunityIntel } from '@bidstack/shared';
 
 import type { Tool } from './index.js';
 
@@ -51,7 +52,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
       dueDate: opp.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: opp.owner?.email ?? null,
       industry: opp.industry,
-      intel: opp.intel,
+      intel: presentOpportunityIntel(opp.intel),
       tasks: opp.tasks.map((t) => ({
         id: t.id,
         title: t.title,

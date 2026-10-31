@@ -6,6 +6,7 @@
 // exponential backoff before giving up.
 
 import { prisma } from '@bidstack/db';
+import { presentOpportunityIntel } from '@bidstack/shared';
 import pino from 'pino';
 
 import { getOrgDust } from './dust-credentials.js';
@@ -72,15 +73,15 @@ function serializeOpportunityToMarkdown(opp: {
     `- **Code:** ${opp.code}`,
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
-    `- **Value (EUR):** ${value}`,
-    `- **Probability:** ${opp.probability}%`,
+    `- **Value (currency not recorded):** ${value}`,
+    `- **Stored probability:** ${opp.probability}%`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
     ``,
     `## Intel`,
     ``,
     '```json',
-    JSON.stringify(opp.intel, null, 2),
+    JSON.stringify(presentOpportunityIntel(opp.intel), null, 2),
     '```',
   ].join('\n');
 }

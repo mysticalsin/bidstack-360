@@ -2,9 +2,10 @@
 // Numbers come back from Prisma as Decimal/BigInt and need explicit conversion.
 
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
-import type {
-  Opportunity as ApiOpportunity,
-  OpportunityFull as ApiOpportunityFull,
+import {
+  presentOpportunityIntel,
+  type Opportunity as ApiOpportunity,
+  type OpportunityFull as ApiOpportunityFull,
 } from '@bidstack/shared';
 
 type SerializedOwner = { id: string; name: string | null; email: string };
@@ -94,7 +95,7 @@ export function serializeOpportunity(
 export function serializeOpportunityFull(o: Full): ApiOpportunityFull {
   return {
     ...serializeOpportunity(o),
-    intel: o.intel as ApiOpportunityFull['intel'],
+    intel: presentOpportunityIntel(o.intel),
     tasks: o.tasks.map((t) => ({
       id: t.id,
       title: t.title,

@@ -292,6 +292,9 @@ importers:
       '@bidstack/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@bidstack/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@fastify/rate-limit':
         specifier: ^10.2.1
         version: 10.3.0

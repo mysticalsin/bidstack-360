@@ -9,3 +9,4 @@ export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
 export * from './document-category.js';
 export * from './workflow-engine.js';
+export * from './intel/present-opportunity-intel.js';

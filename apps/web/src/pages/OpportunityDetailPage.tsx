@@ -34,7 +34,7 @@ import {
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatStage } from '@/lib/format';
-import type { OpportunityStage, IntelPayload, Task } from '@bidstack/shared';
+import { presentOpportunityIntel, type OpportunityStage, type IntelPayload, type Task } from '@bidstack/shared';
 
 import {
   DataFreshnessRibbon,
@@ -68,7 +68,7 @@ export function OpportunityDetailPage() {
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
   const [briefOpen, setBriefOpen] = useState(false);
-  const intel: IntelPayload = data?.intel ?? {};
+  const intel: IntelPayload = presentOpportunityIntel(data?.intel ?? {});
   const nav = useNavigate();
   const qc = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
