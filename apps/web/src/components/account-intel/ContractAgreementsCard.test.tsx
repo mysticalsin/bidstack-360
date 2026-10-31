@@ -1,12 +1,14 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ElementType, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ContractAgreementsCard } from './ContractAgreementsCard';
+import { ContractAgreementCreate } from '@bidstack/shared';
+import { ContractAgreementsCard, contractCurrencyCode } from './ContractAgreementsCard';
 import type { ContractAgreement, ContractFieldProvenance } from '@bidstack/shared';
 
 const hookMocks = vi.hoisted(() => ({
   agreements: [] as ContractAgreement[],
+  isAdmin: false,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -49,7 +51,7 @@ vi.mock('framer-motion', async () => {
 });
 
 vi.mock('@/lib/auth', () => ({
-  useIsAdmin: () => false,
+  useIsAdmin: () => hookMocks.isAdmin,
 }));
 
 vi.mock('@/hooks/useContractAgreements', () => ({
@@ -125,8 +127,35 @@ function agreement(): ContractAgreement {
   };
 }
 
+describe('contract currency', () => {
+  it('does not turn a blank currency into euros', () => {
+    // Why: the add-agreement form used to submit EUR whenever the field was empty.
+    expect(contractCurrencyCode('')).toBeNull();
+    expect(contractCurrencyCode('  ')).toBeNull();
+    expect(contractCurrencyCode('EU')).toBeNull();
+    expect(contractCurrencyCode('nok')).toBe('NOK');
+  });
+
+  it('rejects a create body that omits currency instead of defaulting to EUR', () => {
+    const parsed = ContractAgreementCreate.safeParse({
+      accountKey: 'acme',
+      reference: 'MSA-1',
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('opens the add-agreement form with an empty currency field', () => {
+    hookMocks.agreements = [];
+    hookMocks.isAdmin = true;
+    render(<ContractAgreementsCard accountKey="acme" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add agreement' }));
+    expect((screen.getByLabelText('Currency') as HTMLInputElement).value).toBe('');
+  });
+});
+
 describe('ContractAgreementsCard provenance', () => {
   it('shows compact source badges on decision-critical contract fields', () => {
+    hookMocks.isAdmin = false;
     hookMocks.agreements = [agreement()];
 
     render(<ContractAgreementsCard accountKey="acme" />);

@@ -49,6 +49,12 @@ const KIND_LABEL: Record<ContractKind, string> = {
   other: 'Other',
 };
 
+/** Rate cards are denominated. A blank field must not be stored as euros. */
+export function contractCurrencyCode(raw: string): string | null {
+  const code = raw.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : null;
+}
+
 const UNIT_LABEL: Record<RateCardUnit, string> = {
   day: '/day',
   hour: '/hr',
@@ -451,7 +457,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
     reference: '',
     countries: '',
     globalRebatePct: '',
-    currency: 'EUR',
+    currency: '',
     expiryDate: '',
     rateReviewSchedule: 'annual' as ContractAgreement['rateReviewSchedule'],
   });
@@ -472,7 +478,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       reference: '',
       countries: '',
       globalRebatePct: '',
-      currency: 'EUR',
+      currency: '',
       expiryDate: '',
       rateReviewSchedule: 'annual',
     });
@@ -536,13 +542,23 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       return;
     }
 
+    const currency = contractCurrencyCode(form.currency);
+    if (!currency) {
+      toast.error(t('contractAgreements.toastMissingCurrencyTitle', 'Currency required'), {
+        description: t(
+          'contractAgreements.toastMissingCurrencyDesc',
+          'Enter the 3-letter code printed on the agreement.',
+        ),
+      });
+      return;
+    }
     const payload: ContractExtractionApproval = {
       accountKey,
       kind: form.kind,
       reference: form.reference.trim(),
       countries,
       globalRebateBps: pct ? Math.round(Number(pct) * 100) : null,
-      currency: form.currency.trim().toUpperCase() || 'EUR',
+      currency,
       rateCard,
       expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
       rateReviewSchedule: form.rateReviewSchedule,
@@ -646,7 +662,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
         <input
           value={form.currency}
           onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-          placeholder={t('contractAgreements.placeholderCurrency', 'Currency (EUR)')}
+          placeholder={t('contractAgreements.placeholderCurrency', '3-letter currency code')}
           maxLength={3}
           className={inputCls}
           aria-label={t('contractAgreements.fieldCurrency', 'Currency')}

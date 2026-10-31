@@ -71,8 +71,8 @@ export type Forecast = z.infer<typeof Forecast>;
 
 // ─── Pipeline-weighted forecast projection (Salesforce/Clari model) ──────────
 // Derived from OPEN opportunities (value × stage win-probability), bucketed by
-// close-date quarter and owner. Money is EUR micros on the wire (formatted at
-// the edge); weighted values may be fractional, so no `.int()` constraint.
+// close-date quarter and owner. Opportunity amounts have no currency; the
+// projection reports XXX. Weighted values may be fractional, so no `.int()`.
 
 export const ForecastProjectionOwner = z.object({
   // Null when the opportunity has no owner (rolled up as "Unassigned").

@@ -79,7 +79,8 @@ export const ContractAgreementCreate = z.object({
   reference: z.string().min(1).max(255),
   countries: z.array(CountryCode).max(100).default([]),
   globalRebateBps: z.number().int().min(0).max(100_000).nullable().optional(),
-  currency: z.string().length(3).default('EUR'),
+  // No euro default. A missing code must fail validation instead of becoming EUR.
+  currency: z.string().trim().toUpperCase().length(3),
   rateCard: z.array(RateCardLine).max(200).default([]),
   effectiveDate: z.string().datetime().nullable().optional(),
   expiryDate: z.string().datetime().nullable().optional(),
