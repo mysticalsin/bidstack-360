@@ -48,6 +48,7 @@ describe('getPipelineKpis money precision', () => {
     expect(result.byStage[0]!.valueSum).toBe(600_000_000_001);
     // `proposal` is an open stage, so the rollup must be exact too.
     expect(result.totalValueOpen).toBe(600_000_000_001);
+    expect(result.velocity.avgDaysOpen).toBeNull();
     // Sanity: the naive Number(bigint)/1e6 path would have produced a value that
     // is strictly not equal to the exact result — guards the test's own premise.
     expect(Number(bigSumMicros) / 1_000_000).not.toBe(600_000_000_001);

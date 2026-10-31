@@ -7,7 +7,7 @@ interface PipelineReport {
   totalOpen: number;
   totalValueOpen: number;
   weightedPipeline: number;
-  velocity: { avgDaysOpen: number; closedThisQuarter: number };
+  velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
 }
 
 export function usePipelineReport() {

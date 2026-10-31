@@ -34,6 +34,12 @@ const STATUS_OPTIONS: { value: LeadStatus | ''; label: string }[] = [
   { value: 'converted', label: 'Converted' },
 ];
 
+/** An empty lead list has no average. Zero would read as a measured fit score. */
+export function averageLeadScoreLabel(scores: number[]): string {
+  if (scores.length === 0) return '—';
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length).toLocaleString();
+}
+
 const PRIORITY_OPTIONS: { value: LeadPriority | ''; label: string }[] = [
   { value: '', label: 'All priorities' },
   { value: 'low', label: 'Low' },
@@ -148,10 +154,7 @@ export function LeadsPage() {
     const pipelineReady = items.filter(
       (lead) => lead.status === 'qualified' || lead.status === 'converted',
     ).length;
-    const averageScore =
-      total === 0
-        ? '0'
-        : Math.round(items.reduce((sum, lead) => sum + lead.score, 0) / total).toLocaleString();
+    const averageScore = averageLeadScoreLabel(items.map((lead) => lead.score));
 
     return [
       {

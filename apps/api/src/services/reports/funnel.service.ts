@@ -6,7 +6,7 @@ export interface PipelineKpis {
   totalOpen: number;
   totalValueOpen: number;
   weightedPipeline: number;
-  velocity: { avgDaysOpen: number; closedThisQuarter: number };
+  velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
 }
 
 export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
@@ -52,7 +52,8 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
       AND o.stage NOT IN ('closed_won', 'closed_lost')
   `);
   const weighted = agg?.weighted ?? 0;
-  const avgDaysOpen = agg && agg.openCount > 0 ? Math.round(agg.avgDaysOpen ?? 0) : 0;
+  const avgDaysOpen =
+    agg && agg.openCount > 0 && agg.avgDaysOpen != null ? Math.round(agg.avgDaysOpen) : null;
 
   return {
     byStage,
@@ -68,8 +69,8 @@ export interface LeadFunnel {
   bySource: Array<{ source: string; count: number }>;
   total: number;
   converted: number;
-  conversionRate: number;
-  avgScore: number;
+  conversionRate: number | null;
+  avgScore: number | null;
 }
 
 export async function getLeadFunnel(orgId: string): Promise<LeadFunnel> {
@@ -97,8 +98,8 @@ export async function getLeadFunnel(orgId: string): Promise<LeadFunnel> {
     bySource: bySource.map((s) => ({ source: s.source ?? 'unknown', count: s._count._all })),
     total,
     converted,
-    conversionRate: total > 0 ? Math.round((converted / total) * 10_000) / 100 : 0,
-    avgScore: Math.round((scoreAgg._avg.score ?? 0) * 100) / 100,
+    conversionRate: total > 0 ? Math.round((converted / total) * 10_000) / 100 : null,
+    avgScore: scoreAgg._avg.score == null ? null : Math.round(scoreAgg._avg.score * 100) / 100,
   };
 }
 

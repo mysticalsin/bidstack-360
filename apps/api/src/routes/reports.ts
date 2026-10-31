@@ -20,7 +20,7 @@ const PipelineKpis = z.object({
   totalValueOpen: z.number(),
   weightedPipeline: z.number(),
   velocity: z.object({
-    avgDaysOpen: z.number(),
+    avgDaysOpen: z.number().nullable(),
     closedThisQuarter: z.number().int(),
   }),
 });
@@ -43,8 +43,8 @@ export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
             bySource: z.array(z.object({ source: z.string(), count: z.number().int() })),
             total: z.number().int(),
             converted: z.number().int(),
-            conversionRate: z.number(),
-            avgScore: z.number(),
+            conversionRate: z.number().nullable(),
+            avgScore: z.number().nullable(),
           }),
         },
       },

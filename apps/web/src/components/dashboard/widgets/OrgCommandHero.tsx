@@ -343,11 +343,11 @@ function HeroFooter({ summary, report, t }: HeroFooterProps) {
       <div>
         <span>{t('orgHero.footer.velocity.label', 'Avg days a bid stays open')}</span>
         <strong>
-          {report
-            ? t('orgHero.footer.velocity.value', '{{count}} days', {
+          {report?.velocity.avgDaysOpen == null
+            ? t('orgHero.footer.velocity.empty', '—')
+            : t('orgHero.footer.velocity.value', '{{count}} days', {
                 count: Math.round(report.velocity.avgDaysOpen),
-              })
-            : '—'}
+              })}
         </strong>
       </div>
       <div>
