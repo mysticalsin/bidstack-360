@@ -141,6 +141,12 @@ export const NAV_SECTIONS: NavSection[] = [
       // page hosts the dashboard switcher, "Manage dashboards", and links to
       // saved Reports + the report builder. No separate Reports rail door.
       { to: '/analytics', label: 'Analytics & Reports', labelKey: 'nav.analyticsReports', icon: 'dashboard' },
+      {
+        to: '/workspace/insights',
+        label: 'CRM Insights',
+        labelKey: 'nav.workspaceInsights',
+        icon: 'growth',
+      },
       // Collaborative workspace (AppFlowy embed) — hidden until an admin enables
       // it + sets the URL in Settings → Modules.
       { to: '/workspace', label: 'Collaborate', labelKey: 'nav.collaborate', icon: 'note', featureKey: 'appflowy' },
