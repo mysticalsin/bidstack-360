@@ -13,7 +13,6 @@ import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate, relativeTime } from '@/lib/format';
 import { recordedConfidencePercent } from '@/lib/recorded-confidence';
-import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -89,9 +88,9 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   return (
     <motion.div
       className="page-head motion-page-head cockpit-page-head"
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
-      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={springSoft}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.2, 0, 0, 1] }}
     >
       <div
         className="account-heading-cluster"

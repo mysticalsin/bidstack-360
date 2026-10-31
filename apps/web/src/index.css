@@ -883,10 +883,10 @@ select:focus-visible {
 }
 
 .sb-group-title {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--fg-tertiary);
   padding: 4px 12px 6px;
   opacity: 1;
@@ -904,8 +904,8 @@ select:focus-visible {
   visibility: hidden;
 }
 
-/* Collapsible section header. Shares .sb-group-title typography (uppercase,
-   10.5px, tertiary) but is a real button with a disclosure caret. The caret
+/* Collapsible section header. Shares .sb-group-title typography (sentence
+   case, 12px, tertiary) but is a real button with a disclosure caret. The caret
    stays hidden until hover/focus — or whenever the section is collapsed, so a
    collapsed section always advertises that it can be reopened. */
 .sb-group-toggle {
@@ -1355,7 +1355,7 @@ select:focus-visible {
 }
 [data-theme='dark'] .sb-group-title {
   color: var(--fg-muted);
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
 }
 
 /* ---------- Topbar ---------- */

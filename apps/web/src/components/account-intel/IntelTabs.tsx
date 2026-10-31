@@ -187,13 +187,14 @@ export function SolutionsTab({
   const { t } = useTranslation('crm');
   if (solutions.length === 0) {
     return (
-      <EmptyState
-        title={t('intelTabs.solutionsEmptyTitle', 'No solutions yet')}
-        message={t(
+      <p className="px-4 py-8 text-sm text-[var(--fg-secondary)]">
+        {t('intelTabs.solutionsEmptyTitle', 'No solutions yet')}
+        {'. '}
+        {t(
           'intelTabs.solutionsEmptyMessage',
           'Upload documents and run extraction to review suggested solutions.',
         )}
-      />
+      </p>
     );
   }
   return (

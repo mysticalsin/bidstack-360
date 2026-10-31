@@ -135,7 +135,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
 function NavGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="py-1">
-      <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <div className="px-3 py-1.5 text-xs font-medium text-[var(--fg-tertiary)]">
         {title}
       </div>
       {children}
@@ -169,7 +169,7 @@ function MobileNavSection({
         type="button"
         onClick={() => setSectionCollapsed(section.key, !collapsed)}
         aria-expanded={!collapsed}
-        className="flex min-h-9 w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
+        className="flex min-h-9 w-full items-center justify-between px-3 py-1.5 text-xs font-medium text-[var(--fg-tertiary)]"
       >
         <span>{t(section.titleKey, section.title)}</span>
         <Icon name="chevron-down" size={12} className={cn('transition-transform', collapsed && '-rotate-90')} ariaHidden />

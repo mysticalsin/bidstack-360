@@ -3179,16 +3179,9 @@
 .health-stage {
   align-items: center;
   aspect-ratio: 1;
-  background:
-    radial-gradient(circle at 50% 50%, var(--surface-card) 0 48%, transparent 49%),
-    radial-gradient(
-      circle at 32% 25%,
-      color-mix(in srgb, var(--brand-primary) 12%, transparent),
-      transparent 36%
-    ),
-    var(--surface-page);
-  border: 1px solid var(--border-subtle);
-  border-radius: 18px;
+  background: var(--surface-page);
+  border: 1px solid color-mix(in srgb, var(--fg-primary) 8%, transparent);
+  border-radius: 16px;
   display: flex;
   flex: 0 0 154px;
   justify-content: center;
@@ -3213,16 +3206,14 @@
   stroke: var(--surface-sunken);
 }
 .health-gauge-progress {
-  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--success) 22%, transparent));
-  stroke: url('#health-gauge-gradient');
+  stroke: var(--fg-primary);
   stroke-dasharray: 1;
 }
 .health-core {
   align-items: center;
-  background: color-mix(in srgb, var(--surface-card) 88%, transparent);
-  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  border: 1px solid color-mix(in srgb, var(--fg-primary) 8%, transparent);
   border-radius: 999px;
-  box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
   height: 92px;
@@ -3237,8 +3228,8 @@
 .health-core span,
 .health-core small {
   color: var(--fg-tertiary);
-  font-size: 10px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 500;
 }
 .health-core strong {
   color: var(--fg-primary);
@@ -3246,14 +3237,6 @@
   font-size: 28px;
   line-height: 0.98;
   margin-top: 4px;
-}
-.health-pulse {
-  animation: bs-health-pulse 2.7s ease-in-out infinite;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 34%, transparent);
-  border-radius: 999px;
-  inset: 18px;
-  position: absolute;
-  z-index: 1;
 }
 .health-summary {
   flex: 1;
@@ -3269,7 +3252,7 @@
 .health-summary-head span {
   color: var(--fg-tertiary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .health-summary-head strong {
   color: var(--fg-primary);
@@ -3327,4 +3310,141 @@
   border-radius: inherit;
   display: block;
   height: 100%;
+}
+
+/* Account deal chart and buying-role route. Color stays on the live lane. */
+.account-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.deal-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 168px;
+  padding-top: 8px;
+}
+.deal-chart-row {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  grid-template-columns: 96px minmax(0, 1fr) 148px;
+  min-height: 36px;
+}
+.deal-chart-lane {
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.deal-chart-track {
+  background: color-mix(in srgb, var(--fg-primary) 8%, transparent);
+  border-radius: 4px;
+  height: 8px;
+}
+.deal-chart-fill {
+  background: var(--brand-primary);
+  border-radius: 4px;
+  display: block;
+  height: 8px;
+}
+.deal-chart-value {
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.deal-chart-deals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.deal-chart-deal {
+  border-radius: 8px;
+  color: var(--fg-primary);
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  gap: 2px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 4px 8px;
+  text-decoration: none;
+}
+.deal-chart-deal:hover {
+  background: var(--surface-sunken);
+}
+.deal-chart-deal:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+.deal-chart-deal-meta {
+  color: var(--fg-secondary);
+  font-size: 12px;
+}
+.role-route {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 16px 0 0;
+  position: relative;
+}
+.role-route::before {
+  background: color-mix(in srgb, var(--fg-primary) 12%, transparent);
+  content: '';
+  height: 1px;
+  left: 6%;
+  position: absolute;
+  right: 6%;
+  top: 22px;
+}
+.role-route li {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.role-station {
+  background: var(--surface-page);
+  border: 1.5px solid var(--fg-tertiary);
+  border-radius: 999px;
+  height: 12px;
+  width: 12px;
+}
+.role-route .is-known .role-station {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+.role-label {
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.role-people {
+  color: var(--fg-primary);
+  font-size: 12px;
+}
+.role-unknown {
+  color: var(--fg-tertiary);
+  font-size: 12px;
+}
+@media (max-width: 720px) {
+  .deal-chart-row {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+  .deal-chart-value {
+    grid-column: 2;
+    text-align: left;
+  }
+  .role-route {
+    grid-template-columns: 1fr;
+  }
+  .role-route::before {
+    display: none;
+  }
 }

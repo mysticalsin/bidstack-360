@@ -34,13 +34,30 @@ export function AccountWorkstreamBoard({
   const roles = buyingRoleSlots(people);
   const diagramDeal = grouped.pursuit[0] ?? grouped.delivery[0] ?? grouped.renewal[0] ?? grouped.expansion[0];
 
+  const laneTotals = LANES.map((lane) => ({
+    lane,
+    deals: grouped[lane],
+    value: grouped[lane].reduce((sum, deal) => sum + deal.value, 0),
+  }));
+  const maxLane = Math.max(1, ...laneTotals.map((row) => row.value));
+  const chartLabel = laneTotals
+    .map((row) => {
+      const name = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
+      const amount =
+        row.value > 0
+          ? formatUnspecifiedCompact(row.value)
+          : t('accountWorkstreams.notRecorded', 'Not recorded');
+      return `${name}, ${amount}`;
+    })
+    .join('. ');
+
   return (
     <section
       aria-label={t('accountWorkstreams.region', 'Account workstreams and buying roles')}
-      className="mt-6 space-y-4 border-b border-[var(--border-subtle)] pb-6"
+      className="account-chart mt-6 border-b border-[var(--border-subtle)] pb-6"
     >
       <div>
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+        <h2 className="text-sm font-medium text-[var(--fg-primary)]">
           {t('accountWorkstreams.title', 'Workstreams')}
         </h2>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
@@ -50,11 +67,48 @@ export function AccountWorkstreamBoard({
           )}
         </p>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {LANES.map((lane) => (
-          <WorkstreamLane key={lane} lane={lane} deals={grouped[lane]} />
-        ))}
+      <div className="deal-chart" role="img" aria-label={chartLabel}>
+        {laneTotals.map((row) => {
+          const title = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
+          const width = row.value > 0 ? Math.max(2, Math.round((row.value / maxLane) * 100)) : 0;
+          return (
+            <div key={row.lane} className="deal-chart-row">
+              <span className="deal-chart-lane">{title}</span>
+              <div className="deal-chart-track" aria-hidden>
+                {width > 0 ? <span className="deal-chart-fill" style={{ width: `${width}%` }} /> : null}
+              </div>
+              <span className="deal-chart-value">
+                {row.value > 0
+                  ? formatUnspecifiedCompact(row.value)
+                  : t('accountWorkstreams.notRecorded', 'Not recorded')}
+              </span>
+            </div>
+          );
+        })}
       </div>
+      <ul className="deal-chart-deals">
+        {laneTotals.flatMap((row) =>
+          row.deals.map((deal) => (
+            <li key={deal.id}>
+              <Link
+                to={`/opportunities/${deal.id}`}
+                className="deal-chart-deal"
+              >
+                <span className="truncate font-medium">{deal.name}</span>
+                <span className="deal-chart-deal-meta">
+                  {t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane))}
+                  {' · '}
+                  {deal.stageName || deal.stage || t('accountWorkstreams.stageUnknown', 'Stage unknown')}
+                  {' · '}
+                  {formatUnspecifiedCompact(deal.value)}
+                  {' · '}
+                  {deal.owner ?? t('accountWorkstreams.ownerUnknown', 'Owner unknown')}
+                </span>
+              </Link>
+            </li>
+          )),
+        )}
+      </ul>
       <p className="text-xs text-[var(--fg-tertiary)]">
         {grouped.outcome.length > 0
           ? t('accountWorkstreams.outcomes', '{{count}} closed outcome stays off the live lanes.', {
@@ -64,8 +118,8 @@ export function AccountWorkstreamBoard({
         {t('accountWorkstreams.currency', UNSPECIFIED_CURRENCY_BASIS)}
       </p>
 
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+      <div className="mt-8">
+        <h2 className="text-sm font-medium text-[var(--fg-primary)]">
           {t('accountWorkstreams.rolesTitle', 'Buying roles')}
         </h2>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
@@ -74,31 +128,28 @@ export function AccountWorkstreamBoard({
             'Empty means unknown. A title does not fill a role.',
           )}
         </p>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {roles.map((slot) => (
-            <li
-              key={slot.role}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-3"
-            >
-              <div className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-                {t(`accountWorkstreams.role.${slot.role}`, ROLE_LABEL[slot.role])}
-              </div>
-              {slot.people.length === 0 ? (
-                <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-                  {t('accountWorkstreams.roleUnknown', 'Unknown — not recorded')}
-                </p>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {slot.people.map((person) => (
-                    <li key={person.id} className="text-sm text-[var(--fg-primary)]">
-                      {person.name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ul>
+        <ol className="role-route">
+          {roles.map((slot) => {
+            const known = slot.people.length > 0;
+            return (
+              <li key={slot.role} className={known ? 'is-known' : undefined}>
+                <span className="role-station" aria-hidden />
+                <span className="role-label">
+                  {t(`accountWorkstreams.role.${slot.role}`, ROLE_LABEL[slot.role])}
+                </span>
+                {known ? (
+                  <span className="role-people">
+                    {slot.people.map((person) => person.name).join(', ')}
+                  </span>
+                ) : (
+                  <span className="role-unknown">
+                    {t('accountWorkstreams.roleUnknown', 'Unknown')}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
         {diagramDeal ? (
           <Link
             to={`/opportunities/${diagramDeal.id}`}
@@ -118,41 +169,6 @@ export function AccountWorkstreamBoard({
         )}
       </div>
     </section>
-  );
-}
-
-function WorkstreamLane({ lane, deals }: { lane: LiveWorkstream; deals: WorkDeal[] }) {
-  const { t } = useTranslation('crm');
-  const title = t(`accountWorkstreams.lane.${lane}`, laneTitle(lane));
-  return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3">
-      <h3 className="text-sm font-medium text-[var(--fg-primary)]">{title}</h3>
-      {deals.length === 0 ? (
-        <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-          {t('accountWorkstreams.notRecorded', 'Not recorded')}
-        </p>
-      ) : (
-        <ul className="mt-2 space-y-2">
-          {deals.map((deal) => (
-            <li key={deal.id}>
-              <Link
-                to={`/opportunities/${deal.id}`}
-                className="block min-h-11 rounded-md text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-              >
-                <span className="block truncate font-medium">{deal.name}</span>
-                <span className="text-[var(--fg-secondary)]">
-                  {deal.stageName || deal.stage || t('accountWorkstreams.stageUnknown', 'Stage unknown')}
-                  {' · '}
-                  {formatUnspecifiedCompact(deal.value)}
-                  {' · '}
-                  {deal.owner ?? t('accountWorkstreams.ownerUnknown', 'Owner unknown')}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }
 

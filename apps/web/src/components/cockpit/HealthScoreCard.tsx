@@ -52,9 +52,9 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
       <div className="health-card-body">
         <motion.div
           className="health-stage"
-          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={springSoft}
+          initial={{ opacity: reducedMotion ? 1 : 0 }}
+          animate={{ opacity: 1 }}
+          transition={reducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.2, 0, 0, 1] }}
           aria-label={t(
             'healthScore.gaugeLabel',
             'Weighted signal mix {{score}} out of 100. {{weights}}',
@@ -63,13 +63,6 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
           role="img"
         >
           <svg className="health-gauge" viewBox="0 0 180 180" aria-hidden>
-            <defs>
-              <linearGradient id="health-gauge-gradient" x1="20" x2="160" y1="160" y2="20">
-                <stop offset="0%" stopColor="var(--danger)" />
-                <stop offset="42%" stopColor="var(--warning)" />
-                <stop offset="100%" stopColor="var(--success)" />
-              </linearGradient>
-            </defs>
             <circle className="health-gauge-track" cx="90" cy="90" r="72" pathLength="1" />
             <motion.circle
               className="health-gauge-progress"
@@ -80,7 +73,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
               initial={{ strokeDashoffset: 1 }}
               animate={{ strokeDashoffset: 1 - scorePct }}
               transition={
-                reducedMotion ? { duration: 0 } : { duration: 1.05, ease: [0.2, 0.8, 0.2, 1] }
+                reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.2, 0, 0, 1] }
               }
             />
           </svg>
@@ -91,7 +84,6 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
             </strong>
             <small>/100</small>
           </div>
-          <div className="health-pulse" aria-hidden />
         </motion.div>
         <div className="health-summary">
           <div className="health-summary-head">
@@ -153,7 +145,7 @@ function SignalFactorPanel({
     <div className="border-t border-[var(--border)] px-5 pb-4">
       <button
         type="button"
-        className="flex min-h-[44px] w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+        className="flex min-h-11 w-full items-center justify-between text-left text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
