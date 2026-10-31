@@ -63,13 +63,8 @@ import type { CrmDashboardSnapshot } from '@bidstack/shared';
 // for the right company — we only need to render the layout here.
 export function DashboardPage() {
   const { accountId } = useParams<{ accountId?: string }>();
-  const { t } = useTranslation('crm');
-  return (
-    <>
-      <h1 className="sr-only">{t('dashboard.srHeading', 'Dashboard')}</h1>
-      {!accountId ? <OrgDashboard /> : <AccountCockpitPage accountId={accountId} />}
-    </>
-  );
+  // Each branch renders its own single H1 (org title or the company name).
+  return !accountId ? <OrgDashboard /> : <AccountCockpitPage accountId={accountId} />;
 }
 
 function AccountCockpitPage({ accountId }: { accountId: string }) {

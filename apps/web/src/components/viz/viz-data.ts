@@ -28,6 +28,10 @@ export interface OppRow {
   dueDate: string | null;
   customer: string | null;
   closedAt?: string | null;
+  /** Present on API rows; used by drill-down tables. */
+  name?: string | null;
+  code?: string | null;
+  owner?: string | null;
 }
 
 const isWon = (o: OppRow) => stageKey(o.stage) === 'closed_won';
@@ -143,3 +147,8 @@ export function cumulativeOpen(rows: OppRow[]) {
 const compact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
 /** Currency-free compact amount (opportunity rows carry no currency). */
 export const fmtCompact = (v: number) => compact.format(v);
+
+export type OppStatus = 'open' | 'won' | 'lost';
+export function oppStatus(o: OppRow): OppStatus {
+  return isWon(o) ? 'won' : isLost(o) ? 'lost' : 'open';
+}

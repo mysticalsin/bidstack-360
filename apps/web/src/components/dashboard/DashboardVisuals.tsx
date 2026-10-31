@@ -1,5 +1,7 @@
 // Visual-first /dashboard (Tony 13:25 BRT): every chart is derived from API
 // rows (opportunities, pipeline report, forecast projection, watchdog feed).
+import '@/components/drill/drill.css';
+
 import { Link } from 'react-router-dom';
 
 import { useId, useState } from 'react';
@@ -10,18 +12,22 @@ import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
 import SmoothTab from '@/components/kokonutui/smooth-tab';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
-import { HeroArea, QuarterBars, StageFunnel, StatusRings, WinRateLine } from '@/components/viz/lazy-bklit';
+import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
 import {
-  accountBars, cumulativeWon, fmtCompact, pastDueOpen, stageFunnel, statusMix, winRateByQuarter, wonByQuarter,
-  type OppRow,
+  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
+  winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
+import type { OppDrillFilter } from '@/components/drill/OppDrill';
+
+/** Opens the bid drill-down sheet with a starting filter. */
+export type OnDrill = (f: OppDrillFilter) => void;
 import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed }: {
-  rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed;
+export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill }: {
+  rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
 }) {
   const fresh = feed?.newAlertCount ?? 0;
   const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
@@ -41,14 +47,14 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed }: {
       className="dash-hero"
     >
       <div className="dash-hero-figs">
-        <div>
+        <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
           <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
           <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
-        </div>
-        <div>
+        </HeroFig>
+        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
           <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
           <div className="viz-meta">Won this year</div>
-        </div>
+        </HeroFig>
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
             <PulseOrb tone={pulse} size={96} bold />
@@ -57,8 +63,17 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed }: {
         ) : null}
       </div>
       <HeroArea data={trend} format={fmtCompact} />
-      <div className="viz-caption">Won value to date, by close month</div>
+      <div className="viz-caption">Won value to date, by close month. Select a number to see the bids behind it.</div>
     </ChartCard>
+  );
+}
+
+function HeroFig({ onClick, label, children }: { onClick?: () => void; label: string; children: React.ReactNode }) {
+  if (!onClick) return <div>{children}</div>;
+  return (
+    <button type="button" className="drill-hit" onClick={onClick} aria-label={label}>
+      {children}
+    </button>
   );
 }
 
@@ -95,42 +110,34 @@ export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdue
   );
 }
 
-export function FunnelCard({ rows }: { rows: OppRow[] }) {
+/** Pipeline by stage and bids by status, merged (both answered "where are my
+ *  bids?"). Each funnel column and each status chip opens the bid drill. */
+export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDrill }) {
   const data = stageFunnel(rows);
+  const ids = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
+  const m = statusMix(rows);
   return (
-    <ChartCard title="Pipeline by stage" meta="Open value per stage"
+    <ChartCard title="Pipeline" meta={`${m.open + m.won + m.lost} bids · open value per stage`} interactive testId="dashboard-pipeline"
       summary={data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids'}
       table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, fmtCompact(d.value)]) }}>
-      {data.length ? <StageFunnel data={data} format={fmtCompact} /> : <p className="viz-empty">No open bids.</p>}
-    </ChartCard>
-  );
-}
-
-export function StatusDonutCard({ rows }: { rows: OppRow[] }) {
-  const m = statusMix(rows);
-  const total = m.open + m.won + m.lost;
-  const data = [
-    { label: 'Open', value: m.open, color: 'color-mix(in srgb, var(--brand-primary, #006b4f) 55%, transparent)' },
-    { label: 'Won', value: m.won, color: 'var(--success, #177048)' },
-    { label: 'Lost', value: m.lost, color: 'color-mix(in srgb, var(--fg-tertiary, #6b6b6b) 45%, transparent)' },
-  ].filter((d) => d.value > 0);
-  return (
-    <ChartCard title="Bids by status" meta={`${total} bids`}
-      summary={`Open ${m.open}, won ${m.won}, lost ${m.lost}.`}
-      table={{ columns: ['Status', 'Bids'], rows: data.map((d) => [d.label, d.value]) }}>
-      <div className="dash-rings">
-        <StatusRings data={data} total={total} />
-        <ul className="viz-legend dash-rings-legend">
-          {data.map((d, i) => (
-            <li key={d.label}>
-              <span className="dash-rings-key">
-                <svg width="10" height="10" aria-hidden>{i % 3 === 0 ? <circle cx="5" cy="5" r="4" fill={d.color} /> : i % 3 === 1 ? <rect x="1" y="1" width="8" height="8" fill={d.color} /> : <path d="M5 1 L9 9 L1 9 Z" fill={d.color} />}</svg>
-                {d.label}
-              </span>
-              <span className="dash-rings-num">{d.value}<span className="viz-meta"> · {Math.round((d.value / total) * 100)}%</span></span>
-            </li>
-          ))}
-        </ul>
+      {data.length ? (
+        <div style={{ position: 'relative' }}>
+          <StageFunnel data={data} format={fmtCompact} />
+          <div className="viz-hits">
+            {data.map((d, i) => (
+              <button key={d.label} type="button" aria-label={`${d.label}: ${d.count} bid${d.count === 1 ? '' : 's'}, ${fmtCompact(d.value)}. Show bids`}
+                onClick={() => onDrill({ status: 'open', stage: ids[i] ?? null })} />
+            ))}
+          </div>
+        </div>
+      ) : <p className="viz-empty">No open bids.</p>}
+      <div className="viz-caption">Where your open bids sit today. Select a stage or a status to see the bids.</div>
+      <div className="dash-chips" role="group" aria-label="Bids by status">
+        {([['open', 'Open', m.open], ['won', 'Won', m.won], ['lost', 'Lost', m.lost]] as const).map(([k, label, n]) => (
+          <button key={k} type="button" className="dash-chip" onClick={() => onDrill({ status: k })}>
+            {label} <b>{n}</b>
+          </button>
+        ))}
       </div>
     </ChartCard>
   );
@@ -173,13 +180,20 @@ export function WinRateTrendCard({ rows, headingLevel }: { rows: OppRow[]; headi
   );
 }
 
-export function TopAccountsBarCard({ rows, headingLevel }: { rows: OppRow[]; headingLevel?: 2 | 3 }) {
+export function TopAccountsBarCard({ rows, headingLevel, onDrill }: { rows: OppRow[]; headingLevel?: 2 | 3; onDrill?: OnDrill }) {
   const data = accountBars(rows);
   return (
     <ChartCard headingLevel={headingLevel} title="Top accounts" meta="Won plus open value"
       summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}, open ${fmtCompact(d.open)}`).join('; ')}
       table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.open)]) }}>
-      <HBars data={data} format={fmtCompact} />
+      <HBars data={data} format={fmtCompact} onSelect={onDrill ? (label) => onDrill({ status: 'all', account: label }) : undefined} />
+      {onDrill ? (
+        <ul className="dash-chips" aria-label="Open an account's bids">
+          {data.map((d) => (
+            <li key={d.label}><button type="button" className="dash-chip" onClick={() => onDrill({ status: 'all', account: d.label })}>{d.label} <b>{fmtCompact(d.won + d.open)}</b></button></li>
+          ))}
+        </ul>
+      ) : null}
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'color-mix(in srgb, var(--success, #177048) 75%, transparent)' }} />Won</li>
         <li><i className="dash-key" style={{ background: 'color-mix(in srgb, var(--brand-primary, #006b4f) 22%, transparent)' }} />Open</li>
@@ -190,28 +204,38 @@ export function TopAccountsBarCard({ rows, headingLevel }: { rows: OppRow[]; hea
 
 const isSampleTitle = (t: string) => /^sample:/i.test(t);
 
-export function WatchdogHeatCard({ feed }: { feed?: WatchdogFeed }) {
+/** Watchdog heat and upcoming results, merged into one "what changed at my
+ *  accounts" card. Account names open the account page (its watchdog section
+ *  carries the full event list, sources and filters). */
+export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
   const weeks = (feed?.heatWeekStarts ?? []).map((w) => weekFmt.format(new Date(w)));
   const rows = (feed?.heat ?? []).map((h) => ({ id: h.companyId, name: h.companyName, cells: h.weeks.map((w) => ({ kind: w.worst, count: w.count })) }));
   const sample = (feed?.alerts ?? []).some((a) => isSampleTitle(a.title));
+  const results = (feed?.earnings ?? []).map((e) => ({ id: e.id, date: e.expectedAt, label: e.companyName, companyId: e.companyId }));
+  const days = feed?.days ?? 30;
   return (
-    <ChartCard title="Account watchdog" meta="Signals per week, last 8 weeks"
+    <ChartCard title="Account signals" meta="Last 8 weeks, and results due soon" interactive testId="dashboard-signals"
       sample={sample ? 'Local demo signals (titles start with "Sample:")' : undefined}
-      summary={rows.map((r) => `${r.name}: ${r.cells.reduce((n, c) => n + c.count, 0)} signals`).join('; ') || 'No signals in the last 8 weeks'}
-      table={{ columns: ['Account', ...weeks], rows: rows.map((r) => [r.name, ...r.cells.map((c) => (c.count ? `${c.count} ${c.kind ? KIND_LABEL[c.kind] : ''}` : '–'))]) }}>
-      {rows.length ? <HeatStrip rows={rows} weeks={weeks} /> : <p className="viz-empty">No signals in the last 8 weeks.</p>}
+      summary={`${rows.map((r) => `${r.name}: ${r.cells.reduce((n, c) => n + c.count, 0)} signals`).join('; ') || 'No signals in the last 8 weeks'}. ${results.map((i) => `${i.label} results on ${dayFmt.format(new Date(i.date))}`).join('; ') || 'No results expected'}.`}
+      table={{ columns: ['Account', 'Signals (8 weeks)', 'Results due'], rows: [...new Set([...rows.map((r) => r.name), ...results.map((r) => r.label)])].map((name) => [
+        name,
+        rows.find((r) => r.name === name)?.cells.reduce((n, c) => n + c.count, 0) ?? 0,
+        results.filter((r) => r.label === name).map((r) => dayFmt.format(new Date(r.date))).join(', ') || '–',
+      ]) }}>
+      {rows.length ? <HeatStrip rows={rows} weeks={weeks} rowHref={(id) => `/accounts/${id}`} /> : <p className="viz-empty">No signals in the last 8 weeks.</p>}
       <SignalLegend />
-    </ChartCard>
-  );
-}
-
-export function EarningsCard({ feed }: { feed?: WatchdogFeed }) {
-  const items = (feed?.earnings ?? []).map((e) => ({ id: e.id, date: e.expectedAt, label: e.companyName }));
-  return (
-    <ChartCard title="Upcoming results" meta={`Next ${feed?.days ?? 30} days`}
-      summary={items.map((i) => `${i.label} on ${dayFmt.format(new Date(i.date))}`).join('; ') || 'No results expected'}
-      table={{ columns: ['Account', 'Date'], rows: items.map((i) => [i.label, dayFmt.format(new Date(i.date))]) }}>
-      {items.length ? <EarningsStrip items={items} days={feed?.days ?? 30} /> : <p className="viz-empty">No results expected in this window.</p>}
+      <p className="dash-sub">Results due in the next {days} days</p>
+      {results.length ? (
+        <>
+          <EarningsStrip items={results} days={days} />
+          <ul className="dash-chips" aria-label="Results due">
+            {results.map((r) => (
+              <li key={r.id}><Link className="dash-chip" to={`/accounts/${r.companyId}`}>{r.label} <b>{dayFmt.format(new Date(r.date))}</b></Link></li>
+            ))}
+          </ul>
+        </>
+      ) : <p className="viz-empty">No results expected in this window.</p>}
+      <div className="viz-caption">Select an account to see every signal, its source and what to do next.</div>
     </ChartCard>
   );
 }
@@ -219,9 +243,10 @@ export function EarningsCard({ feed }: { feed?: WatchdogFeed }) {
 /** Revenue, win rate and top accounts in one card with kokonutui SmoothTab
  *  (MIT): one surface instead of three, each view keeps its own summary and
  *  table toggle. */
-export function PerformanceCard({ rows, projection }: {
+export function PerformanceCard({ rows, projection, onDrill }: {
   rows: OppRow[];
   projection?: Parameters<typeof ForecastCard>[0]['projection'];
+  onDrill?: OnDrill;
 }) {
   const [tab, setTab] = useState('revenue');
   const headId = useId();
@@ -232,6 +257,11 @@ export function PerformanceCard({ rows, projection }: {
           <h2 id={headId} className="viz-title">Performance</h2>
           <div className="viz-meta">Revenue, win rate and top accounts from your bids</div>
         </div>
+        {onDrill ? (
+          <button type="button" className="drill-more" onClick={() => onDrill({ status: tab === 'revenue' ? 'won' : 'all' })}>
+            Breakdown
+          </button>
+        ) : null}
       </header>
       <SmoothTab
         label="Performance views"
@@ -240,7 +270,7 @@ export function PerformanceCard({ rows, projection }: {
         items={[
           { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} /> },
           { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} /> },
-          { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} /> },
+          { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} /> },
         ]}
       />
     </section>

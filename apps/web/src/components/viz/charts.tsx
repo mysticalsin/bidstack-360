@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 // Lean, token-styled charts on recharts (already a dependency) + plain SVG.
 // Every chart: hairline axes, ≤1 dashed gridline set, subtle arrive, and
 // isAnimationActive=false under prefers-reduced-motion.
@@ -264,11 +265,17 @@ export function Donut({ data, center, centerLabel }: {
 }
 
 /* ---------- horizontal bars (top accounts) ---------- */
-export function HBars({ data, format }: { data: Array<{ label: string; open: number; won: number }>; format: (v: number) => string }) {
+export function HBars({ data, format, onSelect }: {
+  data: Array<{ label: string; open: number; won: number }>; format: (v: number) => string;
+  /** Pointer shortcut into a drill; keyboard users get the same via the card's drill list. */
+  onSelect?: (label: string) => void;
+}) {
   const reduced = useReducedMotion();
   return (
     <ResponsiveContainer width="100%" height={Math.max(140, data.length * 36 + 8)}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 56, bottom: 0, left: 0 }} barCategoryGap={8}>
+      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 56, bottom: 0, left: 0 }} barCategoryGap={8}
+        style={onSelect ? { cursor: 'pointer' } : undefined}
+        onClick={onSelect ? (st: { activeLabel?: string | number } | null) => { if (st?.activeLabel !== undefined) onSelect(String(st.activeLabel)); } : undefined}>
         <XAxis type="number" hide />
         <YAxis type="category" dataKey="label" width={150} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }}
           tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />
@@ -302,14 +309,19 @@ export function TargetBars({ data, format, target }: {
 }
 
 /* ---------- watchdog heat strip ---------- */
-export function HeatStrip({ rows, weeks }: {
+export function HeatStrip({ rows, weeks, rowHref }: {
   rows: Array<{ id: string; name: string; cells: Array<{ kind: string | null; count: number }> }>; weeks: string[];
+  rowHref?: (id: string) => string;
 }) {
   return (
     <div className="viz-heat">
       {rows.map((r) => (
         <div key={r.id} className="viz-heat-row">
-          <span className="viz-heat-name" title={r.name}>{r.name}</span>
+          {rowHref ? (
+            <Link className="viz-heat-name viz-heat-link" title={r.name} to={rowHref(r.id)}>{r.name}</Link>
+          ) : (
+            <span className="viz-heat-name" title={r.name}>{r.name}</span>
+          )}
           <span className="viz-heat-cells">
             {r.cells.map((c, i) => (
               <i key={i} data-kind={c.kind ?? undefined} style={{ '--a': Math.min(85, 25 + c.count * 20) } as React.CSSProperties}

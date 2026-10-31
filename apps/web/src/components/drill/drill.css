@@ -1,0 +1,36 @@
+/* Drill-down sheets: shallow depth behind every top-level visual.
+   8pt rhythm, two weights (400/500), no nested cards. */
+.drill { display: grid; gap: 24px; }
+.drill-trail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-tertiary); list-style: none; margin: 0; padding: 0; }
+.drill-trail li { display: inline-flex; align-items: center; gap: 8px; }
+.drill-trail li + li::before { content: '›'; color: var(--fg-tertiary); }
+.drill-trail button { color: var(--brand-primary); font-weight: 500; min-height: 32px; padding: 0 4px; border-radius: 6px; }
+.drill-trail button:hover { text-decoration: underline; }
+.drill-trail [aria-current] { color: var(--fg-primary); }
+.drill-caption { font-size: 14px; color: var(--fg-secondary); margin: 0; }
+.drill-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; margin: 0; }
+.drill-stats div { display: grid; gap: 4px; }
+.drill-stats dt { font-size: 12px; color: var(--fg-tertiary); }
+.drill-stats dd { margin: 0; font-size: 24px; font-weight: 500; color: var(--fg-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.drill-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.drill-filters input, .drill-filters select { min-height: 40px; border: 1px solid var(--border-default); border-radius: 8px; padding: 0 12px; font-size: 14px; background: var(--surface-card); color: var(--fg-primary); }
+.drill-filters input { flex: 1 1 200px; min-width: 0; }
+.drill-seg { display: inline-flex; border: 1px solid var(--border-default); border-radius: 8px; overflow: hidden; }
+.drill-seg button { min-height: 40px; padding: 0 12px; font-size: 13px; color: var(--fg-secondary); }
+.drill-seg button[aria-pressed='true'] { background: var(--surface-sunken); color: var(--fg-primary); font-weight: 500; }
+.drill-section-title { font-size: 14px; font-weight: 500; color: var(--fg-primary); margin: 0 0 8px; }
+.drill-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.drill-table th { text-align: left; font-weight: 500; font-size: 12px; color: var(--fg-tertiary); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.drill-table td { padding: 12px 8px 12px 0; border-bottom: 1px solid var(--border-subtle); color: var(--fg-primary); vertical-align: top; }
+.drill-table td.num, .drill-table th.num { text-align: right; }
+.drill-table a, .drill-table button.drill-link { color: var(--fg-primary); font-weight: 500; text-align: left; }
+.drill-table a:hover, .drill-table button.drill-link:hover { color: var(--brand-primary); text-decoration: underline; }
+.drill-sub { display: block; font-size: 12px; color: var(--fg-tertiary); font-weight: 400; }
+.drill-empty { font-size: 14px; color: var(--fg-tertiary); padding: 16px 0; }
+.drill-bar { display: block; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--brand-primary) 55%, transparent); margin-top: 6px; }
+/* Click targets on top-level visuals that open a drill. */
+.drill-hit { display: grid; gap: 4px; text-align: left; border-radius: 8px; padding: 4px; margin: -4px; cursor: pointer; color: inherit; background: none; }
+.drill-hit:hover { background: color-mix(in srgb, var(--brand-primary) 6%, transparent); }
+.drill-hit:focus-visible { outline: 2px solid var(--focus-ring-color, var(--brand-primary)); outline-offset: 2px; }
+.drill-more { font-size: 13px; font-weight: 500; color: var(--brand-primary); min-height: 32px; padding: 0 8px; border-radius: 6px; }
+.drill-more:hover { text-decoration: underline; }

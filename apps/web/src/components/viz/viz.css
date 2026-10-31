@@ -191,3 +191,16 @@
 /* Charts draw labels outside their svg box; hide them on off-screen panels so they cannot bleed into the active one. */
 .dash-perf [role='tabpanel'][inert] svg { visibility: hidden; }
 .viz-bk-reserve { width: 100%; }
+
+.viz-heat-link { font-weight: 500; }
+.viz-heat-link:hover { color: var(--viz-brand); text-decoration: underline; }
+.viz-hits { position: absolute; inset: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.viz-hits button { background: transparent; border-radius: 8px; cursor: pointer; }
+.viz-hits button:hover { background: color-mix(in srgb, var(--viz-brand) 6%, transparent); }
+.viz-hits button:focus-visible { outline: 2px solid var(--viz-brand); outline-offset: -2px; }
+.dash-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.dash-chip { display: inline-flex; align-items: baseline; gap: 8px; min-height: 40px; padding: 0 12px; border: 1px solid var(--viz-line); border-radius: 999px; font-size: 13px; color: var(--viz-muted); }
+.dash-chip b { font-weight: 500; color: var(--viz-ink); font-variant-numeric: tabular-nums; }
+.dash-chip:hover { border-color: var(--viz-brand); color: var(--viz-ink); }
+.dash-chip:focus-visible { outline: 2px solid var(--viz-brand); outline-offset: 2px; }
+.dash-sub { font-size: 13px; font-weight: 500; color: var(--viz-ink); margin: 8px 0 0; }

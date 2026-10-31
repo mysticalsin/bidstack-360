@@ -26,14 +26,12 @@ vi.mock('@/hooks/useWatchdogFeed', () => ({ useWatchdogFeed: () => ({ data: unde
 vi.mock('./DashboardVisuals', () => ({
   DashboardHero: () => <div data-testid="dashboard-hero" />,
   NeedsYou: () => <div data-testid="needs-you" />,
-  FunnelCard: () => <div />,
-  StatusDonutCard: () => <div />,
+  PipelineCard: () => <div data-testid="dashboard-pipeline" />,
+  SignalsCard: () => <div data-testid="dashboard-signals" />,
   ForecastCard: () => <div />,
   WinRateTrendCard: () => <div />,
   TopAccountsBarCard: () => <div />,
   PerformanceCard: () => <div data-testid="dashboard-performance" />,
-  WatchdogHeatCard: () => <div />,
-  EarningsCard: () => <div />,
 }));
 vi.mock('@/components/viz/viz.css', () => ({}));
 vi.mock('@/stores/currency', () => ({

@@ -1,7 +1,7 @@
 import '../../styles/org-dashboard.css';
 import '@/components/viz/viz.css';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -25,10 +25,8 @@ import { KpiRow } from './widgets/KpiRow';
 import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { QuickLinksCard } from './widgets/SidebarCards';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
-import {
-  DashboardHero, EarningsCard, FunnelCard, NeedsYou, PerformanceCard, StatusDonutCard,
-  WatchdogHeatCard,
-} from './DashboardVisuals';
+import { DashboardHero, NeedsYou, PerformanceCard, PipelineCard, SignalsCard } from './DashboardVisuals';
+import { OppDrill, type OppDrillFilter } from '@/components/drill/OppDrill';
 import { GettingStarted } from './widgets/GettingStarted';
 
 // ─── OrgDashboard ─────────────────────────────────────────────────────────────
@@ -43,6 +41,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const projection = useForecastProjection();
   const feed = useWatchdogFeed(30);
   const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
+  // Progressive disclosure (Tony 15:21): five visuals up top, every number,
+  // stage, status and account opens this one drill-down sheet.
+  const [drill, setDrill] = useState<OppDrillFilter | null>(null);
 
   const s = summary.data;
   const closedWon =
@@ -176,9 +177,14 @@ export const OrgDashboard = memo(function OrgDashboard() {
     (s?.opportunities ?? 0) === 0 &&
     (s?.tasks ?? 0) === 0;
 
-  if (summary.isLoading) return <DashboardSkeleton />;
+  // Exactly one H1 per state: the visible page title in the main view, an
+  // sr-only one while loading, on error and in the empty-org state.
+  const srTitle = <h1 className="sr-only">{t('orgDashboard.pageTitle', 'Dashboard')}</h1>;
+  if (summary.isLoading) return <>{srTitle}<DashboardSkeleton /></>;
   if (summary.isError) {
     return (
+      <>
+      {srTitle}
       <ErrorState
         title={t('orgDashboard.errorTitle', 'Could not load dashboard')}
         message={
@@ -192,9 +198,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
           </button>
         }
       />
+      </>
     );
   }
-  if (isEmptyOrg) return <GettingStarted />;
+  if (isEmptyOrg) return <>{srTitle}<GettingStarted /></>;
 
   return (
     <div className="space-y-5">
@@ -240,8 +247,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
       </motion.div>
 
-      {/* Visual-first body (Tony 13:25 BRT): hero + needs-you, then four
-          chart rows. Everything below is derived from API rows. */}
+      {/* Five top-level visuals, each with a plain-language caption; depth is
+          one click away in the drill sheet or on the account page. */}
       <div className="dash-v" aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')} role="region">
         <div className="viz-grid-3">
           <DashboardHero
@@ -250,20 +257,16 @@ export const OrgDashboard = memo(function OrgDashboard() {
             weighted={pipelineReport.data?.weightedPipeline ?? 0}
             openCount={s?.openOpportunities ?? 0}
             feed={feed.data}
+            onDrill={setDrill}
           />
           <NeedsYou rows={oppRows} overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
         </div>
         <div className="viz-grid-2">
-          <FunnelCard rows={oppRows} />
-          <StatusDonutCard rows={oppRows} />
+          <PipelineCard rows={oppRows} onDrill={setDrill} />
+          <SignalsCard feed={feed.data} />
         </div>
-        <div className="viz-grid-2">
-          <PerformanceCard rows={oppRows} projection={projection.data} />
-          <div className="dash-stack">
-            <WatchdogHeatCard feed={feed.data} />
-            <EarningsCard feed={feed.data} />
-          </div>
-        </div>
+        <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
+        <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 
         <details className="dash-more">
           <summary>{t('orgDashboard.moreDetail', 'Workspace detail')}</summary>

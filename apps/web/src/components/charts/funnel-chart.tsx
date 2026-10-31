@@ -648,7 +648,9 @@ function SegmentLabel({
           "absolute inset-0 flex",
           isHorizontal ? "flex-col items-center" : "flex-row items-center"
         )}
-        initial={{ opacity: 0 }}
+        // Labels render at full opacity immediately: text that fades in fails
+        // axe colour-contrast mid-animation, and only the shapes need motion.
+        initial={false}
         transition={{
           delay: index * staggerDelay + 0.25,
           duration: 0.35,
@@ -714,7 +716,7 @@ function SegmentLabel({
           ? cn("flex-col items-center", justifyMap[align])
           : cn("flex-row items-center", justifyMap[align])
       )}
-      initial={{ opacity: 0 }}
+      initial={false}
       style={{
         padding: isHorizontal ? "8% 0" : "0 8%",
       }}

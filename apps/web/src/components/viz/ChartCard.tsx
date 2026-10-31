@@ -12,8 +12,12 @@ export interface TableData {
 }
 
 export function ChartCard({
-  title, meta, sample, table, summary, children, className, testId, headingLevel = 2,
+  title, meta, sample, table, summary, children, className, testId, headingLevel = 2, interactive, actions,
 }: {
+  /** Chart contains its own controls (drill hits), so it must not be role="img". */
+  interactive?: boolean;
+  /** Extra header controls, e.g. a "Breakdown" drill button. */
+  actions?: ReactNode;
   title: string;
   meta?: ReactNode;
   /** Set when any series is illustrative, not from the API. */
@@ -37,6 +41,7 @@ export function ChartCard({
           {meta ? <div className="viz-meta">{meta}</div> : null}
         </div>
         <div className="viz-tools">
+          {actions}
           {sample ? (
             <span className="viz-sample" title={typeof sample === 'string' ? sample : 'Illustrative data, not from your records'}>
               Sample
@@ -60,7 +65,7 @@ export function ChartCard({
           </tbody>
         </table>
       ) : (
-        <figure className="viz-figure" role="img" aria-label={summary}>
+        <figure className="viz-figure" {...(interactive ? { 'aria-label': summary, style: { position: 'relative' } } : { role: 'img', 'aria-label': summary })}>
           {children}
         </figure>
       )}
