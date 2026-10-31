@@ -325,3 +325,30 @@ export function crossRegionTalkingPoints(input: {
   for (const o of input.opportunities.slice(0, 2)) points.push(`Opportunity discussed: ${o}. Check for a ${input.ownedRegion} equivalent.`);
   return points.map((p) => p.replace(/\u2014/g, '-'));
 }
+
+// ─── Consent filter (applied at every ingest path) ─────────────────────────
+
+export interface MeetingConsent {
+  source: MeetingIntelSource;
+  shareSummary: boolean;
+  shareTranscript: boolean;
+}
+
+export type ConsentResult =
+  | { ok: true; meeting: NormalizedMeeting; transcriptDropped: boolean }
+  | { ok: false; reason: 'confidential' | 'no_consent' };
+
+/**
+ * What may leave a user's second brain. Confidential meetings never do; a
+ * Metis user who has not consented to summary sharing shares nothing; raw
+ * transcripts are dropped unless the user explicitly allowed them. ABC and
+ * manual entries never carry a transcript.
+ */
+export function applyMeetingConsent(meeting: NormalizedMeeting, consent: MeetingConsent): ConsentResult {
+  if (meeting.confidential) return { ok: false, reason: 'confidential' };
+  if (consent.source === 'metis' && !consent.shareSummary) return { ok: false, reason: 'no_consent' };
+  const allowTranscript = consent.source === 'metis' && consent.shareTranscript;
+  const { transcript, confidential: _c, ...rest } = meeting;
+  const out: NormalizedMeeting = allowTranscript && transcript ? { ...rest, transcript } : { ...rest };
+  return { ok: true, meeting: out, transcriptDropped: !!transcript && !allowTranscript };
+}
