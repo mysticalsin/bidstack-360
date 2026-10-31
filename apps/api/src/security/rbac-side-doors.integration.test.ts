@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '@bidstack/db';
 
 import { invalidateAccessScope } from '../lib/access-scope.js';
+import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
 import { buildServer } from '../server.js';
 import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../test-support/isolated-org.js';
 
@@ -47,9 +48,25 @@ function get(url: string, role: string) {
 describe('RBAC side doors', () => {
   it('global search drops result types the caller cannot read', async () => {
     const q = encodeURIComponent(oppName.split(/\s+/)[0] ?? oppName);
-    const asSdr = await get(`/api/v1/search?q=${q}&types=opportunity`, 'sdr');
-    expect(asSdr.statusCode, asSdr.body).toBe(200);
-    expect(asSdr.json().items).toEqual([]);
+    // SDR holds opportunities:read again since the 2026-10-31 role-read
+    // restore, so take that one grant away to get a caller who cannot read.
+    const grant = await prisma.rolePermission.findFirstOrThrow({
+      where: { orgId: orgId!, deletedAt: null, role: { name: 'SDR' }, permission: { key: 'opportunities:read' } },
+      select: { roleId: true, permissionId: true },
+    });
+    const withGrant = await get(`/api/v1/search?q=${q}&types=opportunity`, 'sdr');
+    expect(withGrant.json().items.length, withGrant.body).toBeGreaterThan(0);
+    await prisma.rolePermission.updateMany({ where: grant, data: { deletedAt: new Date() } });
+    clearRbacDecisionCacheForTest();
+    try {
+      const asSdr = await get(`/api/v1/search?q=${q}&types=opportunity`, 'sdr');
+      expect(asSdr.statusCode, asSdr.body).toBe(200);
+      expect(asSdr.json().items).toEqual([]);
+    } finally {
+      // Raw SQL: the soft-delete middleware hides the tombstone from updateMany.
+      await prisma.$executeRaw`UPDATE role_permissions SET deleted_at = NULL WHERE role_id = ${grant.roleId}::uuid AND permission_id = ${grant.permissionId}::uuid`;
+      clearRbacDecisionCacheForTest();
+    }
     const asAdmin = await get(`/api/v1/search?q=${q}&types=opportunity`, 'admin');
     expect(asAdmin.statusCode, asAdmin.body).toBe(200);
     expect(asAdmin.json().items.length).toBeGreaterThan(0);
