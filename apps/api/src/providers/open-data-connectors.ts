@@ -41,7 +41,7 @@ export async function buildOpenDataSignals({
   now = new Date(),
   fetchImpl = fetch,
 }: OpenSignalInput): Promise<UnscoredOpenDataSignal[]> {
-  const signals: OpenDataSignal[] = [];
+  const signals: UnscoredOpenDataSignal[] = [];
   const normalizedQuery = query?.trim();
   const normalizedTicker = ticker?.trim().toUpperCase();
 

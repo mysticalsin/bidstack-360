@@ -245,7 +245,10 @@ export function mergeTechnicalStack(
     for (const item of category.items) {
       const key = item.name.toLowerCase();
       const existing = items.get(key);
-      items.set(key, existing && existing.confidence > item.confidence ? existing : item);
+      items.set(
+        key,
+        existing && (existing.confidence ?? -1) > (item.confidence ?? -1) ? existing : item,
+      );
     }
     byCategory.set(category.label, items);
   }

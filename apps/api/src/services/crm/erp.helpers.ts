@@ -74,9 +74,9 @@ export function mergeSuggestions(...groups: CompanySuggestion[][]): CompanySugge
   for (const item of groups.flat()) {
     const key = item.domain ?? normalizeName(item.legalName ?? item.name);
     const existing = byKey.get(key);
-    if (!existing || item.confidence > existing.confidence) byKey.set(key, item);
+    if (!existing || (item.confidence ?? -1) > (existing.confidence ?? -1)) byKey.set(key, item);
   }
-  return [...byKey.values()].sort((a, b) => b.confidence - a.confidence);
+  return [...byKey.values()].sort((a, b) => (b.confidence ?? -1) - (a.confidence ?? -1));
 }
 
 // ─── Low-level utilities (exported for partner search layer) ────────────────
