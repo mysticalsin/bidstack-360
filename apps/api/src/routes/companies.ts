@@ -163,7 +163,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           parentId: body.parentId,
           orgId: req.auth.orgId,
           source: 'manual',
-          confidence: 1,
+          // The column cannot be null. 0 means not scored. A typed name is not a 100% match.
+          confidence: 0,
         },
       });
       await prisma.auditLog.create({

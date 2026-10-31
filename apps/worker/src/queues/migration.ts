@@ -172,7 +172,7 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     }
   }
   const created = await prisma.company.create({
-    data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 1 },
+    data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 0 },
     select: { id: true },
   });
   return created.id;
