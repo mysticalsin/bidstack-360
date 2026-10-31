@@ -66,7 +66,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           period: z.string().min(1).max(50),
           category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
           amountMicros: z.number().int().nonnegative().max(1_000_000_000_000_000),
-          currency: z.string().length(3).default('EUR'),
+          currency: z.string().length(3).default('XXX'),
           note: z.string().max(2000).optional(),
           // The Forecasts grid lists every owner's rows and edits them inline,
           // so a write must target the row's owner — not whoever is signed in.

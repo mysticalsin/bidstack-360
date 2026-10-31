@@ -80,7 +80,7 @@ export function ForecastsPage() {
           period,
           category,
           amountMicros: micros,
-          currency: 'EUR',
+          currency: 'XXX',
         });
         toast.success(t('forecasts.toastUpdated', 'Forecast updated'));
       } catch (err) {
@@ -167,7 +167,7 @@ export function ForecastsPage() {
                         period: body.period,
                         category,
                         amountMicros: amount,
-                        currency: 'EUR',
+                        currency: 'XXX',
                       }),
                     ),
                 );

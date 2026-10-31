@@ -96,14 +96,23 @@ export interface ManualCommitAggregation {
  * silently misstate the number — so non-matching rows are excluded and
  * counted for the caller to log (exclusion should never be silent).
  */
+/** EUR here is the old form default, not a chosen euro amount. */
+export function isUnspecifiedForecastCurrency(currency: string): boolean {
+  return currency === 'XXX' || currency === 'EUR';
+}
+
 export function aggregateManualCommit(
   rows: ManualCommitRow[],
   reportingCurrency: string,
 ): ManualCommitAggregation {
+  const matches = (currency: string) =>
+    reportingCurrency === 'XXX'
+      ? isUnspecifiedForecastCurrency(currency)
+      : currency === reportingCurrency;
   const byPeriod = new Map<string, number>();
   let excludedCount = 0;
   for (const row of rows) {
-    if (row.currency !== reportingCurrency) {
+    if (!matches(row.currency)) {
       excludedCount += 1;
       continue;
     }

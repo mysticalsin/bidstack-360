@@ -21,7 +21,9 @@ import {
 } from './forecasts-projection.helpers.js';
 
 const FORWARD_QUARTERS = 2; // current quarter + next 2 = 3-period rolling window
-const FORECAST_CURRENCY = 'EUR'; // micros are EUR at rest (CLAUDE.md money convention)
+// Opportunities do not store a currency. XXX is the ISO code for no currency.
+// Older forecast rows were written as EUR by the form default; they are the same bucket.
+const FORECAST_CURRENCY = 'XXX';
 const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
 
 export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) => {

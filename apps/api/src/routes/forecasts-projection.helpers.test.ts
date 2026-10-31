@@ -158,6 +158,19 @@ describe('aggregateManualCommit', () => {
     expect(excludedCount).toBe(0);
   });
 
+  it('treats the old EUR default and XXX as one unspecified bucket', () => {
+    const { byPeriod, excludedCount } = aggregateManualCommit(
+      [
+        commitRow({ amountMicros: 1_000_000, currency: 'EUR' }),
+        commitRow({ amountMicros: 2_000_000, currency: 'XXX' }),
+        commitRow({ amountMicros: 9_000_000, currency: 'USD' }),
+      ],
+      'XXX',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(3_000_000);
+    expect(excludedCount).toBe(1);
+  });
+
   it('handles bigint amountMicros from the Prisma driver', () => {
     const { byPeriod } = aggregateManualCommit(
       [commitRow({ amountMicros: BigInt(7_000_000) })],
