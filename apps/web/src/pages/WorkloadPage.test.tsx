@@ -40,15 +40,6 @@ vi.mock('@/hooks/useWorkload', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useFormatMoney', () => ({
-  useFormatMoney: () => ({
-    currency: 'EUR',
-    convert: (v: number) => v,
-    formatMoney: (v: number) => `€${v}`,
-    formatMoneyMicros: (micros: string | number | bigint) => `€${micros}`,
-  }),
-}));
-
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: () => ({
     data: { items: hookMocks.oppItems, nextCursor: null },
@@ -123,8 +114,12 @@ describe('WorkloadPage', () => {
     expect(screen.getByTestId('workload-kpi-bids').textContent).toBe('13');
     expect(screen.getByTestId('workload-kpi-over').textContent).toBe('1');
     expect(screen.getByTestId('workload-kpi-unassigned').textContent).toBe('3');
-    // Weighted total = 9M + 4M + 0 + 1M micros, formatted at the edge.
-    expect(screen.getByTestId('workload-kpi-weighted').textContent).toBe('€14000000');
+    // WHY: opportunities do not store a currency. 14_000_000 micros is 14
+    // major units and must not render as dollars or euros.
+    const weighted = screen.getByTestId('workload-kpi-weighted').textContent ?? '';
+    expect(weighted).toMatch(/unspecified/);
+    expect(weighted).not.toMatch(/[$€£]/);
+    expect(weighted).not.toContain('14000000');
   });
 
   it('shows the bespoke zero state that tells the lead how to light it up', () => {
@@ -182,5 +177,8 @@ describe('WorkloadPage', () => {
     expect(link?.getAttribute('href')).toBe(
       '/opportunities/44444444-4444-4444-8444-444444444444',
     );
+    // Opportunity.value is already major units and has no currency.
+    expect(link?.textContent).toMatch(/unspecified/);
+    expect(link?.textContent).not.toMatch(/[$€£]/);
   });
 });

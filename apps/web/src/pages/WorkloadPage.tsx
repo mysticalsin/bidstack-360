@@ -3,7 +3,7 @@
  * section). One glance answers: whose desk is over capacity, who can take the
  * next RFP, which bids are ownerless, and where the week's deadlines land.
  * Data comes from GET /analytics/workload (per-owner aggregates over existing
- * opportunities + tasks); money arrives in micros and is formatted here.
+ * opportunities + tasks). Amounts are micros with no stored currency.
  */
 import { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -16,7 +16,7 @@ import {
   ErrorState,
   LoadingSkeleton,
 } from '@/components/ui/StateMessages';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import { useWorkload } from '@/hooks/useWorkload';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
@@ -26,7 +26,6 @@ import { WorkloadTable } from './workload/WorkloadTable';
 export function WorkloadPage() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
-  const { formatMoneyMicros } = useFormatMoney();
   const workload = useWorkload();
 
   const owners = useMemo(() => workload.data?.owners ?? [], [workload.data]);
@@ -43,7 +42,7 @@ export function WorkloadPage() {
     {
       key: 'weighted',
       label: t('workload.totalWeighted', 'Weighted pipeline'),
-      value: formatMoneyMicros(totals.weightedValueMicros.toString()),
+      value: formatUnspecifiedCompact(Number(totals.weightedValueMicros) / 1_000_000),
       alert: false,
     },
     {
@@ -132,7 +131,7 @@ export function WorkloadPage() {
             }
           />
         ) : (
-          <WorkloadTable owners={owners} formatMoneyMicros={formatMoneyMicros} />
+          <WorkloadTable owners={owners} />
         )}
       </motion.div>
     </motion.div>

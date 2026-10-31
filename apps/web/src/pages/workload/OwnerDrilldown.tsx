@@ -5,9 +5,9 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import type { Opportunity } from '@bidstack/shared';
 
@@ -24,7 +24,6 @@ function isOpen(o: Opportunity): boolean {
 
 export function OwnerDrilldown({ email, ownerLabel }: Props) {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const opps = useOpportunities({ owner: email, limit: 200 });
 
   if (opps.isLoading) {
@@ -68,10 +67,8 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
               {o.customer} — {o.name}
             </span>
             <span className="tabular-nums text-[var(--fg-secondary)]">
-              {/* Opportunity.value is already denominated in units (serialized
-                  from micros server-side) — convert back for the shared
-                  micros formatter. */}
-              {formatMoneyMicros(Math.round(o.value * 1_000_000))}
+              {/* Opportunity.value is already major units. No currency is stored. */}
+              {formatUnspecifiedCompact(o.value)}
             </span>
             <DueDateChip dueDate={o.dueDate} size="sm" />
             <Icon name="chevron-right" size={12} className="text-[var(--fg-tertiary)]" />
