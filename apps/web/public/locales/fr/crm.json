@@ -3470,6 +3470,8 @@
   "activityTimeline": {
     "regionLabel": "Activité récente",
     "title": "Activité récente",
+    "itemCount_one": "{{count}} dernier élément",
+    "itemCount_other": "{{count}} derniers éléments",
     "itemCount": "{{count}} derniers éléments",
     "emptyTitle": "Rien pour l'instant",
     "emptyMessage": "Les tâches, e-mails et exécutions Dust de ce compte apparaîtront ici."

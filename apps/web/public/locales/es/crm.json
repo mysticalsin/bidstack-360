@@ -3448,6 +3448,8 @@
   "activityTimeline": {
     "regionLabel": "Actividad reciente",
     "title": "Actividad reciente",
+    "itemCount_one": "Último {{count}} elemento",
+    "itemCount_other": "Últimos {{count}} elementos",
     "itemCount": "Últimos {{count}} elementos",
     "emptyTitle": "Nada todavía",
     "emptyMessage": "Las tareas, los correos y las ejecuciones de Dust de esta cuenta aparecerán aquí."

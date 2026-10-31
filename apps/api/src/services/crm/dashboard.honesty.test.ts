@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { mapStoredInsights } from './dashboard.cockpit.js';
 import { defaultProviderHealth } from './dashboard.providers.js';
 import { serializeDeal } from './dashboard.queries.js';
 import { asProviderStatus, formatMicrosCompact } from './dashboard.utils.js';
@@ -22,6 +23,31 @@ afterEach(() => {
     if (previous === undefined) delete process.env[key];
     else process.env[key] = previous;
   }
+});
+
+describe('dashboard insights are stored rows only', () => {
+  it('does not invent a stagnation or upsell score when nothing is stored', () => {
+    expect(mapStoredInsights([])).toEqual([]);
+  });
+
+  it('uses the stored basis points instead of a fixed model score', () => {
+    const [insight] = mapStoredInsights([
+      {
+        id: 'insight-1',
+        kind: 'next_best_action',
+        title: 'Recorded note',
+        summary: 'The owner wrote this down.',
+        confidenceBps: 4000,
+        companyName: 'DNB Bank',
+        opportunityId: null,
+        sourceAttribution: [],
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      },
+    ]);
+    expect(insight?.confidence).toBe(0.4);
+    expect(insight?.title).toBe('Recorded note');
+    expect(JSON.stringify(insight)).not.toContain('Deal stagnation');
+  });
 });
 
 describe('provider health is not a configured-means-healthy probe', () => {

@@ -357,19 +357,17 @@ export const crmGenerateInsights: Tool<typeof GenerateInsightsInput> = {
           orderBy: { updatedAt: 'desc' },
         });
 
-    // AiInsight Prisma model is pending — synthesize the insight in memory.
-    // When the model lands, restore the persistent .create() call.
+    // No insight row is stored. Do not invent a next action or a confidence score.
     void ctx.orgId;
-    const confidenceBps = deal ? 7600 : 5200;
     return {
-      id: `insight-${normalizeName(deal?.customer ?? args.company ?? 'mantu')}-${Date.now()}`,
-      kind: 'next_best_action',
-      title: 'Next best action',
+      insight: null,
+      confidence: null,
+      confidenceBasis: 'not_scored',
       summary: deal
-        ? `Schedule an executive alignment step for ${deal.customer} and attach the compliance checklist.`
-        : 'Run company enrichment before generating a targeted next best action.',
-      confidence: confidenceBps / 10000,
-      createdAt: new Date().toISOString(),
+        ? `No scored next action is stored for ${deal.customer}.`
+        : 'No scored next action is stored.',
+      dealId: deal?.id ?? null,
+      companyName: deal?.customer ?? args.company ?? null,
     };
   },
 };

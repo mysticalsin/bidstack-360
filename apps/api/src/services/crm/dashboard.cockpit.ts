@@ -22,7 +22,6 @@ import {
   asComplianceStatus,
   asRiskSeverity,
   asRiskStatus,
-  attribution,
   formatMicrosCompact,
   normalizeName,
   parseAttribution,
@@ -293,61 +292,32 @@ export function buildActivities(
 
 // ─── Default insights ─────────────────────────────────────────────────────────
 
-export function buildDefaultInsights(
-  opportunities: Array<{
-    id: string;
-    customer: string;
-    name: string;
-    probability: number;
-    updatedAt: Date;
-  }>,
-): Array<z.infer<typeof AiInsight>> {
-  const lowest = [...opportunities].sort((a, b) => a.probability - b.probability)[0];
-  const largest = [...opportunities].sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt))[0];
-  return [
-    {
-      id: 'insight-stagnation',
-      kind: 'deal_stagnation',
-      title: 'Deal stagnation watch',
-      summary: lowest
-        ? `${lowest.customer} needs a next-step owner before the close plan ages out.`
-        : 'No open opportunity risk detected.',
-      confidence: 0.78,
-      companyId: lowest ? normalizeName(lowest.customer) : null,
-      companyName: lowest?.customer ?? null,
-      dealId: lowest?.id ?? null,
-      sourceAttribution: [
-        attribution({
-          source: 'bidstack_rules',
-          label: 'Pipeline velocity model',
-          sourceUrl: null,
-          confidence: 0.78,
-        }),
-      ],
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'insight-upsell',
-      kind: 'funding_upsell',
-      title: 'Funding and award upsell signal',
-      summary: largest
-        ? `${largest.customer} has enough active motion to justify a managed-security expansion play.`
-        : 'No funding signal available yet.',
-      confidence: 0.71,
-      companyId: largest ? normalizeName(largest.customer) : null,
-      companyName: largest?.customer ?? null,
-      dealId: largest?.id ?? null,
-      sourceAttribution: [
-        attribution({
-          source: 'verified_source_registry',
-          label: 'SAM/TED/USAspending adapter registry',
-          sourceUrl: null,
-          confidence: 0.71,
-        }),
-      ],
-      createdAt: new Date().toISOString(),
-    },
-  ];
+type StoredInsightRow = {
+  id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  confidenceBps: number;
+  companyName: string | null;
+  opportunityId: string | null;
+  sourceAttribution: unknown;
+  createdAt: Date;
+};
+
+/** Only rows that were stored. An empty list is not a scored stagnation warning. */
+export function mapStoredInsights(rows: readonly StoredInsightRow[]): Array<z.infer<typeof AiInsight>> {
+  return rows.map((insight) => ({
+    id: insight.id,
+    kind: insight.kind as z.infer<typeof AiInsight>['kind'],
+    title: insight.title,
+    summary: insight.summary,
+    confidence: insight.confidenceBps / 10_000,
+    companyId: insight.companyName ? normalizeName(insight.companyName) : null,
+    companyName: insight.companyName,
+    dealId: insight.opportunityId,
+    sourceAttribution: parseAttribution(insight.sourceAttribution),
+    createdAt: insight.createdAt.toISOString(),
+  }));
 }
 
 // ─── Risk / compliance serializers ────────────────────────────────────────────

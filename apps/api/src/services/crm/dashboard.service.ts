@@ -16,7 +16,7 @@
 import { type z } from 'zod';
 
 import { type PrismaClient } from '@bidstack/db';
-import type { AiInsight, CrmDashboardSnapshot } from '@bidstack/shared';
+import type { CrmDashboardSnapshot } from '@bidstack/shared';
 
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
@@ -32,7 +32,7 @@ import {
 import {
   buildActivities,
   buildCockpit,
-  buildDefaultInsights,
+  mapStoredInsights,
   serializeBidOpportunity,
 } from './dashboard.cockpit.js';
 import {
@@ -48,7 +48,7 @@ import {
   serializeReleaseScore,
   serializeWidget,
 } from './dashboard.queries.js';
-import { normalizeName, parseAttribution } from './dashboard.utils.js';
+import { normalizeName } from './dashboard.utils.js';
 
 // ─── Logger type ───────────────────────────────────────────────────────────────
 
@@ -321,20 +321,7 @@ export async function buildDashboardSnapshot(
           (insight.opportunityId && visibleOpportunityIds?.has(insight.opportunityId)),
       )
     : persistedInsights;
-  const insights = visibleInsights.length
-    ? visibleInsights.map((insight) => ({
-        id: insight.id,
-        kind: insight.kind as z.infer<typeof AiInsight>['kind'],
-        title: insight.title,
-        summary: insight.summary,
-        confidence: insight.confidenceBps / 10_000,
-        companyId: insight.companyName ? normalizeName(insight.companyName) : null,
-        companyName: insight.companyName,
-        dealId: insight.opportunityId,
-        sourceAttribution: parseAttribution(insight.sourceAttribution),
-        createdAt: insight.createdAt.toISOString(),
-      }))
-    : buildDefaultInsights(opportunities);
+  const insights = mapStoredInsights(visibleInsights);
   const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
   const selectedCompany =
     findSelectedCompany(companies, accountId) ??

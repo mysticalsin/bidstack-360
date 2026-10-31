@@ -3447,6 +3447,8 @@
   "activityTimeline": {
     "regionLabel": "Recent activity",
     "title": "Recent activity",
+    "itemCount_one": "Last {{count}} item",
+    "itemCount_other": "Last {{count}} items",
     "itemCount": "Last {{count}} items",
     "emptyTitle": "Nothing yet",
     "emptyMessage": "Tasks, emails, and Dust runs for this account will appear here."

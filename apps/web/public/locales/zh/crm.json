@@ -3415,6 +3415,8 @@
   "activityTimeline": {
     "regionLabel": "近期活动",
     "title": "近期活动",
+    "itemCount_one": "最近 {{count}} 项",
+    "itemCount_other": "最近 {{count}} 项",
     "itemCount": "最近 {{count}} 项",
     "emptyTitle": "暂无内容",
     "emptyMessage": "此账户的任务、邮件和 Dust 运行将显示在此处。"
