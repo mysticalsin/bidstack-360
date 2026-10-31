@@ -39,14 +39,12 @@ export function AccountNewsSignalCard({ accountId }: { accountId: string }) {
   const news = useAccountNews(accountId);
   const items = news.data?.items ?? [];
   const source = attributionFor(news.data?.sourceAttribution, news.data?.fetchedAt);
-  const sourceConfidence = Math.round(source.confidence * 100);
   const sourceHint = t(
     'accountNewsSignal.sourceHint',
-    '{{label}} open-web feed checked at {{fetchedAt}} with {{confidence}}% source confidence. Verify before treating it as a Mantu fact.',
+    '{{label}} is a public news search checked at {{fetchedAt}}. It is not a scored source and not an internal fact.',
     {
       label: source.label,
       fetchedAt: when(source.fetchedAt) || source.fetchedAt,
-      confidence: sourceConfidence,
     },
   );
 
@@ -93,14 +91,6 @@ export function AccountNewsSignalCard({ accountId }: { accountId: string }) {
                 state="crm"
                 hint={sourceHint}
                 data-testid="account-news-source"
-              />
-              <SourceBadge
-                label={t('accountNewsSignal.confidenceBadge', '{{confidence}}% source confidence', {
-                  confidence: sourceConfidence,
-                })}
-                state={source.confidence >= 0.7 ? 'verified' : 'apollo_stale'}
-                hint={sourceHint}
-                data-testid="account-news-source-confidence"
               />
               <span>
                 {t(
