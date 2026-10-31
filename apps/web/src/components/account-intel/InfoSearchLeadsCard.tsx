@@ -1,7 +1,7 @@
 /**
  * InfoSearch call lists / lead intel for the open account (A6).
- * Shows live data when INFOSEARCH_ENABLED is configured; otherwise the API
- * returns clearly-labelled sample data so the section is never empty.
+ * Shows live rows only when InfoSearch is connected. A preview payload is
+ * not listed, so sample names never read as people on this account.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -50,10 +50,7 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
         title={t('infoSearchLeads.title', 'InfoSearch leads')}
         caption={
           preview
-            ? t(
-                'infoSearchLeads.captionPreview',
-                'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists',
-              )
+            ? t('infoSearchLeads.captionPreview', 'InfoSearch is not connected for this workspace.')
             : t(
                 'infoSearchLeads.captionLive',
                 'Call lists and lead intel for this account — pulled live from InfoSearch',
@@ -71,6 +68,13 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
               t('infoSearchLeads.errorMessage', 'Lead intel could not be loaded.')
             }
           />
+        ) : preview ? (
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'infoSearchLeads.previewHidden',
+              'No live call list. Sample names are not shown on this account.',
+            )}
+          </p>
         ) : (leads.data?.items.length ?? 0) === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
             {t('infoSearchLeads.empty', 'No InfoSearch leads matched this account.')}
