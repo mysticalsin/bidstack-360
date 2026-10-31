@@ -49,7 +49,9 @@ import {
   isRedacted,
   liveNodes,
   lockChart,
-  meetingStats,
+  type MeetingStats,
+  nodeEmails,
+  nodeMeetingStats,
   provenanceFor,
   redactedContactIds,
   toNode,
@@ -69,11 +71,17 @@ const EDITABLE = [
   'businessUnit',
   'region',
   'photoUrl',
+  'email',
+  'phone',
+  'linkedinUrl',
   'relationshipStrength',
   'sentiment',
   'ownerUserId',
   'sortOrder',
 ] as const;
+/** Contact PII: the audit diff records that it changed, never the value. */
+const PII_FIELDS = new Set<string>(['email', 'phone', 'linkedinUrl']);
+const auditValue = (k: string, v: unknown) => (PII_FIELDS.has(k) ? (v ? '[set]' : '[cleared]') : v);
 type Editable = (typeof EDITABLE)[number];
 
 export async function auditOrgChart(
@@ -101,8 +109,9 @@ export function sendConflict(reply: FastifyReply, err: unknown): FastifyReply {
 async function viewOf(orgId: string, scope: AccessScope, chartId: string, since?: Date) {
   const nodes = await liveNodes(prisma, orgId, chartId);
   const redacted = await redactedContactIds(orgId, scope, nodes);
-  const contactIds = nodes.filter((n) => n.contactId && !redacted.has(n.contactId)).map((n) => n.contactId!);
-  const stats = await meetingStats(orgId, scope, contactIds, since);
+  const chart = await prisma.orgChart.findFirst({ where: { id: chartId, orgId }, select: { companyId: true } });
+  const visibleNodes = nodes.filter((n) => !(n.contactId && redacted.has(n.contactId)));
+  const stats = chart ? await nodeMeetingStats(orgId, scope, chart.companyId, visibleNodes, since) : new Map<string, MeetingStats>();
   const walk = walkTree(nodes);
   return { nodes, redacted, stats, walk };
 }
@@ -159,7 +168,7 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
     const n = await prisma.orgChartNode.findFirst({ where: { id: nodeId, orgId: req.auth.orgId, deletedAt: null }, include: NODE_INCLUDE });
     if (!n) return null;
     const { redacted, stats, walk } = await viewOf(req.auth.orgId, scope, n.chartId);
-    return toNode(n, { redacted, stats, depth: walk.depth, childCount: walk.childCount });
+    return toNode(n, { redacted, stats, depth: walk.depth, childCount: walk.childCount, pii: await server.hasPermission(req, 'contacts:read') });
   }
 
   function checkChartVersion(chart: { version: number }, expected: number | undefined) {
@@ -201,7 +210,7 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
       const sub = req.query.fromNodeId ? walkTree(nodes, req.query.fromNodeId) : full;
       const maxDepth = req.query.depth;
       const picked = maxDepth === undefined ? sub.order : sub.order.filter((n) => (sub.depth.get(n.id) ?? 0) <= maxDepth);
-      const ctx = { redacted, stats, depth: full.depth, childCount: full.childCount };
+      const ctx = { redacted, stats, depth: full.depth, childCount: full.childCount, pii: await server.hasPermission(req, 'contacts:read') };
       return {
         companyId: company.id,
         chart: {
@@ -238,7 +247,7 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
       const since = new Date(Date.now() - windowDays * 86_400_000);
       const { walk, redacted, stats } = await viewOf(req.auth.orgId, scope, chart.id, since);
       const rows = walk.order.map((n) => {
-        const s = n.contactId && !isRedacted(n, redacted) ? stats.get(n.contactId) : undefined;
+        const s = !isRedacted(n, redacted) ? stats.get(n.id) : undefined;
         return { nodeId: n.id, seniority: n.seniority, met: !!s, meetingCount: s?.count ?? 0, lastMetAt: s?.last?.toISOString() ?? null };
       });
       const bySeniority = SENIORITY_ORDER.map((seniority: SeniorityLevel) => {
@@ -267,7 +276,7 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { node, scope } = await visibleNode(req, req.params.nodeId);
       const { nodes, redacted, stats, walk } = await viewOf(req.auth.orgId, scope, node.chartId);
-      const ctx = { redacted, stats, depth: walk.depth, childCount: walk.childCount };
+      const ctx = { redacted, stats, depth: walk.depth, childCount: walk.childCount, pii: await server.hasPermission(req, 'contacts:read') };
       const byId = new Map(nodes.map((n) => [n.id, n]));
       const ref = (n: NodeRow) => {
         const hidden = isRedacted(n, redacted);
@@ -278,10 +287,10 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const admin = await userHasAnyRole(req.auth.orgId, req.auth.userId, ['Admin']);
       const base = admin ? scopedMeetingWhere(req.auth.orgId, scope) : visibleMeetingWhere(req.auth.orgId, scope);
-      const email = node.contact?.email ?? (node.externalRef?.includes('@') ? node.externalRef : null);
       const who: Prisma.MeetingIntelAttendeeWhereInput[] = [];
       if (node.contactId) who.push({ contactId: node.contactId });
-      if (email) who.push({ email: { equals: email, mode: 'insensitive' } });
+      for (const email of nodeEmails(node)) who.push({ email: { equals: email, mode: 'insensitive' } });
+      if (!who.length && node.name !== node.title) who.push({ contactId: null, name: { equals: node.name, mode: 'insensitive' } });
       const meetings = who.length
         ? await prisma.meetingIntel.findMany({
             where: { AND: [base, { attendees: { some: { isInternal: false, OR: who } } }] },
@@ -380,6 +389,9 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
               businessUnit: b.businessUnit ?? null,
               region: b.region ?? null,
               photoUrl: b.photoUrl ?? null,
+              email: b.email ?? null,
+              phone: b.phone ?? null,
+              linkedinUrl: b.linkedinUrl ?? null,
               relationshipStrength: b.relationshipStrength ?? null,
               sentiment: b.sentiment ?? null,
               ownerUserId: b.ownerUserId ?? null,
@@ -422,8 +434,8 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
       const after: Record<string, unknown> = {};
       for (const k of changed) {
         (data as Record<Editable, unknown>)[k] = b[k];
-        before[k] = node[k as keyof typeof node];
-        after[k] = b[k];
+        before[k] = auditValue(k, node[k as keyof typeof node]);
+        after[k] = auditValue(k, b[k]);
       }
       if (changed.includes('title') && b.seniority === undefined && !(node.provenance as Record<string, unknown>)['seniority']) {
         data.seniority = nodeSeniorityFromTitle(b.title);

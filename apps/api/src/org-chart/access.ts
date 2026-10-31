@@ -12,13 +12,13 @@
 //    (any visibility), like the meeting-intel coverage map. Meeting titles and
 //    challenges in node detail follow meeting-intel visibility.
 import { type Prisma, prisma } from '@bidstack/db';
-import { type OrgChartNode, type OrgChartSource, ORG_CHART_MAX_NODES } from '@bidstack/shared';
+import { type OrgChartNode, type OrgChartSource, ORG_CHART_MAX_NODES, OrgChartProfile } from '@bidstack/shared';
 
 import { type AccessScope, applyCompanyScope } from '../lib/access-scope.js';
-import { companiesInScope, scopedMeetingWhere } from '../meeting-intel/access.js';
+import { companiesInScope, groupCompanyIds, scopedMeetingWhere } from '../meeting-intel/access.js';
 
 export const NODE_INCLUDE = {
-  contact: { select: { id: true, companyId: true, name: true, email: true, reportsToContactId: true } },
+  contact: { select: { id: true, companyId: true, name: true, email: true, phone: true, reportsToContactId: true } },
   owner: { select: { id: true, name: true, email: true } },
 } satisfies Prisma.OrgChartNodeInclude;
 export type NodeRow = Prisma.OrgChartNodeGetPayload<{ include: typeof NODE_INCLUDE }>;
@@ -108,20 +108,93 @@ export async function meetingStats(orgId: string, scope: AccessScope, contactIds
   return out;
 }
 
+/** Emails a node is known by: its own, its contact's, and a seeded attendee email. */
+export function nodeEmails(n: NodeRow): string[] {
+  return [...new Set([n.email, n.contact?.email, n.externalRef?.includes('@') ? n.externalRef : null].filter((e): e is string => !!e).map((e) => e.trim().toLowerCase()))];
+}
+const nameKey = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Meeting stats per NODE id. A node is matched to external attendees by its
+ * contact, by any of its emails, or (only for nodes with no contact and no
+ * email) by exact normalized name on meetings of this account's group. This
+ * fixes "not met" for seeded or imported people who are not CRM contacts.
+ */
+export async function nodeMeetingStats(orgId: string, scope: AccessScope, companyId: string, nodes: NodeRow[], since?: Date): Promise<Map<string, MeetingStats>> {
+  const out = new Map<string, MeetingStats>();
+  if (!nodes.length) return out;
+  const byContact = new Map<string, string[]>();
+  const byEmail = new Map<string, string[]>();
+  const byName = new Map<string, string[]>();
+  const push = (m: Map<string, string[]>, k: string, id: string) => m.set(k, [...(m.get(k) ?? []), id]);
+  for (const n of nodes) {
+    if (n.contactId) push(byContact, n.contactId, n.id);
+    const ems = nodeEmails(n);
+    for (const e of ems) push(byEmail, e, n.id);
+    if (!n.contactId && !ems.length && nameKey(n.name) !== nameKey(n.title ?? '')) {
+      const k = nameKey(n.name);
+      if (k.includes(' ')) push(byName, k, n.id);
+    }
+  }
+  const groups = byName.size ? await groupCompanyIds(orgId, companyId) : [];
+  const who: Prisma.MeetingIntelAttendeeWhereInput[] = [];
+  if (byContact.size) who.push({ contactId: { in: [...byContact.keys()] } });
+  if (byEmail.size) who.push({ email: { in: [...byEmail.keys()] } });
+  const nameWhere: Prisma.MeetingIntelWhereInput | null = byName.size ? { companyId: { in: groups } } : null;
+  const ors: Prisma.MeetingIntelWhereInput[] = [];
+  if (who.length) ors.push({ attendees: { some: { isInternal: false, OR: who } } });
+  if (nameWhere) ors.push({ AND: [nameWhere, { attendees: { some: { isInternal: false, contactId: null } } }] });
+  if (!ors.length) return out;
+  const where: Prisma.MeetingIntelWhereInput = { AND: [scopedMeetingWhere(orgId, scope), { OR: ors }, ...(since ? [{ heldAt: { gte: since } }] : [])] };
+  const groupSet = new Set(groups);
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const rows = await prisma.meetingIntel.findMany({
+      where,
+      select: { id: true, heldAt: true, companyId: true, attendees: { where: { isInternal: false }, select: { contactId: true, email: true, name: true } } },
+      orderBy: { id: 'asc' },
+      take: 1000,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    for (const m of rows) {
+      const hit = new Set<string>();
+      for (const a of m.attendees) {
+        if (a.contactId) for (const id of byContact.get(a.contactId) ?? []) hit.add(id);
+        if (a.email) for (const id of byEmail.get(a.email.toLowerCase()) ?? []) hit.add(id);
+        if (!a.contactId && m.companyId && groupSet.has(m.companyId)) for (const id of byName.get(nameKey(a.name)) ?? []) hit.add(id);
+      }
+      for (const id of hit) {
+        const s = out.get(id) ?? { count: 0, last: null };
+        s.count++;
+        if (!s.last || m.heldAt > s.last) s.last = m.heldAt;
+        out.set(id, s);
+      }
+    }
+    if (rows.length < 1000) break;
+    cursor = rows[rows.length - 1]!.id;
+  }
+  return out;
+}
+
 export function photoPath(nodeId: string): string {
   return `/api/v1/org-chart/nodes/${nodeId}/photo`;
 }
 
 export interface SerializeCtx {
   redacted: Set<string>;
+  /** Keyed by node id (nodeMeetingStats). */
   stats: Map<string, MeetingStats>;
+  /** Caller may see contact PII (contacts:read): email, phone, LinkedIn. */
+  pii?: boolean;
   depth: Map<string, number>;
   childCount: Map<string, number>;
 }
 
 export function toNode(n: NodeRow, ctx: SerializeCtx): OrgChartNode {
   const hidden = isRedacted(n, ctx.redacted);
-  const stats = n.contactId && !hidden ? ctx.stats.get(n.contactId) : undefined;
+  const stats = !hidden ? ctx.stats.get(n.id) : undefined;
+  const pii = !hidden && ctx.pii !== false;
+  const profile = hidden || !n.profile ? null : OrgChartProfile.safeParse(n.profile);
   return {
     id: n.id,
     chartId: n.chartId,
@@ -135,6 +208,10 @@ export function toNode(n: NodeRow, ctx: SerializeCtx): OrgChartNode {
     businessUnit: hidden ? null : n.businessUnit,
     region: n.region,
     photoUrl: hidden ? null : n.photoStorageKey ? photoPath(n.id) : n.photoUrl,
+    email: pii ? (n.email ?? n.contact?.email ?? null) : null,
+    phone: pii ? (n.phone ?? n.contact?.phone ?? null) : null,
+    linkedinUrl: pii ? n.linkedinUrl : null,
+    profile: profile?.success && Object.keys(profile.data).length ? profile.data : null,
     relationshipStrength: hidden ? null : n.relationshipStrength,
     sentiment: hidden ? null : n.sentiment,
     owner: hidden || !n.owner ? null : { id: n.owner.id, name: n.owner.name ?? n.owner.email },
