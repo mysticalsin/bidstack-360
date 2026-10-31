@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "添加你的第一个潜在客户",
-        "description": "捕获入站兴趣，让 Polo PreSales 自动评分。"
+        "description": "捕获入站兴趣。新线索在记录分数之前保持未评分。"
       },
       "firstActivity": {
         "label": "记录你的第一项活动",

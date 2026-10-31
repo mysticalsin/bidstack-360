@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Add your first lead",
-        "description": "Capture inbound interest and let Polo PreSales score it automatically."
+        "description": "Capture inbound interest. A new lead stays unscored until a score is recorded."
       },
       "firstActivity": {
         "label": "Log your first activity",

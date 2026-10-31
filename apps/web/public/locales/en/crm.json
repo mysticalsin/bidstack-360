@@ -382,7 +382,7 @@
     },
     "empty": {
       "title": "No accounts yet",
-      "body": "Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.",
+      "body": "Add an account. Pipeline, health, and technology stay blank until they are recorded on that account.",
       "importCsv": "Or import accounts from CSV",
       "filtered": "No accounts match your filters"
     },

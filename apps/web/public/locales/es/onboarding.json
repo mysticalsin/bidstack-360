@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Añade tu primer prospecto",
-        "description": "Captura el interés entrante y deja que Polo PreSales lo puntúe automáticamente."
+        "description": "Captura el interés entrante. Un prospecto nuevo queda sin puntuar hasta que se registre una puntuación."
       },
       "firstActivity": {
         "label": "Registra tu primera actividad",

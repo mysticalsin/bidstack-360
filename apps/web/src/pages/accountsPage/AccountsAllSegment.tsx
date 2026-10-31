@@ -556,7 +556,7 @@ export function AccountsAllSegment() {
             title={t('accounts.empty.title', 'No accounts yet')}
             message={t(
               'accounts.empty.body',
-              'Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.',
+              'Add an account. Pipeline, health, and technology stay blank until they are recorded on that account.',
             )}
             secondary={
               <EmptyStateLink to="/settings?tab=data-import">

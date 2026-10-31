@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Ajoutez votre premier prospect",
-        "description": "Capturez l'intérêt entrant et laissez Polo PreSales l'évaluer automatiquement."
+        "description": "Capturez l'intérêt entrant. Un nouveau prospect reste non noté tant qu'un score n'est pas enregistré."
       },
       "firstActivity": {
         "label": "Enregistrez votre première activité",
