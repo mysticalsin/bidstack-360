@@ -17,7 +17,23 @@ import {
   basisPointsToPercent,
   degradationPercentPoints,
   probabilityToBasisPoints,
+  unscoredLeadScore,
+  unscoredOpportunityScore,
 } from './predictive-scoring.service.js';
+
+describe('unscored model fallback', () => {
+  it('does not invent a 50% win probability when no model is trained', () => {
+    const score = unscoredOpportunityScore('2026-06-01T00:00:00.000Z');
+    expect(score.winProbability).toBeNull();
+    expect(score.predictedCloseDate).toBeNull();
+    expect(score.modelVersion).toBe('fallback-v0');
+    expect(score.recommendation).toMatch(/not a win forecast/i);
+  });
+
+  it('does not invent a 50 lead score when no model is trained', () => {
+    expect(unscoredLeadScore('2026-06-01T00:00:00.000Z').score).toBeNull();
+  });
+});
 
 describe('probabilityToBasisPoints — canonical persisted scale', () => {
   it('maps probability [0,1] onto integer basis points [0,10000]', () => {
@@ -38,12 +54,10 @@ describe('probabilityToBasisPoints — canonical persisted scale', () => {
     expect(probabilityToBasisPoints(1.5)).toBe(10000);
   });
 
-  it('is comparable with heuristic-path basis points (no scale mismatch)', () => {
-    // routes/predictive.ts writes 8500 for the s4_negotiation stage. An ML
-    // probability of 0.85 must land on the same scale so a degradation
-    // comparison between a heuristic row and an ML row is meaningful.
-    const heuristicStageScore = 8500;
-    expect(probabilityToBasisPoints(0.85)).toBe(heuristicStageScore);
+  it('maps 0.85 onto 8500 basis points, the same scale stored scores use', () => {
+    // The PredictiveScore column is basis points. A model probability of 0.85
+    // must land on 8500 so it stays comparable with any older stored row.
+    expect(probabilityToBasisPoints(0.85)).toBe(8500);
   });
 });
 

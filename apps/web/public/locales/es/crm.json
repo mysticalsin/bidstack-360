@@ -2052,7 +2052,10 @@
     "tableHeaderContribution": "Contribución",
     "title": "Análisis de puntuación de ML",
     "chartAria": "Los {{count}} principales factores que influyen en {{label}}",
-    "footer": "Modelo v{{modelVersion}} · Regresión logística · Actualizado cada hora",
+    "footer": "Modelo {{modelVersion}} · regresión logística · en caché durante una hora",
+    "footerBoosted": "Modelo {{modelVersion}} · gradient boosting · en caché durante una hora",
+    "footerUnscored": "No hay un modelo entrenado. Esto no es un pronóstico.",
+    "titleUnscored": "Puntuación",
     "labelLeadScore": "Puntuación del prospecto",
     "labelWinProbability": "Probabilidad de ganar"
   },

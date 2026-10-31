@@ -36,14 +36,14 @@ const ScoreFactor = z.object({
 });
 
 const LeadScoreResponse = z.object({
-  score: z.number().int().min(0).max(100).describe('Lead score 0-100'),
+  score: z.number().int().min(0).max(100).nullable().describe('Lead score 0-100, or null when no model is trained'),
   factors: z.array(ScoreFactor).max(5).describe('Top SHAP-attributed factors'),
   modelVersion: z.string(),
   scoredAt: z.string().datetime(),
 });
 
 const OppScoreResponse = z.object({
-  winProbability: z.number().int().min(0).max(100),
+  winProbability: z.number().int().min(0).max(100).nullable(),
   predictedCloseDate: z.string().datetime().nullable(),
   factors: z.array(ScoreFactor).max(5),
   recommendation: z.string(),

@@ -2035,7 +2035,10 @@
     "tableHeaderContribution": "Contribution",
     "title": "ML Score Analysis",
     "chartAria": "Top {{count}} factors influencing the {{label}}",
-    "footer": "Model v{{modelVersion}} · Logistic regression · Updated hourly",
+    "footer": "Model {{modelVersion}} · logistic regression · cached for one hour",
+    "footerBoosted": "Model {{modelVersion}} · gradient boosted · cached for one hour",
+    "footerUnscored": "No trained model. This is not a forecast.",
+    "titleUnscored": "Score",
     "labelLeadScore": "Lead Score",
     "labelWinProbability": "Win Probability"
   },

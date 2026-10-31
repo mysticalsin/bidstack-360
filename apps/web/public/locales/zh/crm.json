@@ -2019,7 +2019,10 @@
     "tableHeaderContribution": "贡献",
     "title": "机器学习评分分析",
     "chartAria": "影响{{label}}的前{{count}}个因素",
-    "footer": "模型 v{{modelVersion}} · 逻辑回归 · 每小时更新",
+    "footer": "模型 {{modelVersion}} · 逻辑回归 · 缓存一小时",
+    "footerBoosted": "模型 {{modelVersion}} · 梯度提升 · 缓存一小时",
+    "footerUnscored": "没有已训练的模型。这不是预测。",
+    "titleUnscored": "评分",
     "labelLeadScore": "线索评分",
     "labelWinProbability": "赢单概率"
   },

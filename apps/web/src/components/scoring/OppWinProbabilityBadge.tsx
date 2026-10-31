@@ -148,6 +148,13 @@ export function OppWinProbabilityBadge({
 
   if (isLoading) return <ProbSkeleton size={size} />;
   if (isError || prob === undefined) return null;
+  if (prob === null) {
+    return (
+      <span className="inline-flex min-h-[44px] items-center px-2 text-xs text-[var(--fg-tertiary)]">
+        {t('oppWinProbabilityBadge.notScored', 'Not scored')}
+      </span>
+    );
+  }
 
   const colorClasses = SCORE_TONE_CLASSES[oppWinProbabilityTone(prob)];
   const label = probLabel(prob, t);

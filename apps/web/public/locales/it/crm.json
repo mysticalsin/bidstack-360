@@ -2019,7 +2019,10 @@
     "tableHeaderContribution": "Contributo",
     "title": "Analisi del punteggio ML",
     "chartAria": "I {{count}} principali fattori che influenzano {{label}}",
-    "footer": "Modello v{{modelVersion}} · Regressione logistica · Aggiornato ogni ora",
+    "footer": "Modello {{modelVersion}} · regressione logistica · in cache per un'ora",
+    "footerBoosted": "Modello {{modelVersion}} · gradient boosting · in cache per un'ora",
+    "footerUnscored": "Nessun modello addestrato. Questa non è una previsione.",
+    "titleUnscored": "Punteggio",
     "labelLeadScore": "Punteggio del lead",
     "labelWinProbability": "Probabilità di vittoria"
   },

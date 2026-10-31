@@ -2074,7 +2074,10 @@
     "tableHeaderContribution": "Contribution",
     "title": "Analyse du score ML",
     "chartAria": "Les {{count}} principaux facteurs influençant {{label}}",
-    "footer": "Modèle v{{modelVersion}} · Régression logistique · Mis à jour toutes les heures",
+    "footer": "Modèle {{modelVersion}} · régression logistique · mis en cache pendant une heure",
+    "footerBoosted": "Modèle {{modelVersion}} · gradient boosting · mis en cache pendant une heure",
+    "footerUnscored": "Aucun modèle entraîné. Ce n'est pas une prévision.",
+    "titleUnscored": "Score",
     "labelLeadScore": "Score du prospect",
     "labelWinProbability": "Probabilité de gain"
   },
