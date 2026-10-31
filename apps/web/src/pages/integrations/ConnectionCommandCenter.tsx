@@ -191,10 +191,17 @@ export function ConnectionCommandCenter({
     },
     {
       label: t('connectionCommandCenter.readiness.mcpEndpoint.label', 'MCP endpoint'),
-      value: guide.mcp.configured
-        ? t('connectionCommandCenter.readiness.mcpEndpoint.publicUrlSet', 'Public URL set')
-        : t('connectionCommandCenter.readiness.mcpEndpoint.localFallback', 'Local fallback'),
-      tone: guide.mcp.configured ? 'jade' : 'amber',
+      value:
+        guide.mcp.localOnly || !guide.mcp.configured
+          ? t(
+              'connectionCommandCenter.readiness.mcpEndpoint.localOnly',
+              'Local-only — Dust cloud cannot reach it',
+            )
+          : t(
+              'connectionCommandCenter.readiness.mcpEndpoint.publicUnverified',
+              'Public URL set, unverified',
+            ),
+      tone: 'amber',
     },
     {
       label: t('connectionCommandCenter.readiness.dustDataSource.label', 'Dust data source'),
