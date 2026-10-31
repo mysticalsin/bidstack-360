@@ -2940,7 +2940,7 @@
     "searchPlaceholder": "Search or create…",
     "existingTagsLabel": "Existing tags",
     "createNamed": "+ Create “{{name}}”",
-    "aiSuggestions": "AI suggestions",
+    "aiSuggestions": "Matches in this text",
     "suggestThinking": "Thinking…",
     "suggestAction": "Suggest"
   },

@@ -56,7 +56,7 @@ interface ErpCompanyAutocomplete {
     phone: string | null;
     email: string | null;
     source: 'external_erp' | 'verified_data' | 'external_crm' | 'bidstack';
-    confidence: number;
+    confidence: number | null;
     matchKeys: string[];
     sourceUrl: string | null;
   }>;
@@ -311,8 +311,10 @@ export function ErpConnectorCard() {
                             t('erpConnector.item.noRegistryKeys', 'No registry keys yet')}
                         </div>
                       </div>
-                      <Badge tone={item.source === 'external_erp' ? 'jade' : 'blue'}>
-                        {Math.round(item.confidence * 100)}%
+                      <Badge tone={item.confidence == null ? 'gray' : 'blue'}>
+                        {item.confidence == null
+                          ? t('erpConnector.item.notScored', 'Not scored')
+                          : `${Math.round(item.confidence * 100)}%`}
                       </Badge>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">

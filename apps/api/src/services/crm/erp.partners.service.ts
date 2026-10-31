@@ -60,7 +60,7 @@ function buildPartnerDomain(query: CompanyAutocompleteInput): unknown[] {
   return domain;
 }
 
-function normalizeErpPartner(
+export function normalizeErpPartner(
   row: Record<string, unknown>,
   query: CompanyAutocompleteInput,
 ): CompanySuggestion | null {
@@ -82,7 +82,7 @@ function normalizeErpPartner(
     phone: rowString(row, 'phone'),
     email: rowString(row, 'email'),
     source: 'external_erp',
-    confidence: 0.9,
+    confidence: null,
     matchKeys: matchKeys({ query, name, domain, vat, duns }),
     sourceUrl: null,
   };
@@ -142,7 +142,7 @@ export async function searchLocalCompanies(
     phone: null,
     email: null,
     source: 'verified_data' as const,
-    confidence: row.confidenceBps / 10_000,
+    confidence: row.confidenceBps > 0 ? row.confidenceBps / 10_000 : null,
     matchKeys: matchKeys({
       query,
       name: row.tradeName ?? row.legalName,
@@ -174,7 +174,7 @@ export async function searchLocalCompanies(
         phone: null,
         email: null,
         source: 'external_crm' as const,
-        confidence: 0.56,
+        confidence: null,
         matchKeys: matchKeys({ query, name: row.customer, domain: derivedDomain }),
         sourceUrl: null,
       };

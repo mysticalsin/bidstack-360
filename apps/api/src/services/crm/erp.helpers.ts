@@ -51,7 +51,7 @@ export const ErpCompanySuggestion = z.object({
   phone: z.string().nullable(),
   email: z.string().nullable(),
   source: z.enum(['external_erp', 'verified_data', 'external_crm', 'bidstack']),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
   matchKeys: z.array(z.string()),
   sourceUrl: z.string().url().nullable(),
 });
