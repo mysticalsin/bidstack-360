@@ -66,7 +66,33 @@ describe('dashboard insights are stored rows only', () => {
     ]);
     expect(insight?.confidence).toBe(0.4);
     expect(insight?.title).toBe('Recorded note');
+    expect(insight?.companyName).toBe('DNB Bank');
+    expect(insight?.companyId).toBeNull();
     expect(JSON.stringify(insight)).not.toContain('Deal stagnation');
+    expect(JSON.stringify(insight)).not.toContain('dnb-bank');
+  });
+
+  it('copies the company id from the linked opportunity, not from the stored name', () => {
+    // Why: the customer name used to be normalized into companyId, so an
+    // insight looked attached to an account that was only a label.
+    const [insight] = mapStoredInsights(
+      [
+        {
+          id: 'insight-2',
+          kind: 'account_risk',
+          title: 'Residency',
+          summary: 'Recorded against the treasury opportunity.',
+          confidenceBps: 0,
+          companyName: 'DNB',
+          opportunityId: 'opp-1',
+          sourceAttribution: [],
+          createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      ],
+      new Map([['opp-1', 'co-dnb']]),
+    );
+    expect(insight?.companyId).toBe('co-dnb');
+    expect(insight?.companyName).toBe('DNB');
   });
 });
 

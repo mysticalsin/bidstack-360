@@ -333,14 +333,20 @@ type StoredInsightRow = {
 };
 
 /** Only rows that were stored. An empty list is not a scored stagnation warning. */
-export function mapStoredInsights(rows: readonly StoredInsightRow[]): Array<z.infer<typeof AiInsight>> {
+export function mapStoredInsights(
+  rows: readonly StoredInsightRow[],
+  companyIdByOpportunityId: ReadonlyMap<string, string | null> = new Map(),
+): Array<z.infer<typeof AiInsight>> {
   return rows.map((insight) => ({
     id: insight.id,
     kind: insight.kind as z.infer<typeof AiInsight>['kind'],
     title: insight.title,
     summary: insight.summary,
     confidence: insight.confidenceBps / 10_000,
-    companyId: insight.companyName ? normalizeName(insight.companyName) : null,
+    // A stored name is a label. The company id comes from the linked opportunity.
+    companyId: insight.opportunityId
+      ? (companyIdByOpportunityId.get(insight.opportunityId) ?? null)
+      : null,
     companyName: insight.companyName,
     dealId: insight.opportunityId,
     sourceAttribution: parseAttribution(insight.sourceAttribution),

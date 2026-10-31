@@ -274,14 +274,31 @@ export async function buildDashboardSnapshot(
   );
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
-  const visibleInsights = visibleCompanyKeys
+  const visibleInsights = visibleOpportunityIds
     ? persistedInsights.filter(
         (insight) =>
-          (insight.companyName && visibleCompanyKeys.has(normalizeName(insight.companyName))) ||
-          (insight.opportunityId && visibleOpportunityIds?.has(insight.opportunityId)),
+          insight.opportunityId != null && visibleOpportunityIds.has(insight.opportunityId),
       )
     : persistedInsights;
-  const insights = mapStoredInsights(visibleInsights);
+  const insightOpportunityIds = [
+    ...new Set(
+      visibleInsights
+        .map((insight) => insight.opportunityId)
+        .filter((id): id is string => id != null),
+    ),
+  ];
+  const insightOpportunities =
+    insightOpportunityIds.length === 0
+      ? []
+      : await prisma.opportunity.findMany({
+          where: { orgId, id: { in: insightOpportunityIds }, deletedAt: null },
+          select: { id: true, companyId: true },
+          take: insightOpportunityIds.length,
+        });
+  const insights = mapStoredInsights(
+    visibleInsights,
+    new Map(insightOpportunities.map((row) => [row.id, row.companyId])),
+  );
   const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
   let selectedCompany =
     findSelectedCompany(companies, accountId) ??
