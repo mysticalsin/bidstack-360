@@ -182,6 +182,9 @@ export async function upsertVerifiedCompanyEnrichment({
     companyDescription: (openProfile?.description ??
       existingMetadata.companyDescription ??
       null) as Prisma.InputJsonValue | null,
+    publicFacts: (openProfile?.publicFacts ??
+      existingMetadata.publicFacts ??
+      null) as Prisma.InputJsonValue | null,
     techStackMcp: (techStackMcpProfile?.providerMetadata.techStackMcp ??
       existingMetadata.techStackMcp ??
       null) as Prisma.InputJsonValue | null,
@@ -191,7 +194,9 @@ export async function upsertVerifiedCompanyEnrichment({
     fallbackLogo: favicon.providerMetadata as Prisma.InputJsonValue,
   };
   const confidenceBps = openProfile?.confidenceBps ?? 0;
-  const industryCodes = openProfile?.industryLabels ?? [];
+  const industryCodes = openProfile?.industryLabels?.length
+    ? openProfile.industryLabels
+    : [];
   const legalName = storedLegalName(openProfile);
   const tradeName = openProfile?.tradeName ?? name;
   const incorporationDate = openProfile?.incorporationDate
@@ -217,7 +222,7 @@ export async function upsertVerifiedCompanyEnrichment({
       status: 'active',
       incorporationDate: incorporationDate ?? null,
       employeeCount: openProfile?.employeeCount ?? null,
-      annualRevenueMicros: null,
+      annualRevenueMicros: publicRevenueMicros(openProfile),
       confidenceBps,
       sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
       providerMetadata,
@@ -234,7 +239,9 @@ export async function upsertVerifiedCompanyEnrichment({
       status: 'active',
       incorporationDate,
       employeeCount: openProfile?.employeeCount ?? undefined,
-      annualRevenueMicros: undefined,
+      ...(publicRevenueMicros(openProfile) !== null
+        ? { annualRevenueMicros: publicRevenueMicros(openProfile) }
+        : {}),
       industryCodes,
       confidenceBps,
       sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
@@ -267,6 +274,62 @@ export async function upsertVerifiedCompanyEnrichment({
   return { company: serializeCompany(enrichment), domain, providers };
 }
 
+/** Fill a cockpit account from Wikidata/Wikipedia when those facts are not stored yet. */
+export async function refreshPublicCompanyFacts({
+  orgId,
+  company,
+  prisma,
+  log,
+}: {
+  orgId: string;
+  company: z.infer<typeof CrmCompany>;
+  prisma: PrismaClient;
+  log: RouteLog;
+}): Promise<z.infer<typeof CrmCompany> | null> {
+  if (process.env.NODE_ENV === 'test' || process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1') {
+    return null;
+  }
+  const hasFacts = Boolean(
+    company.publicFacts?.headquarters ||
+      company.publicFacts?.revenueLabel ||
+      company.publicFacts?.description,
+  );
+  const scoredMatch = company.sourceAttribution.some(
+    (item) => item.source === 'wikidata' && item.confidence != null,
+  );
+  // A name-match heuristic is not a measured confidence. Refresh once to drop it.
+  if (hasFacts && !scoredMatch && company.confidence == null) return null;
+  try {
+    const result = await upsertVerifiedCompanyEnrichment({
+      orgId,
+      userId: null,
+      name: company.name,
+      domain: company.domain,
+      website: company.website,
+      country: null,
+      requestedBy: 'account_cockpit',
+      auditAction: 'crm.company.public_profile',
+      log,
+      prisma,
+    });
+    result.company.id = company.id;
+    if (company.domain) result.company.domain = company.domain;
+    return result.company;
+  } catch (err) {
+    log.warn({ err, company: company.name }, 'public company profile refresh failed');
+    return null;
+  }
+}
+
+/** Micros only when the public claim names a currency and the integer fits safely. */
+export function publicRevenueMicros(
+  profile: { revenueAmount?: number | null; revenueCurrency?: string | null } | null | undefined,
+): bigint | null {
+  if (!profile?.revenueCurrency || profile.revenueAmount == null) return null;
+  const micros = Math.round(profile.revenueAmount * 1_000_000);
+  return Number.isSafeInteger(micros) ? BigInt(micros) : null;
+}
+
 /** A search label is not a legal name. Store one only when the profile already has it. */
 export function storedLegalName(
   profile: { legalName?: string | null } | null | undefined,
@@ -283,12 +346,7 @@ function mergeSourceAttribution(
   for (const item of [...existing, ...current]) {
     const parsed = SourceAttribution.safeParse(item);
     if (!parsed.success) continue;
-    const key = [
-      parsed.data.source,
-      parsed.data.label,
-      parsed.data.sourceUrl ?? '',
-      parsed.data.fetchedAt,
-    ].join('|');
+    const key = [parsed.data.source, parsed.data.label, parsed.data.sourceUrl ?? ''].join('|');
     byKey.set(key, parsed.data);
   }
   return [...byKey.values()]

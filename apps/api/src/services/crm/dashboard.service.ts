@@ -29,6 +29,7 @@ import {
   fallbackCompany,
   findSelectedCompany,
 } from './company-enrichment.service.js';
+import { refreshPublicCompanyFacts } from './enrichment.service.js';
 import {
   buildActivities,
   buildCockpit,
@@ -63,7 +64,7 @@ export async function buildDashboardSnapshot(
   orgId: string,
   accountId: string | undefined,
   prisma: PrismaClient,
-  _logger: LoggerLike,
+  logger: LoggerLike,
   scope?: AccessScope,
 ): Promise<z.infer<typeof CrmDashboardSnapshot>> {
   const opportunityWhere = scope
@@ -322,12 +323,25 @@ export async function buildDashboardSnapshot(
     : persistedInsights;
   const insights = mapStoredInsights(visibleInsights);
   const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
-  const selectedCompany =
+  let selectedCompany =
     findSelectedCompany(companies, accountId) ??
     companies.find((company) => company.name === 'CI Financial') ??
     companies.find((company) => company.name === 'Mantu') ??
     companies[0] ??
     fallbackCompany('Mantu');
+  if (accountId) {
+    const refreshed = await refreshPublicCompanyFacts({
+      orgId,
+      company: selectedCompany,
+      prisma,
+      log: logger,
+    });
+    if (refreshed) {
+      const index = companies.findIndex((company) => company.id === selectedCompany.id);
+      selectedCompany = refreshed;
+      if (index >= 0) companies[index] = refreshed;
+    }
+  }
   const [fieldOverrides, performance] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },

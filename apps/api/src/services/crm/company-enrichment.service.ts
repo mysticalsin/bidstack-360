@@ -9,6 +9,7 @@ import { type z } from 'zod';
 
 import {
   CompanyStrategicIntel,
+  PublicCompanyFacts,
   type CrmCompany,
   type CrmLogoSource,
   type SourceAttribution,
@@ -109,6 +110,7 @@ export function serializeCompany(enrichment: {
     domain: enrichment.domain,
     website: enrichment.website,
     industry: industryCodes[0] ?? null,
+    publicFacts: parsePublicFacts(metadata.publicFacts),
     imageUrl: stringUrl(metadata.companyImageUrl),
     employeeCount: enrichment.employeeCount,
     annualRevenueMicros:
@@ -131,6 +133,11 @@ export function serializeCompany(enrichment: {
     sourceAttribution,
     updatedAt: enrichment.updatedAt.toISOString(),
   };
+}
+
+function parsePublicFacts(value: unknown): z.infer<typeof PublicCompanyFacts> | null {
+  const parsed = PublicCompanyFacts.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function parseStrategicIntel({
@@ -450,7 +457,7 @@ export function buildCompanies(
     const logoDomain = row.domain ?? existing.domain;
     if (row.logoUrl) {
       existing.logo = logoFor(existing.name, row.logoUrl, 'official_website');
-    } else if (logoDomain) {
+    } else if (!existing.logo?.url && logoDomain) {
       existing.logo = logoFor(existing.name, logoUrlFor(existing.name, logoDomain), 'favicon');
     }
   }

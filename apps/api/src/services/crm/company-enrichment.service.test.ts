@@ -305,6 +305,51 @@ describe('unscored company shells', () => {
     expect(company?.website).toBeNull();
   });
 
+  it('keeps a stored public logo when the company row has no logo of its own', () => {
+    const [company] = buildCompanies(
+      [],
+      [
+        {
+          id: 'enrich-1',
+          tradeName: 'DNB Bank',
+          legalName: 'DNB Bank ASA',
+          domain: 'dnb.no',
+          website: 'https://www.dnb.no/',
+          industryCodes: ['financial services'],
+          providerMetadata: {
+            publicFacts: {
+              description: 'DNB Bank is a Norwegian bank.',
+              headquarters: 'Oslo, Norway',
+              chiefExecutive: 'Rune Bjerke',
+              stockExchange: 'Oslo Stock Exchange',
+              revenueLabel: '54,857,000,000 NOK',
+              revenueCurrency: 'NOK',
+            },
+          },
+          employeeCount: 9020,
+          annualRevenueMicros: null,
+          status: 'active',
+          registryIds: {},
+          formerNames: [],
+          incorporationDate: null,
+          logoUrl: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/DNB_Logo.svg',
+          logoSource: 'wikimedia',
+          confidenceBps: 8000,
+          sourceAttribution: [],
+          updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+        },
+      ],
+      [{ id: 'company-1', name: 'DNB Bank', domain: 'dnb.no', logoUrl: null }],
+    );
+
+    expect(company?.logo.url).toContain('DNB_Logo.svg');
+    expect(company?.logo.source).toBe('wikimedia');
+    expect(company?.id).toBe('company-1');
+    expect(company?.publicFacts?.headquarters).toBe('Oslo, Norway');
+    expect(company?.employeeCount).toBe(9020);
+    expect(company?.legalName).toBe('DNB Bank ASA');
+  });
+
   it('does not invent Mantu headcount or revenue on the placeholder account', () => {
     const mantu = fallbackCompany('Mantu');
     expect(mantu.legalName).toBeNull();

@@ -77,8 +77,95 @@ describe('company open data verification', () => {
       'wikidata',
       'wikipedia',
     ]);
-    expect(profile?.confidenceBps).toBe(10_000);
+    expect(profile?.confidenceBps).toBe(0);
+    expect(profile?.sourceAttribution.find((item) => item.source === 'wikidata')?.confidence).toBeNull();
     expect(profile?.sourceAttribution.find((item) => item.source === 'wikipedia')?.confidence).toBeNull();
+    expect(profile?.legalName).toBeNull();
+    expect(profile?.revenueAmount).toBeNull();
+  });
+
+  it('keeps the preferred official name and a recognized revenue currency', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL) => {
+      const url = input.toString();
+      if (url.includes('wbsearchentities')) {
+        return jsonResponse({
+          search: [
+            {
+              id: 'Q80788',
+              label: 'DNB Bank',
+              description: 'Norwegian bank',
+              concepturi: 'https://www.wikidata.org/wiki/Q80788',
+            },
+          ],
+        });
+      }
+      if (url.includes('wbgetentities') && url.includes('props=labels')) {
+        return jsonResponse({
+          entities: {
+            Q585: { labels: { en: { value: 'Oslo' } } },
+            Q20: { labels: { en: { value: 'Norway' } } },
+            Q132643: { labels: { en: { value: 'Norwegian krone' } } },
+            Q4582045: { labels: { en: { value: 'Rune Bjerke' } } },
+            Q837171: { labels: { en: { value: 'financial services' } } },
+            Q909158: { labels: { en: { value: 'Oslo Stock Exchange' } } },
+          },
+        });
+      }
+      if (url.includes('wbgetentities')) {
+        return jsonResponse({
+          entities: {
+            Q80788: {
+              id: 'Q80788',
+              labels: { en: { value: 'DNB Bank' } },
+              descriptions: { en: { value: 'Norwegian bank' } },
+              claims: {
+                P856: [claim('https://www.dnb.no/')],
+                P1128: [claim({ amount: '+9020', unit: '1' })],
+                P2139: [claim({ amount: '+54857000000', unit: 'http://www.wikidata.org/entity/Q132643' })],
+                P159: [claim({ id: 'Q585' })],
+                P17: [claim({ id: 'Q20' })],
+                P452: [claim({ id: 'Q837171' })],
+                P169: [claim({ id: 'Q4582045' })],
+                P414: [claim({ id: 'Q909158' })],
+                P1448: [
+                  claim({ text: 'Gjensidige NOR Sparebank ASA', language: 'nb' }, 'normal'),
+                  claim({ text: 'DNB Bank ASA', language: 'nb' }, 'preferred'),
+                ],
+              },
+              sitelinks: { enwiki: { title: 'DNB Bank' } },
+            },
+          },
+        });
+      }
+      if (url.includes('/page/summary/')) {
+        return jsonResponse({
+          extract: 'DNB Bank is a Norwegian bank.',
+          content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/DNB_Bank' } },
+        });
+      }
+      throw new Error(`Unexpected request ${url}`);
+    });
+
+    const profile = await fetchOpenCompanyProfile({
+      name: 'DNB Bank',
+      domain: 'dnb.no',
+      now,
+      fetchImpl,
+    });
+
+    expect(profile?.legalName).toBe('DNB Bank ASA');
+    expect(profile?.tradeName).toBe('DNB Bank');
+    expect(profile?.employeeCount).toBe(9020);
+    expect(profile?.revenueAmount).toBe(54_857_000_000);
+    expect(profile?.revenueCurrency).toBe('NOK');
+    expect(profile?.publicFacts).toMatchObject({
+      headquarters: 'Oslo, Norway',
+      chiefExecutive: 'Rune Bjerke',
+      stockExchange: 'Oslo Stock Exchange',
+      revenueCurrency: 'NOK',
+      revenueLabel: '54,857,000,000 NOK',
+    });
+    expect(profile?.industryLabels).toEqual(['financial services']);
   });
 
   it('rejects ambiguous non-company name matches instead of fabricating a profile', async () => {
@@ -200,8 +287,9 @@ describe('company open data verification', () => {
   });
 });
 
-function claim(value: unknown) {
+function claim(value: unknown, rank = 'normal') {
   return {
+    rank,
     mainsnak: {
       datavalue: { value },
     },

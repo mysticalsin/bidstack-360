@@ -110,6 +110,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             {accountView ? cockpit.company.name : t('pageHead.dashboardTitle', 'Dashboard')}
           </h1>
           <div className="page-sub">{subtitle}</div>
+          {accountView && cockpit.company.publicFacts?.description ? (
+            <p className="mt-1 max-w-2xl text-sm text-[var(--fg-secondary)]">
+              {cockpit.company.publicFacts.description}
+            </p>
+          ) : null}
           {accountView ? (
             <div
               className="account-meta-chips"
@@ -265,6 +270,12 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   if (c.industry) rows.push([t('pageHead.briefIndustry', 'Industry'), c.industry]);
   if (c.employeeCount)
     rows.push([t('pageHead.briefHeadcount', 'Headcount'), c.employeeCount.toLocaleString()]);
+  if (c.publicFacts?.headquarters)
+    rows.push([t('pageHead.briefHeadquarters', 'Headquarters'), c.publicFacts.headquarters]);
+  if (c.publicFacts?.revenueLabel)
+    rows.push([t('pageHead.briefRevenue', 'Revenue'), c.publicFacts.revenueLabel]);
+  if (c.publicFacts?.chiefExecutive)
+    rows.push([t('pageHead.briefChiefExecutive', 'Chief executive'), c.publicFacts.chiefExecutive]);
   if (c.domain) rows.push([t('pageHead.briefDomain', 'Domain'), c.domain]);
   if (c.legalName && c.legalName !== c.name)
     rows.push([t('pageHead.briefLegalName', 'Legal name'), c.legalName]);

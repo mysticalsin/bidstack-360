@@ -60,6 +60,17 @@ export const CompanyStrategicIntel = z.object({
 });
 export type CompanyStrategicIntel = z.infer<typeof CompanyStrategicIntel>;
 
+/** Facts copied from a public source such as Wikidata. Absent fields stay null. */
+export const PublicCompanyFacts = z.object({
+  description: z.string().nullable(),
+  headquarters: z.string().nullable(),
+  chiefExecutive: z.string().nullable(),
+  stockExchange: z.string().nullable(),
+  revenueLabel: z.string().nullable(),
+  revenueCurrency: z.string().length(3).nullable(),
+});
+export type PublicCompanyFacts = z.infer<typeof PublicCompanyFacts>;
+
 export const CrmCompany = z.object({
   id: z.string(),
   source: CrmObjectSource.default('external_crm'),
@@ -68,6 +79,7 @@ export const CrmCompany = z.object({
   domain: z.string().nullable(),
   website: z.string().url().nullable(),
   industry: z.string().nullable(),
+  publicFacts: PublicCompanyFacts.nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: z.number().int().nonnegative().nullable(),

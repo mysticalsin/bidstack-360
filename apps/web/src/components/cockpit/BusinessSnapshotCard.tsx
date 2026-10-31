@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
@@ -14,7 +15,7 @@ import { springSoft } from '@/lib/motion';
 import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
-import { headquartersFor } from './_tokens';
+import type { PublicCompanyFacts } from '@bidstack/shared';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -38,7 +39,8 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
   const c = cockpit.company;
-  const headquarters = headquartersFor(c.name);
+  const facts: PublicCompanyFacts | null = c.publicFacts ?? null;
+  const headquarters = facts?.headquarters ?? null;
   const sourceCount = c.sourceAttribution.length;
   const notVerified = t('businessSnapshot.value.notVerified', 'Not verified');
   const strategic = c.strategicIntel;
@@ -58,6 +60,15 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       })
     : notVerified;
   const rows: SnapshotRow[] = [
+    ...(facts?.description
+      ? [
+          {
+            label: t('businessSnapshot.row.description', 'Public description'),
+            value: facts.description,
+            source: publicSource(c.sourceAttribution, t),
+          },
+        ]
+      : []),
     {
       label: t('businessSnapshot.row.legalName', 'Legal name'),
       value: c.legalName ?? notVerified,
@@ -78,7 +89,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.founded', 'Founded'),
-      value: c.incorporationDate ? c.incorporationDate.slice(0, 4) : notVerified,
+      value: c.incorporationDate ?? notVerified,
       source: c.incorporationDate
         ? attributionSource(latestSource, {
             fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
@@ -98,24 +109,42 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.headquarters', 'Headquarters'),
       value: headquarters ?? notVerified,
       source: headquarters
-        ? {
-            label: t('businessSnapshot.source.derived', 'Derived'),
-            state: 'crm',
-            hint: t(
-              'businessSnapshot.source.derivedHeadquarters',
-              'Derived from Polo PreSales account geography rules.',
-            ),
-          }
+        ? publicSource(c.sourceAttribution, t)
         : missingSource(
-            t('businessSnapshot.source.missingHeadquarters', 'No headquarters source is attached.'),
+            t(
+              'businessSnapshot.source.missingHeadquarters',
+              'No headquarters is on the public profile.',
+            ),
           ),
     },
+    ...(facts?.chiefExecutive
+      ? [
+          {
+            label: t('businessSnapshot.row.chiefExecutive', 'Chief executive'),
+            value: facts.chiefExecutive,
+            source: publicSource(c.sourceAttribution, t),
+          },
+        ]
+      : []),
+    ...(facts?.stockExchange
+      ? [
+          {
+            label: t('businessSnapshot.row.stockExchange', 'Stock exchange'),
+            value: facts.stockExchange,
+            source: publicSource(c.sourceAttribution, t),
+          },
+        ]
+      : []),
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
-      value: c.annualRevenueMicros
-        ? `${formatUnspecifiedAmount(c.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
-        : notVerified,
-      source: cockpitKpiSource(
+      value: facts?.revenueLabel
+        ? facts.revenueLabel
+        : c.annualRevenueMicros
+          ? `${formatUnspecifiedAmount(c.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
+          : notVerified,
+      source: facts?.revenueLabel
+        ? publicSource(c.sourceAttribution, t)
+        : cockpitKpiSource(
         cockpit.kpis,
         'annualRevenueMicros',
         Boolean(c.annualRevenueMicros),
@@ -332,6 +361,25 @@ function latestAttribution(sources: SourceAttribution[]): SourceAttribution | nu
     if (!latest || source.fetchedAt > latest.fetchedAt) latest = source;
   }
   return latest;
+}
+
+function publicSource(sources: SourceAttribution[], t: TFunction): FieldSource {
+  const source =
+    sources.find((item) => item.source === 'wikidata') ??
+    sources.find((item) => item.source === 'wikipedia') ??
+    null;
+  if (!source) {
+    return {
+      label: t('businessSnapshot.source.public', 'Public'),
+      state: 'verified',
+      hint: t('businessSnapshot.source.publicHint', 'Copied from the public company profile.'),
+    };
+  }
+  return {
+    label: source.source === 'wikipedia' ? 'Wikipedia' : 'Wikidata',
+    state: 'verified',
+    hint: source.label,
+  };
 }
 
 function missingSource(hint: string): FieldSource {
