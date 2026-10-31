@@ -320,10 +320,7 @@ export default function SectorViewPage() {
                     <p>{t('sectorView.detailEyebrow', 'Selected sector')}</p>
                     <h2>{titleCase(selectedSector.sector)}</h2>
                     <span>
-                      {t('sectorView.detailSummary', '{{accounts}} accounts across {{countries}} countries', {
-                        accounts: selectedSector.accountCount,
-                        countries: selectedSector.countries.length,
-                      })}
+                      {sectorDetailMeta(selectedSector.accountCount, selectedSector.countries.length)}
                     </span>
                   </div>
                   <div className="sector-detail-score" aria-label={t('sectorView.knownFteLabel', 'Known FTE coverage')}>
@@ -497,10 +494,7 @@ function SectorButton({
       <span className="sector-radar-main">
         <span>{titleCase(sector.sector)}</span>
         <small>
-          {t('sectorView.radarMeta', '{{accounts}} accounts / {{countries}} countries', {
-            accounts: sector.accountCount,
-            countries: sector.countries.length,
-          })}
+          {sectorRadarMeta(sector.accountCount, sector.countries.length)}
         </small>
       </span>
       <span className="sector-radar-bar" aria-hidden>
@@ -530,6 +524,18 @@ function CoverageBar({ label, value, total }: { label: string; value: number; to
       </div>
     </div>
   );
+}
+
+export function sectorRadarMeta(accounts: number, countries: number): string {
+  return `${labeledCount(accounts, 'account', 'accounts')} / ${labeledCount(countries, 'country', 'countries')}`;
+}
+
+export function sectorDetailMeta(accounts: number, countries: number): string {
+  return `${labeledCount(accounts, 'account', 'accounts')} across ${labeledCount(countries, 'country', 'countries')}`;
+}
+
+function labeledCount(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
 }
 
 function SectorAccountRow({ account }: { account: SectorAccount }) {

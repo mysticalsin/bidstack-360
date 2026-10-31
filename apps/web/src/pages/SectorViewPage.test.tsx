@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import SectorViewPage from './SectorViewPage';
+import SectorViewPage, { sectorDetailMeta, sectorRadarMeta } from './SectorViewPage';
 import { useSectorView, type SectorViewResponse } from '@/hooks/useSectorView';
 import { useTerritoryAnalytics, useTerritorySegments } from '@/hooks/useTerritories';
 
@@ -187,5 +187,13 @@ describe('SectorViewPage load resilience', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'By country' }));
     expect(screen.getByTestId('world-map')).toBeTruthy();
+  });
+});
+
+describe('sector count wording', () => {
+  it('uses the singular when a sector has one account or one country', () => {
+    expect(sectorRadarMeta(1, 1)).toBe('1 account / 1 country');
+    expect(sectorRadarMeta(2, 3)).toBe('2 accounts / 3 countries');
+    expect(sectorDetailMeta(1, 2)).toBe('1 account across 2 countries');
   });
 });
