@@ -5,11 +5,11 @@ import '@/components/meetings/meetings.css';
 
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { useMeeting, usePatchMeeting } from '@/hooks/useMeetingIntel';
+import { useFlagMeeting, useMeeting, usePatchMeeting } from '@/hooks/useMeetingIntel';
 import { ApiError } from '@/lib/api';
 import { fmtMeetingDate, SENIOR_LEVELS, SENIORITY_LABEL, SOURCE_LABEL, type MeetingIntelDetail } from '@/lib/meeting-intel/client';
 
@@ -25,7 +25,7 @@ function ListBlock({ title, items, testId }: { title: string; items: string[]; t
   );
 }
 
-function Attendees({ m }: { m: MeetingIntelDetail }) {
+function Attendees({ m }: { m: Pick<MeetingIntelDetail, 'attendees'> }) {
   const ext = m.attendees.filter((a) => !a.isInternal);
   const ours = m.attendees.filter((a) => a.isInternal);
   const names = new Map(m.attendees.filter((a) => a.contactId).map((a) => [a.contactId!, a.name]));
@@ -57,7 +57,13 @@ function Attendees({ m }: { m: MeetingIntelDetail }) {
 
 export default function MeetingDetailPage() {
   const { id } = useParams();
-  const q = useMeeting(id);
+  const flagId = useSearchParams()[0].get('flag') ?? undefined;
+  // From a flag: read through the flag grant (works even when the meeting is
+  // team-only or in another region). Otherwise the normal visibility rules.
+  const direct = useMeeting(flagId ? undefined : id);
+  const viaFlag = useFlagMeeting(flagId);
+  const q = flagId ? viaFlag : direct;
+  const flagView = flagId ? viaFlag.data : undefined;
   const patch = usePatchMeeting(id ?? '');
   const [showTranscript, setShowTranscript] = useState(false);
   if (q.isLoading) return <LoadingSkeleton rows={6} />;
@@ -75,16 +81,20 @@ export default function MeetingDetailPage() {
           <p className="mi-meta" style={{ marginTop: 8 }}>
             <time dateTime={m.heldAt}>{fmtMeetingDate(m.heldAt)}</time>
             <span aria-hidden>·</span>
-            <Link to={`/accounts/${m.companyId}`}>{m.companyName}</Link>
+            {m.companyId ? <Link to={`/accounts/${m.companyId}`}>{m.companyName}</Link> : <span>{m.companyName}</span>}
             <span aria-hidden>·</span>
             <span>{m.sources.map((s) => SOURCE_LABEL[s]).join(', ')}</span>
             <span className="mi-chip">{m.visibility === 'org' ? 'Visible to the organisation' : 'Account team only'}</span>
+            {flagView ? <span className="mi-chip" data-testid="meeting-flag-access">Shared with you by a flag</span> : null}
           </p>
+          {flagView?.companyRestricted ? (
+            <p className="mi-caption" style={{ marginTop: 8 }}>This account is outside your access, so its name, contacts, summary and transcript are hidden. Ask its account team for more.</p>
+          ) : null}
         </div>
-        <Button variant="secondary" size="sm" disabled={patch.isPending}
+        {flagView ? null : <Button variant="secondary" size="sm" disabled={patch.isPending}
           onClick={() => patch.mutate({ visibility: m.visibility === 'org' ? 'account_team' : 'org' })}>
           {m.visibility === 'org' ? 'Limit to account team' : 'Share with organisation'}
-        </Button>
+        </Button>}
       </header>
       {patch.isError ? <p className="mi-caption" role="alert">Only the author or the account team can change this meeting.</p> : null}
 
@@ -106,8 +116,8 @@ export default function MeetingDetailPage() {
       <section className="mi-section" aria-labelledby="mi-src-h">
         <h2 id="mi-src-h" style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>Sources</h2>
         <ul className="mi-list">
-          {m.sourceLinks.map((s) => (
-            <li key={`${s.source}-${s.externalId}`}>
+          {m.sourceLinks.map((s, i) => (
+            <li key={`${s.source}-${s.externalId ?? ''}-${i}`}>
               <span className="mi-row-title">{SOURCE_LABEL[s.source]}</span>
               <span className="mi-row-meta">
                 Added {fmtMeetingDate(s.ingestedAt)}

@@ -1,7 +1,7 @@
 // Meeting intel API client. Types come from @bidstack/shared
 // (packages/shared/src/schemas/meeting-intel.ts) so web and API cannot drift.
 import type {
-  ChallengeRollupResponse, CoverageMapResponse, CrossRegionFlagOut, MeetingIntelDetail, MeetingIntelListQuery,
+  ChallengeRollupResponse, CoverageMapResponse, CrossRegionFlagOut, FlagMeetingDetail, MeetingIntelDetail, MeetingIntelListQuery,
   MeetingIntelManualCreate, MeetingIntelPatch, MeetingIntelRow, MeetingIntelSource, MeetingIntelWatchdogItem,
   MeetingSourceStatus, SeniorityLevel,
 } from '@bidstack/shared';
@@ -10,7 +10,7 @@ import type { z } from 'zod';
 import { api } from '@/lib/api';
 
 export type {
-  ChallengeRollupResponse, CoverageMapResponse, CrossRegionFlagOut, MeetingIntelDetail, MeetingIntelRow,
+  ChallengeRollupResponse, CoverageMapResponse, CrossRegionFlagOut, FlagMeetingDetail, MeetingIntelDetail, MeetingIntelRow,
   MeetingIntelWatchdogItem, MeetingSourceStatus, SeniorityLevel,
 };
 export type MeetingSource = z.infer<typeof MeetingIntelSource>;
@@ -51,6 +51,9 @@ export const meetingClient = {
   flags: (status: 'open' | 'dismissed' | 'all', signal?: AbortSignal) =>
     api<{ items: CrossRegionFlagOut[] }>(`${MI}/flags?status=${status}`, { signal }),
   watchdogFeed: (signal?: AbortSignal) => api<{ items: MeetingIntelWatchdogItem[] }>(`${MI}/flags?format=watchdog`, { signal }),
+  /** The meeting behind a flag, for its recipient (redacted if the account is outside their scope). */
+  flagMeeting: (flagId: string, signal?: AbortSignal) =>
+    api<FlagMeetingDetail>(`${MI}/flags/${encodeURIComponent(flagId)}/meeting`, { signal }),
   dismissFlag: (id: string) => api<void>(`${MI}/flags/${encodeURIComponent(id)}/dismiss`, { method: 'POST' }),
   sources: (signal?: AbortSignal) => api<{ items: MeetingSourceStatus[] }>(`${MI}/sources`, { signal }),
   connectMetis: (shareTranscript: boolean) =>

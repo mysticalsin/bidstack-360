@@ -26,9 +26,9 @@ export function FlagCard({ flag, focus, onDismiss, dismissing }: {
       ) : null}
       <div className="mi-flag-actions">
         {flag.companyRestricted ? (
-          <span className="mi-row-meta">Meeting at a restricted company. Ask its account team for details.</span>
+          <Link className="mi-link" to={`/meetings/${flag.meetingId}?flag=${flag.id}`}>Open meeting (account details hidden)</Link>
         ) : (
-          <Link className="mi-link" to={`/meetings/${flag.meetingId}`}>Open meeting at {flag.companyName}</Link>
+          <Link className="mi-link" to={`/meetings/${flag.meetingId}?flag=${flag.id}`}>Open meeting at {flag.companyName}</Link>
         )}
         <Link className="mi-link" to={`/accounts/${flag.ownedCompanyId}`}>Your account: {flag.ownedCompanyName}</Link>
         {onDismiss && flag.status === 'open' ? (

@@ -12,6 +12,10 @@ export function useMeetingList(q: MeetingListQuery, enabled = true) {
 export function useMeeting(id: string | undefined) {
   return useQuery({ queryKey: [KEY, 'detail', id], queryFn: ({ signal }) => meetingClient.detail(id!, signal), enabled: Boolean(id), retry: noRetry404 });
 }
+/** Opened from a cross-region flag: the recipient sees this one meeting through the flag. */
+export function useFlagMeeting(flagId: string | undefined) {
+  return useQuery({ queryKey: [KEY, 'flag-meeting', flagId], queryFn: ({ signal }) => meetingClient.flagMeeting(flagId!, signal), enabled: Boolean(flagId), retry: noRetry404 });
+}
 /** Details for a handful of meetings (person drill). Capped by the caller. */
 export function useMeetingDetails(ids: string[]) {
   return useQueries({

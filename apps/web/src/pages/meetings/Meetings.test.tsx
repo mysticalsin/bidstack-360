@@ -124,7 +124,32 @@ describe('MeetingFlagsPage', () => {
     expect(cards[0]!.id).toBe('flag-f2');
     fireEvent.click(within(cards[0]!).getByRole('button', { name: 'Dismiss' }));
     await waitFor(() => expect(calls).toEqual(['dismiss f2']));
-    expect(within(cards[0]!).getByRole('link', { name: 'Open meeting at CI Financial Europe' }).getAttribute('href')).toBe('/meetings/m1');
+    expect(within(cards[0]!).getByRole('link', { name: 'Open meeting at CI Financial Europe' }).getAttribute('href')).toBe('/meetings/m1?flag=f2');
+  });
+
+  it('a flag recipient opens the meeting through the flag; a restricted account stays redacted', async () => {
+    const seen: string[] = [];
+    routeApi({
+      'GET /api/meeting-intel/flags/f1/meeting': () => { seen.push('flag'); return { ...meeting, visibility: 'account_team', access: 'flag', flagId: 'f1', companyRestricted: false }; },
+      'GET /api/meeting-intel/flags/f9/meeting': () => ({
+        ...meeting, visibility: 'account_team', access: 'flag', flagId: 'f9', companyRestricted: true, companyId: null,
+        companyName: 'Restricted account', title: 'Meeting at a restricted account', summary: null, transcript: null,
+        attendees: meeting.attendees.map((a) => ({ ...a, name: a.isInternal ? 'Colleague' : 'Restricted contact', contactId: null, reportsToContactId: null })),
+      }),
+    });
+    renderAt('/meetings/m1?flag=f1');
+    await screen.findByRole('heading', { name: 'Cloud cost review with the CIO' });
+    expect(seen).toEqual(['flag']);
+    expect(screen.getByTestId('meeting-flag-access')).toBeTruthy();
+    expect(screen.getByText('CIO wants to cut cloud spend.')).toBeTruthy();
+    // Read-only through a flag: no visibility toggle.
+    expect(screen.queryByRole('button', { name: /Share with organisation|Limit to account team/ })).toBeNull();
+    cleanup();
+    renderAt('/meetings/m1?flag=f9');
+    await screen.findByRole('heading', { name: 'Meeting at a restricted account' });
+    expect(screen.getByText(/outside your access/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Restricted account' })).toBeNull();
+    expect(screen.queryByText('Michael Johnson')).toBeNull();
   });
 });
 
