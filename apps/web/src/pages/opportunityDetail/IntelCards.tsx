@@ -1,6 +1,5 @@
 // Intel display cards for the opportunity detail page. All read from
 // IntelPayload and render — no mutations, no hooks other than useReducedMotion.
-import { useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
@@ -34,7 +33,6 @@ function honestyLabel(
 // ── cards ─────────────────────────────────────────────────────────────────────
 
 export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
-  const reduced = useReducedMotion();
   const { t } = useTranslation('crm');
   // Nothing has ever been pulled for this opportunity — naming Crunchbase/
   // LinkedIn/EU register here would claim sources that were never queried.
@@ -65,10 +63,7 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
 
   return (
     <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-      <span
-        className={`inline-block h-2 w-2 rounded-full bg-[var(--success)] ${reduced ? '' : 'animate-pulse'}`}
-        aria-hidden
-      />
+      <span className="inline-block h-2 w-2 rounded-full bg-[var(--fg-tertiary)]" aria-hidden />
       <span>
         {t('intelCards.dataFreshnessUnverified', 'Intel refreshed {{date}}. Sources are not verified.', {
           date: intel.refreshedAt ? formatDate(intel.refreshedAt) : '—',
