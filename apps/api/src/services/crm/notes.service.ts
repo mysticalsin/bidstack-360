@@ -211,7 +211,7 @@ export async function persistMeetingTechStack(
     website: existing?.website ?? website,
     logoUrl: existing?.logoUrl ?? (input.domain ? faviconUrl(input.domain) : null),
     logoSource: existing?.logoSource ?? (input.domain ? 'favicon' : null),
-    confidenceBps: Math.max(existing?.confidenceBps ?? 0, input.techStack.length ? 7_400 : 5_800),
+    confidenceBps: existing?.confidenceBps ?? 0,
     sourceAttribution: asJsonArray(sourceAttribution),
     providerMetadata: asJsonObject({
       ...existingMetadata,
@@ -257,7 +257,7 @@ export function attribution({
   source: string;
   label: string;
   sourceUrl: string | null;
-  confidence: number;
+  confidence: number | null;
   fetchedAt?: Date;
   providerMetadata?: Record<string, unknown>;
 }): SourceAttributionType {
@@ -321,7 +321,9 @@ function mergeTechStack(
     for (const item of category.items) {
       const key = item.name.toLowerCase();
       const previous = itemMap.get(key);
-      itemMap.set(key, previous && previous.confidence > item.confidence ? previous : item);
+      const previousScore = previous?.confidence ?? -1;
+      const nextScore = item.confidence ?? -1;
+      itemMap.set(key, previous && previousScore > nextScore ? previous : item);
     }
     byCategory.set(category.label, itemMap);
   }
@@ -333,7 +335,9 @@ function parseTechStackMetadata(value: unknown): TechnicalStackCategory[] {
     .array(
       z.object({
         label: z.string(),
-        items: z.array(z.object({ name: z.string(), source: z.string(), confidence: z.number() })),
+        items: z.array(
+          z.object({ name: z.string(), source: z.string(), confidence: z.number().nullable() }),
+        ),
       }),
     )
     .safeParse(value);

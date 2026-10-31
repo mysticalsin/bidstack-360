@@ -120,7 +120,7 @@ function extractTechStack(bodyMd: string): TechnicalStackCategory[] {
     category.set(candidate.name.toLowerCase(), {
       name: candidate.name,
       source: 'meeting_notes_import',
-      confidence: 0.86,
+      confidence: null,
     });
     byCategory.set(candidate.category, category);
   }
@@ -164,7 +164,7 @@ function extractContacts(bodyMd: string): MeetingImportedContact[] {
       email,
       phone,
       roleInDecision: roleFromText(chunk),
-      confidence: email ? 0.86 : 0.62,
+      confidence: null,
     };
     byEmailOrName.set(email ?? name.toLowerCase(), contact);
   }
@@ -268,7 +268,7 @@ function extractTasks(bodyMd: string): MeetingImportedTask[] {
           : /progress|working/i.test(line)
             ? 'in_progress'
             : 'open',
-      confidence: 0.82,
+      confidence: null,
     });
   }
 

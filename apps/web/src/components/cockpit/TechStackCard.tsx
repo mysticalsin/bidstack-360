@@ -566,7 +566,7 @@ function ReadOnlyStackCategory({
             <TechLogo name={item.name} size={14} />
             <span className="tech-pill-name">{item.name}</span>
             <span className="sr-only">
-              {`${item.name} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
+              {confidencePhrase(item.name, item.source, item.confidence)}
             </span>
           </motion.span>
         ))}
@@ -1057,7 +1057,7 @@ function TechStackEditor({
                     <TechLogo name={suggestion.item.name} size={13} />
                     <span>{suggestion.item.name}</span>
                     <small>{sourceLabelForTechItem(suggestion.item)}</small>
-                    <strong>{Math.round(suggestion.item.confidence * 100)}%</strong>
+                    <strong>{confidencePercentLabel(suggestion.item.confidence)}</strong>
                   </button>
                 ))}
               </div>
@@ -1333,7 +1333,7 @@ function TechStackEditor({
                     <span className="tech-editor-source-name">{suggestion.item.name}</span>
                     <small>{suggestion.label}</small>
                     <strong className="tech-editor-source-confidence">
-                      {Math.round(suggestion.item.confidence * 100)}%
+                      {confidencePercentLabel(suggestion.item.confidence)}
                     </strong>
                     <span className="tech-editor-source-transport">
                       {sourceTransportLabelForTechItem(suggestion.item, providerTransportById)}
@@ -1341,7 +1341,7 @@ function TechStackEditor({
                     <SourceBadge
                       label={sourceLabelForTechItem(suggestion.item)}
                       state={sourceStateForTechItem(suggestion.item)}
-                      hint={`${suggestion.item.name} source: ${suggestion.item.source}. Confidence ${Math.round(suggestion.item.confidence * 100)}%.`}
+                      hint={confidencePhrase(suggestion.item.name, suggestion.item.source, suggestion.item.confidence)}
                       className="tech-editor-source"
                     />
                   </button>
@@ -1462,7 +1462,7 @@ function TechStackEditor({
                     <SourceBadge
                       label={sourceLabelForTechItem(item)}
                       state={sourceStateForTechItem(item)}
-                      hint={`${item.name || 'Vendor'} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
+                      hint={confidencePhrase(item.name || 'Vendor', item.source, item.confidence)}
                       className="tech-editor-source"
                     />
                     <button
@@ -1524,19 +1524,29 @@ function TechStackSourceFirstAssist({
   const queuedProviderCount = providerRows.filter((provider) => provider.status === 'queued').length;
   const reviewCountById = new Map(reviewBreakdown.map((item) => [item.id, item.count]));
   const sourceMatchLabel = bestSourceMatch ? sourceLabelForTechItem(bestSourceMatch.item) : null;
-  const sourceMatchConfidence = bestSourceMatch
-    ? Math.round(bestSourceMatch.item.confidence * 100)
-    : 0;
+  const sourceMatchConfidence =
+    bestSourceMatch?.item.confidence == null
+      ? null
+      : Math.round(bestSourceMatch.item.confidence * 100);
   const subtitle = bestSourceMatch
-    ? t(
-        'techStack.sourceFirstBestMatchSubtitle',
-        '{{vendor}} matches {{source}} evidence at {{confidence}}%.',
-        {
-          vendor: bestSourceMatch.item.name,
-          source: sourceMatchLabel,
-          confidence: sourceMatchConfidence,
-        },
-      )
+    ? sourceMatchConfidence == null
+      ? t(
+          'techStack.sourceFirstBestMatchUnscored',
+          '{{vendor}} matches {{source}}. Not scored.',
+          {
+            vendor: bestSourceMatch.item.name,
+            source: sourceMatchLabel,
+          },
+        )
+      : t(
+          'techStack.sourceFirstBestMatchSubtitle',
+          '{{vendor}} matches {{source}} evidence at {{confidence}}%.',
+          {
+            vendor: bestSourceMatch.item.name,
+            source: sourceMatchLabel,
+            confidence: sourceMatchConfidence,
+          },
+        )
     : pullingSources
       ? t(
           'techStack.sourceFirstCheckingSubtitle',
@@ -2057,11 +2067,17 @@ function TrustedSourceRibbon({
   if (suggestions.length === 0) return null;
 
   const providerSummary = buildProviderReviewSummaries(suggestions);
-  const averageConfidence = Math.round(
-    suggestions.reduce((total, suggestion) => total + suggestion.item.confidence, 0) /
-      suggestions.length *
-      100,
-  );
+  const scoredConfidences = suggestions
+    .map((suggestion) => suggestion.item.confidence)
+    .filter((confidence): confidence is number => confidence != null);
+  const averageConfidence =
+    scoredConfidences.length === 0
+      ? null
+      : Math.round(
+          (scoredConfidences.reduce((total, confidence) => total + confidence, 0) /
+            scoredConfidences.length) *
+            100,
+        );
 
   return (
     <div
@@ -2089,7 +2105,7 @@ function TrustedSourceRibbon({
         aria-label={t('techStack.trustedSourceBreakdownAria', 'Trusted source breakdown')}
       >
         <span>
-          <strong>{averageConfidence}%</strong>
+          <strong>{averageConfidence == null ? 'Not scored' : `${averageConfidence}%`}</strong>
           {t('techStack.trustedSourceAverage', ' avg')}
         </span>
         {providerSummary.map((item) => (
@@ -2340,7 +2356,7 @@ function ProviderSuggestions({
             <SourceBadge
               label={sourceLabelForTechItem(suggestion.item)}
               state={sourceStateForTechItem(suggestion.item)}
-              hint={`${suggestion.item.name} source: ${suggestion.item.source}. Confidence ${Math.round(suggestion.item.confidence * 100)}%.`}
+              hint={confidencePhrase(suggestion.item.name, suggestion.item.source, suggestion.item.confidence)}
             />
           </div>
           <div className="tech-suggestion-actions">
@@ -2717,7 +2733,7 @@ function compareSourceSuggestions(
   left: TechnicalStackSuggestion,
   right: TechnicalStackSuggestion,
 ): number {
-  const confidenceDelta = right.item.confidence - left.item.confidence;
+  const confidenceDelta = (right.item.confidence ?? -1) - (left.item.confidence ?? -1);
   if (Math.abs(confidenceDelta) > 0.001) return confidenceDelta;
   return providerRank(left.item.source) - providerRank(right.item.source);
 }
@@ -2779,10 +2795,12 @@ function buildProviderReviewSummaries(
     const providerId = providerIdForTechSource(suggestion.item.source);
     const bucket = buckets[providerId];
     bucket.count += 1;
-    bucket.confidenceTotal += suggestion.item.confidence;
-    if (suggestion.item.confidence > bucket.topConfidence) {
-      bucket.topConfidence = suggestion.item.confidence;
-      bucket.topVendor = suggestion.item.name;
+    if (suggestion.item.confidence != null) {
+      bucket.confidenceTotal += suggestion.item.confidence;
+      if (suggestion.item.confidence > bucket.topConfidence) {
+        bucket.topConfidence = suggestion.item.confidence;
+        bucket.topVendor = suggestion.item.name;
+      }
     }
   }
 
@@ -2808,7 +2826,7 @@ function providerIdForTechSource(source: string): ProviderReviewBreakdownItem['i
 }
 
 function isTrustedSourceSuggestion(suggestion: TechnicalStackSuggestion): boolean {
-  return suggestion.item.confidence >= TRUSTED_SOURCE_CONFIDENCE;
+  return (suggestion.item.confidence ?? -1) >= TRUSTED_SOURCE_CONFIDENCE;
 }
 
 function buildIntakeReviewItems(
@@ -3391,9 +3409,20 @@ function providerRowsFromReviewBreakdown(
   return providerRows;
 }
 
+function confidencePercentLabel(confidence: number | null): string {
+  if (confidence == null) return 'Not scored';
+  return `${Math.round(confidence * 100)}%`;
+}
+
+function confidencePhrase(name: string, source: string, confidence: number | null): string {
+  if (confidence == null) return `${name} source: ${source}. Not scored.`;
+  return `${name} source: ${source}. Confidence ${Math.round(confidence * 100)}%.`;
+}
+
 function sourceStateForTechItem(item: TechnicalStackItemType): CockpitSourceState {
   const source = item.source.toLowerCase();
   if (source.includes('manual')) return 'verified';
+  if (item.confidence == null) return 'crm';
   if (source.includes('apollo')) return item.confidence >= 0.72 ? 'apollo_fresh' : 'apollo_stale';
   if (item.confidence >= 0.86) return 'verified';
   if (item.confidence <= 0.5) return 'missing';

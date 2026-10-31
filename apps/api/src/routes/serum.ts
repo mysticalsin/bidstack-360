@@ -1437,8 +1437,8 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         {
           id: 'evals',
           label: 'Evals and ship gates',
-          status: 'ready',
-          detail: 'Existing RFP eval fixtures are available; SERUM-specific eval suites are not yet promoted.',
+          status: 'empty',
+          detail: 'SERUM-specific eval suites are not promoted. Existing RFP fixtures are not a ship gate.',
         },
       ];
 

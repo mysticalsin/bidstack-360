@@ -180,7 +180,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       const companyName = req.body.companyName.trim();
       const importedAt = new Date();
       const source = attribution({
-        confidence: 0.86,
+        confidence: null,
         fetchedAt: importedAt,
         label: 'Meeting notes import',
         source: 'meeting_notes_import',
@@ -189,6 +189,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
           accountId,
           companyName,
           characterCount: req.body.bodyMd.length,
+          confidenceBasis: 'not_scored',
         },
       });
       const extracted = extractMeetingNotes(req.body.bodyMd, companyName, source);

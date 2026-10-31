@@ -346,8 +346,11 @@ function attributionSource(
   if (!source) return missingSource(fallback.missingHint);
   return {
     label: source.label || fallback.fallbackLabel,
-    state: source.confidence >= 0.88 ? 'verified' : 'crm',
-    hint: `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)} at ${Math.round(source.confidence * 100)}% confidence.`,
+    state: source.confidence != null && source.confidence >= 0.88 ? 'verified' : 'crm',
+    hint:
+      source.confidence == null
+        ? `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)}. Not scored.`
+        : `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)} at ${Math.round(source.confidence * 100)}% confidence.`,
   };
 }
 
