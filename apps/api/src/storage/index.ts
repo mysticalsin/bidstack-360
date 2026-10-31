@@ -74,6 +74,8 @@ export interface StorageAdapter {
   readBuffer(key: string): Promise<Buffer>;
   // Local-only: persist a PUT body to disk. Absent on s3 driver.
   writeLocal?(key: string, body: Readable | Buffer): Promise<{ bytes: number }>;
+  // Server-side write of a small, already-validated object (org chart import photos).
+  putObject?(key: string, body: Buffer, contentType: string): Promise<{ bytes: number }>;
 }
 
 // ─── Local filesystem adapter ────────────────────────────────────────────
@@ -160,6 +162,10 @@ class LocalStorage implements StorageAdapter {
     }
     const s = await stat(target);
     return { bytes: s.size };
+  }
+
+  async putObject(key: string, body: Buffer, _contentType: string): Promise<{ bytes: number }> {
+    return this.writeLocal(key, body);
   }
 
   async getDownload(
@@ -301,6 +307,18 @@ class S3Storage implements StorageAdapter {
       expiresIn: opts.expiresInSeconds ?? 900,
     });
     return { kind: 'redirect', url };
+  }
+
+  async putObject(key: string, body: Buffer, contentType: string): Promise<{ bytes: number }> {
+    const cmd = new (asSdk(this.mod).PutObjectCommand)({
+      Bucket: this.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ContentLength: body.length,
+    });
+    await asSdk(this.client).send(cmd);
+    return { bytes: body.length };
   }
 
   async delete(key: string): Promise<void> {

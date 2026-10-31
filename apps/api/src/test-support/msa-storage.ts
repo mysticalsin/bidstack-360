@@ -20,6 +20,10 @@ export function makeFakeStorage(driver: 's3' | 'local'): FakeStorage {
     put(key, body, contentType) {
       objects.set(key, { body, contentType });
     },
+    async putObject(key, body, contentType) {
+      objects.set(key, { body, contentType });
+      return { bytes: body.length };
+    },
     newKey(orgId, accountId, name) {
       const safe = (v: string) => v.replace(/[^a-zA-Z0-9._-]/g, '_');
       return `orgs/${safe(orgId)}/accounts/${safe(accountId)}/${Math.random().toString(36).slice(2)}-${safe(name)}`;

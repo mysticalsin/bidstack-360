@@ -6244,6 +6244,15 @@ model OrgChartNode {
   photoContentType     String?        @map("photo_content_type") @db.VarChar(40)
   relationshipStrength Int?           @map("relationship_strength") @db.SmallInt
   sentiment            Sentiment?
+  /// Contact details on the node itself (import or admin edit). The linked
+  /// Contact's own email/phone are used when these are empty.
+  email                String?        @db.VarChar(254)
+  phone                String?        @db.VarChar(32)
+  linkedinUrl          String?        @map("linkedin_url") @db.VarChar(300)
+  /// Extra profile from imports (location, tenure, headline, career, ...). Shape: OrgChartProfile.
+  profile              Json?
+  /// Stable id of this person in the imported file (HTML/JSON exports), for idempotent re-imports.
+  importRef            String?        @map("import_ref") @db.VarChar(200)
   ownerUserId          String?        @map("owner_user_id") @db.Uuid
   sortOrder            Int            @default(0) @map("sort_order")
   /// manual | csv | contacts | abc | metis | apollo | seed
@@ -6271,6 +6280,7 @@ model OrgChartNode {
   @@index([orgId, chartId])
   @@index([parentId])
   @@index([orgId, contactId])
+  @@index([chartId, importRef])
   @@index([deletedAt])
   @@map("org_chart_nodes")
 }

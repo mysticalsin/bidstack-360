@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Sentiment } from './contact.js';
 import { SeniorityLevel, classifySeniority } from './meeting-intel.js';
 
-export const ORG_CHART_SOURCES = ['manual', 'csv', 'contacts', 'abc', 'metis', 'apollo', 'seed'] as const;
+export const ORG_CHART_SOURCES = ['manual', 'csv', 'html', 'contacts', 'abc', 'metis', 'apollo', 'seed'] as const;
 export const OrgChartSource = z.enum(ORG_CHART_SOURCES);
 export type OrgChartSource = z.infer<typeof OrgChartSource>;
 
@@ -38,6 +38,75 @@ const httpsUrl = z
   .refine((u) => u.startsWith('https://'), 'Photo URL must be https');
 const text = (max: number) => z.string().trim().min(1).max(max);
 
+const shortText = (max: number) => z.string().max(max);
+const linkItem = z.object({ title: shortText(300), url: z.string().max(1000).nullable(), date: shortText(40).nullable() });
+
+/** Extra, display-only profile carried by imports (HTML/JSON people maps). All text is sanitized plain text. */
+export const OrgChartProfile = z.object({
+  headline: shortText(300).optional(),
+  summary: shortText(1000).optional(),
+  location: shortText(200).optional(),
+  tenure: shortText(600).optional(),
+  workMode: shortText(40).optional(),
+  employer: shortText(200).optional(),
+  personKind: shortText(40).optional(),
+  tier: shortText(20).optional(),
+  languages: z.array(shortText(200)).max(10).optional(),
+  sites: z.array(shortText(120)).max(20).optional(),
+  themes: z.array(shortText(120)).max(20).optional(),
+  career: z.array(z.object({ role: shortText(200), org: shortText(200).nullable(), period: shortText(80).nullable() })).max(15).optional(),
+  education: z.array(z.object({ school: shortText(200), detail: shortText(300).nullable() })).max(10).optional(),
+  signals: z.array(linkItem).max(10).optional(),
+  footprint: z.array(linkItem).max(10).optional(),
+  socials: z.array(z.object({ kind: shortText(20), url: z.string().max(1000) })).max(10).optional(),
+  linkedinConfidence: shortText(20).optional(),
+  fit: z.object({ score: z.number().min(0).max(100), why: z.array(shortText(300)).max(5) }).optional(),
+  startDate: shortText(40).optional(),
+});
+export type OrgChartProfile = z.infer<typeof OrgChartProfile>;
+
+/** linkedin.com (any subdomain) profile URL over https, normalized to www.linkedin.com; null when not a LinkedIn profile. */
+export function normalizeLinkedinUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let u: URL;
+  try {
+    u = new URL(raw.trim().startsWith('http') ? raw.trim() : `https://${raw.trim()}`);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  const host = u.hostname.toLowerCase();
+  if (host !== 'linkedin.com' && !host.endsWith('.linkedin.com')) return null;
+  const m = u.pathname.match(/^\/(in|pub)\/([^/?#]{1,120})/i);
+  if (!m) return null;
+  const slug = m[2]!;
+  if (!/^[\p{L}\p{N}%._-]+$/u.test(slug)) return null;
+  return `https://www.linkedin.com/${m[1]!.toLowerCase()}/${slug}`;
+}
+
+/** E.164-ish: keeps a leading +, drops spaces and punctuation and extensions; 7 to 15 digits. */
+export function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let s = raw.trim().replace(/^tel:/i, '');
+  s = s.split(/\s*(?:ext\.?|x|#|;)\s*\d*$/i)[0] ?? s;
+  if (/[^\d\s+().\-/]/.test(s)) return null;
+  const plus = s.startsWith('+') || s.startsWith('00');
+  const digits = s.replace(/\D/g, '').replace(/^00/, '');
+  if (digits.length < 7 || digits.length > 15) return null;
+  return plus ? `+${digits}` : digits;
+}
+
+const linkedinField = z
+  .string()
+  .max(300)
+  .refine((v) => normalizeLinkedinUrl(v) !== null, 'LinkedIn URL must be a linkedin.com/in/ profile')
+  .transform((v) => normalizeLinkedinUrl(v)!);
+const phoneField = z
+  .string()
+  .max(40)
+  .refine((v) => normalizePhone(v) !== null, 'Phone must have 7 to 15 digits')
+  .transform((v) => normalizePhone(v)!);
+
 export const OrgChartNode = z.object({
   id: z.string().uuid(),
   chartId: z.string().uuid(),
@@ -52,6 +121,12 @@ export const OrgChartNode = z.object({
   region: z.string().nullable(),
   /** Uploaded photo (API path) or external https URL; null when none or redacted. */
   photoUrl: z.string().nullable(),
+  /** Node email, else the linked contact's. Null when redacted or the caller lacks contacts:read. */
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  linkedinUrl: z.string().nullable(),
+  /** Imported extras (location, tenure, career, ...). Null when none or redacted. */
+  profile: OrgChartProfile.nullable(),
   relationshipStrength: z.number().int().min(1).max(5).nullable(),
   sentiment: Sentiment.nullable(),
   owner: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
@@ -132,6 +207,9 @@ const editable = {
   businessUnit: text(120).nullable().optional(),
   region: text(40).nullable().optional(),
   photoUrl: httpsUrl.nullable().optional(),
+  email: z.string().trim().toLowerCase().email().max(254).nullable().optional(),
+  phone: phoneField.nullable().optional(),
+  linkedinUrl: linkedinField.nullable().optional(),
   relationshipStrength: z.number().int().min(1).max(5).nullable().optional(),
   sentiment: Sentiment.nullable().optional(),
   ownerUserId: z.string().uuid().nullable().optional(),
@@ -181,12 +259,40 @@ export const OrgChartImportBody = z.object({
   dryRun: z.boolean().default(false),
   chartVersion: z.number().int().optional(),
 });
+export const ORG_CHART_HTML_MAX_BYTES = 5 * 1024 * 1024;
+export const OrgChartHtmlImportBody = z.object({
+  html: z.string().min(1).max(ORG_CHART_HTML_MAX_BYTES),
+  dryRun: z.boolean().default(false),
+  chartVersion: z.number().int().optional(),
+});
+
+export const OrgChartImportPreviewRow = z.object({
+  line: z.number().int(),
+  name: z.string(),
+  title: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  linkedinUrl: z.string().nullable(),
+  hasPhoto: z.boolean(),
+  manager: z.string().nullable(),
+  action: z.enum(['create', 'update']),
+  extras: z.array(z.string()),
+});
+export type OrgChartImportPreviewRow = z.infer<typeof OrgChartImportPreviewRow>;
+
 export const OrgChartImportResult = z.object({
   dryRun: z.boolean(),
   created: z.number().int(),
   updated: z.number().int(),
-  errors: z.array(z.object({ line: z.number().int(), message: z.string() })),
+  /** `line` is the CSV line, or the person number for HTML imports (name included then). */
+  errors: z.array(z.object({ line: z.number().int(), message: z.string(), name: z.string().optional() })),
   chartVersion: z.number().int().nullable(),
+  /** HTML imports: detected layout, people found, skipped (system accounts) and a preview of every row. */
+  format: z.string().optional(),
+  found: z.number().int().optional(),
+  skipped: z.number().int().optional(),
+  photos: z.number().int().optional(),
+  preview: z.array(OrgChartImportPreviewRow).optional(),
 });
 export type OrgChartImportResult = z.infer<typeof OrgChartImportResult>;
 
@@ -322,6 +428,8 @@ export const ORG_CHART_CSV_COLUMNS = [
   'owner_email',
   'relationship_strength',
   'sentiment',
+  'phone',
+  'linkedin_url',
 ] as const;
 
 export interface OrgChartCsvRow {
@@ -339,6 +447,8 @@ export interface OrgChartCsvRow {
   ownerEmail: string | null;
   relationshipStrength: number | null;
   sentiment: z.infer<typeof Sentiment> | null;
+  phone?: string | null;
+  linkedinUrl?: string | null;
 }
 
 /**
@@ -396,8 +506,22 @@ export function parseOrgChartCsv(csv: string, maxRows = ORG_CHART_MAX_NODES): { 
       errors.push({ line, message: 'photo_url must be an https URL' });
       continue;
     }
+    const phoneRaw = get('phone');
+    const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
+    if (phoneRaw && !phone) {
+      errors.push({ line, message: `Invalid phone: ${phoneRaw.slice(0, 40)}` });
+      continue;
+    }
+    const liRaw = get('linkedin_url');
+    const linkedinUrl = liRaw ? normalizeLinkedinUrl(liRaw) : null;
+    if (liRaw && !linkedinUrl) {
+      errors.push({ line, message: 'linkedin_url must be a linkedin.com/in/ profile' });
+      continue;
+    }
     const title = get('title');
     rows.push({
+      phone,
+      linkedinUrl,
       line,
       name: name.slice(0, 200),
       title: title?.slice(0, 200) ?? null,
