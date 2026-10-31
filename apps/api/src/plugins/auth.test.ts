@@ -184,6 +184,38 @@ describe('auth plugin', () => {
     }
   });
 
+  it('accepts ?access_token= only on WebSocket upgrades, never on plain HTTP', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CLERK_SECRET_KEY = 'sk_test_query_token';
+    process.env.PUBLIC_BASE_URL = 'https://app.bidstack.test';
+    vi.mocked(verifyToken).mockReset();
+    vi.mocked(verifyToken).mockRejectedValue(new Error('bad token'));
+
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(authPlugin);
+    server.get('/private-probe', async () => ({ ok: true }));
+
+    try {
+      const plain = await server.inject({
+        method: 'GET',
+        url: '/private-probe?access_token=leaky-url-token',
+      });
+      expect(plain.statusCode).toBe(401);
+      expect(plain.json().message).toBe('Missing Authorization header');
+      expect(verifyToken).not.toHaveBeenCalled();
+
+      await server.inject({
+        method: 'GET',
+        url: '/private-probe?access_token=ws-token',
+        headers: { upgrade: 'websocket', connection: 'Upgrade' },
+      });
+      expect(verifyToken).toHaveBeenCalledWith('ws-token', expect.anything());
+    } finally {
+      await server.close();
+    }
+  });
+
   describe('verified-session cache (scale fix)', () => {
     // WHY this matters: the onRequest hook runs verifyClerkAuth on EVERY
     // authenticated request. Before the cache, each one did 3 reads + a

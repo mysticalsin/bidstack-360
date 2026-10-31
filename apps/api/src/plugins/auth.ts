@@ -525,7 +525,11 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   // scrubUrl() already redacts access_token from any logged URL, and it travels
   // over wss (TLS). Parsed from req.url directly so it doesn't depend on
   // req.query being populated at the onRequest stage.
-  if (!token) {
+  // Only for WebSocket upgrades: a bearer in a normal URL leaks through
+  // Referer headers, browser history and proxy access logs.
+  const isWebSocketUpgrade =
+    String(req.headers.upgrade ?? '').toLowerCase() === 'websocket';
+  if (!token && isWebSocketUpgrade) {
     const url = req.url ?? '';
     const qIdx = url.indexOf('?');
     if (qIdx >= 0) {
