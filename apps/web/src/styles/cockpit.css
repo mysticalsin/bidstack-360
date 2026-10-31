@@ -3355,7 +3355,7 @@
 .acct-keys > div { display: grid; gap: 4px; min-width: 0; }
 .acct-keys dt { font-size: 13px; color: var(--fg-tertiary); font-weight: 400; }
 .acct-keys dd { margin: 0; font-size: 24px; font-weight: 500; color: var(--fg-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.acct-keys span { font-size: 13px; color: var(--fg-tertiary); }
+.acct-keys > div > span { font-size: 13px; color: var(--fg-tertiary); }
 @media (max-width: 640px) {
   .acct-head { row-gap: 16px; padding-bottom: 24px; }
   .acct-head .page-title { font-size: 24px; }

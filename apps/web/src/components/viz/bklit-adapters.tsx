@@ -52,7 +52,7 @@ export function WinRateLine({ data }: { data: Array<{ x: string; date: Date; rat
     <div aria-hidden className="viz-bk">
       <LineChart data={data as unknown as Record<string, unknown>[]} aspectRatio="2.6 / 1" margin={{ ...MARGIN, left: 32, right: 32 }} animationDuration={reduced ? 0 : 1100}>
         <Grid horizontal numTicksRows={2} strokeDasharray="0" stroke="var(--viz-line)" />
-        <Line dataKey="rate" curve={curveMonotoneX} stroke={BRAND} strokeWidth={2} />
+        <Line dataKey="rate" curve={curveMonotoneX} stroke={BRAND} strokeWidth={2} fadeEdges={false} />
         <XAxis numTicks={data.length} tickMode="data" labels={data.map((d) => d.x)} />
         <ChartTooltip rows={(p) => [
           { color: BRAND, label: 'Win rate', value: `${p.rate}%` },
