@@ -450,14 +450,14 @@ function extractIntentTopics(org: ApolloOrganization): string[] {
 
 function extractTechnologyStack(
   org: ApolloOrganization,
-): Array<{ name: string; source: string; confidence: number }> {
+): Array<{ name: string; source: string; confidence: null }> {
   return uniqueStrings([
     ...labelsFromUnknown(org.technologies),
     ...labelsFromUnknown(org.current_technologies),
     ...labelsFromUnknown(org.organization_technologies),
   ])
     .slice(0, 24)
-    .map((name) => ({ name, source: 'apollo_io', confidence: 0.82 }));
+    .map((name) => ({ name, source: 'apollo_io', confidence: null }));
 }
 
 function extractHiringSignals(

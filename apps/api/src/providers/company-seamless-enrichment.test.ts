@@ -49,7 +49,8 @@ describe('fetchSeamlessCompany', () => {
     expect(p!.description).toBe('R&D-driven biopharma.');
     expect(p!.employeeCount).toBe(10001);
     expect(p!.industryLabels).toEqual(['Pharmaceuticals', 'Biotechnology']);
-    expect(p!.confidenceBps).toBe(9000);
+    expect(p!.confidenceBps).toBe(0);
+    expect(p!.sourceAttribution[0].confidence).toBeNull();
     expect(p!.incorporationDate).toBe(new Date('1973').toISOString());
     expect(p!.sourceAttribution[0].source).toBe('seamless');
     expect(p!.sourceAttribution[0].label).toBe('Seamless.AI');

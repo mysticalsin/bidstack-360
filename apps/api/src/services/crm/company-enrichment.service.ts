@@ -251,7 +251,7 @@ function seamlessTechnicalStack(
       items: technologies.map((name) => ({
         name,
         source: 'enrichment:seamless',
-        confidence: 0.9,
+        confidence: null,
       })),
     },
   ];
@@ -278,7 +278,7 @@ function techStackMcpTechnicalStack(
         items: technologies.map((name) => ({
           name,
           source,
-          confidence: 0.86,
+          confidence: null,
         })),
       },
     ];
@@ -308,7 +308,9 @@ function dedupeTechnicalStack(
       const key = item.name.trim().toLowerCase();
       if (!key) continue;
       const existing = chosen.get(key);
-      if (!existing || existing.item.confidence < item.confidence) {
+      const existingScore = existing?.item.confidence ?? -1;
+      const nextScore = item.confidence ?? -1;
+      if (!existing || nextScore > existingScore) {
         chosen.set(key, { label: category.label, item });
       }
     }

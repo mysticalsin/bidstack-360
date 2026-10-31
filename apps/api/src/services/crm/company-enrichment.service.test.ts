@@ -120,8 +120,8 @@ describe('serializeCompany', () => {
       {
         label: 'Seamless technologies',
         items: [
-          { name: 'SAP', source: 'enrichment:seamless', confidence: 0.9 },
-          { name: 'Salesforce', source: 'enrichment:seamless', confidence: 0.9 },
+          { name: 'SAP', source: 'enrichment:seamless', confidence: null },
+          { name: 'Salesforce', source: 'enrichment:seamless', confidence: null },
         ],
       },
     ]);
@@ -161,12 +161,12 @@ describe('serializeCompany', () => {
           {
             name: 'Cloudflare',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
           {
             name: 'Segment',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
         ],
       },
@@ -213,12 +213,12 @@ describe('serializeCompany', () => {
           {
             name: 'Cloudflare',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
           {
             name: 'Segment',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
         ],
       },
@@ -228,7 +228,7 @@ describe('serializeCompany', () => {
           {
             name: 'Datadog',
             source: 'enrichment:tech_stack_mcp:wappalyzer_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
         ],
       },

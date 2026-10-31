@@ -215,8 +215,8 @@ function seamlessProfile({
         : 'Seamless.AI',
     sourceUrl: resolvedWebsite ?? 'https://seamless.ai',
     fetchedAt: now,
-    confidence: 0.9,
-    providerMetadata: { transport, sourceTool },
+    confidence: null,
+    providerMetadata: { transport, sourceTool, confidenceBasis: 'not_scored' },
   });
 
   return {
@@ -231,7 +231,7 @@ function seamlessProfile({
     employeeCount: typeof company.employeeCount === 'number' ? company.employeeCount : null,
     incorporationDate: toIso(company.foundedOn),
     industryLabels: Array.isArray(company.industries) ? company.industries.slice(0, 20) : [],
-    confidenceBps: 9000,
+    confidenceBps: 0,
     sourceAttribution: [src],
     providerMetadata: {
       seamless: {

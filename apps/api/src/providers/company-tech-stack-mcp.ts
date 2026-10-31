@@ -195,11 +195,12 @@ export async function fetchCompanyTechStackMcp({
         label: mcpLabel,
         sourceUrl,
         fetchedAt: now,
-        confidence: 0.86,
+        confidence: null,
         providerMetadata: {
           transport: 'mcp_streamable_http',
           sourceTool: mcpTool,
           provider: mcpLabel,
+          confidenceBasis: 'not_scored',
         },
       }),
     ],
