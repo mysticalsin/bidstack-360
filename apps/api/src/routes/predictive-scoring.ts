@@ -97,7 +97,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/leads/:id/score',
     {
-      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      config: { permission: 'leads:read', rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: LeadScoreResponse },
@@ -122,7 +122,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/opportunities/:id/score',
     {
-      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      config: { permission: 'opportunities:read', rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: OppScoreResponse },

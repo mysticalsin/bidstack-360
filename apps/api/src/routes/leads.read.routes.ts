@@ -14,6 +14,7 @@ export const leadRoutesRead: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/leads',
     {
+      config: { permission: 'leads:read' },
       schema: {
         querystring: LeadFilter,
         response: { 200: LeadPage },
@@ -84,6 +85,7 @@ export const leadRoutesRead: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/leads/:id',
     {
+      config: { permission: 'leads:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: LeadDetail },

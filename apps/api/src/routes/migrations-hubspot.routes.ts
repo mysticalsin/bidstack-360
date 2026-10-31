@@ -105,7 +105,7 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/migrations/hubspot/auth',
-    { schema: { response: { 302: z.null() } } },
+    { config: { permission: 'settings:write' }, schema: { response: { 302: z.null() } } },
     async (req, reply) => {
       const clientId = process.env.HUBSPOT_CLIENT_ID;
       const redirectUri = process.env.HUBSPOT_REDIRECT_URI;

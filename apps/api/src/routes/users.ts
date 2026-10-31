@@ -13,6 +13,8 @@ const OrgUser = z.object({
   email: z.string(),
   role: z.string(),
   createdAt: z.string().datetime(),
+  /** Set only for former members, which GET /users returns with ?includeDeleted=true. */
+  deletedAt: z.string().datetime().nullable().optional(),
 });
 
 const IdParam = z.object({ id: z.string().uuid() });
@@ -77,6 +79,13 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           // caller needs a short dropdown. Cursor + limit fixes both.
           limit: z.coerce.number().int().min(1).max(200).default(100),
           cursor: z.string().uuid().optional(),
+          // Former members are hidden by default. Pickers and history views
+          // that must still show who owned or did something pass
+          // includeDeleted=true and get them back with deletedAt set.
+          includeDeleted: z
+            .enum(['true', 'false'])
+            .default('false')
+            .transform((v) => v === 'true'),
         }),
         response: {
           200: z.object({
@@ -87,9 +96,11 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { limit, cursor } = req.query;
+      const { limit, cursor, includeDeleted } = req.query;
       const rows = await prisma.user.findMany({
-        where: { orgId: req.auth.orgId },
+        // Explicit on both branches: the soft-delete middleware only steps
+        // aside when where.deletedAt is set, and an empty filter matches all.
+        where: { orgId: req.auth.orgId, deletedAt: includeDeleted ? {} : null },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -106,6 +117,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           email: u.email,
           role: u.role,
           createdAt: u.createdAt.toISOString(),
+          ...(includeDeleted ? { deletedAt: u.deletedAt?.toISOString() ?? null } : {}),
         })),
         nextCursor,
       };

@@ -19,6 +19,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
   server.get(
     '/forecasts',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         querystring: z.object({
           period: z.string().max(10).optional(),
@@ -162,6 +163,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
   server.get(
     '/territories/analytics',
     {
+      config: { permission: 'territories:read' },
       schema: {
         response: {
           200: z.object({

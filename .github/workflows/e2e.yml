@@ -39,7 +39,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # pgvector: migrations CREATE EXTENSION vector (same image as ci.yml).
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: bidstack
           POSTGRES_PASSWORD: bidstack_test
@@ -119,7 +120,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # pgvector: migrations CREATE EXTENSION vector (same image as ci.yml).
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: bidstack
           POSTGRES_PASSWORD: bidstack_test

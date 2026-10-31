@@ -59,6 +59,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/migrations',
     {
+      config: { permission: 'migrations:read' },
       schema: {
         querystring: z.object({
           status: MigrationStatusEnum.optional(),
@@ -84,6 +85,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/migrations/:id',
     {
+      config: { permission: 'migrations:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: MigrationJobResponse },
@@ -222,6 +224,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/migrations/mappings',
     {
+      config: { permission: 'migrations:read' },
       schema: {
         querystring: z.object({
           source: MigrationSourceEnum,
@@ -387,7 +390,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/migrations/:id/errors.csv',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    { config: { permission: 'migrations:read' }, schema: { params: z.object({ id: z.string().uuid() }) } },
     async (req, reply) => {
       const { orgId } = req.auth;
       const job = await prisma.migrationJob.findFirst({

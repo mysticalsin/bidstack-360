@@ -184,6 +184,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/companies/search',
     {
+      config: { permission: 'companies:read' },
       schema: {
         querystring: CompanySearchQuery,
         response: { 200: CompanySearchResponse },
@@ -215,6 +216,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/companies/:companyKey/technical-stack',
     {
+      config: { permission: 'companies:read' },
       schema: {
         params: TechnicalStackParams,
         response: { 200: TechnicalStackState },
@@ -396,6 +398,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/companies/lookup',
     {
+      config: { permission: 'companies:read' },
       schema: {
         querystring: CompanyLookupQuery,
         response: { 200: CompanyLookupResponse },
@@ -460,6 +463,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/companies/:id',
     {
+      config: { permission: 'companies:read' },
       schema: {
         params: z.object({ id: z.string().min(1).max(255) }),
         response: { 200: AccountCockpitSnapshot },

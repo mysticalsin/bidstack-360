@@ -59,6 +59,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/tasks',
     {
+      config: { permission: 'tasks:read' },
       schema: {
         querystring: TaskFilter,
         response: { 200: TaskPage },
@@ -99,6 +100,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/tasks/summary',
     {
+      config: { permission: 'tasks:read' },
       schema: {
         response: { 200: TaskSummary },
       },
@@ -114,6 +116,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/tasks/:id',
     {
+      config: { permission: 'tasks:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: Task },

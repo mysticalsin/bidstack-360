@@ -141,6 +141,29 @@ const STUB_ROLE_OVERRIDES: Record<
     name: 'E2E Sales Manager',
     clerkUser: 'e2e_sales_manager',
   },
+  // Remaining seeded system roles, so RBAC denial paths (e.g. Customer
+  // Success has no leads:read, SDR has no opportunities:read) are testable.
+  'account-executive': {
+    systemRole: 'Account Executive',
+    legacyRole: 'member',
+    email: 'e2e-account-executive@bidstack.local',
+    name: 'E2E Account Executive',
+    clerkUser: 'e2e_account_executive',
+  },
+  sdr: {
+    systemRole: 'SDR',
+    legacyRole: 'member',
+    email: 'e2e-sdr@bidstack.local',
+    name: 'E2E SDR',
+    clerkUser: 'e2e_sdr',
+  },
+  'customer-success': {
+    systemRole: 'Customer Success',
+    legacyRole: 'member',
+    email: 'e2e-customer-success@bidstack.local',
+    name: 'E2E Customer Success',
+    clerkUser: 'e2e_customer_success',
+  },
   'read-only': {
     systemRole: 'Read-Only',
     legacyRole: 'member',
@@ -502,7 +525,11 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   // scrubUrl() already redacts access_token from any logged URL, and it travels
   // over wss (TLS). Parsed from req.url directly so it doesn't depend on
   // req.query being populated at the onRequest stage.
-  if (!token) {
+  // Only for WebSocket upgrades: a bearer in a normal URL leaks through
+  // Referer headers, browser history and proxy access logs.
+  const isWebSocketUpgrade =
+    String(req.headers.upgrade ?? '').toLowerCase() === 'websocket';
+  if (!token && isWebSocketUpgrade) {
     const url = req.url ?? '';
     const qIdx = url.indexOf('?');
     if (qIdx >= 0) {

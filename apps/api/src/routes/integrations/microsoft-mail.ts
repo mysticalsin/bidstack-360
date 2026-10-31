@@ -17,7 +17,6 @@
  * For orgs with strict Conditional Access, override via MICROSOFT_TENANT_ID.
  */
 
-import { randomBytes, createHash } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -26,6 +25,12 @@ import { encryptToken } from '@bidstack/shared/token-crypto';
 import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
+import {
+  consumeOAuthState,
+  issueOAuthState,
+  OAuthStateError,
+  oauthStateHttpStatus,
+} from '../../lib/oauth-state.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import { getAccessToken } from '../../services/microsoft-graph-auth.service.js';
 import {
@@ -72,9 +77,9 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
     handler: async (req, reply) => {
       const { userId, orgId } = req.auth;
 
-      const nonce = randomBytes(16).toString('hex');
-      const statePayload = `${orgId}:${userId}:${nonce}`;
-      const state = createHash('sha256').update(statePayload).digest('base64url');
+      // Sealed state (org, user, nonce, expiry); the nonce is stored below so
+      // the public callback can bind it to this user and use it only once.
+      const { state, nonce } = issueOAuthState('microsoft_mail', { orgId, userId });
 
       await prisma.integrationToken.upsert({
         where: {
@@ -87,10 +92,10 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
           provider: IntegrationProvider.microsoft_graph,
           accessTokenEncrypted: encryptToken('pending'),
           status: 'revoked',
-          deltaState: { mailOAuthState: statePayload },
+          deltaState: { mailOAuthNonce: nonce },
         },
         update: {
-          deltaState: { mailOAuthState: statePayload },
+          deltaState: { mailOAuthNonce: nonce },
         },
       });
 
@@ -111,6 +116,12 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/microsoft/mail/oauth/callback
   app.get('/integrations/microsoft/mail/oauth/callback', {
+    config: {
+      // The provider redirect carries no Polo session; identity comes from the
+      // sealed state (see lib/oauth-state.ts).
+      public: true,
+      rateLimit: { max: 20, timeWindow: '1 minute' },
+    },
     schema: {
       querystring: z.object({
         code: z.string().optional(),
@@ -121,7 +132,6 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
     },
     handler: async (req, reply) => {
       const { code, state, error } = req.query;
-      const { userId, orgId } = req.auth;
 
       if (error) {
         server.log.warn({ error }, 'Microsoft Mail OAuth denied');
@@ -133,18 +143,26 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         throw server.httpErrors.badRequest('Missing code or state');
       }
 
-      const record = await prisma.integrationToken.findUnique({
-        where: {
-          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
-        },
-      });
-      const stored = (record?.deltaState as Record<string, string> | null)?.mailOAuthState;
-      if (!stored) throw server.httpErrors.badRequest('OAuth session not found');
-
-      const expected = createHash('sha256').update(stored).digest('base64url');
-      if (state !== expected) {
-        server.log.warn({ orgId, userId }, 'Microsoft Mail OAuth forged state rejected');
-        throw server.httpErrors.forbidden('Invalid OAuth state');
+      let orgId: string;
+      let userId: string;
+      try {
+        ({ orgId, userId } = await consumeOAuthState({
+          provider: 'microsoft_mail',
+          integrationProvider: IntegrationProvider.microsoft_graph,
+          field: 'mailOAuthNonce',
+          state,
+        }));
+      } catch (err) {
+        if (!(err instanceof OAuthStateError)) throw err;
+        server.log.warn({ reason: err.reason }, 'Microsoft Mail OAuth state rejected');
+        const status = oauthStateHttpStatus(err.reason);
+        const message =
+          err.reason === 'expired'
+            ? 'OAuth state expired, please restart the connection'
+            : err.reason === 'replayed'
+              ? 'OAuth state already used, please restart the connection'
+              : 'Invalid OAuth state';
+        throw server.httpErrors.createError(status, message);
       }
 
       const tokenRes = await fetchWithTimeout(

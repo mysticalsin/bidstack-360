@@ -50,6 +50,7 @@ export const territoriesRoutingRoutes: FastifyPluginAsyncZod = async (server) =>
   server.get(
     '/lead-routing-rules',
     {
+      config: { permission: 'leads:read' },
       schema: { response: { 200: z.object({ items: z.array(LeadRoutingRule) }) } },
     },
     async (req) => {

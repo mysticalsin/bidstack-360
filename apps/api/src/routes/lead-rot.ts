@@ -33,6 +33,7 @@ export const leadRotRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/lead-rot/config',
     {
+      config: { permission: 'leads:read' },
       schema: { response: { 200: LeadStageRotConfigList } },
     },
     async (req) => {

@@ -59,6 +59,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
   server.get(
     '/opportunities/:id/contacts',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: z.object({ items: z.array(OpportunityContact) }) },

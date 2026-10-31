@@ -83,6 +83,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/notes',
     {
+      config: { permission: 'activities:read' },
       schema: {
         querystring: z.object({
           accountId: z.string().min(1).max(255),

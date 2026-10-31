@@ -14,7 +14,7 @@ import { probeSillageConnectivity } from '../../providers/sillage-signals.js';
 export const crmHealthRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/data-quality',
-    { schema: { response: { 200: DataQualityReport } } },
+    { config: { permission: 'companies:read' }, schema: { response: { 200: DataQualityReport } } },
     async (req) =>
       buildDataQualityReport(
         await buildDashboardSnapshot(req.auth.orgId, undefined, prisma, req.log),
@@ -23,7 +23,7 @@ export const crmHealthRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/crm/provider-health',
-    { schema: { response: { 200: z.object({ items: z.array(ProviderHealth) }) } } },
+    { config: { permission: 'companies:read' }, schema: { response: { 200: z.object({ items: z.array(ProviderHealth) }) } } },
     async (req) => {
       const snapshot = await buildDashboardSnapshot(req.auth.orgId, undefined, prisma, req.log);
       return { items: snapshot.providerHealth };

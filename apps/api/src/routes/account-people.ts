@@ -160,7 +160,7 @@ async function serializeCommitment(orgId: string, id: string) {
 export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/companies/:id/people-map',
-    { schema: { params: IdParam, response: { 200: PeopleMap } } },
+    { config: { permission: 'companies:read' }, schema: { params: IdParam, response: { 200: PeopleMap } } },
     async (req) => {
       const map = await peopleMapForCompany(req.auth.orgId, req.params.id);
       if (!map) notFound(server, 'Company not found');
@@ -170,7 +170,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/opportunities/:id/people-map',
-    { schema: { params: IdParam, response: { 200: PeopleMap } } },
+    { config: { permission: 'opportunities:read' }, schema: { params: IdParam, response: { 200: PeopleMap } } },
     async (req) => {
       const map = await peopleMapForOpportunity(req.auth.orgId, req.params.id);
       if (!map) notFound(server, 'Opportunity not found');
@@ -321,7 +321,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/companies/:id/commitments',
-    { schema: { params: IdParam, response: { 200: AccountWork } } },
+    { config: { permission: 'companies:read' }, schema: { params: IdParam, response: { 200: AccountWork } } },
     async (req) => {
       const company = await prisma.company.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
@@ -334,7 +334,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/opportunities/:id/commitments',
-    { schema: { params: IdParam, response: { 200: AccountWork } } },
+    { config: { permission: 'opportunities:read' }, schema: { params: IdParam, response: { 200: AccountWork } } },
     async (req) => {
       const opportunity = await prisma.opportunity.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },

@@ -105,6 +105,7 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/governance-meetings',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         querystring: z.object({ accountKey: z.string().min(1).max(255) }),
         response: { 200: GovernanceMeetingList },

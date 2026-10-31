@@ -22,6 +22,7 @@ import {
 
 import { cancelQueuedCrewRun, enqueueCrewRun } from '../queues/crew-run.js';
 import { seedStandardCrew } from '../lib/crew-standard.js';
+import { canOverrideOwnership } from '../lib/org-admin.js';
 
 // ─── Row shapes + serializers ───────────────────────────────────────────────
 
@@ -615,7 +616,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     async (req) => {
-      const isAdmin = req.auth.role === 'admin';
+      const isAdmin = await canOverrideOwnership(req);
       const run = await loadRunForAction(req.auth.orgId, req.auth.userId, isAdmin, req.params.id);
       if (!run) throw server.httpErrors.notFound('Run not found');
       if (!ACTIVE_RUN_STATUSES.includes(run.status as (typeof ACTIVE_RUN_STATUSES)[number])) {
@@ -666,7 +667,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       const parsedBody = CrewRunRetryBody.safeParse(req.body ?? {});
       if (!parsedBody.success) throw server.httpErrors.badRequest('Invalid retry payload');
       const approvalConfirmed = parsedBody.data.approvalConfirmed;
-      const isAdmin = req.auth.role === 'admin';
+      const isAdmin = await canOverrideOwnership(req);
       const run = await loadRunForAction(req.auth.orgId, req.auth.userId, isAdmin, req.params.id);
       if (!run) throw server.httpErrors.notFound('Run not found');
       if (!RETRYABLE_RUN_STATUSES.includes(run.status as (typeof RETRYABLE_RUN_STATUSES)[number])) {
@@ -730,7 +731,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     async (req) => {
-      const isAdmin = req.auth.role === 'admin';
+      const isAdmin = await canOverrideOwnership(req);
       const callerId = uuidOrNull(req.auth.userId);
       const rows = await prisma.$queryRaw<RunRow[]>`
         SELECT id, crew_id, started_by_user_id, status, inputs, final_output, results, error, created_at, completed_at
@@ -755,7 +756,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     async (req) => {
-      const isAdmin = req.auth.role === 'admin';
+      const isAdmin = await canOverrideOwnership(req);
       const callerId = uuidOrNull(req.auth.userId);
       const { crewId } = req.query;
       const rows = await prisma.$queryRaw<RunRow[]>`

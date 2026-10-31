@@ -30,6 +30,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/service-cases',
     {
+      config: { permission: 'service-desk:read' },
       schema: {
         querystring: ServiceCaseFilter,
         response: {
@@ -129,6 +130,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/service-cases/:id',
     {
+      config: { permission: 'service-desk:read' },
       schema: { params: z.object({ id: z.string().uuid() }), response: { 200: ServiceCase } },
     },
     async (req) => {

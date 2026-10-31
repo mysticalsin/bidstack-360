@@ -63,6 +63,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/bid-scores',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         querystring: BidScoreFilter,
         response: { 200: BidScoreList },
@@ -89,6 +90,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/bid-scores/:opportunityId/latest',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         params: z.object({ opportunityId: z.string().uuid() }),
         response: { 200: BidScoreItem },

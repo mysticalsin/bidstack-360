@@ -56,7 +56,7 @@ const DATA_QUALITY_FLOOR = 0.6;
 export const sectorViewRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/sector-view',
-    { schema: { response: { 200: SectorViewResponse } } },
+    { config: { permission: 'accounts:read' }, schema: { response: { 200: SectorViewResponse } } },
     async (req) => {
       const orgId = req.auth.orgId;
 

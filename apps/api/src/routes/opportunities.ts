@@ -35,6 +35,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/opportunities',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         querystring: OpportunityFilter,
         response: { 200: OpportunityPage },
@@ -183,6 +184,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/opportunities/count',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         querystring: z.object({
           pipelineStageId: z.string().uuid().optional(),
@@ -221,6 +223,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/opportunities/:id',
     {
+      config: { permission: 'opportunities:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: OpportunityFull },

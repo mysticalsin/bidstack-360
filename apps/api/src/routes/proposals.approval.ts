@@ -185,7 +185,7 @@ export const proposalApprovalRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           id: req.params.id,
           deletedAt: null,
-          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+          ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
         },
         include: { sections: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } } },
       });

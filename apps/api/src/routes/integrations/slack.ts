@@ -28,13 +28,18 @@
  * Shared helpers → slack.helpers.ts
  */
 
-import { randomBytes, createHash } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
+import {
+  consumeOAuthState,
+  issueOAuthState,
+  OAuthStateError,
+  oauthStateHttpStatus,
+} from '../../lib/oauth-state.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 import {
   SLACK_AUTH_URL,
@@ -58,15 +63,16 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/oauth/start
   app.get('/integrations/slack/oauth/start', {
+    config: { permission: 'integrations:write' },
     schema: {
       response: { 200: z.object({ authUrl: z.string().url() }) },
     },
     handler: async (req, reply) => {
       const { userId, orgId } = req.auth;
 
-      const nonce = randomBytes(16).toString('hex');
-      const statePayload = `${orgId}:${userId}:${nonce}`;
-      const state = createHash('sha256').update(statePayload).digest('base64url');
+      // Sealed state (org, user, nonce, expiry); the nonce is stored below so
+      // the public callback can bind it to this user and use it only once.
+      const { state, nonce } = issueOAuthState('slack', { orgId, userId });
 
       // Persist pending state for CSRF verification
       await prisma.integrationToken.upsert({
@@ -83,10 +89,10 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
           provider: IntegrationProvider.slack,
           accessTokenEncrypted: encryptToken('pending'),
           status: 'revoked',
-          deltaState: { oauthState: statePayload },
+          deltaState: { oauthNonce: nonce },
         },
         update: {
-          deltaState: { oauthState: statePayload },
+          deltaState: { oauthNonce: nonce },
           status: 'revoked',
         },
       });
@@ -104,6 +110,12 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/oauth/callback
   app.get('/integrations/slack/oauth/callback', {
+    config: {
+      // The provider redirect carries no Polo session; identity comes from the
+      // sealed state (see lib/oauth-state.ts).
+      public: true,
+      rateLimit: { max: 20, timeWindow: '1 minute' },
+    },
     schema: {
       querystring: z.object({
         code: z.string().optional(),
@@ -113,7 +125,6 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
     },
     handler: async (req, reply) => {
       const { code, state, error } = req.query;
-      const { userId, orgId } = req.auth;
       const redirectBase = process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173';
 
       if (error) {
@@ -124,23 +135,26 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
         throw server.httpErrors.badRequest('Missing code or state');
       }
 
-      // CSRF state verification
-      const record = await prisma.integrationToken.findUnique({
-        where: {
-          orgId_userId_provider: {
-            orgId,
-            userId,
-            provider: IntegrationProvider.slack,
-          },
-        },
-      });
-      const storedPayload = (record?.deltaState as Record<string, string> | null)?.oauthState;
-      if (!storedPayload) throw server.httpErrors.badRequest('OAuth session not found');
-
-      const expectedState = createHash('sha256').update(storedPayload).digest('base64url');
-      if (state !== expectedState) {
-        server.log.warn({ orgId, userId }, 'Slack OAuth forged state parameter rejected');
-        throw server.httpErrors.forbidden('Invalid OAuth state');
+      let orgId: string;
+      let userId: string;
+      try {
+        ({ orgId, userId } = await consumeOAuthState({
+          provider: 'slack',
+          integrationProvider: IntegrationProvider.slack,
+          field: 'oauthNonce',
+          state,
+        }));
+      } catch (err) {
+        if (!(err instanceof OAuthStateError)) throw err;
+        server.log.warn({ reason: err.reason }, 'Slack OAuth state rejected');
+        const status = oauthStateHttpStatus(err.reason);
+        const message =
+          err.reason === 'expired'
+            ? 'OAuth state expired, please restart the connection'
+            : err.reason === 'replayed'
+              ? 'OAuth state already used, please restart the connection'
+              : 'Invalid OAuth state';
+        throw server.httpErrors.createError(status, message);
       }
 
       // Exchange code for token
@@ -272,6 +286,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/channels — list available channels for notification config
   app.get('/integrations/slack/channels', {
+    config: { permission: 'integrations:read' },
     schema: {
       response: {
         200: z.object({
@@ -301,6 +316,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/workspace — current workspace info
   app.get('/integrations/slack/workspace', {
+    config: { permission: 'integrations:read' },
     schema: {
       response: {
         200: z.object({

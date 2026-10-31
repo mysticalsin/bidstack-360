@@ -75,7 +75,7 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/sales-toolkits',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { permission: 'documents:read', rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         querystring: z.object({ sector: z.string().trim().max(120).optional() }),
         response: { 200: SalesToolkitsResponse },

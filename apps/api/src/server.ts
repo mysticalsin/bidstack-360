@@ -23,6 +23,8 @@ import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
 import { privacyLogHooks, privacyLogSerializers } from './lib/logger.js';
+import { registerFrontDoorGuard } from './lib/front-door-guard.js';
+import { parseTrustProxy } from './lib/trust-proxy.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
 // Wave 8 — Y.js CRDT collaborative text editing
@@ -32,24 +34,6 @@ import { rbacPlugin } from './plugins/rbac.js';
 import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
-
-/**
- * Parse TRUSTED_PROXIES into a Fastify trustProxy value. Behind Azure Front Door
- * + Container Apps Envoy the client IP is N hops upstream, so a hop COUNT (e.g.
- * "2") or "true" is the correct setting; a CIDR/IP allowlist is also supported.
- * Empty disables proxy trust (direct-exposure default).
- */
-function parseTrustProxy(value: string | undefined): boolean | number | string[] {
-  if (!value) return false;
-  const v = value.trim();
-  if (v === 'true') return true;
-  if (v === 'false' || v === '') return false;
-  if (/^\d+$/.test(v)) return Number(v);
-  return v
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -106,6 +90,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
+
+  // First hook: drop traffic that bypassed Front Door before any other work.
+  registerFrontDoorGuard(server, config.AZURE_FRONT_DOOR_ID);
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);

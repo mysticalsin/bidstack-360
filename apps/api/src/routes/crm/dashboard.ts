@@ -95,6 +95,7 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/dashboard',
     {
+      config: { permission: 'companies:read' },
       schema: {
         querystring: z.object({ account: z.string().min(1).max(255).optional() }),
         response: { 200: CrmDashboardSnapshot },
@@ -128,7 +129,7 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
-  server.get('/crm/release-score', { schema: { response: { 200: ReleaseScore } } }, async (req) => {
+  server.get('/crm/release-score', { config: { permission: 'companies:read' }, schema: { response: { 200: ReleaseScore } } }, async (req) => {
     try {
       // Release score is org-wide and scope-independent, so this skips both the
       // access-scope lookup and the full 12-query dashboard snapshot the route

@@ -269,11 +269,16 @@ class S3Storage implements StorageAdapter {
     return `orgs/${safeOrg}/accounts/${safeAccount}/${randomUUID()}-${sanitizeName(name) || 'file'}`;
   }
 
-  async getUploadUrl({ key, contentType }: UploadUrlOptions): Promise<PresignedUpload> {
+  async getUploadUrl({ key, contentType, bytes }: UploadUrlOptions): Promise<PresignedUpload> {
+    // Bind the declared size into the signature (content-length becomes a
+    // signed header) so the presigned PUT cannot be replayed to park an
+    // arbitrarily large object in the bucket. Finalize re-checks the size, but
+    // without this the oversized object would already be stored.
     const cmd = new (asSdk(this.mod).PutObjectCommand)({
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
+      ContentLength: bytes,
     });
     const url: string = await asSdk(this.signer).getSignedUrl(this.client, cmd, {
       expiresIn: 900,

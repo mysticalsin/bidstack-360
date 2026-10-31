@@ -54,6 +54,7 @@ export const projectReferencesRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/project-references',
     {
+      config: { permission: 'accounts:read' },
       schema: {
         querystring: z.object({ accountKey: z.string().min(1).max(255) }),
         response: { 200: ProjectReferenceList },

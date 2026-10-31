@@ -239,6 +239,7 @@ export async function crmSummaryRoutes(server: FastifyInstance) {
   app.get(
     '/crm/summary',
     {
+      config: { permission: 'companies:read' },
       schema: {
         querystring: QuerySchema,
         response: {
