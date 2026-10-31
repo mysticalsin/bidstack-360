@@ -5,21 +5,28 @@ import './enrichment.css';
 import { useState } from 'react';
 
 import { Spark } from '@/components/viz/charts';
-import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
+import { useHasPermission } from '@/hooks/useCapabilities';
+import { awaitingRefresh, useCompanyEnrichment, useRefreshEnrichment } from '@/hooks/useCompanyEnrichment';
 import { trendPct } from '@/lib/enrichment/aggregate';
-import { fmtMoney } from '@/lib/enrichment/client';
+import { fmtAsOf, fmtMoney } from '@/lib/enrichment/client';
 
 import { SampleBadge, SourceNote } from './SourceNote';
 
 const NA = <span className="en-fact-sm" style={{ color: 'var(--fg-tertiary)' }}>Not known</span>;
 
 export function FirmographicsStrip({ companyId }: { companyId: string }) {
-  const q = useCompanyEnrichment(companyId);
+  const refresh = useRefreshEnrichment(companyId);
+  const q = useCompanyEnrichment(companyId, { pollUntil: refresh.pollUntil });
+  const canRefresh = useHasPermission('companies:write');
   const [allLocations, setAllLocations] = useState(false);
   if (!q.data) return null;
-  const f = q.data.firmographics;
+  const d = q.data;
+  const f = d.firmographics;
   const hc = f.headcount;
-  const pct = hc ? trendPct(hc.value.trend) : null;
+  const trend = hc?.value.trend ?? [];
+  const pct = hc ? (hc.value.growth12m ?? (trend.length > 1 ? trendPct(trend) : null)) : null;
+  // Judged at the last fetch time, which advances on every poll (keeps render pure).
+  const polling = awaitingRefresh(d, refresh.pollUntil, q.dataUpdatedAt);
   const locs = f.locations?.value ?? [];
   const hq = locs.find((l) => l.hq);
   const others = locs.filter((l) => !l.hq);
@@ -33,8 +40,10 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
             <dd>
               {f.revenue ? (
                 <>
-                  <span className="en-fact">{fmtMoney(f.revenue.value.amount, f.revenue.value.currency)}</span>
-                  <SourceNote source={`${f.revenue.source}, ${f.revenue.value.fiscalYear}`} asOf={f.revenue.asOf} />
+                  <span className="en-fact">
+                    {f.revenue.value.amount != null ? fmtMoney(f.revenue.value.amount, f.revenue.value.currency) : `${f.revenue.value.currency} ${f.revenue.value.range}`}
+                  </span>
+                  <SourceNote source={f.revenue.value.fiscalYear ? `${f.revenue.source}, ${f.revenue.value.fiscalYear}` : f.revenue.source} asOf={f.revenue.asOf} />
                 </>
               ) : NA}
             </dd>
@@ -45,8 +54,10 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
               {hc ? (
                 <>
                   <span className="en-fact">
-                    {hc.value.current.toLocaleString('en-GB')}
-                    <Spark values={hc.value.trend.map((p) => p.value)} label={`Headcount over the last ${hc.value.trend.length} months, ${pct === null ? 'no change data' : `${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)}%`}`} width={64} height={20} />
+                    {hc.value.current != null ? hc.value.current.toLocaleString('en-GB') : hc.value.range}
+                    {trend.length > 1 ? (
+                      <Spark values={trend.map((p) => p.value)} label={`Headcount over the last ${trend.length} months, ${pct === null ? 'no change data' : `${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)}%`}`} width={64} height={20} />
+                    ) : null}
                     {pct !== null ? <span className="en-delta" data-down={pct < 0}>{pct > 0 ? '+' : ''}{pct}% in 12 mo</span> : null}
                   </span>
                   <SourceNote source={hc.source} asOf={hc.asOf} />
@@ -88,11 +99,25 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
           </div>
         </dl>
       </div>
-      {q.data.sample ? (
-        <p className="en-src" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <SampleBadge show /> Illustrative firmographics until company enrichment is connected.
+      <div className="en-foot">
+        <p className="en-src" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} role="status">
+          {d.sample ? <SampleBadge show /> : null}
+          {polling
+            ? 'Enrichment queued. Results appear here when the run finishes.'
+            : d.notice ?? (d.sample ? 'Illustrative firmographics until company enrichment is connected.' : null)}
+          {!d.sample && d.fetchedAt && !polling ? (
+            <span>
+              Enriched <time dateTime={d.fetchedAt}>{fmtAsOf(d.fetchedAt)}</time>{d.stale ? ' · due for refresh' : ''}
+            </span>
+          ) : null}
         </p>
-      ) : null}
+        {canRefresh && d.status !== 'not_configured' ? (
+          <button type="button" className="en-link" onClick={() => refresh.mutate()} disabled={refresh.isPending || polling} data-testid="enrichment-refresh">
+            {refresh.isPending || polling ? 'Refreshing…' : d.sample ? 'Enrich now' : 'Refresh'}
+          </button>
+        ) : null}
+        {refresh.isError ? <p className="en-src" role="alert">Could not queue enrichment. Try again later.</p> : null}
+      </div>
     </section>
   );
 }

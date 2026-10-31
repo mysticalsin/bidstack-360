@@ -1,6 +1,10 @@
-// Mock enrichment, used until the enrichment API lands. Deterministic per
-// company so screenshots and tests are stable. Always flagged sample: true.
-import type { CompanyEnrichment, OpenRole, RoleFunction, RoleSeniority } from './types';
+// Sample enrichment, shown when no provider is configured or the account has
+// not been enriched yet. Deterministic per company so screenshots and tests are
+// stable. Always flagged sample: true.
+import type { CompanyEnrichment, OpenRole } from './types';
+
+type RoleFunction = 'Engineering' | 'Data & AI' | 'Product' | 'Operations' | 'Sales' | 'Finance' | 'Risk & Compliance' | 'HR';
+type RoleSeniority = 'Entry' | 'Mid' | 'Senior' | 'Lead' | 'Director+';
 
 const AS_OF = '2026-10-30';
 
@@ -62,7 +66,7 @@ export function mockEnrichment(companyId: string): CompanyEnrichment {
       source: i % 3 === 0 ? 'Company careers site' : 'LinkedIn Jobs',
     });
   }
-  const tagged = (tag: string) => roles.filter((x) => TEMPLATES.find((t) => t.title === x.title)?.tag === tag).map((x) => x.id);
+  const tagged = (tag: string) => roles.filter((x) => TEMPLATES.find((t) => t.title === x.title)?.tag === tag);
   const base = 9000 + Math.floor(r() * 4000);
   const trend = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(2025, 10 + i, 1);
@@ -85,6 +89,7 @@ export function mockEnrichment(companyId: string): CompanyEnrichment {
         score,
         inferredAt: AS_OF,
         source: 'Hiring signal model',
+        postingCount: p.ev.length,
         evidence: p.ev,
       };
     })
@@ -92,6 +97,10 @@ export function mockEnrichment(companyId: string): CompanyEnrichment {
   return {
     companyId,
     sample: true,
+    status: 'sample',
+    notice: null,
+    stale: false,
+    fetchedAt: null,
     firmographics: {
       revenue: { value: { amount: Math.round((1.8 + r() * 2.4) * 1e9), currency: 'CAD', fiscalYear: 'FY2025' }, source: 'Annual report', asOf: '2026-03-14' },
       headcount: { value: { current: trend.at(-1)!.value, trend }, source: 'LinkedIn company page', asOf: AS_OF },
@@ -108,7 +117,7 @@ export function mockEnrichment(companyId: string): CompanyEnrichment {
         asOf: '2026-09-02',
       },
     },
-    hiring: { source: 'LinkedIn Jobs + careers site', asOf: AS_OF, roles },
+    hiring: { source: 'LinkedIn Jobs + careers site', asOf: AS_OF, roles, total: roles.length },
     projects,
   };
 }

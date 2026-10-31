@@ -5,7 +5,7 @@ import './enrichment.css';
 import { useId, useState } from 'react';
 
 import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
-import { breakdown, DIMENSIONS, recentCount, type Dimension } from '@/lib/enrichment/aggregate';
+import { DIMENSIONS, hiringRows, recentCount, type Dimension } from '@/lib/enrichment/aggregate';
 import { fmtAsOf } from '@/lib/enrichment/client';
 
 import { CountBars } from './CountBars';
@@ -21,12 +21,13 @@ export function HiringNowCard({ companyId }: { companyId: string }) {
   const [allRoles, setAllRoles] = useState(false);
   const id = useId();
   if (!q.data) return null;
-  const { roles, source, asOf } = q.data.hiring;
+  const h = q.data.hiring;
+  const { roles, source, asOf, total } = h;
   const fresh = recentCount(roles, asOf, 30);
-  const byFn = breakdown(roles, 'function');
-  const rows = breakdown(roles, dim);
+  const byFn = hiringRows(h, 'function');
+  const rows = hiringRows(h, dim);
   const dimLabel = DIMENSIONS.find((d) => d.id === dim)!.label.toLowerCase();
-  const list = [...roles].sort((a, b) => b.postedAt.localeCompare(a.postedAt));
+  const list = [...roles].sort((a, b) => (b.postedAt ?? '').localeCompare(a.postedAt ?? ''));
   const shown = allRoles ? list : list.slice(0, TOP_ROLES);
   return (
     <section className="en-section" aria-labelledby={`${id}-h`} data-testid="account-hiring-now">
@@ -34,19 +35,19 @@ export function HiringNowCard({ companyId }: { companyId: string }) {
         <h2 id={`${id}-h`}>Hiring now</h2>
         <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
           <SampleBadge show={q.data.sample} />
-          {roles.length ? (
+          {total ? (
             <button type="button" className="en-link" aria-expanded={open} aria-controls={`${id}-d`} onClick={() => setOpen((v) => !v)} data-testid="hiring-breakdown">
               {open ? 'Hide breakdown' : 'Breakdown'}
             </button>
           ) : null}
         </span>
       </header>
-      {roles.length === 0 ? (
+      {total === 0 ? (
         <p className="en-meta">No open roles found.</p>
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
-            <span className="en-big">{roles.length}</span>
+            <span className="en-big">{total.toLocaleString('en-GB')}</span>
             <span className="en-meta">open roles · {fresh} posted in the last 30 days</span>
           </div>
           {open ? null : <CountBars rows={byFn.slice(0, TOP_FUNCTIONS)} label={`Top ${TOP_FUNCTIONS} functions by open roles`} />}
@@ -80,21 +81,24 @@ export function HiringNowCard({ companyId }: { companyId: string }) {
           <ul className="en-list">
             {shown.map((r) => (
               <li key={r.id}>
-                <span className="en-row-title">{r.title}</span>
+                <span className="en-row-title">
+                  {r.url ? <a href={r.url} target="_blank" rel="noreferrer noopener" className="en-ext">{r.title}</a> : r.title}
+                </span>
                 <span className="en-row-meta">
                   {r.function} · {r.seniority} · {r.location}
                 </span>
                 <p className="en-src">
-                  {r.source} · posted <time dateTime={r.postedAt}>{fmtAsOf(r.postedAt)}</time>
+                  {r.source} · {r.postedAt ? <>posted <time dateTime={r.postedAt}>{fmtAsOf(r.postedAt)}</time></> : 'date not given'}
                 </p>
               </li>
             ))}
           </ul>
           {list.length > TOP_ROLES ? (
             <button type="button" className="en-link" style={{ justifySelf: 'start' }} onClick={() => setAllRoles((v) => !v)}>
-              {allRoles ? 'Show fewer' : `Show all ${list.length} roles`}
+              {allRoles ? 'Show fewer' : `Show all ${list.length} ${list.length < total ? 'latest ' : ''}roles`}
             </button>
           ) : null}
+          {list.length < total ? <p className="en-src">Showing the latest {list.length} of {total.toLocaleString('en-GB')} postings; counts above cover all of them.</p> : null}
         </div>
       ) : null}
     </section>

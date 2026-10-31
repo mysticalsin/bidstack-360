@@ -2,7 +2,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// No provider configured locally: the API says so, and the cards show Sample data.
+vi.mock('@/lib/api', async (orig) => ({
+  ...(await orig<typeof import('@/lib/api')>()),
+  api: vi.fn(async () => ({ companyId: 'acct-1', status: 'not_configured', stale: false, providers: {}, provenance: {} })),
+}));
+vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
 
 import { mockEnrichment } from '@/lib/enrichment/mock';
 
@@ -23,13 +30,16 @@ describe('enrichment cards', () => {
     for (const t of ['Revenue', 'Headcount', 'Industry', 'Locations']) expect(within(strip).getByText(t)).toBeTruthy();
     expect(strip.querySelectorAll('.en-src time').length).toBe(4);
     expect(within(strip).getByText('Sample')).toBeTruthy();
+    expect(within(strip).getByText(/not configured/)).toBeTruthy();
+    // No provider: nothing to refresh.
+    expect(within(strip).queryByTestId('enrichment-refresh')).toBeNull();
     fireEvent.click(within(strip).getByRole('button', { name: /more/ }));
     expect(within(strip).getByText(/London, United Kingdom/)).toBeTruthy();
   });
   it('hiring now drills into function / seniority / region breakdowns and postings', async () => {
     wrap(<HiringNowCard companyId="acct-1" />);
     const card = await screen.findByTestId('account-hiring-now');
-    const total = mockEnrichment('acct-1').hiring.roles.length;
+    const total = mockEnrichment('acct-1').hiring.total;
     expect(within(card).getByText(String(total))).toBeTruthy();
     fireEvent.click(within(card).getByTestId('hiring-breakdown'));
     const drill = within(card).getByTestId('hiring-drill');

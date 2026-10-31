@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AccountWatchdog } from '@/hooks/useAccountWatchdog';
 
-import { breakdown, evidenceFor, mergeEnrichmentSignals, recentCount, trendPct } from './aggregate';
+import { breakdown, mergeEnrichmentSignals, recentCount, trendPct } from './aggregate';
 import { mockEnrichment } from './mock';
 
 const wd: AccountWatchdog = {
@@ -30,7 +30,11 @@ describe('enrichment mock', () => {
   });
   it('backs every project with postings that exist', () => {
     const e = mockEnrichment('acct-1');
-    for (const p of e.projects) expect(evidenceFor(p, e.hiring.roles).length).toBe(p.evidence.length);
+    const ids = new Set(e.hiring.roles.map((r) => r.id));
+    for (const p of e.projects) {
+      expect(p.evidence.length).toBe(p.postingCount);
+      expect(p.evidence.every((r) => ids.has(r.id))).toBe(true);
+    }
   });
 });
 
