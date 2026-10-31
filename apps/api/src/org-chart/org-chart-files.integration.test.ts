@@ -115,7 +115,7 @@ describe('CSV import', () => {
     const res = await importCsv(`${good()}\n`.replace(HEADER, `${HEADER},nickname`).replace(/\n(?!$)/g, ',\n').replace(/,\n$/, '\n'));
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json()).toMatchObject({ created: 3, updated: 0, chartVersion: 2 });
-    expect(res.json().errors[0].message).toMatch(/Ignored unknown columns: nickname/);
+    expect(res.json().warnings[0].message).toMatch(/Ignored unknown columns: nickname/);
     const t = (await call('GET', `/companies/${c.acme}/org-chart`)).json();
     const [ceo, cfo, it2] = t.nodes;
     expect(ceo).toMatchObject({ contactId: p.ceo, parentId: null, placement: 'root', source: 'csv', seniority: 'c_level' });
