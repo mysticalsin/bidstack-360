@@ -46,16 +46,16 @@ beforeEach(() => {
 });
 
 describe('WinLossRecentTable currency display', () => {
-  it('converts the EUR value into the selected display currency', () => {
+  it('does not convert a closed bid into dollars when no currency was recorded', () => {
+    // Why: valueMicros has no currency. Showing $2M from an assumed euro rate
+    // is a false figure on a win/loss debrief.
     render(
       <MemoryRouter>
         <WinLossRecentTable rows={[row]} />
       </MemoryRouter>,
     );
 
-    // €1M at USD rate 2.0 → $2M. The pre-fix non-converting formatter showed
-    // the unconverted '$1M' (right symbol, wrong number).
-    expect(screen.getByText(/\$2M/)).toBeDefined();
-    expect(screen.queryByText(/\$1M/)).toBeNull();
+    expect(screen.getByText(/unspecified/)).toBeDefined();
+    expect(screen.queryByText(/\$2M/)).toBeNull();
   });
 });

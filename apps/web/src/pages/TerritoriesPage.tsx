@@ -18,7 +18,7 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Icon } from '@/components/ui/Icon';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import {
@@ -46,7 +46,8 @@ import {
 
 export function TerritoriesPage() {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
+  const formatMoneyMicros = (micros: number, _currency?: string) =>
+    formatUnspecifiedCompact(micros / 1_000_000);
   const territories = useTerritories();
   const rules = useLeadRoutingRules();
   const analytics = useTerritoryAnalytics();

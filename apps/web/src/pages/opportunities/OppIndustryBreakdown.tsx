@@ -8,14 +8,13 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 import { useTerritorySegments } from '@/hooks/useTerritories';
 import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySegmentBreakdown';
 
 export function OppIndustryBreakdown() {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('crm');
-  const { formatMoney } = useFormatMoney();
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
 
@@ -35,7 +34,7 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatMoney(totals.totalValueMicros, 'EUR')}
+              · {formatUnspecifiedCompact(totals.totalValueMicros / 1_000_000)}
             </span>
           ) : null}
         </span>
