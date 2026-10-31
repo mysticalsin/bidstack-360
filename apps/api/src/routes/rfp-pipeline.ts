@@ -341,8 +341,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/proposals/:proposalId/rfp-approve',
     {
-      config: { permission: 'proposals:write' },
-      preHandler: server.requirePermission('proposals:write'),
+      config: { permission: 'proposals:approve' },
+      preHandler: server.requirePermission('proposals:approve'),
       schema: {
         params: ApproveParams,
         body: ApproveBody,
@@ -527,8 +527,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/bid-workspaces/:workspaceId/rfp/:orchestrationId/approve-drafting',
     {
-      config: { permission: 'proposals:write' },
-      preHandler: server.requirePermission('proposals:write'),
+      config: { permission: 'proposals:approve' },
+      preHandler: server.requirePermission('proposals:approve'),
       schema: {
         params: ResumeDraftingParams,
         response: { 200: ResumeDraftingResponse },

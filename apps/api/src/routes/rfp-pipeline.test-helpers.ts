@@ -72,8 +72,11 @@ export function makeRfpTestContext() {
     },
   };
   let restoreAuth: (() => void) | null = null;
+  let previousStubRoleHeader: string | undefined;
 
   beforeAll(async () => {
+    previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
     try {
       await prisma.$queryRaw`SELECT 1`;
       ctx.dbReachable = true;
@@ -118,6 +121,8 @@ export function makeRfpTestContext() {
   }, 30_000);
 
   afterAll(async () => {
+    if (previousStubRoleHeader === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+    else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
     if (ctx.dbReachable && ctx.rfpTablesReady) {
       // Delete in FK-dependency order (children before parents).
       if (ctx.cleanup.auditLogs.length > 0) {
