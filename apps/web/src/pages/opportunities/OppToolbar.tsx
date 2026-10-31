@@ -32,15 +32,21 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  * Headline KPIs. Tenant-wide counts/pipeline come from the server aggregate
  * (`/api/crm/summary`) so they reflect the whole org, not just the current 50-row
  * cursor page — at 100k-company scale a page-derived total under-reports the
- * pipeline by orders of magnitude. Weighted revenue has no server aggregate, so
- * it stays page-derived and is explicitly labelled "(page)" to avoid
- * misrepresenting it as a tenant total.
+ * pipeline by orders of magnitude. The weighted figure has no server aggregate,
+ * so it stays page-derived and is labelled "(page)". It is value × stored
+ * stage probability for open rows on this page.
  */
 export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
   const { t } = useTranslation('crm');
   const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
-  const kpis = summary
+  const currencyDetail = t('oppToolbar.kpiCurrencyBasis', UNSPECIFIED_CURRENCY_BASIS);
+  const weightedDetail = t(
+    'oppToolbar.kpiWeightedRevenueDetail',
+    'Open rows on this page × stored stage probability. {{basis}}',
+    { basis: UNSPECIFIED_CURRENCY_BASIS },
+  );
+  const kpis: Array<{ label: string; value: string; detail?: string }> = summary
     ? [
         {
           label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
@@ -52,11 +58,13 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: `${formatUnspecifiedAmount(summary.pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: formatUnspecifiedAmount(summary.pipelineValue),
+          detail: currencyDetail,
         },
         {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          label: t('oppToolbar.kpiWeightedRevenuePage', 'Weighted (page)'),
+          value: formatUnspecifiedAmount(weighted),
+          detail: weightedDetail,
         },
       ]
     : [
@@ -68,15 +76,18 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0)),
+          detail: currencyDetail,
         },
         {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          label: t('oppToolbar.kpiWeightedRevenuePage', 'Weighted (page)'),
+          value: formatUnspecifiedAmount(weighted),
+          detail: weightedDetail,
         },
         {
           label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))} (${UNSPECIFIED_CURRENCY_BASIS})`,
+          value: formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0)),
+          detail: currencyDetail,
         },
       ];
   return (
@@ -96,6 +107,9 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           <div className="mt-1 text-lg font-bold tabular-nums text-[var(--fg-primary)]">
             {kpi.value}
           </div>
+          {kpi.detail ? (
+            <div className="mt-0.5 text-[11px] leading-snug text-[var(--fg-tertiary)]">{kpi.detail}</div>
+          ) : null}
         </div>
       ))}
     </div>

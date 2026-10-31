@@ -2180,7 +2180,9 @@
   "oppToolbar": {
     "kpiOpportunities": "Opportunités",
     "kpiRevenue": "Revenu",
-    "kpiWeightedRevenue": "RP",
+    "kpiWeightedRevenue": "Pondéré",
+    "kpiWeightedRevenuePage": "Pondéré (page)",
+    "kpiWeightedRevenueDetail": "Lignes ouvertes de cette page × probabilité d'étape enregistrée. {{basis}}",
     "kpiOpen": "Ouvertes",
     "kpiRegionLabel": "Résumé des KPI des opportunités",
     "title": "Opportunités",

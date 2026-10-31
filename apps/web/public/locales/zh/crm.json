@@ -2126,6 +2126,8 @@
     "kpiOpportunities": "商机",
     "kpiRevenue": "收入",
     "kpiWeightedRevenue": "加权",
+    "kpiWeightedRevenuePage": "加权（本页）",
+    "kpiWeightedRevenueDetail": "本页未结行 × 已记录的阶段概率。{{basis}}",
     "kpiOpen": "进行中",
     "kpiRegionLabel": "商机关键指标摘要",
     "title": "商机",

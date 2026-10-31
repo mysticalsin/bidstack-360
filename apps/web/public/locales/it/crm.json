@@ -2125,7 +2125,9 @@
   "oppToolbar": {
     "kpiOpportunities": "Opportunità",
     "kpiRevenue": "Ricavi",
-    "kpiWeightedRevenue": "RP",
+    "kpiWeightedRevenue": "Ponderato",
+    "kpiWeightedRevenuePage": "Ponderato (pagina)",
+    "kpiWeightedRevenueDetail": "Righe aperte di questa pagina × probabilità di fase registrata. {{basis}}",
     "kpiOpen": "Aperte",
     "kpiRegionLabel": "Riepilogo KPI delle opportunità",
     "title": "Opportunità",
