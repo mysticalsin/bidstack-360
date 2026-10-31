@@ -58,3 +58,4 @@ export * from './app-modules.js';
 export * from './sales-toolkit.js';
 export * from './org-locale-settings.js';
 export * from './org-stage-gate.js';
+export * from './people-map.js';
