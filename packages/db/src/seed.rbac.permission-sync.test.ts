@@ -84,6 +84,22 @@ describe('integrations:write parity with contacts:write', () => {
     expect(keys).not.toContain('integrations:write');
   });
 
+  it('commercial approval is Manager-only and is not an Admin or Presales privilege', () => {
+    // WHY: proposals:write used to be enough to PATCH a proposal to approved or
+    // submitted. Dust would then read that row as a human approval. Admin keeps
+    // every other key; the approver is the Manager role, whose description
+    // already says it owns approvals.
+    expect(ALL_PERMISSION_KEYS).toContain('proposals:approve');
+    const admin = permissionKeysFor('Admin');
+    const manager = permissionKeysFor('Manager');
+    const presales = permissionKeysFor('Presales');
+    expect(admin).not.toContain('proposals:approve');
+    expect(admin).toContain('proposals:write');
+    expect(manager).toContain('proposals:approve');
+    expect(presales).toContain('proposals:write');
+    expect(presales).not.toContain('proposals:approve');
+  });
+
   it('Presales (a write role without contacts:write) is not granted integrations:write', () => {
     // Guards against over-granting: Presales writes bid-scores/documents/proposals
     // etc but never contacts, so it must not pick up integrations:write either.

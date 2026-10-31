@@ -10,6 +10,13 @@
 
 import type { PermissionKey } from './permissions.js';
 
+/**
+ * Commercial approval is a separate authority from administrator and from
+ * proposals:write. It is intentionally absent from every role in RBAC_MATRIX,
+ * including Admin. The seeded Manager role is the grant (see seed.rbac.ts).
+ */
+export const PROPOSAL_APPROVE_PERMISSION = 'proposals:approve' satisfies PermissionKey;
+
 export const SYSTEM_ROLE_NAMES = [
   'Admin',
   'Sales Manager',
