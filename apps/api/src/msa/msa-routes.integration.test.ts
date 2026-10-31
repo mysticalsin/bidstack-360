@@ -436,6 +436,23 @@ describe('files and versions', () => {
     expect(dl.headers['x-content-type-options']).toBe('nosniff');
     expect(String(dl.headers['content-disposition'])).toContain('attachment');
     expect(dl.body).toContain('%PDF-');
+    // CORS for the web PDF preview: allowed origin echoed, others get nothing.
+    const webOrigin = 'http://localhost:5173';
+    const fromWeb = await server.inject({ method: 'GET', url: `${url.pathname}${url.search}`, headers: { origin: webOrigin } });
+    expect(fromWeb.statusCode).toBe(200);
+    expect(fromWeb.headers['access-control-allow-origin']).toBe(webOrigin);
+    expect(String(fromWeb.headers['access-control-expose-headers'])).toContain('Content-Disposition');
+    expect(fromWeb.headers['cross-origin-resource-policy']).toBe('cross-origin');
+    const fromEvil = await server.inject({ method: 'GET', url: `${url.pathname}${url.search}`, headers: { origin: 'https://evil.example' } });
+    expect(fromEvil.headers['access-control-allow-origin']).toBeUndefined();
+    expect(fromEvil.headers['access-control-expose-headers']).toBeUndefined();
+    const preflight = await server.inject({
+      method: 'OPTIONS',
+      url: `${url.pathname}${url.search}`,
+      headers: { origin: webOrigin, 'access-control-request-method': 'GET' },
+    });
+    expect(preflight.statusCode).toBeLessThan(300);
+    expect(preflight.headers['access-control-allow-origin']).toBe(webOrigin);
 
     const t = url.searchParams.get('t')!;
     const tampered = await server.inject({ method: 'GET', url: `/api/v1/msa/download?t=${encodeURIComponent(t.slice(0, -4) + 'AAAA')}` });

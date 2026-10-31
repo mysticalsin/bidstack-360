@@ -987,8 +987,20 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         contentType: v.contentType,
       });
       if (dl.kind !== 'stream' || !dl.stream) throw server.httpErrors.notFound('Download link expired or invalid');
+      // hijack() bypasses Fastify's header pipeline, so carry over the CORS
+      // headers @fastify/cors already decided for this Origin. Without them
+      // the web app's fetch() for the PDF preview is blocked cross-origin.
+      const corsHeaders: Record<string, string> = {};
+      for (const [k, val] of Object.entries(reply.getHeaders())) {
+        if ((k.startsWith('access-control-') || k === 'vary') && val !== undefined) corsHeaders[k] = String(val);
+      }
+      if (corsHeaders['access-control-allow-origin']) {
+        corsHeaders['access-control-expose-headers'] = 'Content-Disposition, Content-Length, Content-Type';
+      }
       reply.hijack();
       reply.raw.writeHead(200, {
+        ...corsHeaders,
+        'Cross-Origin-Resource-Policy': 'cross-origin',
         'Content-Type': v.contentType,
         'Content-Disposition': safeContentDisposition(v.fileName),
         'X-Content-Type-Options': 'nosniff',
