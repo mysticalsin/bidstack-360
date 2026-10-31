@@ -3355,15 +3355,16 @@
 .btn-quiet:hover { background: var(--surface-sunken); color: var(--fg-primary); }
 .acct-keys { flex-basis: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin: 0; }
 .acct-keys > div { display: grid; gap: 4px; min-width: 0; }
-.acct-keys dt { font-size: 13px; color: var(--fg-tertiary); font-weight: 400; }
-.acct-keys dd { margin: 0; font-size: 24px; font-weight: 500; color: var(--fg-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.acct-keys > div > span { font-size: 13px; color: var(--fg-tertiary); }
+.acct-keys .acct-key-label { font-size: 13px; color: var(--fg-tertiary); font-weight: 400; }
+.acct-keys .acct-key-value { margin: 0; font-size: 24px; font-weight: 500; color: var(--fg-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.acct-keys > div > span:not(.acct-key-label):not(.acct-key-value) { font-size: 13px; color: var(--fg-tertiary); }
+.acct-keys .acct-key-drill { justify-self: start; padding: 0; margin-top: 4px; }
 @media (max-width: 640px) {
   .acct-head { row-gap: 16px; padding-bottom: 24px; }
   .acct-head .page-title { font-size: 24px; }
   .acct-head .page-actions { justify-content: flex-start; }
   .acct-keys { gap: 16px; }
-  .acct-keys dd { font-size: 20px; }
+  .acct-keys .acct-key-value { font-size: 20px; }
 }
 .acct-head .account-heading-cluster { flex: 1 1 420px; }
 .acct-head .page-actions { flex: none; align-items: center; }

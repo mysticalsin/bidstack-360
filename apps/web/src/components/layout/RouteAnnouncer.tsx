@@ -40,6 +40,7 @@ function routeTitles(t: TFunction): Record<string, string> {
     '/search': t('routeAnnouncer.routeSearch', 'Search'),
     '/integrations': t('routeAnnouncer.routeIntegrations', 'Integrations'),
     '/audit-log': t('routeAnnouncer.routeAuditLog', 'Audit Log'),
+    '/agreements': t('routeAnnouncer.routeAgreements', 'Agreements'),
     '/settings': t('routeAnnouncer.routeSettings', 'Settings'),
     '/login': t('routeAnnouncer.routeLogin', 'Sign in'),
   };
@@ -67,6 +68,9 @@ function titleFor(
     if (view === 'key') return t('routeAnnouncer.routeKeyAccounts', 'Key Accounts');
     if (view === 'top') return t('routeAnnouncer.routeTopAccounts', 'Top Accounts');
     return t('routeAnnouncer.routeAccounts', 'Accounts');
+  }
+  if (pathname.startsWith('/agreements/') && params.id) {
+    return t('routeAnnouncer.agreementDetail', 'Agreement detail');
   }
   if (pathname.startsWith('/opportunities/') && params.id) {
     return t('routeAnnouncer.opportunityDetail', 'Opportunity detail');

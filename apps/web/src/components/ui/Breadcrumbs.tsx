@@ -28,6 +28,7 @@ function primaryLabels(t: TFunction): Record<string, string> {
     integrations: t('breadcrumbs.integrations', 'Integrations'),
     settings: t('breadcrumbs.settings', 'Settings'),
     'audit-log': t('breadcrumbs.auditLog', 'Audit log'),
+    agreements: t('breadcrumbs.agreements', 'Agreements'),
     login: t('breadcrumbs.login', 'Sign in'),
   };
 }

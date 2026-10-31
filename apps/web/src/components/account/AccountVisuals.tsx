@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom';
 
 import { ChartCard, SignalShape } from '@/components/viz/ChartCard';
 import { StageBars } from '@/components/viz/charts';
-import { fmtCompact, stageFunnel, type OppRow } from '@/components/viz/viz-data';
+import type { OppDrillFilter } from '@/components/drill/filterOpps';
+import { fmtCompact, OPEN_STAGES, stageFunnel, stageKey, statusMix, type OppRow } from '@/components/viz/viz-data';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
@@ -65,11 +66,13 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
   );
 }
 
-export function AccountVisuals({ companyId, companyName }: { companyId: string; companyName: string }) {
+export function AccountVisuals({ companyId, companyName, onDrill }: { companyId: string; companyName: string; onDrill?: (f: OppDrillFilter) => void }) {
   const opps = useOpportunityRows();
   const people = usePeopleMap({ companyId });
   const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase());
   const stages = stageFunnel(rows);
+  const stageIds = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
+  const mix = statusMix(rows);
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
@@ -78,11 +81,26 @@ export function AccountVisuals({ companyId, companyName }: { companyId: string; 
     <div className="acct-visuals" data-testid="account-visuals">
       <ChartCard
         title="Pipeline by stage"
-        meta={`${stages.reduce((n, s) => n + s.count, 0)} open bids`}
+        interactive={Boolean(onDrill)}
+        testId="account-pipeline"
+        meta={(() => { const n = stages.reduce((m, s) => m + s.count, 0); return `${n} open bid${n === 1 ? '' : 's'}`; })()}
         summary={stages.map((s) => `${s.label}: ${fmtCompact(s.value)}`).join('; ') || 'No open bids for this account'}
         table={{ columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, fmtCompact(s.value)]) }}
       >
-        {stages.length ? <StageBars data={stages} format={fmtCompact} /> : <p className="viz-empty">No open bids for this account.</p>}
+        {stages.length ? (
+          <StageBars data={stages} format={fmtCompact}
+            onSelect={onDrill ? (label) => { const i = stages.findIndex((x) => x.label === label); onDrill({ status: 'open', stage: stageIds[i] ?? null }); } : undefined} />
+        ) : <p className="viz-empty">No open bids for this account.</p>}
+        {onDrill && rows.length ? (
+          <>
+            <div className="viz-caption">Select a stage bar or a status to see the bids behind it.</div>
+            <div className="dash-chips" role="group" aria-label="Bids by status">
+              {([['open', 'Open', mix.open], ['won', 'Won', mix.won], ['lost', 'Lost', mix.lost]] as const).map(([k, label, n]) => (
+                <button key={k} type="button" className="dash-chip" onClick={() => onDrill({ status: k })}>{label} <b>{n}</b></button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </ChartCard>
       <ChartCard
         title="Relationship map"

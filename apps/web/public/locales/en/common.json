@@ -56,7 +56,8 @@
     "agentStudio": "Agent Studio",
     "calendar": "Calendar",
     "customObjects": "Custom Objects",
-    "analyticsReports": "Analytics & Reports"
+    "analyticsReports": "Analytics & Reports",
+    "agreements": "Agreements"
   },
   "crumbs": {
     "portfolio": "Portfolio",
@@ -147,7 +148,9 @@
     "titleSuffix": "Polo PreSales"
   },
   "routeAnnouncer": {
-    "nowOn": "Now on {{title}}"
+    "nowOn": "Now on {{title}}",
+    "routeAgreements": "Agreements",
+    "agreementDetail": "Agreement detail"
   },
   "footer": {
     "createdBy": "Created by Tony Walteur",
@@ -357,7 +360,8 @@
     "settings": "Settings",
     "auditLog": "Audit log",
     "login": "Sign in",
-    "ariaLabel": "Breadcrumb"
+    "ariaLabel": "Breadcrumb",
+    "agreements": "Agreements"
   },
   "progressRing": {
     "ariaLabelPercentComplete": "{{percent}}% complete"

@@ -90,6 +90,11 @@ vi.mock('@/components/dashboard/OrgDashboard', () => ({
 vi.mock('@/components/account/AccountVisuals', () => ({
   AccountVisuals: () => <section data-testid="account-visuals" />,
 }));
+vi.mock('@/components/agreements/AgreementsSummaryCard', () => ({
+  AgreementsSummaryCard: () => <section data-testid="account-agreements-card" />,
+}));
+vi.mock('@/components/drill/OppDrill', () => ({ OppDrill: () => null }));
+vi.mock('@/hooks/useOpportunityRows', () => ({ useOpportunityRows: () => ({ data: { items: [] } }) }));
 vi.mock('@/components/watchdog/AccountWatchdogSection', () => ({
   AccountWatchdogSection: () => <section data-testid="account-watchdog" />,
 }));

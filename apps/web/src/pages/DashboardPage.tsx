@@ -1,6 +1,6 @@
 import '../styles/cockpit.css';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -26,6 +26,10 @@ import {
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSection';
 import { AccountVisuals } from '@/components/account/AccountVisuals';
+import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
+import { OppDrill } from '@/components/drill/OppDrill';
+import type { OppDrillFilter } from '@/components/drill/filterOpps';
+import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { AccountDetailsFold } from '@/components/account/AccountDetailsFold';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
@@ -86,6 +90,10 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
 
   const isAdmin = useIsAdmin();
   const enrich = useEnrichCompany();
+  // Account bid drill: header numbers and the stage bars open one side sheet
+  // listing this account's bids (progressive disclosure, Tony 15:21).
+  const [drill, setDrill] = useState<OppDrillFilter | null>(null);
+  const oppRows = useOpportunityRows();
   // Per-user block visibility (Customize menu). Default-visible: an unknown/new
   // id is shown unless the user explicitly turned it off.
   const visibleCards = useCockpitLayout((s) => s.visibleCards);
@@ -361,13 +369,23 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           </button>
         </div>
       )}
-      <PageHead cockpit={cockpit} accountView={isAccountView} />
+      <PageHead cockpit={cockpit} accountView={isAccountView} onDrill={isAccountView ? (status) => setDrill({ status }) : undefined} />
       {/* Account view: one header (name, health sentence, 3 numbers), then the
           watchdog signals, then details. The command-center hero repeated the
           name and next move the header already carries, so it is org-only. */}
       {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
       {isAccountView && cockpit.company.id ? (
-        <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} />
+        <>
+          <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} onDrill={setDrill} />
+          <AgreementsSummaryCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
+          <OppDrill
+            rows={(oppRows.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === cockpit.company.name.toLowerCase())}
+            filter={drill}
+            onFilterChange={setDrill}
+            onClose={() => setDrill(null)}
+            rootLabel={cockpit.company.name}
+          />
+        </>
       ) : null}
       {isAccountView ? (
         <AccountDetailsFold label={t('dashboard.accountDetails', 'Account details')}>{cockpitBody}</AccountDetailsFold>

@@ -134,3 +134,6 @@ packages/db/prisma/schema.prisma.pulled
 # Brand raster assets under public/ are source, not QA screenshots
 !apps/web/public/*.png
 !apps/chrome-extension/src/icons/*.png
+
+# API local storage driver runtime data
+apps/api/.storage/

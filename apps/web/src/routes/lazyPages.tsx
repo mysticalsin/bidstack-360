@@ -36,6 +36,8 @@ export const KamAccountPage = lazy(() => import('@/pages/kam/KamAccountPage'));
 // Collaborate (AppFlowy embed, default export)
 export const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'));
 export const WorkspaceInsightsPage = lazy(() => import('@/pages/WorkspaceInsightsPage'));
+export const AgreementsPage = lazy(() => import('@/pages/agreements/AgreementsPage'));
+export const AgreementDetailPage = lazy(() => import('@/pages/agreements/AgreementDetailPage'));
 export const CompaniesPage = lazy(() =>
   import('@/pages/CompaniesPage').then((m) => ({ default: m.CompaniesPage })),
 );

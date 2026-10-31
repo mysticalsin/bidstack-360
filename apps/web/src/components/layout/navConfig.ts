@@ -90,6 +90,15 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    // Agreements (MSA library): MSAs, frameworks, SOWs and amendments with
+    // expiry and notice tracking. Its own section so renewals are one click away.
+    key: 'agreements',
+    title: 'Agreements',
+    titleKey: 'nav.agreements',
+    icon: 'file',
+    items: [{ to: '/agreements', label: 'Agreements', labelKey: 'nav.agreements', icon: 'file' }],
+  },
+  {
     key: 'pipeline',
     title: 'Pipeline',
     titleKey: 'nav.pipeline',

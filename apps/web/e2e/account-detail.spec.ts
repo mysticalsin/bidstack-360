@@ -43,14 +43,22 @@ async function fetchAccountSnapshot(request: APIRequestContext): Promise<{
   return { accountId: target.id, snapshot };
 }
 
+// The account page shows a short top level (header + key numbers, signals,
+// pipeline/relationship visuals, agreements) and folds the full cockpit behind
+// "Account details" (progressive disclosure, Tony 2026-10-31 15:21 BRT).
 async function expectAccountCockpitReady(page: Page, companyName: string) {
   const main = page.getByRole('main');
-  await expect(main.getByRole('region', { name: 'Account metrics' })).toBeVisible({
-    timeout: 30_000,
-  });
   await expect(main.getByRole('heading', { level: 1, name: companyName })).toBeVisible({
     timeout: 30_000,
   });
+  await expect(main.getByRole('group', { name: 'Key numbers' })).toBeVisible({ timeout: 30_000 });
+}
+
+async function openAccountDetails(page: Page) {
+  const fold = page.getByRole('main').getByRole('button', { name: /^Account details/ });
+  await expect(fold).toBeVisible({ timeout: 15_000 });
+  if ((await fold.getAttribute('aria-expanded')) !== 'true') await fold.click();
+  await expect(fold).toHaveAttribute('aria-expanded', 'true');
 }
 
 test('target account renders a scoped, trustworthy cockpit', async ({ page, gotoAndWait }) => {
@@ -70,7 +78,13 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
     await expect(page.getByText(company.domain, { exact: false })).toBeVisible();
   }
 
-  await expect(page.getByRole('region', { name: 'Polo PreSales command center' })).toBeVisible();
+  // Top level: simple, every number drills in.
+  await expect(page.getByTestId('account-visuals')).toBeVisible();
+  await expect(page.getByTestId('account-agreements-card')).toBeVisible();
+  // Depth: the full cockpit behind the fold. The command-center hero is
+  // org-dashboard only (it repeated the account header).
+  await openAccountDetails(page);
+  await expect(page.getByRole('region', { name: 'Account metrics' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Portfolio pipeline by stage' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Account opportunities' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Account signal coverage' })).toBeVisible();
@@ -90,6 +104,7 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
 test('account intelligence tabs are keyboard-operable', async ({ page, gotoAndWait }) => {
   const { accountId } = await fetchAccountSnapshot(page.request);
   await gotoAndWait(`/accounts/${accountId}`);
+  await openAccountDetails(page);
 
   const tablist = page.getByRole('tablist', { name: 'Account intelligence views' });
   await expect(tablist).toBeVisible({ timeout: 15_000 });

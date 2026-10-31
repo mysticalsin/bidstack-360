@@ -30,9 +30,11 @@ import { labelForBand } from './_tokens';
 interface Props {
   cockpit: AccountCockpitSnapshot;
   accountView: boolean;
+  /** Account view: open the bid drill for this account ('open' or closed 'won'/'lost' = all closed). */
+  onDrill?: (status: 'open' | 'all') => void;
 }
 
-export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) {
+export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }: Props) {
   const { t } = useTranslation('crm');
   const [briefOpen, setBriefOpen] = useState(false);
   const enrich = useEnrichCompany();
@@ -212,20 +214,21 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
       </div>
 
       {accountView ? (
-        <dl className="acct-keys" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
+        <div className="acct-keys" role="group" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
           <div>
-            <dt>{t('pageHead.keyOpenPipeline', 'Open pipeline')}</dt>
-            <dd><AnimatedNumber value={openValue} format={formatMoney} /></dd>
+            <span className="acct-key-label">{t('pageHead.keyOpenPipeline', 'Open pipeline')}</span>
+            <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
             <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
               {openOpps.length === 1
                 ? t('pageHead.keyOpenDeal', '1 open deal')
                 : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
             </span>
+            {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
           </div>
           <div>
-            <dt>{t('pageHead.keyWinRate', 'Win rate')}</dt>
-            <dd>{winLoss && closedCount > 0 ? <AnimatedNumber value={winLoss.winRate} format={(n) => `${Math.round(n)}%`} /> : '—'}</dd>
+            <span className="acct-key-label">{t('pageHead.keyWinRate', 'Win rate')}</span>
+            <span className="acct-key-value">{winLoss && closedCount > 0 ? <AnimatedNumber value={winLoss.winRate} format={(n) => `${Math.round(n)}%`} /> : '—'}</span>
             <MetricSpark values={winSpark} label={t('pageHead.sparkWin', 'Running win rate after each closed bid')} />
             <span>
               {winLoss && closedCount > 0
@@ -235,10 +238,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
                   })
                 : t('pageHead.keyNoClosed', 'No closed bids yet')}
             </span>
+            {onDrill && closedCount > 0 ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('all')}>{t('pageHead.showAllBids', 'Show won and lost')}</button> : null}
           </div>
           <div>
-            <dt>{t('pageHead.keyOpenRisks', 'Open risks')}</dt>
-            <dd>{openRisks.length}</dd>
+            <span className="acct-key-label">{t('pageHead.keyOpenRisks', 'Open risks')}</span>
+            <span className="acct-key-value">{openRisks.length}</span>
             {openRisks.length > 0 ? (
               <Spark mode="bars" values={riskSpark} hotFrom={2} width={48} label={t('pageHead.sparkRisk', 'Open risks: {{low}} low, {{med}} medium, {{high}} high, {{crit}} critical', { low: riskSpark[0], med: riskSpark[1], high: riskSpark[2], crit: riskSpark[3] })} />
             ) : null}
@@ -248,7 +252,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
                 : t('pageHead.keyNoHighRisks', 'None high')}
             </span>
           </div>
-        </dl>
+        </div>
       ) : null}
 
       {linkedOpp ? (

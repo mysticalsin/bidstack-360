@@ -123,6 +123,8 @@ test('technical stack source pull and manual add flow stay usable', async ({
 
   try {
     await gotoAndWait(`/accounts/${accountId}`);
+    // The cockpit cards sit behind the "Account details" fold.
+    await page.getByRole('main').getByRole('button', { name: /^Account details/ }).click();
 
     const stackSection = page.getByRole('region', { name: /technical stack overview/i });
     await expect(stackSection, 'technical stack region must mount').toBeVisible({

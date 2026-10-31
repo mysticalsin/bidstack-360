@@ -18,6 +18,8 @@ import { bidRouteElements } from './BidRoutes';
 import { devRouteElements } from './DevRoutes';
 import {
   AccountsPage,
+  AgreementDetailPage,
+  AgreementsPage,
   AgentStudioPage,
   AnalyticsDashboardPage,
   CalendarPage,
@@ -155,6 +157,22 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/agreements"
+            element={
+              <RequireAuth>
+                <AgreementsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/agreements/:id"
+            element={
+              <RequireAuth>
+                <AgreementDetailPage />
               </RequireAuth>
             }
           />
