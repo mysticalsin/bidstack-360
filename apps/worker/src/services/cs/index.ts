@@ -15,11 +15,29 @@ function jsonObject(value: Record<string, unknown>): Prisma.InputJsonObject {
   return value as Prisma.InputJsonObject;
 }
 
+/**
+ * A health number only when a case count or an NPS response exists.
+ * An empty queue plus a missing survey is not a score of 70.
+ */
+export function healthScoreFromSignals(input: {
+  openCases: number;
+  criticalCases: number;
+  npsScore: number | null;
+}): number | null {
+  const hasCases = input.openCases > 0 || input.criticalCases > 0;
+  const hasNps = input.npsScore != null;
+  if (!hasCases && !hasNps) return null;
+  const parts: number[] = [];
+  if (hasCases) parts.push(clampScore(100 - input.openCases * 4 - input.criticalCases * 8));
+  if (input.npsScore != null) parts.push(clampScore((input.npsScore + 100) / 2));
+  return clampScore(parts.reduce((sum, part) => sum + part, 0) / parts.length);
+}
+
 export async function computeAndPersistHealthScore(
   orgId: string,
   accountId: string,
   log: Logger,
-): Promise<number> {
+): Promise<number | null> {
   const [subscriptionCount, openCases, criticalCases, latestNps, previousScore] = await Promise.all([
     prisma.subscription.count({
       where: { orgId, accountId, status: 'ACTIVE', deletedAt: null },
@@ -53,10 +71,13 @@ export async function computeAndPersistHealthScore(
     }),
   ]);
 
-  const npsScore = latestNps?.score ?? 0;
+  const npsScore = latestNps?.score ?? null;
   const supportPenalty = openCases * 4 + criticalCases * 8;
-  const subscriptionSignal = subscriptionCount > 0 ? 10 : -15;
-  const score = clampScore(70 + subscriptionSignal + npsScore * 0.15 - supportPenalty);
+  const score = healthScoreFromSignals({ openCases, criticalCases, npsScore });
+  if (score == null) {
+    log.debug({ orgId, accountId }, 'cs.health: no measured inputs; not storing a score');
+    return null;
+  }
   const trend =
     previousScore && score > previousScore.score + 3
       ? 'IMPROVING'

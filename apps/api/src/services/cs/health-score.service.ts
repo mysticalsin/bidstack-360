@@ -29,20 +29,42 @@ const WEIGHTS = {
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface HealthFactors extends Record<string, unknown> {
-  productUsage: number;       // 0–100
-  engagement: number;         // 0–100
-  supportTickets: number;     // 0–100 (100 = zero tickets, lower = more tickets)
-  nps: number;                // 0–100 (mapped from -100..100)
-  execSponsorStability: number; // 0 or 100
-  contractValue: number;      // 0–100 (informational only, not weighted)
-  decisionMakerChange: boolean; // informational flag
+  productUsage: number | null;
+  engagement: number | null;
+  supportTickets: number | null;
+  nps: number | null;
+  execSponsorStability: number | null;
+  contractValue: number | null;
+  decisionMakerChange: boolean;
 }
 
 export interface ComputeHealthResult {
   accountId: string;
-  score: number;
+  score: number | null;
   factors: HealthFactors;
   trend: 'IMPROVING' | 'STABLE' | 'DECLINING';
+}
+
+/** Weighted score from the factors that were actually measured. Null when none were. */
+export function composeHealthScore(factors: {
+  productUsage: number | null;
+  engagement: number | null;
+  supportTickets: number | null;
+  nps: number | null;
+  execSponsorStability: number | null;
+}): number | null {
+  const weighted: Array<[number, number]> = [];
+  const add = (value: number | null, weight: number) => {
+    if (value != null) weighted.push([value, weight]);
+  };
+  add(factors.productUsage, WEIGHTS.productUsage);
+  add(factors.engagement, WEIGHTS.engagement);
+  add(factors.supportTickets, WEIGHTS.supportTickets);
+  add(factors.nps, WEIGHTS.nps);
+  add(factors.execSponsorStability, WEIGHTS.execSponsorStability);
+  if (weighted.length === 0) return null;
+  const weightSum = weighted.reduce((sum, [, weight]) => sum + weight, 0);
+  return Math.round(weighted.reduce((sum, [value, weight]) => sum + value * weight, 0) / weightSum);
 }
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
@@ -51,7 +73,7 @@ export interface ComputeHealthResult {
 async function computeEngagementScore(
   orgId: string,
   accountId: string,
-): Promise<number> {
+): Promise<number | null> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const count = await prisma.activity.count({
     where: {
@@ -62,15 +84,15 @@ async function computeEngagementScore(
       occurredAt: { gte: thirtyDaysAgo },
     },
   });
-  // 10+ activities = 100, 0 = 10 (never 0 to avoid false positives)
-  return Math.min(100, Math.max(10, count * 10));
+  if (count === 0) return null;
+  return Math.min(100, count * 10);
 }
 
 /** Derive support ticket pressure (inverse score). */
 async function computeSupportScore(
   orgId: string,
   accountId: string,
-): Promise<number> {
+): Promise<number | null> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [recent, total] = await Promise.all([
     prisma.serviceCase.count({
@@ -79,9 +101,8 @@ async function computeSupportScore(
     prisma.serviceCase.count({ where: { orgId, companyId: accountId } }),
   ]);
 
-  // Average monthly baseline
-  const monthlyAvg = total > 0 ? total / 6 : 0; // assume 6-month data window
-  if (monthlyAvg === 0) return 90; // no history = neutral-positive
+  if (total === 0) return null;
+  const monthlyAvg = total / 6;
 
   const ratio = recent / monthlyAvg;
   if (ratio >= 3) return 10;
@@ -95,13 +116,13 @@ async function computeSupportScore(
 async function computeNpsScore(
   orgId: string,
   accountId: string,
-): Promise<number> {
+): Promise<number | null> {
   const latest = await prisma.npsSurvey.findFirst({
     where: { orgId, accountId, score: { not: null } },
     orderBy: { respondedAt: 'desc' },
     select: { score: true },
   });
-  if (!latest?.score) return 50; // neutral when no NPS data
+  if (latest?.score == null) return null;
   // Map -100..100 to 0..100
   return Math.round((latest.score + 100) / 2);
 }
@@ -110,7 +131,7 @@ async function computeNpsScore(
 async function computeExecSponsorStability(
   orgId: string,
   accountId: string,
-): Promise<{ score: number; decisionMakerChange: boolean }> {
+): Promise<{ score: number | null; decisionMakerChange: boolean }> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const recentChampionSignal = await prisma.churnSignal.findFirst({
     where: {
@@ -122,7 +143,7 @@ async function computeExecSponsorStability(
     },
   });
   return {
-    score: recentChampionSignal ? 0 : 100,
+    score: recentChampionSignal ? 0 : null,
     decisionMakerChange: !!recentChampionSignal,
   };
 }
@@ -131,7 +152,7 @@ async function computeExecSponsorStability(
 async function computeProductUsageScore(
   orgId: string,
   accountId: string,
-): Promise<number> {
+): Promise<number | null> {
   // Proxy: count sync events for the org in last 30d as usage signal.
   // Real integration would pull from product analytics (Segment / Mixpanel).
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -143,7 +164,8 @@ async function computeProductUsageScore(
       occurredAt: { gte: sevenDaysAgo },
     },
   });
-  return Math.min(100, Math.max(5, count * 15));
+  if (count === 0) return null;
+  return Math.min(100, count * 15);
 }
 
 /** Determine trend by comparing to the previous health score. */
@@ -186,21 +208,20 @@ export async function computeAndPersistHealthScore(
     computeExecSponsorStability(orgId, accountId),
   ]);
 
-  const score = Math.round(
-    productUsage * WEIGHTS.productUsage +
-    engagement * WEIGHTS.engagement +
-    supportTickets * WEIGHTS.supportTickets +
-    nps * WEIGHTS.nps +
-    execSponsorStability * WEIGHTS.execSponsorStability,
-  );
+  const score = composeHealthScore({
+    productUsage,
+    engagement,
+    supportTickets,
+    nps,
+    execSponsorStability,
+  });
 
-  // Contract value: informational, not weighted into the score.
   const sub = await prisma.subscription.findFirst({
     where: { orgId, accountId, status: 'ACTIVE' },
     select: { arrAmountMicros: true },
     orderBy: { arrAmountMicros: 'desc' },
   });
-  const contractValue = sub ? Math.min(100, Number(sub.arrAmountMicros) / 1_000_000_000) : 0;
+  const contractValue = sub ? Math.min(100, Number(sub.arrAmountMicros) / 1_000_000_000) : null;
 
   const factors: HealthFactors = {
     productUsage,
@@ -211,6 +232,11 @@ export async function computeAndPersistHealthScore(
     contractValue,
     decisionMakerChange,
   };
+
+  if (score == null) {
+    log.info({ orgId, accountId }, 'cs: no measured health inputs; not storing a score');
+    return { accountId, score: null, factors, trend: 'STABLE' };
+  }
 
   const trend = await determineTrend(orgId, accountId, score);
 
