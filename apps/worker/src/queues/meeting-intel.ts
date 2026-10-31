@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma } from '@bidstack/db';
 import { MEETING_INTEL, type MeetingIntelJob } from '@bidstack/shared';
 
-import { defaultPipelineDeps, type PipelineDeps, processIngestItem, syncConnection } from '../meeting-intel/pipeline.js';
+import { defaultPipelineDeps, type PipelineDeps, processIngestItem, raiseCrossRegionFlags, syncConnection } from '../meeting-intel/pipeline.js';
 
 const SCAN_EVERY_MS = 60 * 60_000;
 
@@ -34,7 +34,12 @@ export async function startMeetingIntel(
   const queue = new Queue(MEETING_INTEL.name, { connection, defaultJobOptions: MEETING_INTEL.defaultJobOptions });
   queues.push(queue);
   const enqueue: PipelineDeps['enqueue'] = async (job) => {
-    const id = job.kind === 'sync' ? `${job.orgId}--sync--${job.connectionId}--${Date.now()}` : `${job.orgId}--item--${job.itemId}`;
+    const id =
+      job.kind === 'sync'
+        ? `${job.orgId}--sync--${job.connectionId}--${Date.now()}`
+        : job.kind === 'process'
+          ? `${job.orgId}--item--${job.itemId}`
+          : `${job.orgId}--flags--${job.meetingId}--${Date.now()}`;
     await queue.add(`meeting-intel.${job.kind}`, job, { jobId: id });
   };
   const deps = defaultPipelineDeps(enqueue);
@@ -43,7 +48,12 @@ export async function startMeetingIntel(
     async (job: Job<MeetingIntelJob | Record<string, never>>) => {
       if (job.name === 'meeting-intel.scan') return { enqueued: await scanMeetingSources(enqueue) };
       const data = job.data as MeetingIntelJob;
-      const res = data.kind === 'sync' ? await syncConnection(data, deps) : await processIngestItem(data, deps);
+      const res =
+        data.kind === 'sync'
+          ? await syncConnection(data, deps)
+          : data.kind === 'process'
+            ? await processIngestItem(data, deps)
+            : { flags: await raiseCrossRegionFlags(data.orgId, data.meetingId) };
       log.info({ jobId: job.id, orgId: data.orgId, kind: data.kind, ...res }, 'meeting intel job finished');
       return res;
     },

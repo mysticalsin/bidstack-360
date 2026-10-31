@@ -118,7 +118,9 @@ export const MEETING_INTEL: QueueConfig = {
 
 export type MeetingIntelJob =
   | { kind: 'sync'; orgId: string; connectionId: string }
-  | { kind: 'process'; orgId: string; itemId: string };
+  | { kind: 'process'; orgId: string; itemId: string }
+  /** Manual entries created by the API: raise cross-region flags only. */
+  | { kind: 'flags'; orgId: string; meetingId: string };
 
 export interface MsaTextExtractJob {
   orgId: string;
