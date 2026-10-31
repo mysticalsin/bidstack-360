@@ -105,7 +105,36 @@ export interface EnrichmentProvider {
   id: EnrichmentProviderId;
   configured(): boolean;
   enrich(input: EnrichmentInput, ctx: ProviderContext): Promise<ProviderResult>;
+  /** Optional: senior people at a company (org chart seed). */
+  searchPeople?(input: PeopleSearchInput, ctx: Pick<ProviderContext, 'reserve'>): Promise<PeopleSearchResult>;
 }
+
+export interface PeopleSearchInput {
+  domain: string | null;
+  /** Provider's own organization id when an earlier enrichment found it. */
+  providerCompanyId?: string | null;
+}
+
+/** A person from a people search. Apollo search returns no email, phone or photo. */
+export interface ProviderPerson {
+  externalId: string;
+  name: string;
+  title: string | null;
+  refreshedAt: string | null;
+}
+
+export interface PeopleSearchResult {
+  provider: EnrichmentProviderId;
+  status: ProviderStatus;
+  people: ProviderPerson[];
+  creditsUsed: number;
+  retryAfterMs?: number;
+  error?: string;
+}
+
+/** Seniorities asked for when seeding an org chart (Apollo person_seniorities). */
+export const PEOPLE_SEARCH_SENIORITIES = ['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director'] as const;
+export const PEOPLE_PER_PAGE = 100;
 
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -353,7 +382,43 @@ export function createApolloProvider(opts: ProviderOptions = {}): EnrichmentProv
       }
       return { ...result, jobPostings: postings, creditsUsed: credits };
     },
+    // People API Search (mixed_people/api_search): 0 credits, needs a master
+    // key; returns names (last name obfuscated) and titles only. One page.
+    async searchPeople(input, ctx) {
+      const apiKey = key();
+      const base = { provider: 'apollo' as const, people: [], creditsUsed: 0 };
+      if (!apiKey) return { ...base, status: 'not_configured' };
+      const domain = normalizeDomain(input.domain);
+      if (!domain && !input.providerCompanyId) return { ...base, status: 'no_domain' };
+      if (!(await ctx.reserve('mixed_people.api_search', 0))) return { ...base, status: 'budget_exceeded' };
+      const qs = new URLSearchParams();
+      if (input.providerCompanyId) qs.append('organization_ids[]', input.providerCompanyId);
+      else if (domain) qs.append('q_organization_domains_list[]', domain);
+      for (const s of PEOPLE_SEARCH_SENIORITIES) qs.append('person_seniorities[]', s);
+      qs.set('page', '1');
+      qs.set('per_page', String(PEOPLE_PER_PAGE));
+      try {
+        const body = rec(
+          await getJson(fetchImpl, `${APOLLO_BASE}/mixed_people/api_search?${qs.toString()}`, { method: 'POST', headers: { ...headers(apiKey), 'content-type': 'application/json' } }, timeoutMs),
+        );
+        const rows = Array.isArray(body.people) ? body.people : [];
+        const people = rows.map(mapApolloPerson).filter((p): p is ProviderPerson => p !== null);
+        return { ...base, status: 'ok', people };
+      } catch (err) {
+        const f = failure('apollo', err, 0);
+        return { ...base, status: f.status, retryAfterMs: f.retryAfterMs, error: f.error };
+      }
+    },
   };
+}
+
+export function mapApolloPerson(row: unknown): ProviderPerson | null {
+  const r = rec(row);
+  const id = str(r.id);
+  const first = str(r.first_name);
+  if (!id || !first) return null;
+  const last = str(r.last_name) ?? str(r.last_name_obfuscated);
+  return { externalId: id, name: [first, last].filter(Boolean).join(' ').slice(0, 200), title: str(r.title)?.slice(0, 200) ?? null, refreshedAt: str(r.last_refreshed_at) };
 }
 
 // ---------------------------------------------------------------- Seamless

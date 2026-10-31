@@ -23,6 +23,8 @@ import {
   OrgChartNodeDetail,
   OrgChartNodeMove,
   OrgChartNodePatch,
+  OrgChartSeedBody,
+  OrgChartSeedResponse,
   OrgChartSetRoot,
   OrgChartTreeQuery,
   OrgChartTreeResponse,
@@ -34,6 +36,7 @@ import {
 } from '@bidstack/shared';
 
 import { type AccessScope, getAccessScope } from '../lib/access-scope.js';
+import { enqueueOrgChartSeed } from '../queues/account-enrichment.js';
 import { getStorage } from '../storage/index.js';
 import { userHasAnyRole } from '../lib/rbac-decision-cache.js';
 import { groupCompanyIds, companiesInScope, scopedMeetingWhere, visibleMeetingWhere } from '../meeting-intel/access.js';
@@ -572,6 +575,23 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
       } catch (err) {
         return sendConflict(reply, err);
       }
+    },
+  );
+
+  // ── Auto-seed (contacts, meeting attendees, optional Apollo) ──────────────
+  server.post(
+    '/companies/:id/org-chart/seed',
+    {
+      config: { permission: 'orgchart:write', rateLimit: { max: 5, timeWindow: '1 minute' } },
+      schema: { params: IdParams, body: OrgChartSeedBody, response: { 202: OrgChartSeedResponse } },
+    },
+    async (req, reply) => {
+      const { company } = await account(req, req.params.id);
+      const includeApollo = req.body?.includeApollo ?? false;
+      const includeMeetingAttendees = req.body?.includeMeetingAttendees ?? true;
+      const jobId = await enqueueOrgChartSeed({ kind: 'orgchart_seed', orgId: req.auth.orgId, companyId: company.id, requestedById: req.auth.userId, includeApollo, includeMeetingAttendees });
+      await auditOrgChart(req, 'orgchart.seed.requested', 'company', company.id, { includeApollo, includeMeetingAttendees, queued: jobId !== null });
+      return reply.code(202).send({ queued: jobId !== null, jobId });
     },
   );
 };

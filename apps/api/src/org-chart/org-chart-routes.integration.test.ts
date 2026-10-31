@@ -9,6 +9,7 @@ import { prisma } from '@bidstack/db';
 
 import { invalidateAccessScope } from '../lib/access-scope.js';
 import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
+import { __setOrgChartSeedEnqueueForTest } from '../queues/account-enrichment.js';
 import { buildServer } from '../server.js';
 import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../test-support/isolated-org.js';
 
@@ -274,5 +275,28 @@ describe('audit', () => {
     const actions = new Set(rows.map((r) => r.action));
     for (const a of ['orgchart.node.create', 'orgchart.node.update', 'orgchart.node.move', 'orgchart.node.delete', 'orgchart.root.set', 'orgchart.node.view']) expect(actions).toContain(a);
     expect(rows.filter((r) => r.action !== 'orgchart.node.view').every((r) => r.userId === adminId)).toBe(true);
+  });
+});
+
+describe('auto-seed request', () => {
+  it('queues a seed job only for admins, off for Apollo unless asked, and audits', async () => {
+    const queued: unknown[] = [];
+    __setOrgChartSeedEnqueueForTest(async (j) => (queued.push(j), `seed-${queued.length}`));
+    try {
+      const res = await call('POST', `/companies/${c.root}/org-chart/seed`);
+      expect(res.statusCode, res.body).toBe(202);
+      expect(res.json()).toEqual({ queued: true, jobId: 'seed-1' });
+      expect(queued[0]).toEqual({ kind: 'orgchart_seed', orgId: orgA.orgId, companyId: c.root, requestedById: adminId, includeApollo: false, includeMeetingAttendees: true });
+      await call('POST', `/companies/${c.root}/org-chart/seed`, { payload: { includeApollo: true } });
+      expect(queued[1]).toMatchObject({ includeApollo: true });
+      clearRbacDecisionCacheForTest();
+      expect((await call('POST', `/companies/${c.root}/org-chart/seed`, { role: 'read-only', payload: {} })).statusCode).toBe(403);
+      clearRbacDecisionCacheForTest();
+      expect((await call('POST', `/companies/${c.b}/org-chart/seed`, { payload: {} })).statusCode).toBe(404);
+      expect(queued).toHaveLength(2);
+      expect(await prisma.auditLog.count({ where: { orgId: orgA.orgId, action: 'orgchart.seed.requested' } })).toBe(2);
+    } finally {
+      __setOrgChartSeedEnqueueForTest(null);
+    }
   });
 });
