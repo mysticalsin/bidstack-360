@@ -4,7 +4,7 @@
 import { prisma } from '@bidstack/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { runWatchdogScan } from './account-watchdog.js';
+import { runWatchdogScan, syncEnrichmentSignals } from './account-watchdog.js';
 
 let dbReachable = false;
 let orgId: string | null = null;
@@ -92,7 +92,7 @@ describe('runWatchdogScan (DB contract)', () => {
   t('stores material filings, alerts KAM + open-deal owners once, and records honest status', async () => {
     const now = new Date('2026-10-31T12:00:00Z');
     const first = await runWatchdogScan({ orgId: orgId!, env, fetchImpl: fetchStub, now, sleep: noSleep });
-    expect(first).toEqual({ subjects: 2, inserted: 2, alerted: 1, errored: 1 });
+    expect(first).toEqual({ subjects: 2, inserted: 2, alerted: 1, errored: 1, enrichment: 0 });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain('/company/00123456/filing-history');
 
@@ -131,5 +131,33 @@ describe('runWatchdogScan (DB contract)', () => {
     expect(calls.length).toBe(before);
     const subj = await prisma.accountWatchSubject.findUniqueOrThrow({ where: { id: subjectId } });
     expect(subj.lastError).toBe('Companies House not configured (COMPANIES_HOUSE_API_KEY)');
+  });
+});
+
+describe('syncEnrichmentSignals (DB contract)', () => {
+  t('inserts medium+ potential projects once per project, keeps dismissals, sends no alerts, stays in its org', async () => {
+    const now = new Date('2026-11-01T12:00:00Z');
+    const co = await prisma.company.create({ data: { orgId: orgId!, name: 'Enriched Ltd' } });
+    const ev = { postingId: 'p1', title: 'Cloud Architect', url: 'https://jobs.example/9', region: 'EMEA', seniority: 'principal', postedAt: '2026-10-25T00:00:00.000Z', source: 'apollo' };
+    const proj = (id: string, confidence: string) => ({ id, kind: id.split(':')[0], name: `P ${id}`, rationale: 'Hiring.', confidence, region: 'EMEA', postingCount: 11, seniorCount: 2, skills: [], evidence: [ev], method: 'rules' });
+    await prisma.companyFirmographics.create({
+      data: { orgId: orgId!, companyId: co.id, status: 'ok', fetchedAt: new Date('2026-10-31T12:00:00Z'), projects: [proj('cloud_migration:EMEA', 'high'), proj('crm:EMEA', 'medium'), proj('erp:EMEA', 'low')] },
+    });
+    // Too old for the lookback window: ignored.
+    const old = await prisma.company.create({ data: { orgId: orgId!, name: 'Old Enriched Ltd' } });
+    await prisma.companyFirmographics.create({ data: { orgId: orgId!, companyId: old.id, status: 'ok', fetchedAt: new Date('2026-09-01T00:00:00Z'), projects: [proj('crm:AMER', 'high')] } });
+    const notesBefore = await prisma.notification.count({ where: { orgId: orgId! } });
+
+    expect(await syncEnrichmentSignals(prisma, { now, orgId: orgId! })).toBe(2);
+    const rows = await prisma.accountWatchEvent.findMany({ where: { orgId: orgId!, source: 'enrichment' }, orderBy: { severity: 'desc' } });
+    expect(rows.map((r) => [r.companyId, r.externalId, r.implication, r.severity, r.confirmed])).toEqual([
+      [co.id, 'cloud_migration:EMEA', 'OPPORTUNITY', 2, false],
+      [co.id, 'crm:EMEA', 'OPPORTUNITY', 1, false],
+    ]);
+    await prisma.accountWatchEvent.update({ where: { id: rows[0]!.id }, data: { status: 'DISMISSED' } });
+    expect(await syncEnrichmentSignals(prisma, { now, orgId: orgId! })).toBe(0);
+    expect((await prisma.accountWatchEvent.findUnique({ where: { id: rows[0]!.id } }))!.status).toBe('DISMISSED');
+    expect(await prisma.notification.count({ where: { orgId: orgId! } })).toBe(notesBefore);
+    expect(await prisma.accountWatchEvent.count({ where: { orgId: otherOrgId!, source: 'enrichment' } })).toBe(0);
   });
 });

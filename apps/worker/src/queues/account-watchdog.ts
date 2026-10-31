@@ -19,6 +19,7 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma, OpportunityStage, type Prisma } from '@bidstack/db';
+import { enrichmentWatchRows } from '@bidstack/shared';
 
 import { fetchCompaniesHouseEvents } from '../lib/watchdog/companies-house.js';
 import { detectAccountEvents, type DetectResult, type WatchdogStore } from '../lib/watchdog/detect.js';
@@ -39,7 +40,7 @@ const JOB_OPTIONS = {
   removeOnFail: { age: 86_400 * 7, count: 200 },
 };
 
-type Db = Pick<typeof prisma, 'accountWatchSubject' | 'accountWatchEvent' | 'notification' | 'opportunity'>;
+type Db = Pick<typeof prisma, 'accountWatchSubject' | 'accountWatchEvent' | 'notification' | 'opportunity' | 'companyFirmographics'>;
 
 export interface WatchdogScanDeps {
   db?: Db;
@@ -57,6 +58,41 @@ export interface WatchdogScanSummary {
   inserted: number;
   alerted: number;
   errored: number;
+  /** New enrichment (potential project) signals this scan. */
+  enrichment: number;
+}
+
+const ENRICHMENT_SYNC_BATCH = 1000;
+/** Re-read firmographics enriched in the last week (wider than the scan interval, so nothing is missed). */
+const ENRICHMENT_LOOKBACK_MS = 7 * 86_400_000;
+
+/**
+ * Potential projects (account enrichment) as watch events, org-wide. Same rows
+ * and rules as GET /enrichment/signals (medium+), read straight from
+ * company_firmographics: the worker has no user session to call the API with,
+ * and per-user scoping happens when the events are read. Insert only, so a
+ * dismissed signal stays dismissed. No notifications: these are severity 1–2,
+ * below the alert threshold.
+ */
+export async function syncEnrichmentSignals(db: Db, opts: { now: Date; orgId?: string }): Promise<number> {
+  const rows = await db.companyFirmographics.findMany({
+    where: {
+      ...(opts.orgId ? { orgId: opts.orgId } : {}),
+      fetchedAt: { gte: new Date(opts.now.getTime() - ENRICHMENT_LOOKBACK_MS) },
+      company: { deletedAt: null },
+    },
+    select: { orgId: true, companyId: true, projects: true, fetchedAt: true },
+    orderBy: { fetchedAt: 'desc' },
+    take: ENRICHMENT_SYNC_BATCH,
+  });
+  const store = prismaWatchdogStore(db);
+  let inserted = 0;
+  for (const r of rows) {
+    const events = enrichmentWatchRows(r).map((e) => ({ ...e, severity: (e.severity === 2 ? 2 : 1) as 1 | 2, payload: { ...e.payload } }));
+    if (!events.length) continue;
+    inserted += (await store.insertEvents(events)).length;
+  }
+  return inserted;
 }
 
 export function prismaWatchdogStore(db: Db): WatchdogStore {
@@ -156,7 +192,13 @@ export async function runWatchdogScan(deps: WatchdogScanDeps = {}): Promise<Watc
     },
   });
 
-  const summary: WatchdogScanSummary = { subjects: subjects.length, inserted: 0, alerted: 0, errored: 0 };
+  const summary: WatchdogScanSummary = { subjects: subjects.length, inserted: 0, alerted: 0, errored: 0, enrichment: 0 };
+  try {
+    summary.enrichment = await syncEnrichmentSignals(db, { now, orgId: deps.orgId });
+  } catch (err) {
+    deps.log?.error({ err: err instanceof Error ? err.message : String(err) }, 'watchdog enrichment sync failed');
+    summary.errored++;
+  }
   for (const [i, s] of subjects.entries()) {
     if (i > 0) await sleep(PACE_MS);
     const adapters: Array<(since: Date | undefined) => Promise<RawWatchEvent[]>> = [];
