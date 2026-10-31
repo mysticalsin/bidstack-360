@@ -11,6 +11,7 @@
 // Every query is org-scoped (`where: { orgId }`) — multi-tenancy is enforced
 // at the row level, never trusted from the client.
 
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -23,6 +24,8 @@ import {
   SavedViewListQuery,
   SavedViewPatch,
 } from '@bidstack/shared';
+
+import { canOverrideOwnership } from '../lib/org-admin.js';
 
 const IdParam = z.object({ id: z.string().uuid() });
 
@@ -194,7 +197,7 @@ export const savedViewsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       assertFiltersSize(req.body.filters, server);
-      const existing = await loadOwnedOrAdmin(req.auth, req.params.id, server);
+      const existing = await loadOwnedOrAdmin(req, req.params.id, server);
 
       const updated = await prisma.$transaction(async (tx) => {
         const view = await tx.savedView.update({
@@ -242,7 +245,7 @@ export const savedViewsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      const existing = await loadOwnedOrAdmin(req.auth, req.params.id, server);
+      const existing = await loadOwnedOrAdmin(req, req.params.id, server);
       await prisma.$transaction([
         prisma.savedView.update({
           where: { id: existing.id },
@@ -284,10 +287,11 @@ function assertFiltersSize(
 }
 
 async function loadOwnedOrAdmin(
-  auth: { orgId: string; userId: string; role: string },
+  req: FastifyRequest,
   id: string,
   server: Parameters<FastifyPluginAsyncZod>[0],
 ): Promise<{ id: string; userId: string; name: string }> {
+  const auth = req.auth;
   const view = await prisma.savedView.findFirst({
     where: { id, orgId: auth.orgId, deletedAt: null },
     select: { id: true, userId: true, name: true },
@@ -295,8 +299,7 @@ async function loadOwnedOrAdmin(
   if (!view) throw server.httpErrors.notFound('Saved view not found');
 
   const isOwner = view.userId === auth.userId;
-  const isAdmin = auth.role === 'admin';
-  if (!isOwner && !isAdmin) {
+  if (!isOwner && !(await canOverrideOwnership(req))) {
     throw server.httpErrors.forbidden('Only the view owner or an admin can modify this view');
   }
   return view;

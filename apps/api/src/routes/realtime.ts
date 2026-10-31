@@ -9,6 +9,7 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import type { PermissionKey } from '@bidstack/shared';
+import { canOverrideOwnership } from '../lib/org-admin.js';
 import { getOrgPresence, getEntityPresence } from '../services/presence.service.js';
 import { publish } from '../services/realtime.service.js';
 
@@ -149,7 +150,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       }
 
       // Only the lock owner or an admin can release.
-      if (existing.userId !== userId && req.auth.role !== 'admin') {
+      if (existing.userId !== userId && !(await canOverrideOwnership(req))) {
         return reply.code(403).send({ error: 'NOT_LOCK_OWNER' });
       }
 
