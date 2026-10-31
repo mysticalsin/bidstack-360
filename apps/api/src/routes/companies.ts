@@ -10,6 +10,7 @@ import {
   CompanyHierarchy,
   type CompanyHierarchyNode,
 } from '@bidstack/shared';
+import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -31,21 +32,28 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const s = req.query.search;
+      // Same country / key-account / deal scope as /accounts and
+      // /crm/companies/search: a restricted user must not list or search
+      // companies outside their access groups through this older route.
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const items = await prisma.company.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          deletedAt: null,
-          ...(req.query.industry ? { industry: req.query.industry } : {}),
-          ...(s
-            ? {
-                OR: [
-                  { name: { contains: s, mode: 'insensitive' } },
-                  { domain: { contains: s, mode: 'insensitive' } },
-                  { industry: { contains: s, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
-        },
+        where: applyCompanyScope(
+          {
+            orgId: req.auth.orgId,
+            deletedAt: null,
+            ...(req.query.industry ? { industry: req.query.industry } : {}),
+            ...(s
+              ? {
+                  OR: [
+                    { name: { contains: s, mode: 'insensitive' } },
+                    { domain: { contains: s, mode: 'insensitive' } },
+                    { industry: { contains: s, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
+          },
+          scope,
+        ),
         select: {
           id: true,
           orgId: true,
@@ -91,8 +99,9 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const c = await prisma.company.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
         include: {
           parent: { select: { id: true, name: true } },
           children: { where: { deletedAt: null }, select: { id: true, name: true } },
@@ -305,8 +314,9 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const root = await prisma.company.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
         select: { id: true, name: true, parentId: true },
       });
       if (!root) throw server.httpErrors.notFound('Company not found');
