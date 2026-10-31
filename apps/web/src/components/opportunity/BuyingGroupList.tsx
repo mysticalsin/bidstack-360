@@ -64,10 +64,10 @@ export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
           <div className="min-w-[640px]">
             <SankeyChart
               data={{ nodes: diagram.nodes, links: diagram.links }}
-              aspectRatio={`2 / ${Math.max(1, rows.length * 0.55)}`}
-              nodePadding={18}
+              aspectRatio="3 / 1"
+              nodePadding={10}
               animationDuration={reduced ? 0 : 400}
-              margin={{ top: 16, right: 160, bottom: 16, left: 140 }}
+              margin={{ top: 8, right: 148, bottom: 8, left: 128 }}
             >
               <SankeyLink useGradient={false} stroke="var(--chart-1)" strokeOpacity={0.4} />
               <SankeyNode
