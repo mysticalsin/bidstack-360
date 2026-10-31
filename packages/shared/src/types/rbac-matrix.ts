@@ -189,6 +189,8 @@ export const MATRIX_RESOURCES = [
   'kam',
   'leads',
   'mcp',
+  // Data-migration jobs (migrations:read, added on polo/backend-hardening).
+  'migrations',
   'opportunities',
   'products',
   'proposals',
