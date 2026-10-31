@@ -90,6 +90,9 @@ vi.mock('@/components/dashboard/OrgDashboard', () => ({
 vi.mock('@/components/account/AccountVisuals', () => ({
   AccountVisuals: () => <section data-testid="account-visuals" />,
 }));
+vi.mock('@/components/enrichment/FirmographicsStrip', () => ({ FirmographicsStrip: () => <section data-testid="account-firmographics" /> }));
+vi.mock('@/components/enrichment/HiringNowCard', () => ({ HiringNowCard: () => <section data-testid="account-hiring-now" /> }));
+vi.mock('@/components/enrichment/PotentialProjectsCard', () => ({ PotentialProjectsCard: () => <section data-testid="account-potential-projects" /> }));
 vi.mock('@/components/meetings/WhoWeMetCard', () => ({
   WhoWeMetCard: () => <section data-testid="account-who-we-met-card" />,
 }));

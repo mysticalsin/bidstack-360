@@ -28,6 +28,9 @@ import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSec
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
 import { WhoWeMetCard } from '@/components/meetings/WhoWeMetCard';
+import { FirmographicsStrip } from '@/components/enrichment/FirmographicsStrip';
+import { HiringNowCard } from '@/components/enrichment/HiringNowCard';
+import { PotentialProjectsCard } from '@/components/enrichment/PotentialProjectsCard';
 import { OppDrill } from '@/components/drill/OppDrill';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
@@ -374,7 +377,14 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       {/* Account view: one header (name, health sentence, 3 numbers), then the
           watchdog signals, then details. The command-center hero repeated the
           name and next move the header already carries, so it is org-only. */}
+      {isAccountView && cockpit.company.id && <FirmographicsStrip companyId={cockpit.company.id} />}
       {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
+      {isAccountView && cockpit.company.id ? (
+        <div className="en-row2" style={{ marginBottom: 24 }}>
+          <HiringNowCard companyId={cockpit.company.id} />
+          <PotentialProjectsCard companyId={cockpit.company.id} />
+        </div>
+      ) : null}
       {isAccountView && cockpit.company.id ? (
         <>
           <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} onDrill={setDrill} />
