@@ -13,7 +13,15 @@ export interface SsoSignInPolicy {
   google: boolean;
 }
 
-export function ssoSignInPolicy(env: SsoEnv = import.meta.env): SsoSignInPolicy {
+function ssoEnvFromMeta(): SsoEnv {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return {
+    VITE_SSO_MICROSOFT_ENABLED: env.VITE_SSO_MICROSOFT_ENABLED,
+    VITE_SSO_GOOGLE_ENABLED: env.VITE_SSO_GOOGLE_ENABLED,
+  };
+}
+
+export function ssoSignInPolicy(env: SsoEnv = ssoEnvFromMeta()): SsoSignInPolicy {
   return {
     official: 'microsoft',
     microsoft: env.VITE_SSO_MICROSOFT_ENABLED !== 'false',
