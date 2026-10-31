@@ -107,7 +107,7 @@ describe('slack disconnect RBAC gate', () => {
         // '/api/v1/integrations' prefix, so the live path doubles the
         // segment — this mirrors every other route in this file (oauth,
         // channels, workspace, events), not something introduced here.
-        url: '/api/v1/integrations/integrations/slack/disconnect',
+        url: '/api/v1/integrations/slack/disconnect',
         headers: { 'x-bidstack-e2e-role': 'read-only' },
       });
       expect(res.statusCode).toBe(403);
@@ -132,7 +132,7 @@ describe('slack disconnect RBAC gate', () => {
         // '/api/v1/integrations' prefix, so the live path doubles the
         // segment — this mirrors every other route in this file (oauth,
         // channels, workspace, events), not something introduced here.
-        url: '/api/v1/integrations/integrations/slack/disconnect',
+        url: '/api/v1/integrations/slack/disconnect',
       });
       expect(res.statusCode).toBe(204);
 

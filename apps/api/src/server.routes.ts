@@ -272,15 +272,17 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(publicSignRoutes, { prefix: '/api/v1' });
 
   // Wave 5 — Outlook (Microsoft Graph Mail) + Gmail OAuth flows
-  // WHY /api/v1/integrations prefix: consistent with other integration routes (dust, erp)
-  await server.register(gmailOAuthRoutes, { prefix: '/api/v1/integrations' });
-  await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1/integrations' });
-  await server.register(slackOAuthRoutes, { prefix: '/api/v1/integrations' });
+  // These plugins declare their paths as '/integrations/...', so the prefix is
+  // /api/v1. (A '/api/v1/integrations' prefix doubled the segment and left the
+  // OAuth redirect_uri and the web client pointing at 404s.)
+  await server.register(gmailOAuthRoutes, { prefix: '/api/v1' });
+  await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1' });
+  await server.register(slackOAuthRoutes, { prefix: '/api/v1' });
   await server.register(slackCommandsPlugin, { prefix: '/api/v1' });
   await server.register(emailRoutes, { prefix: '/api/v1' });
   // Webhook endpoint: NO auth prefix — Graph calls this as an unauthenticated third party.
   // clientState secret provides the anti-forgery verification layer.
-  await server.register(microsoftWebhookRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(microsoftWebhookRoutes, { prefix: '/api/v1' });
 
   // Wave 5 — Onboarding templates + sample data management
   await server.register(onboardingRoutes, { prefix: '/api/v1' });
