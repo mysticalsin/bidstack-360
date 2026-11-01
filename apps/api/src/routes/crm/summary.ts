@@ -51,6 +51,14 @@ type CrmSummaryCacheEntry = {
 const CRM_SUMMARY_CACHE_TTL_MS = 10_000;
 const crmSummaryCache = new Map<string, CrmSummaryCacheEntry>();
 
+/** Newest `limit` rows across sources. Each source must already be its own newest `limit`. */
+export function mergeLatestActivity<T extends { date: string }>(
+  groups: readonly (readonly T[])[],
+  limit: number,
+): T[] {
+  return groups.flat().sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+}
+
 function crmSummaryCacheKey(orgId: string, limit: number): string {
   return `${orgId}:${limit}`;
 }
@@ -120,7 +128,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         ) AS "openServiceCases"
     `,
       prisma.opportunity.findMany({
-        take: 5,
+        take: limit,
         orderBy: { updatedAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -132,7 +140,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         },
       }),
       prisma.lead.findMany({
-        take: 5,
+        take: limit,
         orderBy: { updatedAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -144,7 +152,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         },
       }),
       prisma.task.findMany({
-        take: 5,
+        take: limit,
         orderBy: { createdAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -155,7 +163,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         },
       }),
       prisma.serviceCase.findMany({
-        take: 5,
+        take: limit,
         orderBy: { updatedAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -184,38 +192,39 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
   };
   const pipelineValueMicros = microsText(counts.pipelineValueMicros);
 
-  const recentActivity = [
-    ...recentOpportunities.map((o) => ({
-      type: 'opportunity' as const,
-      title: o.name,
-      subtitle: o.stage,
-      date: o.updatedAt.toISOString(),
-      url: `/opportunities/${o.id}`,
-    })),
-    ...recentLeads.map((l) => ({
-      type: 'lead' as const,
-      title: `${l.firstName} ${l.lastName ?? ''}`.trim(),
-      subtitle: l.status,
-      date: l.updatedAt.toISOString(),
-      url: `/leads/${l.id}`,
-    })),
-    ...recentTasks.map((t) => ({
-      type: 'task' as const,
-      title: t.title,
-      subtitle: t.status,
-      date: t.createdAt.toISOString(),
-      url: `/tasks/${t.id}`,
-    })),
-    ...recentCases.map((c) => ({
-      type: 'case' as const,
-      title: c.subject,
-      subtitle: c.status,
-      date: c.updatedAt.toISOString(),
-      url: `/service-desk/${c.id}`,
-    })),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, limit);
+  const recentActivity = mergeLatestActivity(
+    [
+      recentOpportunities.map((o) => ({
+        type: 'opportunity' as const,
+        title: o.name,
+        subtitle: o.stage,
+        date: o.updatedAt.toISOString(),
+        url: `/opportunities/${o.id}`,
+      })),
+      recentLeads.map((l) => ({
+        type: 'lead' as const,
+        title: `${l.firstName} ${l.lastName ?? ''}`.trim(),
+        subtitle: l.status,
+        date: l.updatedAt.toISOString(),
+        url: `/leads/${l.id}`,
+      })),
+      recentTasks.map((t) => ({
+        type: 'task' as const,
+        title: t.title,
+        subtitle: t.status,
+        date: t.createdAt.toISOString(),
+        url: `/tasks/${t.id}`,
+      })),
+      recentCases.map((c) => ({
+        type: 'case' as const,
+        title: c.subject,
+        subtitle: c.status,
+        date: c.updatedAt.toISOString(),
+        url: `/service-desk/${c.id}`,
+      })),
+    ],
+    limit,
+  );
 
   return {
     companies: counts.companies,
