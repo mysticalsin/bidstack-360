@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatMicrosAmount, microsToUnits, microsToUnitsText, sumMicros, unitsTextToMicros } from './money.js';
+import {
+  formatMicrosAmount,
+  microsToSafeNumber,
+  microsToUnits,
+  microsToUnitsText,
+  sumMicros,
+  unitsTextToMicros,
+  unitsToMicros,
+} from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -46,6 +54,16 @@ describe('microsToUnits', () => {
     expect(unitsTextToMicros('8598204328457.18')).toBe(8_598_204_328_457_180_000n);
     expect(unitsTextToMicros('8,598,204,328,457.184962')).toBe(micros);
     expect(unitsTextToMicros('nope')).toBeNull();
+  });
+
+  it('stores a safe unit amount as integer micros without multiplying a float', () => {
+    // WHY: Math.round(54_857_000_000 * 1e6) is not a safe integer, so the public
+    // revenue claim was dropped instead of stored.
+    expect(unitsToMicros(54_857_000_000)).toBe(54_857_000_000_000_000n);
+    expect(unitsToMicros('+54857000000')).toBe(54_857_000_000_000_000n);
+    expect(unitsToMicros('8598204328457.184962')).toBe(8_598_204_328_457_184_962n);
+    expect(microsToSafeNumber(54_857_000_000_000_000n)).toBeNull();
+    expect(microsToSafeNumber(1_200_000_000_000_000n)).toBe(1_200_000_000_000_000);
   });
 
   it('reconstructs negative amounts exactly, including the fractional remainder', () => {

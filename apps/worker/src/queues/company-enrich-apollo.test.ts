@@ -105,6 +105,24 @@ describe('mapApolloOrganization', () => {
     expect(mapped.incorporationDate?.getUTCFullYear()).toBe(1998);
   });
 
+  it('keeps a large revenue string as integer micros', () => {
+    // WHY: Math.round(Number(text) * 1e6) cannot store this remainder.
+    const mapped = mapApolloOrganization({
+      name: 'Large Co',
+      annual_revenue: '8598204328457.184962',
+    });
+    expect(mapped.annualRevenueMicros).toBe(8_598_204_328_457_184_962n);
+    expect(mapped.strategicIntel.annualRevenueMicros).toBeNull();
+  });
+
+  it('stores a safe public-scale revenue without dropping it', () => {
+    const mapped = mapApolloOrganization({
+      name: 'DNB',
+      annual_revenue: 54_857_000_000,
+    });
+    expect(mapped.annualRevenueMicros).toBe(54_857_000_000_000_000n);
+  });
+
   it('falls back to organization_revenue when annual_revenue is absent', () => {
     // Apollo returns revenue under `organization_revenue` on some endpoints
     // (verified live against the bulk enrich API) rather than `annual_revenue`.

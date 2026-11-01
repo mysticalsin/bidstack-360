@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { faviconProfile, fetchOpenCompanyProfile, toPublicPreview } from './company-open-enrichment.js';
+import {
+  faviconProfile,
+  fetchOpenCompanyProfile,
+  toPublicPreview,
+} from './company-open-enrichment.js';
 
 const now = new Date('2026-05-11T00:00:00.000Z');
 
@@ -78,8 +82,12 @@ describe('company open data verification', () => {
       'wikipedia',
     ]);
     expect(profile?.confidenceBps).toBe(0);
-    expect(profile?.sourceAttribution.find((item) => item.source === 'wikidata')?.confidence).toBeNull();
-    expect(profile?.sourceAttribution.find((item) => item.source === 'wikipedia')?.confidence).toBeNull();
+    expect(
+      profile?.sourceAttribution.find((item) => item.source === 'wikidata')?.confidence,
+    ).toBeNull();
+    expect(
+      profile?.sourceAttribution.find((item) => item.source === 'wikipedia')?.confidence,
+    ).toBeNull();
     expect(profile?.legalName).toBeNull();
     expect(profile?.revenueAmount).toBeNull();
   });
@@ -121,7 +129,9 @@ describe('company open data verification', () => {
               claims: {
                 P856: [claim('https://www.dnb.no/')],
                 P1128: [claim({ amount: '+9020', unit: '1' })],
-                P2139: [claim({ amount: '+54857000000', unit: 'http://www.wikidata.org/entity/Q132643' })],
+                P2139: [
+                  claim({ amount: '+54857000000', unit: 'http://www.wikidata.org/entity/Q132643' }),
+                ],
                 P159: [claim({ id: 'Q585' })],
                 P17: [claim({ id: 'Q20' })],
                 P452: [claim({ id: 'Q837171' })],
@@ -284,6 +294,7 @@ describe('company open data verification', () => {
       incorporationDate: null,
       industryLabels: ['software industry', 'technology'],
       revenueAmount: null,
+      revenueAmountText: null,
       revenueCurrency: null,
       publicFacts: {
         description: 'American multinational technology corporation',

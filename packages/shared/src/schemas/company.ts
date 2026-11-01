@@ -128,6 +128,7 @@ export const CompanyDetail = Company.extend({
   ),
   // Stored on the enrichment profile or a manual override. No currency column.
   annualRevenueMicros: z.number().nullable(),
+  annualRevenueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   parent: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
   children: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
   customFieldValues: z.array(CustomFieldValueLite).optional(),

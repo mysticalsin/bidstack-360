@@ -10,6 +10,7 @@ import { type z } from 'zod';
 import {
   CompanyStrategicIntel,
   PublicCompanyFacts,
+  microsToSafeNumber,
   type CrmCompany,
   type CrmLogoSource,
   type SourceAttribution,
@@ -117,8 +118,9 @@ export function serializeCompany(enrichment: {
     publicFacts: parsePublicFacts(metadata.publicFacts),
     imageUrl: stringUrl(metadata.companyImageUrl),
     employeeCount: enrichment.employeeCount,
-    annualRevenueMicros:
-      enrichment.annualRevenueMicros === null ? null : Number(enrichment.annualRevenueMicros),
+    annualRevenueMicros: microsToSafeNumber(enrichment.annualRevenueMicros),
+    annualRevenueMicrosText:
+      enrichment.annualRevenueMicros === null ? null : enrichment.annualRevenueMicros.toString(),
     status: enrichment.status,
     registryIds: stringRecord(enrichment.registryIds),
     formerNames: stringArray(enrichment.formerNames),
@@ -190,7 +192,7 @@ function parseStrategicIntel({
     freshness,
     employeeTrend: 'unknown',
     employeeCount,
-    annualRevenueMicros: annualRevenueMicros === null ? null : Number(annualRevenueMicros),
+    annualRevenueMicros: microsToSafeNumber(annualRevenueMicros),
     intentTopics: [],
     hiringSignals: [],
     leadershipSignals: [],
@@ -228,20 +230,19 @@ function freshnessFor(
   return ageMs > COMPANY_STRATEGIC_INTEL_STALE_AFTER_MS ? 'stale' : 'fresh';
 }
 
-function buildProviderTechnicalStack(
-  metadata: Record<string, unknown>,
-): CompanyTechnicalStack {
+function buildProviderTechnicalStack(metadata: Record<string, unknown>): CompanyTechnicalStack {
   return dedupeTechnicalStack(
     mergeTechnicalStack(
-      mergeTechnicalStack(parseTechnicalStack(metadata.meetingTechStack), seamlessTechnicalStack(metadata)),
+      mergeTechnicalStack(
+        parseTechnicalStack(metadata.meetingTechStack),
+        seamlessTechnicalStack(metadata),
+      ),
       techStackMcpTechnicalStack(metadata),
     ),
   );
 }
 
-function seamlessTechnicalStack(
-  metadata: Record<string, unknown>,
-): CompanyTechnicalStack {
+function seamlessTechnicalStack(metadata: Record<string, unknown>): CompanyTechnicalStack {
   const openCompanyProfile = record(metadata.openCompanyProfile);
   const seamlessProfiles = [record(openCompanyProfile.seamless), record(metadata.seamless)];
   const technologies = [
@@ -264,9 +265,7 @@ function seamlessTechnicalStack(
   ];
 }
 
-function techStackMcpTechnicalStack(
-  metadata: Record<string, unknown>,
-): CompanyTechnicalStack {
+function techStackMcpTechnicalStack(metadata: Record<string, unknown>): CompanyTechnicalStack {
   const providerProfiles = Array.isArray(metadata.techStackMcps)
     ? metadata.techStackMcps.map(record)
     : [];
@@ -302,9 +301,7 @@ function slugProviderSource(value: string): string {
   );
 }
 
-function dedupeTechnicalStack(
-  stack: CompanyTechnicalStack,
-): CompanyTechnicalStack {
+function dedupeTechnicalStack(stack: CompanyTechnicalStack): CompanyTechnicalStack {
   const chosen = new Map<
     string,
     { label: string; item: CompanyTechnicalStack[number]['items'][number] }

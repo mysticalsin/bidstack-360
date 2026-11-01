@@ -1,8 +1,17 @@
 import { prisma } from '@bidstack/db';
-import { type Company, type CompanyDetail } from '@bidstack/shared';
+import { microsToSafeNumber, type Company, type CompanyDetail } from '@bidstack/shared';
 import { type z } from 'zod';
 
 import { normalizeName } from '../services/crm/dashboard.utils.js';
+
+function revenueOverrideMicros(value: unknown): bigint | null {
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    const micros = BigInt(value);
+    return micros > 0n ? micros : null;
+  }
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value);
+  return null;
+}
 
 export function serializeCompany(c: {
   id: string;
@@ -73,7 +82,13 @@ export async function serializeCompanyDetail(
     createdAt: Date;
     updatedAt: Date;
   } & {
-    contacts: Array<{ id: string; name: string; role: string | null; email: string | null; phone: string | null }>;
+    contacts: Array<{
+      id: string;
+      name: string;
+      role: string | null;
+      email: string | null;
+      phone: string | null;
+    }>;
     opportunities: Array<{
       id: string;
       code: string;
@@ -83,8 +98,19 @@ export async function serializeCompanyDetail(
       probability: number;
       dueDate: Date | null;
     }>;
-    serviceCases: Array<{ id: string; number: string; subject: string; status: string; priority: string }>;
-    notes: Array<{ id: string; title: string; author: { name: string | null } | null; createdAt: Date }>;
+    serviceCases: Array<{
+      id: string;
+      number: string;
+      subject: string;
+      status: string;
+      priority: string;
+    }>;
+    notes: Array<{
+      id: string;
+      title: string;
+      author: { name: string | null } | null;
+      createdAt: Date;
+    }>;
     parent?: { id: string; name: string } | null;
     children?: Array<{ id: string; name: string }>;
   },
@@ -106,17 +132,15 @@ export async function serializeCompanyDetail(
       select: { value: true },
     }),
   ]);
-  const overrideMicros =
-    revenueOverride && typeof revenueOverride.value === 'number' && revenueOverride.value > 0
-      ? revenueOverride.value
-      : null;
-  const storedMicros = enrichment?.annualRevenueMicros;
-  const annualRevenueMicros =
-    overrideMicros ?? (storedMicros == null ? null : Number(storedMicros));
+  const overrideMicros = revenueOverrideMicros(revenueOverride?.value);
+  const storedMicros = enrichment?.annualRevenueMicros ?? null;
+  const chosen = overrideMicros ?? storedMicros;
+  const annualRevenueMicros = microsToSafeNumber(chosen);
 
   return {
     ...serializeCompany(c),
     annualRevenueMicros,
+    annualRevenueMicrosText: chosen == null ? null : chosen.toString(),
     contacts: c.contacts.map((x) => ({ ...x, email: x.email ?? null, phone: x.phone ?? null })),
     opportunities: c.opportunities.map((x) => ({
       ...x,

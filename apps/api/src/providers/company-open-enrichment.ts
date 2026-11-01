@@ -43,6 +43,8 @@ export interface OpenCompanyProfile {
   industryLabels: string[];
   /** Major-unit revenue from a public claim. Currency is set only for a known unit. */
   revenueAmount: number | null;
+  /** Original decimal text, so a large claim is not rounded before it is stored. */
+  revenueAmountText: string | null;
   revenueCurrency: string | null;
   publicFacts: PublicCompanyFacts;
   confidenceBps: number;
@@ -114,8 +116,7 @@ export function toPublicPreview(profile: OpenCompanyProfile | null): {
   const name = profile.tradeName?.trim() || profile.legalName?.trim() || '';
   if (!name && !profile.domain) return null;
   const count = profile.employeeCount;
-  const employeeCount =
-    count !== null && Number.isInteger(count) && count >= 0 ? count : null;
+  const employeeCount = count !== null && Number.isInteger(count) && count >= 0 ? count : null;
   return {
     name: name || profile.domain || '',
     legalName: profile.legalName,
@@ -186,13 +187,14 @@ export async function fetchOpenCompanyProfile({
   const industryLabels = claimEntityIds(entity, PROPERTY.industry)
     .map((id) => labels.get(id))
     .filter((item): item is string => Boolean(item));
-  const headquartersPlace = labels.get(claimEntityIds(entity, PROPERTY.headquarters)[0] ?? '') ?? null;
+  const headquartersPlace =
+    labels.get(claimEntityIds(entity, PROPERTY.headquarters)[0] ?? '') ?? null;
   const country = labels.get(claimEntityIds(entity, PROPERTY.country)[0] ?? '') ?? null;
   const headquarters = [headquartersPlace, country].filter(Boolean).join(', ') || null;
   const revenueCurrency = revenue?.unitId ? (CURRENCY_CODE[revenue.unitId] ?? null) : null;
   const revenueUnit = revenue?.unitId ? (labels.get(revenue.unitId) ?? null) : null;
   const revenueLabel = revenue
-    ? `${formatPublicAmount(revenue.amount)} ${revenueCurrency ?? revenueUnit ?? ''}`.trim()
+    ? `${formatPublicAmount(revenue.amountText)} ${revenueCurrency ?? revenueUnit ?? ''}`.trim()
     : null;
   const publicFacts: PublicCompanyFacts = {
     description: clipText(summary?.extract ?? description),
@@ -216,6 +218,7 @@ export async function fetchOpenCompanyProfile({
     incorporationDate,
     industryLabels,
     revenueAmount: revenue?.amount ?? null,
+    revenueAmountText: revenue?.amountText ?? null,
     revenueCurrency,
     publicFacts,
     confidenceBps: 0,
@@ -385,20 +388,23 @@ function claimString(entity: WikidataEntity, property: string): string | null {
 function claimText(entity: WikidataEntity, property: string): string | null {
   const value = claimValue(entity, property);
   if (typeof value === 'string' && value.trim()) return value.trim();
-  if (isRecord(value) && typeof value.text === 'string' && value.text.trim()) return value.text.trim();
+  if (isRecord(value) && typeof value.text === 'string' && value.text.trim())
+    return value.text.trim();
   return null;
 }
 
 function claimQuantity(
   entity: WikidataEntity,
   property: string,
-): { amount: number; unitId: string | null } | null {
+): { amount: number; amountText: string; unitId: string | null } | null {
   const value = claimValue(entity, property);
   if (!isRecord(value) || typeof value.amount !== 'string') return null;
-  const parsed = Number(value.amount);
+  const amountText = value.amount.trim().replace(/^\+/, '');
+  if (!/^\d+(\.\d+)?$/.test(amountText)) return null;
+  const parsed = Number(amountText);
   if (!Number.isFinite(parsed) || parsed < 0) return null;
-  const unit = typeof value.unit === 'string' ? value.unit.split('/').pop() ?? null : null;
-  return { amount: parsed, unitId: unit && unit !== '1' ? unit : null };
+  const unit = typeof value.unit === 'string' ? (value.unit.split('/').pop() ?? null) : null;
+  return { amount: parsed, amountText, unitId: unit && unit !== '1' ? unit : null };
 }
 
 function claimDate(entity: WikidataEntity, property: string): string | null {
@@ -466,8 +472,11 @@ async function entityLabels(ids: string[], fetchImpl: FetchLike): Promise<Map<st
   return labels;
 }
 
-function formatPublicAmount(amount: number): string {
-  return new Intl.NumberFormat('en', { maximumFractionDigits: 0 }).format(amount);
+function formatPublicAmount(amountText: string): string {
+  const [whole = '0', frac = ''] = amountText.split('.');
+  const body = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const trimmedFrac = frac.replace(/0+$/, '');
+  return trimmedFrac ? `${body}.${trimmedFrac}` : body;
 }
 
 function clipText(value: string | null): string | null {

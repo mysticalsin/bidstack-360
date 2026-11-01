@@ -18,7 +18,7 @@ import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { COMPANY_ENRICH_APOLLO } from '@bidstack/shared';
+import { COMPANY_ENRICH_APOLLO, microsToSafeNumber, unitsToMicros } from '@bidstack/shared';
 
 export const QUEUE_NAME = COMPANY_ENRICH_APOLLO.name;
 
@@ -208,12 +208,12 @@ export function mapApolloOrganization(
 ): MappedEnrichment {
   const now = context.now ?? new Date();
   const employees = coerceInt(org.estimated_num_employees);
-  const revenue = coerceNumber(org.annual_revenue ?? org.organization_revenue);
+  const revenue = revenueToMicros(org.annual_revenue ?? org.organization_revenue);
   const foundedYear = coerceInt(org.founded_year);
   const jobPostings = context.jobPostings ?? org.job_postings;
   const executives = context.executives ?? org.senior_leadership ?? org.leadership_changes;
   const technicalStack = extractTechnologyStack(org);
-  const annualRevenueMicros = revenue === null ? null : BigInt(Math.round(revenue * 1_000_000));
+  const annualRevenueMicros = revenue;
   const strategicIntel = buildApolloStrategicIntel({
     org,
     now,
@@ -327,7 +327,7 @@ function buildApolloStrategicIntel({
     freshness: 'fresh',
     employeeTrend,
     employeeCount,
-    annualRevenueMicros: annualRevenueMicros === null ? null : Number(annualRevenueMicros),
+    annualRevenueMicros: microsToSafeNumber(annualRevenueMicros),
     intentTopics,
     hiringSignals,
     leadershipSignals,
@@ -380,6 +380,11 @@ export function verifyApolloEnrichJobSignature(
   return (
     actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
   );
+}
+
+function revenueToMicros(value: unknown): bigint | null {
+  if (typeof value === 'number' || typeof value === 'string') return unitsToMicros(value);
+  return null;
 }
 
 function coerceNumber(value: unknown): number | null {
@@ -541,7 +546,7 @@ function extractRevenueSignals(
         detail: 'Apollo returned company annual revenue.',
         observedAt,
         confidence: null,
-        metadata: { annualRevenueMicros: Number(annualRevenueMicros) },
+        metadata: { annualRevenueMicros: annualRevenueMicros.toString() },
       }),
     );
   }

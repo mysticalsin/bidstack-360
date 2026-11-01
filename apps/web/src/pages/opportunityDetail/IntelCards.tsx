@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useCompany } from '@/hooks/useCompanies';
 import { formatDate } from '@/lib/format';
-import type { IntelPayload } from '@bidstack/shared';
+import { formatMicrosAmount, type IntelPayload } from '@bidstack/shared';
 
 import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
 
@@ -23,10 +23,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function honestyLabel(
-  t: (key: string, defaultValue: string) => string,
-  value: unknown,
-): string {
+function honestyLabel(t: (key: string, defaultValue: string) => string, value: unknown): string {
   const label: FinancialHonesty = financialHonesty(value);
   if (label === 'unknown') return t('intelCards.financial.unknown', 'unknown');
   if (label === 'proxy') return t('intelCards.financial.proxy', 'proxy');
@@ -41,13 +38,13 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
   // LinkedIn/EU register here would claim sources that were never queried.
   const hasIntel = Boolean(
     intel.refreshedAt ||
-      intel.financial ||
-      intel.winPrediction ||
-      intel.hiring ||
-      intel.triggers?.length ||
-      intel.competitors?.length ||
-      intel.news?.length ||
-      intel.decisionUnit?.length,
+    intel.financial ||
+    intel.winPrediction ||
+    intel.hiring ||
+    intel.triggers?.length ||
+    intel.competitors?.length ||
+    intel.news?.length ||
+    intel.decisionUnit?.length,
   );
 
   if (!hasIntel) {
@@ -68,9 +65,13 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
     <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
       <span className="inline-block h-2 w-2 rounded-full bg-[var(--fg-tertiary)]" aria-hidden />
       <span>
-        {t('intelCards.dataFreshnessUnverified', 'Intel refreshed {{date}}. Sources are not verified.', {
-          date: intel.refreshedAt ? formatDate(intel.refreshedAt) : '—',
-        })}
+        {t(
+          'intelCards.dataFreshnessUnverified',
+          'Intel refreshed {{date}}. Sources are not verified.',
+          {
+            date: intel.refreshedAt ? formatDate(intel.refreshedAt) : '—',
+          },
+        )}
       </span>
     </div>
   );
@@ -88,6 +89,7 @@ export function FinancialHealthCard({
   const company = useCompany(companyId ?? undefined);
   const recordedHeadcount = company.data?.employeeCount;
   const recordedRevenue = company.data?.annualRevenueMicros;
+  const recordedRevenueText = company.data?.annualRevenueMicrosText;
   // The financial block has no source receipt. A stored number is a proxy;
   // a provider name or raw object is not a query we ran. Headcount on the
   // linked company is the account record, not a market probe.
@@ -98,14 +100,22 @@ export function FinancialHealthCard({
           formatted: recordedHeadcount.toLocaleString('en-US'),
         })
       : label(f?.headcount);
-  const revenue =
-    typeof recordedRevenue === 'number' && recordedRevenue > 0
+  const exactRevenue =
+    recordedRevenueText && /^\d+$/.test(recordedRevenueText)
+      ? formatMicrosAmount(BigInt(recordedRevenueText))
+      : null;
+  const revenue = exactRevenue
+    ? t('intelCards.financial.recordedRevenue', '{{formatted}} recorded on the account', {
+        formatted: exactRevenue,
+      })
+    : typeof recordedRevenue === 'number' && recordedRevenue > 0
       ? t('intelCards.financial.recordedRevenue', '{{formatted}} recorded on the account', {
           formatted: formatUnspecifiedCompact(recordedRevenue / 1_000_000),
         })
       : label(f?.revenueAnnual);
   const hasRecordedAccountFigure =
     typeof recordedHeadcount === 'number' ||
+    exactRevenue != null ||
     (typeof recordedRevenue === 'number' && recordedRevenue > 0);
   return (
     <Card>
@@ -123,7 +133,10 @@ export function FinancialHealthCard({
         }
       />
       <div className="p-5 space-y-3 text-sm">
-        <Row label={t('intelCards.financial.marketCap', 'Market cap')} value={label(f?.marketCap)} />
+        <Row
+          label={t('intelCards.financial.marketCap', 'Market cap')}
+          value={label(f?.marketCap)}
+        />
         <Row label={t('intelCards.financial.revenueTtm', 'Revenue (TTM)')} value={revenue} />
         <Row label={t('intelCards.financial.growth', 'Growth')} value={label(f?.revenueGrowth)} />
         <Row
@@ -205,7 +218,8 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
             <div className="min-w-0">
               <div className="text-sm text-[var(--fg-primary)]">{trigger.label}</div>
               <div className="text-xs text-[var(--fg-tertiary)]">
-                {trigger.kind} · {trigger.source ?? t('intelCards.triggers.unknownSource', 'unknown')} ·{' '}
+                {trigger.kind} ·{' '}
+                {trigger.source ?? t('intelCards.triggers.unknownSource', 'unknown')} ·{' '}
                 {formatDate(trigger.observedAt)}
               </div>
             </div>
@@ -215,7 +229,9 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
                 weight: trigger.weight,
               })}
             >
-              {t('intelCards.triggers.weightValue', '{{weight}}/10 proxy', { weight: trigger.weight })}
+              {t('intelCards.triggers.weightValue', '{{weight}}/10 proxy', {
+                weight: trigger.weight,
+              })}
             </div>
           </li>
         ))}

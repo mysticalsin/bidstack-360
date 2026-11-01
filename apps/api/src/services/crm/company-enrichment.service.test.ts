@@ -339,7 +339,15 @@ describe('unscored company shells', () => {
           updatedAt: new Date('2026-06-07T12:00:00.000Z'),
         },
       ],
-      [{ id: 'company-1', name: 'DNB Bank', domain: 'dnb.no', logoUrl: null, legalName: 'DNB Bank' }],
+      [
+        {
+          id: 'company-1',
+          name: 'DNB Bank',
+          domain: 'dnb.no',
+          logoUrl: null,
+          legalName: 'DNB Bank',
+        },
+      ],
     );
 
     expect(company?.logo.url).toContain('DNB_Logo.svg');
@@ -444,5 +452,33 @@ describe('unscored company shells', () => {
     expect(mantu.domain).toBeNull();
     expect(mantu.website).toBeNull();
     expect(mantu.logo.url).toBeNull();
+  });
+});
+
+describe('stored public revenue', () => {
+  it('keeps a large revenue as text instead of a rounded number', () => {
+    // WHY: Number(54_857_000_000_000_000n) is not the stored integer.
+    const company = serializeCompany({
+      id: 'enrich-dnb',
+      tradeName: 'DNB Bank',
+      legalName: 'DNB Bank ASA',
+      domain: 'dnb.no',
+      website: 'https://www.dnb.no/',
+      industryCodes: ['financial services'],
+      providerMetadata: {},
+      employeeCount: 9020,
+      annualRevenueMicros: 54_857_000_000_000_000n,
+      status: 'active',
+      registryIds: {},
+      formerNames: [],
+      incorporationDate: null,
+      logoUrl: null,
+      logoSource: null,
+      confidenceBps: 0,
+      sourceAttribution: [],
+      updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+    });
+    expect(company.annualRevenueMicros).toBeNull();
+    expect(company.annualRevenueMicrosText).toBe('54857000000000000');
   });
 });

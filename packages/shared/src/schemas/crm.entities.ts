@@ -85,6 +85,8 @@ export const CrmCompany = z.object({
   imageUrl: z.string().url().nullable().optional(),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: z.number().int().nonnegative().nullable(),
+  /** Exact stored micros when the number field cannot hold every digit. */
+  annualRevenueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   status: z.string().nullable(),
   registryIds: z.record(z.string()).default({}),
   formerNames: z.array(z.string()).default([]),

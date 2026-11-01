@@ -56,11 +56,40 @@ export function microsToUnitsText(micros: bigint | number | string): string {
 
 /** Parse a unit amount into integer micros. Rejects more than 6 decimal places. */
 export function unitsTextToMicros(text: string): bigint | null {
-  const trimmed = text.trim().replace(/,/g, '');
+  const trimmed = text.trim().replace(/,/g, '').replace(/^\+/, '');
   if (!/^\d+(\.\d{1,6})?$/.test(trimmed)) return null;
   const [whole = '0', frac = ''] = trimmed.split('.');
   const padded = (frac + '000000').slice(0, 6);
   return BigInt(whole) * MICROS_PER_UNIT + BigInt(padded);
+}
+
+/**
+ * Units to integer micros. A digit string keeps the remainder. A number is exact
+ * when it is a safe integer of units. A fractional number is kept only while the
+ * rounded micros still fit in a safe integer.
+ */
+export function unitsToMicros(value: number | string): bigint | null {
+  if (typeof value === 'string') return unitsTextToMicros(value);
+  if (!Number.isFinite(value) || value < 0) return null;
+  if (Number.isSafeInteger(value)) return BigInt(value) * MICROS_PER_UNIT;
+  const rounded = Math.round(value * 1_000_000);
+  if (!Number.isSafeInteger(rounded) || rounded < 0) return null;
+  return BigInt(rounded);
+}
+
+/** A JS number only when every digit of the micros integer survives. */
+export function microsToSafeNumber(
+  micros: bigint | number | string | null | undefined,
+): number | null {
+  if (micros == null || micros === '') return null;
+  let value: bigint;
+  try {
+    value = typeof micros === 'bigint' ? micros : BigInt(micros);
+  } catch {
+    return null;
+  }
+  if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(value);
 }
 
 export function microsToUnits(micros: bigint | number): number {

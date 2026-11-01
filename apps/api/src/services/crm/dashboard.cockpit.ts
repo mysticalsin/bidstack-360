@@ -33,7 +33,10 @@ import {
   record,
   titleCase,
 } from './dashboard.utils.js';
-import { TECHNICAL_STACK_FIELD_KEY, parseTechnicalStackOverride } from './technical-stack.service.js';
+import {
+  TECHNICAL_STACK_FIELD_KEY,
+  parseTechnicalStackOverride,
+} from './technical-stack.service.js';
 
 const COCKPIT_RISK_LIMIT = 6;
 const COCKPIT_COMPLIANCE_LIMIT = 6;
@@ -65,19 +68,24 @@ function contactAction(
     rated === 0 ? 'none have an influence rating' : `${rated} have an influence rating`;
   const emailLabel =
     withEmail === contacts.length ? 'all have an email' : `${withEmail} have an email`;
-  const countLabel = contacts.length === 1 ? '1 linked contact' : `${contacts.length} linked contacts`;
+  const countLabel =
+    contacts.length === 1 ? '1 linked contact' : `${contacts.length} linked contacts`;
   return `${countLabel}. ${ratedLabel}; ${emailLabel}.`;
 }
 
 function engagementAction(recent: number, openCount: number, onTrack: number): string {
-  const recentLabel = recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
+  const recentLabel =
+    recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
   if (recent === 0 && openCount === 0) {
     return 'No tasks in the last 30 days and no open follow-ups.';
   }
   if (recent === 0) return 'No tasks in the last 30 days.';
   const overdue = openCount - onTrack;
   if (overdue > 0) {
-    const overdueLabel = overdue === 1 ? '1 open follow-up is past its due date' : `${overdue} open follow-ups are past their due date`;
+    const overdueLabel =
+      overdue === 1
+        ? '1 open follow-up is past its due date'
+        : `${overdue} open follow-ups are past their due date`;
     return `${recentLabel}. ${overdueLabel}.`;
   }
   return `${recentLabel}. Open follow-ups are inside their due dates.`;
@@ -143,8 +151,7 @@ function factor(
     key,
     label,
     whatItMeasures,
-    recommendedAction:
-      FACTOR_ACTIONS[key][band === 'strong' || band === 'good' ? 'high' : 'low'],
+    recommendedAction: FACTOR_ACTIONS[key][band === 'strong' || band === 'good' ? 'high' : 'low'],
     score: clamped,
     band,
   };
@@ -193,8 +200,7 @@ export function computeSignalCoverage(input: {
     'engagement',
     'Engagement recency',
     'Activity in the last 30 days and follow-ups still inside their due dates.',
-    Math.min(50, recent * 17) +
-      (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 0),
+    Math.min(50, recent * 17) + (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 0),
   );
 
   const complete = openDeals.filter(
@@ -246,7 +252,8 @@ export interface AccountPerformance {
 /** Integer micros text. Number() moves a sum past 2^53 off the cent. */
 export function microsText(value: bigint | number | string | null | undefined): string {
   if (typeof value === 'bigint') return value.toString();
-  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value)).toString();
+  if (typeof value === 'number' && Number.isFinite(value))
+    return BigInt(Math.trunc(value)).toString();
   if (typeof value === 'string' && /^-?\d+$/.test(value)) {
     const parsed = BigInt(value);
     return parsed < 0n ? '0' : parsed.toString();
@@ -326,6 +333,24 @@ function revenueOverrideMicros(value: unknown): bigint | null {
   return null;
 }
 
+function exactStoredRevenueLabel(company: {
+  annualRevenueMicros?: number | null;
+  annualRevenueMicrosText?: string | null;
+}): string | null {
+  const text = company.annualRevenueMicrosText;
+  if (!text || !/^\d+$/.test(text)) return null;
+  const micros = BigInt(text);
+  if (micros <= 0n) return null;
+  if (
+    company.annualRevenueMicros != null &&
+    Number.isSafeInteger(company.annualRevenueMicros) &&
+    BigInt(company.annualRevenueMicros) === micros
+  ) {
+    return null;
+  }
+  return `${formatMicrosAmount(micros)} unspecified`;
+}
+
 /** Exact revenue text from a manual override, when one is stored. */
 export function revenueOverrideLabel(overrides: CockpitFieldOverride[]): string | null {
   for (const override of overrides) {
@@ -356,7 +381,8 @@ export function applyFieldOverrides(
       const micros = revenueOverrideMicros(o.value);
       if (micros == null || micros <= 0n) continue;
       overriddenKeys.add('annualRevenueMicros');
-      if (micros <= BigInt(Number.MAX_SAFE_INTEGER)) next.annualRevenueMicros = Number(micros);
+      next.annualRevenueMicrosText = micros.toString();
+      next.annualRevenueMicros = micros <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(micros) : null;
     }
   }
   return { company: next, overriddenKeys };
@@ -668,11 +694,13 @@ export function buildCockpit({
       if (influenceDelta !== 0) return influenceDelta;
       return a.name.localeCompare(b.name);
     });
+  const storedRevenueText = exactStoredRevenueLabel(company);
   const annualRevenue =
     revenueOverrideLabel(fieldOverrides) ??
+    storedRevenueText ??
     (company.annualRevenueMicros
       ? formatMicrosCompact(company.annualRevenueMicros)
-      : 'Not verified');
+      : (company.publicFacts?.revenueLabel ?? 'Not verified'));
   const accountOpportunityIds = new Set(companyOpps.map((opp) => opp.id));
   const companyRisks = risks.filter(
     (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),

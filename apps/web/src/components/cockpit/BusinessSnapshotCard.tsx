@@ -12,7 +12,12 @@ import {
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
-import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
+import {
+  formatMicrosAmount,
+  type AccountCockpitSnapshot,
+  type CockpitKpi,
+  type SourceAttribution,
+} from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
 import type { PublicCompanyFacts } from '@bidstack/shared';
@@ -148,23 +153,20 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
       value: facts?.revenueLabel
         ? facts.revenueLabel
-        : c.annualRevenueMicros
-          ? `${formatUnspecifiedAmount(c.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
-          : notVerified,
+        : c.annualRevenueMicrosText && /^\d+$/.test(c.annualRevenueMicrosText)
+          ? `${formatMicrosAmount(BigInt(c.annualRevenueMicrosText))} unspecified · ${UNSPECIFIED_CURRENCY_BASIS}`
+          : c.annualRevenueMicros
+            ? `${formatUnspecifiedAmount(c.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
+            : notVerified,
       source: facts?.revenueLabel
         ? publicSource(c.sourceAttribution, t)
-        : cockpitKpiSource(
-        cockpit.kpis,
-        'annualRevenueMicros',
-        Boolean(c.annualRevenueMicros),
-        {
-          fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
-          missingHint: t(
-            'businessSnapshot.source.missingRevenue',
-            'No revenue source is attached.',
-          ),
-        },
-      ),
+        : cockpitKpiSource(cockpit.kpis, 'annualRevenueMicros', Boolean(c.annualRevenueMicros), {
+            fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+            missingHint: t(
+              'businessSnapshot.source.missingRevenue',
+              'No revenue source is attached.',
+            ),
+          }),
     },
     {
       label: t('businessSnapshot.row.employees', 'Employees'),
@@ -249,30 +251,31 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
           scored.reduce((sum, source) => sum + (source.confidence ?? 0), 0) / scored.length;
         return `${Math.round(average * 100)}%`;
       })(),
-      source:
-        c.sourceAttribution.some((source) => typeof source.confidence === 'number')
-          ? {
-              label: t('businessSnapshot.source.confidence', 'Receipts'),
-              state: 'crm',
-              hint: t(
-                'businessSnapshot.source.confidenceHint',
-                'Average of attached source receipts. The stored company confidence is not shown.',
-              ),
-            }
-          : {
-              label: t('businessSnapshot.source.crm', 'CRM'),
-              state: 'crm',
-              hint: t(
-                'businessSnapshot.source.crmConfidenceHint',
-                sourceCount > 0
-                  ? 'A source receipt is attached, but it is not a scored source.'
-                  : 'No source receipts are attached, so this is not scored.',
-              ),
-            },
+      source: c.sourceAttribution.some((source) => typeof source.confidence === 'number')
+        ? {
+            label: t('businessSnapshot.source.confidence', 'Receipts'),
+            state: 'crm',
+            hint: t(
+              'businessSnapshot.source.confidenceHint',
+              'Average of attached source receipts. The stored company confidence is not shown.',
+            ),
+          }
+        : {
+            label: t('businessSnapshot.source.crm', 'CRM'),
+            state: 'crm',
+            hint: t(
+              'businessSnapshot.source.crmConfidenceHint',
+              sourceCount > 0
+                ? 'A source receipt is attached, but it is not a scored source.'
+                : 'No source receipts are attached, so this is not scored.',
+            ),
+          },
     },
   ];
   const notSynced = t('businessSnapshot.value.notSynced', 'Not synced');
-  const recorded = rows.filter((row) => row.source.state !== 'missing' && row.value !== notVerified && row.value !== notSynced);
+  const recorded = rows.filter(
+    (row) => row.source.state !== 'missing' && row.value !== notVerified && row.value !== notSynced,
+  );
   const missing = rows.filter((row) => !recorded.includes(row));
   const recordedShare = rows.length === 0 ? 0 : Math.round((recorded.length / rows.length) * 100);
 
@@ -294,10 +297,14 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         <div className="mb-3">
           <div className="mb-1 flex items-baseline justify-between text-xs text-[var(--fg-secondary)]">
             <span>
-              {t('businessSnapshot.recordedCount', '{{count}} recorded', { count: recorded.length })}
+              {t('businessSnapshot.recordedCount', '{{count}} recorded', {
+                count: recorded.length,
+              })}
             </span>
             <span>
-              {t('businessSnapshot.missingCount', '{{count}} not recorded', { count: missing.length })}
+              {t('businessSnapshot.missingCount', '{{count}} not recorded', {
+                count: missing.length,
+              })}
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]" aria-hidden>

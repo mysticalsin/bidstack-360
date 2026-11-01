@@ -2,6 +2,7 @@ import { type z } from 'zod';
 import type { PrismaClient, Prisma } from '@bidstack/db';
 import {
   SourceAttribution,
+  unitsToMicros,
   type CrmCompany,
   type SourceAttribution as SourceAttributionType,
 } from '@bidstack/shared';
@@ -96,19 +97,20 @@ export async function upsertVerifiedCompanyEnrichment({
         })) ??
         process.env.SEAMLESS_API_KEY ??
         null);
-  const seamlessProfile = seamlessMcpUrl || seamlessApiKey
-    ? await fetchSeamlessCompany({
-        name,
-        domain: requestedDomain,
-        website: requestedWebsite,
-        now,
-        apiKey: seamlessApiKey ?? undefined,
-        mcpUrl: seamlessMcpUrl ?? undefined,
-      }).catch((err) => {
-        log.warn({ err, company: name }, 'seamless enrichment failed');
-        return null;
-      })
-    : null;
+  const seamlessProfile =
+    seamlessMcpUrl || seamlessApiKey
+      ? await fetchSeamlessCompany({
+          name,
+          domain: requestedDomain,
+          website: requestedWebsite,
+          now,
+          apiKey: seamlessApiKey ?? undefined,
+          mcpUrl: seamlessMcpUrl ?? undefined,
+        }).catch((err) => {
+          log.warn({ err, company: name }, 'seamless enrichment failed');
+          return null;
+        })
+      : null;
   const openProfile =
     seamlessProfile ??
     (process.env.NODE_ENV === 'test' || process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1'
@@ -194,9 +196,7 @@ export async function upsertVerifiedCompanyEnrichment({
     fallbackLogo: favicon.providerMetadata as Prisma.InputJsonValue,
   };
   const confidenceBps = openProfile?.confidenceBps ?? 0;
-  const industryCodes = openProfile?.industryLabels?.length
-    ? openProfile.industryLabels
-    : [];
+  const industryCodes = openProfile?.industryLabels?.length ? openProfile.industryLabels : [];
   const legalName = storedLegalName(openProfile);
   const tradeName = openProfile?.tradeName ?? name;
   const incorporationDate = openProfile?.incorporationDate
@@ -291,8 +291,8 @@ export async function refreshPublicCompanyFacts({
   }
   const hasFacts = Boolean(
     company.publicFacts?.headquarters ||
-      company.publicFacts?.revenueLabel ||
-      company.publicFacts?.description,
+    company.publicFacts?.revenueLabel ||
+    company.publicFacts?.description,
   );
   const scoredMatch = company.sourceAttribution.some(
     (item) => item.source === 'wikidata' && item.confidence != null,
@@ -321,13 +321,22 @@ export async function refreshPublicCompanyFacts({
   }
 }
 
-/** Micros only when the public claim names a currency and the integer fits safely. */
+/** Micros only when the public claim names a currency. The digit string wins. */
 export function publicRevenueMicros(
-  profile: { revenueAmount?: number | null; revenueCurrency?: string | null } | null | undefined,
+  profile:
+    | {
+        revenueAmount?: number | null;
+        revenueAmountText?: string | null;
+        revenueCurrency?: string | null;
+      }
+    | null
+    | undefined,
 ): bigint | null {
-  if (!profile?.revenueCurrency || profile.revenueAmount == null) return null;
-  const micros = Math.round(profile.revenueAmount * 1_000_000);
-  return Number.isSafeInteger(micros) ? BigInt(micros) : null;
+  if (!profile?.revenueCurrency) return null;
+  const fromText = profile.revenueAmountText ? unitsToMicros(profile.revenueAmountText) : null;
+  if (fromText != null) return fromText;
+  if (profile.revenueAmount == null) return null;
+  return unitsToMicros(profile.revenueAmount);
 }
 
 /** A search label is not a legal name. Store one only when the profile already has it. */
@@ -349,9 +358,7 @@ function mergeSourceAttribution(
     const key = [parsed.data.source, parsed.data.label, parsed.data.sourceUrl ?? ''].join('|');
     byKey.set(key, parsed.data);
   }
-  return [...byKey.values()]
-    .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))
-    .slice(0, 12);
+  return [...byKey.values()].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt)).slice(0, 12);
 }
 
 export async function queueApolloEnrichment({
