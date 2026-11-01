@@ -13,8 +13,12 @@ const TRIGGER_DAYS = [90, 60, 30] as const;
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
 
-function daysUntil(target: Date): number {
-  return Math.floor((target.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+/** Whole UTC days until a renewal date. Today is 0. Floor of the clock is a day short in the afternoon. */
+export function renewalDaysOut(target: Date, now = Date.now()): number {
+  const due = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  const at = new Date(now);
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return (due - today) / 86_400_000;
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -51,7 +55,7 @@ export async function processRenewalOpportunities(
   let created = 0;
 
   for (const sub of subs) {
-    const daysOut = daysUntil(sub.renewalDate);
+    const daysOut = renewalDaysOut(sub.renewalDate);
 
     for (const threshold of TRIGGER_DAYS) {
       if (daysOut > threshold) continue; // not yet within window
