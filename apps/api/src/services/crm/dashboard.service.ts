@@ -51,7 +51,7 @@ import {
   serializeReleaseScore,
   serializeWidget,
 } from './dashboard.queries.js';
-import { normalizeName } from './dashboard.utils.js';
+import { capDealSample, DASHBOARD_DEAL_SAMPLE, normalizeName } from './dashboard.utils.js';
 
 // ─── Logger type ───────────────────────────────────────────────────────────────
 
@@ -143,7 +143,7 @@ export async function buildDashboardSnapshot(
         },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 100,
+      take: DASHBOARD_DEAL_SAMPLE + 1,
     }),
     prisma.task.findMany({
       where: taskWhere,
@@ -282,15 +282,16 @@ export async function buildDashboardSnapshot(
     }),
   ]);
 
+  const { rows: sampledOpportunities, capped: dealsSampleCapped } = capDealSample(opportunities);
   const visibleCompanyKeys =
     scope && !scope.unrestricted
-      ? new Set(opportunities.map((opportunity) => normalizeName(opportunity.customer)))
+      ? new Set(sampledOpportunities.map((opportunity) => normalizeName(opportunity.customer)))
       : null;
   const visibleOpportunityIds =
     scope && !scope.unrestricted
-      ? new Set(opportunities.map((opportunity) => opportunity.id))
+      ? new Set(sampledOpportunities.map((opportunity) => opportunity.id))
       : null;
-  const companies = buildCompanies(opportunities, enrichments, companyRows).filter(
+  const companies = buildCompanies(sampledOpportunities, enrichments, companyRows).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
   // A requested account with no opportunity or enrichment yet (new, imported or sparse) still
@@ -299,7 +300,7 @@ export async function buildDashboardSnapshot(
     const sparse = await findSparseAccount(prisma, orgId, accountId, scope);
     if (sparse) companies.push(companyFromRow(sparse));
   }
-  const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
+  const deals = sampledOpportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
   const visibleInsights = visibleOpportunityIds
     ? persistedInsights.filter(
@@ -502,6 +503,7 @@ export async function buildDashboardSnapshot(
     }),
     companies,
     deals: snapshotDeals,
+    dealsSampleCapped,
     activities,
     insights,
     widgets: dashboardWidgets,
