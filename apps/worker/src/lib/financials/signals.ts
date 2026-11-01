@@ -224,6 +224,7 @@ const CUE_RULES: Array<{ rule: FinancialSignalRule; re: RegExp }> = [
 /** Find cue sentences in narrative text blocks; one snippet per rule. Tables (mostly digits) are skipped. */
 export function findTextCues(blocks: Array<{ concept: string; text: string }>, maxLen = 260): TextCue[] {
   const out: TextCue[] = [];
+  const vocab = buildVocab(blocks.map((b) => b.text));
   const have = new Set<FinancialSignalRule>();
   for (const b of blocks) {
     // accounting-policy and standards notes are boilerplate, not company news
@@ -245,8 +246,9 @@ export function findTextCues(blocks: Array<{ concept: string; text: string }>, m
       for (let m = g.exec(sq); m; m = g.exec(sq)) {
         const from = at[m.index]!;
         const to = (at[m.index + m[0].length - 1] ?? from) + 1;
-        const snippet = sentenceAround(text, from, to, maxLen);
-        if (!snippet) continue;
+        const raw = sentenceAround(text, from, to, maxLen);
+        if (!raw) continue;
+        const snippet = repairSplitWords(raw, vocab);
         out.push({ rule, snippet, concept: b.concept });
         have.add(rule);
         break;
@@ -270,4 +272,68 @@ export function sentenceAround(text: string, from: number, to: number, maxLen = 
   if (digits / s.length > 0.15) return null;
   if (s.length > maxLen) s = `${s.slice(0, maxLen - 3).trim()}...`;
   return (start > 0 && cut === -1 ? '...' : '') + s;
+}
+
+// ── broken-word repair for snippets ──
+// PDF-to-iXBRL conversion splits words ("Ma rch", "capi tal", "acquisi-\ntion").
+// We rejoin fragments only when the joined word is used intact elsewhere in the
+// same filing (or is a month name) and is more common there than the fragments,
+// so real word pairs ("in to", "a man") stay apart. No outside dictionary.
+
+const BASE_WORDS = [
+  'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  'janeiro', 'fevereiro', 'março', 'maio', 'junho', 'julho', 'setembro', 'outubro', 'novembro', 'dezembro',
+  'januar', 'februar', 'mars', 'juni', 'juli', 'oktober', 'desember',
+];
+const WORD_RE = /[\p{L}]+/gu;
+
+export type Vocab = Map<string, number>;
+
+/** Word counts from the filing's own text (intact tokens only), plus month names. */
+export function buildVocab(texts: string[]): Vocab {
+  const v: Vocab = new Map();
+  for (const t of texts) for (const w of t.toLowerCase().match(WORD_RE) ?? []) v.set(w, (v.get(w) ?? 0) + 1);
+  for (const w of BASE_WORDS) v.set(w, Math.max(v.get(w) ?? 0, 1000));
+  return v;
+}
+
+const isWord = (t: string) => /^\p{L}+$/u.test(t);
+
+/** Rejoin hyphen and space split tokens and normalise whitespace in a snippet. */
+export function repairSplitWords(snippet: string, vocab: Vocab): string {
+  const f = (w: string) => vocab.get(w.toLowerCase()) ?? 0;
+  // 1. hyphen at a line break: "acquisi- tion" / "acquisi-\ntion"
+  let s = snippet.replace(/(\p{L}+)-\s+(\p{Ll}\p{L}*)/gu, (m, a: string, b: string) => (f(a + b) > 0 ? a + b : m));
+  // 2. normalise whitespace and spaces before punctuation
+  s = s.replace(/\s+/g, ' ').replace(/ ([,.;:!?%)])/g, '$1').replace(/\( /g, '(').trim();
+  // 3. space splits: greedily join 2 or 3 alphabetic tokens into a known word
+  const toks = s.split(' ');
+  const out: string[] = [];
+  for (let i = 0; i < toks.length; ) {
+    let joined = false;
+    for (const n of [3, 2]) {
+      if (i + n > toks.length) continue;
+      const parts = toks.slice(i, i + n);
+      // keep trailing punctuation on the last fragment ("tugal." / "Group,")
+      const last = parts[n - 1]!;
+      const tail = last.match(/[^\p{L}]+$/u)?.[0] ?? '';
+      const core = [...parts.slice(0, -1), last.slice(0, last.length - tail.length)];
+      if (!core.every(isWord)) continue;
+      const word = core.join('');
+      const fw = f(word);
+      if (fw === 0 || word.length < 4) continue;
+      // at least one fragment must be rarer than the whole word in this filing
+      if (Math.min(...core.map(f)) >= fw) continue;
+      out.push(word + tail);
+      i += n;
+      joined = true;
+      break;
+    }
+    if (!joined) {
+      out.push(toks[i]!);
+      i += 1;
+    }
+  }
+  return out.join(' ');
 }
