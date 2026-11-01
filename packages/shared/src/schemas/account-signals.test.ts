@@ -162,6 +162,15 @@ describe('computeMomentum', () => {
     const metPage = computeMomentum({ ...empty, meetings, meetingsArePage: true }, NOW);
     expect(met.drivers.find((driver) => driver.key === 'meetings')?.signal).toBeGreaterThan(0);
     expect(metPage.drivers.find((driver) => driver.key === 'meetings')?.signal).toBe(0);
+    expect(metPage.drivers.find((driver) => driver.key === 'meetings')?.detail).toContain('At least 3 meetings');
+    const reached = computeMomentum({
+      ...empty,
+      meetings: [daysAgo(40), daysAgo(70)],
+      meetingsArePage: true,
+    }, NOW);
+    expect(reached.drivers.find((driver) => driver.key === 'meetings')?.detail).toBe(
+      '1 meeting in 60 days, last 40 days ago',
+    );
     const news = [{ occurredAt: daysAgo(10), importance: 75, sentiment: 0.8, category: 'funding' as const }];
     const tone = computeMomentum({ ...empty, events: news }, NOW);
     const tonePage = computeMomentum({ ...empty, events: news, newsArePage: true }, NOW);
