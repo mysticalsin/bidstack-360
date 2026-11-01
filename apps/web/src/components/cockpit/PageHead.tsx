@@ -29,6 +29,7 @@ import { useAccountHistory } from '@/stores/accountHistory';
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
 import { deriveNextMove } from './CommandCenter';
+import { openRiskHeadline } from './open-risk-headline';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -87,8 +88,8 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   );
   const openOpps = accountOpps.filter((o) => closedOutcome(o) === null);
   const openMicros = openOpps.reduce((sum, o) => sum + recordedMicros(o.value, o.valueMicros), 0n);
-  const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
-  const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
+  const riskHeadline = openRiskHeadline(cockpit);
+  const highRisks = riskHeadline.high;
   const winLoss = cockpit.winLoss;
   const nextMove = deriveNextMove(cockpit, t);
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
@@ -97,7 +98,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: microsToUnits(recordedMicros(o.value, o.valueMicros)), dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer, pipelineStage: o.pipelineStage, valueMicros: o.valueMicros }));
   const openSpark = cumulativeOpen(sparkRows);
   const winSpark = runningWinRate(sparkRows);
-  const riskSpark = (['low', 'medium', 'high', 'critical'] as const).map((sev) => openRisks.filter((r) => r.severity === sev).length);
+  const riskSpark = riskHeadline.spark;
 
   return (
     <motion.div
@@ -249,8 +250,8 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
           </div>
           <div>
             <span className="acct-key-label">{t('pageHead.keyOpenRisks', 'Open risks')}</span>
-            <span className="acct-key-value">{openRisks.length}</span>
-            {openRisks.length > 0 ? (
+            <span className="acct-key-value">{riskHeadline.total}</span>
+            {riskHeadline.total > 0 ? (
               <Spark mode="bars" values={riskSpark} hotFrom={2} width={48} label={t('pageHead.sparkRisk', 'Open risks: {{low}} low, {{med}} medium, {{high}} high, {{crit}} critical', { low: riskSpark[0], med: riskSpark[1], high: riskSpark[2], crit: riskSpark[3] })} />
             ) : null}
             <span>
