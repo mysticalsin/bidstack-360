@@ -50,6 +50,7 @@ export * from './meeting-intel.js';
 export * from './account-enrichment.js';
 export * from './account-signals.js';
 export * from './account-financials.js';
+export * from './account-positioning.js';
 export * from './win-loss.js';
 export * from './tenant-export.js';
 export * from './erasure.js';
