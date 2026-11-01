@@ -41,4 +41,18 @@ describe('openPipelineStages', () => {
     expect(shares[0]).toBeLessThan(shares[1]!);
     expect(shares[1]).toBe(100);
   });
+
+  it('totals the open book from micros when the unit numbers collapse', () => {
+    // WHY: adding the unit numbers made this book 18,014,398,509,481,984.
+    // The recorded stages sum to one unit more.
+    const smaller = (9007199254740992n * 1_000_000n).toString();
+    const larger = (9007199254740993n * 1_000_000n).toString();
+    const collapsed = Number(9007199254740993n);
+    const headline = pipelineHeadline([
+      { stage: 'proposal', count: 1, valueSum: collapsed, valueSumMicros: smaller },
+      { stage: 'negotiation', count: 1, valueSum: collapsed, valueSumMicros: larger },
+    ]);
+    expect(headline.openMicros).toBe((9007199254740992n + 9007199254740993n) * 1_000_000n);
+    expect(collapsed + collapsed).toBe(18_014_398_509_481_984);
+  });
 });

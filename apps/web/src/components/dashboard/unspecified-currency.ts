@@ -103,11 +103,9 @@ export function recordedMicros(value: number, micros?: string | null): bigint {
   return unitsToMicros(value) ?? 0n;
 }
 
-/** Compact from integer micros. Unit counts past the safe range keep their leading digits. */
-export function formatUnspecifiedCompactMicros(micros: string | number | bigint): string {
-  const value = asMicros(micros);
-  const negative = value < 0n;
-  const abs = negative ? -value : value;
+function compactMicrosMagnitude(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
   const units = abs / 1_000_000n;
   const remainder = abs % 1_000_000n;
   let magnitude: number;
@@ -118,5 +116,24 @@ export function formatUnspecifiedCompactMicros(micros: string | number | bigint)
     const significant = digits.slice(0, 15);
     magnitude = Number(significant) * 10 ** (digits.length - significant.length);
   }
-  return formatUnspecifiedCompact(negative ? -magnitude : magnitude);
+  return negative ? -magnitude : magnitude;
+}
+
+/**
+ * Compact while the unit count fits in a safe integer. Past that, the full
+ * amount, because the collapsed unit number is one unit low.
+ */
+export function headlineMicrosLabel(micros: string | number | bigint): string {
+  const value = asMicros(micros);
+  const abs = value < 0n ? -value : value;
+  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) return formatMicrosAmount(value);
+  return new Intl.NumberFormat(undefined, {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(compactMicrosMagnitude(value));
+}
+
+/** Compact from integer micros. Unit counts past the safe range keep their leading digits. */
+export function formatUnspecifiedCompactMicros(micros: string | number | bigint): string {
+  return formatUnspecifiedCompact(compactMicrosMagnitude(asMicros(micros)));
 }

@@ -1,6 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
-import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  headlineMicrosLabel,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import {
   openPipelineStages,
   pipelineHeadline,
@@ -20,13 +23,6 @@ export function ThinkingMark({ label }: { label: string }) {
       {label}
     </span>
   );
-}
-
-function compactAmount(value: number): string {
-  return new Intl.NumberFormat(undefined, {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
 }
 
 function ShareBars({ values }: { values: readonly number[] }) {
@@ -67,21 +63,21 @@ export function PipelineMetricStrip({
   const cards = [
     {
       label: t('pipeline.kpiOpenValue', 'Open pipeline'),
-      value: compactAmount(headline.openValue),
+      value: headlineMicrosLabel(headline.openMicros),
       detail: t('pipeline.metricOpenDetail', 'Open stages only.'),
       basis: UNSPECIFIED_CURRENCY_BASIS,
       bars: stageBarShares(open),
     },
     {
       label: t('pipeline.kpiWonValue', 'Won'),
-      value: compactAmount(headline.wonValue),
+      value: headlineMicrosLabel(headline.wonMicros),
       detail: `${t('pipeline.metricWonDetail', 'Closed won. Count is the win rate numerator.')} ${UNSPECIFIED_CURRENCY_BASIS}`,
       basis: null,
       bars: [headline.wonValue],
     },
     {
       label: t('pipeline.kpiLostValue', 'Lost'),
-      value: compactAmount(headline.lostValue),
+      value: headlineMicrosLabel(headline.lostMicros),
       detail: `${t('pipeline.metricLostDetail', 'Closed lost, including a stage marked lost.')} ${UNSPECIFIED_CURRENCY_BASIS}`,
       basis: null,
       bars: [headline.lostValue],

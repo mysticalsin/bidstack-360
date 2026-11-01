@@ -38,6 +38,25 @@ describe('PipelineMetricStrip', () => {
     expect(screen.getByLabelText(/Win rate/).textContent).toMatch(/67%/);
   });
 
+  it('prints the open total from micros when the unit numbers collapse', () => {
+    // WHY: the open card added valueSum. That sum reads one unit low.
+    const smaller = (9007199254740992n * 1_000_000n).toString();
+    const larger = (9007199254740993n * 1_000_000n).toString();
+    const collapsed = Number(9007199254740993n);
+    render(
+      <PipelineMetricStrip
+        stages={[
+          { stage: 'proposal', count: 1, valueSum: collapsed, valueSumMicros: smaller },
+          { stage: 'negotiation', count: 1, valueSum: collapsed, valueSumMicros: larger },
+        ]}
+      />,
+    );
+
+    const open = screen.getByLabelText(/Open pipeline/);
+    expect(open.getAttribute('aria-label')).toMatch(/18,014,398,509,481,985/);
+    expect(open.getAttribute('aria-label')).not.toMatch(/18,014,398,509,481,984/);
+  });
+
   it('shows the thinking mark while the figures are still loading', () => {
     render(<PipelineMetricStrip stages={undefined} loading />);
     expect(screen.getByRole('status').textContent).toMatch(/Loading the pipeline/);
