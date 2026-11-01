@@ -39,5 +39,18 @@ describe('mergeLatestActivity', () => {
         pipelineStage: { key: 's1_lead', isWon: false, isLost: true, deletedAt: new Date() },
       }),
     ).toBe('new');
+    // WHY: an open custom stage used to read as unspecified. The feed keeps its name.
+    expect(
+      opportunityActivitySubtitle({
+        stage: 'custom_discovery',
+        pipelineStage: {
+          key: 'custom_discovery',
+          name: 'Discovery',
+          isWon: false,
+          isLost: false,
+          deletedAt: null,
+        },
+      }),
+    ).toBe('Discovery');
   });
 });
