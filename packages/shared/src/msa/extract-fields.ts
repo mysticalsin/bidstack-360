@@ -230,6 +230,29 @@ export function storableRateCard(value: unknown): Array<{ role: string; rateMicr
   return out;
 }
 
+/** What confirm left off the record, so the saved agreement still says so. */
+export function intakeOmissionNotes(fields: {
+  liabilityCap?: { value: unknown };
+  rateCard?: { value: unknown };
+}): string | null {
+  const lines: string[] = [];
+  if (fields.liabilityCap?.value === 'amount not readable') lines.push('Liability cap: amount not readable');
+  if (Array.isArray(fields.rateCard?.value)) {
+    const kept = new Set(storableRateCard(fields.rateCard.value).map((row) => `${row.role}\0${row.rateMicros}\0${row.unit}`));
+    for (const row of fields.rateCard.value) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+      const item = row as { role?: unknown; rateMicros?: unknown; unit?: unknown };
+      if (typeof item.role !== 'string' || !item.role.trim()) continue;
+      const unit = item.unit === 'hour' || item.unit === 'month' || item.unit === 'year' ? item.unit : 'day';
+      const micros = typeof item.rateMicros === 'number' ? item.rateMicros : null;
+      if (micros != null && kept.has(`${item.role.trim()}\0${micros}\0${unit}`)) continue;
+      lines.push(rateCardLineText(item.role.trim(), micros, unit));
+    }
+  }
+  const text = lines.join('\n').slice(0, 4000);
+  return text || null;
+}
+
 function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number | null; unit: 'day' | 'hour' | 'month' | 'year' }[] {
   const lines: { role: string; rateMicros: number | null; unit: 'day' | 'hour' | 'month' | 'year' }[] = [];
   const unitMap: Record<string, 'day' | 'hour' | 'month' | 'year'> = {
