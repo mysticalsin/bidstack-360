@@ -17,6 +17,26 @@ export async function mintNextCode(orgId: string): Promise<string> {
   return `OP-${(n + 1).toString().padStart(4, '0')}`;
 }
 
+/**
+ * The one live pipeline stage with this key. Zero means the deal keeps the
+ * enum only. Two means the create must stop: picking the first would hide a
+ * lost or won flag on the other row.
+ */
+export async function solePipelineStage(
+  orgId: string,
+  key: string,
+): Promise<{ id: string; isWon: boolean; isLost: boolean; deletedAt: Date | null } | null> {
+  const rows = await prisma.pipelineStage.findMany({
+    where: { orgId, key, deletedAt: null },
+    select: { id: true, isWon: true, isLost: true, deletedAt: true },
+    take: 2,
+  });
+  if (rows.length > 1) {
+    throw new Error(`stage "${key}" matches more than one pipeline stage, so the deal was not created`);
+  }
+  return rows[0] ?? null;
+}
+
 /** Lost wins when the enum and a live stage flag disagree, or both are set. */
 export function dealOutcome(deal: {
   stage: string;

@@ -22,6 +22,7 @@ import {
   requireCompanyLink,
   dealOutcome,
   serializeDeal,
+  solePipelineStage,
   source,
 } from './crm-tools.helpers.js';
 
@@ -111,7 +112,7 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
 
 export const crmCreateDeal: Tool<typeof DealCreateInput> = {
   description:
-    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. Omit probability when it is unknown; 0 is stored and adds nothing to weighted pipeline.',
+    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. The stage key links the one live pipeline stage with that key. Two matches are refused. Omit probability when it is unknown; 0 is stored and adds nothing to weighted pipeline.',
   input: DealCreateInput,
   inputJsonSchema: {
     type: 'object',
@@ -133,6 +134,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
       companyId: args.companyId,
       name: args.customer,
     });
+    const stageRow = await solePipelineStage(ctx.orgId, args.stage);
     const code = await mintNextCode(ctx.orgId);
     const created = await prisma.opportunity.create({
       data: {
@@ -142,12 +144,14 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
         companyId: company.id,
         name: args.name,
         stage: args.stage as PrismaStage,
+        ...(stageRow ? { pipelineStageId: stageRow.id } : {}),
         valueMicros: BigInt(Math.round(args.value * 1_000_000)),
         probability: args.probability ?? 0,
         dueDate: args.dueDate ? new Date(args.dueDate) : null,
         industry: args.industry ?? null,
         intel: {},
       },
+      include: { pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } } },
     });
 
     await prisma.auditLog.create({
@@ -163,7 +167,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
     return {
       ...serializeDeal(created),
       companyId: created.companyId,
-      outcome: dealOutcome({ stage: created.stage, pipelineStage: null }),
+      outcome: dealOutcome(created),
     };
   },
 };

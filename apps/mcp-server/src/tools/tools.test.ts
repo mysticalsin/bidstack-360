@@ -280,6 +280,89 @@ describeDb('MCP tools', () => {
     expect(renamed.outcome).toBe('lost');
   });
 
+  it('crm_create_deal links the one live stage with that key', async () => {
+    // WHY: create stored the enum and reported open. A stage key whose only
+    // live row is lost must come back lost. Two rows with that key are refused
+    // so the first one is not treated as the outcome.
+    const openKeys = [
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
+    ] as const;
+    const free: string[] = [];
+    for (const key of openKeys) {
+      const n = await prisma.pipelineStage.count({ where: { orgId, key, deletedAt: null } });
+      if (n === 0) free.push(key);
+    }
+    expect(free.length).toBeGreaterThanOrEqual(2);
+    const lostKey = free[0]!;
+    const ambiguousKey = free[1]!;
+    const token = randomBytes(4).toString('hex');
+    const company = await prisma.company.create({
+      data: { orgId, name: `Create Co ${token}` },
+    });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Create ${token}` },
+    });
+    const other = await prisma.pipeline.create({
+      data: { orgId, name: `Create other ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: lostKey, name: 'Lost key', isLost: true },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: ambiguousKey, name: 'Neg A' },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: other.id, key: ambiguousKey, name: 'Neg B' },
+    });
+
+    try {
+      const created = (await tools['crm_create_deal'].handler(
+        {
+          customer: company.name,
+          companyId: company.id,
+          name: `Flagged create ${token}`,
+          stage: lostKey,
+          value: 0,
+        },
+        ctx,
+      )) as { id: string; stage: string; outcome: string };
+      expect(created.stage).toBe(lostKey);
+      expect(created.outcome).toBe('lost');
+      const row = await prisma.opportunity.findFirst({
+        where: { id: created.id, orgId },
+        select: { pipelineStageId: true },
+      });
+      expect(row?.pipelineStageId).toBe(lost.id);
+
+      await expect(
+        tools['crm_create_deal'].handler(
+          {
+            customer: company.name,
+            companyId: company.id,
+            name: `Ambiguous ${token}`,
+            stage: ambiguousKey,
+            value: 0,
+          },
+          ctx,
+        ),
+      ).rejects.toThrow(/more than one pipeline stage/);
+      const leftover = await prisma.opportunity.count({
+        where: { orgId, name: `Ambiguous ${token}` },
+      });
+      expect(leftover).toBe(0);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { orgId, companyId: company.id } });
+      await prisma.auditLog.deleteMany({ where: { orgId, targetType: 'opportunity' } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: { in: [pipeline.id, other.id] } } });
+      await prisma.pipeline.deleteMany({ where: { id: { in: [pipeline.id, other.id] } } });
+      await prisma.company.delete({ where: { id: company.id } });
+    }
+  });
+
   it('opportunities.get returns a single opp', async () => {
     const out = (await tools['opportunities.get'].handler({ id: oppId }, ctx)) as { id: string };
     expect(out.id).toBe(oppId);
