@@ -23,6 +23,7 @@ import {
   SCORED_NEWS_PAGE,
   NOTABLE_SIGNAL_DAYS,
   openJobsCopy,
+  pickNotableSignal,
   peoplePageIsPartial,
   readCoversWindow,
   sentimentCopy,
@@ -167,7 +168,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const { ids, childrenCapped } = await accountIds(orgId, companyId);
   const live = await companiesWithLiveSignals(orgId, ids);
   const since24 = new Date(now.getTime() - 730 * DAY);
-  const [company, firmo, initiativeLoad, fin, loadedPeople, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
+  const [company, firmo, initiativeLoad, fin, loadedPeople, opps, wonOrg, risky, topEvent, momentumIn, competitors] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, tier: true, industry: true, countryCode: true, employeeCount: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, provenance: true } }),
     loadInitiatives(orgId, scope, { id: companyId }, now, ids),
@@ -205,12 +206,15 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       const capped = rows.length === RISK_EVENT_PAGE && pageIsCapped(rows.length, await prisma.accountWatchEvent.count({ where }), RISK_EVENT_PAGE);
       return { rows, capped };
     })(),
-    prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: new Date(now.getTime() - NOTABLE_SIGNAL_DAYS * DAY), lte: now }, ...hideSampleWhere(live) },
-      select: { title: true, occurredAt: true, source: true, sample: true, importance: true, severity: true },
-      orderBy: [{ importance: 'desc' }, { occurredAt: 'desc' }],
-      take: 1,
-    }),
+    (async () => {
+      const where = { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' as const }, occurredAt: { gte: new Date(now.getTime() - NOTABLE_SIGNAL_DAYS * DAY), lte: now }, ...hideSampleWhere(live) };
+      const select = { title: true, occurredAt: true, source: true, sample: true, importance: true, severity: true };
+      const [byImportance, bySeverity] = await Promise.all([
+        prisma.accountWatchEvent.findFirst({ where: { ...where, importance: { gt: 0 } }, select, orderBy: [{ importance: 'desc' }, { occurredAt: 'desc' }] }),
+        prisma.accountWatchEvent.findFirst({ where: { ...where, importance: 0 }, select, orderBy: [{ severity: 'desc' }, { occurredAt: 'desc' }] }),
+      ]);
+      return pickNotableSignal(byImportance, bySeverity);
+    })(),
     loadMomentumInputs(orgId, scope, [companyId], now),
     (async () => {
       const where = { orgId, deletedAt: null, opportunity: { companyId: { in: ids } } };
@@ -259,7 +263,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     : company.employeeCount
       ? { value: company.employeeCount, source: 'Account record' }
       : null;
-  const top = topEvents[0];
+  const top = topEvent;
   const brief: BriefFacts = {
     name: company.name,
     tierLabel: tierLabel(company.tier),

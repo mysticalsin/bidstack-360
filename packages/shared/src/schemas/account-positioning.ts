@@ -214,6 +214,22 @@ const SEN_WEIGHT: Record<Seniority, number> = { c_level: 3, vp: 2.5, director: 2
 const DAY = 86_400_000;
 export const NOTABLE_SIGNAL_DAYS = 180;
 
+/** Same score as the timeline: a stored importance, or severity when importance was never set. */
+export function signalScore(row: { importance: number; severity: number }): number {
+  if (row.importance) return row.importance;
+  return Math.min(100, row.severity * 20);
+}
+
+/** The notable row is the higher score. A newer row wins a tie. */
+export function pickNotableSignal<T extends { importance: number; severity: number; occurredAt: Date }>(
+  byImportance: T | null,
+  bySeverity: T | null,
+): T | null {
+  const ranked = [byImportance, bySeverity].filter((row): row is T => row != null);
+  ranked.sort((a, b) => signalScore(b) - signalScore(a) || b.occurredAt.getTime() - a.occurredAt.getTime());
+  return ranked[0] ?? null;
+}
+
 export const JOB_POST_PAGE = 1000;
 export const SCORED_NEWS_PAGE = 1000;
 export const RISK_EVENT_PAGE = 20;

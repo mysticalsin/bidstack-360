@@ -5,6 +5,7 @@ import {
   buildPlays,
   composeBrief,
   dealRangeFor,
+  pickNotableSignal,
   openJobsCopy,
   pickApproach,
   readCoversWindow,
@@ -373,6 +374,31 @@ describe('key number page copy', () => {
     expect(recentOnly.compare).toBe(false);
     expect(recentOnly.period).toContain('past this page');
     expect(sentimentCopy(false, true, true, 4).compare).toBe(true);
+  });
+});
+
+describe('pickNotableSignal', () => {
+  const at = (day: number) => new Date(`2026-06-${String(day).padStart(2, '0')}T00:00:00Z`);
+
+  it('lets an unscored severe event outrank a small stored importance', () => {
+    // WHY: importance 1 was chosen over a severity-5 event whose importance was never set.
+    const mild = { title: 'Sponsors a marathon', importance: 1, severity: 0, occurredAt: at(20) };
+    const severe = { title: 'Plant closure', importance: 0, severity: 5, occurredAt: at(2) };
+    expect(pickNotableSignal(mild, severe)?.title).toBe('Plant closure');
+  });
+
+  it('keeps a high stored importance ahead of a milder unscored event', () => {
+    // WHY: severity only fills in when importance is unset. Importance 90 beats severity 2, which scores 40.
+    const ranked = { title: 'Guidance cut', importance: 90, severity: 1, occurredAt: at(2) };
+    const milder = { title: 'Office move', importance: 0, severity: 2, occurredAt: at(20) };
+    expect(pickNotableSignal(ranked, milder)?.title).toBe('Guidance cut');
+  });
+
+  it('breaks a tied score toward the newer event', () => {
+    const older = { title: 'Older', importance: 40, severity: 0, occurredAt: at(2) };
+    const newer = { title: 'Newer', importance: 40, severity: 0, occurredAt: at(18) };
+    expect(pickNotableSignal(older, newer)?.title).toBe('Newer');
+    expect(pickNotableSignal(null, null)).toBeNull();
   });
 });
 
