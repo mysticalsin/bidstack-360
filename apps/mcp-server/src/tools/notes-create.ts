@@ -43,7 +43,7 @@ export const notesCreate: Tool<typeof Input> = {
     const created = await prisma.note.create({
       data: {
         orgId: ctx.orgId,
-        accountId: args.accountId,
+        accountId: args.accountId.toLowerCase(),
         companyId: company?.id ?? null,
         authorUserId: author.id,
         title: args.title,

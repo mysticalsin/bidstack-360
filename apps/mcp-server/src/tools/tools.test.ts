@@ -905,6 +905,28 @@ describeDb('MCP tools', () => {
     ).rejects.toThrow(/UUID/);
   });
 
+  it('notes.list finds a lowercase account tag when the company id is uppercase', async () => {
+    // WHY: the account page stores the company id in lowercase. Dust often
+    // sends the same id in another case, and the note has no companyId yet.
+    const author = await prisma.user.findFirst({ where: { orgId }, select: { id: true } });
+    const accountId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+    await prisma.note.create({
+      data: {
+        orgId,
+        accountId,
+        companyId: null,
+        authorUserId: author!.id,
+        title: 'Lowercase tag',
+        bodyMd: 'Saved from the account page.',
+      },
+    });
+    const out = (await tools['notes.list'].handler(
+      { accountId: accountId.toUpperCase(), limit: 10 },
+      ctx,
+    )) as Array<{ title: string; companyId: string | null }>;
+    expect(out.some((note) => note.title === 'Lowercase tag')).toBe(true);
+  });
+
   it('crm_search_companies returns a company id and does not invent confidence for text-only matches', async () => {
     const company = await prisma.company.create({
       data: { orgId, name: 'Canonical Search Co' },
