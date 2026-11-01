@@ -12,10 +12,10 @@ import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { headlineMicrosLabel, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { MiniCalendar, YearBars } from '@/components/viz/charts';
 import { CATEGORY_LABEL, noDash, sourceLabel } from '@/components/signals/category';
-import type { SignalCategory } from '@bidstack/shared';
+import { microsToUnits, type SignalCategory } from '@bidstack/shared';
 import { fmtCompact } from '@/components/viz/viz-data';
 import { useAccountWatchdog, useSetWatchEventStatus, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
 import { useHasPermission } from '@/hooks/useCapabilities';
@@ -264,7 +264,7 @@ function Results({ data }: { data: AccountWatchdog }) {
   );
 }
 
-const amount = (micros: bigint) => formatUnspecifiedAmount(Number(micros / 1_000_000n));
+const amount = (micros: bigint) => headlineMicrosLabel(micros, 'en-GB');
 
 function TrackRecord({ data }: { data: AccountWatchdog }) {
   const [projectsOpen, setProjectsOpen] = useState(false);
@@ -278,7 +278,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
   for (const p of data.pastProjects) {
     const y = String(new Date(p.closedAt).getUTCFullYear());
     const cur = byYear.get(y) ?? { won: 0, lost: 0 };
-    const v = Number(BigInt(p.valueMicros) / 1_000_000n);
+    const v = microsToUnits(BigInt(p.valueMicros));
     if (p.outcome === 'won') cur.won += v; else cur.lost += v;
     byYear.set(y, cur);
   }

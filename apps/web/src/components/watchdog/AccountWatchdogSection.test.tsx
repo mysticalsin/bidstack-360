@@ -127,6 +127,23 @@ describe('AccountWatchdogSection', () => {
     expect(screen.queryByRole('heading', { name: 'Timeline' })).toBeNull();
   });
 
+  it('keeps the cents on a closed project', () => {
+    // WHY: dividing micros by 1e6 dropped 250,000.50 to 250,000 and turned 7.86 million into a whole number.
+    state.data = {
+      ...base,
+      pastProjects: [
+        { id: 'p1', name: 'Core banking RFP', outcome: 'won', valueMicros: '7860000000000', closedAt: '2026-03-01T00:00:00Z' },
+        { id: 'p2', name: 'Data pilot', outcome: 'lost', valueMicros: '250000500000', closedAt: '2026-02-01T00:00:00Z' },
+      ],
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByText('8,110,000.50 total value')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 projects' }));
+    expect(screen.getByText('7.86m')).toBeTruthy();
+    expect(screen.getByText('250,000.50')).toBeTruthy();
+    expect(screen.queryByText('7.9m')).toBeNull();
+  });
+
   it('folds cross-region meeting flags for this account into signals (task 5)', () => {
     state.data = base;
     mi.data = { items: [
