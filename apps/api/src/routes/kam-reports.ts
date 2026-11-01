@@ -22,6 +22,18 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function staleThreshold(days: number): Date {
   return new Date(Date.now() - days * DAY_MS);
 }
+
+/** Whole UTC days since the last activity. Floor of the clock is a day short after noon. */
+export function staleCalendarDays(lastActivityAt: Date, now = Date.now()): number {
+  const then = Date.UTC(
+    lastActivityAt.getUTCFullYear(),
+    lastActivityAt.getUTCMonth(),
+    lastActivityAt.getUTCDate(),
+  );
+  const at = new Date(now);
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return (today - then) / 86_400_000;
+}
 /** companyId filter clause for cross-account queries (null scope → no filter). */
 function companyClause(ids: string[] | null): Prisma.KamInitiativeWhereInput {
   return ids ? { companyId: { in: ids } } : {};
@@ -193,7 +205,7 @@ export const kamReportRoutes: FastifyPluginAsyncZod = async (server) => {
           companyId: r.companyId,
           stage: r.stage,
           lastActivityAt: r.lastActivityAt.toISOString(),
-          daysStale: Math.floor((now - r.lastActivityAt.getTime()) / DAY_MS),
+          daysStale: staleCalendarDays(r.lastActivityAt, now),
         })),
       };
     },
