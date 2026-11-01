@@ -18,6 +18,8 @@ vi.mock('framer-motion', async () => {
         React.createElement('div', props, children),
     },
     useReducedMotion: () => true,
+    useMotionValue: () => ({ get: () => 0, set: () => undefined }),
+    animate: () => ({ stop: () => undefined }),
   };
 });
 
@@ -49,6 +51,22 @@ describe('OpenIssuesCard', () => {
     );
     expect(screen.getByText('Latest 50 rows. 3 open items on the account.')).toBeTruthy();
     expect(screen.queryByText('Nothing recorded')).toBeNull();
+  });
+
+  it('shows unranked open risks when the card list is empty', () => {
+    // WHY: the buckets waited for a visible row. Three open risks with no
+    // rank read as an empty mix.
+    render(
+      <OpenIssuesCard
+        risks={[]}
+        compliance={[]}
+        openRiskCount={3}
+        openRiskSeverity={{ critical: 0, high: 0, medium: 0, low: 0 }}
+        risksCapped
+      />,
+    );
+    expect(screen.getByText('Unranked')).toBeTruthy();
+    expect(screen.getByText('3')).toBeTruthy();
   });
 
   it('does not mark an unranked risk as low', () => {

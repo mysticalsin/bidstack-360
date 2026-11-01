@@ -122,7 +122,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
         }
       />
       <div style={{ padding: '8px 18px 14px' }}>
-        {recorded > 0 ? (
+        {recorded > 0 || (openRiskSeverity != null && (total > 0 || unranked > 0)) ? (
         <div className="issue-buckets" aria-label={t('openIssues.bucketsLabel', 'Severity buckets')}>
           {buckets.map((bucket, index) => (
             <motion.div
