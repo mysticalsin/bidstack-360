@@ -67,6 +67,7 @@ describe('ForecastsPage amounts', () => {
     };
     render(<ForecastsPage />);
     expect(screen.getAllByText('$1.5M').length).toBeGreaterThan(0);
+    expect(screen.getByText('Commit · USD')).toBeTruthy();
     expect(screen.getAllByText('0 unspecified').length).toBeGreaterThan(0);
   });
 });

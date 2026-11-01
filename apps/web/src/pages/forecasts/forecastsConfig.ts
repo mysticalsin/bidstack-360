@@ -144,6 +144,49 @@ export function sumForecastMicros(...amounts: string[]): bigint {
   return amounts.reduce((total, amount) => total + BigInt(amount), 0n);
 }
 
+export interface ForecastCategoryTotals {
+  pipeline: bigint;
+  best_case: bigint;
+  commit: bigint;
+  closed: bigint;
+}
+
+export interface ForecastCurrencyBucket {
+  code: string;
+  totals: ForecastCategoryTotals;
+}
+
+function emptyCategoryTotals(): ForecastCategoryTotals {
+  return { pipeline: 0n, best_case: 0n, commit: 0n, closed: 0n };
+}
+
+/**
+ * Unspecified rows stay in one book. Each recorded currency gets its own
+ * totals, so a dollar commit is not added to the unspecified headline.
+ */
+export function forecastCurrencyBuckets(items: readonly Forecast[]): {
+  unspecified: ForecastCategoryTotals;
+  recorded: ForecastCurrencyBucket[];
+} {
+  const unspecified = emptyCategoryTotals();
+  const byCode = new Map<string, ForecastCategoryTotals>();
+  for (const item of items) {
+    const amount = BigInt(item.amountMicros);
+    if (isUnspecifiedForecastCurrency(item.currency)) {
+      unspecified[item.category] += amount;
+      continue;
+    }
+    const code = item.currency.trim().toUpperCase();
+    const bucket = byCode.get(code) ?? emptyCategoryTotals();
+    bucket[item.category] += amount;
+    byCode.set(code, bucket);
+  }
+  const recorded = [...byCode.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([code, totals]) => ({ code, totals }));
+  return { unspecified, recorded };
+}
+
 /** One currency for a row total. Mixed recorded currencies are not added together. */
 export function forecastRowTotalCurrency(row: ForecastRow): string | 'mixed' {
   const recorded = CATEGORIES.filter((category) => row.ids[category]);

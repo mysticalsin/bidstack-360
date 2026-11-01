@@ -4,6 +4,7 @@ import type { Forecast } from '@bidstack/shared';
 
 import {
   buildChartData,
+  forecastCurrencyBuckets,
   formatForecastAmount,
   forecastRowTotalCurrency,
   groupForecasts,
@@ -61,5 +62,30 @@ describe('forecast grouping', () => {
     expect(label).toContain('$');
     expect(label).not.toContain('unspecified');
     expect(label).not.toContain('9,007,199,254,740,992');
+  });
+
+  it('keeps a recorded currency out of the unspecified total', () => {
+    // WHY: one headline was adding a dollar commit to the unspecified book.
+    const buckets = forecastCurrencyBuckets([
+      forecast({ amountMicros: '1500000000000', currency: 'USD' }),
+      forecast({
+        id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5e',
+        category: 'pipeline',
+        amountMicros: '1000000',
+        currency: 'EUR',
+      }),
+      forecast({
+        id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5f',
+        category: 'closed',
+        amountMicros: '2000000',
+        currency: 'gbp',
+      }),
+    ]);
+    expect(buckets.unspecified.pipeline).toBe(1_000_000n);
+    expect(buckets.unspecified.commit).toBe(0n);
+    expect(buckets.recorded.map((bucket) => bucket.code)).toEqual(['GBP', 'USD']);
+    expect(buckets.recorded.find((bucket) => bucket.code === 'USD')?.totals.commit).toBe(
+      1_500_000_000_000n,
+    );
   });
 });

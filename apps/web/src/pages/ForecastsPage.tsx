@@ -25,6 +25,8 @@ import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
 import {
   buildChartData,
+  forecastCurrencyBuckets,
+  formatForecastAmount,
   groupForecasts,
   isUnspecifiedForecastCurrency,
   matchesPeriodFilter,
@@ -67,14 +69,11 @@ export function ForecastsPage() {
 
   // Headline totals for the selected period — so the page answers "what's the
   // number?" in one glance, led by Commit (the figure the bid team is held to).
-  const totals = useMemo(() => {
-    const t = { pipeline: 0n, best_case: 0n, commit: 0n, closed: 0n };
-    for (const item of filteredItems) {
-      if (!isUnspecifiedForecastCurrency(item.currency)) continue;
-      t[item.category] += BigInt(item.amountMicros);
-    }
-    return t;
-  }, [filteredItems]);
+  const currencyBuckets = useMemo(
+    () => forecastCurrencyBuckets(filteredItems),
+    [filteredItems],
+  );
+  const totals = currencyBuckets.unspecified;
 
   // ownerId identifies the row being edited — the grid shows every owner's
   // forecasts, so the write MUST carry it through or it silently overwrites the
@@ -262,6 +261,44 @@ export function ForecastsPage() {
           </div>
         ))}
       </motion.div>
+
+      {currencyBuckets.recorded.map((bucket) => (
+        <motion.div
+          key={bucket.code}
+          variants={reducedMotion ? undefined : staggerChild}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+          aria-label={t('forecasts.currencyTotals', '{{code}} forecast totals', {
+            code: bucket.code,
+          })}
+        >
+          {(
+            [
+              { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
+              { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
+              { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
+              { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
+            ] as const
+          ).map((k) => (
+            <div
+              key={k.key}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                {k.label}
+                {' · '}
+                {bucket.code}
+              </div>
+              <div
+                className={`mt-1 text-lg font-bold tabular-nums ${
+                  k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
+                }`}
+              >
+                {formatForecastAmount(bucket.totals[k.key], bucket.code)}
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      ))}
 
       {/* ── Chart (desktop only; returns null when empty) ── */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
