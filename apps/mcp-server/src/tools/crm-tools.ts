@@ -13,6 +13,7 @@ import {
 } from './crm-tools.schemas.js';
 import {
   companyIdForCustomerRename,
+  recordOpportunityStageMove,
   logoUrl,
   mintNextCode,
   normalizeDomain,
@@ -164,7 +165,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
 
 export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
   description:
-    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. Other fields do not touch the company link. Writes an audit entry.',
+    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. Other fields do not touch the company link. Writes an audit entry.',
   input: DealUpdateInput,
   inputJsonSchema: {
     type: 'object',
@@ -213,6 +214,7 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
       },
     });
 
+    await recordOpportunityStageMove(ctx.orgId, before, args.patch.stage);
     return { ...serializeDeal(updated), companyId: updated.companyId };
   },
 };

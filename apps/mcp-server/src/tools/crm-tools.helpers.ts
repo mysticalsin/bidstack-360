@@ -99,6 +99,24 @@ export async function companyIdForCustomerRename(
   return matches[0]?.id ?? null;
 }
 
+/** A real stage change. The same stage again is not a lost or won event. */
+export async function recordOpportunityStageMove(
+  orgId: string,
+  before: { id: string; stage: string },
+  nextStage: string | undefined,
+): Promise<void> {
+  if (!nextStage || nextStage === before.stage) return;
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      action: 'opportunity.stage',
+      targetType: 'opportunity',
+      targetId: before.id,
+      diff: { fromStage: before.stage, toStage: nextStage },
+    },
+  });
+}
+
 export function normalizeName(value: string) {
   return value
     .trim()

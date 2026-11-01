@@ -289,6 +289,43 @@ describeDb('MCP tools', () => {
     expect(stored).toMatchObject({ companyId: from.id, customer: `Nobody ${token}` });
   });
 
+  it('opportunity.update records a lost stage move and ignores the same stage', async () => {
+    // WHY: the deal timeline reads opportunity.stage. A Dust stage write that
+    // only stored the new value left the lost move unnamed.
+    const token = randomBytes(4).toString('hex');
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-lost-${token}`,
+        customer: 'Lost Co',
+        name: 'Lost move',
+        stage: 's4_negotiation',
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    await tools['opportunity.update'].handler(
+      { id: opp.id, patch: { stage: 'closed_lost' } },
+      ctx,
+    );
+    const moved = await prisma.auditLog.findFirst({
+      where: { orgId, targetId: opp.id, action: 'opportunity.stage' },
+      orderBy: { at: 'desc' },
+    });
+    expect(moved?.diff).toMatchObject({ fromStage: 's4_negotiation', toStage: 'closed_lost' });
+
+    await tools['crm_update_deal'].handler(
+      { id: opp.id, patch: { stage: 'closed_lost' } },
+      ctx,
+    );
+    const repeats = await prisma.auditLog.count({
+      where: { orgId, targetId: opp.id, action: 'opportunity.stage' },
+    });
+    expect(repeats).toBe(1);
+  });
+
   it('contacts.list returns empty when no contacts', async () => {
     const out = (await tools['contacts.list'].handler({ limit: 10 }, ctx)) as unknown[];
     expect(Array.isArray(out)).toBe(true);

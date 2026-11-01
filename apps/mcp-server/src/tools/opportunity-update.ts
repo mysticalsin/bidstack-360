@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { companyIdForCustomerRename } from './crm-tools.helpers.js';
+import { companyIdForCustomerRename, recordOpportunityStageMove } from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -33,7 +33,7 @@ const Input = z.object({
 
 export const opportunityUpdate: Tool<typeof Input> = {
   description:
-    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage, probability, or value change does not touch the link. Writes audit_log.',
+    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. Other fields do not touch the link. Writes audit_log.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -97,6 +97,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
         diff: patch,
       },
     });
+    await recordOpportunityStageMove(ctx.orgId, before, patch.stage);
 
     return {
       id: updated.id,
