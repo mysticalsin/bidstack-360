@@ -21,11 +21,13 @@ import type { AiInsight, CrmDashboardSnapshot } from '@bidstack/shared';
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
   accountOpportunityScopePredicate,
+  applyCompanyScope,
   applyOpportunityScope,
   type AccessScope,
 } from '../../lib/access-scope.js';
 import {
   buildCompanies,
+  companyFromRow,
   fallbackCompany,
   findSelectedCompany,
 } from './company-enrichment.service.js';
@@ -58,6 +60,22 @@ const DASHBOARD_ACTIVITY_LIMIT = 12;
 export type LoggerLike = {
   warn: (obj: unknown, msg?: string) => void;
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The Company row for `?account=` (id or exact name), honouring the access scope. */
+async function findSparseAccount(prisma: PrismaClient, orgId: string, accountId: string, scope?: AccessScope) {
+  const base = {
+    orgId,
+    deletedAt: null,
+    OR: [...(UUID.test(accountId) ? [{ id: accountId }] : []), { name: { equals: accountId, mode: 'insensitive' as const } }],
+  };
+  return prisma.company.findFirst({
+    where: scope ? applyCompanyScope(base, scope) : base,
+    select: { id: true, name: true, legalName: true, domain: true, website: true, industry: true, employeeCount: true, logoUrl: true, confidence: true, updatedAt: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+}
 
 // ─── Main orchestrator ─────────────────────────────────────────────────────────
 
@@ -313,6 +331,12 @@ export async function buildDashboardSnapshot(
   const companies = buildCompanies(opportunities, enrichments, companyRows).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
+  // A requested account with no opportunity or enrichment yet (new, imported or sparse) still
+  // gets a cockpit: read its Company row directly, within the caller's account scope.
+  if (accountId && !findSelectedCompany(companies, accountId)) {
+    const sparse = await findSparseAccount(prisma, orgId, accountId, scope);
+    if (sparse) companies.push(companyFromRow(sparse));
+  }
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
   const visibleInsights = visibleCompanyKeys

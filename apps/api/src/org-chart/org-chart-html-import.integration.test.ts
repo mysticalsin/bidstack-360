@@ -49,6 +49,7 @@ beforeAll(async () => {
   restoreAuth = useIsolatedOrgAuth(orgA.clerkOrg);
   c.map = (await prisma.company.create({ data: { orgId: orgA.orgId, name: `${TAG} Example Corp`, countryCode: 'BR' } })).id;
   c.table = (await prisma.company.create({ data: { orgId: orgA.orgId, name: `${TAG} Example Inc`, countryCode: 'US' } })).id;
+  c.dom = (await prisma.company.create({ data: { orgId: orgA.orgId, name: `${TAG} Example Bank`, domain: `example-${TAG}.com`, countryCode: 'US' } })).id;
   server = await buildServer();
   await server.ready();
 });
@@ -153,6 +154,16 @@ describe('HTML import', () => {
     const body = (await importHtml(c.table!, html, { dryRun: true })).json();
     expect(body.preview.map((r: { name: string }) => r.name)).toEqual(['Kai Own']);
     expect(body.skippedBy.map((s: { reason: string }) => s.reason)).toEqual(['own_firm', 'other_employer']);
+  });
+
+  it('a company that only contains the account name is another employer unless the email is on the account domain', async () => {
+    const html = `<table><tr><th>Name</th><th>Title</th><th>Company</th><th>Email</th></tr>
+      <tr><td>Ann Own</td><td>CEO</td><td>${TAG} Example Bank plc</td><td></td></tr>
+      <tr><td>Sam Temp</td><td>Recruiter</td><td>${TAG} Example Bank Staffing</td><td>sam@staffing-${TAG}.com</td></tr>
+      <tr><td>Lee Inside</td><td>HR lead</td><td>${TAG} Example Bank Staffing</td><td>lee@example-${TAG}.com</td></tr></table>`;
+    const body = (await importHtml(c.dom!, html, { dryRun: true })).json();
+    expect(body.preview.map((r: { name: string }) => r.name)).toEqual(['Ann Own', 'Lee Inside']);
+    expect(body.skippedBy).toEqual([expect.objectContaining({ reason: 'other_employer', count: 1 })]);
   });
 
   it('rejects an HTML file with no people (422) and an unknown manager (all or nothing)', async () => {

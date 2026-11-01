@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { cleanText, companyCore, decodeDataImage, parseOrgChartHtml, sameCompany, type StaffContext } from './html-import.js';
+import { cleanText, companyCore, decodeDataImage, isClientEmployer, parseOrgChartHtml, sameCompany, type StaffContext } from './html-import.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (n: string) => readFileSync(path.join(here, '__fixtures__', n), 'utf8');
@@ -155,6 +155,32 @@ describe('parseOrgChartHtml: staff rule (generic, every layout)', () => {
     expect(sameCompany('CI Financial Corp', 'CI Financial')).toBe(true);
     expect(sameCompany('Example Corp', 'Other Bank')).toBe(false);
     expect(sameCompany('', 'Example')).toBe(false);
+  });
+  it('does not treat a company that only contains the account name as the client', () => {
+    const acct = ['Example Corp', 'example.com'];
+    expect(isClientEmployer('Example Staffing', null, acct)).toBe(false);
+    expect(isClientEmployer('Example Staffing', 'jo@examplestaffing.com', acct)).toBe(false);
+    expect(isClientEmployer('Example Corporation', null, acct)).toBe(true); // same name after legal suffixes
+    expect(isClientEmployer('example.com', null, acct)).toBe(true);
+    // containment is enough once a second account field or the email domain backs it up
+    expect(isClientEmployer('Example Staffing', 'jo@example.com', acct)).toBe(true);
+    expect(isClientEmployer('Example Staffing', 'jo@uk.example.com', acct)).toBe(true);
+    expect(isClientEmployer('Example Staffing', null, ['Example Corp', 'Example Staffing Solutions Ltd'])).toBe(true);
+    expect(isClientEmployer('Example Staffing', null, ['Example Corp', 'example.com', 'Example Holdings'])).toBe(false);
+  });
+  it('skips "Example Staffing" people as another employer unless their email is on the account domain', () => {
+    const r = parseOrgChartHtml(
+      table([
+        ['Name', 'Company', 'Email'],
+        ['Ann One', 'Example Corp', 'ann@example.com'],
+        ['Sam Temp', 'Example Staffing', 'sam@examplestaffing.com'],
+        ['Kim Agency', 'Example Staffing', ''],
+        ['Lee Inside', 'Example Staffing', 'lee@example.com'],
+      ]),
+      ctx,
+    );
+    expect(r.people.map((p) => p.name)).toEqual(['Ann One', 'Lee Inside']);
+    expect(r.skippedBy).toEqual([expect.objectContaining({ reason: 'other_employer', count: 2 })]);
   });
 });
 
