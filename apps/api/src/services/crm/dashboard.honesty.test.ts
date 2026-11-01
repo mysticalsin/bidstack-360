@@ -150,12 +150,11 @@ describe('company revenue is not printed as dollars', () => {
     const label = formatMicrosCompact(2_000_000_000_000);
     expect(label).toBe('2M unspecified');
     expect(label).not.toMatch(/[$€]|EUR|USD/);
-    // WHY: dividing the micros number by 1e6 moved this compact figure.
-    expect(formatMicrosCompact(9_007_199_254_740_991)).toBe(
-      new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
-        9_007_199_254 + 740_991 / 1_000_000,
-      ) + ' unspecified',
-    );
+    // WHY: one compact digit turned 7,860,000 into 7.9M.
+    expect(formatMicrosCompact(7_860_000_000_000)).toBe('7.86M unspecified');
+    expect(formatMicrosCompact(12_015_000_000_000)).toBe('12,015,000 unspecified');
+    // WHY: the cent does not survive a one-digit compact of this micros value.
+    expect(formatMicrosCompact(9_007_199_254_740_991)).toBe('9,007,199,254.74 unspecified');
   });
 });
 

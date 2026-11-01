@@ -14,6 +14,7 @@ import {
   type CrmDashboardSnapshot,
   type CrmDeal,
   type DataQualityReport,
+  formatMicrosAmount,
   type ProviderHealth,
   SourceAttribution,
   type SourceAttribution as SourceAttributionType,
@@ -140,14 +141,24 @@ export function titleCase(value: string) {
 }
 
 /** Company revenue has no currency column. A dollar sign would invent one. */
-export function formatMicrosCompact(micros: number) {
-  const whole = Number.isSafeInteger(micros) ? BigInt(micros) / 1_000_000n : 0n;
-  const remainder = Number.isSafeInteger(micros) ? BigInt(micros) % 1_000_000n : 0n;
-  const units = Number(whole) + Number(remainder) / 1_000_000;
+export function formatMicrosCompact(micros: number): string {
+  if (!Number.isSafeInteger(micros)) return 'amount not readable';
+  const asBig = BigInt(micros);
+  const exact = `${formatMicrosAmount(asBig)} unspecified`;
+  const negative = asBig < 0n;
+  const abs = negative ? -asBig : asBig;
+  const whole = abs / 1_000_000n;
+  const remainder = abs % 1_000_000n;
+  if (remainder !== 0n || whole > BigInt(Number.MAX_SAFE_INTEGER)) return exact;
+  const units = Number(whole);
+  const scale =
+    units >= 1e12 ? 1e12 : units >= 1e9 ? 1e9 : units >= 1e6 ? 1e6 : units >= 1e3 ? 1e3 : 1;
+  const shown = Number((units / scale).toFixed(2)) * scale;
+  if (shown !== units) return exact;
   const compact = new Intl.NumberFormat('en', {
     notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(Number.isFinite(units) ? units : 0);
+    maximumFractionDigits: 2,
+  }).format(negative ? -units : units);
   return `${compact} unspecified`;
 }
 
