@@ -73,6 +73,7 @@ export function MomentumList({ data }: { data: PortfolioData }) {
                     {noDash(a.verdict)}
                     {a.dealsCapped ? ' · Latest 1,000 deals' : ''}
                     {a.feedsCapped ? ' · Latest 1,000 signals' : ''}
+                    {a.childrenCapped ? ' · Latest 1,000 subsidiaries' : ''}
                   </span>
                 </span>
                 <span className="sg-port-spark" aria-hidden>

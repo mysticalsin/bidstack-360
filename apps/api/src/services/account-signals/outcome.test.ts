@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { capMomentumDeals, closedAtOf, openBookMicros, recordedOutcome, toMomentumOpp, type OppRow } from './load';
+import { capMomentumDeals, closedAtOf, openBookMicros, pageIsCapped, recordedOutcome, toMomentumOpp, type OppRow } from './load';
 
 const row = (over: Partial<OppRow>): OppRow => ({
   id: 'o1',
@@ -54,6 +54,13 @@ describe('recordedOutcome', () => {
     expect(capped.capped).toBe(true);
     expect(capped.rows).toHaveLength(1000);
     expect(capMomentumDeals(rows.slice(0, 1000)).capped).toBe(false);
+  });
+
+  it('calls a full page a sample only when another row exists', () => {
+    // WHY: take 1001 is rejected by the query guard, so the extra row is a count.
+    expect(pageIsCapped(1000, 1001)).toBe(true);
+    expect(pageIsCapped(1000, 1000)).toBe(false);
+    expect(pageIsCapped(4, 4)).toBe(false);
   });
 
   it('leaves a live lost stage out of the open pipeline total', () => {

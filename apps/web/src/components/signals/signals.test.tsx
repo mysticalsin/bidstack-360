@@ -170,6 +170,12 @@ describe('Portfolio momentum', () => {
     };
     wrap(<MomentumList data={signaled} />);
     expect(screen.getByText(/Latest 1,000 signals/)).toBeTruthy();
+    const children = {
+      ...port,
+      accounts: port.accounts.map((account) => (account.companyId === 'c' ? { ...account, childrenCapped: true } : account)),
+    };
+    wrap(<MomentumList data={children} />);
+    expect(screen.getByText(/Latest 1,000 subsidiaries/)).toBeTruthy();
   });
 
   it('lists top alerts with category and Sample, linking to the account watchdog', () => {
