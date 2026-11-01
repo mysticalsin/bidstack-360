@@ -28,7 +28,8 @@ export const CompanyStrategicSignal = z.object({
   detail: z.string().nullable(),
   observedAt: z.string().datetime(),
   source: z.string().min(1),
-  confidence: z.number().min(0).max(1),
+  /** Null when Apollo returned the fact without a score. Never invent 0. */
+  confidence: z.number().min(0).max(1).nullable(),
   url: z.string().url().nullable(),
   metadata: z.record(z.unknown()).default({}),
 });
@@ -49,6 +50,8 @@ export const CompanyStrategicIntel = z.object({
   employeeTrend: z.enum(['hiring', 'contracting', 'flat', 'unknown']),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: z.number().int().nonnegative().nullable(),
+  /** Count of Apollo job postings. Null when Apollo did not return one. */
+  openJobCount: z.number().int().nonnegative().nullable().optional(),
   intentTopics: z.array(z.string()).default([]),
   hiringSignals: z.array(CompanyStrategicSignal).default([]),
   leadershipSignals: z.array(CompanyStrategicSignal).default([]),

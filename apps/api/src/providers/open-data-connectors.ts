@@ -176,7 +176,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
         'buying intent',
         'hiring signals',
         'news and funding signals with public-news cross-check',
-        'opt-in leadership title signals without emails or phone numbers',
+        'open job posting counts without phone numbers or contact leads',
       ],
     },
     {

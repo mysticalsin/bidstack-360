@@ -6,10 +6,9 @@
  *   1. CRM contacts of the account and its subsidiaries (source 'contacts').
  *   2. External meeting-intel attendees not linked to a contact, from ABC,
  *      Metis or MARS (source 'abc' / 'metis' / 'mars'), when includeMeetingAttendees.
- *   3. Apollo People API Search (source 'apollo'), when includeApollo. The
- *      search costs 0 credits; the run still refuses when the month's Apollo
- *      usage is at or over ENRICHMENT_MONTHLY_BUDGET_APOLLO, and writes a
- *      0-credit ledger row so usage reports show the call.
+ *   3. Apollo people search is not part of company enrichment. The Apollo
+ *      provider does not implement searchPeople, so includeApollo does not
+ *      request contact leads.
  *
  * Rules: the seed only ADDS nodes. Existing nodes are never changed or moved.
  * Re-running is idempotent (contactId, or source + externalRef, already on the

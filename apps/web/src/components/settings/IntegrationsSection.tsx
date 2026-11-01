@@ -288,8 +288,6 @@ function ApolloAccountIntelCard({
     'APOLLO_MCP_URL=https://...',
     'APOLLO_MCP_BEARER_TOKEN=...',
     'APOLLO_API_KEY=...',
-    'APOLLO_API_ENABLE_PEOPLE_SEARCH=true',
-    'APOLLO_API_ENABLE_PEOPLE_ENRICHMENT=false',
   ].join('\n');
 
   return (
@@ -298,7 +296,7 @@ function ApolloAccountIntelCard({
         title={t('integrations.apolloTitle', 'Apollo account intelligence')}
         caption={t(
           'integrations.apolloCaption',
-          'Feeds account cockpit fields: industry, employees, revenue, intent, hiring movement, leadership changes, technologies, and last sync freshness.',
+          'Feeds account cockpit fields: industry, employees, revenue, open jobs, intent, hiring movement, technologies, and last sync freshness.',
         )}
         action={
           <div className="flex items-center gap-2">
@@ -328,7 +326,7 @@ function ApolloAccountIntelCard({
           <p className="text-sm text-[var(--fg-secondary)]">
             {t(
               'integrations.apolloDescription',
-              'Connect Apollo MCP first for company search and get-company. Keep REST People Search on for C-level discovery; it is no-credit and does not return email or phone fields. Keep People Enrichment off unless an admin intentionally accepts credit usage.',
+              'Connect Apollo for company search and get-company. Polo stores company revenue and the open-job count. It does not request phone numbers or contact leads.',
             )}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -337,16 +335,16 @@ function ApolloAccountIntelCard({
                 t('integrations.featureAccountFieldsLabel', 'Account fields'),
                 t(
                   'integrations.featureAccountFieldsValue',
-                  'Industry, employees, revenue, tech stack',
+                  'Industry, employees, revenue, open jobs',
                 ),
               ],
               [
                 t('integrations.featureSignalsLabel', 'Signals'),
-                t('integrations.featureSignalsValue', 'Intent topics, hiring, C-level movement'),
+                t('integrations.featureSignalsValue', 'Intent topics and hiring'),
               ],
               [
                 t('integrations.featureSafetyLabel', 'Safety'),
-                t('integrations.featureSafetyValue', 'Emails and phones stripped before storage'),
+                t('integrations.featureSafetyValue', 'Phone numbers and contact leads are not stored'),
               ],
               [
                 t('integrations.featureFreshnessLabel', 'Freshness'),

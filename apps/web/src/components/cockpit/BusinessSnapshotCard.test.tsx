@@ -285,6 +285,26 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.getByTitle(/currency not recorded; not a euro forecast/)).toBeTruthy();
   });
 
+  it('shows an Apollo open-job count and leaves a missing count as No data', () => {
+    const { unmount } = render(<BusinessSnapshotCard cockpit={cockpit()} />);
+    expect(screen.getByText('Open jobs')).toBeTruthy();
+    expect(screen.getByText('No data')).toBeTruthy();
+    unmount();
+
+    render(
+      <BusinessSnapshotCard
+        cockpit={cockpit({
+          strategicIntel: {
+            ...cockpit().company.strategicIntel!,
+            openJobCount: 17,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('17')).toBeTruthy();
+    expect(screen.queryByText('No data')).toBeNull();
+  });
+
   it('does not invent a headquarters from the company name', () => {
     render(<BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: null })} />);
     expect(screen.queryByText('Oslo, Norway')).toBeNull();

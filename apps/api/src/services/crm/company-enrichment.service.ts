@@ -162,7 +162,11 @@ function parseStrategicIntel({
 
   const parsed = CompanyStrategicIntel.safeParse(apollo.strategicIntel);
   if (parsed.success) {
-    return { ...parsed.data, freshness: freshnessFor(parsed.data.lastSyncedAt) };
+    return {
+      ...parsed.data,
+      openJobCount: openJobCountFrom(parsed.data.openJobCount),
+      freshness: freshnessFor(parsed.data.lastSyncedAt),
+    };
   }
 
   const lastSyncedAt = stringDate(apollo.lastSyncedAt) ?? latestSourceDate(sourceAttribution);
@@ -193,6 +197,7 @@ function parseStrategicIntel({
     employeeTrend: 'unknown',
     employeeCount,
     annualRevenueMicros: microsToSafeNumber(annualRevenueMicros),
+    openJobCount: openJobCountFrom(record(apollo.strategicIntel).openJobCount),
     intentTopics: [],
     hiringSignals: [],
     leadershipSignals: [],
@@ -205,6 +210,11 @@ function parseStrategicIntel({
     limitations: stringArray(apollo.limitations),
     signals: [],
   };
+}
+
+/** A stored open-job count. Missing and non-integers stay null — never zero. */
+function openJobCountFrom(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 function stringDate(value: unknown): string | null {

@@ -14,10 +14,10 @@ numbers.
 - Prefer company/account tools first: Apollo MCP `search_companies` and
   `get_company`, then REST organization enrichment only when MCP is unavailable
   and a domain is known.
-- Default people-oriented tools to off:
-  - `APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH=false`
-  - `APOLLO_API_ENABLE_PEOPLE_SEARCH=false`
-  - Apollo People Enrichment is not used for account intelligence.
+- Do not request Apollo people search, contact leads, or phone numbers.
+  Company revenue is stored as integer micros. Open jobs are a count of
+  postings. A missing revenue or job count stays empty and is not scored.
+  Apollo People Enrichment is not used for account intelligence.
 - Cross-check Apollo news/funding/expansion signals against a fixed public-news
   endpoint (`APOLLO_NEWS_CROSSCHECK_ENABLED=true` by default) so strategic
   account planning is not based on a single vendor payload.

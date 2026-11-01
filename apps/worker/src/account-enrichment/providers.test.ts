@@ -268,61 +268,36 @@ it('defaultProviders orders Apollo first, Seamless second', () => {
   expect(defaultProviders({ env: {} }).map((p) => p.id)).toEqual(['apollo', 'seamless']);
 });
 
-describe('apollo people search (org chart seed)', () => {
-  it('posts one 0-credit api_search page with senior filters and maps names and titles', async () => {
-    const { calls, fetchImpl } = mockFetch([
-      {
-        body: {
-          total_entries: 3,
-          people: [
-            { id: 'p1', first_name: 'Ada', last_name_obfuscated: 'Lo***e', title: 'Chief Executive Officer', last_refreshed_at: '2026-10-01T00:00:00Z', organization: { name: 'Acme' } },
-            { id: 'p2', first_name: 'Bob', last_name_obfuscated: 'Sm***h', title: 'VP Engineering' },
-            { id: 'p3', title: 'No name' },
-          ],
+it('keeps revenue and job postings and does not request or keep phone numbers or leads', async () => {
+  const { calls, fetchImpl } = mockFetch([
+    {
+      body: {
+        organization: {
+          ...APOLLO_ORG,
+          phone: '+1-555-0100',
+          primary_phone: { number: '+1-555-0100', sanitized_number: '+15550100' },
+          numbers: ['+1-555-0199'],
+          leads: [{ name: 'Pat Prospect', email: 'pat@example.com' }],
+          people: [{ first_name: 'Ada', title: 'Chief Executive Officer' }],
         },
       },
-    ]);
-    const c = ctx();
-    const r = await createApolloProvider({ env: { APOLLO_API_KEY: KEY }, fetchImpl }).searchPeople!({ domain: 'https://www.acme.fr' }, c);
-    expect(r).toMatchObject({ status: 'ok', creditsUsed: 0 });
-    expect(r.people).toEqual([
-      { externalId: 'p1', name: 'Ada Lo***e', title: 'Chief Executive Officer', refreshedAt: '2026-10-01T00:00:00Z' },
-      { externalId: 'p2', name: 'Bob Sm***h', title: 'VP Engineering', refreshedAt: null },
-    ]);
-    expect(c.reserved).toEqual([['mixed_people.api_search', 0]]);
-    const url = new URL(calls[0]!.url);
-    expect(url.pathname).toBe('/api/v1/mixed_people/api_search');
-    expect(calls[0]!.init.method).toBe('POST');
-    expect(url.searchParams.getAll('q_organization_domains_list[]')).toEqual(['acme.fr']);
-    expect(url.searchParams.getAll('person_seniorities[]')).toEqual(['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director']);
-    expect(url.searchParams.get('per_page')).toBe('100');
-    expect((calls[0]!.init.headers as Record<string, string>)['x-api-key']).toBe(KEY);
-    expect(calls[0]!.url).not.toContain(KEY);
-  });
-
-  it('prefers the Apollo organization id, and reports 403 (key not scoped) without throwing', async () => {
-    const { calls, fetchImpl } = mockFetch([{ status: 403, body: { error: 'api_key_not_master' } }]);
-    const r = await createApolloProvider({ env: { APOLLO_API_KEY: KEY }, fetchImpl }).searchPeople!({ domain: 'acme.fr', providerCompanyId: 'ap-1' }, ctx());
-    expect(r.status).toBe('error');
-    expect(r.error).toContain('403');
-    expect(r.error).not.toContain(KEY);
-    const url = new URL(calls[0]!.url);
-    expect(url.searchParams.getAll('organization_ids[]')).toEqual(['ap-1']);
-    expect(url.searchParams.has('q_organization_domains_list[]')).toBe(false);
-  });
-
-  it('spends nothing when unconfigured, without a domain, or when the budget refuses', async () => {
-    const { calls, fetchImpl } = mockFetch([]);
-    expect((await createApolloProvider({ env: {}, fetchImpl }).searchPeople!({ domain: 'acme.fr' }, ctx())).status).toBe('not_configured');
-    expect((await createApolloProvider({ env: { APOLLO_API_KEY: KEY }, fetchImpl }).searchPeople!({ domain: null }, ctx())).status).toBe('no_domain');
-    const refuse = { reserve: async () => false };
-    expect((await createApolloProvider({ env: { APOLLO_API_KEY: KEY }, fetchImpl }).searchPeople!({ domain: 'acme.fr' }, refuse)).status).toBe('budget_exceeded');
-    expect(calls).toHaveLength(0);
-  });
-
-  it('maps 429 to rate_limited with retry-after', async () => {
-    const { fetchImpl } = mockFetch([{ status: 429, body: {}, headers: { 'retry-after': '30' } }]);
-    const r = await createApolloProvider({ env: { APOLLO_API_KEY: KEY }, fetchImpl }).searchPeople!({ domain: 'acme.fr' }, ctx());
-    expect(r).toMatchObject({ status: 'rate_limited', retryAfterMs: 30_000 });
-  });
+    },
+    {
+      body: {
+        organization_job_postings: [
+          { id: 'j1', title: 'Data Engineer', url: 'https://jobs.acme.fr/1', phone: '+1-555-0102' },
+          { id: 'p1', title: 'Chief Executive Officer', first_name: 'Ada', email: 'ada@example.com' },
+        ],
+      },
+    },
+  ]);
+  const provider = createApolloProvider({ env: { APOLLO_API_KEY: KEY }, fetchImpl });
+  expect(provider.searchPeople).toBeUndefined();
+  const result = await provider.enrich({ name: 'Acme', domain: 'acme.fr' }, ctx(10, 1));
+  expect(result.fields.annualRevenueUsd).toBe(125_000_000);
+  expect(result.jobPostings).toEqual([
+    expect.objectContaining({ externalId: 'j1', title: 'Data Engineer' }),
+  ]);
+  expect(calls.map((call) => call.url).join(' ')).not.toMatch(/mixed_people|people\/match|search_people/);
+  expect(JSON.stringify(result)).not.toMatch(/555|Pat Prospect|pat@example|ada@example|Ada/);
 });

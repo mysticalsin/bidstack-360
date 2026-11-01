@@ -8,6 +8,7 @@ import {
   cleanText,
   seniorityFromTitle,
   SENIOR,
+  microsToSafeNumber,
   stripSamplePrefix,
   themeForText,
   tierLabel,
@@ -23,6 +24,7 @@ import {
 } from '@bidstack/shared';
 
 import type { AccessScope } from '../../lib/access-scope.js';
+import { normalizeName } from '../crm/dashboard.utils.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
@@ -30,6 +32,28 @@ import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/lo
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
 
 const DAY = 86_400_000;
+
+/** Revenue micros and open-job count already stored from Apollo company enrichment. */
+async function apolloCompanyFacts(orgId: string, companyName: string): Promise<{
+  openJobCount: number | null;
+  revenueMicros: bigint | null;
+}> {
+  const row = await prisma.companyEnrichment.findFirst({
+    where: { orgId, normalizedName: normalizeName(companyName), deletedAt: null },
+    select: { annualRevenueMicros: true, providerMetadata: true },
+  });
+  if (!row) return { openJobCount: null, revenueMicros: null };
+  const metadata = row.providerMetadata;
+  const apollo =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? (metadata as { apollo?: { strategicIntel?: { openJobCount?: unknown } } }).apollo
+      : undefined;
+  const count = apollo?.strategicIntel?.openJobCount;
+  return {
+    openJobCount: typeof count === 'number' && Number.isInteger(count) && count >= 0 ? count : null,
+    revenueMicros: row.annualRevenueMicros,
+  };
+}
 const OPEN: string[] = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'];
 const RISK_KINDS = ['RESTRUCTURING', 'LAYOFFS', 'LEADERSHIP_CHANGE', 'INSOLVENCY', 'GUIDANCE_CHANGE'] as const;
 const SEN_ORDER: Seniority[] = ['c_level', 'vp', 'director', 'manager', 'ic', 'unknown'];
@@ -261,7 +285,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
   const [company, firmo, fin, rawPostings, opps, news, momentumIn, { people, lastMeeting }] = await Promise.all([
-    prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { employeeCount: true, updatedAt: true } }),
+    prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
     prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
@@ -276,6 +300,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   ]);
   const items: KeyNumber[] = [];
   const postings = rawPostings.flatMap((p) => (p.postedAt ? [{ postedAt: p.postedAt, lastSeenAt: p.lastSeenAt }] : []));
+  const apolloFacts = await apolloCompanyFacts(orgId, company.name);
   const periods = fyPeriods(fin);
   const asc = [...periods].reverse();
   const latest = periods[0];
@@ -299,6 +324,11 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
   } else if (firmo?.annualRevenueUsd) {
     items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: 'USD', value: Number(firmo.annualRevenueUsd), source: 'Enrichment cache', period: `Annual, as of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}`, anchor: 'firmographics' }));
+  } else if (apolloFacts.revenueMicros !== null && apolloFacts.revenueMicros > 0n) {
+    const value = microsToSafeNumber(apolloFacts.revenueMicros);
+    items.push(value === null
+      ? base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money_micros', source: 'Apollo', period: 'Annual company revenue', missing: 'No data' })
+      : base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money_micros', value, source: 'Apollo', period: 'Annual company revenue returned by Apollo', anchor: 'firmographics' }));
   } else items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', source: 'None', period: 'n/a', missing: finMissing }));
 
   // Margin trend.
@@ -315,7 +345,9 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const prev90 = postings.filter((p) => p.postedAt >= d180 && p.postedAt < d90).length;
   if (postings.length) {
     items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', value: openJobs, delta: pctChange(last90, prev90), deltaUnit: 'pct', series: monthly(postings.map((p) => p.postedAt), now, 6), sub: `${last90} posted in 90 days`, source: 'Job postings cache', period: 'Seen in 45 days; trend is last 90 days vs the 90 before', anchor: 'hiring-now' }));
-  } else items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', source: 'None', period: 'n/a', missing: 'No job postings tracked yet' }));
+  } else if (apolloFacts.openJobCount !== null) {
+    items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', value: apolloFacts.openJobCount, source: 'Apollo', period: 'Open job postings returned by Apollo', anchor: 'hiring-now' }));
+  } else items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', source: 'None', period: 'n/a', missing: 'No data' }));
 
   // Momentum.
   const loaded = momentumIn.get(companyId);

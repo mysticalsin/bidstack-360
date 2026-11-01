@@ -7,8 +7,9 @@
 // is configured and a domain is known.
 // Maps the response
 // to the CompanyEnrichment row keyed by (orgId, normalizedName), and writes an
-// audit log entry. People/contact tools are opt-in only; by default this worker
-// never calls Apollo people endpoints and never stores email/phone fields.
+// audit log entry. Company revenue is stored as integer micros. Open jobs are
+// a posting count. This worker never calls Apollo people or lead endpoints
+// and never stores phone numbers or contact leads.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -23,25 +24,19 @@ import { COMPANY_ENRICH_APOLLO, microsToSafeNumber, unitsToMicros } from '@bidst
 export const QUEUE_NAME = COMPANY_ENRICH_APOLLO.name;
 
 const APOLLO_ENDPOINT = 'https://api.apollo.io/api/v1/organizations/enrich';
-const APOLLO_PEOPLE_SEARCH_ENDPOINT = 'https://api.apollo.io/api/v1/mixed_people/api_search';
 const GDELT_DOC_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const APOLLO_TIMEOUT_MS = 10_000;
 const APOLLO_CONCURRENCY = 5;
 const APOLLO_COMPANY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const APOLLO_MCP_PROTOCOL_VERSION = '2025-06-18';
-const DEFAULT_EXECUTIVE_TITLES = [
-  'chief executive officer',
-  'chief financial officer',
-  'chief operating officer',
-  'chief technology officer',
-  'chief information officer',
-  'chief security officer',
-  'chief marketing officer',
-  'chief revenue officer',
-  'president',
-  'vice president',
-];
-const DEFAULT_EXECUTIVE_SENIORITIES = ['owner', 'founder', 'c_suite', 'vp', 'head'];
+const OPEN_JOB_COUNT_KEYS = [
+  'organization_num_jobs',
+  'num_job_postings',
+  'job_postings_count',
+  'organization_job_postings_count',
+  'open_jobs',
+  'open_job_count',
+] as const;
 
 export const ApolloEnrichJobData = z.object({
   orgId: z.string().uuid(),
@@ -107,13 +102,6 @@ const ApolloResponse = z
     return { organization: ApolloOrganization.parse(payload) };
   });
 
-const ApolloPeopleSearchResponse = z
-  .object({
-    people: z.array(z.unknown()).optional(),
-    contacts: z.array(z.unknown()).optional(),
-  })
-  .passthrough();
-
 const GdeltDocResponse = z
   .object({
     articles: z.array(z.unknown()).optional(),
@@ -175,6 +163,8 @@ interface ApolloStrategicIntel {
   employeeTrend: 'hiring' | 'contracting' | 'flat' | 'unknown';
   employeeCount: number | null;
   annualRevenueMicros: number | null;
+  /** Null when the company payload did not include a posting count. */
+  openJobCount: number | null;
   intentTopics: string[];
   hiringSignals: ApolloStrategicSignal[];
   leadershipSignals: ApolloStrategicSignal[];
@@ -275,6 +265,7 @@ function buildApolloStrategicIntel({
 }): ApolloStrategicIntel {
   const observedAt = now.toISOString();
   const intentTopics = extractIntentTopics(org);
+  const openJobCount = apolloOpenJobCount(org, jobPostings);
   const hiringSignals = extractHiringSignals(jobPostings, org, observedAt);
   const leadershipSignals = extractLeadershipSignals(executives, observedAt);
   const revenueSignals = extractRevenueSignals(org, annualRevenueMicros, observedAt);
@@ -314,6 +305,7 @@ function buildApolloStrategicIntel({
   const summaryParts = [
     intentTopics.length ? `${intentTopics.length} intent topic(s)` : null,
     employeeCount ? `${employeeCount.toLocaleString()} employees` : null,
+    openJobCount !== null ? `${openJobCount.toLocaleString()} open job(s)` : null,
     hiringSignals.length ? `${hiringSignals.length} hiring signal(s)` : null,
     leadershipSignals.length ? `${leadershipSignals.length} leadership signal(s)` : null,
     newsSignals.length ? `${newsSignals.length} news/funding signal(s)` : null,
@@ -328,6 +320,7 @@ function buildApolloStrategicIntel({
     employeeTrend,
     employeeCount,
     annualRevenueMicros: microsToSafeNumber(annualRevenueMicros),
+    openJobCount,
     intentTopics,
     hiringSignals,
     leadershipSignals,
@@ -338,7 +331,7 @@ function buildApolloStrategicIntel({
       : 'Apollo synced company profile; no strategic signals returned yet.',
     limitations: [
       'Apollo account intelligence follows the connected Apollo plan and tool limits; credit-sensitive enrichment is opt-in in Polo PreSales.',
-      'Emails and phone numbers are intentionally excluded from Polo PreSales Apollo account intelligence.',
+      'Phone numbers and contact leads are not requested or stored. A missing revenue or open-job count stays empty.',
     ],
     signals,
   };
@@ -465,6 +458,72 @@ function extractTechnologyStack(
     .map((name) => ({ name, source: 'apollo_io', confidence: null }));
 }
 
+/**
+ * Open-job count from the company payload Apollo already returned.
+ * A number field wins. A posting list is counted. People and leads are not.
+ * Missing data stays null so callers do not show a made-up zero.
+ */
+export function apolloOpenJobCount(org: ApolloOrganization, jobPostings?: unknown): number | null {
+  const raw = org as unknown as Record<string, unknown>;
+  for (const key of OPEN_JOB_COUNT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const count = nonNegativeInt(raw[key]);
+    if (count !== null) return count;
+  }
+  const fromContext = postingCount(jobPostings);
+  if (fromContext !== null) return fromContext;
+  return postingCount(org.job_postings);
+}
+
+function nonNegativeInt(value: unknown): number | null {
+  const n = coerceInt(value);
+  return n !== null && n >= 0 ? n : null;
+}
+
+function postingCount(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' || typeof value === 'string') return nonNegativeInt(value);
+  if (Array.isArray(value)) {
+    const postings = value.filter((row) => isJobPostingRow(record(row)));
+    return postings.length > 0 ? postings.length : null;
+  }
+  const root = record(value);
+  if (!Object.keys(root).length) return null;
+  const pagination = record(root.pagination);
+  const total =
+    nonNegativeInt(root.total_entries) ??
+    nonNegativeInt(root.total) ??
+    nonNegativeInt(root.count) ??
+    nonNegativeInt(pagination.total_entries);
+  if (total !== null) return total;
+  for (const key of ['job_postings', 'jobs', 'organization_job_postings', 'items', 'results', 'data']) {
+    if (!Object.prototype.hasOwnProperty.call(root, key)) continue;
+    const nested = postingCount(root[key]);
+    if (nested !== null) return nested;
+  }
+  return isJobPostingRow(root) ? 1 : null;
+}
+
+function isJobPostingRow(row: Record<string, unknown>): boolean {
+  if (!Object.keys(row).length || isContactLeadRow(row)) return false;
+  return firstString(row, ['title', 'job_title', 'name', 'role']) !== null;
+}
+
+/** A person or contact lead. A job title alone is not enough. */
+function isContactLeadRow(row: Record<string, unknown>): boolean {
+  return Object.keys(row).some((key) => {
+    const compact = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return (
+      compact === 'firstname' ||
+      compact === 'lastname' ||
+      compact === 'lastnameobfuscated' ||
+      compact === 'personid' ||
+      compact === 'contactid' ||
+      compact.includes('email')
+    );
+  });
+}
+
 function extractHiringSignals(
   jobPostings: unknown,
   org: ApolloOrganization,
@@ -473,6 +532,7 @@ function extractHiringSignals(
   const rows = rowsFromUnknown(jobPostings).slice(0, 10);
   const jobSignals = rows
     .map((row, index) => {
+      if (isContactLeadRow(row)) return null;
       const title = firstString(row, ['title', 'job_title', 'name', 'role']);
       if (!title) return null;
       const department = firstString(row, ['department', 'team', 'function']);
@@ -659,8 +719,6 @@ function rowsFromUnknown(value: unknown): Record<string, unknown>[] {
     'data',
     'companies',
     'organizations',
-    'people',
-    'contacts',
     'job_postings',
     'jobs',
     'articles',
@@ -744,7 +802,11 @@ function isExecutiveTitle(title: string): boolean {
 }
 
 export function sanitizeApolloPayload(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeApolloPayload);
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => !isContactLeadRow(record(item)))
+      .map(sanitizeApolloPayload);
+  }
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
@@ -755,12 +817,25 @@ export function sanitizeApolloPayload(value: unknown): unknown {
 
 function isSensitiveApolloKey(key: string): boolean {
   const normalized = key.toLowerCase();
-  return (
+  if (
     normalized.includes('email') ||
     normalized.includes('phone') ||
     normalized.includes('mobile') ||
     normalized.includes('dial') ||
-    normalized === 'contact'
+    normalized.includes('people')
+  ) {
+    return true;
+  }
+  const compact = normalized.replace(/[^a-z0-9]/g, '');
+  return (
+    compact === 'contact' ||
+    compact === 'contacts' ||
+    compact === 'number' ||
+    compact === 'numbers' ||
+    compact === 'sanitizednumber' ||
+    compact === 'rawnumber' ||
+    compact === 'lead' ||
+    compact === 'leads'
   );
 }
 
@@ -770,17 +845,6 @@ export interface CallApolloOptions {
   domain?: string;
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
-}
-
-export interface CallApolloPeopleSearchOptions {
-  apiKey: string;
-  domain: string;
-  companyName?: string;
-  fetchImpl?: typeof fetch;
-  signal?: AbortSignal;
-  perPage?: number;
-  titles?: string[];
-  seniorities?: string[];
 }
 
 export interface FetchCompanyNewsCrossCheckOptions {
@@ -807,7 +871,6 @@ interface ApolloMcpToolNames {
   searchCompanies: string;
   getCompany: string;
   getJobPostings: string;
-  searchPeople: string;
 }
 
 interface ApolloMcpCompanyIntel {
@@ -887,39 +950,6 @@ export async function callApolloEnrich(options: CallApolloOptions): Promise<Apol
   return parsed.organization;
 }
 
-export async function callApolloPeopleSearch(
-  options: CallApolloPeopleSearchOptions,
-): Promise<z.infer<typeof ApolloPeopleSearchResponse>> {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const domain = normalizeDomain(options.domain);
-  if (!domain) throw new Error('apollo people search requires a company domain');
-
-  const url = new URL(APOLLO_PEOPLE_SEARCH_ENDPOINT);
-  appendSearchParam(url, 'q_organization_domains_list[]', domain);
-  for (const seniority of options.seniorities ?? DEFAULT_EXECUTIVE_SENIORITIES) {
-    appendSearchParam(url, 'person_seniorities[]', seniority);
-  }
-  for (const title of options.titles ?? DEFAULT_EXECUTIVE_TITLES) {
-    appendSearchParam(url, 'person_titles[]', title);
-  }
-  url.searchParams.set('include_similar_titles', 'false');
-  url.searchParams.set('page', '1');
-  url.searchParams.set('per_page', String(Math.max(1, Math.min(25, options.perPage ?? 10))));
-
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: apolloApiHeaders(options.apiKey),
-    signal: options.signal ?? AbortSignal.timeout(APOLLO_TIMEOUT_MS),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`apollo /mixed_people/api_search ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  return ApolloPeopleSearchResponse.parse(await res.json());
-}
-
 export async function fetchCompanyNewsCrossCheck(
   options: FetchCompanyNewsCrossCheckOptions,
 ): Promise<{
@@ -971,23 +1001,6 @@ function quoteGdeltPhrase(value: string): string {
   return `"${value.replace(/["\\]/g, ' ').replace(/\s+/g, ' ').trim()}"`;
 }
 
-function apolloApiHeaders(apiKey: string): Record<string, string> {
-  return {
-    Accept: 'application/json',
-    'Cache-Control': 'no-cache',
-    // Apollo API docs expose Bearer credentials on reference pages. Some
-    // existing Apollo endpoints in this worker use X-Api-Key, so send both
-    // with the same secret to keep old and current auth surfaces compatible.
-    Authorization: `Bearer ${apiKey}`,
-    'X-Api-Key': apiKey,
-  };
-}
-
-function appendSearchParam(url: URL, key: string, value: string): void {
-  const trimmed = value.trim();
-  if (trimmed) url.searchParams.append(key, trimmed);
-}
-
 export async function callApolloMcpCompanyIntel(
   options: CallApolloMcpOptions,
 ): Promise<ApolloMcpCompanyIntel> {
@@ -995,7 +1008,6 @@ export async function callApolloMcpCompanyIntel(
     searchCompanies: 'search_companies',
     getCompany: 'get_company',
     getJobPostings: 'get_job_postings',
-    searchPeople: 'search_people',
     ...options.tools,
   };
   const client = new ApolloMcpClient({
@@ -1055,19 +1067,9 @@ export async function callApolloMcpCompanyIntel(
     }
   }
 
-  let executives: unknown = null;
-  if (options.includeExecutiveSearch === true && options.domain) {
-    try {
-      executives = await client.callTool(tools.searchPeople, {
-        q_organization_domains_list: [options.domain],
-        person_titles: DEFAULT_EXECUTIVE_TITLES,
-        person_seniorities: DEFAULT_EXECUTIVE_SENIORITIES,
-        limit: 10,
-      });
-    } catch {
-      executives = null;
-    }
-  }
+  // People search and contact leads are not company facts. The flag is ignored.
+  void options.includeExecutiveSearch;
+  const executives: unknown = null;
 
   return {
     organization,
@@ -1252,6 +1254,235 @@ function apolloOrganizationId(org: ApolloOrganization): string | null {
   return value === null || value === undefined ? null : String(value);
 }
 
+export async function processCompanyEnrichApolloJob(
+  data: ApolloEnrichJobData,
+  jobLog: pino.Logger,
+): Promise<{ enrichmentId: string } | { skipped: true; reason: string }> {
+  const transport = resolveApolloEnrichmentTransport({
+    hasDomain: Boolean(data.domain),
+  });
+  let organization: ApolloOrganization;
+  let syncMode: ApolloSyncMode;
+  let creditPolicy: ApolloCreditPolicy;
+  let rawMcp: Record<string, unknown> | null = null;
+  let rawNewsCrossCheck: unknown = null;
+  let jobPostings: unknown = null;
+  let executives: unknown = null;
+
+  if (transport.kind === 'mcp') {
+    const mcpIntel = await callApolloMcpCompanyIntel({
+      url: transport.url,
+      bearerToken: transport.bearerToken,
+      companyName: data.companyName,
+      ...(data.domain ? { domain: data.domain } : {}),
+      timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
+      includeCreditTools: process.env.APOLLO_MCP_ENABLE_CREDIT_TOOLS === 'true',
+      tools: {
+        searchCompanies: process.env.APOLLO_MCP_SEARCH_COMPANIES_TOOL ?? 'search_companies',
+        getCompany: process.env.APOLLO_MCP_GET_COMPANY_TOOL ?? 'get_company',
+        getJobPostings: process.env.APOLLO_MCP_GET_JOB_POSTINGS_TOOL ?? 'get_job_postings',
+      },
+    });
+    organization = mcpIntel.organization;
+    syncMode = mcpIntel.syncMode;
+    creditPolicy = mcpIntel.creditPolicy;
+    rawMcp = mcpIntel.raw;
+    jobPostings = mcpIntel.jobPostings;
+    executives = mcpIntel.executives;
+  } else if (transport.kind === 'none') {
+    jobLog.warn(
+      {
+        companyName: data.companyName,
+        hasDomain: Boolean(data.domain),
+        reason: transport.reason,
+      },
+      'Apollo enrichment is a no-op: configure complete Apollo MCP credentials, or APOLLO_API_KEY with a domain',
+    );
+    return { skipped: true, reason: transport.reason };
+  } else {
+    const domain = data.domain;
+    if (!domain) {
+      jobLog.warn(
+        { companyName: data.companyName },
+        'Apollo REST enrichment skipped because no company domain was provided',
+      );
+      return { skipped: true, reason: 'Apollo REST fallback requires a company domain' };
+    }
+    organization = await callApolloEnrich({
+      apiKey: transport.apiKey,
+      companyName: data.companyName,
+      domain,
+    });
+    syncMode = 'apollo_api_organization_enrich';
+    creditPolicy = 'uses_credits';
+  }
+
+  if (process.env.APOLLO_NEWS_CROSSCHECK_ENABLED !== 'false') {
+    try {
+      const newsDomain = data.domain ?? normalizeDomain(organization.primary_domain ?? null);
+      rawNewsCrossCheck = await fetchCompanyNewsCrossCheck({
+        companyName: data.companyName,
+        ...(newsDomain ? { domain: newsDomain } : {}),
+      });
+    } catch (err) {
+      jobLog.warn(
+        { err, companyName: data.companyName },
+        'Company news cross-check skipped; continuing with Apollo company intelligence',
+      );
+    }
+  }
+
+  const mapped = mapApolloOrganization(organization, {
+    syncMode,
+    creditPolicy,
+    jobPostings,
+    executives,
+    newsCrossCheck: rawNewsCrossCheck,
+  });
+
+  const normalizedName = normalizeName(data.companyName);
+  const sourceUrl = mapped.website ?? (mapped.domain ? `https://${mapped.domain}/` : null);
+  const nowIso = mapped.strategicIntel.lastSyncedAt;
+  const sourceAttribution = [
+    {
+      source: 'apollo_io',
+      label:
+        syncMode === 'apollo_api_organization_enrich'
+          ? 'Apollo.io organization enrichment'
+          : 'Apollo MCP company intelligence',
+      sourceUrl,
+      fetchedAt: nowIso,
+      confidence: null,
+      providerMetadata: {
+        transport: syncMode.startsWith('apollo_mcp') ? 'mcp_streamable_http' : 'rest_api',
+        endpoint: syncMode.startsWith('apollo_mcp') ? '/mcp' : APOLLO_ENDPOINT,
+        organizationName: organization.name ?? null,
+        creditPolicy,
+      },
+    },
+  ];
+  const meetingTechStack =
+    mapped.technicalStack.length > 0
+      ? [{ label: 'Apollo technologies', items: mapped.technicalStack }]
+      : undefined;
+  const apolloMetadata = {
+    provider: 'apollo_io',
+    lastSyncedAt: nowIso,
+    syncMode,
+    creditPolicy,
+    strategicIntel: mapped.strategicIntel,
+    limitations: mapped.strategicIntel.limitations,
+    rawMcp,
+    rawNewsCrossCheck: sanitizeApolloPayload(rawNewsCrossCheck),
+  };
+
+  // legal_name is NOT NULL. Apollo does not return a legal name, so the
+  // required column keeps the organization label. The company serializer
+  // still withholds that label until public facts record a legal name.
+  const tradeName = organization.name?.trim() || data.companyName;
+  const legalName = mapped.legalName?.trim() || tradeName;
+
+  const enrichment = await prisma.companyEnrichment.upsert({
+    where: { orgId_normalizedName: { orgId: data.orgId, normalizedName } },
+    create: {
+      orgId: data.orgId,
+      normalizedName,
+      legalName,
+      tradeName,
+      domain: mapped.domain ?? data.domain ?? null,
+      website: mapped.website ?? sourceUrl,
+      logoUrl: mapped.logoUrl,
+      logoSource: mapped.logoUrl ? 'manual' : null,
+      registryIds: {},
+      formerNames: mapped.formerNames,
+      industryCodes: mapped.industryCodes,
+      incorporationDate: mapped.incorporationDate,
+      employeeCount: mapped.employeeCount,
+      annualRevenueMicros: mapped.annualRevenueMicros,
+      status: 'active',
+      confidenceBps: 0,
+      sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
+      providerMetadata: {
+        apollo: apolloMetadata,
+        apolloOrganization: sanitizeApolloPayload(organization),
+        mappedIndustry: mapped.industry,
+        ...(meetingTechStack ? { meetingTechStack } : {}),
+      } as unknown as Prisma.InputJsonValue,
+      cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
+    },
+    update: {
+      ...(mapped.legalName?.trim() ? { legalName: mapped.legalName.trim() } : {}),
+      tradeName,
+      domain: mapped.domain ?? data.domain ?? null,
+      website: mapped.website ?? sourceUrl,
+      logoUrl: mapped.logoUrl,
+      logoSource: mapped.logoUrl ? 'manual' : null,
+      formerNames: mapped.formerNames,
+      industryCodes: mapped.industryCodes,
+      incorporationDate: mapped.incorporationDate,
+      employeeCount: mapped.employeeCount,
+      annualRevenueMicros: mapped.annualRevenueMicros,
+      status: 'active',
+      confidenceBps: 0,
+      sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
+      providerMetadata: {
+        apollo: apolloMetadata,
+        apolloOrganization: sanitizeApolloPayload(organization),
+        mappedIndustry: mapped.industry,
+        ...(meetingTechStack ? { meetingTechStack } : {}),
+      } as unknown as Prisma.InputJsonValue,
+      cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
+    },
+  });
+
+  const companyMatches: Prisma.CompanyWhereInput[] = [
+    { name: { equals: data.companyName, mode: 'insensitive' } },
+  ];
+  if (mapped.domain) {
+    companyMatches.push({ domain: { equals: mapped.domain, mode: 'insensitive' } });
+  }
+
+  await prisma.company.updateMany({
+    where: {
+      orgId: data.orgId,
+      deletedAt: null,
+      OR: companyMatches,
+    },
+    data: {
+      legalName: mapped.legalName ?? undefined,
+      domain: mapped.domain ?? data.domain ?? undefined,
+      website: mapped.website ?? undefined,
+      logoUrl: mapped.logoUrl ?? undefined,
+      industry: mapped.industry ?? undefined,
+      employeeCount: mapped.employeeCount ?? undefined,
+      source: 'apollo_io',
+      enrichedAt: new Date(nowIso),
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      orgId: data.orgId,
+      action: 'crm.company.enrich.apollo',
+      targetType: 'company_enrichment',
+      targetId: enrichment.id,
+      diff: {
+        companyName: data.companyName,
+        domain: mapped.domain,
+        employeeCount: mapped.employeeCount,
+        syncMode,
+        creditPolicy,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  jobLog.info(
+    { enrichmentId: enrichment.id, employees: mapped.employeeCount },
+    'apollo enrichment cache updated',
+  );
+  return { enrichmentId: enrichment.id };
+}
+
 export async function startCompanyEnrichApollo(
   connection: IORedis,
   log: pino.Logger,
@@ -1273,245 +1504,7 @@ export async function startCompanyEnrichApollo(
         jobLog.warn({ companyName: data.companyName }, 'apollo enrichment job signature rejected');
         throw new Error('Invalid Apollo enrichment job signature');
       }
-
-      const transport = resolveApolloEnrichmentTransport({
-        hasDomain: Boolean(data.domain),
-      });
-      let organization: ApolloOrganization;
-      let syncMode: ApolloSyncMode;
-      let creditPolicy: ApolloCreditPolicy;
-      let rawMcp: Record<string, unknown> | null = null;
-      let rawPeopleSearch: unknown = null;
-      let rawNewsCrossCheck: unknown = null;
-      let jobPostings: unknown = null;
-      let executives: unknown = null;
-
-      if (transport.kind === 'mcp') {
-        const mcpIntel = await callApolloMcpCompanyIntel({
-          url: transport.url,
-          bearerToken: transport.bearerToken,
-          companyName: data.companyName,
-          ...(data.domain ? { domain: data.domain } : {}),
-          timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
-          includeCreditTools: process.env.APOLLO_MCP_ENABLE_CREDIT_TOOLS === 'true',
-          includeExecutiveSearch: process.env.APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH === 'true',
-          tools: {
-            searchCompanies: process.env.APOLLO_MCP_SEARCH_COMPANIES_TOOL ?? 'search_companies',
-            getCompany: process.env.APOLLO_MCP_GET_COMPANY_TOOL ?? 'get_company',
-            getJobPostings: process.env.APOLLO_MCP_GET_JOB_POSTINGS_TOOL ?? 'get_job_postings',
-            searchPeople: process.env.APOLLO_MCP_SEARCH_PEOPLE_TOOL ?? 'search_people',
-          },
-        });
-        organization = mcpIntel.organization;
-        syncMode = mcpIntel.syncMode;
-        creditPolicy = mcpIntel.creditPolicy;
-        rawMcp = mcpIntel.raw;
-        jobPostings = mcpIntel.jobPostings;
-        executives = mcpIntel.executives;
-      } else if (transport.kind === 'none') {
-        jobLog.warn(
-          {
-            companyName: data.companyName,
-            hasDomain: Boolean(data.domain),
-            reason: transport.reason,
-          },
-          'Apollo enrichment is a no-op: configure complete Apollo MCP credentials, or APOLLO_API_KEY with a domain',
-        );
-        return { skipped: true, reason: transport.reason };
-      } else {
-        const domain = data.domain;
-        if (!domain) {
-          jobLog.warn(
-            { companyName: data.companyName },
-            'Apollo REST enrichment skipped because no company domain was provided',
-          );
-          return { skipped: true, reason: 'Apollo REST fallback requires a company domain' };
-        }
-        organization = await callApolloEnrich({
-          apiKey: transport.apiKey,
-          companyName: data.companyName,
-          domain,
-        });
-        syncMode = 'apollo_api_organization_enrich';
-        creditPolicy = 'uses_credits';
-        if (process.env.APOLLO_API_ENABLE_PEOPLE_SEARCH === 'true') {
-          try {
-            const peopleSearch = await callApolloPeopleSearch({
-              apiKey: transport.apiKey,
-              companyName: data.companyName,
-              domain,
-              perPage: Number(process.env.APOLLO_API_PEOPLE_SEARCH_PER_PAGE ?? 10),
-            });
-            rawPeopleSearch = peopleSearch;
-            executives = peopleSearch;
-          } catch (err) {
-            jobLog.warn(
-              { err, companyName: data.companyName, domain: data.domain },
-              'Apollo people search failed; continuing with company enrichment only',
-            );
-          }
-        }
-      }
-
-      if (process.env.APOLLO_NEWS_CROSSCHECK_ENABLED !== 'false') {
-        try {
-          const newsDomain = data.domain ?? normalizeDomain(organization.primary_domain ?? null);
-          rawNewsCrossCheck = await fetchCompanyNewsCrossCheck({
-            companyName: data.companyName,
-            ...(newsDomain ? { domain: newsDomain } : {}),
-          });
-        } catch (err) {
-          jobLog.warn(
-            { err, companyName: data.companyName },
-            'Company news cross-check skipped; continuing with Apollo company intelligence',
-          );
-        }
-      }
-
-      const mapped = mapApolloOrganization(organization, {
-        syncMode,
-        creditPolicy,
-        jobPostings,
-        executives,
-        newsCrossCheck: rawNewsCrossCheck,
-      });
-
-      const normalizedName = normalizeName(data.companyName);
-      const sourceUrl = mapped.website ?? (mapped.domain ? `https://${mapped.domain}/` : null);
-      const nowIso = mapped.strategicIntel.lastSyncedAt;
-      const sourceAttribution = [
-        {
-          source: 'apollo_io',
-          label:
-            syncMode === 'apollo_api_organization_enrich'
-              ? 'Apollo.io organization enrichment'
-              : 'Apollo MCP company intelligence',
-          sourceUrl,
-          fetchedAt: nowIso,
-          confidence: null,
-          providerMetadata: {
-            transport: syncMode.startsWith('apollo_mcp') ? 'mcp_streamable_http' : 'rest_api',
-            endpoint: syncMode.startsWith('apollo_mcp') ? '/mcp' : APOLLO_ENDPOINT,
-            organizationName: organization.name ?? null,
-            creditPolicy,
-          },
-        },
-      ];
-      const meetingTechStack =
-        mapped.technicalStack.length > 0
-          ? [{ label: 'Apollo technologies', items: mapped.technicalStack }]
-          : undefined;
-      const apolloMetadata = {
-        provider: 'apollo_io',
-        lastSyncedAt: nowIso,
-        syncMode,
-        creditPolicy,
-        strategicIntel: mapped.strategicIntel,
-        limitations: mapped.strategicIntel.limitations,
-        rawMcp,
-        rawPeopleSearch: sanitizeApolloPayload(rawPeopleSearch),
-        rawNewsCrossCheck: sanitizeApolloPayload(rawNewsCrossCheck),
-      };
-
-      const enrichment = await prisma.companyEnrichment.upsert({
-        where: { orgId_normalizedName: { orgId: data.orgId, normalizedName } },
-        create: {
-          orgId: data.orgId,
-          normalizedName,
-          legalName: mapped.legalName,
-          tradeName: organization.name ?? data.companyName,
-          domain: mapped.domain ?? data.domain ?? null,
-          website: mapped.website ?? sourceUrl,
-          logoUrl: mapped.logoUrl,
-          logoSource: mapped.logoUrl ? 'manual' : null,
-          registryIds: {},
-          formerNames: mapped.formerNames,
-          industryCodes: mapped.industryCodes,
-          incorporationDate: mapped.incorporationDate,
-          employeeCount: mapped.employeeCount,
-          annualRevenueMicros: mapped.annualRevenueMicros,
-          status: 'active',
-          confidenceBps: 0,
-          sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
-          providerMetadata: {
-            apollo: apolloMetadata,
-            apolloOrganization: sanitizeApolloPayload(organization),
-            mappedIndustry: mapped.industry,
-            ...(meetingTechStack ? { meetingTechStack } : {}),
-          } as unknown as Prisma.InputJsonValue,
-          cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
-        },
-        update: {
-          ...(mapped.legalName ? { legalName: mapped.legalName } : {}),
-          tradeName: organization.name ?? data.companyName,
-          domain: mapped.domain ?? data.domain ?? null,
-          website: mapped.website ?? sourceUrl,
-          logoUrl: mapped.logoUrl,
-          logoSource: mapped.logoUrl ? 'manual' : null,
-          formerNames: mapped.formerNames,
-          industryCodes: mapped.industryCodes,
-          incorporationDate: mapped.incorporationDate,
-          employeeCount: mapped.employeeCount,
-          annualRevenueMicros: mapped.annualRevenueMicros,
-          status: 'active',
-          confidenceBps: 0,
-          sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
-          providerMetadata: {
-            apollo: apolloMetadata,
-            apolloOrganization: sanitizeApolloPayload(organization),
-            mappedIndustry: mapped.industry,
-            ...(meetingTechStack ? { meetingTechStack } : {}),
-          } as unknown as Prisma.InputJsonValue,
-          cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
-        },
-      });
-
-      const companyMatches: Prisma.CompanyWhereInput[] = [
-        { name: { equals: data.companyName, mode: 'insensitive' } },
-      ];
-      if (mapped.domain) {
-        companyMatches.push({ domain: { equals: mapped.domain, mode: 'insensitive' } });
-      }
-
-      await prisma.company.updateMany({
-        where: {
-          orgId: data.orgId,
-          deletedAt: null,
-          OR: companyMatches,
-        },
-        data: {
-          legalName: mapped.legalName ?? undefined,
-          domain: mapped.domain ?? data.domain ?? undefined,
-          website: mapped.website ?? undefined,
-          logoUrl: mapped.logoUrl ?? undefined,
-          industry: mapped.industry ?? undefined,
-          employeeCount: mapped.employeeCount ?? undefined,
-          source: 'apollo_io',
-          enrichedAt: new Date(nowIso),
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          orgId: data.orgId,
-          action: 'crm.company.enrich.apollo',
-          targetType: 'company_enrichment',
-          targetId: enrichment.id,
-          diff: {
-            companyName: data.companyName,
-            domain: mapped.domain,
-            employeeCount: mapped.employeeCount,
-            syncMode,
-            creditPolicy,
-          } as Prisma.InputJsonValue,
-        },
-      });
-
-      jobLog.info(
-        { enrichmentId: enrichment.id, employees: mapped.employeeCount },
-        'apollo enrichment cache updated',
-      );
-      return { enrichmentId: enrichment.id };
+      return processCompanyEnrichApolloJob(data, jobLog);
     },
     { connection, concurrency: APOLLO_CONCURRENCY },
   );
