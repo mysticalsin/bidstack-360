@@ -716,6 +716,8 @@ export const TimelineItem = z.object({
   implication: z.enum(['OPPORTUNITY', 'RISK', 'NEUTRAL']),
   sample: z.boolean(),
   upcoming: z.boolean(),
+  /** v22.1: several market / analyst notes in one week, shown as one row. */
+  groupCount: z.number().int().optional(),
 });
 export type TimelineItem = z.infer<typeof TimelineItem>;
 
