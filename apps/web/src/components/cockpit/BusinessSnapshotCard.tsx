@@ -7,6 +7,7 @@ import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import {
   formatUnspecifiedAmount,
+  unitsFromMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { relativeTime } from '@/lib/format';
@@ -156,7 +157,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         : c.annualRevenueMicrosText && /^\d+$/.test(c.annualRevenueMicrosText)
           ? `${formatMicrosAmount(BigInt(c.annualRevenueMicrosText))} unspecified · ${UNSPECIFIED_CURRENCY_BASIS}`
           : c.annualRevenueMicros
-            ? `${formatUnspecifiedAmount(c.annualRevenueMicros / 1_000_000)} · ${UNSPECIFIED_CURRENCY_BASIS}`
+            ? `${formatUnspecifiedAmount(unitsFromMicros(c.annualRevenueMicros))} · ${UNSPECIFIED_CURRENCY_BASIS}`
             : notVerified,
       source: facts?.revenueLabel
         ? publicSource(c.sourceAttribution, t)

@@ -120,7 +120,12 @@ describe('provider health is not a configured-means-healthy probe', () => {
     process.env.SILLAGE_API_KEY = 'configured';
     process.env.GMAIL_CLIENT_ID = 'configured';
     const rows = defaultProviderHealth();
-    const openRows = ['SEC EDGAR', 'Wikidata + Wikimedia Commons', 'USAspending', 'TradingView Widgets'];
+    const openRows = [
+      'SEC EDGAR',
+      'Wikidata + Wikimedia Commons',
+      'USAspending',
+      'TradingView Widgets',
+    ];
     const configuredRows = ['Apollo Organizations', 'SAM.gov', 'Sillage Buying Signals', 'Gmail'];
     for (const provider of [...openRows, ...configuredRows]) {
       const row = rows.find((item) => item.provider === provider);
@@ -145,6 +150,12 @@ describe('company revenue is not printed as dollars', () => {
     const label = formatMicrosCompact(2_000_000_000_000);
     expect(label).toBe('2M unspecified');
     expect(label).not.toMatch(/[$€]|EUR|USD/);
+    // WHY: dividing the micros number by 1e6 moved this compact figure.
+    expect(formatMicrosCompact(9_007_199_254_740_991)).toBe(
+      new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
+        9_007_199_254 + 740_991 / 1_000_000,
+      ) + ' unspecified',
+    );
   });
 });
 
@@ -189,7 +200,9 @@ describe('deal currency is omitted when the opportunity has none', () => {
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
     expect(deal.amountMicros).toBe('8598204328457184962');
-    expect(deal.amountMicros).not.toBe(BigInt(Math.round(Number(8_598_204_328_457_184_962n))).toString());
+    expect(deal.amountMicros).not.toBe(
+      BigInt(Math.round(Number(8_598_204_328_457_184_962n))).toString(),
+    );
   });
 
   it('does not present a stored zero as a measured probability', () => {

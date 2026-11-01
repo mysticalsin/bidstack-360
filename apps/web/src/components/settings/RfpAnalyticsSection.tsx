@@ -10,7 +10,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import { formatExactUnspecified } from '@/components/dashboard/unspecified-currency';
 import { Card } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
@@ -37,9 +37,8 @@ interface RfpAnalytics {
 
 /** Linked opportunity value has no currency column. */
 export function formatLinkedOpportunityValue(micros: string): string {
-  const major = Number(micros) / 1e6;
-  if (!Number.isFinite(major)) return '—';
-  return formatUnspecifiedCompact(major);
+  if (!/^\d+$/.test(micros)) return '—';
+  return formatExactUnspecified(micros);
 }
 
 export function RfpAnalyticsSection() {

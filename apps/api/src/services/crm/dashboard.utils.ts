@@ -141,7 +141,9 @@ export function titleCase(value: string) {
 
 /** Company revenue has no currency column. A dollar sign would invent one. */
 export function formatMicrosCompact(micros: number) {
-  const units = micros / 1_000_000;
+  const whole = Number.isSafeInteger(micros) ? BigInt(micros) / 1_000_000n : 0n;
+  const remainder = Number.isSafeInteger(micros) ? BigInt(micros) % 1_000_000n : 0n;
+  const units = Number(whole) + Number(remainder) / 1_000_000;
   const compact = new Intl.NumberFormat('en', {
     notation: 'compact',
     maximumFractionDigits: 1,
@@ -235,7 +237,8 @@ export function recordedDealStage(opportunity: {
 }): z.infer<typeof CrmDeal>['stage'] {
   const stage = livePipelineStage(opportunity.pipelineStage);
   const key = stage?.key ?? opportunity.stage;
-  const lost = stage?.isLost === true || opportunity.stage === 'closed_lost' || key === 'closed_lost';
+  const lost =
+    stage?.isLost === true || opportunity.stage === 'closed_lost' || key === 'closed_lost';
   if (lost) return 'closed_lost';
   const won = stage?.isWon === true || opportunity.stage === 'closed_won' || key === 'closed_won';
   if (won) return 'closed_won';

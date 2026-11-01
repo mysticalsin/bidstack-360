@@ -8,7 +8,10 @@ import { useCompany } from '@/hooks/useCompanies';
 import { formatDate } from '@/lib/format';
 import { formatMicrosAmount, type IntelPayload } from '@bidstack/shared';
 
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  unitsFromMicros,
+} from '@/components/dashboard/unspecified-currency';
 
 import { financialHonesty, type FinancialHonesty } from './intel-honesty';
 
@@ -110,7 +113,7 @@ export function FinancialHealthCard({
       })
     : typeof recordedRevenue === 'number' && recordedRevenue > 0
       ? t('intelCards.financial.recordedRevenue', '{{formatted}} recorded on the account', {
-          formatted: formatUnspecifiedCompact(recordedRevenue / 1_000_000),
+          formatted: formatUnspecifiedCompact(unitsFromMicros(recordedRevenue)),
         })
       : label(f?.revenueAnnual);
   const hasRecordedAccountFigure =
