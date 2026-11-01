@@ -344,10 +344,17 @@ export function mapApolloFundingEvents(org: Record<string, unknown>, companyName
 }
 
 function compact(n: number): string {
-  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
-  return String(Math.round(n));
+  const oneDecimal = (scale: number, suffix: string) => {
+    const shown = (n / scale).toFixed(1);
+    return Number(shown) * scale === n ? `${shown}${suffix}` : null;
+  };
+  if (n >= 1e9) return oneDecimal(1e9, 'B') ?? n.toLocaleString('en-GB');
+  if (n >= 1e6) return oneDecimal(1e6, 'M') ?? n.toLocaleString('en-GB');
+  if (n >= 1e3) {
+    const shown = Math.round(n / 1e3);
+    if (shown * 1e3 === n) return `${shown}K`;
+  }
+  return n.toLocaleString('en-GB');
 }
 
 export function mapApolloJobPosting(row: unknown): ProviderJobPosting | null {
