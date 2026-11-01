@@ -360,6 +360,48 @@ describeDb('MCP tools', () => {
     ).rejects.toThrow(/company id/);
   });
 
+  it('leads.list filters by company id, not the company name', async () => {
+    // WHY: a matching company name is not a link. Dust asking for the
+    // account must see the linked lead and must not see the name-only row.
+    const company = await prisma.company.create({
+      data: { orgId, name: `List Lead ${randomBytes(4).toString('hex')}` },
+    });
+    const linked = (await tools['leads.create'].handler(
+      {
+        firstName: 'Ned',
+        lastName: 'Linked',
+        companyName: 'Stored label',
+        companyId: company.id,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { id: string };
+    const nameOnly = (await tools['leads.create'].handler(
+      {
+        firstName: 'Una',
+        lastName: 'Label',
+        companyName: company.name,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { id: string; companyId: string | null };
+    // The name matches one company, so create stores the link. Clear it to
+    // prove the list does not treat the name as membership.
+    await prisma.lead.update({ where: { id: nameOnly.id }, data: { companyId: null } });
+
+    const out = (await tools['leads.list'].handler({ companyId: company.id, limit: 20 }, ctx)) as Array<{
+      id: string;
+      companyId: string | null;
+    }>;
+    expect(out.map((row) => row.id)).toContain(linked.id);
+    expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
+    expect(out.every((row) => row.companyId === company.id)).toBe(true);
+  });
+
   it('leads.list returns leads for the org', async () => {
     const out = (await tools['leads.list'].handler({ limit: 10 }, ctx)) as Array<{ id: string }>;
     expect(Array.isArray(out)).toBe(true);
