@@ -46,13 +46,14 @@ export function Spark({ values, mode = 'line', hotFrom, label, width = 96, heigh
 
 /* ---------- horizontal stage bars (pipeline funnel) ---------- */
 export function StageBars({ data, format, height, onSelect }: {
-  data: Array<{ label: string; value: number; count: number }>; format: (v: number) => string; height?: number;
+  data: Array<{ label: string; value: number; count: number; amount?: string }>; format: (v: number) => string; height?: number;
   /** Pointer shortcut; callers must also offer a keyboard path (chips, table). */
   onSelect?: (label: string) => void;
 }) {
   const reduced = useReducedMotion();
   const h = height ?? Math.max(72, data.length * 44 + 16);
   const max = Math.max(...data.map((d) => d.value), 1);
+  const labeled = data.some((d) => d.amount);
   return (
     <ResponsiveContainer width="100%" height={h}>
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 64, bottom: 0, left: 0 }} barCategoryGap={10}
@@ -60,15 +61,32 @@ export function StageBars({ data, format, height, onSelect }: {
         onClick={onSelect ? (st: { activeLabel?: string | number } | null) => { if (st?.activeLabel !== undefined) onSelect(String(st.activeLabel)); } : undefined}>
         <XAxis type="number" hide domain={[0, max]} />
         <YAxis type="category" dataKey="label" width={132} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }} />
-        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<ChartTip format={format} />} />
+        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={labeled ? <StageBarTip rows={data} /> : <ChartTip format={format} />} />
         <Bar dataKey="value" name="Value" radius={[0, 4, 4, 0]} maxBarSize={28} {...anim(reduced)}
-          label={{ position: 'right', formatter: (v: unknown) => format(Number(v)), fill: 'var(--viz-muted)', fontSize: 12 }}>
+          label={{ position: 'right', formatter: (v: unknown, _e?: unknown, i?: number) => (i !== undefined && data[i]?.amount ? data[i].amount : format(Number(v))), fill: 'var(--viz-muted)', fontSize: 12 }}>
           {data.map((d, i) => (
             <Cell key={d.label} fill={`color-mix(in srgb, var(--brand-primary, #006b4f) ${90 - i * (50 / Math.max(1, data.length - 1))}%, transparent)`} />
           ))}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+function StageBarTip({ active, label, rows }: {
+  active?: boolean;
+  label?: string | number;
+  rows: Array<{ label: string; amount?: string; count: number }>;
+}) {
+  if (!active || label === undefined) return null;
+  const row = rows.find((d) => d.label === String(label));
+  if (!row) return null;
+  return (
+    <div className="viz-tip">
+      <div style={{ marginBottom: 4 }}><b>{label}</b></div>
+      <div>Value: {row.amount}</div>
+      <div>Bids: {row.count}</div>
+    </div>
   );
 }
 
