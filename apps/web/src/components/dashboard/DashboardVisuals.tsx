@@ -14,7 +14,7 @@ import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
 import {
-  accountBars, cumulativeWon, fmtCompact, pastDueOpen, stageFunnel, statusMix,
+  accountBars, cumulativeWon, fmtCompact, forecastCommitLabel, forecastPoint, pastDueOpen, stageFunnel, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
@@ -146,20 +146,24 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
 export function ForecastCard({ rows, projection, headingLevel }: {
   rows: OppRow[];
   headingLevel?: 2 | 3;
-  projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
+  projection?: { periods: Array<{ label: string; weightedMicros: string | number; wonMicros: string | number; openMicros: string | number; manualCommitMicros: string | number | null }> };
 }) {
-  const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
+  const actuals = wonByQuarter(rows).map((q) =>
+    forecastPoint({ label: q.label, wonMicros: q.wonMicros, weightedMicros: '0', openMicros: '0' }),
+  );
   const future = (projection?.periods ?? [])
-    .filter((p) => p.openMicros > 0 || p.weightedMicros > 0)
-    .map((p) => ({ label: p.label, won: p.wonMicros / 1e6, weighted: p.weightedMicros / 1e6, open: p.openMicros / 1e6 }));
+    .filter((p) => {
+      const point = forecastPoint(p);
+      return point.openLabel !== '0' || point.weightedLabel !== '0';
+    })
+    .map((p) => forecastPoint(p));
   const seen = new Set(future.map((f) => f.label));
   const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
-  const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
-  const target = commits.length ? commits[0]! / 1e6 : null;
+  const target = (projection?.periods ?? []).map((p) => forecastCommitLabel(p.manualCommitMicros)).find((label) => label != null) ?? null;
   return (
-    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
-      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
+    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${target} per quarter` : 'No target set yet · add a commit forecast to compare'}
+      summary={data.map((d) => `${d.label}: won ${d.wonLabel}${d.weighted ? `, weighted ${d.weightedLabel}` : ''}`).join('; ')}
+      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, d.wonLabel, d.weightedLabel, d.openLabel]) }}>
       <QuarterBars data={data} format={fmtCompact} />
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'var(--success, #177048)' }} />Won</li>

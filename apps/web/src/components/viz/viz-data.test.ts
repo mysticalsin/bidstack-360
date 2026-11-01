@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, forecastPoint, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -36,7 +36,10 @@ describe('viz-data', () => {
       { x: 'Q2 2026', won: 1, lost: 0, rate: 100 },
       { x: 'Q4 2026', won: 0, lost: 1, rate: 0 },
     ]);
-    expect(wonByQuarter(rows)).toEqual([{ label: 'Q1 2026', won: 200 }, { label: 'Q2 2026', won: 300 }]);
+    expect(wonByQuarter(rows)).toEqual([
+      { label: 'Q1 2026', won: 200, wonMicros: '200000000' },
+      { label: 'Q2 2026', won: 300, wonMicros: '300000000' },
+    ]);
   });
 
   it('accumulates won value by month and open value by due date', () => {
@@ -96,12 +99,30 @@ describe('viz-data', () => {
     });
     const storedOpen = row({ stage: 's2_sent', value: 0, valueMicros: '10000000', dueDate: '2026-05-01' });
     // WHY: the quarter bar and the spark added the unit number, so a stored amount of 0 units drew nothing.
-    expect(wonByQuarter([storedWon])).toEqual([{ label: 'Q1 2026', won: 200 }]);
+    expect(wonByQuarter([storedWon])).toEqual([{ label: 'Q1 2026', won: 200, wonMicros: '200000000' }]);
     expect(cumulativeWon([storedWon]).map((point) => point.y)).toEqual([0, 200]);
     expect(cumulativeOpen([storedOpen])).toEqual([0, 10]);
     expect(fmtCompact(7_860_000)).toContain('7.86');
     expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
     expect(fmtCompact(12_015_000)).toBe('12,015,000');
+    const forecast = forecastPoint({
+      label: 'Q1 2026',
+      wonMicros: '7860000000000',
+      weightedMicros: '12015000000000',
+      openMicros: '0',
+    });
+    expect(forecast.won).toBe(7_860_000);
+    expect(forecast.wonLabel).toContain('7.86');
+    expect(forecast.wonLabel).not.toMatch(/7\.9/);
+    expect(forecast.weightedLabel).toBe('12,015,000');
+    const unread = forecastPoint({
+      label: 'Q2 2026',
+      wonMicros: Number.MAX_SAFE_INTEGER + 2,
+      weightedMicros: '0',
+      openMicros: '0',
+    });
+    expect(unread.wonLabel).toBe('amount not readable');
+    expect(unread.won).toBe(0);
     expect(statusMix([row({
       stage: 's2_sent',
       pipelineStage: { isLost: true, deletedAt: '2026-02-01T00:00:00.000Z' },
