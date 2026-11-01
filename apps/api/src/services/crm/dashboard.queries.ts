@@ -26,6 +26,7 @@ import { defaultReleaseScore } from './dashboard.defaults.js';
 import {
   asProviderStatus,
   isCompanyUuid,
+  normalizeCountry,
   normalizeName,
   OPPORTUNITY_CUSTOMER_KEY_SQL,
   opportunityCustomerKeySql,
@@ -228,11 +229,31 @@ const OPP_COMPANY_SELECT = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Enrichment rows whose name, domain, or website contain the query. No query means the newest rows. */
-export function enrichmentSearchWhere(
-  orgId: string,
-  q: string | undefined,
-): Prisma.CompanyEnrichmentWhereInput {
+/**
+ * Country argument for company search.
+ * Blank stays the unfiltered search. A non-empty value that is not ISO-2
+ * matches nothing — "France" is not every country. `fr` and `FR` are one code.
+ */
+export type CompanySearchCountry =
+  | { kind: 'any' }
+  | { kind: 'none' }
+  | { kind: 'code'; code: string };
+
+export function companySearchCountry(country: string | null | undefined): CompanySearchCountry {
+  if (country == null) return { kind: 'any' };
+  const trimmed = country.trim();
+  if (!trimmed) return { kind: 'any' };
+  const code = normalizeCountry(trimmed);
+  if (!code) return { kind: 'none' };
+  return { kind: 'code', code };
+}
+
+/** Contradiction so a bad country cannot fall open into the unfiltered search. */
+function matchNoRows(orgId: string): { AND: [{ orgId: string }, { NOT: { orgId: string } }] } {
+  return { AND: [{ orgId }, { NOT: { orgId } }] };
+}
+
+function enrichmentTextWhere(orgId: string, q: string | undefined): Prisma.CompanyEnrichmentWhereInput {
   const query = q?.trim();
   return {
     orgId,
@@ -240,28 +261,94 @@ export function enrichmentSearchWhere(
     ...(query
       ? {
           OR: [
-            { tradeName: { contains: query, mode: 'insensitive' } },
-            { legalName: { contains: query, mode: 'insensitive' } },
-            { domain: { contains: query, mode: 'insensitive' } },
-            { website: { contains: query, mode: 'insensitive' } },
+            { tradeName: { contains: query, mode: 'insensitive' as const } },
+            { legalName: { contains: query, mode: 'insensitive' as const } },
+            { domain: { contains: query, mode: 'insensitive' as const } },
+            { website: { contains: query, mode: 'insensitive' as const } },
           ],
         }
       : {}),
   };
 }
 
-/** Opportunity rows whose customer contains the query, still inside the caller's scope. */
+/**
+ * Enrichment rows whose name, domain, or website contain the query.
+ * No query means the newest rows. Enrichment has no country column: a country
+ * code keeps only normalized names already recorded on Company or Opportunity.
+ * No such names, or a non-ISO country, matches nothing.
+ */
+export function enrichmentSearchWhere(
+  orgId: string,
+  q: string | undefined,
+  country?: string | null,
+  recordedNormalizedNames?: readonly string[],
+): Prisma.CompanyEnrichmentWhereInput {
+  const parsed = companySearchCountry(country);
+  if (parsed.kind === 'none') return matchNoRows(orgId);
+  const text = enrichmentTextWhere(orgId, q);
+  if (parsed.kind === 'any') return text;
+  const names = [...new Set((recordedNormalizedNames ?? []).map((name) => name.trim()).filter(Boolean))];
+  if (names.length === 0) return matchNoRows(orgId);
+  return { AND: [text, { normalizedName: { in: names } }] };
+}
+
+/**
+ * Opportunity rows whose customer contains the query, still inside the caller's scope.
+ * A country code also requires Opportunity.country or the linked Company.countryCode.
+ */
 export function opportunityCustomerSearchWhere(
   orgId: string,
   q: string | undefined,
   scope?: AccessScope,
+  country?: string | null,
 ): Prisma.OpportunityWhereInput {
+  const parsed = companySearchCountry(country);
+  if (parsed.kind === 'none') {
+    const where = matchNoRows(orgId);
+    return scope ? applyOpportunityScope(where, scope) : where;
+  }
   const query = q?.trim();
   const where: Prisma.OpportunityWhereInput = {
     orgId,
-    ...(query ? { customer: { contains: query, mode: 'insensitive' } } : {}),
+    ...(query ? { customer: { contains: query, mode: 'insensitive' as const } } : {}),
+    ...(parsed.kind === 'code'
+      ? {
+          AND: [
+            {
+              OR: [
+                { country: { equals: parsed.code, mode: 'insensitive' as const } },
+                {
+                  company: {
+                    is: {
+                      deletedAt: null,
+                      countryCode: { equals: parsed.code, mode: 'insensitive' as const },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        }
+      : {}),
   };
   return scope ? applyOpportunityScope(where, scope) : where;
+}
+
+/**
+ * buildCompanies injects Mantu whenever that name was not loaded. A country
+ * filter keeps only names the search actually recorded, and a non-ISO country
+ * keeps nothing. Omitted country returns the list unchanged.
+ */
+export function companiesMatchingRecordedCountry<T extends { name: string }>(
+  country: string | null | undefined,
+  companies: readonly T[],
+  recordedNames: readonly string[],
+): T[] {
+  const parsed = companySearchCountry(country);
+  if (parsed.kind === 'any') return [...companies];
+  if (parsed.kind === 'none') return [];
+  const recorded = new Set(recordedNames.map((name) => normalizeName(name)));
+  return companies.filter((company) => recorded.has(normalizeName(company.name)));
 }
 
 async function visibleCustomerKeys(
@@ -286,32 +373,175 @@ async function visibleCustomerKeys(
   return new Set(rows.map((row) => normalizeName(row.customer)));
 }
 
+/** normalizeName(companies.name). Same rules as OPPORTUNITY_CUSTOMER_KEY_SQL. */
+const COMPANY_NAME_KEY_SQL =
+  "trim(both '-' from regexp_replace(lower(btrim(c.name)), '[^a-z0-9]+', '-', 'g'))";
+
+type OpportunityCompanyRow = {
+  customer: string;
+  industry: string | null;
+  logoUrl: string | null;
+  updatedAt: Date;
+};
+
+function searchContainsPattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+function asUpdatedAt(value: Date | string): number {
+  return value instanceof Date ? value.getTime() : Date.parse(value);
+}
+
+/** Newest row per customer. Each input list is already capped by the search limit. */
+function mergeOpportunityCompanies(groups: OpportunityCompanyRow[][]): OpportunityCompanyRow[] {
+  const byKey = new Map<string, OpportunityCompanyRow>();
+  for (const group of groups) {
+    for (const row of group) {
+      const key = normalizeName(row.customer);
+      const existing = byKey.get(key);
+      if (!existing || asUpdatedAt(row.updatedAt) > asUpdatedAt(existing.updatedAt)) byKey.set(key, row);
+    }
+  }
+  return [...byKey.values()];
+}
+
 /**
- * Companies matching a search box. The query runs in the database. A fixed
- * page of recent deals is not the catalog.
+ * Opportunities whose customer name matches a Company row in this country,
+ * including rows that never set opportunity.companyId. Scope still applies.
  */
-export async function searchCrmCompanies(
+async function opportunityCompaniesForRecordedCountry(
   orgId: string,
   prisma: PrismaClient,
   scope: AccessScope | undefined,
   q: string | undefined,
+  code: string,
+  limit: number,
+): Promise<OpportunityCompanyRow[]> {
+  const query = q?.trim();
+  const customerSql = query
+    ? Prisma.sql`AND o.customer ILIKE ${searchContainsPattern(query)} ESCAPE '\\'`
+    : Prisma.empty;
+  const visibility = opportunityVisibilitySql(scope);
+  const customerKey = Prisma.raw(opportunityCustomerKeySql('o.customer'));
+  const companyKey = Prisma.raw(COMPANY_NAME_KEY_SQL);
+  return prisma.$queryRaw<OpportunityCompanyRow[]>(Prisma.sql`
+    SELECT customer, industry, "logoUrl", "updatedAt"
+    FROM (
+      SELECT DISTINCT ON (${customerKey})
+        o.customer AS customer,
+        o.industry AS industry,
+        o.logo_url AS "logoUrl",
+        o.updated_at AS "updatedAt"
+      FROM opportunities o
+      ${visibility.join}
+      WHERE o.org_id = ${orgId}::uuid
+        AND o.deleted_at IS NULL
+        ${customerSql}
+        AND ${customerKey} <> ''
+        AND EXISTS (
+          SELECT 1
+          FROM companies c
+          WHERE c.org_id = o.org_id
+            AND c.deleted_at IS NULL
+            AND upper(btrim(c.country_code)) = ${code}
+            AND ${companyKey} <> ''
+            AND ${companyKey} = ${customerKey}
+        )
+        ${visibility.where}
+      ORDER BY ${customerKey}, o.updated_at DESC
+    ) matched
+    ORDER BY "updatedAt" DESC
+    LIMIT ${limit}
+  `);
+}
+
+/**
+ * Enrichment normalized names that have a recorded country. The enrichment
+ * table itself has no country column, so an enrichment-only row does not match.
+ */
+async function enrichmentNamesForRecordedCountry(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope | undefined,
+  q: string | undefined,
+  code: string,
+  limit: number,
+): Promise<string[]> {
+  const query = q?.trim();
+  const textSql = query
+    ? Prisma.sql`AND (
+        e.trade_name ILIKE ${searchContainsPattern(query)} ESCAPE '\\'
+        OR e.legal_name ILIKE ${searchContainsPattern(query)} ESCAPE '\\'
+        OR e.domain ILIKE ${searchContainsPattern(query)} ESCAPE '\\'
+        OR e.website ILIKE ${searchContainsPattern(query)} ESCAPE '\\'
+      )`
+    : Prisma.empty;
+  const visibility = opportunityVisibilitySql(scope);
+  const customerKey = Prisma.raw(opportunityCustomerKeySql('o.customer'));
+  const companyKey = Prisma.raw(COMPANY_NAME_KEY_SQL);
+  const rows = await prisma.$queryRaw<Array<{ normalizedName: string }>>(Prisma.sql`
+    SELECT e.normalized_name AS "normalizedName"
+    FROM company_enrichments e
+    WHERE e.org_id = ${orgId}::uuid
+      AND e.deleted_at IS NULL
+      AND e.normalized_name <> ''
+      ${textSql}
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM companies c
+          WHERE c.org_id = e.org_id
+            AND c.deleted_at IS NULL
+            AND upper(btrim(c.country_code)) = ${code}
+            AND ${companyKey} <> ''
+            AND ${companyKey} = e.normalized_name
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM opportunities o
+          ${visibility.join}
+          WHERE o.org_id = e.org_id
+            AND o.deleted_at IS NULL
+            AND upper(btrim(o.country)) = ${code}
+            AND ${customerKey} <> ''
+            AND ${customerKey} = e.normalized_name
+            ${visibility.where}
+        )
+      )
+    ORDER BY e.updated_at DESC
+    LIMIT ${limit}
+  `);
+  return [...new Set(rows.map((row) => row.normalizedName).filter((name) => name.trim() !== ''))];
+}
+
+async function enrichmentsForRecordedCountry(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope | undefined,
+  q: string | undefined,
+  country: string | null | undefined,
+  code: string,
+  limit: number,
+) {
+  const names = await enrichmentNamesForRecordedCountry(orgId, prisma, scope, q, code, limit);
+  if (names.length === 0) return [];
+  return prisma.companyEnrichment.findMany({
+    where: enrichmentSearchWhere(orgId, q, country, names),
+    select: ENRICHMENT_SELECT,
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+  });
+}
+
+async function companiesVisibleToScope(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope | undefined,
+  opportunities: Array<{ customer: string }>,
+  enrichments: Array<{ tradeName: string | null; legalName: string }>,
+  companies: Array<z.infer<typeof CrmCompany>>,
   limit: number,
 ): Promise<Array<z.infer<typeof CrmCompany>>> {
-  const [opportunities, enrichments] = await Promise.all([
-    prisma.opportunity.findMany({
-      where: opportunityCustomerSearchWhere(orgId, q, scope),
-      select: OPP_COMPANY_SELECT,
-      orderBy: { updatedAt: 'desc' },
-      distinct: ['customer'],
-      take: limit,
-    }),
-    prisma.companyEnrichment.findMany({
-      where: enrichmentSearchWhere(orgId, q),
-      select: ENRICHMENT_SELECT,
-      orderBy: { updatedAt: 'desc' },
-      take: limit,
-    }),
-  ]);
   const restricted = scope && !scope.unrestricted;
   const visibleKeys = restricted
     ? await visibleCustomerKeys(orgId, prisma, scope, [
@@ -321,9 +551,62 @@ export async function searchCrmCompanies(
         ),
       ])
     : null;
-  return buildCompanies(opportunities, enrichments)
+  return companies
     .filter((company) => !visibleKeys || visibleKeys.has(normalizeName(company.name)))
     .slice(0, limit);
+}
+
+/**
+ * Companies matching a search box. The query runs in the database. A fixed
+ * page of recent deals is not the catalog. `country` is ISO-2; anything else
+ * that is non-empty matches nothing.
+ */
+export async function searchCrmCompanies(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope | undefined,
+  q: string | undefined,
+  limit: number,
+  country?: string | null,
+): Promise<Array<z.infer<typeof CrmCompany>>> {
+  const parsed = companySearchCountry(country);
+  if (parsed.kind === 'none') return [];
+
+  const [countryOpportunities, linkedCompanyOpportunities, enrichments] = await Promise.all([
+    prisma.opportunity.findMany({
+      where: opportunityCustomerSearchWhere(
+        orgId,
+        q,
+        scope,
+        parsed.kind === 'code' ? country : undefined,
+      ),
+      select: OPP_COMPANY_SELECT,
+      orderBy: { updatedAt: 'desc' },
+      distinct: ['customer'],
+      take: limit,
+    }),
+    parsed.kind === 'code'
+      ? opportunityCompaniesForRecordedCountry(orgId, prisma, scope, q, parsed.code, limit)
+      : Promise.resolve([]),
+    parsed.kind === 'code'
+      ? enrichmentsForRecordedCountry(orgId, prisma, scope, q, country, parsed.code, limit)
+      : prisma.companyEnrichment.findMany({
+          where: enrichmentSearchWhere(orgId, q),
+          select: ENRICHMENT_SELECT,
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+        }),
+  ]);
+  const opportunities =
+    parsed.kind === 'code'
+      ? mergeOpportunityCompanies([countryOpportunities, linkedCompanyOpportunities])
+      : countryOpportunities;
+  const built = buildCompanies(opportunities, enrichments);
+  const listed = companiesMatchingRecordedCountry(country, built, [
+    ...opportunities.map((opportunity) => opportunity.customer),
+    ...enrichments.map((enrichment) => enrichment.tradeName ?? enrichment.legalName),
+  ]);
+  return companiesVisibleToScope(orgId, prisma, scope, opportunities, enrichments, listed, limit);
 }
 
 /** Newest page of companies. This is not every company in the org. */
