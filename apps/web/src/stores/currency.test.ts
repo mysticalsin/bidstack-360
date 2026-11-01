@@ -1,12 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useCurrencyStore } from './currency';
+import { convertMicrosByRates, useCurrencyStore } from './currency';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 
 async function loadCurrency() {
   vi.resetModules();
   return import('./currency');
 }
+
+describe('convertMicrosByRates', () => {
+  it('does not snap a rate to six decimals', () => {
+    // WHY: rounding 1.1234567 to 1.123457 moved this amount by millions of micros.
+    const micros = 10_000_000_000_000n;
+    expect(convertMicrosByRates(micros, 1.1234567, 1)).toBe(8_901_099_615_143n);
+    expect(convertMicrosByRates(micros, 1.1234567, 1.1234567)).toBe(micros);
+  });
+});
 
 describe('useCurrencyStore', () => {
   beforeEach(() => {

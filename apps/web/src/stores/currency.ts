@@ -54,22 +54,38 @@ function isUsableRate(rate: unknown): rate is number {
   return typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
 }
 
-const RATE_SCALE = 1_000_000;
+/**
+ * Smallest power of ten at which both rates round back to themselves.
+ * Six decimals is not enough: 1.1234567 becomes 1.123457 and moves the result
+ * by more than a micro.
+ */
+function exactRateScale(fromRate: number, toRate: number): number | null {
+  let scale = 1;
+  let largestSafe: number | null = null;
+  for (let power = 0; power <= 15; power += 1) {
+    const fromScaled = Math.round(fromRate * scale);
+    const toScaled = Math.round(toRate * scale);
+    if (
+      !Number.isSafeInteger(fromScaled) ||
+      !Number.isSafeInteger(toScaled) ||
+      fromScaled <= 0 ||
+      toScaled <= 0
+    ) {
+      break;
+    }
+    largestSafe = scale;
+    if (fromScaled / scale === fromRate && toScaled / scale === toRate) return scale;
+    scale *= 10;
+  }
+  return largestSafe;
+}
 
 /** Nearest micros after FX. Equal scaled rates keep every digit, including the cent. */
 export function convertMicrosByRates(micros: bigint, fromRate: number, toRate: number): bigint | null {
-  const fromScaled = Math.round(fromRate * RATE_SCALE);
-  const toScaled = Math.round(toRate * RATE_SCALE);
-  if (
-    !Number.isSafeInteger(fromScaled) ||
-    !Number.isSafeInteger(toScaled) ||
-    fromScaled <= 0 ||
-    toScaled <= 0
-  ) {
-    return null;
-  }
-  const from = BigInt(fromScaled);
-  const to = BigInt(toScaled);
+  const scale = exactRateScale(fromRate, toRate);
+  if (scale == null) return null;
+  const from = BigInt(Math.round(fromRate * scale));
+  const to = BigInt(Math.round(toRate * scale));
   const negative = micros < 0n;
   const abs = negative ? -micros : micros;
   const rounded = (abs * to + from / 2n) / from;
