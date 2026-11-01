@@ -22,6 +22,7 @@ import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
+import { recordedMicros } from '@/components/dashboard/unspecified-currency';
 import { useTableSort } from '@/hooks/useTableSort';
 import { api, downloadFromApi } from '@/lib/api';
 import {
@@ -125,7 +126,7 @@ export function OpportunitiesPage() {
       name: (o: Opportunity) => o.name,
       customer: (o: Opportunity) => o.customer,
       stage: (o: Opportunity) => resolvePipelineStage(o).name,
-      value: (o: Opportunity) => o.value,
+      value: (o: Opportunity) => recordedMicros(o.value, o.valueMicros),
       probability: (o: Opportunity) => o.probability,
       dueDate: (o: Opportunity) => o.dueDate,
     }),

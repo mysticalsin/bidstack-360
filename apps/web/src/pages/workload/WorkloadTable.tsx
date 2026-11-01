@@ -20,7 +20,11 @@ import {
   TableScrollArea,
 } from '@/components/ui/Table';
 import { useTableSort } from '@/hooks/useTableSort';
-import { formatUnspecifiedCompact, unitsFromMicros } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  recordedMicros,
+  unitsFromMicros,
+} from '@/components/dashboard/unspecified-currency';
 import type { WorkloadOwner } from '@/hooks/useWorkload';
 import { capacityLevel, relativeLoad, type CapacityLevel } from './workloadConfig';
 import { OwnerDrilldown } from './OwnerDrilldown';
@@ -28,11 +32,10 @@ import { OwnerDrilldown } from './OwnerDrilldown';
 type SortKey = 'owner' | 'openBids' | 'weighted' | 'overdueTasks' | 'closing';
 
 // Module-level so useTableSort's memo sees a stable reference.
-const ACCESSORS: Record<SortKey, (o: WorkloadOwner) => string | number | null> = {
+const ACCESSORS: Record<SortKey, (o: WorkloadOwner) => string | number | bigint | null> = {
   owner: (o) => o.name ?? o.email,
   openBids: (o) => o.openBids,
-  // Number() on micros loses sub-cent precision — irrelevant for ordering.
-  weighted: (o) => Number(o.weightedValueMicros),
+  weighted: (o) => recordedMicros(0, o.weightedValueMicros),
   overdueTasks: (o) => o.overdueTasks,
   closing: (o) => o.closingWithin7Days,
 };

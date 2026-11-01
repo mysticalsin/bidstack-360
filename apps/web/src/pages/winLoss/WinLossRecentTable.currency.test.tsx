@@ -4,7 +4,7 @@
 // applies the FX rate, so a €1M bid rendered '$1M' (unconverted) instead of the
 // true '$2M' — a figure silently wrong by the full FX delta on a win/loss
 // debrief table. Fails if the cell reverts to the non-converting formatter.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -57,5 +57,29 @@ describe('WinLossRecentTable currency display', () => {
 
     expect(screen.getByText(/unspecified/)).toBeDefined();
     expect(screen.queryByText(/\$2M/)).toBeNull();
+  });
+
+  it('orders closed bids by the micros integer when the unit numbers collapse', () => {
+    // WHY: the value header used Number(valueMicros). These two bids tied,
+    // so the larger loss did not rise when the column was sorted.
+    const smaller = '9007199254740992';
+    const larger = '9007199254740993';
+    expect(Number(smaller)).toBe(Number(larger));
+    render(
+      <MemoryRouter>
+        <WinLossRecentTable
+          rows={[
+            { ...row, opportunityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Smaller bid', valueMicros: smaller },
+            { ...row, opportunityId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Larger bid', valueMicros: larger },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Sort by Value/ }));
+
+    const rows = screen.getAllByTestId(/win-loss-row-/);
+    expect(rows[0]?.textContent).toContain('Smaller bid');
+    expect(rows[1]?.textContent).toContain('Larger bid');
   });
 });

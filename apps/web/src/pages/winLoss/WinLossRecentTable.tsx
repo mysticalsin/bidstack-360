@@ -6,20 +6,23 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
-import { formatUnspecifiedCompact, unitsFromMicros } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  recordedMicros,
+  unitsFromMicros,
+} from '@/components/dashboard/unspecified-currency';
 import { useTableSort } from '@/hooks/useTableSort';
 import { REASON_LABELS } from '@/pages/winLoss/reasonLabels';
 import type { WinLossClosedRow } from '@/pages/winLoss/useWinLossAnalysis';
 
 type SortKey = 'name' | 'customer' | 'outcome' | 'reason' | 'value' | 'owner' | 'decidedAt';
 
-const ACCESSORS: Record<SortKey, (r: WinLossClosedRow) => string | number | null> = {
+const ACCESSORS: Record<SortKey, (r: WinLossClosedRow) => string | number | bigint | null> = {
   name: (r) => r.name,
   customer: (r) => r.customer,
   outcome: (r) => r.outcome,
   reason: (r) => r.reason,
-  // Precision loss past 2^53 micros is irrelevant for ordering.
-  value: (r) => Number(r.valueMicros),
+  value: (r) => recordedMicros(0, r.valueMicros),
   owner: (r) => r.ownerName,
   decidedAt: (r) => r.decidedAt,
 };

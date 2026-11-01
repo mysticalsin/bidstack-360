@@ -122,6 +122,36 @@ describe('WorkloadPage', () => {
     expect(weighted).not.toContain('14000000');
   });
 
+  it('orders desks by the micros integer when the unit numbers collapse', () => {
+    // WHY: Number(weightedValueMicros) makes these two desks a tie, so the
+    // larger book no longer leads the default weighted sort.
+    const smaller = '9007199254740992';
+    const larger = '9007199254740993';
+    expect(Number(smaller)).toBe(Number(larger));
+    hookMocks.owners = [
+      owner({
+        ownerId: '11111111-1111-4111-8111-111111111111',
+        name: 'Smaller Desk',
+        email: 'small@example.com',
+        openBids: 1,
+        weightedValueMicros: smaller,
+      }),
+      owner({
+        ownerId: '22222222-2222-4222-8222-222222222222',
+        name: 'Larger Desk',
+        email: 'large@example.com',
+        openBids: 1,
+        weightedValueMicros: larger,
+      }),
+    ];
+
+    renderPage();
+
+    const rows = screen.getAllByTestId(/workload-row-/);
+    expect(rows[0]?.textContent).toContain('Larger Desk');
+    expect(rows[1]?.textContent).toContain('Smaller Desk');
+  });
+
   it('shows the bespoke zero state that tells the lead how to light it up', () => {
     hookMocks.owners = [];
 
