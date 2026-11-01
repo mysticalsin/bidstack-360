@@ -7,6 +7,25 @@ type Logger = Pick<pino.Logger, 'debug' | 'info' | 'warn'>;
 
 const DAY_MS = 86_400_000;
 
+/**
+ * Whole UTC days from today until the renewal date. Today is 0.
+ * Ceil of the clock turns "30 days and a few hours" into 31.
+ */
+export function renewalDaysOut(target: Date, now = Date.now()): number {
+  const due = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  const at = new Date(now);
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return (due - today) / DAY_MS;
+}
+
+/** The 90/60/30 bucket for a UTC day count. Past 90 days, or already past, is not a bucket. */
+export function renewalTrigger(daysOut: number): 90 | 60 | 30 | null {
+  if (!Number.isInteger(daysOut) || daysOut < 0 || daysOut > 90) return null;
+  if (daysOut > 60) return 90;
+  if (daysOut > 30) return 60;
+  return 30;
+}
+
 function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -114,24 +133,23 @@ export async function computeAndPersistHealthScore(
 
 export async function processRenewalOpportunities(orgId: string, log: Logger): Promise<number> {
   const now = new Date();
-  const horizon = new Date(now.getTime() + 90 * DAY_MS);
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // Inclusive through the UTC date 90 days out, including a renewal later that day.
+  const horizonEnd = new Date(todayStart.getTime() + 91 * DAY_MS - 1);
   const subscriptions = await prisma.subscription.findMany({
     where: {
       orgId,
       status: 'ACTIVE',
       deletedAt: null,
-      renewalDate: { gte: now, lte: horizon },
+      renewalDate: { gte: todayStart, lte: horizonEnd },
     },
     select: { id: true, renewalDate: true, ownerId: true },
   });
 
   let created = 0;
   for (const subscription of subscriptions) {
-    const daysOut = Math.max(
-      0,
-      Math.ceil((subscription.renewalDate.getTime() - now.getTime()) / DAY_MS),
-    );
-    const trigger = daysOut > 60 ? 90 : daysOut > 30 ? 60 : 30;
+    const trigger = renewalTrigger(renewalDaysOut(subscription.renewalDate, now.getTime()));
+    if (trigger == null) continue;
     const existing = await prisma.renewalOpportunity.findFirst({
       where: {
         orgId,
