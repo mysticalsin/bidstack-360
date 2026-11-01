@@ -3,7 +3,9 @@ import { renderHook } from '@testing-library/react';
 import { microsToUnits } from '@bidstack/shared';
 
 import { convertMicrosByRates, useCurrencyStore } from './currency';
+import { useDisplayMoney } from '../hooks/useDisplayMoney';
 import { useFormatMoney } from '../hooks/useFormatMoney';
+import { formatMoney, formatMoneyMicros } from '../lib/format';
 
 async function loadCurrency() {
   vi.resetModules();
@@ -433,6 +435,25 @@ describe('useCurrencyStore', () => {
     const expected = microsToUnits(convertMicrosByRates(micros, 1, 1.1)!);
     expect(useCurrencyStore.getState().convert(fractional, 'EUR')).toBe(expected);
     expect(useCurrencyStore.getState().convert(fractional, 'EUR')).not.toBe(fractional);
+  });
+
+  it('prints a converted count past the safe unit range in full', () => {
+    // WHY: microsToUnits of this result is one unit low. The label must use the integer.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const huge = 9_007_199_254_740_992;
+    const micros = convertMicrosByRates(BigInt(huge) * 1_000_000n, 1, 1.1)!;
+    const full = formatMoneyMicros(micros, 'USD', { compact: false });
+    expect(full).not.toBe(formatMoney(microsToUnits(micros), 'USD'));
+    const { result } = renderHook(() => useDisplayMoney(huge, 'EUR'));
+    expect(result.current).toBe(full);
+    expect(result.current).toContain('9,907,919,180,215,092');
   });
 });
 

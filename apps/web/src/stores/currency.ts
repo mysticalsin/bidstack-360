@@ -40,6 +40,8 @@ interface CurrencyStore {
   enableAutoDetect: () => Promise<void>;
   fetchRates: () => Promise<void>;
   convert: (amount: number, from: string) => number;
+  /** Converted unit amount in integer micros. Null when the amount is not finite. */
+  convertAmountMicros: (amount: number, from: string) => bigint | null;
   /** FX in integer micros. An identity rate returns the stored integer. */
   convertMicros: (micros: bigint, from: string) => bigint;
 }
@@ -432,6 +434,23 @@ export const useCurrencyStore = create<CurrencyStore>()(
         return inflightRatesRequest;
       },
 
+      convertAmountMicros: (amount, from) => {
+        if (!Number.isFinite(amount)) return null;
+        const source = normalizeCurrencyCode(from);
+        if (!source) return null;
+        const negative = amount < 0;
+        const micros = unitAmountToMicros(negative ? -amount : amount);
+        if (micros == null) return null;
+        const signed = negative ? -micros : micros;
+        const { currency: to, rates } = get();
+        if (!rates?.rates || source === to) return signed;
+        const base = normalizeCurrencyCode(rates.base);
+        const fromRate = source === base ? 1 : rates.rates[source];
+        const toRate = to === base ? 1 : rates.rates[to];
+        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return signed;
+        return convertMicrosByRates(signed, fromRate, toRate);
+      },
+
       convert: (amount, from) => {
         const { currency: to, rates } = get();
         const source = normalizeCurrencyCode(from);
@@ -442,10 +461,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
         const fromRate = source === base ? 1.0 : rates.rates[source];
         const toRate = to === base ? 1.0 : rates.rates[to];
         if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return amount;
-        const negative = amount < 0;
-        const micros = unitAmountToMicros(negative ? -amount : amount);
-        if (micros == null) return amount;
-        const converted = convertMicrosByRates(negative ? -micros : micros, fromRate, toRate);
+        const converted = get().convertAmountMicros(amount, from);
         if (converted == null) return amount;
         return microsToUnits(converted);
       },
