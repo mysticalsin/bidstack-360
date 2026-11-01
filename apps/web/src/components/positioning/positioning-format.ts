@@ -31,7 +31,12 @@ export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
   if (n.value === null) return 'No data';
   switch (n.unit) {
     case 'money':
-      return fmtMoney(n.value, n.currency ?? 'USD');
+      if (!n.currency) {
+        if (!Number.isFinite(n.value)) return 'amount not readable';
+        const sign = n.value < 0 ? '-' : '';
+        return `${sign}${Math.round(Math.abs(n.value)).toLocaleString('en-GB')} unspecified`;
+      }
+      return fmtMoney(n.value, n.currency);
     case 'money_micros':
       return fmtMicros ? fmtMicros(Math.round(n.value)) : formatMoneyMicros(Math.round(n.value), undefined, { compact: true });
     case 'pct':

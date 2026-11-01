@@ -46,6 +46,8 @@ describe('positioning-format', () => {
   it('formats values, deltas and direction tones', () => {
     expect(formatValue(kn({ value: 1234 }))).toBe('1,234');
     expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1.70bn');
+    // WHY: a missing currency was printed as USD, and 7.86 million became USD 8m.
+    expect(formatValue(kn({ value: 7_860_000, unit: 'money', currency: null }))).toBe('7,860,000 unspecified');
     expect(formatValue(kn({ value: 18.34, unit: 'pct' }))).toBe('18.3%');
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');
