@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evidencePageCapped, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
+import { confirmThemeFromProbes, evidencePageCapped, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
 
 describe('evidencePageCapped', () => {
   it('names a full news or meeting page only when another row exists', () => {
@@ -36,5 +36,18 @@ describe('evidencePageCapped', () => {
     // WHY: a contains search for cloud returns cloudflare, which is not the cloud theme.
     expect(themeConfirmedByRows('cloud', [{ name: 'Cloudflare DNS', category: 'general' }])).toBe(false);
     expect(themeConfirmedByRows('cloud', [{ name: 'Cloud practice', category: 'general' }])).toBe(true);
+  });
+
+  it('keeps looking after a noisy probe word', async () => {
+    // WHY: five Cloudflare rows used to fill the cloud lookup and hide Kubernetes.
+    const words: string[] = [];
+    const confirmed = await confirmThemeFromProbes('cloud', async (word) => {
+      words.push(word);
+      if (word === 'cloud') return Array.from({ length: 5 }, () => ({ name: 'Cloudflare DNS', category: 'general' }));
+      if (word === 'kubernetes') return [{ name: 'Kubernetes landing zone', category: 'general' }];
+      return [];
+    });
+    expect(confirmed).toBe(true);
+    expect(words).toEqual(['cloud', 'kubernetes']);
   });
 });
