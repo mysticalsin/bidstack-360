@@ -392,6 +392,29 @@ describe('buildCockpit recorded facts only', () => {
     });
     expect(cockpit.keyContacts[0]?.title).toBe('Chief Information Officer');
     expect(cockpit.keyContacts[0]?.roleInDecision).toBe('buyer');
+    const capped = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [opportunity],
+      contacts: [contact],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: [
+        {
+          contactId: 'c1',
+          status: 'accepted',
+          linkLabel: 'Buyer',
+          opportunityId: 'deal-1',
+          observedAt: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      ],
+      buyingRolesCapped: true,
+    });
+    // WHY: a page of 200 accepted facts can hide a second role, so one label is not the champion.
+    expect(capped.keyContacts[0]?.roleInDecision).toBeNull();
 
     const titledOnly = buildCockpit({
       company: company({ name: 'Acme' }),
