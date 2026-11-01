@@ -203,20 +203,8 @@ jobs:
             pnpm db:seed
           fi
 
-      - name: Start API server
-        run: |
-          pnpm --filter @bidstack/api dev &
-          echo "Waiting for API..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:4000/health > /dev/null; then
-              echo "API ready after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-        env:
-          DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
-          REDIS_URL: redis://localhost:6379
+      # Do not start the API here. Playwright's webServer owns the port
+      # (E2E_API_URL). Starting both fights over :4000.
 
       - name: Run E2E shard ${{ matrix.shard }}/${{ matrix.total }}
         run: >

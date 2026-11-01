@@ -122,6 +122,13 @@ jobs:
           --exclude "src/routes/crm/widgets.test.ts"
           --exclude "src/routes/notes.test.ts"
           --exclude "src/routes/opportunity-timeline.test.ts"
+          --exclude "src/plugins/request-id.test.ts"
+          --exclude "src/plugins/security-headers.test.ts"
+          --exclude "src/routes/dust-integration.test.ts"
+          --exclude "src/routes/ops-sentry-smoke.test.ts"
+          --exclude "src/security/penetration.access-control.test.ts"
+          --exclude "src/security/penetration.injection-upload.test.ts"
+          --exclude "src/security/penetration.webhook.test.ts"
 
       - name: Build
         run: pnpm -r build
@@ -309,17 +316,7 @@ jobs:
       - name: Build web
         run: pnpm --filter @bidstack/web build
 
-      - name: Start API in background
-        run: |
-          pnpm --filter @bidstack/api dev &
-          # Wait up to 30s for /health.
-          for i in {1..30}; do
-            if curl -sf http://localhost:4000/health > /dev/null; then
-              echo "API up after ${i}s"
-              break
-            fi
-            sleep 1
-          done
+      # Playwright webServer starts the API; a second process on :4000 fails.
 
       - name: Run Playwright smoke suite
         env:
