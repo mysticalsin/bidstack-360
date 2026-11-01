@@ -264,6 +264,8 @@ export const AccountCockpitSnapshot = z.object({
   contactsCapped: z.boolean().optional(),
   /** True when recent activity is the latest 5 tasks, not every task loaded. */
   activityCapped: z.boolean().optional(),
+  /** True when the deal list is the latest page, not every opportunity on the account. */
+  dealsCapped: z.boolean().optional(),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;

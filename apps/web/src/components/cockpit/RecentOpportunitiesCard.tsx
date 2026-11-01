@@ -61,16 +61,27 @@ interface Props {
   opps?: ReturnType<typeof useOpportunities>;
   accountName?: string;
   items?: RecentOpportunityItem[];
+  /** The loaded deals are a page. An empty list is not “no bids on the account”. */
+  dealsCapped?: boolean;
 }
 
 export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   opps,
   accountName,
   items,
+  dealsCapped = false,
 }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
   const visibleItems = items ?? opps?.data?.items ?? [];
+  const shown = visibleItems.slice(0, 5);
+  const listNote =
+    visibleItems.length > shown.length
+      ? t('recentOpportunities.showing', 'Showing {{shown}} of {{total}} open bids.', {
+          shown: shown.length,
+          total: visibleItems.length,
+        })
+      : null;
   const loading = items ? false : (opps?.isLoading ?? false);
   const accountScoped = Boolean(accountName);
   return (
@@ -124,10 +135,15 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         <EmptyState
           title={
             accountScoped
-              ? t(
-                  'recentOpportunities.emptyAccountTitle',
-                  'No open opportunities for this account yet',
-                )
+              ? dealsCapped
+                ? t(
+                    'recentOpportunities.emptyCapped',
+                    'No open bids in the opportunities loaded for this account',
+                  )
+                : t(
+                    'recentOpportunities.emptyAccountTitle',
+                    'No open opportunities for this account yet',
+                  )
               : t('recentOpportunities.emptyTitle', 'No opportunities yet')
           }
           message={
@@ -140,8 +156,15 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
           }
         />
       ) : (
+        <>
+        {listNote ? <p className="text-xs text-[var(--fg-secondary)]">{listNote}</p> : null}
+        {dealsCapped ? (
+          <p className="text-xs text-[var(--fg-secondary)]">
+            {t('recentOpportunities.dealsCapped', 'More opportunities sit outside this page.')}
+          </p>
+        ) : null}
         <ul className="proto-list-flat">
-          {visibleItems.slice(0, 5).map((o, index) => (
+          {shown.map((o, index) => (
             <motion.li
               key={o.id}
               className="proto-row"
@@ -169,6 +192,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
             </motion.li>
           ))}
         </ul>
+        </>
       )}
     </Card>
   );
