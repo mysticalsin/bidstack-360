@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { storedMicros } from './crm-tools.helpers.js';
 
 const Input = z.object({
   id: z.string().uuid(),
   opportunityName: z.string().min(1).max(255).optional(),
-  opportunityValueMicros: z.number().min(0).optional(),
+  opportunityValueMicros: z.union([z.number().nonnegative(), z.string().regex(/^\d+$/)]).optional(),
   stage: z
     .enum([
       's1_lead',
@@ -31,7 +32,12 @@ export const leadsConvert: Tool<typeof Input> = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       opportunityName: { type: 'string', minLength: 1, maxLength: 255 },
-      opportunityValueMicros: { type: 'number', minimum: 0 },
+      opportunityValueMicros: {
+        anyOf: [
+          { type: 'number', minimum: 0 },
+          { type: 'string', pattern: '^\\d+$' },
+        ],
+      },
       stage: {
         type: 'string',
         enum: STAGE_OPTIONS,
@@ -65,7 +71,7 @@ export const leadsConvert: Tool<typeof Input> = {
           companyId: linked?.id ?? null,
           name: args.opportunityName ?? `${lead.companyName} — ${lead.firstName} ${lead.lastName}`,
           stage: (args.stage ?? 's1_lead') as PrismaStage,
-          valueMicros: BigInt(Math.round(args.opportunityValueMicros ?? 0)),
+          valueMicros: storedMicros(args.opportunityValueMicros),
           // 0 adds nothing to weighted pipeline. 25 used to be written for every conversion.
           probability: 0,
           industry: null,

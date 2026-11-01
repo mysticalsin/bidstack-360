@@ -117,6 +117,22 @@ export function valueToMicros(value: number | string): bigint {
   return micros;
 }
 
+/**
+ * Micros already in integer units of 1e-6. A digit string is exact. A JSON
+ * number is exact only while it is a safe integer.
+ */
+export function storedMicros(value: number | string | undefined): bigint {
+  if (value == null || value === '') return 0n;
+  if (typeof value === 'string') {
+    if (!/^\d+$/.test(value)) throw new Error('amount is not an integer number of micros');
+    return BigInt(value);
+  }
+  if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(value)) {
+    throw new Error('amount is too large to store as a JSON number; send the micros as text');
+  }
+  return BigInt(value);
+}
+
 /** Integer micros for Dust. The unit number cannot keep a large cent. */
 export function dealValueMicros(valueMicros: bigint | number | unknown): string {
   if (typeof valueMicros === 'bigint') return valueMicros.toString();
