@@ -64,7 +64,7 @@ export function formatRecordedDealAmount(
 ): string {
   if (deal.valueMicros && /^\d+$/.test(deal.valueMicros)) {
     return mode === 'compact'
-      ? formatUnspecifiedCompact(unitsFromMicros(deal.valueMicros))
+      ? unspecifiedMicrosLabel(deal.valueMicros)
       : formatMicrosAmount(asMicros(deal.valueMicros));
   }
   return mode === 'compact'

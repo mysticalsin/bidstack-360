@@ -34,6 +34,16 @@ describe('exact unspecified amounts', () => {
       '8,598,204,328,457.18',
     );
     expect(formatRecordedDealAmount({ value: 500_000 })).toBe('500,000');
+    expect(formatRecordedDealAmount({ value: 0, valueMicros: '1500000000000' }, 'compact')).toBe(
+      '1.5M unspecified',
+    );
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    expect(formatRecordedDealAmount({ value: 0, valueMicros: huge }, 'compact')).toBe(
+      '9,007,199,254,740,993 unspecified',
+    );
+    expect(formatRecordedDealAmount({ value: 0, valueMicros: huge }, 'compact')).not.toContain(
+      '9,007,199,254,740,992',
+    );
   });
 
   it('sums a stage from micros when one card has a zero unit number', () => {
