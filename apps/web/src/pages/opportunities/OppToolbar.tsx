@@ -37,13 +37,29 @@ import { formatMicrosAmount, type Opportunity, type PipelineStage } from '@bidst
  * so it stays page-derived and is labelled "(page)". It is value × stored
  * stage probability for open rows on this page.
  */
+function dealMicros(opp: Opportunity): bigint {
+  if (opp.valueMicros != null && /^\d+$/.test(opp.valueMicros)) return BigInt(opp.valueMicros);
+  return BigInt(Math.round(opp.value * 1_000_000));
+}
+
+function sumDealMicros(rows: Opportunity[], weight: boolean): bigint {
+  return rows.reduce((sum, opp) => {
+    const micros = dealMicros(opp);
+    if (!weight) return sum + micros;
+    if (opp.probability <= 0) return sum;
+    return sum + (micros * BigInt(opp.probability)) / 100n;
+  }, 0n);
+}
+
 export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
   const { t } = useTranslation('crm');
   const openOpps = opps.filter((o) => closedOutcome(o) === null);
-  const wonValue = opps
-    .filter((o) => closedOutcome(o) === 'won')
-    .reduce((acc, o) => acc + o.value, 0);
-  const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
+  const wonMicros = sumDealMicros(
+    opps.filter((o) => closedOutcome(o) === 'won'),
+    false,
+  );
+  const weightedMicros = sumDealMicros(openOpps, true);
+  const openMicros = sumDealMicros(openOpps, false);
   const currencyDetail = t('oppToolbar.kpiCurrencyBasis', UNSPECIFIED_CURRENCY_BASIS);
   const weightedDetail = t(
     'oppToolbar.kpiWeightedRevenueDetail',
@@ -69,7 +85,7 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiWeightedRevenuePage', 'Weighted (page)'),
-          value: formatUnspecifiedAmount(weighted),
+          value: formatMicrosAmount(weightedMicros),
           detail: weightedDetail,
         },
       ]
@@ -82,17 +98,17 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiRevenuePage', 'Won (page)'),
-          value: formatUnspecifiedAmount(wonValue),
+          value: formatMicrosAmount(wonMicros),
           detail: currencyDetail,
         },
         {
           label: t('oppToolbar.kpiWeightedRevenuePage', 'Weighted (page)'),
-          value: formatUnspecifiedAmount(weighted),
+          value: formatMicrosAmount(weightedMicros),
           detail: weightedDetail,
         },
         {
           label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0)),
+          value: formatMicrosAmount(openMicros),
           detail: currencyDetail,
         },
       ];

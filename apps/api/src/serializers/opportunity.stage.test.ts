@@ -29,6 +29,7 @@ describe('serializeOpportunity stage', () => {
     // WHY: Number(bigint) / 1e6 rounds this amount to the next cent.
     const micros = 8_598_204_328_457_184_962n;
     const deal = serializeOpportunity({ ...base, valueMicros: micros, pipelineStage: null });
+    expect(deal.valueMicros).toBe(micros.toString());
     expect(deal.value.toFixed(2)).toBe('8598204328457.18');
     expect(deal.value.toFixed(2)).toBe(microsToUnits(micros).toFixed(2));
   });

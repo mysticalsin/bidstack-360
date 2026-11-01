@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Opportunity } from '@bidstack/shared';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
@@ -28,6 +28,8 @@ const summary = {
   openServiceCases: 0,
   recentActivity: [],
 } satisfies OrgSummary;
+
+afterEach(cleanup);
 
 describe('OppKpiBar weighted tile', () => {
   it('names the page figure as value times stored stage probability', () => {
@@ -65,5 +67,18 @@ describe('OppKpiBar weighted tile', () => {
     );
     expect(screen.getByText('8,598,204,328,457.18')).toBeTruthy();
     expect(screen.queryByText(/457\.19/)).toBeNull();
+  });
+
+  it('weights a large page amount from integer micros', () => {
+    // WHY: value × probability in JS numbers moved this page total off the cent.
+    const open = {
+      value: 0,
+      valueMicros: '8598204328457184962',
+      probability: 100,
+      pipelineStage: null,
+      stage: 's2_sent',
+    } as Opportunity;
+    render(<OppKpiBar opps={[open]} summary={summary} />);
+    expect(screen.getByText('8,598,204,328,457.18')).toBeTruthy();
   });
 });

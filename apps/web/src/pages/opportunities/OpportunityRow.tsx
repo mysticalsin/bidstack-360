@@ -27,6 +27,7 @@ import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { celebratesWonMove, isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
 import { storedProbabilityLabel } from '@/lib/stored-probability';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -209,7 +210,11 @@ export const Row = memo(function Row({
           min={0}
           align="right"
           isSaving={saving.value}
-          format={(v) => `${formatUnspecifiedAmount(v)} unspecified`}
+          format={(v) =>
+            opp.valueMicros
+              ? `${formatMicrosAmount(BigInt(opp.valueMicros))} unspecified`
+              : `${formatUnspecifiedAmount(v)} unspecified`
+          }
           onSave={(next) => {
             startSave('value');
             patch.mutate(

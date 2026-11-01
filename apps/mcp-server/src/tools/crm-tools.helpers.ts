@@ -104,6 +104,15 @@ export function dealValueUnits(valueMicros: bigint | number | unknown): number {
   return 0;
 }
 
+/** Integer micros for Dust. The unit number cannot keep a large cent. */
+export function dealValueMicros(valueMicros: bigint | number | unknown): string {
+  if (typeof valueMicros === 'bigint') return valueMicros.toString();
+  if (typeof valueMicros === 'number' && Number.isFinite(valueMicros)) {
+    return BigInt(Math.trunc(valueMicros)).toString();
+  }
+  return '0';
+}
+
 /** A blank probability is stored as 0. Dust should not read that as a measured chance. */
 export function recordedProbability(probability: number): number | null {
   return probability === 0 ? null : probability;
@@ -142,6 +151,7 @@ export function serializeDeal(deal: {
     name: deal.name,
     stage: deal.stage,
     value: dealValueUnits(deal.valueMicros),
+    valueMicros: dealValueMicros(deal.valueMicros),
     probability: recordedProbability(deal.probability),
     dueDate: deal.dueDate?.toISOString().slice(0, 10) ?? null,
     industry: deal.industry,

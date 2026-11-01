@@ -5,6 +5,7 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import type { Tool } from './index.js';
 import {
   dealOutcome,
+  dealValueMicros,
   dealValueUnits,
   liveStageName,
   outcomeWhere,
@@ -105,6 +106,7 @@ export const opportunitiesList: Tool<typeof Input> = {
       stageName: liveStageName(o.stage, o.pipelineStage),
       outcome: dealOutcome(o),
       value: dealValueUnits(o.valueMicros),
+      valueMicros: dealValueMicros(o.valueMicros),
       probability: recordedProbability(o.probability),
       // Opportunity has no currency column. Do not label the value as EUR.
       currency: null,

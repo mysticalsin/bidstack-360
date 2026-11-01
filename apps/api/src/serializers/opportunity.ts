@@ -84,6 +84,10 @@ export function serializeOpportunity(
     pipelineStageId: stageRemoved ? null : (o.pipelineStageId ?? null),
     pipelineStage: liveStage,
     value: microsToUnits(o.valueMicros),
+    valueMicros:
+      typeof o.valueMicros === 'bigint'
+        ? o.valueMicros.toString()
+        : BigInt(Math.trunc(o.valueMicros)).toString(),
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,

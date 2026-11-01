@@ -64,6 +64,8 @@ export const Opportunity = z.object({
   pipelineStageId: z.string().uuid().nullable(),
   pipelineStage: PipelineStage.nullable(),
   value: z.number().nonnegative().max(1_000_000_000_000),
+  /** Integer micros. The unit number cannot keep a cent past a safe integer. */
+  valueMicros: z.string().regex(/^\d+$/).optional(),
   probability: z.number().int().min(0).max(100),
   dueDate: z.string().date().nullable(),
   owner: z.string().email().nullable(),
@@ -88,6 +90,7 @@ export const OpportunityCreate = Opportunity.omit({
   viewCount: true,
   territoryName: true,
   pipelineStage: true,
+  valueMicros: true,
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
@@ -105,6 +108,7 @@ export const OpportunityPatch = Opportunity.partial().omit({
   viewCount: true,
   territoryName: true,
   pipelineStage: true,
+  valueMicros: true,
 }).extend({
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and
