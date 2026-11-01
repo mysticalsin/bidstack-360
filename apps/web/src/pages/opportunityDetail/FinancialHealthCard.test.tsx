@@ -28,10 +28,14 @@ describe('FinancialHealthCard', () => {
   it('shows the account headcount and leaves unrecorded lines unknown', () => {
     // WHY: the deal card used to say unknown for headcount even when the
     // linked company had a stored count. That count is not a market probe.
-    useCompany.mockReturnValue({ data: { employeeCount: 2500, name: 'CI Financial' } });
+    useCompany.mockReturnValue({
+      data: { employeeCount: 2500, name: 'CI Financial', annualRevenueMicros: 1_200_000_000_000_000 },
+    });
     render(<FinancialHealthCard intel={{} as IntelPayload} companyId="company-1" />);
 
     expect(screen.getByText('2,500 recorded on the account')).toBeTruthy();
+    expect(screen.getByText(/1\.2B unspecified recorded on the account/)).toBeTruthy();
+    expect(screen.queryByText(/\$|€/)).toBeNull();
     expect(screen.getAllByText('unknown').length).toBeGreaterThan(0);
     expect(screen.queryByText(/market cap/i)).toBeTruthy();
     expect(useCompany).toHaveBeenCalledWith('company-1');

@@ -2,6 +2,8 @@ import { prisma } from '@bidstack/db';
 import { type Company, type CompanyDetail } from '@bidstack/shared';
 import { type z } from 'zod';
 
+import { normalizeName } from '../services/crm/dashboard.utils.js';
+
 export function serializeCompany(c: {
   id: string;
   orgId: string;
@@ -87,14 +89,34 @@ export async function serializeCompanyDetail(
     children?: Array<{ id: string; name: string }>;
   },
 ): Promise<z.infer<typeof CompanyDetail>> {
-  const customFieldValues = await prisma.customFieldValue.findMany({
-    where: { orgId: c.orgId, entityType: 'company', entityId: c.id },
-    select: { id: true, definitionId: true, value: true },
-    take: 100, // query-guard requires a bound; matches contacts/opps/leads
-  });
+  const companyKey = normalizeName(c.name);
+  const [customFieldValues, enrichment, revenueOverride] = await Promise.all([
+    prisma.customFieldValue.findMany({
+      where: { orgId: c.orgId, entityType: 'company', entityId: c.id },
+      select: { id: true, definitionId: true, value: true },
+      take: 100, // query-guard requires a bound; matches contacts/opps/leads
+    }),
+    prisma.companyEnrichment.findFirst({
+      where: { orgId: c.orgId, deletedAt: null, normalizedName: companyKey },
+      select: { annualRevenueMicros: true },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    prisma.companyFieldOverride.findFirst({
+      where: { orgId: c.orgId, companyKey, fieldKey: 'annualRevenueMicros' },
+      select: { value: true },
+    }),
+  ]);
+  const overrideMicros =
+    revenueOverride && typeof revenueOverride.value === 'number' && revenueOverride.value > 0
+      ? revenueOverride.value
+      : null;
+  const storedMicros = enrichment?.annualRevenueMicros;
+  const annualRevenueMicros =
+    overrideMicros ?? (storedMicros == null ? null : Number(storedMicros));
 
   return {
     ...serializeCompany(c),
+    annualRevenueMicros,
     contacts: c.contacts.map((x) => ({ ...x, email: x.email ?? null, phone: x.phone ?? null })),
     opportunities: c.opportunities.map((x) => ({
       ...x,

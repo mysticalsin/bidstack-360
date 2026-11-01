@@ -8,6 +8,8 @@ import { useCompany } from '@/hooks/useCompanies';
 import { formatDate } from '@/lib/format';
 import type { IntelPayload } from '@bidstack/shared';
 
+import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+
 import { financialHonesty, type FinancialHonesty } from './intel-honesty';
 
 // ── tiny utility used by all financial rows ──────────────────────────────────
@@ -85,6 +87,7 @@ export function FinancialHealthCard({
   const { t } = useTranslation('crm');
   const company = useCompany(companyId ?? undefined);
   const recordedHeadcount = company.data?.employeeCount;
+  const recordedRevenue = company.data?.annualRevenueMicros;
   // The financial block has no source receipt. A stored number is a proxy;
   // a provider name or raw object is not a query we ran. Headcount on the
   // linked company is the account record, not a market probe.
@@ -95,15 +98,24 @@ export function FinancialHealthCard({
           formatted: recordedHeadcount.toLocaleString('en-US'),
         })
       : label(f?.headcount);
+  const revenue =
+    typeof recordedRevenue === 'number' && recordedRevenue > 0
+      ? t('intelCards.financial.recordedRevenue', '{{formatted}} recorded on the account', {
+          formatted: formatUnspecifiedCompact(recordedRevenue / 1_000_000),
+        })
+      : label(f?.revenueAnnual);
+  const hasRecordedAccountFigure =
+    typeof recordedHeadcount === 'number' ||
+    (typeof recordedRevenue === 'number' && recordedRevenue > 0);
   return (
     <Card>
       <SectionHeader
         title={t('intelCards.financial.title', 'Financial health')}
         caption={
-          typeof recordedHeadcount === 'number'
+          hasRecordedAccountFigure
             ? t(
                 'intelCards.financial.recordedCaption',
-                'Headcount is stored on the account. The other lines have no recorded source.',
+                'Headcount and revenue are the figures stored on the account. The other lines have no recorded source.',
               )
             : f
               ? t('intelCards.financial.sourceNotProbed', 'source not probed')
@@ -112,7 +124,7 @@ export function FinancialHealthCard({
       />
       <div className="p-5 space-y-3 text-sm">
         <Row label={t('intelCards.financial.marketCap', 'Market cap')} value={label(f?.marketCap)} />
-        <Row label={t('intelCards.financial.revenueTtm', 'Revenue (TTM)')} value={label(f?.revenueAnnual)} />
+        <Row label={t('intelCards.financial.revenueTtm', 'Revenue (TTM)')} value={revenue} />
         <Row label={t('intelCards.financial.growth', 'Growth')} value={label(f?.revenueGrowth)} />
         <Row
           label={t('intelCards.financial.ebitdaMargin', 'EBITDA margin')}
