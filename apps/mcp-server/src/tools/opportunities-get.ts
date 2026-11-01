@@ -15,9 +15,17 @@ const Input = z
   })
   .refine((v) => v.id || v.code, { message: 'Provide either id or code' });
 
+function stageWords(stage: string): string {
+  return stage
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export const opportunitiesGet: Tool<typeof Input> = {
   description:
-    'Fetch one opportunity with full intel payload (financials, triggers, decision unit, competitors, news, hiring, win prediction).',
+    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the label. currency is null and currencyBasis is unspecified. probability is win likelihood, not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -36,6 +44,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
       },
       include: {
         owner: true,
+        pipelineStage: { select: { name: true } },
         tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
         documents: { orderBy: { createdAt: 'desc' }, take: 50 },
       },
@@ -45,9 +54,15 @@ export const opportunitiesGet: Tool<typeof Input> = {
       id: opp.id,
       code: opp.code,
       customer: opp.customer,
+      companyId: opp.companyId,
       name: opp.name,
       stage: opp.stage,
+      stageName: opp.pipelineStage?.name?.trim() || stageWords(opp.stage),
       value: Number(opp.valueMicros) / 1_000_000,
+      currency: null,
+      currencyBasis: 'unspecified' as const,
+      health: 'not_account_health' as const,
+      healthNote: 'Probability is win likelihood for this opportunity, not account health.',
       probability: opp.probability,
       dueDate: opp.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: opp.owner?.email ?? null,

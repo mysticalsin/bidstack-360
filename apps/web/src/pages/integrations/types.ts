@@ -128,7 +128,7 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
   {
     group: 'legacy',
     name: 'opportunities.get',
-    desc: 'Fetch one opportunity with related CRM context.',
+    desc: 'Fetch one opportunity by company id. The amount has no recorded currency.',
   },
   { group: 'legacy', name: 'opportunity.update', desc: 'Patch fields and write audit log.' },
   { group: 'legacy', name: 'contacts.list', desc: 'List people linked to one company by company id.' },

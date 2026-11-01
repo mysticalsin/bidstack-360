@@ -176,6 +176,41 @@ describeDb('MCP tools', () => {
     ).rejects.toThrow(/not found/i);
   });
 
+  it('opportunities.get returns the company link and does not name a currency', async () => {
+    // WHY: Dust reading one deal saw a customer string and a bare number.
+    // The company id is the link, and the amount has no recorded currency.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Get Co ${randomBytes(4).toString('hex')}` },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: 'Stored label',
+        companyId: company.id,
+        name: 'Linked get',
+        stage: 's3_technical_iteration',
+        valueMicros: 1_240_000_000_000n,
+        probability: 65,
+        intel: {},
+      },
+    });
+    const out = (await tools['opportunities.get'].handler({ id: opp.id }, ctx)) as {
+      companyId: string | null;
+      currency: null;
+      currencyBasis: string;
+      stage: string;
+      stageName: string;
+      health: string;
+    };
+    expect(out.companyId).toBe(company.id);
+    expect(out.currency).toBeNull();
+    expect(out.currencyBasis).toBe('unspecified');
+    expect(out.stage).toBe('s3_technical_iteration');
+    expect(out.stageName).toBe('S3 Technical Iteration');
+    expect(out.health).toBe('not_account_health');
+  });
+
   it('opportunities.get returns a single opp', async () => {
     const out = (await tools['opportunities.get'].handler({ id: oppId }, ctx)) as { id: string };
     expect(out.id).toBe(oppId);
