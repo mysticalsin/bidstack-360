@@ -102,7 +102,7 @@ async function buildRenderContext(args: {
     args.opportunityId
       ? prisma.opportunity.findFirst({
           where: { id: args.opportunityId, orgId: args.orgId, deletedAt: null },
-          select: { name: true, valueMicros: true, country: true },
+          select: { name: true, valueMicros: true },
         })
       : null,
     args.contactId
@@ -136,12 +136,8 @@ async function buildRenderContext(args: {
     opportunity: opportunity
       ? {
           name: opportunity.name,
-          // Polo PreSales stores values as micros (millionths) to avoid float math.
-          // Render in the opportunity's country-implied currency (EUR fallback).
-          amount: formatAmount(
-            Number(opportunity.valueMicros) / 1_000_000,
-            inferCurrencyFromCountry(opportunity.country),
-          ),
+          // Opportunity has no currency column. Do not infer one from the country.
+          amount: formatOpportunityAmount(opportunity.valueMicros),
         }
       : null,
     contact: contact
@@ -178,34 +174,12 @@ function resolveToken(token: string, ctx: RenderContext): unknown {
   return null;
 }
 
-function formatAmount(num: number, currency: string): string {
+/** Whole units plus an explicit missing-currency mark. Not a euro or dollar figure. */
+export function formatOpportunityAmount(valueMicros: bigint | number): string {
+  const num = Number(valueMicros) / 1_000_000;
   if (!Number.isFinite(num) || num === 0) return '';
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(num);
-  } catch {
-    return `${currency} ${num}`;
-  }
-}
-
-/**
- * Best-effort currency inference from country code so the email-template
- * preview renders something reasonable without forcing a per-Opportunity
- * currency column. A future Sprint can swap to a real per-record currency.
- */
-function inferCurrencyFromCountry(country: string | null | undefined): string {
-  if (!country) return 'EUR';
-  const c = country.toUpperCase();
-  if (['US'].includes(c)) return 'USD';
-  if (['GB'].includes(c)) return 'GBP';
-  if (['CH'].includes(c)) return 'CHF';
-  if (['JP'].includes(c)) return 'JPY';
-  if (['AU'].includes(c)) return 'AUD';
-  if (['CA'].includes(c)) return 'CAD';
-  return 'EUR';
+  const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(num);
+  return `${amount} unspecified`;
 }
 
 function formatToday(): string {
