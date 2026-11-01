@@ -226,31 +226,167 @@ const OPP_COMPANY_SELECT = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Enrichment rows whose name, domain, or website contain the query. No query means the newest rows. */
+export function enrichmentSearchWhere(
+  orgId: string,
+  q: string | undefined,
+): Prisma.CompanyEnrichmentWhereInput {
+  const query = q?.trim();
+  return {
+    orgId,
+    deletedAt: null,
+    ...(query
+      ? {
+          OR: [
+            { tradeName: { contains: query, mode: 'insensitive' } },
+            { legalName: { contains: query, mode: 'insensitive' } },
+            { domain: { contains: query, mode: 'insensitive' } },
+            { website: { contains: query, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+  };
+}
+
+/** Opportunity rows whose customer contains the query, still inside the caller's scope. */
+export function opportunityCustomerSearchWhere(
+  orgId: string,
+  q: string | undefined,
+  scope?: AccessScope,
+): Prisma.OpportunityWhereInput {
+  const query = q?.trim();
+  const where: Prisma.OpportunityWhereInput = {
+    orgId,
+    ...(query ? { customer: { contains: query, mode: 'insensitive' } } : {}),
+  };
+  return scope ? applyOpportunityScope(where, scope) : where;
+}
+
+async function visibleCustomerKeys(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope,
+  names: string[],
+): Promise<Set<string>> {
+  if (names.length === 0) return new Set();
+  const rows = await prisma.opportunity.findMany({
+    where: applyOpportunityScope(
+      {
+        orgId,
+        OR: names.map((name) => ({ customer: { equals: name, mode: 'insensitive' as const } })),
+      },
+      scope,
+    ),
+    select: { customer: true },
+    distinct: ['customer'],
+    take: names.length,
+  });
+  return new Set(rows.map((row) => normalizeName(row.customer)));
+}
+
+/**
+ * Companies matching a search box. The query runs in the database. A fixed
+ * page of recent deals is not the catalog.
+ */
+export async function searchCrmCompanies(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope | undefined,
+  q: string | undefined,
+  limit: number,
+): Promise<Array<z.infer<typeof CrmCompany>>> {
+  const [opportunities, enrichments] = await Promise.all([
+    prisma.opportunity.findMany({
+      where: opportunityCustomerSearchWhere(orgId, q, scope),
+      select: OPP_COMPANY_SELECT,
+      orderBy: { updatedAt: 'desc' },
+      distinct: ['customer'],
+      take: limit,
+    }),
+    prisma.companyEnrichment.findMany({
+      where: enrichmentSearchWhere(orgId, q),
+      select: ENRICHMENT_SELECT,
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+    }),
+  ]);
+  const restricted = scope && !scope.unrestricted;
+  const visibleKeys = restricted
+    ? await visibleCustomerKeys(orgId, prisma, scope, [
+        ...opportunities.map((opportunity) => opportunity.customer),
+        ...enrichments.flatMap((enrichment) =>
+          [enrichment.tradeName, enrichment.legalName].filter((name): name is string => Boolean(name)),
+        ),
+      ])
+    : null;
+  return buildCompanies(opportunities, enrichments)
+    .filter((company) => !visibleKeys || visibleKeys.has(normalizeName(company.name)))
+    .slice(0, limit);
+}
+
+/** Newest page of companies. This is not every company in the org. */
 export async function getCompaniesOnly(
   orgId: string,
   prisma: PrismaClient,
   scope?: AccessScope,
 ): Promise<Array<z.infer<typeof CrmCompany>>> {
-  const opportunityWhere = scope ? applyOpportunityScope({ orgId }, scope) : { orgId };
-  const [opportunities, enrichments] = await Promise.all([
-    prisma.opportunity.findMany({
-      where: opportunityWhere,
-      select: OPP_COMPANY_SELECT,
-      orderBy: { updatedAt: 'desc' },
-      take: 200,
-    }),
-    prisma.companyEnrichment.findMany({
-      where: { orgId },
-      select: ENRICHMENT_SELECT,
-      take: 500,
-    }),
+  return searchCrmCompanies(orgId, prisma, scope, undefined, 50);
+}
+
+export async function companiesForLookup(
+  orgId: string,
+  prisma: PrismaClient,
+  scope: AccessScope | undefined,
+  query: { domain?: string | null; name?: string | null; registryNeedles: string[] },
+): Promise<Array<z.infer<typeof CrmCompany>>> {
+  const name = query.name?.trim();
+  const domain = query.domain?.trim();
+  const enrichmentOr: Prisma.CompanyEnrichmentWhereInput[] = [];
+  if (domain) {
+    enrichmentOr.push(
+      { domain: { contains: domain, mode: 'insensitive' } },
+      { website: { contains: domain, mode: 'insensitive' } },
+    );
+  }
+  if (name) {
+    enrichmentOr.push(
+      { tradeName: { contains: name, mode: 'insensitive' } },
+      { legalName: { contains: name, mode: 'insensitive' } },
+    );
+  }
+  for (const needle of query.registryNeedles) {
+    enrichmentOr.push({ registryIds: { string_contains: needle } });
+  }
+  const [enrichments, opportunities] = await Promise.all([
+    enrichmentOr.length
+      ? prisma.companyEnrichment.findMany({
+          where: { orgId, deletedAt: null, OR: enrichmentOr },
+          select: ENRICHMENT_SELECT,
+          orderBy: { updatedAt: 'desc' },
+          take: 50,
+        })
+      : Promise.resolve([]),
+    name
+      ? prisma.opportunity.findMany({
+          where: opportunityCustomerSearchWhere(orgId, name, scope),
+          select: OPP_COMPANY_SELECT,
+          orderBy: { updatedAt: 'desc' },
+          distinct: ['customer'],
+          take: 20,
+        })
+      : Promise.resolve([]),
   ]);
-  const visibleCompanyKeys =
-    scope && !scope.unrestricted
-      ? new Set(opportunities.map((opportunity) => normalizeName(opportunity.customer)))
-      : null;
+  const restricted = scope && !scope.unrestricted;
+  const visibleKeys = restricted
+    ? await visibleCustomerKeys(orgId, prisma, scope, [
+        ...opportunities.map((opportunity) => opportunity.customer),
+        ...enrichments.flatMap((enrichment) =>
+          [enrichment.tradeName, enrichment.legalName].filter((value): value is string => Boolean(value)),
+        ),
+      ])
+    : null;
   return buildCompanies(opportunities, enrichments).filter(
-    (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
+    (company) => !visibleKeys || visibleKeys.has(normalizeName(company.name)),
   );
 }
 

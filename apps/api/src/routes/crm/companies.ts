@@ -16,10 +16,11 @@ import {
 
 import {
   buildCompanyCockpit,
+  companiesForLookup,
   normalizeDomain,
   normalizeRegistryValue,
   domainFor,
-  getCompaniesOnly,
+  searchCrmCompanies,
 } from '../../services/crm/dashboard.service.js';
 import { resolveCockpitCompany } from '../../services/crm/dashboard.queries.js';
 import { normalizeName } from '../../services/crm/dashboard.utils.js';
@@ -188,23 +189,13 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
-      const companies = await getCompaniesOnly(req.auth.orgId, prisma, scope);
-      const q = req.query.q?.toLowerCase();
-      const items = companies
-        .filter((company) => {
-          if (!q) return true;
-          return [
-            company.name,
-            company.legalName ?? '',
-            company.domain ?? '',
-            company.website ?? '',
-            ...Object.values(company.registryIds),
-          ]
-            .join(' ')
-            .toLowerCase()
-            .includes(q);
-        })
-        .slice(0, req.query.limit);
+      const items = await searchCrmCompanies(
+        req.auth.orgId,
+        prisma,
+        scope,
+        req.query.q,
+        req.query.limit,
+      );
       return { items };
     },
   );
@@ -402,7 +393,6 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
-      const companies = await getCompaniesOnly(req.auth.orgId, prisma, scope);
       const domain = normalizeDomain(req.query.domain);
       const registryNeedles = [
         req.query.vat,
@@ -413,6 +403,11 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       ]
         .filter((value): value is string => Boolean(value))
         .map(normalizeRegistryValue);
+      const companies = await companiesForLookup(req.auth.orgId, prisma, scope, {
+        domain,
+        name: req.query.name,
+        registryNeedles,
+      });
       const name = req.query.name?.trim().toLowerCase();
 
       let local: {
