@@ -745,6 +745,12 @@ export const AccountPulse = z.object({
   drivers: z.array(PulseDriver),
   /** True when any input is demo data. */
   sample: z.boolean(),
+  /** True when open pipeline and win/loss used the latest 1,000 deals. */
+  dealsCapped: z.boolean().optional(),
+  /** True when meetings or news used the latest 1,000 rows. */
+  feedsCapped: z.boolean().optional(),
+  /** True when subsidiary rollup used the latest 1,000 direct subsidiaries. */
+  childrenCapped: z.boolean().optional(),
   /** What the watchdog is listening to right now. */
   // v22: hint says what to add when a source cannot run (news needs a website or ticker).
   sources: z.array(z.object({ id: z.string(), label: z.string(), active: z.boolean(), hint: z.string().nullable().optional() })),

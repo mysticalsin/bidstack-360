@@ -93,6 +93,15 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
           {pulse.sample ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
         </div>
         <p className="sg-verdict">{pulse.verdict}</p>
+        {pulse.dealsCapped || pulse.feedsCapped || pulse.childrenCapped ? (
+          <p className="sg-meta">
+            {[
+              pulse.dealsCapped ? 'Latest 1,000 deals' : '',
+              pulse.feedsCapped ? 'Latest 1,000 signals' : '',
+              pulse.childrenCapped ? 'Latest 1,000 subsidiaries' : '',
+            ].filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
         <div className="sg-drivers" role="group" aria-label="Top drivers">
           {top.map((d) => (
             <button
