@@ -513,44 +513,53 @@ export async function fetchAccountPerformance(
 ): Promise<AccountPerformance> {
   // A customer string is not a company. Placeholder accounts use a slug id.
   if (!isCompanyUuid(companyId)) return EMPTY_ACCOUNT_PERFORMANCE;
-  const byStageWhere: Prisma.OpportunityWhereInput = scope
-    ? applyOpportunityScope(
-        {
-          orgId,
-          companyId,
-          deletedAt: null,
-          stage: { in: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
-        },
-        scope,
-      )
-    : {
-        orgId,
-        companyId,
-        deletedAt: null,
-        stage: { in: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
-      };
-  const [byStage, revenueRows] = await Promise.all([
-    prismaClient.opportunity.groupBy({
-      by: ['stage'],
-      where: byStageWhere,
+  const base = { orgId, companyId, deletedAt: null };
+  const lostWhere: Prisma.OpportunityWhereInput = {
+    ...base,
+    OR: [
+      { stage: OpportunityStage.closed_lost },
+      { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+    ],
+  };
+  const wonWhere: Prisma.OpportunityWhereInput = {
+    ...base,
+    NOT: {
+      OR: [
+        { stage: OpportunityStage.closed_lost },
+        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+      ],
+    },
+    OR: [
+      { stage: OpportunityStage.closed_won },
+      { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+    ],
+  };
+  const scoped = (where: Prisma.OpportunityWhereInput) =>
+    scope ? applyOpportunityScope(where, scope) : where;
+  const [won, lost, revenueRows] = await Promise.all([
+    prismaClient.opportunity.aggregate({
+      where: scoped(wonWhere),
+      _sum: { valueMicros: true },
+      _count: { _all: true },
+    }),
+    prismaClient.opportunity.aggregate({
+      where: scoped(lostWhere),
       _sum: { valueMicros: true },
       _count: { _all: true },
     }),
     fetchRevenueRows(orgId, companyId, prismaClient, scope),
   ]);
 
-  const won = byStage.find((r) => r.stage === OpportunityStage.closed_won);
-  const lost = byStage.find((r) => r.stage === OpportunityStage.closed_lost);
-  const wonCount = countGroupRow(won);
-  const lostCount = countGroupRow(lost);
+  const wonCount = won._count._all;
+  const lostCount = lost._count._all;
   const decided = wonCount + lostCount;
 
   return {
     winLoss: {
       wonCount,
       lostCount,
-      wonValueMicros: sumGroupValueMicros(won),
-      lostValueMicros: sumGroupValueMicros(lost),
+      wonValueMicros: Number(won._sum.valueMicros ?? 0),
+      lostValueMicros: Number(lost._sum.valueMicros ?? 0),
       winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
     },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
@@ -559,16 +568,6 @@ export async function fetchAccountPerformance(
       .map((r) => ({ period: r.period, revenueMicros: Number(r.revenue ?? 0) }))
       .reverse(),
   };
-}
-
-function countGroupRow(row: { _count?: true | { _all?: number } } | undefined): number {
-  return row && typeof row._count === 'object' ? (row._count._all ?? 0) : 0;
-}
-
-function sumGroupValueMicros(
-  row: { _sum?: { valueMicros?: bigint | number | null } } | undefined,
-): number {
-  return Number(row?._sum?.valueMicros ?? 0);
 }
 
 async function fetchRevenueRows(
@@ -599,8 +598,24 @@ async function fetchRevenueRows(
       LEFT JOIN territories t ON t.id = o.territory_id
       WHERE o.org_id = ${orgId}::uuid
         AND o.company_id = ${companyId}::uuid
-        AND o.stage = 'closed_won'
         AND o.deleted_at IS NULL
+        AND o.stage <> 'closed_lost'
+        AND NOT EXISTS (
+          SELECT 1 FROM pipeline_stages ps
+          WHERE ps.id = o.pipeline_stage_id
+            AND ps.deleted_at IS NULL
+            AND ps.is_lost
+        )
+        AND (
+          o.stage = 'closed_won'
+          OR EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND ps.is_won
+              AND NOT ps.is_lost
+          )
+        )
         AND o.due_date IS NOT NULL
         AND (
           ${countryScopeSql}
@@ -613,14 +628,30 @@ async function fetchRevenueRows(
   }
 
   return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
-    SELECT to_char(date_trunc('month', due_date), 'YYYY-MM') AS period,
-           SUM(value_micros) AS revenue
-    FROM opportunities
-    WHERE org_id = ${orgId}::uuid
-      AND company_id = ${companyId}::uuid
-      AND stage = 'closed_won'
-      AND deleted_at IS NULL
-      AND due_date IS NOT NULL
+    SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
+           SUM(o.value_micros) AS revenue
+    FROM opportunities o
+    WHERE o.org_id = ${orgId}::uuid
+      AND o.company_id = ${companyId}::uuid
+      AND o.deleted_at IS NULL
+      AND o.due_date IS NOT NULL
+      AND o.stage <> 'closed_lost'
+      AND NOT EXISTS (
+        SELECT 1 FROM pipeline_stages ps
+        WHERE ps.id = o.pipeline_stage_id
+          AND ps.deleted_at IS NULL
+          AND ps.is_lost
+      )
+      AND (
+        o.stage = 'closed_won'
+        OR EXISTS (
+          SELECT 1 FROM pipeline_stages ps
+          WHERE ps.id = o.pipeline_stage_id
+            AND ps.deleted_at IS NULL
+            AND ps.is_won
+            AND NOT ps.is_lost
+        )
+      )
     GROUP BY 1
     ORDER BY 1 DESC
     LIMIT 12
