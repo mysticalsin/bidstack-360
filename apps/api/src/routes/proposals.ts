@@ -149,7 +149,22 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         SELECT p.status::text AS status,
                p.owner_id      AS owner_id,
                COUNT(*)::int   AS cnt,
-               COALESCE(SUM(o.value_micros), 0)::text AS val
+               COALESCE(SUM(
+                 CASE
+                   WHEN p.status::text NOT IN ('won', 'lost')
+                    AND o.id IS NOT NULL
+                    AND o.deleted_at IS NULL
+                    AND o.stage NOT IN ('closed_won', 'closed_lost')
+                    AND NOT EXISTS (
+                      SELECT 1 FROM pipeline_stages ps
+                      WHERE ps.id = o.pipeline_stage_id
+                        AND ps.deleted_at IS NULL
+                        AND (ps.is_lost OR ps.is_won)
+                    )
+                   THEN o.value_micros
+                   ELSE 0
+                 END
+               ), 0)::text AS val
         FROM proposals p
         LEFT JOIN opportunities o ON o.id = p.opportunity_id AND o.org_id = p.org_id
         WHERE p.org_id = ${orgId}::uuid AND p.deleted_at IS NULL
