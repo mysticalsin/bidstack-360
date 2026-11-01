@@ -250,6 +250,8 @@ export const envSchema = z.object({
   // agent loops, memory, or pattern learning before the backend is configured.
   SERUM_ENABLED: z.enum(['true', 'false']).default('false'),
   SERUM_DEMO_MODE_ENABLED: z.enum(['true', 'false']).default('false'),
+  // Optional LLM pass on MSA intake. Off by default: documents stay local.
+  MSA_LLM_EXTRACT_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Observability
   SENTRY_DSN: z.string().optional(),

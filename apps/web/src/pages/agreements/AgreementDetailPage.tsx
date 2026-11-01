@@ -7,13 +7,16 @@ import '@/components/agreements/agreements.css';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
+import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
+import { ValuePanel } from '@/components/agreements/ValuePanel';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { useAgreementLeverage } from '@/hooks/useMsaLeverage';
 import { useMsaDetail, useMsaDownloadUrl, useMsaTimeline } from '@/hooks/useMsa';
 import { ApiError } from '@/lib/api';
 import { actionLabel, fmtBytes, fmtDate, fmtDays, fmtMoneyMicros, KIND_LABEL, urgency } from '@/lib/msa/labels';
@@ -99,6 +102,7 @@ export default function AgreementDetailPage() {
   const { id } = useParams();
   const detail = useMsaDetail(id);
   const timeline = useMsaTimeline(id);
+  const leverage = useAgreementLeverage(id);
   const canWrite = useHasPermission('msa:write');
   const [search] = useSearchParams();
   // ?version= comes from a document-search hit.
@@ -137,6 +141,17 @@ export default function AgreementDetailPage() {
     ['Governing law', a.governingLaw ?? '–'],
     ['Countries', a.countries.length ? a.countries.join(', ') : '–'],
     ['Owner', a.owner?.name ?? a.owner?.email ?? '–'],
+    ['Signing entity', a.signingEntity?.name ?? a.signingEntityName ?? '–'],
+    ['Term (months)', a.termMonths != null ? String(a.termMonths) : '–'],
+    ['Renewal terms', a.renewalTerms ?? '–'],
+    ['Intellectual property', a.ipClause ?? '–'],
+    ['Confidentiality', a.confidentiality ?? '–'],
+    ['Non-solicit', a.nonSolicit ?? '–'],
+    ['Exclusivity', a.exclusivity ?? '–'],
+    ['Insurance', a.insurance ?? '–'],
+    ['Indexation', a.indexation ?? '–'],
+    ['Scope of services', a.scopeOfServices ?? '–'],
+    ['Affiliates', a.affiliatesClause ?? '–'],
   ];
 
   return (
@@ -155,6 +170,7 @@ export default function AgreementDetailPage() {
         <Button variant="secondary" onClick={() => setUploadOpen(true)} data-testid="agreement-upload-version"><Icon name="upload" size={16} /> Upload new version</Button>
       </header>
       {sample ? <SampleBanner what="details" /> : null}
+      {!sample && leverage.data?.flag ? <LeverageFlag flag={leverage.data.flag} /> : null}
 
       <section className="agr-section" aria-labelledby="agr-terms">
         <h2 id="agr-terms">Key terms</h2>
@@ -211,6 +227,14 @@ export default function AgreementDetailPage() {
               </tbody>
             </table>
           )}
+        </section>
+      ) : null}
+
+      {!sample ? (
+        <section className="agr-section" aria-labelledby="agr-value">
+          <h2 id="agr-value">Where we can bring value</h2>
+          <p className="agr-caption">Uncovered brand services, renewal windows, and weak or missing clauses. Blank means not found.</p>
+          <ValuePanel msaId={a.id} />
         </section>
       ) : null}
 

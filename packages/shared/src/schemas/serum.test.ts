@@ -13,6 +13,7 @@ describe('SERUM schemas', () => {
         lms360Enabled: false,
         serumEnabled: false,
         serumDemoModeEnabled: false,
+        msaLlmExtractEnabled: false,
       }),
     ).not.toThrow();
   });

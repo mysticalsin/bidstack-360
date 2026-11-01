@@ -75,3 +75,28 @@
 .agr-hits .s { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted, #5b6270); }
 .agr-hits .snip { font-size: 13px; color: var(--muted, #5b6270); }
 .agr-hits mark { background: color-mix(in srgb, var(--accent, #0f6b4f) 18%, transparent); color: inherit; border-radius: 2px; padding: 0 2px; }
+
+.agr-drop-lg { min-height: 176px; }
+.agr-intake .agr-drop { background: var(--surface-sunken); }
+.agr-cite { font-size: 12px; color: var(--fg-tertiary); }
+.agr-review-terms { grid-template-columns: 1fr; }
+.agr-review-terms div { padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.agr-review-terms div:last-child { border-bottom: 0; }
+.agr-review-terms [data-low] dd { background: color-mix(in srgb, var(--tag-amber-fg, #b45309) 12%, transparent); border-radius: 4px; padding: 2px 6px; }
+.agr-review-terms [data-missing] dd { color: var(--fg-tertiary); font-style: italic; }
+.agr-leverage { display: grid; gap: 8px; padding: 16px; border-radius: 12px; border: 2px solid var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 8%, var(--surface-card)); }
+.agr-leverage-kicker { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brand-primary); }
+.agr-leverage-head { margin: 0; font-size: 16px; font-weight: 500; color: var(--fg-primary); }
+.agr-value { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.agr-value li { display: grid; gap: 4px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle); }
+.agr-value li:last-child { border-bottom: 0; padding-bottom: 0; }
+.agr-value .t { margin: 0; font-size: 14px; font-weight: 500; color: var(--fg-primary); }
+.agr-dash-tile { display: grid; gap: 8px; padding: 16px; border-radius: 12px; border: 1px solid var(--border-subtle); background: var(--surface-card); color: inherit; text-decoration: none; min-height: 120px; }
+.agr-dash-tile:hover { border-color: var(--brand-primary); }
+.agr-dash-tile:focus-visible { outline: 2px solid var(--focus-ring-color, var(--brand-primary)); outline-offset: 2px; }
+.agr-dash-tile .v { font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--fg-primary); }
+.agr-dash-tile .l { font-size: 13px; color: var(--fg-secondary); }
+.agr-entities { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.agr-entities li { display: grid; gap: 4px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: 8px; }
+.agr-entities .t { font-weight: 500; color: var(--fg-primary); }
+.agr-unverified { color: var(--tag-amber-fg, #b45309); font-size: 12px; }

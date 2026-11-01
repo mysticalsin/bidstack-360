@@ -22,6 +22,7 @@ import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
+import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
 import { useIsAdmin } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
@@ -42,6 +43,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   'opportunity-filters': ['sectionOpportunityFilters', 'Opportunity filters'],
   'rfp-analytics': ['sectionRfpAnalytics', 'RFP Analytics'],
   modules: ['sectionModules', 'Modules'],
+  'signing-entities': ['sectionSigningEntities', 'Signing entities'],
   integrations: ['sectionIntegrations', 'Integrations'],
   'meeting-sources': ['sectionMeetingSources', 'Meeting sources'],
   webhooks: ['sectionWebhooks', 'Webhooks'],
@@ -62,6 +64,7 @@ const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'opportunity-filters',
   'rfp-analytics',
   'modules',
+  'signing-entities',
   'webhooks',
   'audit-log',
   'developer',
@@ -120,6 +123,7 @@ export function SettingsPage() {
     'opportunity-filters': <OpportunityFiltersSection />,
     'rfp-analytics': <RfpAnalyticsSection />,
     modules: <ModulesSection />,
+    'signing-entities': <SigningEntitiesSection />,
     integrations: <IntegrationsSection />,
     'meeting-sources': <MeetingSourcesSection />,
     webhooks: <WebhooksSection />,

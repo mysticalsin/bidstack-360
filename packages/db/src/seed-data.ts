@@ -362,6 +362,16 @@ export const fixtureCompanies: FixtureCompany[] = [
     tier: 'standard',
     keyAccountNotes: null,
   },
+  {
+    id: 'c0000000-0000-4000-8000-0000000000aa',
+    name: 'Northwind Pharma',
+    domain: 'northwind-pharma.example',
+    industry: 'pharmaceuticals',
+    countryCode: 'FR',
+    employeeCount: 4200,
+    tier: 'key',
+    keyAccountNotes: 'Synthetic fixture: HEMA MSA, no IT pipeline. Used for leverage demos and tests.',
+  },
 ];
 
 export interface FixtureContact {
@@ -454,6 +464,16 @@ export const fixtureContacts: FixtureContact[] = [
     role: 'VP Operations',
     email: 'o.reyes@aritzia.com',
     phone: '+1 604 555 0188',
+    influence: 5,
+    sentiment: Sentiment.warm,
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000aa',
+    customer: 'Northwind Pharma',
+    name: 'Alex Buyer',
+    role: 'Head of Procurement',
+    email: 'alex.buyer@northwind-pharma.example',
+    phone: '+33 1 55 00 0100',
     influence: 5,
     sentiment: Sentiment.warm,
   },

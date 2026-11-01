@@ -184,3 +184,4 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // by the seed CLIs and the Clerk organization.created webhook so a brand-new
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
+export { seedSigningEntities } from './seed-signing-entities.js';

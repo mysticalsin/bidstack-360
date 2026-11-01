@@ -100,6 +100,9 @@ const dashboardState: { current: unknown } = { current: null };
 vi.mock('@/hooks/useCrmDashboard', () => ({
   useCrmDashboard: () => dashboardState.current,
 }));
+vi.mock('@/hooks/useMsaLeverage', () => ({
+  useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
+}));
 
 function company(i: number): CrmCompany {
   return {

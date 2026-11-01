@@ -17,5 +17,7 @@ export const FeatureFlags = z.object({
   serumEnabled: z.boolean(),
   /** Explicit demo/safe-mode surfaces. Defaults off and must never mimic production activity. */
   serumDemoModeEnabled: z.boolean(),
+  /** Optional LLM refinement of MSA intake. Off by default; no document leaves the process unless this is on. */
+  msaLlmExtractEnabled: z.boolean(),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlags>;

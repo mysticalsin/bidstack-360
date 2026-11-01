@@ -20,6 +20,7 @@ import {
   AccountsPage,
   AgreementDetailPage,
   AgreementsPage,
+  IntakeReviewPage,
   MeetingDetailPage,
   OrgChartPage,
   MeetingFlagsPage,
@@ -183,6 +184,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <AgreementsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/agreements/intake/:id"
+            element={
+              <RequireAuth>
+                <IntakeReviewPage />
               </RequireAuth>
             }
           />
