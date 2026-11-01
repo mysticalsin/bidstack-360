@@ -87,6 +87,8 @@ describe('meeting brief open deals', () => {
       });
       const reopened = await buildMeetingContext(orgId, event.id);
       expect(reopened.openOpps.map((row) => row.id)).toEqual([deal.id]);
+      expect(reopened.openOpps[0]?.stage).toBe('S2 Sent');
+      expect(reopened.openOpps[0]?.stage).not.toBe('Price lost');
     } finally {
       await prisma.calendarEvent.deleteMany({ where: { id: event.id } });
       await prisma.opportunity.deleteMany({ where: { id: deal.id } });
@@ -181,6 +183,8 @@ describe('meeting brief open deals', () => {
         [...opens].reverse().slice(0, 5).map((row) => row.id),
       );
       expect(brief.openOppsOmitted).toBe(1);
+      expect(brief.openOpps[0]?.stage).toBe('S2 Sent');
+      expect(brief.openOpps[0]?.stage).not.toBe('s2_sent');
       expect(brief.openOpps.map((row) => row.id)).not.toContain(lost.id);
       expect(brief.openOpps.map((row) => row.id)).not.toContain(elsewhere.id);
     } finally {

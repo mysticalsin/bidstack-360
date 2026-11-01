@@ -329,7 +329,18 @@ describeDb('MCP tools', () => {
       )) as Array<{ id: string }>;
       expect(lostRows.map((row) => row.id)).toEqual([flagged.id]);
 
+      const beforeDelete = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {
+        stageName: string;
+      };
+      expect(beforeDelete.stageName).toBe('Price lost');
+
       await prisma.pipelineStage.update({ where: { id: lost.id }, data: { deletedAt: new Date() } });
+      const afterGet = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {
+        stageName: string;
+        outcome: string;
+      };
+      expect(afterGet.outcome).toBe('open');
+      expect(afterGet.stageName).toBe('S2 Sent');
       const afterDelete = (await tools['opportunities.list'].handler(
         { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
         ctx,

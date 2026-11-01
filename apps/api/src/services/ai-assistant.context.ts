@@ -223,7 +223,12 @@ async function openDealsForMeeting(
   if (!id) return { openOpps: [], openOppsOmitted: 0 };
   const type = event.relatedEntityType?.trim().toLowerCase() ?? '';
   const open = { orgId, deletedAt: null, ...excludeClosedOutcome() };
-  const select = { id: true, name: true, stage: true } as const;
+  const select = {
+    id: true,
+    name: true,
+    stage: true,
+    pipelineStage: { select: { name: true, deletedAt: true } },
+  } as const;
 
   if (type === 'company' || type === 'account') {
     return listOpenDeals({ ...open, companyId: id });
@@ -246,14 +251,38 @@ async function openDealsForMeeting(
   return listOpenDeals({ ...open, companyId: id });
 }
 
-function meetingDeal(row: { id: string; name: string; stage: string }) {
-  return { id: row.id, title: row.name, stage: String(row.stage) };
+function meetingStageLabel(row: {
+  stage: string;
+  pipelineStage: { name: string; deletedAt: Date | null } | null;
+}): string {
+  const live =
+    row.pipelineStage && row.pipelineStage.deletedAt == null ? row.pipelineStage.name.trim() : '';
+  if (live) return live;
+  return row.stage
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function meetingDeal(row: {
+  id: string;
+  name: string;
+  stage: string;
+  pipelineStage: { name: string; deletedAt: Date | null } | null;
+}) {
+  return { id: row.id, title: row.name, stage: meetingStageLabel(row) };
 }
 
 async function listOpenDeals(where: Prisma.OpportunityWhereInput) {
   const rows = await prisma.opportunity.findMany({
     where,
-    select: { id: true, name: true, stage: true },
+    select: {
+      id: true,
+      name: true,
+      stage: true,
+      pipelineStage: { select: { name: true, deletedAt: true } },
+    },
     orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
     take: MEETING_OPEN_DEAL_CAP + 1,
   });

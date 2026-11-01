@@ -58,7 +58,10 @@ export const opportunitiesGet: Tool<typeof Input> = {
       companyId: opp.companyId,
       name: opp.name,
       stage: opp.stage,
-      stageName: opp.pipelineStage?.name?.trim() || stageWords(opp.stage),
+      stageName:
+        (opp.pipelineStage && opp.pipelineStage.deletedAt == null
+          ? opp.pipelineStage.name?.trim()
+          : '') || stageWords(opp.stage),
       outcome: dealOutcome(opp),
       value: Number(opp.valueMicros) / 1_000_000,
       currency: null,
