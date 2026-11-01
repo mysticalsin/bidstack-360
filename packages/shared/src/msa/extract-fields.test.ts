@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contractMicros, extractMsaFields, rateCardLineText, storableLiabilityCap, storableRateCard } from './extract-fields.js';
+import { contractMicros, extractMsaFields, intakeOmissionNotes, rateCardLineText, storableLiabilityCap, storableRateCard } from './extract-fields.js';
 import { SYNTHETIC_NORTHWIND_MSA_TEXT } from './synthetic-msa.js';
 
 describe('extractMsaFields', () => {
@@ -99,6 +99,9 @@ describe('extractMsaFields', () => {
     );
     expect(storableRateCard(largeCard)).toEqual([]);
     expect(rateCardLineText('Director', 1_000_000_000_000, 'day')).toBe('Director: 1,000,000 / day');
+    expect(intakeOmissionNotes(large)).toBe('Director: 1,000,000.01 / day, too large to store');
+    expect(intakeOmissionNotes(fields)).toBeNull();
+    expect(intakeOmissionNotes(huge)).toBe('Liability cap: amount not readable');
   });
 
   it('returns blank not-found fields when the document has no commercial terms', () => {
