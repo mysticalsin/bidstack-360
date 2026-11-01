@@ -259,6 +259,7 @@ export function ProductsTab({
     description: string | null;
     category: string;
     priceRangeMicros: number | null;
+    priceRangeMicrosText?: string | null;
     currency: string;
     status: string;
     confidenceBps: number;
@@ -294,9 +295,9 @@ export function ProductsTab({
                 <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-wider">
                   {p.category}
                 </span>
-                {p.priceRangeMicros ? (
+                {p.priceRangeMicrosText || p.priceRangeMicros ? (
                   <span className="rounded-full bg-tag-blue-bg px-2 py-0.5 text-[10px] font-medium text-tag-blue-fg">
-                    {formatMoneyMicros(p.priceRangeMicros, p.currency)}
+                    {formatMoneyMicros(p.priceRangeMicrosText ?? p.priceRangeMicros ?? 0, p.currency)}
                   </span>
                 ) : null}
               </div>
