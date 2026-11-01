@@ -203,6 +203,16 @@ describe('mapApolloFundingEvents', () => {
     expect(s).toHaveLength(1);
     expect(s[0]).toMatchObject({ externalId: 'funding:f1', kind: 'FUNDING_ROUND', title: 'Acme: Series C of $40.0M', url: 'https://n.example/x' });
   });
+
+  it('does not move a funding amount to the next tenth', () => {
+    // WHY: toFixed(1) turned 7,860,000 into $7.9M on the account timeline.
+    const s = mapApolloFundingEvents(
+      { funding_events: [{ id: 'f9', date: '2026-09-15', type: 'Series C', amount: '7860000', currency: '$' }] },
+      'Acme',
+    );
+    expect(s[0]?.title).toBe('Acme: Series C of $7,860,000');
+    expect(s[0]?.title).not.toContain('7.9');
+  });
 });
 
 void ({} as NewsItem);
