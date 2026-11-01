@@ -108,6 +108,26 @@ describe('computeSignalCoverage', () => {
     expect(action).not.toMatch(/No recent activity/i);
   });
 
+  it('does not tell the seller to confirm a champion that was not recorded', () => {
+    // Why: a full contact list used to say the map was healthy and to confirm
+    // the champion. Influence and email are not a decision role.
+    const health = computeSignalCoverage({
+      company: company(),
+      contacts: [
+        { influence: 5, email: 'a@x.com' },
+        { influence: 4, email: 'b@x.com' },
+        { influence: 3, email: 'c@x.com' },
+        { influence: 2, email: 'd@x.com' },
+      ],
+      openDeals: [],
+      tasks: [],
+    });
+    const action = health.factors?.find((factor) => factor.key === 'contacts')?.recommendedAction ?? '';
+    expect(action).toContain('4 linked contacts');
+    expect(action).toContain('4 have an influence rating');
+    expect(action).not.toMatch(/champion/i);
+  });
+
   it('does not score an incomplete open deal as pipeline coverage', () => {
     // Why: an open deal used to add 40 points before owner, date, or probability existed.
     const missing = computeSignalCoverage({

@@ -53,6 +53,20 @@ function firmographicAction(company: z.infer<typeof CrmCompany>): string {
   return `Still missing: ${missing.join(', ')}.`;
 }
 
+function contactAction(
+  contacts: Array<{ influence: number | null; email: string | null }>,
+): string {
+  if (contacts.length === 0) return 'No stakeholders are linked to this account.';
+  const rated = contacts.filter((contact) => contact.influence != null).length;
+  const withEmail = contacts.filter((contact) => contact.email).length;
+  const ratedLabel =
+    rated === 0 ? 'none have an influence rating' : `${rated} have an influence rating`;
+  const emailLabel =
+    withEmail === contacts.length ? 'all have an email' : `${withEmail} have an email`;
+  const countLabel = contacts.length === 1 ? '1 linked contact' : `${contacts.length} linked contacts`;
+  return `${countLabel}. ${ratedLabel}; ${emailLabel}.`;
+}
+
 function engagementAction(recent: number, openCount: number, onTrack: number): string {
   const recentLabel = recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
   if (recent === 0 && openCount === 0) {
@@ -173,6 +187,7 @@ export function computeSignalCoverage(input: {
   );
 
   firmographics.recommendedAction = firmographicAction(company);
+  contactFactor.recommendedAction = contactAction(contacts);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
