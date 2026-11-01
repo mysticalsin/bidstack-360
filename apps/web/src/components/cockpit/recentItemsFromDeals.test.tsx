@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
 import { RecentOpportunitiesCard, recentItemsFromDeals } from './RecentOpportunitiesCard';
@@ -16,6 +16,8 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('RecentOpportunitiesCard', () => {
+  afterEach(cleanup);
+
   it('links to the open deals for that account', () => {
     // WHY: "Open pipeline" used to land on a search that still listed closed bids.
     render(
@@ -26,6 +28,35 @@ describe('RecentOpportunitiesCard', () => {
     expect(screen.getByRole('link', { name: /Open pipeline/ }).getAttribute('href')).toBe(
       '/opportunities?search=CI%20Financial&excludeClosed=true',
     );
+  });
+
+  it('says when the five rows are not every open bid', () => {
+    // WHY: the card kept five rows and read as the account's open pipeline.
+    const items = Array.from({ length: 6 }, (_, i) => ({
+      id: `d${i}`,
+      name: `Bid ${i}`,
+      customer: 'Acme',
+      value: '1',
+      stage: 's2_sent',
+    }));
+    render(
+      <MemoryRouter>
+        <RecentOpportunitiesCard accountName="Acme" items={items} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Showing 5 of 6 open bids.')).toBeTruthy();
+    expect(screen.queryByText('Bid 5')).toBeNull();
+  });
+
+  it('does not call a capped deal page an empty account', () => {
+    // WHY: the loaded page can be closed deals while open bids sit further on.
+    render(
+      <MemoryRouter>
+        <RecentOpportunitiesCard accountName="Acme" items={[]} dealsCapped />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('No open bids in the opportunities loaded for this account')).toBeTruthy();
+    expect(screen.queryByText('No open opportunities for this account yet')).toBeNull();
   });
 });
 

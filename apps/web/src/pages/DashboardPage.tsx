@@ -262,6 +262,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               <RecentOpportunitiesCard
                 accountName={cockpit.company.name}
                 items={recentItemsFromDeals(companyDeals)}
+                dealsCapped={cockpit.dealsCapped}
               />
             </Reveal>
           )}

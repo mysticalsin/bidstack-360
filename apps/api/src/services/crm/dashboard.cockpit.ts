@@ -1049,6 +1049,7 @@ export function buildCockpit({
     })),
     recentActivity: buildActivities(accountTasks).slice(0, 5),
     activityCapped: accountTasks.length > 5,
+    dealsCapped: coveragePages?.dealsCapped ? true : undefined,
     risks: visibleRisks.map(serializeRisk),
     compliance: visibleCompliance.map(serializeCompliance),
     openRiskCount,

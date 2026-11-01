@@ -1075,6 +1075,7 @@ describe('buildCockpit recorded facts only', () => {
       coveragePages: { dealsCapped: true },
     });
     expect(cockpit.registerDealsCapped).toBe(false);
+    expect(cockpit.dealsCapped).toBe(true);
   });
 });
 
