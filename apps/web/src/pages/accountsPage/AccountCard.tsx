@@ -12,7 +12,7 @@ import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { springLayout, springSnap } from '@/lib/motion';
-import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
+import { formatExactUnspecified } from '@/components/dashboard/unspecified-currency';
 import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 
 import {
@@ -121,7 +121,7 @@ export const AccountCard = memo(function AccountCard({
             <div>
               <dt>{t('account.pipeline', 'Weighted pipeline')}</dt>
               <dd>
-                <AnimatedMetric value={formatUnspecifiedAmount(pipelineMicros / 1_000_000)} />
+                <AnimatedMetric value={formatExactUnspecified(pipelineMicros)} />
               </dd>
             </div>
             <div>

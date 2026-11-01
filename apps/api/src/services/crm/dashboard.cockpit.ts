@@ -235,11 +235,22 @@ export interface AccountPerformance {
   winLoss: {
     wonCount: number;
     lostCount: number;
-    wonValueMicros: number;
-    lostValueMicros: number;
+    wonValueMicros: string;
+    lostValueMicros: string;
     winRate: number | null;
   };
-  revenueEvolution: Array<{ period: string; revenueMicros: number }>;
+  revenueEvolution: Array<{ period: string; revenueMicros: string }>;
+}
+
+/** Integer micros text. Number() moves a sum past 2^53 off the cent. */
+export function microsText(value: bigint | number | string | null | undefined): string {
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value)).toString();
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+    const parsed = BigInt(value);
+    return parsed < 0n ? '0' : parsed.toString();
+  }
+  return '0';
 }
 
 /**
@@ -256,8 +267,12 @@ export function deriveAccountPerformance(
     pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
   }>,
 ): AccountPerformance {
-  const toMicros = (v: bigint | number | unknown): number =>
-    typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
+  const toMicros = (v: bigint | number | unknown): bigint => {
+    if (typeof v === 'bigint') return v;
+    if (typeof v === 'number' && Number.isFinite(v)) return BigInt(Math.trunc(v));
+    if (typeof v === 'string' && /^\d+$/.test(v)) return BigInt(v);
+    return 0n;
+  };
   const lostOpps = opps.filter((o) => {
     const stage = livePipelineStage(o.pipelineStage);
     return stage?.isLost === true || o.stage === 'closed_lost';
@@ -273,27 +288,27 @@ export function deriveAccountPerformance(
   });
   const decided = wonOpps.length + lostOpps.length;
 
-  const revenueByMonth = new Map<string, number>();
+  const revenueByMonth = new Map<string, bigint>();
   for (const o of wonOpps) {
     const when = o.dueDate ?? null;
     if (!when) continue;
     const d = when instanceof Date ? when : new Date(when as string);
     if (Number.isNaN(d.getTime())) continue;
     const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toMicros(o.valueMicros));
+    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0n) + toMicros(o.valueMicros));
   }
   return {
     winLoss: {
       wonCount: wonOpps.length,
       lostCount: lostOpps.length,
-      wonValueMicros: wonOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
-      lostValueMicros: lostOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
+      wonValueMicros: wonOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0n).toString(),
+      lostValueMicros: lostOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0n).toString(),
       winRate: decided > 0 ? Math.round((wonOpps.length / decided) * 100) : null,
     },
     revenueEvolution: [...revenueByMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-12)
-      .map(([period, revenueMicros]) => ({ period, revenueMicros })),
+      .map(([period, revenueMicros]) => ({ period, revenueMicros: revenueMicros.toString() })),
   };
 }
 

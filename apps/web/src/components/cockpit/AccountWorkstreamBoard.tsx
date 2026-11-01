@@ -6,6 +6,7 @@ import { Bar } from '@/components/charts/bar';
 import { BarChart } from '@/components/charts/bar-chart';
 import { BarYAxis } from '@/components/charts/bar-y-axis';
 import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 
 import {
   buyingRoleSlots,
@@ -41,18 +42,27 @@ export function AccountWorkstreamBoard({
   const unassigned = peopleWithoutDecisionRole(people);
   const diagramDeal = grouped.pursuit[0] ?? grouped.delivery[0] ?? grouped.renewal[0] ?? grouped.expansion[0];
 
-  const laneTotals = LANES.map((lane) => ({
-    lane,
-    deals: grouped[lane],
-    value: grouped[lane].reduce((sum, deal) => sum + deal.value, 0),
-  }));
+  const laneTotals = LANES.map((lane) => {
+    const deals = grouped[lane];
+    const micros = deals.every((deal) => deal.valueMicros != null)
+      ? deals.reduce((sum, deal) => sum + BigInt(deal.valueMicros ?? 0), 0n)
+      : null;
+    return {
+      lane,
+      deals,
+      value: deals.reduce((sum, deal) => sum + deal.value, 0),
+      valueMicros: micros?.toString() ?? null,
+    };
+  });
   const chartLabel = laneTotals
     .map((row) => {
       const name = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
       const amount =
-        row.value > 0
-          ? formatUnspecifiedCompact(row.value)
-          : t('accountWorkstreams.notRecorded', 'Not recorded');
+        row.valueMicros != null && row.valueMicros !== '0'
+          ? `${formatMicrosAmount(BigInt(row.valueMicros))} unspecified`
+          : row.value > 0
+            ? formatUnspecifiedCompact(row.value)
+            : t('accountWorkstreams.notRecorded', 'Not recorded');
       return `${name}, ${amount}`;
     })
     .join('. ');
@@ -99,9 +109,11 @@ export function AccountWorkstreamBoard({
         <ul className="deal-chart-values">
           {laneTotals.map((row) => (
             <li key={row.lane}>
-              {row.value > 0
-                ? formatUnspecifiedCompact(row.value)
-                : t('accountWorkstreams.notRecorded', 'Not recorded')}
+              {row.valueMicros != null && row.valueMicros !== '0'
+                ? `${formatMicrosAmount(BigInt(row.valueMicros))} unspecified`
+                : row.value > 0
+                  ? formatUnspecifiedCompact(row.value)
+                  : t('accountWorkstreams.notRecorded', 'Not recorded')}
             </li>
           ))}
         </ul>
@@ -120,7 +132,9 @@ export function AccountWorkstreamBoard({
                   {' · '}
                   {deal.stageName || deal.stage || t('accountWorkstreams.stageUnknown', 'Stage unknown')}
                   {' · '}
-                  {formatUnspecifiedCompact(deal.value)}
+                  {deal.valueMicros != null
+                    ? `${formatMicrosAmount(BigInt(deal.valueMicros))} unspecified`
+                    : formatUnspecifiedCompact(deal.value)}
                   {' · '}
                   {deal.owner ?? t('accountWorkstreams.ownerUnknown', 'Owner unknown')}
                 </span>

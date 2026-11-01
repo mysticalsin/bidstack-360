@@ -166,10 +166,30 @@ describe('deal currency is omitted when the opportunity has none', () => {
       owner: null,
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
+    expect(deal.amountMicros).toBe('1000000');
     expect(deal.currencyCode).toBeNull();
     expect(deal.probability).toBe(40);
     expect(deal.companyId).toBeNull();
     expect(deal.companyName).toBe('Acme');
+  });
+
+  it('keeps a large deal amount as the exact micros string', () => {
+    // WHY: Math.round(Number(micros)) moved this amount to the next cent on the cockpit.
+    const deal = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5b',
+      customer: 'Acme',
+      name: 'Large book',
+      stage: 's4_negotiation',
+      pipelineStage: null,
+      valueMicros: 8_598_204_328_457_184_962n,
+      probability: 40,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(deal.amountMicros).toBe('8598204328457184962');
+    expect(deal.amountMicros).not.toBe(BigInt(Math.round(Number(8_598_204_328_457_184_962n))).toString());
   });
 
   it('does not present a stored zero as a measured probability', () => {

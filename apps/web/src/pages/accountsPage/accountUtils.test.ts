@@ -39,7 +39,7 @@ function deal(overrides: Partial<CrmDeal> = {}): CrmDeal {
     companyName: 'Acme',
     name: 'Expansion',
     stage: 'proposal',
-    amountMicros: 1_000_000_000_000,
+    amountMicros: '1000000000000',
     currencyCode: 'EUR',
     probability: 50,
     closeDate: null,
@@ -103,12 +103,12 @@ describe('accountUtils', () => {
     // Why: a customer string used to count as this account's pipeline, so an
     // unlinked deal with the same name inflated open deals and the proxy band.
     const row = deriveAccount(company(), [
-      deal({ id: 'unlinked', companyId: null, companyName: 'Acme', amountMicros: 5_000_000_000_000 }),
+      deal({ id: 'unlinked', companyId: null, companyName: 'Acme', amountMicros: '5000000000000' }),
       deal({ id: 'other', companyId: 'co-other', companyName: 'Acme' }),
     ]);
     expect(row.openDeals).toBe(0);
     expect(row.totalDeals).toBe(0);
-    expect(row.pipelineMicros).toBe(0);
+    expect(row.pipelineMicros).toBe('0');
   });
 
   it('does not treat a missing probability as 50 percent', () => {
@@ -119,12 +119,12 @@ describe('accountUtils', () => {
         id: 'unweighted',
         stage: 'proposal',
         probability: null,
-        amountMicros: 1_000_000_000_000,
+        amountMicros: '1000000000000',
       }),
     ]);
     expect(row.openDeals).toBe(1);
     expect(row.openDealsMissingProbability).toBe(1);
-    expect(row.pipelineMicros).toBe(0);
+    expect(row.pipelineMicros).toBe('0');
     expect(row.health).toBe('critical');
   });
 
@@ -136,18 +136,32 @@ describe('accountUtils', () => {
         id: 'blank',
         stage: 'proposal',
         probability: 0,
-        amountMicros: 1_000_000_000_000,
+        amountMicros: '1000000000000',
       }),
       deal({
         id: 'recorded',
         stage: 'proposal',
         probability: 40,
-        amountMicros: 1_000_000_000_000,
+        amountMicros: '1000000000000',
       }),
     ]);
     expect(row.openDeals).toBe(2);
     expect(row.openDealsMissingProbability).toBe(1);
-    expect(row.pipelineMicros).toBe(400_000_000_000);
+    expect(row.pipelineMicros).toBe('400000000000');
+  });
+
+  it('weights a large amount from the integer micros', () => {
+    // WHY: amount * probability in JS numbers moved this book off the cent.
+    const row = deriveAccount(company(), [
+      deal({
+        id: 'large',
+        stage: 'proposal',
+        probability: 100,
+        amountMicros: '8598204328457184962',
+      }),
+    ]);
+    expect(row.pipelineMicros).toBe('8598204328457184962');
+    expect(row.health).toBe('strong');
   });
 
   it('keeps the pipeline band from reading as a measured health score', () => {

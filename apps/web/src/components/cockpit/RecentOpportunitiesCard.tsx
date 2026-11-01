@@ -11,6 +11,7 @@ import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
 import { formatStage } from '@/lib/format';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { springSoft } from '@/lib/motion';
 
 export interface RecentOpportunityItem {
@@ -18,7 +19,7 @@ export interface RecentOpportunityItem {
   code?: string | null;
   name: string;
   customer?: string | null;
-  value: number;
+  value: string;
   stage?: string | null;
 }
 
@@ -28,7 +29,7 @@ export function recentItemsFromDeals(
     id: string;
     name: string;
     stage: string;
-    amountMicros: number;
+    amountMicros: string | number;
     companyName: string | null;
   }>,
 ): RecentOpportunityItem[] {
@@ -36,7 +37,13 @@ export function recentItemsFromDeals(
     id: deal.id,
     name: deal.name,
     customer: deal.companyName,
-    value: deal.amountMicros / 1_000_000,
+    value: formatMicrosAmount(
+      typeof deal.amountMicros === 'bigint'
+        ? deal.amountMicros
+        : typeof deal.amountMicros === 'number'
+          ? BigInt(Math.trunc(deal.amountMicros))
+          : BigInt(deal.amountMicros),
+    ),
     stage: deal.stage,
   }));
 }
@@ -131,7 +138,9 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
                 </div>
                 <div className="proto-row-right">
                   <span className="proto-row-money">
-                    <AnimatedMetric value={formatUnspecifiedAmount(o.value)} />
+                    <AnimatedMetric
+                      value={typeof o.value === 'number' ? formatUnspecifiedAmount(o.value) : o.value}
+                    />
                   </span>
                   <Badge tone="purple">{formatStage(o.stage ?? 'unknown')}</Badge>
                 </div>

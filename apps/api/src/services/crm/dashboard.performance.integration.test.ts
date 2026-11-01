@@ -113,13 +113,13 @@ describe('account win/loss counts a flagged stage', () => {
     expect(result.winLoss).toEqual({
       wonCount: 2,
       lostCount: 2,
-      wonValueMicros: 3_000_000,
-      lostValueMicros: 13_000_000,
+      wonValueMicros: '3000000',
+      lostValueMicros: '13000000',
       winRate: 50,
     });
     expect(result.revenueEvolution).toEqual([
-      { period: '2026-01', revenueMicros: 1_000_000 },
-      { period: '2026-03', revenueMicros: 2_000_000 },
+      { period: '2026-01', revenueMicros: '1000000' },
+      { period: '2026-03', revenueMicros: '2000000' },
     ]);
   });
 });

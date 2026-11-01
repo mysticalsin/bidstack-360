@@ -38,6 +38,7 @@ import {
 import { recentItemsFromDeals } from '@/components/cockpit/RecentOpportunitiesCard';
 import { AccountStageBars } from '@/components/cockpit/AccountStageBars';
 import { AccountWorkstreamBoard } from '@/components/cockpit/AccountWorkstreamBoard';
+import { unitsFromMicros } from '@/components/dashboard/unspecified-currency';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
@@ -227,7 +228,8 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
             id: deal.id,
             name: deal.name,
             stage: deal.stage,
-            value: deal.amountMicros / 1_000_000,
+            value: unitsFromMicros(deal.amountMicros),
+            valueMicros: deal.amountMicros,
             owner: deal.ownerName,
           }))}
           people={cockpit.keyContacts.map((person) => ({

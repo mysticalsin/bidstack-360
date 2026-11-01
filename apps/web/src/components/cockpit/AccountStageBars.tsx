@@ -1,6 +1,13 @@
 import { useTranslation } from 'react-i18next';
 
-import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  compareMicros,
+  formatExactUnspecified,
+  microsSharePercent,
+  shareBarWidth,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { formatStage } from '@/lib/format';
 
@@ -9,7 +16,7 @@ import type { CrmDeal } from '@bidstack/shared';
 interface StageBar {
   stage: string;
   count: number;
-  amountMicros: number;
+  amountMicros: string;
   label: string;
   name: string | null;
 }
@@ -29,22 +36,25 @@ export function stageBars(deals: readonly CrmDeal[]): StageBar[] {
   }
   return [...grouped.entries()]
     .map(([stage, rows]) => {
-      const amountMicros = rows.reduce((sum, deal) => sum + deal.amountMicros, 0);
+      const amount = rows.reduce((sum, deal) => sum + BigInt(deal.amountMicros), 0n);
+      const amountMicros = amount.toString();
       const codes = new Set(rows.map((deal) => deal.currencyCode).filter((code): code is string => Boolean(code)));
-      const major = amountMicros / 1_000_000;
       const label =
         codes.size === 1
-          ? `${formatUnspecifiedCompact(major).replace(/ unspecified$/, '')} ${[...codes][0]}`
-          : formatUnspecifiedCompact(major);
+          ? `${formatMicrosAmount(amount)} ${[...codes][0]}`
+          : formatExactUnspecified(amountMicros);
       return { stage, count: rows.length, amountMicros, label, name: rows[0]?.stageName ?? null };
     })
-    .sort((a, b) => b.amountMicros - a.amountMicros);
+    .sort((a, b) => compareMicros(b.amountMicros, a.amountMicros));
 }
 
 export function AccountStageBars({ deals }: { deals: readonly CrmDeal[] }) {
   const { t } = useTranslation('crm');
   const bars = stageBars(deals);
-  const max = Math.max(1, ...bars.map((bar) => bar.amountMicros));
+  const max = bars.reduce<string>(
+    (largest, bar) => (compareMicros(bar.amountMicros, largest) > 0 ? bar.amountMicros : largest),
+    '0',
+  );
 
   return (
     <Card role="region" aria-label={t('accountStageBars.region', 'This account by stage')}>
@@ -74,7 +84,7 @@ export function AccountStageBars({ deals }: { deals: readonly CrmDeal[] }) {
               <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]" aria-hidden>
                 <span
                   className="block h-full rounded-full bg-[var(--brand-primary)]"
-                  style={{ width: `${Math.max(8, Math.round((bar.amountMicros / max) * 100))}%` }}
+                  style={{ width: `${shareBarWidth(microsSharePercent(bar.amountMicros, max), 8)}%` }}
                 />
               </div>
             </div>

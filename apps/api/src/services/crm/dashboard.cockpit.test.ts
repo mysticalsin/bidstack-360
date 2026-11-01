@@ -617,6 +617,23 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     };
   }
 
+  it('keeps a large won total as the exact micros string', () => {
+    // WHY: Number(bigint) moved this won book off the cent before the card printed it.
+    const cockpit = buildCockpit(
+      baseArgs([
+        opp({
+          stage: 'closed_won',
+          valueMicros: 8_598_204_328_457_184_962n,
+          dueDate: new Date('2026-04-01'),
+        }),
+      ]),
+    );
+    expect(cockpit.winLoss?.wonValueMicros).toBe('8598204328457184962');
+    expect(cockpit.revenueEvolution).toEqual([
+      { period: '2026-04', revenueMicros: '8598204328457184962' },
+    ]);
+  });
+
   it('derives win/loss from the canonical stage column (no pipelineStage FK needed)', () => {
     const cockpit = buildCockpit(
       baseArgs([
@@ -629,8 +646,8 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     expect(cockpit.winLoss).toEqual({
       wonCount: 2,
       lostCount: 1,
-      wonValueMicros: 800_000_000_000,
-      lostValueMicros: 200_000_000_000,
+      wonValueMicros: '800000000000',
+      lostValueMicros: '200000000000',
       winRate: 67,
     });
   });
@@ -647,8 +664,8 @@ describe('buildCockpit win/loss + revenue derivation', () => {
       ]),
     );
     expect(cockpit.revenueEvolution).toEqual([
-      { period: '2026-01', revenueMicros: 100_000_000_000 },
-      { period: '2026-02', revenueMicros: 750_000_000_000 },
+      { period: '2026-01', revenueMicros: '100000000000' },
+      { period: '2026-02', revenueMicros: '750000000000' },
     ]);
   });
 
@@ -681,12 +698,12 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     expect(cockpit.winLoss).toEqual({
       wonCount: 1,
       lostCount: 1,
-      wonValueMicros: 100_000_000_000,
-      lostValueMicros: 400_000_000_000,
+      wonValueMicros: '100000000000',
+      lostValueMicros: '400000000000',
       winRate: 50,
     });
     expect(cockpit.revenueEvolution).toEqual([
-      { period: '2026-03', revenueMicros: 100_000_000_000 },
+      { period: '2026-03', revenueMicros: '100000000000' },
     ]);
   });
 

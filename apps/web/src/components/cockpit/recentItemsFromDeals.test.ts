@@ -19,7 +19,7 @@ describe('recentItemsFromDeals', () => {
         id: 'deal-1',
         name: 'DNB Bank — Cloud landing zone',
         customer: 'DNB Bank',
-        value: 2_700_000,
+        value: '2,700,000',
         stage: 'screening',
       },
     ]);

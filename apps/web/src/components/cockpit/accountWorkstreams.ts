@@ -18,6 +18,8 @@ export interface WorkDeal {
   isWon?: boolean;
   isLost?: boolean;
   value: number;
+  /** Integer micros when the cockpit deal still has them. The chart scale uses value. */
+  valueMicros?: string;
   owner: string | null;
 }
 

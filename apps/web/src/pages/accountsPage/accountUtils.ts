@@ -3,6 +3,8 @@
 // filter labels) and AccountCard (healthTone, healthLabel, sourcePillsFor).
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
+import { compareMicros } from '@/components/dashboard/unspecified-currency';
+
 export type SortKey = 'name' | 'pipeline' | 'health' | 'industry' | 'coverage';
 export type AccountSegmentKey = 'all' | 'enriched' | 'with_tech' | 'needs_data' | 'watch';
 
@@ -10,7 +12,7 @@ export interface AccountRow {
   company: CrmCompany;
   openDeals: number;
   openDealsMissingProbability: number;
-  pipelineMicros: number;
+  pipelineMicros: string;
   totalDeals: number;
   // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
   // banded into 4 buckets. Real CompanyHealth lives in cockpit; per-account here
@@ -38,21 +40,22 @@ export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow
   const matched = deals.filter((d) => d.companyId === company.id);
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
   let openDealsMissingProbability = 0;
-  const pipelineMicros = open.reduce((acc, deal) => {
+  const pipeline = open.reduce((acc, deal) => {
     // A blank probability is stored as 0. It adds nothing and is not a measured chance.
     if (deal.probability == null || deal.probability === 0) {
       openDealsMissingProbability += 1;
       return acc;
     }
-    return acc + Math.round(deal.amountMicros * (deal.probability / 100));
-  }, 0);
+    return acc + (BigInt(deal.amountMicros) * BigInt(deal.probability)) / 100n;
+  }, 0n);
+  const pipelineMicros = pipeline.toString();
   // Health proxy: 0 → critical, <250k → needs_attention, <2M → good, ≥2M → strong.
   const health: AccountRow['health'] =
-    pipelineMicros === 0
+    pipeline === 0n
       ? 'critical'
-      : pipelineMicros < 250_000_000_000
+      : pipeline < 250_000_000_000n
         ? 'needs_attention'
-        : pipelineMicros < 2_000_000_000_000
+        : pipeline < 2_000_000_000_000n
           ? 'good'
           : 'strong';
   const coverageFields = [
@@ -94,7 +97,7 @@ export function sortRows(a: AccountRow, b: AccountRow, key: SortKey): number {
     case 'name':
       return a.company.name.localeCompare(b.company.name);
     case 'pipeline':
-      return b.pipelineMicros - a.pipelineMicros;
+      return compareMicros(b.pipelineMicros, a.pipelineMicros);
     case 'health': {
       const order = { strong: 0, good: 1, needs_attention: 2, critical: 3 };
       return order[a.health] - order[b.health];
@@ -102,7 +105,7 @@ export function sortRows(a: AccountRow, b: AccountRow, key: SortKey): number {
     case 'industry':
       return (a.company.industry ?? '').localeCompare(b.company.industry ?? '');
     case 'coverage':
-      return b.coverage.score - a.coverage.score || b.pipelineMicros - a.pipelineMicros;
+      return b.coverage.score - a.coverage.score || compareMicros(b.pipelineMicros, a.pipelineMicros);
   }
 }
 

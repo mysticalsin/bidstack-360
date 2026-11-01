@@ -152,7 +152,7 @@ function cockpit(): AccountCockpitSnapshot {
     externalLastSyncedAt: null,
     kpis: [],
     revenueEvolution: [],
-    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: 0, lostValueMicros: 0, winRate: 0 },
+    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: '0', lostValueMicros: '0', winRate: 0 },
     technicalStack: [
       {
         label: 'Cloud',

@@ -1,7 +1,12 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  compareMicros,
+  formatExactUnspecified,
+  microsSharePercent,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
@@ -22,8 +27,14 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
   const points = cockpit.revenueEvolution ?? [];
   if (!flags.showRevenueBlock || points.length === 0) return null;
 
-  const max = Math.max(...points.map((p) => p.revenueMicros), 1);
-  const peak = points.reduce((a, b) => (b.revenueMicros > a.revenueMicros ? b : a), points[0]!);
+  const max = points.reduce<string>(
+    (largest, point) => (compareMicros(point.revenueMicros, largest) > 0 ? point.revenueMicros : largest),
+    '0',
+  );
+  const peak = points.reduce(
+    (best, point) => (compareMicros(point.revenueMicros, best.revenueMicros) > 0 ? point : best),
+    points[0]!,
+  );
   return (
     <Card role="region" aria-label={t('revenueEvolution.regionLabel', 'Revenue evolution')}>
       <SectionHeader
@@ -53,9 +64,19 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
   );
 });
 
-function RevenueBar({ period, micros, max }: { period: string; micros: number; max: number }) {
+function RevenueBar({
+  period,
+  micros,
+  max,
+}: {
+  period: string;
+  micros: string;
+  max: string;
+}) {
   const { t } = useTranslation('crm');
-  const formatted = formatUnspecifiedCompact(micros / 1_000_000);
+  const formatted = formatExactUnspecified(micros);
+  const share = microsSharePercent(micros, max);
+  const height = share <= 0 ? 0 : Math.max(6, (share / 100) * 96);
   return (
     <li
       className="flex flex-1 flex-col items-center gap-1"
@@ -63,7 +84,7 @@ function RevenueBar({ period, micros, max }: { period: string; micros: number; m
     >
       <div
         className="w-full rounded-t bg-[var(--brand-primary)]"
-        style={{ height: `${Math.max(6, (micros / max) * 96)}px` }}
+        style={{ height: `${height}px` }}
         aria-hidden
       />
       <span className="text-[11px] text-[var(--fg-tertiary)]">{period}</span>

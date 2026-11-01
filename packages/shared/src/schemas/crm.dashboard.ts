@@ -214,15 +214,15 @@ export const AccountCockpitSnapshot = z.object({
   // is on AND points exist, so an account with no won deals shows nothing
   // rather than an empty chart.
   revenueEvolution: z
-    .array(z.object({ period: z.string().min(1), revenueMicros: z.number().int().nonnegative() }))
+    .array(z.object({ period: z.string().min(1), revenueMicros: z.string().regex(/^\d+$/) }))
     .optional(),
   // Won/lost summary derived from the account's own opportunity pipeline.
   winLoss: z
     .object({
       wonCount: z.number().int().nonnegative(),
       lostCount: z.number().int().nonnegative(),
-      wonValueMicros: z.number().int().nonnegative(),
-      lostValueMicros: z.number().int().nonnegative(),
+      wonValueMicros: z.string().regex(/^\d+$/),
+      lostValueMicros: z.string().regex(/^\d+$/),
       winRate: z.number().int().min(0).max(100).nullable(),
     })
     .optional(),

@@ -134,7 +134,7 @@ function cockpit(overrides: Partial<CrmCompany> = {}): AccountCockpitSnapshot {
       },
     ],
     revenueEvolution: [],
-    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: 0, lostValueMicros: 0, winRate: 0 },
+    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: '0', lostValueMicros: '0', winRate: 0 },
     technicalStack: [],
     health: { score: 80, band: 'good', counts: {}, factors: [] },
     keyContacts: [],

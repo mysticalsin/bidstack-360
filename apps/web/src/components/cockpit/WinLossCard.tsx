@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
@@ -20,7 +21,7 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
   const { t } = useTranslation('crm');
   const flags = useFeatureFlags();
   const wl = cockpit.winLoss;
-  const wonValue = formatUnspecifiedCompact((wl?.wonValueMicros ?? 0) / 1_000_000);
+  const wonValue = formatMicrosAmount(BigInt(wl?.wonValueMicros ?? 0));
   if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0 || wl.winRate == null) {
     return null;
   }

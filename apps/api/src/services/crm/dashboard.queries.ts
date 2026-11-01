@@ -21,7 +21,7 @@ import type {
 } from '@bidstack/shared';
 
 import { buildCompanies } from './company-enrichment.service.js';
-import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
+import { buildCockpit, microsText, type AccountPerformance } from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
 import { asProviderStatus, normalizeName, record, recordedDealStage } from './dashboard.utils.js';
 import {
@@ -67,7 +67,11 @@ export function serializeDeal(opportunity: {
     name: opportunity.name,
     stage: recordedDealStage(opportunity),
     stageName: liveStage?.name ?? null,
-    amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
+    amountMicros: microsText(
+      typeof opportunity.valueMicros === 'bigint' || typeof opportunity.valueMicros === 'number'
+        ? opportunity.valueMicros
+        : null,
+    ),
     currencyCode: recorded && recorded.length === 3 ? recorded : null,
     // A blank probability is stored as 0. That is not a measured win chance.
     probability: opportunity.probability === 0 ? null : opportunity.probability,
@@ -498,7 +502,7 @@ export function fetchBuyingRoleFacts(orgId: string, contactIds: string[], prisma
  * Exact win/loss + revenue-by-month for ONE account, computed in Postgres so
  * the numbers are correct regardless of how many opportunities the account has
  * (the cockpit's opportunity list is take-capped for display; aggregates must
- * not be). Sums are BigInt in SQL, returned as Number micros at the edge.
+ * not be). Sums stay integer micros strings so a large book is not rounded.
  */
 function isCompanyUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -508,8 +512,8 @@ const EMPTY_ACCOUNT_PERFORMANCE: AccountPerformance = {
   winLoss: {
     wonCount: 0,
     lostCount: 0,
-    wonValueMicros: 0,
-    lostValueMicros: 0,
+    wonValueMicros: '0',
+    lostValueMicros: '0',
     winRate: null,
   },
   revenueEvolution: [],
@@ -568,14 +572,21 @@ export async function fetchAccountPerformance(
     winLoss: {
       wonCount,
       lostCount,
-      wonValueMicros: Number(won._sum.valueMicros ?? 0),
-      lostValueMicros: Number(lost._sum.valueMicros ?? 0),
+      wonValueMicros: microsText(won._sum.valueMicros),
+      lostValueMicros: microsText(lost._sum.valueMicros),
       winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
     },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
     // oldest-first.
     revenueEvolution: revenueRows
-      .map((r) => ({ period: r.period, revenueMicros: Number(r.revenue ?? 0) }))
+      .map((r) => ({
+        period: r.period,
+        revenueMicros: microsText(
+          typeof r.revenue === 'bigint' || typeof r.revenue === 'number' || typeof r.revenue === 'string'
+            ? r.revenue
+            : null,
+        ),
+      }))
       .reverse(),
   };
 }
@@ -585,7 +596,7 @@ async function fetchRevenueRows(
   companyId: string,
   prismaClient: PrismaClient,
   scope?: AccessScope,
-): Promise<Array<{ period: string; revenue: bigint | number | null }>> {
+): Promise<Array<{ period: string; revenue: string | null }>> {
   if (!scope?.unrestricted && scope) {
     // Aggregate in Postgres for the scoped path too — a JS findMany summed in
     // app code was take-capped (5k rows), so an account with >5k closed_won opps
@@ -601,9 +612,9 @@ async function fetchRevenueRows(
             OR t.country_codes && ARRAY[${Prisma.join(variants)}]::text[]
             OR`
         : Prisma.empty;
-    return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
+    return prismaClient.$queryRaw<Array<{ period: string; revenue: string | null }>>(Prisma.sql`
       SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
-             SUM(o.value_micros) AS revenue
+             SUM(o.value_micros)::text AS revenue
       FROM opportunities o
       LEFT JOIN territories t ON t.id = o.territory_id
       WHERE o.org_id = ${orgId}::uuid
@@ -637,9 +648,9 @@ async function fetchRevenueRows(
     `);
   }
 
-  return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
+  return prismaClient.$queryRaw<Array<{ period: string; revenue: string | null }>>(Prisma.sql`
     SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
-           SUM(o.value_micros) AS revenue
+           SUM(o.value_micros)::text AS revenue
     FROM opportunities o
     WHERE o.org_id = ${orgId}::uuid
       AND o.company_id = ${companyId}::uuid

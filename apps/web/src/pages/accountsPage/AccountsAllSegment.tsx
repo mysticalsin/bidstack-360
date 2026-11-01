@@ -9,10 +9,8 @@ import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/compo
 import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import {
-  formatUnspecifiedAmount,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
@@ -125,7 +123,7 @@ export function AccountsAllSegment() {
   // (rows is already memoized — this just avoids four extra O(n) passes).
   const summaryStats = useMemo(
     () => ({
-      totalPipeline: rows.reduce((acc, r) => acc + r.pipelineMicros, 0),
+      totalPipeline: rows.reduce((acc, r) => acc + BigInt(r.pipelineMicros), 0n).toString(),
       totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
       logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
       enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
@@ -274,7 +272,7 @@ export function AccountsAllSegment() {
                   })}{' '}
               · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: `${formatUnspecifiedAmount(totalPipeline / 1_000_000)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+                amount: `${formatMicrosAmount(BigInt(totalPipeline))} (${UNSPECIFIED_CURRENCY_BASIS})`,
               })}
             </>
           }
@@ -367,7 +365,7 @@ export function AccountsAllSegment() {
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
-          value={formatUnspecifiedAmount(totalPipeline / 1_000_000)}
+          value={formatMicrosAmount(BigInt(totalPipeline))}
           sublabel={t('accounts.stats.weightedPipeline.detail', UNSPECIFIED_CURRENCY_BASIS)}
         />
         <StatTile

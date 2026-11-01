@@ -133,7 +133,8 @@ export const CrmDeal = z.object({
   stage: CrmDealStage,
   /** Live pipeline stage label. Absent when the deal has no live stage row. */
   stageName: z.string().min(1).nullable().optional(),
-  amountMicros: z.number().int().nonnegative(),
+  /** Integer micros. A JS number rounds a deal past 2^53. */
+  amountMicros: z.string().regex(/^\d+$/),
   currencyCode: z.string().length(3).nullable(),
   probability: z.number().int().min(0).max(100).nullable(),
   closeDate: z.string().date().nullable(),
