@@ -15,7 +15,7 @@ import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { useForecasts, useCreateForecast, useDeleteForecast } from '@/hooks/useForecasts';
 import { useUsers } from '@/hooks/useUsers';
-import { formatMicrosAmount } from '@bidstack/shared';
+import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { staggerChild, staggerParent } from '@/lib/motion';
 import type { Forecast } from '@bidstack/shared';
 
@@ -33,8 +33,7 @@ import {
 
 export function ForecastsPage() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: string | bigint) =>
-    formatMicrosAmount(typeof micros === 'bigint' ? micros : BigInt(micros));
+  const formatMoneyMicros = (micros: string | bigint) => unspecifiedMicrosLabel(micros);
   const reducedMotion = useReducedMotion();
   const forecasts = useForecasts();
   // Owner picker (NewForecastDialog): no server-side user search exists, so

@@ -66,7 +66,7 @@ describe('ForecastProjection', () => {
           openMicros: '1500000000000',
           weightedMicros: '600000000000',
           wonMicros: '0',
-          manualCommitMicros: null,
+          manualCommitMicros: '2500000000000',
           byOwner: [
             {
               ownerId: null,
@@ -84,5 +84,7 @@ describe('ForecastProjection', () => {
 
     expect(screen.getAllByText('1.5M unspecified').length).toBeGreaterThan(0);
     expect(screen.getAllByText('600K unspecified').length).toBeGreaterThan(0);
+    // WHY: the manual commit was a bare number, so it read as the display currency.
+    expect(screen.getByText('Manual commit: 2.5M unspecified')).toBeTruthy();
   });
 });
