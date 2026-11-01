@@ -236,6 +236,22 @@ export function momentumFor(loaded: LoadedSignals | undefined, now: Date): Momen
   return computeMomentum(loaded?.data ?? { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, now);
 }
 
+/** A capped page is not the whole book. Say so on the lines that used that page. */
+export function annotatePulseRead<T extends { key: string; detail: string }>(
+  drivers: readonly T[],
+  caps: { dealsCapped?: boolean; feedsCapped?: boolean },
+): T[] {
+  return drivers.map((driver) => {
+    if (caps.dealsCapped && (driver.key === 'pipeline' || driver.key === 'winloss')) {
+      return { ...driver, detail: `${driver.detail} Latest 1,000 deals.` };
+    }
+    if (caps.feedsCapped && (driver.key === 'meetings' || driver.key === 'news')) {
+      return { ...driver, detail: `${driver.detail} Latest 1,000 signals.` };
+    }
+    return driver;
+  });
+}
+
 /** Watchdog sources and whether each one is feeding this account now. */
 export async function sourceStatus(orgId: string, companyId: string, env: Record<string, string | undefined> = process.env) {
   const [subject, firmo, meetings, company, finProfile] = await Promise.all([

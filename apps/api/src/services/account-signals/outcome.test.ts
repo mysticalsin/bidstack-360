@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { capMomentumDeals, closedAtOf, openBookMicros, pageIsCapped, recordedOutcome, toMomentumOpp, type OppRow } from './load';
+import { annotatePulseRead, capMomentumDeals, closedAtOf, openBookMicros, pageIsCapped, recordedOutcome, toMomentumOpp, type OppRow } from './load';
 
 const row = (over: Partial<OppRow>): OppRow => ({
   id: 'o1',
@@ -72,5 +72,31 @@ describe('recordedOutcome', () => {
     const open = row({ stage: 's2_sent', valueMicros: 1_000_000_000_000n });
     const won = row({ stage: 'closed_won', valueMicros: 500n });
     expect(openBookMicros(lost) + openBookMicros(open) + openBookMicros(won)).toBe(1_000_000_000_000n);
+  });
+});
+
+describe('annotatePulseRead', () => {
+  it('names the page on the lines that used it', () => {
+    // WHY: the account pulse printed 7.86M as the open book when only the latest 1,000 deals were loaded.
+    const drivers = annotatePulseRead(
+      [
+        { key: 'pipeline', detail: '7.86M open pipeline, all opened in the last 90 days' },
+        { key: 'winloss', detail: '2 won, 1 lost in the last 6 months' },
+        { key: 'meetings', detail: '3 meetings in 60 days (1 before), last today' },
+        { key: 'news', detail: 'News mixed: 1 positive, 0 negative in 90 days' },
+        { key: 'hiring', detail: 'Headcount +8% in 12 months' },
+      ],
+      { dealsCapped: true, feedsCapped: true },
+    );
+    expect(drivers.find((driver) => driver.key === 'pipeline')?.detail).toContain('Latest 1,000 deals.');
+    expect(drivers.find((driver) => driver.key === 'winloss')?.detail).toContain('Latest 1,000 deals.');
+    expect(drivers.find((driver) => driver.key === 'meetings')?.detail).toContain('Latest 1,000 signals.');
+    expect(drivers.find((driver) => driver.key === 'news')?.detail).toContain('Latest 1,000 signals.');
+    expect(drivers.find((driver) => driver.key === 'hiring')?.detail).toBe('Headcount +8% in 12 months');
+    const open = annotatePulseRead(
+      [{ key: 'pipeline', detail: '2M open pipeline, flat over 90 days' }],
+      {},
+    );
+    expect(open[0]?.detail).toBe('2M open pipeline, flat over 90 days');
   });
 });

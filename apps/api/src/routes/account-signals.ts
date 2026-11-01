@@ -26,6 +26,7 @@ import { canReadAccount } from '../lib/account-access.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import {
+  annotatePulseRead,
   closedAtOf,
   groupMap,
   groupRollup,
@@ -65,7 +66,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const scope = await getAccessScope(orgId, userId);
       const now = new Date();
       const loaded = await loadMomentumInputs(orgId, scope, [company.id], now);
-      const m = momentumFor(loaded.get(company.id), now);
+      const row = loaded.get(company.id);
+      const m = momentumFor(row, now);
       return {
         companyId: company.id,
         companyName: company.name,
@@ -75,8 +77,14 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         verdict: m.verdict,
         coverage: m.coverage,
         series: m.series,
-        drivers: m.drivers.slice(0, 5),
-        sample: loaded.get(company.id)?.sample ?? false,
+        drivers: annotatePulseRead(m.drivers.slice(0, 5), {
+          dealsCapped: row?.dealsCapped,
+          feedsCapped: row?.feedsCapped,
+        }),
+        sample: row?.sample ?? false,
+        dealsCapped: row?.dealsCapped ?? false,
+        feedsCapped: row?.feedsCapped ?? false,
+        childrenCapped: row?.childrenCapped ?? false,
         sources: await sourceStatus(orgId, company.id),
         computedAt: now.toISOString(),
       };

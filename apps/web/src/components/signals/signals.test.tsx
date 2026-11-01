@@ -52,6 +52,12 @@ describe('PulseView', () => {
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
   });
 
+  it('says when the pulse is the latest page rather than the whole book', () => {
+    // WHY: the account pulse had no caption, so a capped deal page read as every deal.
+    wrap(<PulseView pulse={{ ...pulse, dealsCapped: true, feedsCapped: true, childrenCapped: true }} />);
+    expect(screen.getByText('Latest 1,000 deals · Latest 1,000 signals · Latest 1,000 subsidiaries')).toBeTruthy();
+  });
+
   it('opens the drill panel for a driver with its contribution and a link', () => {
     const { container } = wrap(<PulseView pulse={pulse} />);
     const drill = container.querySelector('.sg-drill') as HTMLElement;
