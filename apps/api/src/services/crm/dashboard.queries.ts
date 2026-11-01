@@ -661,7 +661,7 @@ const EMPTY_ACCOUNT_PERFORMANCE: AccountPerformance = {
     winRate: null,
   },
   revenueEvolution: [],
-  book: { projectCount: 0, openCount: 0 },
+  book: { projectCount: 0, openCount: 0, contactCount: 0, taskCount: 0 },
 };
 
 export async function fetchAccountPerformance(
@@ -702,7 +702,10 @@ export async function fetchAccountPerformance(
   };
   const scoped = (where: Prisma.OpportunityWhereInput) =>
     scope ? applyOpportunityScope(where, scope) : where;
-  const [won, lost, projects, open, revenueRows] = await Promise.all([
+  const taskOpportunityWhere = scope
+    ? applyOpportunityScope({ companyId, deletedAt: null }, scope)
+    : { companyId, deletedAt: null };
+  const [won, lost, projects, open, contactCount, taskCount, revenueRows] = await Promise.all([
     prismaClient.opportunity.aggregate({
       where: scoped(wonWhere),
       _sum: { valueMicros: true },
@@ -715,6 +718,14 @@ export async function fetchAccountPerformance(
     }),
     prismaClient.opportunity.count({ where: scoped(base) }),
     prismaClient.opportunity.count({ where: scoped(openWhere) }),
+    prismaClient.contact.count({ where: { orgId, companyId, deletedAt: null } }),
+    prismaClient.task.count({
+      where: {
+        orgId,
+        deletedAt: null,
+        OR: [{ accountId: companyId }, { opportunity: taskOpportunityWhere }],
+      },
+    }),
     fetchRevenueRows(orgId, companyId, prismaClient, scope),
   ]);
 
@@ -730,7 +741,7 @@ export async function fetchAccountPerformance(
       lostValueMicros: microsText(lost._sum.valueMicros),
       winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
     },
-    book: { projectCount: projects, openCount: open },
+    book: { projectCount: projects, openCount: open, contactCount, taskCount },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
     // oldest-first.
     revenueEvolution: revenueRows
