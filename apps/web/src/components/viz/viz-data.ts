@@ -160,7 +160,7 @@ export function cumulativeWon(rows: OppRow[]) {
       if (d.getUTCFullYear() === year && d.getUTCMonth() === m) run += deal.v;
     }
     const date = new Date(year, m, 1); // local midnight, for axis display only
-    return { x: monFmt.format(date), date, y: microsToUnits(run) };
+    return { x: monFmt.format(date), date, y: microsToUnits(run), yMicros: run.toString() };
   });
 }
 

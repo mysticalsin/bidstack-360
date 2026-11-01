@@ -101,6 +101,25 @@ describe('viz-data', () => {
     // WHY: the quarter bar and the spark added the unit number, so a stored amount of 0 units drew nothing.
     expect(wonByQuarter([storedWon])).toEqual([{ label: 'Q1 2026', won: 200, wonMicros: '200000000' }]);
     expect(cumulativeWon([storedWon]).map((point) => point.y)).toEqual([0, 200]);
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const hugeWon = cumulativeWon([
+      row({
+        stage: 'closed_won',
+        value: 0,
+        valueMicros: huge,
+        dueDate: '2026-01-15T00:00:00.000Z',
+        closedAt: '2026-01-15T00:00:00.000Z',
+      }),
+      row({
+        stage: 'closed_won',
+        value: 0,
+        valueMicros: huge,
+        dueDate: '2026-01-20T00:00:00.000Z',
+        closedAt: '2026-01-20T00:00:00.000Z',
+      }),
+    ]);
+    // WHY: adding the unit numbers made two of these wins one unit short of the real book.
+    expect(hugeWon.at(-1)?.yMicros).toBe((9007199254740993n * 2n * 1_000_000n).toString());
     expect(cumulativeOpen([storedOpen])).toEqual([0, 10]);
     expect(fmtCompact(7_860_000)).toContain('7.86');
     expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
