@@ -123,10 +123,15 @@ export function mapStage(v: unknown): string {
     );
   }
   if (s.includes('negoti') || s.includes('contract')) return 's4_negotiation';
-  if (s.includes('proposal') || s.includes('sent') || s.includes('quote')) return 's2_sent';
+  if (s.includes('proposal') || /(^|_)sent($|_)/.test(s) || s.includes('quote')) return 's2_sent';
   if (s.includes('demo') || s.includes('technical') || s.includes('evaluation'))
     return 's3_technical_iteration';
-  return 's1_lead';
+  if (s === 'lead' || s.includes('prospect') || s.includes('qualif') || s.includes('ongoing')) {
+    return 's1_lead';
+  }
+  throw new Error(
+    `opportunity.stage "${asTrimmed(v)}" is not a known stage, so it was not imported`,
+  );
 }
 
 /** Map a source row through the column mappings into { targetField: rawValue }. */

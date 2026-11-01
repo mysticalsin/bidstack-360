@@ -51,10 +51,13 @@ describe('mapStage', () => {
     expect(() => mapStage('Successfully Closed')).toThrow(/Successfully Closed/);
   });
 
-  it('defaults unknown/blank stages to s1_lead (never crashes the import)', () => {
-    expect(mapStage('Whatever')).toBe('s1_lead');
+  it('keeps a blank stage as a lead and refuses an unknown label', () => {
+    // WHY: "Whatever" used to become a lead, and "absent" became sent.
     expect(mapStage('')).toBe('s1_lead');
     expect(mapStage(null)).toBe('s1_lead');
+    expect(mapStage('Prospect')).toBe('s1_lead');
+    expect(() => mapStage('Whatever')).toThrow(/Whatever.*not imported/);
+    expect(() => mapStage('absent')).toThrow(/absent.*not imported/);
   });
 });
 
