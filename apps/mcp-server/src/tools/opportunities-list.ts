@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { requireCompanyLink } from './crm-tools.helpers.js';
+import { dealOutcome, requireCompanyLink } from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -26,7 +26,7 @@ const Input = z.object({
 
 export const opportunitiesList: Tool<typeof Input> = {
   description:
-    'List opportunities. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. currency is null and currencyBasis is unspecified when the row has no currency. probability is win likelihood, not account health.',
+    'List opportunities. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. stage is the stored key. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified when the row has no currency. probability is win likelihood, not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -68,7 +68,10 @@ export const opportunitiesList: Tool<typeof Input> = {
             }
           : {}),
       },
-      include: { owner: true },
+      include: {
+        owner: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
       orderBy: { updatedAt: 'desc' },
       take: args.limit,
     });
@@ -78,6 +81,7 @@ export const opportunitiesList: Tool<typeof Input> = {
       customer: o.customer,
       name: o.name,
       stage: o.stage,
+      outcome: dealOutcome(o),
       value: Number(o.valueMicros) / 1_000_000,
       probability: o.probability,
       // Opportunity has no currency column. Do not label the value as EUR.

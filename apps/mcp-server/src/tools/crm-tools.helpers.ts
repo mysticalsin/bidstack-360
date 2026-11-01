@@ -17,6 +17,17 @@ export async function mintNextCode(orgId: string): Promise<string> {
   return `OP-${(n + 1).toString().padStart(4, '0')}`;
 }
 
+/** Lost wins when the enum and a live stage flag disagree, or both are set. */
+export function dealOutcome(deal: {
+  stage: string;
+  pipelineStage: { isWon: boolean; isLost: boolean; deletedAt: Date | null } | null;
+}): 'open' | 'won' | 'lost' {
+  const stage = deal.pipelineStage?.deletedAt == null ? deal.pipelineStage : null;
+  if (deal.stage === 'closed_lost' || stage?.isLost) return 'lost';
+  if (deal.stage === 'closed_won' || stage?.isWon) return 'won';
+  return 'open';
+}
+
 export function serializeDeal(deal: {
   id: string;
   code: string;

@@ -211,6 +211,68 @@ describeDb('MCP tools', () => {
     expect(out.health).toBe('not_account_health');
   });
 
+  it('opportunities.get and list report a lost flag even when the stage key looks open', async () => {
+    // WHY: Dust was reading the stored key. A stage marked lost still looked
+    // like an open deal, and a stage marked both won and lost looked won.
+    const token = randomBytes(4).toString('hex');
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Outcome ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    const both = await prisma.pipelineStage.create({
+      data: {
+        orgId,
+        pipelineId: pipeline.id,
+        key: 'both_flags',
+        name: 'Both',
+        isWon: true,
+        isLost: true,
+      },
+    });
+    const lostOpp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OL1-${token}`,
+        customer: 'Outcome Co',
+        name: 'Looks open',
+        stage: 's2_sent',
+        pipelineStageId: lost.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const bothOpp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OL2-${token}`,
+        customer: 'Outcome Co',
+        name: 'Both flags',
+        stage: 's4_negotiation',
+        pipelineStageId: both.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const one = (await tools['opportunities.get'].handler({ id: lostOpp.id }, ctx)) as {
+      stage: string;
+      outcome: string;
+    };
+    expect(one.stage).toBe('s2_sent');
+    expect(one.outcome).toBe('lost');
+
+    const listed = (await tools['opportunities.list'].handler(
+      { search: `OP-OL`, limit: 20 },
+      ctx,
+    )) as Array<{ id: string; outcome: string }>;
+    expect(listed.find((row) => row.id === lostOpp.id)?.outcome).toBe('lost');
+    expect(listed.find((row) => row.id === bothOpp.id)?.outcome).toBe('lost');
+  });
+
   it('opportunities.get returns a single opp', async () => {
     const out = (await tools['opportunities.get'].handler({ id: oppId }, ctx)) as { id: string };
     expect(out.id).toBe(oppId);

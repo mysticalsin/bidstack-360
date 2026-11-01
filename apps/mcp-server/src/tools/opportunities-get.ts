@@ -4,6 +4,7 @@ import { prisma } from '@bidstack/db';
 import { presentOpportunityIntel } from '@bidstack/shared';
 
 import type { Tool } from './index.js';
+import { dealOutcome } from './crm-tools.helpers.js';
 
 const Input = z
   .object({
@@ -25,7 +26,7 @@ function stageWords(stage: string): string {
 
 export const opportunitiesGet: Tool<typeof Input> = {
   description:
-    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the label. currency is null and currencyBasis is unspecified. probability is win likelihood, not account health.',
+    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the label. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified. probability is win likelihood, not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -44,7 +45,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
       },
       include: {
         owner: true,
-        pipelineStage: { select: { name: true } },
+        pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
         tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
         documents: { orderBy: { createdAt: 'desc' }, take: 50 },
       },
@@ -58,6 +59,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
       name: opp.name,
       stage: opp.stage,
       stageName: opp.pipelineStage?.name?.trim() || stageWords(opp.stage),
+      outcome: dealOutcome(opp),
       value: Number(opp.valueMicros) / 1_000_000,
       currency: null,
       currencyBasis: 'unspecified' as const,
