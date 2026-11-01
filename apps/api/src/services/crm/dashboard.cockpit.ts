@@ -169,6 +169,14 @@ export function registerDealsAreCapped(loaded: number, total: number): boolean {
   return loaded >= REGISTER_DEAL_PAGE && total > REGISTER_DEAL_PAGE;
 }
 
+/** Accepted buying-role holders loaded besides the influence page. */
+export const ROLE_HOLDER_PROBE = 1000;
+
+/** A further holder exists only when this probe is full and another id remains. */
+export function roleHoldersAreCapped(loaded: number, anotherExists: boolean): boolean {
+  return loaded >= ROLE_HOLDER_PROBE && anotherExists;
+}
+
 export function computeSignalCoverage(
   input: {
     company: z.infer<typeof CrmCompany>;
@@ -641,6 +649,7 @@ export function buildCockpit({
   blockedCount,
   registerDealsCapped = false,
   registerDealIds,
+  roleHoldersCapped = false,
   risksCapped,
   complianceCapped,
   buyingRolesCapped = false,
@@ -740,6 +749,8 @@ export function buildCockpit({
   registerDealsCapped?: boolean;
   /** Deal ids the register was loaded for. The 100-deal card is not this set. */
   registerDealIds?: readonly string[];
+  /** Accepted role holders filled ROLE_HOLDER_PROBE, so the champion count is partial. */
+  roleHoldersCapped?: boolean;
   risksCapped?: boolean;
   complianceCapped?: boolean;
   /** Accepted buying-role facts filled their page, so one role is not the whole set. */
@@ -998,7 +1009,7 @@ export function buildCockpit({
     buyingRolesCapped,
     championCount: buyingRolesCapped ? undefined : championCount,
     buyerCount: buyingRolesCapped ? undefined : buyerCount,
-    contactsCapped: coveragePages?.contactsCapped,
+    contactsCapped: roleHoldersCapped,
     roadmap: [],
   };
 }

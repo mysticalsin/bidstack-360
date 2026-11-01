@@ -27,8 +27,10 @@ import {
   COCKPIT_OPP_PAGE,
   COCKPIT_TASK_PAGE,
   REGISTER_DEAL_PAGE,
+  ROLE_HOLDER_PROBE,
   microsText,
   registerDealsAreCapped,
+  roleHoldersAreCapped,
   type AccountPerformance,
 } from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
@@ -622,6 +624,7 @@ export async function buildCompanyCockpit(
     complianceTotal: compliancePage.complianceTotal,
     blockedCount: compliancePage.blockedCount,
     registerDealsCapped: registerDeals.capped,
+    roleHoldersCapped: roleHolders.roleHoldersCapped,
     risksCapped: riskPage.capped,
     complianceCapped: compliancePage.capped,
     buyingRoleFacts: buyingRoleFacts.rows,
@@ -653,9 +656,9 @@ const cockpitContactSelect = {
 } as const;
 
 /**
- * The influence page is 20 people. A champion just outside it never reaches
- * the buying-role read. Pull accepted role holders the page missed, and say
- * when more than 20 distinct holders exist.
+ * The influence page is 20 people. Accepted role holders outside it still
+ * count, up to ROLE_HOLDER_PROBE distinct people. A further holder marks the
+ * champion count partial.
  */
 export async function includeBuyingRoleContacts(
   orgId: string,
@@ -676,25 +679,34 @@ export async function includeBuyingRoleContacts(
   }>;
   roleHoldersCapped: boolean;
 }> {
+  const where = {
+    orgId,
+    deletedAt: null,
+    kind: 'buying_role' as const,
+    status: 'accepted' as const,
+    opportunity: { orgId, companyId, deletedAt: null },
+  };
   const probe = await prismaClient.contactFact.findMany({
-    where: {
-      orgId,
-      deletedAt: null,
-      kind: 'buying_role' as const,
-      status: 'accepted' as const,
-      opportunity: { orgId, companyId, deletedAt: null },
-    },
+    where,
     distinct: ['contactId'],
     select: { contactId: true },
     orderBy: { contactId: 'asc' },
-    take: COCKPIT_CONTACT_PAGE + 1,
+    take: ROLE_HOLDER_PROBE,
   });
-  const roleHoldersCapped = probe.length > COCKPIT_CONTACT_PAGE;
+  const another =
+    probe.length < ROLE_HOLDER_PROBE
+      ? []
+      : await prismaClient.contactFact.findMany({
+          where,
+          distinct: ['contactId'],
+          select: { contactId: true },
+          orderBy: { contactId: 'asc' },
+          skip: ROLE_HOLDER_PROBE,
+          take: 1,
+        });
+  const roleHoldersCapped = roleHoldersAreCapped(probe.length, another.length > 0);
   const have = new Set(loaded.map((contact) => contact.id));
-  const missing = probe
-    .slice(0, COCKPIT_CONTACT_PAGE)
-    .map((row) => row.contactId)
-    .filter((id) => !have.has(id));
+  const missing = probe.map((row) => row.contactId).filter((id) => !have.has(id));
   if (missing.length === 0) return { extra: [], roleHoldersCapped };
   const extra = await prismaClient.contact.findMany({
     where: { orgId, companyId, deletedAt: null, id: { in: missing } },

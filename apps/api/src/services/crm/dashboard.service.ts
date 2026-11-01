@@ -539,6 +539,7 @@ export async function buildDashboardSnapshot(
       complianceTotal: compliancePage.complianceTotal,
       blockedCount: compliancePage.blockedCount,
       registerDealsCapped: registerDeals.capped,
+      roleHoldersCapped: roleHolders.roleHoldersCapped,
       risksCapped: riskPage.capped,
       complianceCapped: compliancePage.capped,
       buyingRoleFacts: buyingRoleFacts.rows,
