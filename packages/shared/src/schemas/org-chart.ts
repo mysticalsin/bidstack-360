@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Sentiment } from './contact.js';
 import { SeniorityLevel, classifySeniority } from './meeting-intel.js';
 
-export const ORG_CHART_SOURCES = ['manual', 'csv', 'html', 'contacts', 'abc', 'metis', 'apollo', 'seed'] as const;
+export const ORG_CHART_SOURCES = ['manual', 'csv', 'html', 'contacts', 'abc', 'metis', 'mars', 'apollo', 'seed'] as const;
 export const OrgChartSource = z.enum(ORG_CHART_SOURCES);
 export type OrgChartSource = z.infer<typeof OrgChartSource>;
 

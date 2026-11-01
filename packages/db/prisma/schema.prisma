@@ -5967,6 +5967,7 @@ enum MeetingIntelSource {
   abc
   metis
   manual
+  mars
 
   @@map("meeting_intel_source")
 }
@@ -6015,6 +6016,10 @@ model MeetingSourceConnection {
   consentedAt     DateTime?          @map("consented_at") @db.Timestamptz(6)
   revokedAt       DateTime?          @map("revoked_at") @db.Timestamptz(6)
   lastSyncAt      DateTime?          @map("last_sync_at") @db.Timestamptz(6)
+  /// Opaque resume cursor from a cursor-paged source (MARS). Null = start from lastSyncAt.
+  syncCursor      String?            @map("sync_cursor") @db.VarChar(500)
+  /// Source settings (MARS: account key map and per account cursors). Validated by MarsConnectionSettings.
+  settings        Json?
   lastError       String?            @map("last_error")
   itemsReceived   Int                @default(0) @map("items_received")
   createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -6293,7 +6298,7 @@ model OrgChartNode {
   importRef            String?        @map("import_ref") @db.VarChar(200)
   ownerUserId          String?        @map("owner_user_id") @db.Uuid
   sortOrder            Int            @default(0) @map("sort_order")
-  /// manual | csv | contacts | abc | metis | apollo | seed
+  /// manual | csv | html | contacts | abc | metis | mars | apollo | seed
   source               String         @default("manual") @db.VarChar(16)
   /// Provider id for seeded prospects (Apollo person id, meeting attendee email).
   externalRef          String?        @map("external_ref") @db.VarChar(160)

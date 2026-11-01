@@ -3,14 +3,18 @@
  *   meeting-intel.scan     repeatable (hourly): enqueue a sync per connected source
  *   meeting-intel.sync     pull one connection (ABC org-level, Metis per user)
  *   meeting-intel.process  match, enrich, dedupe and flag one ingest item
+ *   meeting-intel.mars-scan  repeatable, only with MARS_INTEGRATION_ENABLED=true
+ *   meeting-intel.mars-sync  pull the MARS weekly meeting log for one org
  */
 import { type Job, Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
-import { MEETING_INTEL, type MeetingIntelJob } from '@bidstack/shared';
+import { isMarsEnabled, MEETING_INTEL, type MeetingIntelJob } from '@bidstack/shared';
 
+import { marsSourceFromEnv } from '../mars/source.js';
+import { marsOrgsToSync, marsSyncDepsFromEnv, runMarsSync } from '../mars/sync.js';
 import { defaultPipelineDeps, type PipelineDeps, processIngestItem, raiseCrossRegionFlags, syncConnection } from '../meeting-intel/pipeline.js';
 
 const SCAN_EVERY_MS = 60 * 60_000;
@@ -39,17 +43,28 @@ export async function startMeetingIntel(
         ? `${job.orgId}--sync--${job.connectionId}--${Date.now()}`
         : job.kind === 'process'
           ? `${job.orgId}--item--${job.itemId}`
-          : `${job.orgId}--flags--${job.meetingId}--${Date.now()}`;
+          : job.kind === 'mars-sync'
+            ? `${job.orgId}--mars--${Math.floor(Date.now() / 60_000)}`
+            : `${job.orgId}--flags--${job.meetingId}--${Date.now()}`;
     await queue.add(`meeting-intel.${job.kind}`, job, { jobId: id });
   };
   const deps = defaultPipelineDeps(enqueue);
+  const marsDeps = marsSyncDepsFromEnv(marsSourceFromEnv(), enqueue);
   const worker = new Worker<MeetingIntelJob | Record<string, never>>(
     MEETING_INTEL.name,
     async (job: Job<MeetingIntelJob | Record<string, never>>) => {
       if (job.name === 'meeting-intel.scan') return { enqueued: await scanMeetingSources(enqueue) };
+      if (job.name === 'meeting-intel.mars-scan') {
+        if (!marsDeps.enabled) return { enqueued: 0 };
+        const orgs = await marsOrgsToSync();
+        for (const orgId of orgs) await enqueue({ kind: 'mars-sync', orgId, reason: 'schedule' });
+        return { enqueued: orgs.length };
+      }
       const data = job.data as MeetingIntelJob;
       const res =
-        data.kind === 'sync'
+        data.kind === 'mars-sync'
+          ? await runMarsSync(data, marsDeps)
+          : data.kind === 'sync'
           ? await syncConnection(data, deps)
           : data.kind === 'process'
             ? await processIngestItem(data, deps)
@@ -64,5 +79,9 @@ export async function startMeetingIntel(
   });
   workers.push(worker);
   await queue.add('meeting-intel.scan', {}, { repeat: { every: SCAN_EVERY_MS }, jobId: 'meeting-intel-scan' });
+  if (isMarsEnabled(process.env.MARS_INTEGRATION_ENABLED)) {
+    const minutes = Math.max(15, Number(process.env.MARS_SYNC_EVERY_MINUTES) || 60);
+    await queue.add('meeting-intel.mars-scan', {}, { repeat: { every: minutes * 60_000 }, jobId: 'meeting-intel-mars-scan' });
+  }
   log.info({ queue: MEETING_INTEL.name }, 'meeting intel worker started');
 }

@@ -5,7 +5,7 @@
 // API contract: /workspace/fleet/polo-meeting-intel-api.md.
 import { z } from 'zod';
 
-export const MeetingIntelSource = z.enum(['abc', 'metis', 'manual']);
+export const MeetingIntelSource = z.enum(['abc', 'metis', 'manual', 'mars']);
 export type MeetingIntelSource = z.infer<typeof MeetingIntelSource>;
 
 export const MeetingIntelVisibility = z.enum(['account_team', 'org']);
@@ -27,6 +27,10 @@ export const NormalizedAttendee = z.object({
   title: z.string().trim().max(200).optional(),
   region: z.string().trim().max(100).optional(),
   businessUnit: z.string().trim().max(200).optional(),
+  /** MARS only: kept in the ingest payload for person dedupe and org chart suggestions, never on the attendee row. */
+  linkedinUrl: z.string().trim().url().max(300).optional(),
+  /** MARS only: manager as the logging manager understood it. A hint for suggestions, never a fact. */
+  reportsTo: z.object({ name: z.string().trim().min(1).max(200), email: z.string().trim().email().max(320).optional() }).optional(),
 });
 export type NormalizedAttendee = z.infer<typeof NormalizedAttendee>;
 

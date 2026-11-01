@@ -98,7 +98,7 @@ export async function syncConnection(
 export async function storeIngestItems(
   orgId: string,
   conn: {
-    source: 'abc' | 'metis' | 'manual';
+    source: 'abc' | 'metis' | 'manual' | 'mars';
     connectionId: string | null;
     submittedById: string | null;
     shareSummary: boolean;
