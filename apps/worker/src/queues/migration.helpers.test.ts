@@ -42,13 +42,13 @@ describe('mapStage', () => {
     expect(mapStage('Technical Evaluation')).toBe('s3_technical_iteration');
   });
 
-  it('does not record an unspecified close as a loss', () => {
-    // Why: "closed" without won or lost used to become closed_lost, so a
-    // close that was not a loss was imported as one.
+  it('does not record an unspecified close as a lead or a loss', () => {
+    // Why: "closed" without won or lost was first a false loss, then a false
+    // lead. The import must keep the row out and name the original label.
     expect(mapStage('Closed Lost')).toBe('closed_lost');
     expect(mapStage('Lost')).toBe('closed_lost');
-    expect(mapStage('Closed')).toBe('s1_lead');
-    expect(mapStage('Successfully Closed')).toBe('s1_lead');
+    expect(() => mapStage('Closed')).toThrow(/Closed.*not imported/);
+    expect(() => mapStage('Successfully Closed')).toThrow(/Successfully Closed/);
   });
 
   it('defaults unknown/blank stages to s1_lead (never crashes the import)', () => {

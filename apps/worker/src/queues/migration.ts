@@ -114,9 +114,14 @@ export function mapStage(v: unknown): string {
   if (!s) return 's1_lead';
   if (OPP_STAGES.has(s)) return s;
   if (s.includes('won')) return 'closed_won';
-  // "Closed" without won or lost is not a loss. Counting it as closed_lost
-  // made an unspecified close show up as a lost event.
   if (s.includes('lost')) return 'closed_lost';
+  // An unspecified close is not a lead and not a loss. The import records
+  // the row as an error so the original label is not replaced by s1_lead.
+  if (s.includes('closed')) {
+    throw new Error(
+      `opportunity.stage "${asTrimmed(v)}" is closed without won or lost, so it was not imported`,
+    );
+  }
   if (s.includes('negoti') || s.includes('contract')) return 's4_negotiation';
   if (s.includes('proposal') || s.includes('sent') || s.includes('quote')) return 's2_sent';
   if (s.includes('demo') || s.includes('technical') || s.includes('evaluation'))
@@ -311,6 +316,7 @@ async function writeOpportunity(
   }
   // Bounded retry on (orgId, code) unique collisions — same pattern as the
   // API's create route.
+  const stage = mapStage(t['opportunity.stage']);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const created = await prisma.$transaction(async (tx) => {
@@ -321,7 +327,7 @@ async function writeOpportunity(
             code,
             name,
             customer,
-            stage: mapStage(t['opportunity.stage']) as never,
+            stage: stage as never,
             valueMicros: asMicros(t['opportunity.valueMicros']) ?? 0n,
             probability: asInt(t['opportunity.probability']) ?? 0,
             dueDate: asDate(t['opportunity.closeDate']),
