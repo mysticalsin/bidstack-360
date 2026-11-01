@@ -270,51 +270,126 @@ export const crmEnrichCompany: Tool<typeof EnrichCompanyInput> = {
 };
 
 export const crmListActivities: Tool<typeof ActivityListInput> = {
-  description: 'List CRM activity timeline entries from tasks and job events.',
+  description:
+    'List follow-up tasks and logged activities for one company or deal. A company name must match exactly one company. Tasks match the company id or the opportunity company. Activities match the company, its linked deals, or its linked people. A matching customer label is not included.',
   input: ActivityListInput,
   inputJsonSchema: {
     type: 'object',
     properties: {
-      company: { type: 'string' },
+      company: {
+        type: 'string',
+        description: 'Company id, or a name that matches exactly one company.',
+      },
       dealId: { type: 'string', format: 'uuid' },
       limit: { type: 'integer', minimum: 1, maximum: 100, default: 25 },
     },
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
-    const tasks = await prisma.task.findMany({
-      where: {
-        orgId: ctx.orgId,
-        deletedAt: null, // skip soft-deleted (Review)
-        ...(args.dealId ? { oppId: args.dealId } : {}),
-        ...(args.company
-          ? {
-              opportunity: {
-                companyId: (
-                  await requireCompanyLink(
-                    ctx.orgId,
-                    isCompanyUuid(args.company) ? { companyId: args.company } : { name: args.company },
-                  )
-                ).id,
-              },
-            }
-          : {}),
-      },
-      include: { opportunity: true, assignee: true },
-      orderBy: { createdAt: 'desc' },
-      take: args.limit,
-    });
-    return tasks.map((task) => ({
-      id: task.id,
-      kind: 'task',
-      subject: task.title,
-      company: task.opportunity?.customer ?? null,
-      dealId: task.oppId,
-      actor: task.assignee?.email ?? null,
-      occurredAt: task.createdAt.toISOString(),
-    }));
+    const company = args.company
+      ? await requireCompanyLink(
+          ctx.orgId,
+          isCompanyUuid(args.company) ? { companyId: args.company } : { name: args.company },
+        )
+      : null;
+    if (args.dealId && company) {
+      const deal = await prisma.opportunity.findFirst({
+        where: {
+          id: args.dealId,
+          orgId: ctx.orgId,
+          deletedAt: null,
+          companyId: company.id,
+        },
+        select: { id: true },
+      });
+      // The deal is not this company's. Do not return its timeline under the account.
+      if (!deal) return [];
+    }
+
+    const linkedIds = await linkedActivityIds(ctx.orgId, company?.id, args.dealId);
+    const [tasks, activities] = await Promise.all([
+      prisma.task.findMany({
+        where: {
+          orgId: ctx.orgId,
+          deletedAt: null, // skip soft-deleted (Review)
+          ...(args.dealId ? { oppId: args.dealId } : {}),
+          ...(company
+            ? {
+                OR: [
+                  { accountId: company.id },
+                  { opportunity: { companyId: company.id, deletedAt: null } },
+                ],
+              }
+            : {}),
+        },
+        include: { opportunity: true, assignee: true },
+        orderBy: { createdAt: 'desc' },
+        take: args.limit,
+      }),
+      prisma.activity.findMany({
+        where: {
+          orgId: ctx.orgId,
+          deletedAt: null,
+          ...(linkedIds ? { OR: linkedIds } : {}),
+        },
+        include: { owner: true },
+        orderBy: { occurredAt: 'desc' },
+        take: args.limit,
+      }),
+    ]);
+
+    return [
+      ...tasks.map((task) => ({
+        id: task.id,
+        kind: 'task' as const,
+        subject: task.title,
+        company: company?.name ?? task.opportunity?.customer ?? null,
+        dealId: task.oppId,
+        actor: task.assignee?.email ?? null,
+        occurredAt: task.createdAt.toISOString(),
+      })),
+      ...activities.map((activity) => ({
+        id: activity.id,
+        kind: activity.type,
+        subject: activity.subject,
+        company: company?.name ?? null,
+        dealId: activity.entityType === 'opportunity' ? activity.entityId : null,
+        actor: activity.owner?.email ?? null,
+        occurredAt: activity.occurredAt.toISOString(),
+      })),
+    ]
+      .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0))
+      .slice(0, args.limit);
   },
 };
+
+/** Company, linked-deal, and linked-person activity targets. Null means no entity filter. */
+async function linkedActivityIds(
+  orgId: string,
+  companyId: string | undefined,
+  dealId: string | undefined,
+): Promise<Prisma.ActivityWhereInput[] | null> {
+  if (dealId) return [{ entityType: 'opportunity', entityId: dealId }];
+  if (!companyId) return null;
+  const [opportunities, contacts] = await Promise.all([
+    prisma.opportunity.findMany({
+      where: { orgId, deletedAt: null, companyId },
+      select: { id: true },
+    }),
+    prisma.contact.findMany({
+      where: { orgId, deletedAt: null, companyId },
+      select: { id: true },
+    }),
+  ]);
+  const or: Prisma.ActivityWhereInput[] = [{ entityType: 'company', entityId: companyId }];
+  if (opportunities.length > 0) {
+    or.push({ entityType: 'opportunity', entityId: { in: opportunities.map((row) => row.id) } });
+  }
+  if (contacts.length > 0) {
+    or.push({ entityType: 'contact', entityId: { in: contacts.map((row) => row.id) } });
+  }
+  return or;
+}
 
 export const crmCreateActivity: Tool<typeof ActivityCreateInput> = {
   description: 'Create a CRM activity as a follow-up task on a deal.',

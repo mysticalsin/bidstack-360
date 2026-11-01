@@ -93,6 +93,7 @@ describeDb('MCP tools', () => {
 
   afterAll(async () => {
     await prisma.auditLog.deleteMany({ where: { orgId } });
+    await prisma.activity.deleteMany({ where: { orgId } });
     await prisma.note.deleteMany({ where: { orgId } });
     await prisma.task.deleteMany({ where: { orgId } });
     await prisma.lead.deleteMany({ where: { orgId } });
@@ -372,6 +373,111 @@ describeDb('MCP tools', () => {
     };
     expect(out.id).toBe(created.id);
     expect(out.name).toBe('Bob Jones');
+  });
+
+  it('crm_list_activities returns linked events, not a customer-name match', async () => {
+    // WHY: the timeline used to be follow-up tasks on opportunity.companyId.
+    // A logged meeting on the account was invisible, and a deal that only
+    // repeated the company name could be treated as the account.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Activity Co ${randomBytes(4).toString('hex')}` },
+    });
+    const linked = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: 'Stored label',
+        companyId: company.id,
+        name: 'Linked pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const nameOnly = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: company.name,
+        name: 'Name only pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const person = await prisma.contact.create({
+      data: { orgId, customer: 'Stored label', companyId: company.id, name: 'Linked Person' },
+    });
+    const stranger = await prisma.contact.create({
+      data: { orgId, customer: company.name, name: 'Name Only Person' },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'meeting',
+        subject: 'Linked meeting',
+        entityType: 'opportunity',
+        entityId: linked.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'call',
+        subject: 'Name only call',
+        entityType: 'opportunity',
+        entityId: nameOnly.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'note',
+        subject: 'Company note',
+        entityType: 'company',
+        entityId: company.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'email',
+        subject: 'Linked email',
+        entityType: 'contact',
+        entityId: person.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'email',
+        subject: 'Name only email',
+        entityType: 'contact',
+        entityId: stranger.id,
+      },
+    });
+    await prisma.task.create({
+      data: { orgId, accountId: company.id, title: 'Account task' },
+    });
+
+    const out = (await tools['crm_list_activities'].handler(
+      { company: company.id, limit: 20 },
+      ctx,
+    )) as Array<{ subject: string | null }>;
+    const subjects = out.map((row) => row.subject);
+    expect(subjects).toEqual(
+      expect.arrayContaining(['Linked meeting', 'Company note', 'Linked email', 'Account task']),
+    );
+    expect(subjects).not.toContain('Name only call');
+    expect(subjects).not.toContain('Name only email');
+
+    const otherDeal = (await tools['crm_list_activities'].handler(
+      { company: company.id, dealId: nameOnly.id, limit: 20 },
+      ctx,
+    )) as unknown[];
+    expect(otherDeal).toEqual([]);
   });
 
   it('tasks.list includes a pursuit task through the opportunity company', async () => {

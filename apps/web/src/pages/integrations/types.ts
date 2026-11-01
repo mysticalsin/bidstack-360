@@ -105,7 +105,11 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
     name: 'crm_update_deal',
     desc: 'Patch deal fields and write an audit log entry.',
   },
-  { group: 'crm', name: 'crm_list_activities', desc: 'List activities for a company or deal.' },
+  {
+    group: 'crm',
+    name: 'crm_list_activities',
+    desc: 'List tasks and logged events linked to one company or deal.',
+  },
   {
     group: 'crm',
     name: 'crm_create_activity',
