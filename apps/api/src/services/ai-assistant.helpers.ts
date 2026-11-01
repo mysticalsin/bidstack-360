@@ -77,8 +77,9 @@ export interface EmailDraftResult {
 
 export interface DealSentimentResult {
   sessionId: string;
-  score: number; // -1 to 1
-  label: 'positive' | 'neutral' | 'negative';
+  /** -1 to 1 when a model returned one. Null when no score was produced. */
+  score: number | null;
+  label: 'positive' | 'neutral' | 'negative' | null;
   summary: string;
   riskFlags: string[];
   suggestedActions: string[];

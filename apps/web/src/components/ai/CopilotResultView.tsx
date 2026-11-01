@@ -110,7 +110,7 @@ function EmailDraftView({ data }: { data: EmailDraftResult }) {
   );
 }
 
-const SENTIMENT_BADGE: Record<DealSentimentResult['label'], string> = {
+const SENTIMENT_BADGE: Record<'positive' | 'neutral' | 'negative', string> = {
   positive: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
   neutral: 'bg-[var(--tag-gray-bg)] text-[var(--tag-gray-fg)]',
   negative: 'bg-[var(--danger-tint)] text-[var(--danger)]',
@@ -118,20 +118,29 @@ const SENTIMENT_BADGE: Record<DealSentimentResult['label'], string> = {
 
 function DealSentimentView({ data }: { data: DealSentimentResult }) {
   const { t } = useTranslation('crm');
-  const scoreText = `${data.score > 0 ? '+' : ''}${data.score.toFixed(1)}`;
+  const scoreText =
+    data.score == null ? null : `${data.score > 0 ? '+' : ''}${data.score.toFixed(1)}`;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            'rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider',
-            SENTIMENT_BADGE[data.label],
-          )}
-        >
-          {data.label}
-        </span>
+        {data.score == null || data.label == null ? (
+          <span className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('copilot.sentimentMissing', 'No sentiment score')}
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider',
+              SENTIMENT_BADGE[data.label],
+            )}
+          >
+            {data.label}
+          </span>
+        )}
         <span className="font-mono text-xs text-[var(--fg-tertiary)]">
-          {t('copilot.sentimentScore', '{{score}} on the −1…+1 read', { score: scoreText })}
+          {scoreText
+            ? t('copilot.sentimentScore', '{{score}} on the −1…+1 read', { score: scoreText })
+            : t('copilot.sentimentMissingDetail', 'No model score was returned')}
         </span>
       </div>
       {data.summary ? (

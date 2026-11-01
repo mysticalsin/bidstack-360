@@ -20,6 +20,37 @@ import { buildAccountIntelContext, buildSentimentContext } from './ai-assistant.
 
 // ─── Deal sentiment ───────────────────────────────────────────────────────────
 
+/** Activity count only. A count is not a sentiment score. */
+export function recordedDealSentiment(activityCount: number): {
+  score: null;
+  label: null;
+  summary: string;
+  riskFlags: [];
+  suggestedActions: [];
+} {
+  return {
+    score: null,
+    label: null,
+    summary: `${activityCount} activities recorded for this deal. No sentiment score was produced.`,
+    riskFlags: [],
+    suggestedActions: [],
+  };
+}
+
+export function parseDealSentimentScore(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < -1 || value > 1) return null;
+  return value;
+}
+
+export function parseDealSentimentLabel(
+  value: unknown,
+): 'positive' | 'neutral' | 'negative' | null {
+  if (value === 'positive' || value === 'neutral' || value === 'negative') return value;
+  return null;
+}
+
+// ─── Deal sentiment runner ────────────────────────────────────────────────────
+
 export async function analyzeDealSentiment(
   opts: { orgId: string; userId: string; dealId: string },
   log: PinoLogger,
@@ -58,18 +89,7 @@ export async function analyzeDealSentiment(
   }
 
   if (!responseText) {
-    // Stub: infer rough sentiment from activity count as a simple heuristic.
-    const score = activities.length >= 5 ? 0.3 : activities.length >= 2 ? 0 : -0.2;
-    responseText = JSON.stringify({
-      score,
-      label: score > 0.1 ? 'positive' : score < -0.1 ? 'negative' : 'neutral',
-      summary: `${activities.length} activities recorded for this deal.`,
-      riskFlags: activities.length === 0 ? ['No recent activity — deal may be stalled'] : [],
-      suggestedActions:
-        activities.length === 0
-          ? ['Schedule a follow-up call', 'Send a check-in email']
-          : ['Review latest activity for next steps'],
-    });
+    responseText = JSON.stringify(recordedDealSentiment(activities.length));
   }
 
   const tokenInput = Math.ceil(prompt.length / 4);
@@ -77,8 +97,8 @@ export async function analyzeDealSentiment(
   const costMicros = estimateCost(tokenInput, tokenOutput);
 
   let parsed: {
-    score: number;
-    label: string;
+    score: number | null;
+    label: string | null;
     summary: string;
     riskFlags: string[];
     suggestedActions: string[];
@@ -87,8 +107,8 @@ export async function analyzeDealSentiment(
     parsed = JSON.parse(responseText) as typeof parsed;
   } catch {
     parsed = {
-      score: 0,
-      label: 'neutral',
+      score: null,
+      label: null,
       summary: responseText.slice(0, 500),
       riskFlags: [],
       suggestedActions: [],
@@ -112,8 +132,8 @@ export async function analyzeDealSentiment(
 
   return {
     sessionId,
-    score: parsed.score ?? 0,
-    label: (parsed.label as 'positive' | 'neutral' | 'negative') ?? 'neutral',
+    score: parseDealSentimentScore(parsed.score),
+    label: parseDealSentimentLabel(parsed.label),
     summary: parsed.summary ?? '',
     riskFlags: Array.isArray(parsed.riskFlags) ? parsed.riskFlags : [],
     suggestedActions: Array.isArray(parsed.suggestedActions) ? parsed.suggestedActions : [],
