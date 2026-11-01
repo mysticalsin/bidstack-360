@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
+import { formatMicrosAmount } from '@bidstack/shared';
+
 import {
   headlineMicrosLabel,
   UNSPECIFIED_CURRENCY_BASIS,
@@ -60,7 +62,9 @@ export function PipelineMetricStrip({
   const headline = pipelineHeadline(stages);
   const open = openPipelineStages(stages);
   const weightedLabel =
-    weightedMicros && /^-?\d+$/.test(weightedMicros) ? headlineMicrosLabel(weightedMicros) : null;
+    weightedMicros && /^-?\d+$/.test(weightedMicros)
+      ? formatMicrosAmount(BigInt(weightedMicros))
+      : null;
   const winRate =
     headline.winRate === null
       ? t('pipeline.winRateNoClosedBids', 'No closed bids')

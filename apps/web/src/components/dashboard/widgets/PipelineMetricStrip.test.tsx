@@ -87,7 +87,21 @@ describe('PipelineMetricStrip', () => {
         weightedMicros="7110500000000"
       />,
     );
-    expect(screen.getByLabelText(/Open pipeline/).textContent).toMatch(/7\.11M weighted/);
+    expect(screen.getByLabelText(/Open pipeline/).textContent).toMatch(/7,110,500 weighted/);
+    expect(screen.getByLabelText(/Open pipeline/).textContent).not.toMatch(/7\.11M weighted/);
+  });
+
+  it('keeps a weighted cent that a compact label would hide', () => {
+    // WHY: 7.11M is also the compact form of 7,110,000, so the half unit vanished.
+    render(
+      <PipelineMetricStrip
+        stages={[{ stage: 'proposal', count: 1, valueSum: 1, valueSumMicros: '1000000' }]}
+        weightedMicros="200000500000"
+      />,
+    );
+    const open = screen.getByLabelText(/Open pipeline/);
+    expect(open.textContent).toMatch(/200,000\.50 weighted/);
+    expect(open.textContent).not.toMatch(/200,001/);
   });
 
   it('shows the thinking mark while the figures are still loading', () => {
