@@ -88,6 +88,69 @@ describe('serializeCompany', () => {
     expect(company.strategicIntel?.freshness).toBe('stale');
   });
 
+  it('keeps Apollo revenue and the open-job count when a signal is not scored', () => {
+    const company = serializeCompany({
+      id: 'acme',
+      tradeName: 'Acme',
+      legalName: 'Acme',
+      domain: 'acme.com',
+      website: 'https://acme.com/',
+      industryCodes: ['Technology'],
+      providerMetadata: {
+        apollo: {
+          strategicIntel: {
+            provider: 'apollo_io',
+            lastSyncedAt: '2026-05-30T12:00:00.000Z',
+            syncMode: 'apollo_api_organization_enrich',
+            creditPolicy: 'uses_credits',
+            freshness: 'fresh',
+            employeeTrend: 'hiring',
+            employeeCount: 1200,
+            annualRevenueMicros: 125_000_000_000_000,
+            openJobCount: 17,
+            intentTopics: [],
+            hiringSignals: [
+              {
+                id: 'job-1',
+                kind: 'hiring',
+                label: 'Data Engineer',
+                detail: null,
+                observedAt: '2026-05-30T12:00:00.000Z',
+                source: 'apollo_io',
+                confidence: null,
+                url: null,
+                metadata: {},
+              },
+            ],
+            leadershipSignals: [],
+            revenueSignals: [],
+            newsSignals: [],
+            summary: 'Apollo synced company profile.',
+            limitations: [],
+            signals: [],
+          },
+        },
+      },
+      employeeCount: 1200,
+      annualRevenueMicros: 125_000_000_000_000n,
+      status: 'active',
+      registryIds: {},
+      formerNames: [],
+      incorporationDate: null,
+      logoUrl: null,
+      logoSource: null,
+      confidenceBps: 0,
+      sourceAttribution: [],
+      updatedAt: new Date('2026-05-30T12:00:00.000Z'),
+    });
+
+    expect(company.annualRevenueMicros).toBe(125_000_000_000_000);
+    expect(company.annualRevenueMicrosText).toBe('125000000000000');
+    expect(company.strategicIntel?.openJobCount).toBe(17);
+    expect(company.strategicIntel?.hiringSignals[0]?.confidence).toBeNull();
+    expect(JSON.stringify(company)).not.toMatch(/phone|leads|people search/i);
+  });
+
   it('maps Seamless technologies into the company technical stack', () => {
     const company = serializeCompany({
       id: 'sanofi',

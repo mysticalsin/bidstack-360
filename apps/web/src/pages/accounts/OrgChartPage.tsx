@@ -544,16 +544,13 @@ function PersonPanel(props: {
 }
 
 function SeedPanel({ busy, onRun, onCancel }: { busy: boolean; onRun: (o: { includeApollo: boolean; includeMeetingAttendees: boolean }) => void; onCancel: () => void }) {
-  const [apollo, setApollo] = useState(false);
   const [attendees, setAttendees] = useState(true);
   return (
     <div className="oc-pp" data-testid="orgchart-seed">
       <h2>Auto-fill</h2>
       <p className="oc-muted">Adds people from this account&apos;s contacts. The top of the chart is the best CEO-like title, or a CEO placeholder. People go under their CRM manager, else the nearest senior in the same function. Nobody already on the chart is moved or edited.</p>
-      <form className="oc-form" onSubmit={(e) => { e.preventDefault(); onRun({ includeApollo: apollo, includeMeetingAttendees: attendees }); }}>
+      <form className="oc-form" onSubmit={(e) => { e.preventDefault(); onRun({ includeApollo: false, includeMeetingAttendees: attendees }); }}>
         <label className="oc-check"><input type="checkbox" checked={attendees} onChange={(e) => setAttendees(e.target.checked)} /> Include meeting attendees who aren&apos;t contacts</label>
-        <label className="oc-check"><input type="checkbox" checked={apollo} onChange={(e) => setApollo(e.target.checked)} data-testid="orgchart-seed-apollo" /> Include Apollo people search (directors and above)</label>
-        <p className="oc-src">Apollo runs only when a key is configured and this month&apos;s budget allows. Otherwise it is skipped.</p>
         <div className="oc-form-actions">
           <button type="button" className="oc-btn" onClick={onCancel}>Cancel</button>
           <button type="submit" className="oc-btn oc-primary" disabled={busy} data-testid="orgchart-seed-run">Run auto-fill</button>

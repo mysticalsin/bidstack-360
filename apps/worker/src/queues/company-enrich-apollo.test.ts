@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ApolloEnrichJobData,
+  apolloOpenJobCount,
   callApolloEnrich,
   callApolloMcpCompanyIntel,
-  callApolloPeopleSearch,
   createApolloEnrichJobSignature,
   fetchCompanyNewsCrossCheck,
   mapApolloOrganization,
@@ -259,19 +259,25 @@ describe('normalizeName', () => {
 });
 
 describe('sanitizeApolloPayload', () => {
-  it('recursively removes email and phone fields before metadata persistence', () => {
+  it('drops phone numbers and contact leads before metadata persistence', () => {
     expect(
       sanitizeApolloPayload({
         name: 'Acme',
+        annual_revenue: 125_000_000,
+        organization_num_jobs: 17,
         email: 'ceo@example.com',
         sanitized_phone: '+15550101',
-        nested: { mobilePhone: '+15550202', title: 'CEO' },
+        numbers: ['+15550102'],
+        nested: { mobilePhone: '+15550202', number: '+15550303', title: 'CEO' },
         people: [{ name: 'Jane Doe', email_status: 'verified', phone_numbers: ['x'] }],
+        leads: [{ name: 'Pat Prospect' }],
+        org_chart_root_people_ids: ['person-1'],
       }),
     ).toEqual({
       name: 'Acme',
+      annual_revenue: 125_000_000,
+      organization_num_jobs: 17,
       nested: { title: 'CEO' },
-      people: [{ name: 'Jane Doe' }],
     });
   });
 });
@@ -388,78 +394,85 @@ describe('callApolloEnrich', () => {
   });
 });
 
-describe('callApolloPeopleSearch', () => {
-  it('POSTs Apollo People Search by company domain for executive signals without contact fields', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          people: [
-            {
-              id: 'person-1',
-              name: 'Jane Doe',
-              title: 'Chief Revenue Officer',
-              email: 'jane@example.com',
-              phone: '+1-555-0101',
-            },
-          ],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
-    );
-
-    const result = await callApolloPeopleSearch({
-      apiKey: 'test-key',
-      companyName: 'Acme',
-      domain: 'www.acme.com',
-      perPage: 7,
-      fetchImpl: fetchMock as unknown as typeof fetch,
+describe('Apollo company revenue and open jobs', () => {
+  it('keeps dollar revenue as micros and an open-job count, and drops phones and leads', () => {
+    const org = {
+      name: 'Acme',
+      primary_domain: 'acme.com',
+      annual_revenue: 125_000_000,
+      organization_num_jobs: 17,
+      phone: '+1-555-0100',
+      primary_phone: { number: '+1-555-0100', sanitized_number: '+15550100' },
+      numbers: ['+1-555-0199'],
+      leads: [{ name: 'Pat Prospect', email: 'pat@example.com', title: 'Chief Executive Officer' }],
+      people: [{ first_name: 'Ada', title: 'VP Sales', email: 'ada@example.com' }],
+      job_postings: [
+        { title: 'Data Engineer', department: 'IT' },
+        { first_name: 'Ada', title: 'VP Sales', email: 'ada@example.com' },
+      ],
+    };
+    const mapped = mapApolloOrganization(org, {
+      syncMode: 'apollo_api_organization_enrich',
+      now: new Date('2026-05-30T12:00:00Z'),
+      executives: {
+        people: [
+          {
+            name: 'Jane Doe',
+            title: 'Chief Revenue Officer',
+            email: 'jane@example.com',
+            phone: '+1-555-0101',
+          },
+        ],
+      },
     });
 
-    expect(result.people).toHaveLength(1);
-    const [url, init] = fetchMock.mock.calls[0]!;
-    const requestUrl = new URL(String(url));
-    expect(requestUrl.toString()).toContain(
-      'https://api.apollo.io/api/v1/mixed_people/api_search?',
-    );
-    expect(requestUrl.searchParams.getAll('q_organization_domains_list[]')).toEqual(['acme.com']);
-    expect(requestUrl.searchParams.getAll('person_seniorities[]')).toContain('c_suite');
-    expect(requestUrl.searchParams.getAll('person_titles[]')).toContain('chief revenue officer');
-    expect(requestUrl.searchParams.get('include_similar_titles')).toBe('false');
-    expect(requestUrl.searchParams.get('per_page')).toBe('7');
-    expect(init.method).toBe('POST');
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
-    expect((init.headers as Record<string, string>)['X-Api-Key']).toBe('test-key');
+    expect(mapped.annualRevenueMicros).toBe(125_000_000_000_000n);
+    expect(mapped.strategicIntel.annualRevenueMicros).toBe(125_000_000_000_000);
+    // The company payload's count wins over the two-row sample.
+    expect(mapped.strategicIntel.openJobCount).toBe(17);
+    expect(apolloOpenJobCount(org)).toBe(17);
+    expect(mapped.strategicIntel.hiringSignals.map((signal) => signal.label)).toEqual([
+      'Data Engineer',
+    ]);
+    expect(mapped.strategicIntel.leadershipSignals).toEqual([]);
+    const stored = JSON.stringify(sanitizeApolloPayload(org));
+    expect(stored).not.toMatch(/555|Pat Prospect|pat@example|ada@example|Jane Doe|\bAda\b/);
+    expect(stored).toContain('125000000');
+    expect(stored).toContain('"organization_num_jobs":17');
   });
 
-  it('feeds People Search results into leadership signals and strips contact channels', () => {
+  it('counts a job-posting list and does not invent a count from leads', () => {
     const mapped = mapApolloOrganization(
       {
         name: 'Acme',
-        primary_domain: 'acme.com',
+        organization_revenue: 7_500_000,
+        leads: [{ name: 'Pat Prospect', title: 'Director' }],
       },
       {
-        syncMode: 'apollo_api_organization_enrich',
-        creditPolicy: 'uses_credits',
-        now: new Date('2026-05-30T12:00:00Z'),
-        executives: {
-          people: [
-            {
-              id: 'person-1',
-              name: 'Jane Doe',
-              title: 'Chief Revenue Officer',
-              email: 'jane@example.com',
-              phone: '+1-555-0101',
-              linkedin_url: 'https://www.linkedin.com/in/jane-doe/',
-            },
-          ],
+        jobPostings: {
+          pagination: { total_entries: 4 },
+          organization_job_postings: [{ title: 'Architect' }, { title: 'Analyst' }],
+          people: [{ first_name: 'Ada', title: 'CEO', email: 'ada@example.com' }],
         },
       },
     );
 
-    expect(mapped.strategicIntel.leadershipSignals[0]?.label).toBe(
-      'Jane Doe - Chief Revenue Officer',
-    );
-    expect(JSON.stringify(mapped.strategicIntel.leadershipSignals)).not.toMatch(/jane@example|555/);
+    expect(mapped.annualRevenueMicros).toBe(7_500_000_000_000n);
+    expect(mapped.strategicIntel.openJobCount).toBe(4);
+  });
+
+  it('leaves revenue and open jobs empty when Apollo omits them', () => {
+    const mapped = mapApolloOrganization({
+      name: 'Acme',
+      phone: '+1-555-0100',
+      numbers: ['+1-555-0199'],
+      leads: [{ name: 'Pat Prospect' }],
+    });
+
+    expect(mapped.annualRevenueMicros).toBeNull();
+    expect(mapped.strategicIntel.openJobCount).toBeNull();
+    expect(mapped.strategicIntel.annualRevenueMicros).toBeNull();
+    expect(JSON.stringify(mapped)).not.toMatch(/555|Pat Prospect/);
   });
 });
 
@@ -579,7 +592,7 @@ describe('callApolloMcpCompanyIntel', () => {
     expect(toolCalls).toEqual(['search_companies', 'get_company']);
   });
 
-  it('calls MCP people search only when executive search is explicitly enabled', async () => {
+  it('does not call MCP people search even when executive search is requested', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -647,11 +660,12 @@ describe('callApolloMcpCompanyIntel', () => {
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
 
-    expect(JSON.stringify(intel.raw.executives)).not.toMatch(/jane@example|555/);
+    expect(JSON.stringify(intel.raw)).not.toMatch(/jane@example|555|search_people/);
     const toolCalls = fetchMock.mock.calls
       .map((call) => JSON.parse((call[1] as RequestInit).body as string))
       .filter((body) => body.method === 'tools/call')
       .map((body) => body.params.name);
-    expect(toolCalls).toEqual(['search_companies', 'get_company', 'search_people']);
+    expect(toolCalls).toEqual(['search_companies', 'get_company']);
+    expect(toolCalls).not.toContain('search_people');
   });
 });

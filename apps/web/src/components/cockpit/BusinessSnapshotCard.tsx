@@ -43,8 +43,10 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
   const headquarters = facts?.headquarters ?? null;
   const sourceCount = c.sourceAttribution.length;
   const notVerified = t('businessSnapshot.value.notVerified', 'Not verified');
+  const noData = t('businessSnapshot.value.noData', 'No data');
   const revenueLabel = recordedRevenueLabel(c);
   const strategic = c.strategicIntel;
+  const openJobCount = strategic?.openJobCount;
   const latestSource = latestAttribution(c.sourceAttribution);
   const intentSummary = strategic?.intentTopics.length
     ? strategic.intentTopics.slice(0, 3).join(', ')
@@ -169,6 +171,18 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
             }),
     },
     {
+      label: t('businessSnapshot.row.openJobs', 'Open jobs'),
+      value: typeof openJobCount === 'number' ? openJobCount.toLocaleString() : noData,
+      source: typeof openJobCount === 'number'
+        ? strategicSource(
+            strategic,
+            t('businessSnapshot.source.missingOpenJobs', 'No open-job count is attached. Not scored.'),
+          )
+        : missingSource(
+            t('businessSnapshot.source.missingOpenJobs', 'No open-job count is attached. Not scored.'),
+          ),
+    },
+    {
       label: t('businessSnapshot.row.employees', 'Employees'),
       value: c.employeeCount ? c.employeeCount.toLocaleString() : notVerified,
       source: employeeSource(cockpit.kpis, c, t),
@@ -274,7 +288,11 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
   ];
   const notSynced = t('businessSnapshot.value.notSynced', 'Not synced');
   const recorded = rows.filter(
-    (row) => row.source.state !== 'missing' && row.value !== notVerified && row.value !== notSynced,
+    (row) =>
+      row.source.state !== 'missing' &&
+      row.value !== notVerified &&
+      row.value !== notSynced &&
+      row.value !== noData,
   );
   const missing = rows.filter((row) => !recorded.includes(row));
   const recordedShare = rows.length === 0 ? 0 : Math.round((recorded.length / rows.length) * 100);

@@ -162,7 +162,7 @@ describe('OrgChartPage', () => {
     expect(await node('Nora Lee')).toBeTruthy();
     fireEvent.click(screen.getByTestId('orgchart-autofill'));
     const seed = await screen.findByTestId('orgchart-seed');
-    fireEvent.click(within(seed).getByTestId('orgchart-seed-apollo'));
+    expect(within(seed).queryByTestId('orgchart-seed-apollo')).toBeNull();
     await act(async () => { fireEvent.click(within(seed).getByTestId('orgchart-seed-run')); });
     await waitFor(() => expect(srv.calls).toContain('POST C/seed'));
   });
