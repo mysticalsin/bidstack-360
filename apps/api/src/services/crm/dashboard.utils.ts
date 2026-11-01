@@ -9,6 +9,7 @@
 import { z } from 'zod';
 
 import {
+  formatMicrosAmount,
   type AccountCockpitSnapshot,
   type CrmCompany,
   type CrmDashboardSnapshot,
@@ -139,16 +140,37 @@ export function titleCase(value: string) {
     .join(' ');
 }
 
-/** Company revenue has no currency column. A dollar sign would invent one. */
+function exactCompact(units: bigint, scale: bigint, suffix: string, digits: number): string | null {
+  if (units < scale) return null;
+  const factor = 10n ** BigInt(digits);
+  const step = scale / factor;
+  if (step === 0n || units % step !== 0n) return null;
+  const shown = units / step;
+  const whole = shown / factor;
+  const frac = shown % factor;
+  if (frac === 0n) return `${whole}${suffix}`;
+  return `${whole}.${frac.toString().padStart(digits, '0').replace(/0+$/, '')}${suffix}`;
+}
+
+/** Company revenue has no currency column. Compact only when the label is the same amount. */
 export function formatMicrosCompact(micros: number) {
-  const whole = Number.isSafeInteger(micros) ? BigInt(micros) / 1_000_000n : 0n;
-  const remainder = Number.isSafeInteger(micros) ? BigInt(micros) % 1_000_000n : 0n;
-  const units = Number(whole) + Number(remainder) / 1_000_000;
-  const compact = new Intl.NumberFormat('en', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(Number.isFinite(units) ? units : 0);
-  return `${compact} unspecified`;
+  if (!Number.isSafeInteger(micros)) return 'amount not readable';
+  const value = BigInt(micros);
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const sign = negative ? '-' : '';
+  const units = abs / 1_000_000n;
+  const compact = abs % 1_000_000n !== 0n
+    ? null
+    : units >= 1_000_000_000n
+      ? exactCompact(units, 1_000_000_000n, 'B', 1)
+      : units >= 1_000_000n
+        ? exactCompact(units, 1_000_000n, 'M', 2)
+        : units >= 1_000n
+          ? exactCompact(units, 1_000n, 'K', 0)
+          : null;
+  const body = compact ?? formatMicrosAmount(abs);
+  return `${sign}${body} unspecified`;
 }
 
 // ─── Normalizers ─────────────────────────────────────────────────────────────
