@@ -318,15 +318,17 @@ export function computeSignalCoverage(
   firmographics.recommendedAction = firmographicAction(company);
   contactFactor.recommendedAction = contactAction(contacts, pages?.contactsCapped);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
-  pipeline.recommendedAction = pipelineAction(openDeals, pages?.dealsCapped ? pages.openDealCount : undefined);
-  const pipelineUnseen =
-    Boolean(pages?.dealsCapped) && openDeals.length === 0 && (pages?.openDealCount ?? 0) > 0;
-  if (pipelineUnseen) pipeline.scored = false;
+  const accountOpen = pages?.dealsCapped ? pages.openDealCount : undefined;
+  pipeline.recommendedAction = pipelineAction(openDeals, accountOpen);
+  // A sample of the open book is not the account's pipeline quality.
+  if (accountOpen != null && accountOpen !== openDeals.length) pipeline.scored = false;
   if (pages?.contactsCapped) {
     contactFactor.whatItMeasures += ` Scored from the ${COCKPIT_CONTACT_PAGE} highest-influence contacts.`;
   }
   if (pages?.dealsCapped) {
-    pipeline.whatItMeasures += ` Scored from the latest ${COCKPIT_OPP_PAGE} opportunities.`;
+    pipeline.whatItMeasures += pipeline.scored === false
+      ? ` Not scored. The latest ${COCKPIT_OPP_PAGE} opportunities do not hold every open deal.`
+      : ` Scored from the latest ${COCKPIT_OPP_PAGE} opportunities.`;
   }
   if (pages?.tasksCapped) {
     engagement.whatItMeasures += ` Scored from the latest ${COCKPIT_TASK_PAGE} tasks.`;
@@ -341,7 +343,7 @@ export function computeSignalCoverage(
   ];
   const measured = weighted.filter((row) => row.factor.scored !== false);
   const weightSum = measured.reduce((sum, row) => sum + row.weight, 0);
-  // An unseen pipeline is not a measured zero. The other weights fill its share.
+  // A partial open-deal page is not the account pipeline. The other weights fill its share.
   const score = weightSum === 0
     ? 0
     : Math.round(measured.reduce((sum, row) => sum + row.factor.score * row.weight, 0) / weightSum);
