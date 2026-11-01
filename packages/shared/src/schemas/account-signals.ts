@@ -866,6 +866,8 @@ export const AccountTimeline = z.object({
   to: Iso,
   items: z.array(TimelineItem),
   counts: z.record(z.string(), z.number().int()),
+  /** True when deal open and close marks used the latest 1,000 updated deals. */
+  dealsCapped: z.boolean().optional(),
 });
 export type AccountTimeline = z.infer<typeof AccountTimeline>;
 

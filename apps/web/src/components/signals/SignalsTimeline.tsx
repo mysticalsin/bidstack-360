@@ -81,7 +81,7 @@ function Detail({ item }: { item: TimelineItem }) {
   );
 }
 
-export function TimelineView({ items, from, to }: { items: TimelineItem[]; from: string; to: string }) {
+export function TimelineView({ items, from, to, dealsCapped }: { items: TimelineItem[]; from: string; to: string; dealsCapped?: boolean }) {
   const narrow = useNarrow();
   const id = useId();
   const present = useMemo(() => {
@@ -117,12 +117,16 @@ export function TimelineView({ items, from, to }: { items: TimelineItem[]; from:
     });
   const hovered = hover ? items.find((i) => i.id === hover.id) : null;
 
+  const dealPage = dealsCapped ? <p className="sg-meta">Latest 1,000 deals</p> : null;
   if (!items.length) {
     return (
-      <p className="sg-empty">
-        <span>Nothing on the timeline yet</span>
-        Meetings, deals and their news appear here as they happen.
-      </p>
+      <>
+        {dealPage}
+        <p className="sg-empty">
+          <span>Nothing on the timeline yet</span>
+          Meetings, deals and their news appear here as they happen.
+        </p>
+      </>
     );
   }
 
@@ -130,6 +134,7 @@ export function TimelineView({ items, from, to }: { items: TimelineItem[]; from:
 
   return (
     <>
+      {dealPage}
       <div className="sg-filters" role="group" aria-label="Filter the timeline">
         {chips.map((c) => (
           <button key={c} type="button" className="sg-chip" data-tone={CATEGORY_TONE[c]} data-cat={c} aria-pressed={!off.has(c)} onClick={() => toggle(c)}>
@@ -271,7 +276,7 @@ export function SignalsTimeline({ companyId }: { companyId: string }) {
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
       ) : (
-        <TimelineView items={q.data.items} from={q.data.from} to={q.data.to} />
+        <TimelineView items={q.data.items} from={q.data.from} to={q.data.to} dealsCapped={q.data.dealsCapped} />
       )}
     </section>
   );
