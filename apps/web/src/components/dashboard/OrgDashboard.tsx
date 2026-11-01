@@ -268,7 +268,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
             feed={feed.data}
             onDrill={setDrill}
           />
-          <NeedsYou rows={oppRows} overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
+          <NeedsYou overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
         </div>
         <Suspense
           fallback={

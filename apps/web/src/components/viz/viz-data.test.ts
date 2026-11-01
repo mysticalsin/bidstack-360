@@ -60,6 +60,11 @@ describe('viz-data', () => {
 
   it('flags open bids past their due date', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
+    const today = Date.parse('2026-11-01T15:00:00.000Z');
+    const dueToday = row({ stage: 's2_sent', dueDate: '2026-11-01', customer: 'Today' });
+    const dueYesterday = row({ stage: 's2_sent', dueDate: '2026-10-31', customer: 'Yesterday' });
+    // WHY: due today was past due as soon as midnight UTC passed. The overdue list keeps today open.
+    expect(pastDueOpen([dueToday, dueYesterday], today).map((o) => o.customer)).toEqual(['Yesterday']);
   });
 
   it('keeps a live lost stage out of the open charts', () => {

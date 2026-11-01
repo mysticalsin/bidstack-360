@@ -13,7 +13,7 @@ import SmoothTab from '@/components/kokonutui/smooth-tab';
 import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
 import {
-  accountBars, cumulativeWon, fmtCompact, forecastCommitLabel, forecastPoint, pastDueOpen, stageFunnel, statusMix,
+  accountBars, cumulativeWon, fmtCompact, forecastCommitLabel, forecastPoint, stageFunnel, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
@@ -22,6 +22,8 @@ import type { OppDrillFilter } from '@/components/drill/OppDrill';
 export type OnDrill = (f: OppDrillFilter) => void;
 import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { recordedPipelineCompact } from './unspecified-currency';
+import { useOpportunities } from '@/hooks/useOpportunities';
+import { closedOutcome } from '@/lib/pipeline-stages';
 
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
@@ -108,12 +110,24 @@ function HeroFig({ onClick, label, children }: { onClick?: () => void; label: st
   );
 }
 
-export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdueTasks: number; feed?: WatchdogFeed }) {
+export function NeedsYou({ overdueTasks, feed }: { overdueTasks: number; feed?: WatchdogFeed }) {
   const [now] = useState(() => Date.now());
-  const pastDue = pastDueOpen(rows, now);
+  const overdue = useOpportunities({ overdue: true, excludeClosed: true, limit: 200 });
+  const pastDue = (overdue.data?.items ?? []).filter((opp) => closedOutcome(opp) === null);
+  const pastDueCapped = Boolean(overdue.data?.nextCursor);
+  const pastDueTitle = pastDueCapped
+    ? `At least ${pastDue.length} open ${pastDue.length === 1 ? 'bid' : 'bids'} past due date`
+    : `${pastDue.length} open bid${pastDue.length === 1 ? '' : 's'} past due date`;
   const soon = (feed?.earnings ?? []).filter((e) => new Date(e.expectedAt).getTime() - now < 14 * 86_400_000);
   const items = [
-    pastDue.length > 0 && { key: 'due', to: '/opportunities', title: `${pastDue.length} open bid${pastDue.length === 1 ? '' : 's'} past due date`, meta: pastDue.slice(0, 2).map((o) => o.customer).filter(Boolean).join(', '), kind: 'RISK' },
+    !overdue.isLoading && !overdue.isError && (pastDue.length > 0 || pastDueCapped) && {
+      key: 'due',
+      to: '/opportunities?due=overdue',
+      title: pastDue.length === 0 ? 'More open bids are past due than this page shows' : pastDueTitle,
+      meta: pastDue.slice(0, 2).map((o) => o.customer).filter(Boolean).join(', '),
+      kind: 'RISK',
+    },
+    overdue.isError && { key: 'due-error', to: '/opportunities?due=overdue', title: 'Could not load past-due bids', meta: 'Open the overdue list', kind: 'RISK' },
     overdueTasks > 0 && { key: 'tasks', to: '/tasks?filter=overdue', title: `${overdueTasks} overdue task${overdueTasks === 1 ? '' : 's'}`, meta: 'Follow-ups waiting on you', kind: 'RISK' },
     (feed?.newAlertCount ?? 0) > 0 && { key: 'alerts', to: `/accounts/${feed!.alerts[0]!.companyId}`, title: `${feed!.newAlertCount} new account signal${feed!.newAlertCount === 1 ? '' : 's'}`, meta: feed!.alerts[0]!.title, kind: feed!.alerts[0]!.implication },
     ...soon.slice(0, 2).map((e) => ({ key: e.id, to: `/accounts/${e.companyId}`, title: `${e.companyName} results ${dayFmt.format(new Date(e.expectedAt))}`, meta: `${e.fiscalPeriod}${e.confirmed ? ' · confirmed' : ''}`, kind: 'NEUTRAL' })),
@@ -121,7 +135,9 @@ export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdue
   return (
     <section className="viz dash-needs" aria-labelledby="dash-needs-t" data-testid="needs-you">
       <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{items.length}</span></header>
-      {items.length === 0 ? <p className="viz-empty">Nothing waiting. Nice.</p> : (
+      {items.length === 0 ? (
+        <p className="viz-empty">{overdue.isLoading ? 'Checking past-due bids.' : 'Nothing waiting. Nice.'}</p>
+      ) : (
         <ul className="dash-needs-list">
           {items.map((it, i) => (
             <li key={it.key} style={{ '--i': i } as React.CSSProperties}>
