@@ -219,6 +219,16 @@ export function pickApproach(theme: InitiativeTheme, people: KnownPerson[], now:
 
 // ── plays ───────────────────────────────────────────────────────────────────
 
+/** Lower-case a label but keep acronyms (M&A, ERP, R&D, AI) as written. */
+export function lowerLabel(label: string): string {
+  return label.split(' ').map((w) => (/[A-Z].*[A-Z&]|^[A-Z]{2,}$/.test(w) ? w : w.toLowerCase())).join(' ');
+}
+
+/** "financial_services" becomes "financial services". */
+export function humanIndustry(v: string): string {
+  return /_/.test(v) ? v.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase() : v;
+}
+
 /** Which offering a filed-financials signal points to. */
 export const FINANCIAL_RULE_THEME: Partial<Record<string, InitiativeTheme>> = {
   margin_squeeze: 'erp_finance',
@@ -338,7 +348,7 @@ export function buildPlays(input: PlayInputs): PositioningPlay[] {
     score = Math.round(Math.min(0.95, Math.max(0.05, score)) * 100) / 100;
     const lead = d.chips.find((c) => c.kind !== 'initiative') ?? d.chips[0];
     const points: string[] = [];
-    if (lead) points.push(`${lead.label}${lead.at ? ` (${monthYear(lead.at)}, ${lead.source})` : ` (${lead.source})`} points to ${hook.label.toLowerCase()} work.`);
+    if (lead) points.push(`${lead.label}${lead.at ? ` (${monthYear(lead.at)}, ${lead.source})` : ` (${lead.source})`} points to ${lowerLabel(hook.label)} work.`);
     points.push(hook.pitch);
     const met = approach.find((p) => p.met && p.lastMetAt);
     if (met) points.push(`Build on the ${monthYear(met.lastMetAt)} conversation with ${met.name}.`);
@@ -433,7 +443,7 @@ export type MicrosFmt = (micros: string) => string;
 /** One plain-English paragraph built only from the facts given. */
 export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: MicrosFmt): string {
   const s: string[] = [];
-  const where = [f.industry ? `in ${f.industry}` : '', f.country ? `based in ${f.country}` : ''].filter(Boolean).join(', ');
+  const where = [f.industry ? `in ${humanIndustry(f.industry)}` : '', f.country ? `based in ${f.country}` : ''].filter(Boolean).join(', ');
   const emp = f.employees ? ` with about ${f.employees.value.toLocaleString('en-GB')} employees` : '';
   s.push(`${f.name} is a ${f.tierLabel} account${where ? ` ${where}` : ''}${emp}.`);
   if (f.financials && f.financials.revenue !== null) {

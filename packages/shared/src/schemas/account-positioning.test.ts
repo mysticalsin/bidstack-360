@@ -137,3 +137,13 @@ describe('composeBrief', () => {
     expect(txt).not.toContain('\u2014');
   });
 });
+
+describe('labels', () => {
+  it('keeps acronyms and humanises industries', async () => {
+    const { lowerLabel, humanIndustry } = await import('./account-positioning.js');
+    expect(lowerLabel('M&A integration')).toBe('M&A integration');
+    expect(lowerLabel('ERP and finance transformation')).toBe('ERP and finance transformation');
+    expect(lowerLabel('Data and AI')).toBe('data and AI');
+    expect(humanIndustry('financial_services')).toBe('financial services');
+  });
+});
