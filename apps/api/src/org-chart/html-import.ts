@@ -355,7 +355,10 @@ function build(line: number, raw: Raw, errors: HtmlParseResult['errors'], warnin
 // ── who counts as the account's own staff ──────────────────────────────────
 /** Names the import uses to tell client staff from everyone else. */
 export interface StaffContext {
-  /** The account: its name, legal name, domain and parent names. An employer matching any of these is staff. */
+  /**
+   * The account: its name, legal name, domain and parent names. An employer with the same name as any
+   * of these is staff; a name that only contains one of them needs a second field or the email domain.
+   */
   accountNames: string[];
   /** Our own firm (the tenant, e.g. Amaris or Mantu). People employed by it are never client staff. */
   ownFirmNames: string[];
@@ -403,8 +406,30 @@ export function skipReason(f: Partial<Record<Field, unknown>>, ctx: StaffContext
   if (EXTERNAL_KINDS.has(kind) || EXTERNAL_KINDS.has(cat)) return 'external';
   if (truthy(f.external) || falsy(f.internal)) return 'external';
   if (kind && !STAFF_KINDS.has(kind) && /extern|vendor|contract|supplier|agency/.test(kind)) return 'external';
-  if (employer && ctx.accountNames.length && !ctx.accountNames.some((n) => sameCompany(employer, n))) return 'other_employer';
+  if (employer && ctx.accountNames.length && !isClientEmployer(employer, str(f.email), ctx.accountNames)) return 'other_employer';
   return null;
+}
+
+const DOMAIN_LIKE = /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+\/?$/i;
+const hostOf = (v: string) => v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+/**
+ * True when an employer string is the account itself. A same-name match (after dropping legal
+ * suffixes) on the name, legal name, domain or parent is enough. A name that only contains, or is
+ * contained in, the account name ("Example Staffing" vs "Example Corp") is not: it also needs a
+ * second, different account field to match, or the person's email to be on the account's domain.
+ */
+export function isClientEmployer(employer: string, email: string | null | undefined, accountNames: string[]): boolean {
+  const emp = companyCore(employer);
+  if (!emp) return false;
+  const cores = [...new Set(accountNames.map(companyCore).filter(Boolean))];
+  const flat = (v: string) => v.replace(/ /g, '');
+  if (cores.some((c) => c === emp || flat(c) === flat(emp))) return true;
+  const partial = cores.filter((c) => sameCompany(emp, c));
+  if (partial.length === 0) return false;
+  if (partial.length >= 2) return true;
+  const at = email?.trim().toLowerCase().split('@')[1];
+  if (!at) return false;
+  return accountNames.filter((n) => DOMAIN_LIKE.test(n.trim())).map(hostOf).some((d) => at === d || at.endsWith(`.${d}`));
 }
 
 // ── layout 1: JSON data islands ────────────────────────────────────────────

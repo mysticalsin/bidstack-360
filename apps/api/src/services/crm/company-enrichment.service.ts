@@ -361,6 +361,54 @@ export function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
 
 // ─── Company list builders ────────────────────────────────────────────────────
 
+/** A Company row with no opportunity or enrichment footprint (a new or sparse account), as a CrmCompany. */
+export function companyFromRow(row: {
+  id: string;
+  name: string;
+  legalName: string | null;
+  domain: string | null;
+  website: string | null;
+  industry: string | null;
+  employeeCount: number | null;
+  logoUrl: string | null;
+  confidence: number;
+  updatedAt: Date;
+}): z.infer<typeof CrmCompany> {
+  const website = row.website && /^https?:\/\//i.test(row.website) ? safeUrl(row.website) : row.domain ? `https://${row.domain}` : null;
+  const confidence = Math.min(1, Math.max(0, Number.isFinite(row.confidence) ? row.confidence : 0.5));
+  return {
+    id: row.id,
+    source: 'bidstack',
+    name: row.name,
+    legalName: row.legalName,
+    domain: row.domain,
+    website,
+    industry: row.industry,
+    employeeCount: row.employeeCount !== null && row.employeeCount >= 0 ? row.employeeCount : null,
+    annualRevenueMicros: null,
+    status: 'active',
+    registryIds: {},
+    formerNames: [],
+    incorporationDate: null,
+    imageUrl: null,
+    logo: row.logoUrl
+      ? logoFor(row.name, row.logoUrl, 'official_website')
+      : row.domain
+        ? logoFor(row.name, logoUrlFor(row.name, row.domain), 'favicon')
+        : null,
+    confidence,
+    sourceAttribution: [attribution({ source: 'bidstack', label: 'Polo account record', sourceUrl: null, confidence })],
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+function safeUrl(v: string): string | null {
+  try {
+    return new URL(v).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function findSelectedCompany(
   companies: Array<z.infer<typeof CrmCompany>>,
   accountId: string | undefined,
