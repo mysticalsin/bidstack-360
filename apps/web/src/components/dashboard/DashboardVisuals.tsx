@@ -86,7 +86,14 @@ export function DashboardHero({
           </div>
         ) : null}
       </div>
-      <HeroArea data={trend} format={fmtCompact} />
+      <HeroArea
+        data={trend.map((point) => ({
+          date: point.date,
+          y: point.y,
+          label: recordedPipelineCompact(point.yMicros, point.y),
+        }))}
+        format={fmtCompact}
+      />
       <div className="viz-caption">Won value to date, by close month. Select a number to see the bids behind it.</div>
     </ChartCard>
   );

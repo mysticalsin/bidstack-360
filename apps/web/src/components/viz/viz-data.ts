@@ -261,6 +261,14 @@ export function fmtCompact(v: number): string {
   return headlineMicrosLabel(BigInt(v) * 1_000_000n, 'en-GB');
 }
 
+/** Chart hover uses the micros label when the point carries one. */
+export function heroTooltipValue(
+  point: { y?: number; label?: string },
+  format: (n: number) => string,
+): string {
+  return point.label ?? format(point.y ?? 0);
+}
+
 export type OppStatus = 'open' | 'won' | 'lost';
 export function oppStatus(o: OppRow): OppStatus {
   return isWon(o) ? 'won' : isLost(o) ? 'lost' : 'open';
