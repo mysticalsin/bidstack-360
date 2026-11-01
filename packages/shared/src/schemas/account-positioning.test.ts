@@ -5,8 +5,11 @@ import {
   buildPlays,
   composeBrief,
   dealRangeFor,
+  openJobsCopy,
   pickApproach,
+  readCoversWindow,
   seniorityFromTitle,
+  sentimentCopy,
   type BriefFacts,
   type KnownPerson,
 } from './account-positioning.js';
@@ -163,6 +166,26 @@ describe('buildGaps', () => {
     expect(gaps.find((g) => g.kind === 'senior_contacts')?.title).toBe('1 senior contact, none met in the latest 200 meetings');
   });
 
+  it('does not treat the latest risk page as every risk event', () => {
+    // WHY: twenty leadership items hid an older layoff, and silence read as an all-clear.
+    const gaps = buildGaps({
+      people: [person('Cy', 'Chief Information Officer', true, '2026-10-01T00:00:00Z')],
+      lastMeetingAt: '2026-10-01T00:00:00Z',
+      momentum: null,
+      openDeals: 1,
+      riskEvents: [{ kind: 'LEADERSHIP_CHANGE', title: 'New CFO', at: '2026-10-01', url: null, source: 'News', sample: false }],
+      competitorMentions: [{ competitor: 'Accenture', title: 'Won the desk', at: '2026-10-01', url: null, source: 'Competitor intel' }],
+      financialRisks: [],
+      financialStaleFy: null,
+      financialSource: null,
+      riskPageCapped: true,
+      competitorPageCapped: true,
+      now,
+    });
+    expect(gaps.find((g) => g.kind === 'leadership_change')?.detail).toContain('latest 20 risk events');
+    expect(gaps.find((g) => g.kind === 'competitor')?.detail).toContain('Latest 10 mentions');
+  });
+
   it('does not call a full sample an empty account', () => {
     // WHY: zero open rows inside the latest 500 is not proof the account has no pipeline.
     const gaps = buildGaps({
@@ -297,6 +320,40 @@ describe('composeBrief', () => {
     expect(txt).toContain('We know at least 4 people there (at least 1 senior), at least 1 met in the last 12 months');
     expect(txt).toContain('People counts use the latest 1,000 contacts.');
     expect(txt).not.toContain('No contacts are mapped yet.');
+  });
+});
+
+describe('readCoversWindow', () => {
+  const now = Date.parse('2026-11-01T00:00:00Z');
+  const daysAgo = (n: number) => now - n * 86_400_000;
+
+  it('treats unread older weeks as missing when the page is full', () => {
+    // WHY: a newest-1,000 page of this month is not a quiet prior quarter.
+    expect(readCoversWindow([daysAgo(3), daysAgo(10)], now, 90, true)).toBe(false);
+    expect(readCoversWindow([daysAgo(3), daysAgo(200)], now, 180, true)).toBe(true);
+    expect(readCoversWindow([], now, 90, false)).toBe(true);
+  });
+});
+
+describe('key number page copy', () => {
+  it('withholds the hiring trend when the latest posts do not reach 90 days', () => {
+    // WHY: the open-jobs arrow compared a full page with weeks that were never read.
+    const partial = openJobsCopy(true, false, false, null);
+    expect(partial.period).toContain('past the latest 1,000 posts');
+    expect(partial.sub).toBe('latest 1,000 posts');
+    expect(openJobsCopy(true, true, false, 12).period).toContain('past this page');
+    expect(openJobsCopy(false, true, true, 12).sub).toBe('12 posted in 90 days');
+  });
+
+  it('withholds the sentiment comparison when the prior window was not read', () => {
+    // WHY: the mean of the newest 1,000 items was labelled as the last 90 days against the 90 before.
+    const partial = sentimentCopy(true, false, false, 1000);
+    expect(partial.compare).toBe(false);
+    expect(partial.period).toContain('not the full 90 days');
+    const recentOnly = sentimentCopy(true, true, false, 40);
+    expect(recentOnly.compare).toBe(false);
+    expect(recentOnly.period).toContain('past this page');
+    expect(sentimentCopy(false, true, true, 4).compare).toBe(true);
   });
 });
 

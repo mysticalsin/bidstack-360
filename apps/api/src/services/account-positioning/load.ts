@@ -14,10 +14,17 @@ import {
   stripSamplePrefix,
   themeForText,
   tierLabel,
+  COMPETITOR_MENTION_PAGE,
+  JOB_POST_PAGE,
   PEOPLE_CHART_PAGE,
   PEOPLE_CONTACT_PAGE,
   PEOPLE_MEETING_PAGE,
+  RISK_EVENT_PAGE,
+  SCORED_NEWS_PAGE,
+  openJobsCopy,
   peoplePageIsPartial,
+  readCoversWindow,
+  sentimentCopy,
   type AccountKeyNumbers,
   type AccountPositioning,
   type BriefFacts,
@@ -186,12 +193,17 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       orderBy: { closedAt: 'desc' },
       take: WON_REFERENCE_SAMPLE,
     }),
-    prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, kind: { in: [...RISK_KINDS] }, occurredAt: { gte: new Date(now.getTime() - 365 * DAY) }, ...hideSampleWhere(live) },
-      select: { kind: true, title: true, occurredAt: true, sourceUrl: true, source: true, sample: true },
-      orderBy: { occurredAt: 'desc' },
-      take: 20,
-    }),
+    (async () => {
+      const where = { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' as const }, kind: { in: [...RISK_KINDS] }, occurredAt: { gte: new Date(now.getTime() - 365 * DAY) }, ...hideSampleWhere(live) };
+      const rows = await prisma.accountWatchEvent.findMany({
+        where,
+        select: { kind: true, title: true, occurredAt: true, sourceUrl: true, source: true, sample: true },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'asc' }],
+        take: RISK_EVENT_PAGE,
+      });
+      const capped = rows.length === RISK_EVENT_PAGE && pageIsCapped(rows.length, await prisma.accountWatchEvent.count({ where }), RISK_EVENT_PAGE);
+      return { rows, capped };
+    })(),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: new Date(now.getTime() - 180 * DAY), lte: now }, ...hideSampleWhere(live) },
       select: { title: true, occurredAt: true, source: true, sample: true, importance: true, severity: true },
@@ -199,12 +211,17 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       take: 1,
     }),
     loadMomentumInputs(orgId, scope, [companyId], now),
-    prisma.competitorInsight.findMany({
-      where: { orgId, deletedAt: null, opportunity: { companyId: { in: ids } } },
-      select: { title: true, sourceUrl: true, publishedAt: true, competitorProfile: { select: { name: true } } },
-      orderBy: { publishedAt: 'desc' },
-      take: 10,
-    }),
+    (async () => {
+      const where = { orgId, deletedAt: null, opportunity: { companyId: { in: ids } } };
+      const rows = await prisma.competitorInsight.findMany({
+        where,
+        select: { title: true, sourceUrl: true, publishedAt: true, competitorProfile: { select: { name: true } } },
+        orderBy: [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+        take: COMPETITOR_MENTION_PAGE,
+      });
+      const capped = rows.length === COMPETITOR_MENTION_PAGE && pageIsCapped(rows.length, await prisma.competitorInsight.count({ where }), COMPETITOR_MENTION_PAGE);
+      return { rows, capped };
+    })(),
   ]);
   const { people, lastMeeting, peoplePage } = loadedPeople;
   const loaded = momentumIn.get(companyId);
@@ -287,13 +304,15 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     lastMeetingAt: lastMeeting?.at ?? null,
     momentum,
     openDeals: open.length,
-    riskEvents: risky.map((e) => ({ kind: e.kind, title: cleanText(stripSamplePrefix(e.title)), at: e.occurredAt.toISOString(), url: e.sourceUrl || null, source: sourceLabel(e.source), sample: e.sample })),
-    competitorMentions: competitors.map((ci) => ({ competitor: ci.competitorProfile.name, title: cleanText(ci.title), at: ci.publishedAt ? ci.publishedAt.toISOString() : null, url: ci.sourceUrl || null, source: 'Competitor intel' })),
+    riskEvents: risky.rows.map((e) => ({ kind: e.kind, title: cleanText(stripSamplePrefix(e.title)), at: e.occurredAt.toISOString(), url: e.sourceUrl || null, source: sourceLabel(e.source), sample: e.sample })),
+    competitorMentions: competitors.rows.map((ci) => ({ competitor: ci.competitorProfile.name, title: cleanText(ci.title), at: ci.publishedAt ? ci.publishedAt.toISOString() : null, url: ci.sourceUrl || null, source: 'Competitor intel' })),
     financialRisks: finSignals.filter((s) => fin.signals.find((x) => x.rule === s.rule && x.title === s.title)?.implication === 'RISK'),
     financialStaleFy: stale && latest ? latest.fiscalYear : null,
     financialSource: finSource,
     dealSampleLimit: dealSample.capped ? POSITIONING_DEAL_SAMPLE : null,
     peoplePage,
+    riskPageCapped: risky.capped,
+    competitorPageCapped: competitors.capped,
     now,
   });
   return { companyId, plays, brief, gaps, sample: plays.length > 0 && plays.every((p) => p.sample), computedAt: now.toISOString() };
@@ -338,7 +357,25 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
-    prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
+    (async () => {
+      const where = { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } };
+      const rows = await prisma.companyJobPosting.findMany({
+        where,
+        select: { postedAt: true, lastSeenAt: true },
+        orderBy: [{ postedAt: 'desc' }, { id: 'asc' }],
+        take: JOB_POST_PAGE,
+      });
+      const capped = rows.length === JOB_POST_PAGE && pageIsCapped(rows.length, await prisma.companyJobPosting.count({ where }), JOB_POST_PAGE);
+      const openSince = new Date(now.getTime() - 45 * DAY);
+      const openCount = await prisma.companyJobPosting.count({
+        where: {
+          orgId,
+          companyId: { in: ids },
+          OR: [{ lastSeenAt: { gte: openSince } }, { lastSeenAt: null, postedAt: { gte: openSince } }],
+        },
+      });
+      return { rows, capped, openCount };
+    })(),
     prisma.opportunity.findMany({
       where: { orgId, companyId: { in: ids }, deletedAt: null },
       select: {
@@ -352,17 +389,23 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
       orderBy: { updatedAt: 'desc' },
       take: POSITIONING_DEAL_SAMPLE + 1,
     }),
-    prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, sentiment: { not: null }, occurredAt: { gte: d180, lte: now }, ...hideSampleWhere(live) },
-      select: { sentiment: true, occurredAt: true, sample: true, source: true },
-      take: 1000,
-    }),
+    (async () => {
+      const where = { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' as const }, sentiment: { not: null }, occurredAt: { gte: d180, lte: now }, ...hideSampleWhere(live) };
+      const rows = await prisma.accountWatchEvent.findMany({
+        where,
+        select: { sentiment: true, occurredAt: true, sample: true, source: true },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'asc' }],
+        take: SCORED_NEWS_PAGE,
+      });
+      const capped = rows.length === SCORED_NEWS_PAGE && pageIsCapped(rows.length, await prisma.accountWatchEvent.count({ where }), SCORED_NEWS_PAGE);
+      return { rows, capped };
+    })(),
     loadMomentumInputs(orgId, scope, [companyId], now),
     loadPeople(c, ids),
   ]);
   const { people, lastMeeting, peoplePage } = loadedPeople;
   const items: KeyNumber[] = [];
-  const postings = rawPostings.flatMap((p) => (p.postedAt ? [{ postedAt: p.postedAt, lastSeenAt: p.lastSeenAt }] : []));
+  const postings = rawPostings.rows.flatMap((p) => (p.postedAt ? [{ postedAt: p.postedAt, lastSeenAt: p.lastSeenAt }] : []));
   const periods = fyPeriods(fin);
   const asc = [...periods].reverse();
   const latest = periods[0];
@@ -396,12 +439,28 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     items.push(base({ id: 'margin', group: 'company', label: lm.label, unit: 'pct', value: Math.round(lm.value * 10) / 10, delta: pm && pm.label === lm.label ? Math.round((lm.value - pm.value) * 10) / 10 : null, deltaUnit: 'pts', series, source: `${latest.source}, derived by Polo`, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
   } else items.push(base({ id: 'margin', group: 'company', label: 'Margin', unit: 'pct', source: 'None', period: 'n/a', missing: latest ? 'No margin in the filed numbers' : finMissing }));
 
-  // Open jobs and hiring trend.
-  const openJobs = postings.filter((p) => (p.lastSeenAt ?? p.postedAt) >= new Date(now.getTime() - 45 * DAY)).length;
-  const last90 = postings.filter((p) => p.postedAt >= d90).length;
-  const prev90 = postings.filter((p) => p.postedAt >= d180 && p.postedAt < d90).length;
-  if (postings.length) {
-    items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', value: openJobs, delta: pctChange(last90, prev90), deltaUnit: 'pct', series: monthly(postings.map((p) => p.postedAt), now, 6), sub: `${last90} posted in 90 days`, source: 'Job postings cache', period: 'Seen in 45 days; trend is last 90 days vs the 90 before', anchor: 'hiring-now' }));
+  // Open jobs are counted in full. The trend uses the newest post page only when that page reaches the window.
+  const postedAtMs = postings.map((p) => p.postedAt.getTime());
+  const recentComplete = readCoversWindow(postedAtMs, now.getTime(), 90, rawPostings.capped);
+  const compareComplete = readCoversWindow(postedAtMs, now.getTime(), 180, rawPostings.capped);
+  const last90 = recentComplete ? postings.filter((p) => p.postedAt >= d90).length : null;
+  const prev90 = compareComplete ? postings.filter((p) => p.postedAt >= d180 && p.postedAt < d90).length : null;
+  const jobsCopy = openJobsCopy(rawPostings.capped, recentComplete, compareComplete, last90);
+  if (rawPostings.openCount || postings.length) {
+    items.push(base({
+      id: 'open_jobs',
+      group: 'company',
+      label: 'Open jobs',
+      unit: 'count',
+      value: rawPostings.openCount,
+      delta: last90 != null && prev90 != null ? pctChange(last90, prev90) : null,
+      deltaUnit: 'pct',
+      series: compareComplete ? monthly(postings.map((p) => p.postedAt), now, 6) : [],
+      sub: jobsCopy.sub,
+      source: 'Job postings cache',
+      period: jobsCopy.period,
+      anchor: 'hiring-now',
+    }));
   } else items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', source: 'None', period: 'n/a', missing: 'No job postings tracked yet' }));
 
   // Momentum.
@@ -493,15 +552,19 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
       : base({ id: 'fin_warnings', group: 'health', label: 'Financial warnings', unit: 'count', goodWhen: 'down', source: 'Filed financials', period: 'n/a', missing: finMissing }),
   );
 
-  // News sentiment: mean over 90 days vs the 90 before.
+  // News sentiment: mean over 90 days vs the 90 before, only when the page actually reaches those windows.
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
-  const recent = news.filter((n) => n.occurredAt >= d90).map((n) => n.sentiment!);
-  const before = news.filter((n) => n.occurredAt < d90).map((n) => n.sentiment!);
+  const scored = news.rows;
+  const recentCompleteNews = readCoversWindow(scored.map((n) => n.occurredAt.getTime()), now.getTime(), 90, news.capped);
+  const priorCompleteNews = readCoversWindow(scored.map((n) => n.occurredAt.getTime()), now.getTime(), 180, news.capped);
+  const recent = scored.filter((n) => n.occurredAt >= d90).map((n) => n.sentiment!);
+  const before = scored.filter((n) => n.occurredAt < d90).map((n) => n.sentiment!);
   const sNow = mean(recent);
   const sPrev = mean(before);
+  const tone = sentimentCopy(news.capped, recentCompleteNews, priorCompleteNews, recent.length);
   items.push(
     sNow != null
-      ? base({ id: 'sentiment', group: 'health', label: 'News sentiment', unit: 'sentiment', value: Math.round(sNow * 100) / 100, delta: sPrev != null ? Math.round((sNow - sPrev) * 100) / 100 : null, deltaUnit: 'abs', sub: `${recent.length} scored item${recent.length === 1 ? '' : 's'}`, source: [...new Set(news.map((n) => sourceLabel(n.source)))].slice(0, 3).join(', '), period: 'Last 90 days vs the 90 before, scale -1 to +1', anchor: 'watchdog', sample: news.filter((n) => n.occurredAt >= d90).every((n) => n.sample) })
+      ? base({ id: 'sentiment', group: 'health', label: 'News sentiment', unit: 'sentiment', value: Math.round(sNow * 100) / 100, delta: tone.compare && sPrev != null ? Math.round((sNow - sPrev) * 100) / 100 : null, deltaUnit: 'abs', sub: tone.sub, source: [...new Set(scored.map((n) => sourceLabel(n.source)))].slice(0, 3).join(', '), period: tone.period, anchor: 'watchdog', sample: scored.filter((n) => n.occurredAt >= d90).every((n) => n.sample) })
       : base({ id: 'sentiment', group: 'health', label: 'News sentiment', unit: 'sentiment', source: 'News watchdog', period: 'Last 90 days', missing: 'No scored news in 90 days', anchor: 'watchdog' }),
   );
   return { companyId, items, computedAt: now.toISOString() };
