@@ -20,8 +20,9 @@ import {
   type TerritorySegment,
 } from '@/hooks/useTerritories';
 import {
-  formatUnspecifiedCompact,
-  unitsFromMicros,
+  compareMicros,
+  formatExactUnspecified,
+  microsSharePercent,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
@@ -438,10 +439,12 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
       />
     );
   }
-  const sorted = [...items].sort(
-    (a, b) => unitsFromMicros(b.totalValueMicros) - unitsFromMicros(a.totalValueMicros),
+  const sorted = [...items].sort((a, b) => compareMicros(b.totalValueMicros, a.totalValueMicros));
+  const max = sorted.reduce<string | number | bigint>(
+    (largest, segment) =>
+      compareMicros(segment.totalValueMicros, largest) > 0 ? segment.totalValueMicros : largest,
+    0,
   );
-  const max = Math.max(1, ...sorted.map((s) => unitsFromMicros(s.totalValueMicros)));
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-[var(--fg-tertiary)]">
@@ -458,7 +461,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatUnspecifiedCompact(unitsFromMicros(seg.totalValueMicros)),
+                value: formatExactUnspecified(seg.totalValueMicros),
               })}
             </span>
           </div>
@@ -466,7 +469,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span
               className="block h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-500"
               style={{
-                width: `${Math.max(3, Math.round((unitsFromMicros(seg.totalValueMicros) / max) * 100))}%`,
+                width: `${Math.max(3, Math.round(microsSharePercent(seg.totalValueMicros, max)))}%`,
               }}
             />
           </div>

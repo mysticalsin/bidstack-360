@@ -21,9 +21,6 @@ export function OppIndustryBreakdown() {
   const { t } = useTranslation('crm');
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
-  const formatSegment = (micros: number | string) =>
-    formatUnspecifiedCompact(unitsFromMicros(micros));
-
   return (
     <Card>
       <button
@@ -70,7 +67,6 @@ export function OppIndustryBreakdown() {
             isError={segments.isError}
             errorMessage={segments.error instanceof Error ? segments.error.message : undefined}
             onRetry={() => void segments.refetch()}
-            formatMoneyMicros={formatSegment}
           />
         </div>
       ) : null}

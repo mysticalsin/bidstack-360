@@ -362,7 +362,6 @@ export function TerritoriesPage() {
               isError={segments.isError}
               errorMessage={segments.error?.message}
               onRetry={() => void segments.refetch()}
-              formatMoneyMicros={formatMoneyMicros}
             />
           )}
         </Card>

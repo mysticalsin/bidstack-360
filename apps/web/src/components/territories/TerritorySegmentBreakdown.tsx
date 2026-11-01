@@ -6,7 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
-import { unitsFromMicros, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  compareMicros,
+  formatExactUnspecified,
+  microsSharePercent,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
 
 export function TerritorySegmentBreakdown({
@@ -16,7 +21,6 @@ export function TerritorySegmentBreakdown({
   isError,
   errorMessage,
   onRetry,
-  formatMoneyMicros,
 }: {
   dimension: SegmentDimension;
   segments: TerritorySegment[];
@@ -24,7 +28,6 @@ export function TerritorySegmentBreakdown({
   isError: boolean;
   errorMessage?: string;
   onRetry: () => void;
-  formatMoneyMicros: (micros: number | string) => string;
 }) {
   const { t } = useTranslation('crm');
 
@@ -70,7 +73,10 @@ export function TerritorySegmentBreakdown({
   }
 
   // Bar width is proportional to value share of the largest segment.
-  const maxValue = Math.max(...segments.map((s) => unitsFromMicros(s.totalValueMicros)), 1);
+  const maxValue = segments.reduce<string | number | bigint>(
+    (max, segment) => (compareMicros(segment.totalValueMicros, max) > 0 ? segment.totalValueMicros : max),
+    0,
+  );
   // Cap the visible rows; surface the overflow rather than silently truncating.
   const VISIBLE = 18;
   const shown = segments.slice(0, VISIBLE);
@@ -87,10 +93,7 @@ export function TerritorySegmentBreakdown({
       </p>
       <ul className="space-y-2">
         {shown.map((s) => {
-          const widthPct = Math.max(
-            2,
-            Math.round((unitsFromMicros(s.totalValueMicros) / maxValue) * 100),
-          );
+          const widthPct = Math.max(2, Math.round(microsSharePercent(s.totalValueMicros, maxValue)));
           return (
             <li
               key={s.key}
@@ -101,7 +104,7 @@ export function TerritorySegmentBreakdown({
                   {s.label}
                 </span>
                 <span className="shrink-0 text-sm font-semibold text-[var(--fg-primary)]">
-                  {formatMoneyMicros(s.totalValueMicros)}
+                  {formatExactUnspecified(s.totalValueMicros)}
                 </span>
               </div>
               {/* Value bar */}
