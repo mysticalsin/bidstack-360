@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { openPipelineStages, pipelineHeadline } from './PipelineByStageMini';
+import { openPipelineStages, pipelineHeadline } from './pipeline-headline';
 
 describe('openPipelineStages', () => {
   it('keeps closed won and lost out of the open pipeline chart', () => {

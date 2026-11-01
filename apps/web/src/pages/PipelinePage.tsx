@@ -27,7 +27,7 @@ import {
   formatUnspecifiedCompact,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
-import { pipelineHeadline } from '@/components/dashboard/widgets/PipelineByStageMini';
+import { pipelineHeadline } from '@/components/dashboard/widgets/pipeline-headline';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,

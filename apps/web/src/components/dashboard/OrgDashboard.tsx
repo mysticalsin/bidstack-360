@@ -83,13 +83,14 @@ export const OrgDashboard = memo(function OrgDashboard() {
         <p className="mt-2 text-sm text-[var(--fg-secondary)]">{UNSPECIFIED_CURRENCY_BASIS}</p>
       </section>
 
+      <PipelineByStageMini report={pipelineReport.data} />
+
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
         <div className="flex min-w-0 flex-col gap-6">
           <ClosingThisWeekCard />
           <TopAccountsCard />
         </div>
         <aside className="flex min-w-0 flex-col gap-6" aria-label={t('orgDashboard.detailsAriaLabel', 'Workspace details')}>
-          <PipelineByStageMini report={pipelineReport.data} reduced />
           <AlertCard
             tone="rose"
             icon="tasks"

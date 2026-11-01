@@ -8,7 +8,7 @@ import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-cur
 import {
   openPipelineStages,
   type PipelineStagePoint,
-} from '@/components/dashboard/widgets/PipelineByStageMini';
+} from '@/components/dashboard/widgets/pipeline-headline';
 
 function stageName(stage: string): string {
   return stage
