@@ -132,11 +132,29 @@ export const InternalTaskRow = z.object({
 });
 export type InternalTaskRow = z.infer<typeof InternalTaskRow>;
 
+export const WORK_PAGE = 1000;
+
 export const AccountWork = z.object({
   commitments: z.array(CustomerCommitmentRow),
   internalTasks: z.array(InternalTaskRow),
+  /** True when commitments are the soonest 1,000. */
+  commitmentsCapped: z.boolean().optional(),
+  /** True when internal tasks are the soonest 1,000. */
+  tasksCapped: z.boolean().optional(),
 });
 export type AccountWork = z.infer<typeof AccountWork>;
+
+/** Names a full work page. A complete list stays silent. */
+export function workPageNotes(caps: {
+  commitmentsCapped?: boolean;
+  tasksCapped?: boolean;
+} | null | undefined): { commitments: string | null; tasks: string | null } {
+  const page = String(WORK_PAGE).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return {
+    commitments: caps?.commitmentsCapped ? `Soonest ${page} commitments. Later promises are outside this page.` : null,
+    tasks: caps?.tasksCapped ? `Soonest ${page} internal tasks. Later tasks are outside this page.` : null,
+  };
+}
 
 export const CustomerCommitmentCreate = z.object({
   promise: z.string().min(1).max(2000),

@@ -10,7 +10,7 @@ import {
   useDecidePersonFact,
   usePeopleMap,
 } from '@/hooks/useAccountPeople';
-import { peopleMapPageNotes, type ConnectionStanding, type PeopleMapPerson } from '@bidstack/shared';
+import { peopleMapPageNotes, workPageNotes, type ConnectionStanding, type PeopleMapPerson } from '@bidstack/shared';
 
 type DealOption = { id: string; name: string };
 
@@ -542,13 +542,14 @@ function CommitmentLists({
   opportunityId?: string;
   people: PeopleMapPerson[];
   deals: DealOption[];
-  work: { commitments: Array<{ id: string; promise: string; dueDate: string | null; status: string; ownerName: string | null; opportunityId: string | null; recordKind: string }>; internalTasks: Array<{ id: string; title: string; dueDate: string | null; status: string; assigneeEmail: string | null; recordKind: string }> } | undefined;
+  work: { commitments: Array<{ id: string; promise: string; dueDate: string | null; status: string; ownerName: string | null; opportunityId: string | null; recordKind: string }>; internalTasks: Array<{ id: string; title: string; dueDate: string | null; status: string; assigneeEmail: string | null; recordKind: string }>; commitmentsCapped?: boolean; tasksCapped?: boolean } | undefined;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
   onRetry: () => void;
 }) {
   const { t } = useTranslation('crm');
+  const notes = workPageNotes(work);
   const create = useCreateCommitment({ companyId, opportunityId });
   const [promise, setPromise] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -569,6 +570,7 @@ function CommitmentLists({
             'What the customer promised. Internal tasks stay in the list below and are not the same record.',
           )}
         </p>
+        {notes.commitments ? <p className="mt-2 text-sm text-[var(--fg-secondary)]">{notes.commitments}</p> : null}
       </header>
       <div className="space-y-6 px-5 py-4">
         {isLoading ? (
@@ -727,6 +729,7 @@ function CommitmentLists({
                   'Follow-ups for us. Saving a task does not create a customer commitment.',
                 )}
               </p>
+              {notes.tasks ? <p className="mt-2 text-sm text-[var(--fg-secondary)]">{notes.tasks}</p> : null}
               {(work?.internalTasks.length ?? 0) === 0 ? (
                 <p className="mt-3 text-sm text-[var(--fg-secondary)]">
                   {t('commitments.tasksEmpty', 'No internal tasks on this record.')}
