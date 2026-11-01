@@ -27,6 +27,8 @@ export const WATCH_EVENT_KINDS = [
   'HIRING_SPIKE',
   'LAYOFFS',
   'PARTNERSHIP',
+  // v22.1: analyst notes, ratings, price targets, stock moves and investor commentary.
+  'MARKET_COMMENTARY',
 ] as const;
 export type WatchEventKind = (typeof WATCH_EVENT_KINDS)[number];
 
@@ -42,6 +44,7 @@ export const SignalCategory = z.enum([
   'm_and_a',
   'partnership',
   'filing',
+  'market',
   'news',
   // Our side of the timeline.
   'meeting',
@@ -61,6 +64,7 @@ export const SIGNAL_CATEGORY_LABEL: Record<SignalCategory, string> = {
   m_and_a: 'M&A',
   partnership: 'Partnership',
   filing: 'Filing',
+  market: 'Market / analyst',
   news: 'News',
   meeting: 'Meeting',
   deal: 'Deal',
@@ -91,6 +95,8 @@ export function categoryForKind(kind: string, implication?: Implication | null):
       return 'm_and_a';
     case 'PARTNERSHIP':
       return 'partnership';
+    case 'MARKET_COMMENTARY':
+      return 'market';
     case 'LAYOFFS':
     case 'INSOLVENCY':
     case 'RESTRUCTURING':
@@ -215,7 +221,7 @@ interface Rule {
 const RULES: Rule[] = [
   { kind: 'INSOLVENCY', re: /\b(insolven\w*|bankrupt\w*|administration order|chapter 11|receivership|liquidation)\b/i, implication: 'RISK', sentiment: -1, rule: 'insolvency wording' },
   { kind: 'LAYOFFS', re: /\b(lay ?offs?|laid off|job cuts?|cuts? [\d,]+ (jobs|roles|staff)|cutting [\d,]+|redundanc\w*|workforce reduction|headcount reduction)\b/i, implication: 'RISK', sentiment: -0.7, rule: 'layoffs wording' },
-  { kind: 'NEWS_SIGNAL', re: /\b(lawsuit|sued|fined|fines?|probe|investigat\w*|data breach|breach|outage|cyber ?attack|ransomware|downgrade[sd]?|default\w*|penalt\w*|sanction\w*|recall\w*|class action)\b/i, implication: 'RISK', sentiment: -0.6, rule: 'risk wording' },
+  { kind: 'NEWS_SIGNAL', re: /\b(lawsuit|sued|fined|fines?|probe|investigat\w*|data breach|breach|outage|cyber ?attack|ransomware|(credit|debt|bond) (rating )?downgrade[sd]?|downgrade[sd]? [^.]{0,40}?\b(credit|debt|bond)|default\w*|penalt\w*|sanction\w*|recall\w*|class action)\b/i, implication: 'RISK', sentiment: -0.6, rule: 'risk wording' },
   { kind: 'M_AND_A', re: /\b(acquires?|acquired|acquisition|to acquire|merger|merges?|takeover|to buy|buys|divest\w*|sells? (its |the )?\w+ (unit|business|division))\b/i, implication: 'OPPORTUNITY', sentiment: 0.3, rule: 'M&A wording' },
   { kind: 'FUNDING_ROUND', re: /\b(raises?|raised|funding round|series [a-h]\b|seed round|growth round|secures? [$€£]?\s?[\d.,]+ ?(m|bn|million|billion)|venture (capital|funding)|financing round|private placement|capital raise)\b/i, implication: 'OPPORTUNITY', sentiment: 0.8, rule: 'funding wording' },
   { kind: 'LEADERSHIP_CHANGE', re: /\b(appoints?|appointed|names? (a |its )?(new )?(chief|ceo|cfo|cto|cio|coo|ciso|president|head)|steps? down|resigns?|resignation|retires?|joins as|new (ceo|cfo|cto|cio|coo|ciso|chair\w*)|successor|interim (ceo|cfo))\b/i, implication: 'OPPORTUNITY', sentiment: 0.1, rule: 'leadership wording' },
@@ -229,10 +235,40 @@ const RULES: Rule[] = [
 const POSITIVE = /\b(beats?|record|surge\w*|soar\w*|jumps?|rises?|rose|growth|grew|strong|wins?|award\w*|upgrade[sd]?)\b/i;
 const NEGATIVE = /\b(miss(es|ed)?|falls?|fell|drops?|plunge\w*|slump\w*|weak|loss(es)?|warns?|warning|cuts? (guidance|forecast)|decline\w*)\b/i;
 
+// v22.1: stock-market chatter. Price targets, ratings, analyst notes, share
+// moves and investor-commentary headlines ("Should X (TSX:ATZ) attract
+// attention?") are about the stock, not the business, so they get their own
+// low-weight category instead of tripping the funding or earnings rules.
+const MARKET_WORDS =
+  /\b(price target|target price|pt (raised|cut|lowered)|analysts?|(strong |moderate )?(buy|sell|hold) rating|rated|ratings?|re-?rated|upgrades?|upgraded|downgrades?|downgraded|outperform|underperform|overweight|underweight|equal[- ]weight|market perform|consensus|stocks?|shares? (price|rose|fell|jump\w*|drop\w*|climb\w*|slid\w*|slip\w*|gain\w*|surg\w*|plung\w*|rall\w*|sink\w*|tumbl\w*|up|down|higher|lower)|share price|investors?|investor (day|attention)|valuation|undervalued|overvalued|trading session|market (tone|outlook|cap)|short interest|dividend yield|cash flow|trades? at a (discount|premium)|catalysts?|investment (narrative|case|thesis)|buy the dip|52-week|all-time high|(rise|rose|fell|gain(ed)?|drop(ped)?|climb(ed)?|jump(ed)?) [\d.]+ ?%|slideshow)\b/i;
+/** "(TSX:ATZ)", "(NYSE: DNB)", "(ATZ.TO)", "(TSX:ATZ:CA)". */
+const TICKER_TAG = /\((?:[A-Z]{2,8}: ?)?[A-Z0-9]{1,6}(?:\.[A-Z]{1,3})?(?::[A-Z]{2})?\)/;
+/** Real business events keep their own category even when a stock word appears. */
+const BUSINESS_EVENT = /\b(series [a-h]\b|seed round|funding round|raises? [$€£]\s?[\d.,]+|acquires?|acquired|acquisition|to acquire|merger|takeover|insolven\w*|bankrupt\w*|lay ?offs?|job cuts?|appoints?|appointed|steps? down|resigns?|new (ceo|cfo|cto|cio|coo|chair\w*)|partners? with|partnership|launch(es|ed)?|unveil\w*|(reports?|posts?|announces?) (q[1-4]|first|second|third|fourth|full[- ]year|quarterly|annual) (quarter )?(results|earnings))\b/i;
+const MARKET_NEGATIVE = /\b(downgrade[sd]?|cuts?|lower(s|ed)?|underperform|underweight|sell rating|slid\w*|slip\w*|fell|drop\w*|plung\w*|tumbl\w*|sink\w*|pressure)\b/i;
+const MARKET_POSITIVE = /\b(upgrade[sd]?|raise[sd]?|boost\w*|outperform|overweight|buy rating|rose|gain\w*|climb\w*|jump\w*|surg\w*|rall\w*|strong)\b/i;
+
+/** True for analyst, rating, price-target, stock-move and investor-commentary headlines. */
+export function isMarketCommentary(rawTitle: string): boolean {
+  const head = cleanText(rawTitle);
+  if (BUSINESS_EVENT.test(head)) return false;
+  if (MARKET_WORDS.test(head)) return true;
+  // SEO investor pieces: a ticker tag and a question ("Can X (TSX:ATZ) expand?").
+  return TICKER_TAG.test(rawTitle) && /\?\s*$/.test(head);
+}
+
 /** Rule-based classification of a headline (plus optional description). */
 export function classifySignalText(title: string, description = ''): SignalClassification {
   const text = `${cleanText(title)} ${cleanText(description)}`;
   const head = cleanText(title);
+  const hardRisk = RULES.slice(0, 3).find((r) => r.re.test(head));
+  if (!hardRisk && isMarketCommentary(title)) {
+    const neg = MARKET_NEGATIVE.test(head);
+    const pos = MARKET_POSITIVE.test(head);
+    const implication: Implication = neg && !pos ? 'RISK' : 'NEUTRAL';
+    const sentiment = neg && !pos ? -0.2 : pos && !neg ? 0.2 : 0;
+    return { kind: 'MARKET_COMMENTARY', category: 'market', implication, sentiment, rule: 'market or analyst wording' };
+  }
   // Headline first: descriptions often mention unrelated boilerplate.
   const hit = RULES.find((r) => r.re.test(head)) ?? RULES.find((r) => r.re.test(text));
   let kind: WatchEventKind = hit?.kind ?? 'NEWS_SIGNAL';
@@ -286,6 +322,8 @@ const KIND_BASE: Partial<Record<WatchEventKind, number>> = {
   FILING: 35,
   OTHER_DISCLOSURE: 30,
   NEWS_SIGNAL: 30,
+  // Stock chatter is context, never an alert on its own.
+  MARKET_COMMENTARY: 15,
 };
 
 /** Sources that publish first-hand (the company itself or a regulator). */
@@ -299,7 +337,7 @@ export function importanceScore(input: { kind: string; implication: Implication;
   // Risk news (lawsuit, fine, breach, downgrade) is crucial for a key account,
   // so it starts at the restructuring level rather than generic news.
   if (input.kind === 'NEWS_SIGNAL' && input.implication === 'RISK') s = 60;
-  if (input.implication === 'RISK') s += 10;
+  if (input.implication === 'RISK') s += input.kind === 'MARKET_COMMENTARY' ? 5 : 10;
   if (PRIMARY_SOURCES.has(input.source)) s += 10;
   s += Math.min(15, Math.max(0, (input.mentions ?? 1) - 1) * 5);
   return Math.max(0, Math.min(100, Math.round(s)));
@@ -759,4 +797,55 @@ export type PortfolioMomentum = z.infer<typeof PortfolioMomentum>;
 /** "Sample: Foo" -> "Foo" for display (the UI shows a Sample badge instead). */
 export function stripSamplePrefix(title: string): string {
   return title.replace(/^Sample:\s*/i, '');
+}
+
+// ── Market-note grouping (v22.1) ────────────────────────────────────────────
+
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEK = 7 * 86_400_000;
+
+/** "5 analyst notes this week" / "3 analyst notes, week of 19 Oct". */
+export function marketGroupTitle(count: number, weekStart: Date, now: Date): string {
+  const noun = count === 1 ? 'analyst note' : 'analyst notes';
+  if (now.getTime() - weekStart.getTime() < WEEK) return `${count} ${noun} this week`;
+  return `${count} ${noun}, week of ${weekStart.getUTCDate()} ${MON[weekStart.getUTCMonth()]}`;
+}
+
+/**
+ * Collapse repetitive market / analyst items per account into one row per
+ * rolling week (counted back from now). Single notes stay as they are. The
+ * merged row sits where the newest member was, so the list order holds.
+ */
+export function collapseMarketNotes<T>(
+  items: T[],
+  opts: { now: Date; isMarket(t: T): boolean; at(t: T): Date; merge(group: T[], title: string, weekStart: Date): T },
+): T[] {
+  const buckets = new Map<number, T[]>();
+  for (const it of items) {
+    if (!opts.isMarket(it)) continue;
+    const b = Math.max(0, Math.floor((opts.now.getTime() - opts.at(it).getTime()) / WEEK));
+    const arr = buckets.get(b) ?? [];
+    arr.push(it);
+    buckets.set(b, arr);
+  }
+  const out: T[] = [];
+  const done = new Set<number>();
+  for (const it of items) {
+    if (!opts.isMarket(it)) {
+      out.push(it);
+      continue;
+    }
+    const b = Math.max(0, Math.floor((opts.now.getTime() - opts.at(it).getTime()) / WEEK));
+    const group = buckets.get(b)!;
+    if (group.length < 2) {
+      out.push(it);
+      continue;
+    }
+    if (done.has(b)) continue;
+    done.add(b);
+    const sorted = [...group].sort((a, z) => opts.at(z).getTime() - opts.at(a).getTime());
+    const weekStart = new Date(opts.now.getTime() - (b + 1) * WEEK);
+    out.push(opts.merge(sorted, marketGroupTitle(group.length, b === 0 ? new Date(opts.now.getTime() - 1) : weekStart, opts.now), weekStart));
+  }
+  return out;
 }

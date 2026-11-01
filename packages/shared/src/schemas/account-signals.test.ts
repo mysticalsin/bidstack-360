@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   momentumVerdict,
+  collapseMarketNotes,
+  importanceScore as importanceScoreV221,
+  isMarketCommentary,
   classifySignalText,
   cleanText,
   computeMomentum,
@@ -182,5 +185,67 @@ describe('importance for risk news', () => {
     const c = classifySignalText('DNB Bank fined by regulator over anti-money laundering controls');
     expect(c.implication).toBe('RISK');
     expect(importanceScore({ kind: c.kind, implication: c.implication, source: 'gdelt' })).toBeGreaterThanOrEqual(ALERT_IMPORTANCE);
+  });
+});
+
+describe('market / analyst classification (v22.1)', () => {
+  // Real-style headlines seen on Google News for the demo accounts, 2026-10.
+  const market = [
+    'Aritzia (TSE:ATZ) Stock Price Target Raised at Canaccord Genuity Group',
+    'Aritzia Inc. (TSE:ATZ) Stock Now Rated "Moderate Buy" by Wall Street Analysts',
+    'TD Forecasts Strong Price Appreciation for Aritzia (TSE:ATZ) Stock',
+    'Aritzia Inc. (ATZ:CA) Analysts Collectively Boost Target Forecasts',
+    'Why Did Aritzia (TSX:ATZ) Rise 0.826% on October 21, 2026?',
+    'Can Aritzia (TSX:ATZ) Expand Its Boutique Network?',
+    'Should Aritzia (TSX:ATZ) Attract Attention After Its Latest Trading Session?',
+    'Did Strong Earnings Guidance Just Shift Aritzia\'s (TSX:ATZ) Investment Narrative?',
+    'Aritzia, Inc. (TSX:ATZ): Surging Net Income, U.S. Expansion Keep Investors Watching',
+    'DNB Bank (OB:DNB) Stock Can Q3 Earnings Sustain Fee Led Strength',
+    'NOS (ENXTLS:NOS) Stock May Trade At A Discount On Cash Flow',
+    'MAPFRE shares slide 3% as analysts cut target price',
+  ];
+  it.each(market)('treats "%s" as Market / analyst, never Funding', (title) => {
+    const c = classifySignalText(title);
+    expect(c.kind).toBe('MARKET_COMMENTARY');
+    expect(c.category).toBe('market');
+    expect(importanceScoreV221({ kind: c.kind, implication: c.implication, source: 'google_news' })).toBeLessThan(30);
+  });
+
+  const business: Array<[string, string]> = [
+    ['Acme raises $40M Series C led by Atomico', 'FUNDING_ROUND'],
+    ['Aritzia to acquire Canadian e-commerce startup; shares jump 4%', 'M_AND_A'],
+    ['DNB Bank appoints new CFO', 'LEADERSHIP_CHANGE'],
+    ['MAPFRE reports third quarter results', 'EARNINGS_RELEASE'],
+    ['NOS hit by data breach, shares fall', 'NEWS_SIGNAL'],
+    ['Moody\'s downgrades CI Financial credit rating', 'NEWS_SIGNAL'],
+    ['MAHLE announces 1,000 job cuts in Germany', 'LAYOFFS'],
+  ];
+  it.each(business)('keeps the business event in "%s"', (title, kind) => {
+    expect(classifySignalText(title).kind).toBe(kind);
+  });
+
+  it('marks downgrades and cuts as mild risk, raises as neutral', () => {
+    expect(classifySignalText('Analyst downgrades Aritzia (TSX:ATZ) to Hold').implication).toBe('RISK');
+    expect(classifySignalText('Aritzia (TSE:ATZ) Stock Price Target Raised at Canaccord').implication).toBe('NEUTRAL');
+    expect(isMarketCommentary('Aritzia opens flagship store in Chicago')).toBe(false);
+  });
+
+  it('collapses several notes in a week into one row and leaves single notes alone', () => {
+    const now = new Date('2026-11-01T12:00:00Z');
+    const d = (days: number) => new Date(now.getTime() - days * 86_400_000);
+    const items = [
+      { id: 'a', m: true, at: d(1) },
+      { id: 'b', m: false, at: d(2) },
+      { id: 'c', m: true, at: d(3) },
+      { id: 'd', m: true, at: d(5) },
+      { id: 'e', m: true, at: d(10) },
+    ];
+    const out = collapseMarketNotes(items, {
+      now,
+      isMarket: (t) => t.m,
+      at: (t) => t.at,
+      merge: (g, title) => ({ id: `grp:${g.map((x) => x.id).join('')}:${title}`, m: true, at: g[0]!.at }),
+    });
+    expect(out.map((o) => o.id)).toEqual(['grp:acd:3 analyst notes this week', 'b', 'e']);
   });
 });
