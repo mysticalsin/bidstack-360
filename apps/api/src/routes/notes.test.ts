@@ -352,4 +352,82 @@ describe('notes routes (integration)', () => {
     await prisma.note.delete({ where: { id: probeId } });
     await prisma.company.delete({ where: { id: company.id } });
   });
+
+  skipIfNoDb('POST import-meeting keeps another company and a blank re-import off the row', async () => {
+    // WHY: compliance was matched by framework label alone. A note for one
+    // company rewrote another company's status, and a later note with no
+    // owner cleared the owner.
+    const stamp = Date.now();
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: `probe-compliance-${stamp}`, title: 'Probe', bodyMd: 'org' },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = (probe.json() as { id: string }).id;
+    const probeRow = await prisma.note.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const orgId = probeRow!.orgId;
+    const otherName = `Other Compliance ${stamp}`;
+    const companyName = `Fresh Compliance ${stamp}`;
+    const other = await prisma.complianceCheck.create({
+      data: {
+        orgId,
+        label: 'GDPR',
+        status: 'compliant',
+        owner: 'Ada',
+        sourceAttribution: [
+          {
+            source: 'meeting_notes_import',
+            label: 'Meeting notes import',
+            sourceUrl: null,
+            fetchedAt: new Date().toISOString(),
+            confidence: null,
+            providerMetadata: { companyName: otherName },
+          },
+        ],
+      },
+    });
+    const first = await server.inject({
+      method: 'POST',
+      url: '/api/notes/import-meeting',
+      payload: {
+        accountId: companyName,
+        companyName,
+        bodyMd: 'Compliance: GDPR not started. Owner: Bea',
+      },
+    });
+    expect(first.statusCode).toBe(201);
+    const second = await server.inject({
+      method: 'POST',
+      url: '/api/notes/import-meeting',
+      payload: {
+        accountId: companyName,
+        companyName,
+        bodyMd: 'Compliance: GDPR was mentioned again',
+      },
+    });
+    expect(second.statusCode).toBe(201);
+    const rows = await prisma.complianceCheck.findMany({
+      where: { orgId, label: 'GDPR', deletedAt: null },
+      select: { id: true, status: true, owner: true, sourceAttribution: true },
+    });
+    const companyOf = (value: unknown) => {
+      if (!Array.isArray(value)) return null;
+      const meta = (value[0] as { providerMetadata?: { companyName?: string } } | undefined)
+        ?.providerMetadata?.companyName;
+      return typeof meta === 'string' ? meta : null;
+    };
+    const kept = rows.find((row) => row.id === other.id);
+    const fresh = rows.find((row) => companyOf(row.sourceAttribution) === companyName);
+    expect(kept?.status).toBe('compliant');
+    expect(kept?.owner).toBe('Ada');
+    expect(fresh?.status).toBe('not_started');
+    expect(fresh?.owner).toBe('Bea');
+    await prisma.complianceCheck.deleteMany({
+      where: { orgId, label: 'GDPR', id: { in: rows.map((row) => row.id) } },
+    });
+    await prisma.note.deleteMany({
+      where: { orgId, accountId: { in: [companyName.toLowerCase(), `probe-compliance-${stamp}`] } },
+    });
+  });
 });

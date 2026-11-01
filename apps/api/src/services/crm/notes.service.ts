@@ -116,24 +116,34 @@ export async function persistCompliance(
 ): Promise<number> {
   if (compliance.length === 0) return 0;
   const labels = compliance.map((c) => c.label);
+  const companyKey = companyName.trim().toLowerCase();
   const existing = await tx.complianceCheck.findMany({
-    where: { orgId, label: { in: labels, mode: 'insensitive' } },
-    select: { id: true, label: true },
+    where: { orgId, deletedAt: null, label: { in: labels, mode: 'insensitive' } },
+    select: { id: true, label: true, sourceAttribution: true },
     take: 1000,
   });
-  const existingByLabel = new Map(existing.map((e) => [e.label.toLowerCase(), e.id]));
-  const toUpdate = compliance.filter((c) => existingByLabel.has(c.label.toLowerCase()));
-  const toCreate = compliance.filter((c) => !existingByLabel.has(c.label.toLowerCase()));
+  const toUpdate: Array<{ id: string; check: ComplianceCheck }> = [];
+  const toCreate: ComplianceCheck[] = [];
+  for (const check of compliance) {
+    const matches = existing.filter(
+      (row) =>
+        row.label.toLowerCase() === check.label.toLowerCase() &&
+        attributedCompanyName(row.sourceAttribution) === companyKey,
+    );
+    if (matches.length === 0) toCreate.push(check);
+    else for (const row of matches) toUpdate.push({ id: row.id, check });
+  }
   if (toUpdate.length > 0) {
     await Promise.all(
-      toUpdate.map((c) =>
+      toUpdate.map(({ id, check }) =>
         tx.complianceCheck.update({
-          where: { id: existingByLabel.get(c.label.toLowerCase())! },
+          where: { id },
           data: {
-            // A later note that only names the framework must not wipe a status.
-            ...(c.status ? { status: c.status } : {}),
-            owner: c.owner,
-            sourceAttribution: asJsonArray(c.sourceAttribution),
+            // A later note that only names the framework must not wipe a
+            // status or an owner, and must not edit another company's row.
+            ...(check.status ? { status: check.status } : {}),
+            ...(check.owner ? { owner: check.owner } : {}),
+            sourceAttribution: asJsonArray(check.sourceAttribution),
           },
         }),
       ),
@@ -313,6 +323,18 @@ export function asJsonArray(value: unknown[]): Prisma.InputJsonArray {
 }
 
 // ─── Persistence-private helpers ──────────────────────────────────────────────
+
+function attributedCompanyName(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const meta = (item as { providerMetadata?: unknown }).providerMetadata;
+    if (!meta || typeof meta !== 'object') continue;
+    const name = (meta as { companyName?: unknown }).companyName;
+    if (typeof name === 'string' && name.trim()) return name.trim().toLowerCase();
+  }
+  return null;
+}
 
 function mergeTechStack(
   existing: TechnicalStackCategory[],
