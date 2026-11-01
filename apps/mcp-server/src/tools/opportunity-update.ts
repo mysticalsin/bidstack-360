@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { companyIdForCustomerRename } from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -32,7 +33,7 @@ const Input = z.object({
 
 export const opportunityUpdate: Tool<typeof Input> = {
   description:
-    'Patch an opportunity. Common use: agent updates stage, probability, or value. Writes audit_log.',
+    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage, probability, or value change does not touch the link. Writes audit_log.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -64,6 +65,10 @@ export const opportunityUpdate: Tool<typeof Input> = {
     if (!before) throw new Error('Opportunity not found');
 
     const { patch } = args;
+    const companyId =
+      patch.customer !== undefined && patch.customer !== before.customer
+        ? await companyIdForCustomerRename(ctx.orgId, patch.customer)
+        : undefined;
     const updated = await prisma.opportunity.update({
       where: { id: before.id },
       data: {
@@ -76,6 +81,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
           ? { dueDate: patch.dueDate ? new Date(patch.dueDate) : null }
           : {}),
         ...(patch.customer ? { customer: patch.customer } : {}),
+        ...(companyId !== undefined ? { companyId } : {}),
         ...(patch.name ? { name: patch.name } : {}),
         ...(patch.industry !== undefined ? { industry: patch.industry } : {}),
       },
@@ -103,6 +109,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: updated.owner?.email ?? null,
       industry: updated.industry,
+      companyId: updated.companyId,
       updatedAt: updated.updatedAt.toISOString(),
     };
   },

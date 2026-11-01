@@ -79,6 +79,26 @@ export async function requireCompanyLink(
   return uniqueCompanyLink(matches);
 }
 
+/**
+ * A renamed customer label. One exact company stores that id. None clears the
+ * link. Several is a refusal so the previous id is left untouched by the caller.
+ */
+export async function companyIdForCustomerRename(
+  orgId: string,
+  customer: string,
+): Promise<string | null> {
+  const name = customer.trim();
+  if (!name) return null;
+  const matches = await prisma.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: name, mode: 'insensitive' } },
+    select: { id: true },
+    take: 2,
+  });
+  if (matches.length === 0) return null;
+  if (matches.length > 1) throw new Error('Company name matches more than one company');
+  return matches[0]?.id ?? null;
+}
+
 export function normalizeName(value: string) {
   return value
     .trim()

@@ -230,6 +230,65 @@ describeDb('MCP tools', () => {
     expect(audit).toBeTruthy();
   });
 
+  it('opportunity.update moves the company id when the customer name changes', async () => {
+    // WHY: Dust lists deals by company id. A customer rename that left the old
+    // id kept the deal on the previous account after the label had moved.
+    const token = randomBytes(4).toString('hex');
+    const from = await prisma.company.create({
+      data: { orgId, name: `From Deal ${token}` },
+    });
+    const to = await prisma.company.create({
+      data: { orgId, name: `To Deal ${token}` },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-relink-${token}`,
+        customer: 'Stored label',
+        companyId: from.id,
+        name: 'Relink deal',
+        stage: 's1_lead',
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const moved = (await tools['opportunity.update'].handler(
+      { id: opp.id, patch: { customer: to.name } },
+      ctx,
+    )) as { companyId: string | null; customer: string };
+    expect(moved.customer).toBe(to.name);
+    expect(moved.companyId).toBe(to.id);
+
+    const same = (await tools['crm_update_deal'].handler(
+      { id: opp.id, patch: { name: 'Relink deal renamed' } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(same.companyId).toBe(to.id);
+
+    const cleared = (await tools['crm_update_deal'].handler(
+      { id: opp.id, patch: { customer: `Nobody ${token}` } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(cleared.companyId).toBeNull();
+
+    await prisma.opportunity.update({ where: { id: opp.id }, data: { companyId: from.id } });
+    await prisma.company.create({ data: { orgId, name: `Twin Deal ${token}` } });
+    await prisma.company.create({ data: { orgId, name: `twin deal ${token}` } });
+    await expect(
+      tools['opportunity.update'].handler(
+        { id: opp.id, patch: { customer: `Twin Deal ${token}` } },
+        ctx,
+      ),
+    ).rejects.toThrow('Company name matches more than one company');
+    const stored = await prisma.opportunity.findUnique({
+      where: { id: opp.id },
+      select: { companyId: true, customer: true },
+    });
+    expect(stored).toMatchObject({ companyId: from.id, customer: `Nobody ${token}` });
+  });
+
   it('contacts.list returns empty when no contacts', async () => {
     const out = (await tools['contacts.list'].handler({ limit: 10 }, ctx)) as unknown[];
     expect(Array.isArray(out)).toBe(true);

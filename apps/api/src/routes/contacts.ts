@@ -1,7 +1,8 @@
-// Contacts routes — CRUD over the people / decision-unit table. The
-// `customer` field is a free-text customer-account tag (same convention as
-// Notes / Files) so contacts can attach to accounts that aren't yet
-// first-class CrmCompany rows.
+// Contacts routes — CRUD over the people / decision-unit table. `companyId`
+// is the company link. `customer` is the label. Changing that label relinks
+// when the name matches one company, clears the link when it matches none,
+// and refuses when it matches two. A name, role, or sentiment edit leaves
+// the stored link alone.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -17,6 +18,7 @@ import {
 } from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { resolveLeadCompanyId } from './leads.company-link.js';
 
 function linkStateFor(companyId: string | null): ContactLinkState {
   // Reads do not invent a link. A historical row with a null companyId stays
@@ -206,15 +208,27 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       // could PATCH any contact by guessing its UUID.
       const existing = await prisma.contact.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, customer: true },
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
+
+      // Same string is not a reassignment. A dialog that resends the label
+      // must not drop a link whose label does not match a company name.
+      let companyIdUpdate: string | null | undefined;
+      if (req.body.customer !== undefined && req.body.customer !== existing.customer) {
+        const linkedCompanyId = await resolveLeadCompanyId(req.auth.orgId, req.body.customer);
+        if (linkedCompanyId === 'ambiguous') {
+          throw server.httpErrors.conflict('Company name matches more than one company');
+        }
+        companyIdUpdate = linkedCompanyId;
+      }
 
       const updated = await prisma.$transaction(async (tx) => {
         const contact = await tx.contact.update({
           where: { id: existing.id },
           data: {
             ...(req.body.customer !== undefined ? { customer: req.body.customer } : {}),
+            ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
             ...(req.body.name !== undefined ? { name: req.body.name } : {}),
             ...(req.body.role !== undefined ? { role: req.body.role } : {}),
             ...(req.body.email !== undefined ? { email: req.body.email } : {}),

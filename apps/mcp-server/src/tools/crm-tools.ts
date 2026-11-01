@@ -12,6 +12,7 @@ import {
   Stage,
 } from './crm-tools.schemas.js';
 import {
+  companyIdForCustomerRename,
   logoUrl,
   mintNextCode,
   normalizeDomain,
@@ -162,7 +163,8 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
 };
 
 export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
-  description: 'Update a CRM deal/opportunity and write an audit entry.',
+  description:
+    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. Other fields do not touch the company link. Writes an audit entry.',
   input: DealUpdateInput,
   inputJsonSchema: {
     type: 'object',
@@ -179,6 +181,10 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
     });
     if (!before) throw new Error('Deal not found');
 
+    const companyId =
+      args.patch.customer !== undefined && args.patch.customer !== before.customer
+        ? await companyIdForCustomerRename(ctx.orgId, args.patch.customer)
+        : undefined;
     const updated = await prisma.opportunity.update({
       where: { id: before.id },
       data: {
@@ -191,6 +197,7 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
           ? { dueDate: args.patch.dueDate ? new Date(args.patch.dueDate) : null }
           : {}),
         ...(args.patch.customer !== undefined ? { customer: args.patch.customer } : {}),
+        ...(companyId !== undefined ? { companyId } : {}),
         ...(args.patch.name !== undefined ? { name: args.patch.name } : {}),
         ...(args.patch.industry !== undefined ? { industry: args.patch.industry } : {}),
       },
@@ -206,7 +213,7 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
       },
     });
 
-    return serializeDeal(updated);
+    return { ...serializeDeal(updated), companyId: updated.companyId };
   },
 };
 
