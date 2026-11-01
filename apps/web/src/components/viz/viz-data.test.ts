@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -82,6 +82,26 @@ describe('viz-data', () => {
       'closed_won',
     ]);
     expect(pastDueOpen([lost], Date.parse('2026-06-01'))).toEqual([]);
+    const fromMicros = stageFunnel([
+      row({ stage: 's2_sent', value: 0, valueMicros: '7860000000000' }),
+      row({ stage: 's2_sent', value: 0, valueMicros: '12015000000000' }),
+    ]);
+    expect(fromMicros[0]).toMatchObject({ value: 19_875_000, count: 2, amount: '19,875,000' });
+    const storedWon = row({
+      stage: 'closed_won',
+      value: 0,
+      valueMicros: '200000000',
+      dueDate: '2026-02-03T00:00:00.000Z',
+      closedAt: '2026-02-03T00:00:00.000Z',
+    });
+    const storedOpen = row({ stage: 's2_sent', value: 0, valueMicros: '10000000', dueDate: '2026-05-01' });
+    // WHY: the quarter bar and the spark added the unit number, so a stored amount of 0 units drew nothing.
+    expect(wonByQuarter([storedWon])).toEqual([{ label: 'Q1 2026', won: 200 }]);
+    expect(cumulativeWon([storedWon]).map((point) => point.y)).toEqual([0, 200]);
+    expect(cumulativeOpen([storedOpen])).toEqual([0, 10]);
+    expect(fmtCompact(7_860_000)).toContain('7.86');
+    expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
+    expect(fmtCompact(12_015_000)).toBe('12,015,000');
     expect(statusMix([row({
       stage: 's2_sent',
       pipelineStage: { isLost: true, deletedAt: '2026-02-01T00:00:00.000Z' },

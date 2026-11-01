@@ -118,8 +118,8 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
   const m = statusMix(rows);
   return (
     <ChartCard title="Pipeline" meta={`${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
-      summary={data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids'}
-      table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, fmtCompact(d.value)]) }}>
+      summary={data.map((d) => `${d.label}: ${d.amount} across ${d.count}`).join('; ') || 'No open bids'}
+      table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, d.amount]) }}>
       {data.length ? (
         <div style={{ position: 'relative' }}>
           <StageFunnel data={data} format={fmtCompact} />

@@ -83,8 +83,8 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
         interactive={Boolean(onDrill)}
         testId="account-pipeline"
         meta={(() => { const n = stages.reduce((m, s) => m + s.count, 0); return `${n} open bid${n === 1 ? '' : 's'}`; })()}
-        summary={stages.map((s) => `${s.label}: ${fmtCompact(s.value)}`).join('; ') || 'No open bids for this account'}
-        table={{ columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, fmtCompact(s.value)]) }}
+        summary={stages.map((s) => `${s.label}: ${s.amount}`).join('; ') || 'No open bids for this account'}
+        table={{ columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, s.amount]) }}
       >
         {stages.length ? (
           <StageBars data={stages} format={fmtCompact}

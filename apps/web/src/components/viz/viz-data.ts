@@ -1,5 +1,8 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { microsToUnits } from '@bidstack/shared';
+
+import { headlineMicrosLabel, recordedMicros } from '@/components/dashboard/unspecified-currency';
 import { closedOutcome, LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -34,6 +37,8 @@ export interface OppRow {
   owner?: string | null;
   /** Live stage flags. A deleted stage row is not a close. */
   pipelineStage?: { isWon?: boolean; isLost?: boolean; deletedAt?: string | Date | null } | null;
+  /** Integer micros. The unit number cannot keep a cent past a safe integer. */
+  valueMicros?: string | null;
 }
 
 const isWon = (o: OppRow) => closedOutcome(o) === 'won';
@@ -52,6 +57,8 @@ export interface StageBucket {
   id: string;
   label: string;
   value: number;
+  /** Exact total, compact only when that label is the same cent. */
+  amount: string;
   count: number;
 }
 
@@ -63,23 +70,29 @@ const STAGE_RANK = new Map<string, number>([
 
 /** One bar per stage that actually has rows. Legacy open keys stay in pipeline order, a named stage follows, then won and lost. */
 export function stageBuckets(rows: OppRow[]): StageBucket[] {
-  const buckets = new Map<string, StageBucket & { rank: number }>();
+  const buckets = new Map<string, StageBucket & { rank: number; micros: bigint }>();
   for (const row of rows) {
     const id = stageKey(row.stage);
     const current = buckets.get(id) ?? {
       id,
       label: stageText(id),
       value: 0,
+      amount: '',
       count: 0,
       rank: STAGE_RANK.get(id) ?? 100,
+      micros: 0n,
     };
-    current.value += row.value ?? 0;
+    current.micros += recordedMicros(row.value ?? 0, row.valueMicros);
     current.count += 1;
     buckets.set(id, current);
   }
   return [...buckets.values()]
     .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
-    .map(({ rank: _rank, ...bucket }) => bucket);
+    .map(({ rank: _rank, micros, ...bucket }) => ({
+      ...bucket,
+      value: microsToUnits(micros),
+      amount: headlineMicrosLabel(micros, 'en-GB'),
+    }));
 }
 
 export function stageFunnel(rows: OppRow[]): StageBucket[] {
@@ -114,44 +127,51 @@ export function winRateByQuarter(rows: OppRow[]) {
 
 /** Won value per close quarter (actuals), oldest first. */
 export function wonByQuarter(rows: OppRow[]) {
-  const by = new Map<string, { v: number; t: number }>();
+  const by = new Map<string, { v: bigint; t: number }>();
   for (const o of rows.filter(isWon)) {
     const at = closeDate(o);
     if (!at) continue;
     const q = quarterOf(at);
-    const cur = by.get(q) ?? { v: 0, t: new Date(at).getTime() };
-    cur.v += o.value ?? 0;
+    const cur = by.get(q) ?? { v: 0n, t: new Date(at).getTime() };
+    cur.v += recordedMicros(o.value ?? 0, o.valueMicros);
     by.set(q, cur);
   }
-  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: v.v }));
+  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: microsToUnits(v.v) }));
 }
 
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
 /** Cumulative won value by close month for the year of the latest close. */
 export function cumulativeWon(rows: OppRow[]) {
-  const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: o.value ?? 0 })).filter((r): r is { at: string; v: number } => Boolean(r.at));
+  const won = rows.filter(isWon).flatMap((o) => {
+    const at = closeDate(o);
+    return at ? [{ at, v: recordedMicros(o.value ?? 0, o.valueMicros) }] : [];
+  });
   if (!won.length) return [];
   const year = Math.max(...won.map((r) => new Date(r.at).getUTCFullYear()));
   const lastMonth = Math.max(...won.filter((r) => new Date(r.at).getUTCFullYear() === year).map((r) => new Date(r.at).getUTCMonth()));
-  let run = 0;
+  let run = 0n;
   return Array.from({ length: lastMonth + 1 }, (_, m) => {
-    run += won.filter((r) => { const d = new Date(r.at); return d.getUTCFullYear() === year && d.getUTCMonth() === m; }).reduce((n, r) => n + r.v, 0);
+    for (const deal of won) {
+      const d = new Date(deal.at);
+      if (d.getUTCFullYear() === year && d.getUTCMonth() === m) run += deal.v;
+    }
     const date = new Date(year, m, 1); // local midnight, for axis display only
-    return { x: monFmt.format(date), date, y: run };
+    return { x: monFmt.format(date), date, y: microsToUnits(run) };
   });
 }
 
 /** Per-account open vs won value, top N by total. */
 export function accountBars(rows: OppRow[], n = 6) {
-  const by = new Map<string, { open: number; won: number }>();
+  const by = new Map<string, { open: bigint; won: bigint }>();
   for (const o of rows) {
     if (!o.customer || isLost(o)) continue;
-    const cur = by.get(o.customer) ?? { open: 0, won: 0 };
-    if (isWon(o)) cur.won += o.value ?? 0; else cur.open += o.value ?? 0;
+    const cur = by.get(o.customer) ?? { open: 0n, won: 0n };
+    const micros = recordedMicros(o.value ?? 0, o.valueMicros);
+    if (isWon(o)) cur.won += micros; else cur.open += micros;
     by.set(o.customer, cur);
   }
   return [...by.entries()]
-    .map(([label, v]) => ({ label, ...v }))
+    .map(([label, v]) => ({ label, open: microsToUnits(v.open), won: microsToUnits(v.won) }))
     .sort((a, b) => b.open + b.won - (a.open + a.won))
     .slice(0, n);
 }
@@ -173,13 +193,16 @@ export function cumulativeOpen(rows: OppRow[]) {
   const open = rows.filter((o) => !isClosed(o)).sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
   if (!open.length) return [];
   // Starts at 0 so a single open bid still draws a rising line.
-  let run = 0;
-  return [0, ...open.map((o) => (run += o.value ?? 0))];
+  let run = 0n;
+  return [0, ...open.map((o) => microsToUnits((run += recordedMicros(o.value ?? 0, o.valueMicros))))];
 }
 
-const compact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
-/** Currency-free compact amount (opportunity rows carry no currency). */
-export const fmtCompact = (v: number) => compact.format(v);
+/** Currency-free amount. One compact digit is kept only when it names the same cent. */
+export function fmtCompact(v: number): string {
+  if (!Number.isFinite(v)) return '—';
+  if (!Number.isSafeInteger(v)) return v.toLocaleString('en-GB');
+  return headlineMicrosLabel(BigInt(v) * 1_000_000n, 'en-GB');
+}
 
 export type OppStatus = 'open' | 'won' | 'lost';
 export function oppStatus(o: OppRow): OppStatus {

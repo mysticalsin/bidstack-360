@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom';
 
 import { DrillSheet, type DrillCrumb } from './DrillSheet';
 import { filterOpps, type OppDrillFilter } from './filterOpps';
-import { closeDate, fmtCompact, OPEN_STAGES, stageBuckets, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
+import { headlineMicrosLabel, recordedMicros } from '@/components/dashboard/unspecified-currency';
+import { closeDate, OPEN_STAGES, stageBuckets, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
 
 export type { OppDrillFilter } from './filterOpps';
 
@@ -24,8 +25,13 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
   const f = useMemo<OppDrillFilter>(() => filter ?? {}, [filter]);
   const status = f.status ?? 'all';
   const shown = useMemo(() => filterOpps(rows, f, q).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)), [rows, f, q]);
-  const total = shown.reduce((n, o) => n + (o.value ?? 0), 0);
-  const weighted = shown.reduce((n, o) => n + ((o.value ?? 0) * (o.probability ?? 0)) / 100, 0);
+  const totalMicros = shown.reduce((n, o) => n + recordedMicros(o.value ?? 0, o.valueMicros), 0n);
+  const weightedMicros = shown.reduce(
+    (n, o) => n + (recordedMicros(o.value ?? 0, o.valueMicros) * BigInt(Math.trunc(o.probability ?? 0))) / 100n,
+    0n,
+  );
+  const totalLabel = headlineMicrosLabel(totalMicros, 'en-GB');
+  const weightedLabel = headlineMicrosLabel(weightedMicros, 'en-GB');
 
   // Stage breakdown when no stage is chosen yet: the next level down.
   const byStage = useMemo(() => {
@@ -56,12 +62,12 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
       onOpenChange={(o) => { if (!o) onClose(); }}
       testId="opp-drill"
       title={title}
-      caption={`${shown.length} bid${shown.length === 1 ? '' : 's'} worth ${fmtCompact(total)}. Pick a stage or a bid to go deeper.`}
+      caption={`${shown.length} bid${shown.length === 1 ? '' : 's'} worth ${totalLabel}. Pick a stage or a bid to go deeper.`}
       trail={trail}
       stats={[
         { label: 'Bids', value: shown.length },
-        { label: 'Total value', value: fmtCompact(total) },
-        ...(status === 'open' || status === 'all' ? [{ label: 'Weighted', value: fmtCompact(weighted) }] : []),
+        { label: 'Total value', value: totalLabel },
+        ...(status === 'open' || status === 'all' ? [{ label: 'Weighted', value: weightedLabel }] : []),
       ]}
       filters={
         <>
@@ -94,7 +100,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
                     <span className="drill-bar" style={{ width: `${Math.max(4, (s.value / maxStage) * 100)}%` }} aria-hidden />
                   </td>
                   <td className="num">{s.count}</td>
-                  <td className="num">{fmtCompact(s.value)}</td>
+                  <td className="num">{s.amount}</td>
                 </tr>
               ))}
             </tbody>
@@ -120,7 +126,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
                       ) : null}
                     </td>
                     <td>{stageText(stageKey(o.stage))}</td>
-                    <td className="num">{fmtCompact(o.value ?? 0)}</td>
+                    <td className="num">{headlineMicrosLabel(recordedMicros(o.value ?? 0, o.valueMicros), 'en-GB')}</td>
                     <td className="num">{d ? dateFmt.format(new Date(d)) : '–'}</td>
                   </tr>
                 );

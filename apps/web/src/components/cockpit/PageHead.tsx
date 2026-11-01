@@ -12,6 +12,9 @@ import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
+import { microsToUnits } from '@bidstack/shared';
+
+import { recordedMicros } from '@/components/dashboard/unspecified-currency';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { MetricSpark } from '@/components/viz/lazy-bklit';
@@ -78,12 +81,12 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
     date: formatDate(new Date().toISOString()),
     company: cockpit.company.name,
   });
-  const { formatMoney } = useFormatMoney();
+  const { formatMoneyMicros } = useFormatMoney();
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
   const openOpps = accountOpps.filter((o) => closedOutcome(o) === null);
-  const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
+  const openMicros = openOpps.reduce((sum, o) => sum + recordedMicros(o.value, o.valueMicros), 0n);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
   const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
   const winLoss = cockpit.winLoss;
@@ -91,7 +94,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
   // Sparklines (real rows only): open value accumulated by due date, running
   // win rate across closed bids in close order, open risks by severity.
-  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer, pipelineStage: o.pipelineStage }));
+  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: microsToUnits(recordedMicros(o.value, o.valueMicros)), dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer, pipelineStage: o.pipelineStage, valueMicros: o.valueMicros }));
   const openSpark = cumulativeOpen(sparkRows);
   const winSpark = runningWinRate(sparkRows);
   const riskSpark = (['low', 'medium', 'high', 'critical'] as const).map((sev) => openRisks.filter((r) => r.severity === sev).length);
@@ -221,7 +224,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
         <div className="acct-keys" role="group" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
           <div>
             <span className="acct-key-label">{t('pageHead.keyOpenPipeline', 'Open pipeline')}</span>
-            <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
+            <span className="acct-key-value">{formatMoneyMicros(openMicros)}</span>
             <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
               {openOpps.length === 1
