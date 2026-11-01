@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import {
-  formatUnspecifiedCompact,
+  formatRecordedDealAmount,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { DueDateChip } from '@/components/ui/DueDateChip';
@@ -67,25 +67,24 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
         )}
       </p>
       <ul className="divide-y divide-[var(--border-subtle)]">
-      {open.map((o) => (
-        <li key={o.id}>
-          <Link
-            to={`/opportunities/${o.id}`}
-            className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 text-xs hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--border-focus)] dark:hover:bg-[var(--row-hover-tint)]"
-          >
-            <span className="font-mono text-[11px] text-[var(--fg-tertiary)]">{o.code}</span>
-            <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg-primary)]">
-              {o.customer} — {o.name}
-            </span>
-            <span className="tabular-nums text-[var(--fg-secondary)]">
-              {/* Opportunity.value is already major units. No currency is stored. */}
-              {formatUnspecifiedCompact(o.value)}
-            </span>
-            <DueDateChip dueDate={o.dueDate} size="sm" />
-            <Icon name="chevron-right" size={12} className="text-[var(--fg-tertiary)]" />
-          </Link>
-        </li>
-      ))}
+        {open.map((o) => (
+          <li key={o.id}>
+            <Link
+              to={`/opportunities/${o.id}`}
+              className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 text-xs hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--border-focus)] dark:hover:bg-[var(--row-hover-tint)]"
+            >
+              <span className="font-mono text-[11px] text-[var(--fg-tertiary)]">{o.code}</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg-primary)]">
+                {o.customer} — {o.name}
+              </span>
+              <span className="tabular-nums text-[var(--fg-secondary)]">
+                {formatRecordedDealAmount(o, 'compact')}
+              </span>
+              <DueDateChip dueDate={o.dueDate} size="sm" />
+              <Icon name="chevron-right" size={12} className="text-[var(--fg-tertiary)]" />
+            </Link>
+          </li>
+        ))}
       </ul>
     </div>
   );

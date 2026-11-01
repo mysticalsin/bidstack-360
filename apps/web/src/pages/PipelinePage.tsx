@@ -23,7 +23,10 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  sumRecordedDealUnits,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { PipelineMetricStrip } from '@/components/dashboard/widgets/PipelineMetricStrip';
 import {
   getOpportunityStageBusinessKey,
@@ -96,7 +99,8 @@ export function PipelinePage() {
     [stages],
   );
   const getVisibleStageId = useCallback(
-    (opp: Opportunity) => stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
+    (opp: Opportunity) =>
+      stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
     [stageIdByBusinessKey],
   );
 
@@ -250,9 +254,7 @@ export function PipelinePage() {
         <ErrorState
           title={t('pipeline.errorTitle', 'Could not load pipeline')}
           message={
-            error instanceof Error
-              ? error.message
-              : t('pipeline.errorMessage', 'Please try again.')
+            error instanceof Error ? error.message : t('pipeline.errorMessage', 'Please try again.')
           }
           action={
             <button
@@ -298,7 +300,7 @@ export function PipelinePage() {
         >
           {visibleStages.map((stage) => {
             const items = byStage.get(stage.id) ?? [];
-            const total = items.reduce((acc, o) => acc + o.value, 0);
+            const total = sumRecordedDealUnits(items);
             const isHover = hoverStageId === stage.id;
             return (
               <StageColumn

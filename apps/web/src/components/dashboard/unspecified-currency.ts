@@ -1,4 +1,4 @@
-import { formatMicrosAmount } from '@bidstack/shared';
+import { formatMicrosAmount, microsToUnits, unitsToMicros } from '@bidstack/shared';
 
 /**
  * Opportunity rows do not store a currency. A summed pipeline is not a euro
@@ -42,6 +42,19 @@ export function compareMicros(a: string | number | bigint, b: string | number | 
 /** Full amount to the cent, with the missing-currency mark. */
 export function formatExactUnspecified(micros: string | number | bigint): string {
   return `${formatMicrosAmount(asMicros(micros))} unspecified`;
+}
+
+/** Column total in major units. Micros win, then the sum is rounded to the cent. */
+export function sumRecordedDealUnits(
+  deals: readonly { value: number; valueMicros?: string | null }[],
+): number {
+  const micros = deals.reduce((sum, deal) => {
+    if (deal.valueMicros && /^\d+$/.test(deal.valueMicros)) return sum + BigInt(deal.valueMicros);
+    if (!Number.isFinite(deal.value)) return sum;
+    return sum + (unitsToMicros(deal.value) ?? 0n);
+  }, 0n);
+  const cents = (micros + 5_000n) / 10_000n;
+  return microsToUnits(cents * 10_000n);
 }
 
 /** A deal amount. The micros string wins when the unit number was stored as zero. */
