@@ -205,7 +205,10 @@ export async function persistMeetingTechStack(
   const website = input.domain ? `https://${input.domain}/` : null;
 
   const data = {
-    legalName: existing?.legalName ?? null,
+    // The enrichment column cannot be empty. This is the name on the note,
+    // not a registry legal name. Public-source tagging stays off unless
+    // public facts are already stored.
+    legalName: existing?.legalName ?? input.companyName,
     tradeName: existing?.tradeName ?? input.companyName,
     domain: existing?.domain ?? input.domain,
     website: existing?.website ?? website,
