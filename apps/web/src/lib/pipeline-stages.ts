@@ -41,6 +41,11 @@ export function closedOutcome(opp: {
   return null;
 }
 
+/** Confetti is for a won move. A stage marked lost as well is a loss. */
+export function celebratesWonMove(stage: { isWon?: boolean; isLost?: boolean } | null | undefined): boolean {
+  return Boolean(stage?.isWon) && !stage?.isLost;
+}
+
 export function resolvePipelineStage(opp: Opportunity): PipelineStage {
   if (opp.pipelineStage) return opp.pipelineStage;
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  celebratesWonMove,
   closedOutcome,
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -131,5 +132,13 @@ describe('closedOutcome', () => {
         pipelineStage: { isWon: true, isLost: true, deletedAt: null },
       }),
     ).toBe('lost');
+  });
+
+  it('does not celebrate a stage that is also lost', () => {
+    // WHY: moving a bid onto a both-flagged stage used to fire the won toast.
+    expect(celebratesWonMove({ isWon: true, isLost: false })).toBe(true);
+    expect(celebratesWonMove({ isWon: true, isLost: true })).toBe(false);
+    expect(celebratesWonMove({ isWon: false, isLost: true })).toBe(false);
+    expect(celebratesWonMove(undefined)).toBe(false);
   });
 });

@@ -25,7 +25,7 @@ import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
 import type { usePatchOpportunity } from '@/hooks/useOpportunities';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import { isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
+import { celebratesWonMove, isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -181,7 +181,7 @@ export const Row = memo(function Row({
                   flash('stage');
                   // Confetti only on closed_won, never on closed_lost —
                   // no celebration for a lost bid.
-                  if (nextStage?.isWon) {
+                  if (celebratesWonMove(nextStage)) {
                     fireConfetti();
                     toast.success(`Won "${opp.name}"!`, { duration: 5000 });
                   }
