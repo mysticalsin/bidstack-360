@@ -13,6 +13,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import type { AccountCockpitSnapshot, CockpitKpi } from '@bidstack/shared';
 
 import { KPI_TONE_BG, KPI_TONE_FG, iconForKpi } from './_tokens';
+import { kpiFractionWouldMove } from './kpi-value';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -289,6 +290,8 @@ function KpiValue({ raw, reduced }: { raw: string; reduced: boolean | null }) {
   const prefix = raw.slice(0, match.index);
   const suffix = raw.slice(match.index + literal.length);
   const hasDecimals = literal.includes('.');
+  // One fraction digit is the count-up format. A label it would change stays as written.
+  if (hasDecimals && kpiFractionWouldMove(literal)) return <>{raw}</>;
   return (
     <>
       {prefix}
