@@ -6,7 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { enrichmentWatchRows } from '@bidstack/shared';
+import { categoryForKind, enrichmentWatchRows, importanceScore, stripSamplePrefix } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
@@ -25,6 +25,13 @@ const WatchEvent = z.object({
   implicationRationale: z.string().nullable(),
   severity: z.number().int(),
   status: z.string(),
+  // v21 (additive): 0..100 importance, signal category, how many outlets ran
+  // the story, and whether the row is labelled sample data.
+  importance: z.number().int(),
+  category: z.string(),
+  mentions: z.number().int(),
+  sample: z.boolean(),
+  displayTitle: z.string(),
 });
 
 const EarningsDate = z.object({
@@ -83,6 +90,9 @@ export const WatchdogFeedResponse = z.object({
       source: z.string(),
       occurredAt: z.string(),
       implication: Implication,
+      importance: z.number().int(),
+      category: z.string(),
+      sample: z.boolean(),
     }),
   ),
   newAlertCount: z.number().int(),
@@ -129,6 +139,7 @@ export async function syncEnrichmentWatchEvents(orgId: string, companyId: string
       implication: r.implication,
       implicationRationale: r.rationale,
       severity: r.severity,
+      importance: importanceScore({ kind: r.kind, implication: r.implication, source: r.source }),
       confirmed: r.confirmed,
       payload: r.payload as unknown as Prisma.InputJsonValue,
     })),
@@ -172,7 +183,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         }),
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId: { in: ids }, status: 'NEW' },
-          orderBy: [{ severity: 'desc' }, { occurredAt: 'desc' }],
+          orderBy: [{ importance: 'desc' }, { severity: 'desc' }, { occurredAt: 'desc' }],
           take: 5,
         }),
         prisma.accountWatchEvent.count({ where: { orgId, companyId: { in: ids }, status: 'NEW' } }),
@@ -218,6 +229,9 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           source: e.source,
           occurredAt: e.occurredAt.toISOString(),
           implication: e.implication,
+          importance: e.importance || e.severity * 20,
+          category: categoryForKind(e.kind, e.implication),
+          sample: e.sample,
         })),
         newAlertCount,
         heat,
@@ -329,6 +343,11 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           implicationRationale: e.implicationRationale,
           severity: e.severity,
           status: e.status,
+          importance: e.importance || e.severity * 20,
+          category: categoryForKind(e.kind, e.implication),
+          mentions: e.mentions,
+          sample: e.sample,
+          displayTitle: stripSamplePrefix(e.title),
         })),
         earnings: earnings.map((d) => ({
           id: d.id,

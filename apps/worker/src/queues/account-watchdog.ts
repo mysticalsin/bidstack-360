@@ -19,11 +19,13 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma, OpportunityStage, type Prisma } from '@bidstack/db';
-import { enrichmentWatchRows } from '@bidstack/shared';
+import { enrichmentWatchRows, importanceScore } from '@bidstack/shared';
 
 import { fetchCompaniesHouseEvents } from '../lib/watchdog/companies-house.js';
 import { detectAccountEvents, type DetectResult, type WatchdogStore } from '../lib/watchdog/detect.js';
 import { fetchEdgarEvents, type FetchLike, type RawWatchEvent } from '../lib/watchdog/edgar.js';
+import { redisNewsCache } from '../lib/watchdog/news.js';
+import { runNewsScan } from '../lib/watchdog/news-scan.js';
 
 export const WATCHDOG_QUEUE = 'account.watchdog';
 const SCAN_EVERY_MS = 6 * 60 * 60_000;
@@ -128,6 +130,9 @@ export function prismaWatchdogStore(db: Db): WatchdogStore {
           implication: r.implication,
           implicationRationale: r.rationale,
           severity: r.severity,
+          // v21: 0..100 importance on every new row (filings, enrichment), so the
+          // portfolio alerts and account feed rank all sources on one scale.
+          importance: importanceScore({ kind: r.kind, implication: r.implication, source: r.source }),
           confirmed: r.confirmed,
           payload: r.payload as Prisma.InputJsonValue,
         })),
@@ -255,7 +260,22 @@ export async function startAccountWatchdog(
   const queue = new Queue(WATCHDOG_QUEUE, { connection, defaultJobOptions: JOB_OPTIONS });
   queues.push(queue);
   const child = log.child({ worker: WATCHDOG_QUEUE });
-  const worker = new Worker(WATCHDOG_QUEUE, (_job: Job) => runWatchdogScan({ log: child }), { connection, concurrency: 1 });
+  const newsCache = redisNewsCache(connection);
+  const worker = new Worker(
+    WATCHDOG_QUEUE,
+    async (_job: Job) => {
+      const filings = await runWatchdogScan({ log: child });
+      // News watchdog (v21): no-op unless WATCHDOG_NEWS_SOURCES is set. A news
+      // failure never fails the filings scan.
+      const news = await runNewsScan({ log: child, cache: newsCache }).catch((err: unknown) => {
+        child.error({ err: err instanceof Error ? err.message : String(err) }, 'news watchdog scan failed');
+        return null;
+      });
+      if (news?.enabled) child.info(news, 'news watchdog scan complete');
+      return { ...filings, news };
+    },
+    { connection, concurrency: 1 },
+  );
   worker.on('failed', (job, err) => log.warn({ jobId: job?.id, err: err.message }, 'account watchdog scan failed'));
   workers.push(worker);
   // Idempotent jobId: restarts never stack duplicate repeatables.

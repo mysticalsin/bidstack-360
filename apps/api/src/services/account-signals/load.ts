@@ -25,15 +25,13 @@ export interface OppRow {
   valueMicros: bigint;
   createdAt: Date;
   updatedAt: Date;
+  closedAt?: Date | null;
 }
 
-/**
- * When a deal closed. Branch seam: polo/backend-hardening has no closedAt
- * column, so the last update stands in; polo/consolidated reads closedAt.
- */
+/** When a deal closed: closedAt, or the last update for deals closed before closedAt existed. */
 export function closedAtOf(o: OppRow): Date | null {
   if (o.stage !== 'closed_won' && o.stage !== 'closed_lost') return null;
-  return o.updatedAt;
+  return o.closedAt ?? o.updatedAt;
 }
 
 export function toMomentumOpp(o: OppRow): MomentumOpp {
@@ -41,7 +39,7 @@ export function toMomentumOpp(o: OppRow): MomentumOpp {
   return { createdAt: o.createdAt, closedAt: closedAtOf(o), outcome, valueMicros: o.valueMicros };
 }
 
-export const OPP_SELECT = { id: true, companyId: true, name: true, stage: true, valueMicros: true, createdAt: true, updatedAt: true } as const;
+export const OPP_SELECT = { id: true, companyId: true, name: true, stage: true, valueMicros: true, createdAt: true, updatedAt: true, closedAt: true } as const;
 
 /** Root account plus its direct children (one level: subsidiaries roll up). */
 export async function groupMap(orgId: string, rootIds: string[]): Promise<Map<string, string[]>> {
