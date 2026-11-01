@@ -1048,6 +1048,7 @@ export function buildCockpit({
       updatedAt: contact.createdAt.toISOString(),
     })),
     recentActivity: buildActivities(accountTasks).slice(0, 5),
+    activityCapped: accountTasks.length > 5,
     risks: visibleRisks.map(serializeRisk),
     compliance: visibleCompliance.map(serializeCompliance),
     openRiskCount,

@@ -964,6 +964,34 @@ describe('buildCockpit recorded facts only', () => {
     });
     expect(cockpit.recentActivity.map((item) => item.subject)).toEqual(['Send the deployment plan']);
     expect(cockpit.recentActivity[0]?.companyId).toBe('mantu');
+    expect(cockpit.activityCapped).toBe(false);
+  });
+
+  it('keeps only the latest five tasks and says the list is short', () => {
+    // WHY: the activity card said "last 5" as if that were every task. Six
+    // follow-ups left one off the list with no remainder.
+    const tasks = [1, 2, 3, 4, 5, 6].map((n) => ({
+      id: `task-${n}`,
+      title: `Follow-up ${n}`,
+      status: 'open',
+      dueDate: null,
+      accountId: 'mantu',
+      opportunity: null,
+      assignee: null,
+      createdAt: new Date(`2026-06-0${n}T00:00:00.000Z`),
+    }));
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks,
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(cockpit.recentActivity).toHaveLength(5);
+    expect(cockpit.activityCapped).toBe(true);
   });
 
   it('keeps register counts that the six cards do not show', () => {

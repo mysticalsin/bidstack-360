@@ -262,6 +262,8 @@ export const AccountCockpitSnapshot = z.object({
   buyerCount: z.number().int().nonnegative().optional(),
   /** True when those contacts are a page, not the whole account. */
   contactsCapped: z.boolean().optional(),
+  /** True when recent activity is the latest 5 tasks, not every task loaded. */
+  activityCapped: z.boolean().optional(),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
