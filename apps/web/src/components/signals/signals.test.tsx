@@ -120,6 +120,12 @@ describe('InitiativesView', () => {
     expect(screen.getByText('Latest 1,000 subsidiaries')).toBeTruthy();
   });
 
+  it('says when initiative evidence is the latest 100 news and meetings', () => {
+    // WHY: a full page of news and meetings was shown as the whole year.
+    wrap(<InitiativesView items={[init(1)]} evidenceCapped />);
+    expect(screen.getByText('Latest 100 news and meetings')).toBeTruthy();
+  });
+
   it('shows confidence, evidence counts, the hook, evidence on click and caps at four', () => {
     wrap(<InitiativesView items={[init(1), init(2, { confidence: 'low', hook: { offering: 'Cloud', pitch: '', nextStep: '', alreadySold: true } }), init(3), init(4), init(5)]} />);
     expect(screen.getAllByRole('article')).toHaveLength(4);

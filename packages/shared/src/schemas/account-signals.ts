@@ -761,6 +761,8 @@ export const AccountInitiatives = z.object({
   items: z.array(Initiative),
   /** True when hiring, news, and meetings include only the latest 1,000 direct subsidiaries. */
   subsidiariesCapped: z.boolean().optional(),
+  /** True when news or meetings stopped at the latest 100. */
+  evidenceCapped: z.boolean().optional(),
 });
 export type AccountInitiatives = z.infer<typeof AccountInitiatives>;
 

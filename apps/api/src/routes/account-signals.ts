@@ -225,8 +225,13 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const scope = await getAccessScope(orgId, userId);
       const rollup = await groupRollup(orgId, [company.id]);
       const ids = rollup.groups.get(company.id) ?? [company.id];
-      const items = await loadInitiatives(orgId, scope, company, new Date(), ids);
-      return { companyId: company.id, items, subsidiariesCapped: rollup.cappedRoots.has(company.id) };
+      const loaded = await loadInitiatives(orgId, scope, company, new Date(), ids);
+      return {
+        companyId: company.id,
+        items: loaded.items,
+        subsidiariesCapped: rollup.cappedRoots.has(company.id),
+        evidenceCapped: loaded.evidenceCapped,
+      };
     },
   );
 

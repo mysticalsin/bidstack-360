@@ -13,10 +13,22 @@ import {
 
 import type { AccessScope } from '../../lib/access-scope.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
-import { groupMap } from './load.js';
+import { groupMap, pageIsCapped } from './load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from './live-signals.js';
 
 const DAY = 86_400_000;
+const EVIDENCE_PAGE = 100;
+
+/** True when the latest news page or the latest meeting page is not the whole year. */
+export function evidencePageCapped(
+  events: number,
+  eventTotal: number,
+  meetings: number,
+  meetingTotal: number,
+  limit = EVIDENCE_PAGE,
+): boolean {
+  return pageIsCapped(events, eventTotal, limit) || pageIsCapped(meetings, meetingTotal, limit);
+}
 const importanceOf = (e: { importance: number; severity: number }) =>
   e.importance || Math.min(100, e.severity * 20);
 
@@ -26,36 +38,43 @@ export async function loadInitiatives(
   company: { id: string },
   now: Date,
   companyIds?: string[],
-): Promise<Initiative[]> {
+): Promise<{ items: Initiative[]; evidenceCapped: boolean }> {
   const ids = companyIds ?? (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
   const live = await companiesWithLiveSignals(orgId, ids);
+  const eventWhere = {
+    orgId,
+    companyId: { in: ids },
+    status: { not: 'DISMISSED' as const },
+    occurredAt: { gte: new Date(now.getTime() - 365 * DAY) },
+    ...hideSampleWhere(live),
+    kind: {
+      in: [
+        'STRATEGIC_INITIATIVE',
+        'PRODUCT_LAUNCH',
+        'FUNDING_ROUND',
+        'PARTNERSHIP',
+        'M_AND_A',
+        'LAYOFFS',
+        'RESTRUCTURING',
+        'HIRING_SPIKE',
+      ] as const,
+    },
+  };
+  const meetingWhere = {
+    AND: [
+      visibleMeetingWhere(orgId, scope),
+      { companyId: { in: ids }, heldAt: { gte: new Date(now.getTime() - 365 * DAY) } },
+    ],
+  };
   const [firmo, events, solutions, meetings] = await Promise.all([
     prisma.companyFirmographics.findFirst({
       where: { orgId, companyId: company.id },
       select: { projects: true },
     }),
     prisma.accountWatchEvent.findMany({
-      where: {
-        orgId,
-        companyId: { in: ids },
-        status: { not: 'DISMISSED' },
-        occurredAt: { gte: new Date(now.getTime() - 365 * DAY) },
-        ...hideSampleWhere(live),
-        kind: {
-          in: [
-            'STRATEGIC_INITIATIVE',
-            'PRODUCT_LAUNCH',
-            'FUNDING_ROUND',
-            'PARTNERSHIP',
-            'M_AND_A',
-            'LAYOFFS',
-            'RESTRUCTURING',
-            'HIRING_SPIKE',
-          ],
-        },
-      },
+      where: eventWhere,
       orderBy: { occurredAt: 'desc' },
-      take: 100,
+      take: EVIDENCE_PAGE,
     }),
     prisma.accountSolution.findMany({
       where: { orgId, companyId: company.id, deletedAt: null },
@@ -63,16 +82,17 @@ export async function loadInitiatives(
       take: 100,
     }),
     prisma.meetingIntel.findMany({
-      where: {
-        AND: [
-          visibleMeetingWhere(orgId, scope),
-          { companyId: { in: ids }, heldAt: { gte: new Date(now.getTime() - 365 * DAY) } },
-        ],
-      },
+      where: meetingWhere,
       select: { id: true, title: true, heldAt: true, opportunities: true, challenges: true },
-      take: 100,
+      take: EVIDENCE_PAGE,
     }),
   ]);
+  const evidenceCapped = evidencePageCapped(
+    events.length,
+    events.length < EVIDENCE_PAGE ? events.length : await prisma.accountWatchEvent.count({ where: eventWhere }),
+    meetings.length,
+    meetings.length < EVIDENCE_PAGE ? meetings.length : await prisma.meetingIntel.count({ where: meetingWhere }),
+  );
   const soldThemes = new Set<InitiativeTheme>(
     solutions.map((s) => themeForText(`${s.category} ${s.name}`)),
   );
@@ -204,7 +224,7 @@ export async function loadInitiatives(
       seen(it, at);
     }
   }
-  return [...byTheme.values()]
+  const items = [...byTheme.values()]
     .map((it) => {
       const kinds = new Set(it.evidence.map((e) => e.kind));
       const score = Math.min(0.95, it.confidenceScore + (kinds.size >= 2 ? 0.1 : 0));
@@ -220,4 +240,5 @@ export async function loadInitiatives(
         b.confidenceScore - a.confidenceScore || (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''),
     )
     .slice(0, 8);
+  return { items, evidenceCapped };
 }
