@@ -79,12 +79,12 @@ export function resolveStageProbability(
 /** Manual "commit" forecast row as read from the DB (pre-currency-filter). */
 export interface ManualCommitRow {
   period: string;
-  amountMicros: number | bigint;
+  amountMicros: number | bigint | string;
   currency: string;
 }
 
 export interface ManualCommitAggregation {
-  byPeriod: Map<string, number>;
+  byPeriod: Map<string, bigint>;
   /** Rows excluded because their currency didn't match the reporting currency. */
   excludedCount: number;
 }
@@ -109,14 +109,16 @@ export function aggregateManualCommit(
     reportingCurrency === 'XXX'
       ? isUnspecifiedForecastCurrency(currency)
       : currency === reportingCurrency;
-  const byPeriod = new Map<string, number>();
+  const byPeriod = new Map<string, bigint>();
   let excludedCount = 0;
   for (const row of rows) {
     if (!matches(row.currency)) {
       excludedCount += 1;
       continue;
     }
-    byPeriod.set(row.period, (byPeriod.get(row.period) ?? 0) + Number(row.amountMicros));
+    const amount =
+      typeof row.amountMicros === 'bigint' ? row.amountMicros : BigInt(row.amountMicros);
+    byPeriod.set(row.period, (byPeriod.get(row.period) ?? 0n) + amount);
   }
   return { byPeriod, excludedCount };
 }
@@ -176,7 +178,7 @@ export function aggregateProjection(
   rows: ProjectionRow[],
   window: ProjectionWindow,
   stageProbabilities: Map<string, number>,
-  manualCommitByPeriod: Map<string, number>,
+  manualCommitByPeriod: Map<string, bigint>,
 ): ForecastProjectionPeriod[] {
   const owners = new Map<string, Map<string, OwnerAccumulator>>();
   for (const period of window.periods) owners.set(period, new Map());
@@ -200,7 +202,7 @@ export function aggregateProjection(
 function buildPeriod(
   period: string,
   periodOwners: Map<string, OwnerAccumulator>,
-  manualCommitByPeriod: Map<string, number>,
+  manualCommitByPeriod: Map<string, bigint>,
 ): ForecastProjectionPeriod {
   const byOwner: ForecastProjectionOwner[] = [...periodOwners.values()]
     .sort((a, b) => (a.weightedMicros > b.weightedMicros ? -1 : a.weightedMicros < b.weightedMicros ? 1 : 0))
@@ -221,7 +223,7 @@ function buildPeriod(
     openMicros: sum((owner) => owner.openMicros),
     weightedMicros: sum((owner) => owner.weightedMicros),
     wonMicros: sum((owner) => owner.wonMicros),
-    manualCommitMicros: manual ?? null,
+    manualCommitMicros: manual != null ? manual.toString() : null,
     byOwner,
   };
 }

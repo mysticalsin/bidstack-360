@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/Table';
 import { useForecastProjection } from '@/hooks/useForecasts';
 import { formatUnspecifiedCompact, unitsFromMicros } from '@/components/dashboard/unspecified-currency';
-import type { ForecastProjectionPeriod } from '@bidstack/shared';
+import { formatMicrosAmount, type ForecastProjectionPeriod } from '@bidstack/shared';
 
 type FormatMoney = (micros: number | string) => string;
 
@@ -121,7 +121,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
             {c.key === 'weighted' && period.manualCommitMicros !== null ? (
               <Badge tone="amber">
                 {t('forecastProjection.override', 'Manual commit')}:{' '}
-                {formatMoneyMicros(period.manualCommitMicros)}
+                {formatMicrosAmount(BigInt(period.manualCommitMicros))}
               </Badge>
             ) : null}
           </div>

@@ -159,10 +159,10 @@ describe('aggregateProjection', () => {
       [row({})],
       window,
       probs,
-      new Map([['2026-Q3', 9_000_000]]),
+      new Map([['2026-Q3', 9_000_000n]]),
     );
     expect(result.find((p) => p.period === '2026-Q2')!.manualCommitMicros).toBeNull();
-    expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe(9_000_000);
+    expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe('9000000');
   });
 });
 
@@ -181,7 +181,7 @@ describe('aggregateManualCommit', () => {
       [commitRow({ amountMicros: 1_000_000, currency: 'EUR' }), commitRow({ amountMicros: 5_000_000, currency: 'USD' })],
       'EUR',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(1_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(1_000_000n);
     expect(excludedCount).toBe(1);
   });
 
@@ -190,7 +190,7 @@ describe('aggregateManualCommit', () => {
       [commitRow({ amountMicros: 2_000_000 }), commitRow({ amountMicros: 3_000_000 })],
       'EUR',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(5_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(5_000_000n);
     expect(excludedCount).toBe(0);
   });
 
@@ -203,8 +203,18 @@ describe('aggregateManualCommit', () => {
       ],
       'XXX',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(3_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(3_000_000n);
     expect(excludedCount).toBe(1);
+  });
+
+  it('sums a large commit as integer micros', () => {
+    // WHY: Number(amountMicros) moved this manual commit off the cent.
+    const micros = '8598204328457184962';
+    const { byPeriod } = aggregateManualCommit(
+      [commitRow({ amountMicros: micros }), commitRow({ amountMicros: 2n })],
+      'EUR',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(BigInt(micros) + 2n);
   });
 
   it('handles bigint amountMicros from the Prisma driver', () => {
@@ -212,6 +222,6 @@ describe('aggregateManualCommit', () => {
       [commitRow({ amountMicros: BigInt(7_000_000) })],
       'EUR',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(7_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(7_000_000n);
   });
 });

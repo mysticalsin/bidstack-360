@@ -138,7 +138,7 @@ async function loadManualCommit(
   periods: string[],
   currency: string,
   logger: FastifyBaseLogger,
-): Promise<Map<string, number>> {
+): Promise<Map<string, bigint>> {
   const rows = await prisma.forecast.findMany({
     where: { orgId, deletedAt: null, category: 'commit', period: { in: periods } },
     select: { period: true, amountMicros: true, currency: true },

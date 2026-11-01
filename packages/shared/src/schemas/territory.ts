@@ -93,7 +93,7 @@ export const ForecastProjectionPeriod = z.object({
   wonMicros: z.string(),
   // Manual commit forecast for this period, when a rep has set one — the
   // override that takes precedence over the derived baseline. Null = none.
-  manualCommitMicros: z.number().nonnegative().nullable(),
+  manualCommitMicros: z.string().regex(/^\d+$/).nullable(),
   byOwner: z.array(ForecastProjectionOwner),
 });
 export type ForecastProjectionPeriod = z.infer<typeof ForecastProjectionPeriod>;
