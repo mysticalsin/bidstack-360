@@ -61,7 +61,7 @@ describe('FinancialHealthSection', () => {
     state.data = real;
     render(<FinancialHealthSection companyId="c1" />);
     const rev = screen.getByTestId('fh-tile-revenue');
-    expect(rev.textContent).toContain('EUR 1.82bn');
+    expect(rev.textContent).toContain('EUR 1,823,000,000');
     expect(rev.textContent).toContain('+7%');
     expect(rev.textContent).toContain('FY2025');
     expect(rev.querySelector('a')?.getAttribute('href')).toBe('https://filings.xbrl.org/r/2025');
@@ -95,9 +95,12 @@ describe('FinancialHealthSection', () => {
   it('falls back to net margin for banks and formats money', () => {
     const tiles = buildTiles([P(2025, 90e9, null, 48), P(2024, 86e9, null, 53)]);
     expect(tiles[1]!.label).toBe('Net margin');
-    expect(fmtMoney(90_649e6, 'NOK')).toBe('NOK 90.6bn');
-    expect(fmtMoney(-156_444e6, 'NOK')).toBe('-NOK 156.4bn');
+    // 90.649bn is not 90.6bn. Compact stays only when it names the same amount.
+    expect(fmtMoney(90_649e6, 'NOK')).toBe('NOK 90,649,000,000');
+    expect(fmtMoney(-156_444e6, 'NOK')).toBe('-NOK 156,444,000,000');
     expect(fmtMoney(935e6, 'CAD')).toBe('CAD 935m');
+    expect(fmtMoney(7_860_000, 'EUR')).toBe('EUR 7,860,000');
+    expect(fmtMoney(2_000_000, 'EUR')).toBe('EUR 2m');
   });
   it('period ends read as filed (31 Dec, not 30 Dec) and recent data is not flagged stale', () => {
     state.data = real;
