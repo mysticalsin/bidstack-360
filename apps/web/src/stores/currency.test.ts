@@ -15,6 +15,17 @@ describe('convertMicrosByRates', () => {
     expect(convertMicrosByRates(micros, 1.1234567, 1)).toBe(8_901_099_615_143n);
     expect(convertMicrosByRates(micros, 1.1234567, 1.1234567)).toBe(micros);
   });
+
+  it('does not replace a rate with a nearby decimal', () => {
+    // WHY: 11/10 prints as 1.1, but it is not the stored rate. On this amount
+    // that decimal moves the result by 631 micros.
+    const micros = 8_598_204_328_457_184_962n;
+    const decimal = (micros * 10n + 5n) / 11n;
+    const converted = convertMicrosByRates(micros, 1.1, 1);
+    expect(converted).toBe(7_816_549_389_506_531_153n);
+    expect(converted).not.toBe(decimal);
+    expect(convertMicrosByRates(3_000_000n, 1 / 3, 1)).toBe(9_000_000n);
+  });
 });
 
 describe('useCurrencyStore', () => {

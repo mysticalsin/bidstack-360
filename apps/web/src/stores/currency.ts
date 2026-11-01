@@ -54,41 +54,42 @@ function isUsableRate(rate: unknown): rate is number {
   return typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
 }
 
-/**
- * Smallest power of ten at which both rates round back to themselves.
- * Six decimals is not enough: 1.1234567 becomes 1.123457 and moves the result
- * by more than a micro.
- */
-function exactRateScale(fromRate: number, toRate: number): number | null {
-  let scale = 1;
-  let largestSafe: number | null = null;
-  for (let power = 0; power <= 15; power += 1) {
-    const fromScaled = Math.round(fromRate * scale);
-    const toScaled = Math.round(toRate * scale);
-    if (
-      !Number.isSafeInteger(fromScaled) ||
-      !Number.isSafeInteger(toScaled) ||
-      fromScaled <= 0 ||
-      toScaled <= 0
-    ) {
-      break;
-    }
-    largestSafe = scale;
-    if (fromScaled / scale === fromRate && toScaled / scale === toRate) return scale;
-    scale *= 10;
+/** Exact numerator and denominator of a positive finite rate. A decimal scale is not the rate. */
+function rateRatio(rate: number): { num: bigint; den: bigint } | null {
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  const bytes = new ArrayBuffer(8);
+  const view = new DataView(bytes);
+  view.setFloat64(0, rate);
+  const hi = view.getUint32(0);
+  const lo = view.getUint32(4);
+  const exponent = (hi >>> 20) & 0x7ff;
+  const fraction = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
+  let mantissa = fraction;
+  let exp: number;
+  if (exponent === 0) {
+    exp = -1022 - 52;
+  } else {
+    mantissa |= 1n << 52n;
+    exp = exponent - 1023 - 52;
   }
-  return largestSafe;
+  if (mantissa === 0n) return null;
+  let num = mantissa;
+  let den = 1n;
+  if (exp >= 0) num <<= BigInt(exp);
+  else den <<= BigInt(-exp);
+  return { num, den };
 }
 
-/** Nearest micros after FX. Equal scaled rates keep every digit, including the cent. */
+/** Nearest micros after FX. Equal rates keep every digit, including the cent. */
 export function convertMicrosByRates(micros: bigint, fromRate: number, toRate: number): bigint | null {
-  const scale = exactRateScale(fromRate, toRate);
-  if (scale == null) return null;
-  const from = BigInt(Math.round(fromRate * scale));
-  const to = BigInt(Math.round(toRate * scale));
+  const from = rateRatio(fromRate);
+  const to = rateRatio(toRate);
+  if (!from || !to) return null;
   const negative = micros < 0n;
   const abs = negative ? -micros : micros;
-  const rounded = (abs * to + from / 2n) / from;
+  const numerator = abs * to.num * from.den;
+  const denominator = to.den * from.num;
+  const rounded = (numerator + denominator / 2n) / denominator;
   return negative ? -rounded : rounded;
 }
 
