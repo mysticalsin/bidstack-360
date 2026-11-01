@@ -400,6 +400,23 @@ describe('useFormatMoney hook integration', () => {
     expect(formatted).toContain('€');
     expect(formatted).not.toContain('CA$');
   });
+
+  it('does not convert micros that have no source currency', () => {
+    // Why: omitting the source used to assume euros and then convert into
+    // the header currency, so an unspecified pipeline looked like dollars.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: fullRates(),
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('1500000000000');
+    expect(formatted).toContain('unspecified');
+    expect(formatted).not.toMatch(/[$€]/);
+  });
 });
 
 function fullRates(): Record<string, number> {

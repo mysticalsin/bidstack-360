@@ -16,7 +16,6 @@ import {
 } from 'react-simple-maps';
 
 import { cn } from '@/lib/cn';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useThemeStore } from '@/stores/theme';
 import { Icon } from '@/components/ui/Icon';
 
@@ -244,21 +243,16 @@ export const WorldMap = memo(function WorldMap({
   className,
   onCountryClick,
   selectedCountryCode,
-  currencyKnown = false,
 }: WorldMapProps) {
   const { t } = useTranslation('crm');
   const theme = useThemeStore((s) => s.theme);
-  const { formatMoneyMicros } = useFormatMoney();
   const formatAmount = (micros: number | string) => {
-    if (!currencyKnown) {
-      const major = Number(micros) / 1_000_000;
-      const compact = new Intl.NumberFormat('en', {
-        notation: 'compact',
-        maximumFractionDigits: 1,
-      }).format(Number.isFinite(major) ? major : 0);
-      return `${compact} unspecified`;
-    }
-    return formatMoneyMicros(typeof micros === 'string' ? micros : String(micros));
+    const major = Number(micros) / 1_000_000;
+    const compact = new Intl.NumberFormat('en', {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(Number.isFinite(major) ? major : 0);
+    return `${compact} unspecified`;
   };
   const [hovered, setHovered] = useState<{
     item: TerritoryAnalyticsItem;

@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
 
+import {
+  formatUnspecifiedAmount,
+  formatUnspecifiedCompact,
+} from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
@@ -20,13 +24,15 @@ export function useFormatMoney() {
   return {
     currency,
     convert,
-    formatMoney: (value: number, sourceCurrency = 'EUR') =>
-      formatMoney(convert(value, sourceCurrency), currency),
+    formatMoney: (value: number, sourceCurrency?: string | null) => {
+      const source = sourceCurrency?.trim();
+      if (!source) return formatUnspecifiedAmount(value);
+      return formatMoney(convert(value, source), currency);
+    },
     formatMoneyMicros: (
       micros: string | number | bigint,
-      // Micros are EUR-denominated at rest (CLAUDE.md money convention) — the
-      // default source must match or every dashboard figure gets FX-skewed.
-      sourceCurrency = 'EUR',
+      // No source currency means the amount is unspecified. Do not assume EUR.
+      sourceCurrency?: string | null,
       options?: { compact?: boolean },
     ) => {
       const asBigInt =
@@ -39,7 +45,13 @@ export function useFormatMoney() {
       const whole = asBigInt / million;
       const remainder = asBigInt % million;
       const value = Number(whole) + Number(remainder) / 1_000_000;
-      const converted = convert(value, sourceCurrency);
+      const source = sourceCurrency?.trim();
+      if (!source) {
+        return options?.compact === false
+          ? formatUnspecifiedAmount(value)
+          : formatUnspecifiedCompact(value);
+      }
+      const converted = convert(value, source);
       const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
       return formatMoneyMicros(convertedMicros, currency, options);
     },
