@@ -48,11 +48,42 @@ export function quarterOf(iso: string): string {
   return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
 }
 
-export function stageFunnel(rows: OppRow[]) {
-  return OPEN_STAGES.map((id) => {
-    const inStage = rows.filter((o) => !isClosed(o) && stageKey(o.stage) === id);
-    return { label: stageText(id), value: inStage.reduce((n, o) => n + (o.value ?? 0), 0), count: inStage.length };
-  }).filter((s) => s.count > 0);
+export interface StageBucket {
+  id: string;
+  label: string;
+  value: number;
+  count: number;
+}
+
+const STAGE_RANK = new Map<string, number>([
+  ...OPEN_STAGES.map((id, index) => [id, index] as const),
+  ['closed_won', 200],
+  ['closed_lost', 201],
+]);
+
+/** One bar per stage that actually has rows. Legacy open keys stay in pipeline order, a named stage follows, then won and lost. */
+export function stageBuckets(rows: OppRow[]): StageBucket[] {
+  const buckets = new Map<string, StageBucket & { rank: number }>();
+  for (const row of rows) {
+    const id = stageKey(row.stage);
+    const current = buckets.get(id) ?? {
+      id,
+      label: stageText(id),
+      value: 0,
+      count: 0,
+      rank: STAGE_RANK.get(id) ?? 100,
+    };
+    current.value += row.value ?? 0;
+    current.count += 1;
+    buckets.set(id, current);
+  }
+  return [...buckets.values()]
+    .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
+    .map(({ rank: _rank, ...bucket }) => bucket);
+}
+
+export function stageFunnel(rows: OppRow[]): StageBucket[] {
+  return stageBuckets(rows.filter((row) => !isClosed(row)));
 }
 
 export function statusMix(rows: OppRow[]) {
