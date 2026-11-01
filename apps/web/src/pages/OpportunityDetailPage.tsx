@@ -381,7 +381,7 @@ export function OpportunityDetailPage() {
         <FinancialHealthCard intel={intel} />
         <WinPredictionCard intel={intel} />
         <BidScoreCard opportunityId={data.id} />
-        <OpportunityAccountIntel accountId={data.customer} />
+        <OpportunityAccountIntel accountId={data.companyId} />
       </div>
 
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

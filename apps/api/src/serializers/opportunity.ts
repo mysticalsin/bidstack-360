@@ -21,6 +21,7 @@ type SerializedOpportunity = {
   id: string;
   code: string;
   customer: string;
+  companyId?: string | null;
   name: string;
   stage: OpportunityStage;
   pipelineStageId: string | null;
@@ -72,6 +73,7 @@ export function serializeOpportunity(
     id: o.id,
     code: o.code,
     customer: o.customer,
+    companyId: o.companyId ?? null,
     name: o.name,
     stage: o.pipelineStage?.name ?? o.stage ?? null,
     pipelineStageId: o.pipelineStageId ?? null,

@@ -58,6 +58,7 @@ export const Opportunity = z.object({
   // schemas below still enforce the canonical OP-NNNN format for supplied codes.
   code: OpportunityCode,
   customer: z.string().min(1).max(255),
+  companyId: z.string().uuid().nullable(),
   name: z.string().min(1).max(255),
   stage: z.string().nullable(),
   pipelineStageId: z.string().uuid().nullable(),
@@ -80,6 +81,7 @@ export type Opportunity = z.infer<typeof Opportunity>;
 
 export const OpportunityCreate = Opportunity.omit({
   id: true,
+  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
@@ -96,6 +98,7 @@ export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 export const OpportunityPatch = Opportunity.partial().omit({
   id: true,
   code: true,
+  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
