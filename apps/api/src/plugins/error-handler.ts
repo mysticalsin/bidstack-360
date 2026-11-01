@@ -11,10 +11,26 @@ import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-cl
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { captureSentryServerError } from './sentry.js';
 
+function jsonText(body: unknown): string {
+  try {
+    const text = JSON.stringify(body);
+    if (typeof text === 'string') return text;
+  } catch {
+    // A BigInt or circular cause must not turn the error response into plain text.
+  }
+  return '{"statusCode":500,"error":"Internal Server Error","message":"Something went wrong"}';
+}
+
 function sendJson(reply: FastifyReply, status: number, body: unknown) {
-  // The route response schema must not run again on an error body. A second
-  // failure used to write plain text, which the web client cannot parse.
-  return reply.status(status).type('application/json').serializer(JSON.stringify).send(body);
+  // Send an already-encoded JSON string. Running the route schema again on an
+  // error body used to throw, and Fastify then wrote plain text. The agreements
+  // card surfaces that as "Invalid JSON response from server".
+  const text = jsonText(body);
+  return reply
+    .status(status)
+    .type('application/json; charset=utf-8')
+    .serializer((payload) => (typeof payload === 'string' ? payload : text))
+    .send(text);
 }
 
 const plugin: FastifyPluginAsync = fp(async (server) => {

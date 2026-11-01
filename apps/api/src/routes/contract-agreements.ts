@@ -13,9 +13,10 @@ import {
   ContractAgreementPage,
   ContractAgreementPatch,
   RateCardLine,
+  ContractFieldProvenance,
   ContractExtractionDraft,
   ContractExtractionResult,
-  type ContractFieldProvenance,
+  type ContractFieldProvenance as ContractFieldProvenanceValue,
   type ContractExtractionStatus,
 } from '@bidstack/shared';
 
@@ -112,53 +113,70 @@ type ContractFieldKey = (typeof CONTRACT_FIELD_KEYS)[number];
 function buildFieldSources(
   row: DbRow,
   extraction?: ExtractionSourceRow | null,
-): Record<ContractFieldKey, ContractFieldProvenance> {
+): Record<ContractFieldKey, ContractFieldProvenanceValue> {
   const extractedDraft = extraction
     ? (ContractExtractionDraft.safeParse(extraction.extractedData).data ?? null)
     : null;
   const sourceFileName = row.sourceFile?.name ?? null;
-  let provenance: ContractFieldProvenance;
+  let provenance: ContractFieldProvenanceValue;
 
+  const savedOn = isoOrNull(row.updatedAt) ?? new Date(0).toISOString();
+  const savedDay = savedOn.slice(0, 10);
   if (row.sourceExtractionId && extractedDraft) {
     const isLlm = extractionSource(extractedDraft) === 'llm';
     provenance = {
       source: isLlm ? 'derived:llm' : 'derived:deterministic',
       label: isLlm ? 'AI reviewed' : 'Rules reviewed',
-      hint: `Human-reviewed ${isLlm ? 'AI' : 'rules'} extraction from ${sourceFileName ?? 'the source document'}. Saved ${row.updatedAt.toISOString().slice(0, 10)}.`,
+      hint: `Human-reviewed ${isLlm ? 'AI' : 'rules'} extraction from ${sourceFileName ?? 'the source document'}. Saved ${savedDay}.`,
       confidence:
         extractedDraft.confidenceBps == null ? null : extractedDraft.confidenceBps / 10_000,
       sourceFileId: uuidOrNull(row.sourceFileId),
       sourceFileName,
       sourceExtractionId: uuidOrNull(row.sourceExtractionId),
-      updatedAt: row.updatedAt.toISOString(),
+      updatedAt: savedOn,
     };
   } else if (row.sourceFileId) {
     provenance = {
       source: 'document',
       label: 'Document',
-      hint: `Linked to source document ${sourceFileName ?? row.sourceFileId}. Saved ${row.updatedAt.toISOString().slice(0, 10)}.`,
+      hint: `Linked to source document ${sourceFileName ?? row.sourceFileId}. Saved ${savedDay}.`,
       confidence: null,
       sourceFileId: uuidOrNull(row.sourceFileId),
       sourceFileName,
       sourceExtractionId: uuidOrNull(row.sourceExtractionId),
-      updatedAt: row.updatedAt.toISOString(),
+      updatedAt: savedOn,
     };
   } else {
     provenance = {
       source: 'manual',
       label: 'Manual',
-      hint: `Manually maintained in Polo PreSales CRM. Saved ${row.updatedAt.toISOString().slice(0, 10)}.`,
+      hint: `Manually maintained in Polo PreSales CRM. Saved ${savedDay}.`,
       confidence: 1,
       sourceFileId: null,
       sourceFileName: null,
       sourceExtractionId: null,
-      updatedAt: row.updatedAt.toISOString(),
+      updatedAt: savedOn,
     };
+  }
+  const parsedProvenance = ContractFieldProvenance.safeParse(provenance);
+  if (!parsedProvenance.success) {
+    provenance = {
+      source: 'manual',
+      label: 'Manual',
+      hint: 'Manually maintained in Polo PreSales CRM.',
+      confidence: 1,
+      sourceFileId: null,
+      sourceFileName: null,
+      sourceExtractionId: null,
+      updatedAt: savedOn,
+    };
+  } else {
+    provenance = parsedProvenance.data;
   }
 
   return Object.fromEntries(CONTRACT_FIELD_KEYS.map((key) => [key, provenance])) as Record<
     ContractFieldKey,
-    ContractFieldProvenance
+    ContractFieldProvenanceValue
   >;
 }
 
@@ -172,12 +190,58 @@ function enumOr<T extends string>(value: string, allowed: Set<string>, fallback:
 
 function isoOrNull(value: Date | null): string | null {
   if (!value || Number.isNaN(value.getTime())) return null;
-  const iso = value.toISOString();
-  return z.string().datetime().safeParse(iso).success ? iso : null;
+  try {
+    const iso = value.toISOString();
+    return z.string().datetime().safeParse(iso).success ? iso : null;
+  } catch {
+    return null;
+  }
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_RATE_MICROS = 1_000_000_000_000;
+
+function integerRateMicros(value: unknown): number | null {
+  if (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 0 &&
+    value <= MAX_RATE_MICROS
+  ) {
+    return value;
+  }
+  if (typeof value === 'bigint' && value >= 0n && value <= BigInt(MAX_RATE_MICROS))
+    return Number(value);
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    try {
+      const micros = BigInt(value);
+      if (micros <= BigInt(MAX_RATE_MICROS)) return Number(micros);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function coerceRateCard(value: unknown): z.infer<typeof RateCardLine>[] {
+  if (!Array.isArray(value)) return [];
+  const lines: z.infer<typeof RateCardLine>[] = [];
+  for (const entry of value) {
+    const direct = RateCardLine.safeParse(entry);
+    if (direct.success) {
+      lines.push(direct.data);
+    } else if (entry && typeof entry === 'object') {
+      const rateMicros = integerRateMicros((entry as { rateMicros?: unknown }).rateMicros);
+      if (rateMicros != null) {
+        const recovered = RateCardLine.safeParse({ ...entry, rateMicros });
+        if (recovered.success) lines.push(recovered.data);
+      }
+    }
+    if (lines.length === 200) break;
+  }
+  return lines;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function uuidOrNull(value: string | null): string | null {
   return value && UUID_RE.test(value) ? value : null;
@@ -211,7 +275,7 @@ function serialize(
     currency,
     // The Json column is validated back into RateCardLine[]; a malformed legacy
     // value degrades to an empty card rather than failing the read.
-    rateCard: (z.array(RateCardLine).safeParse(row.rateCard).data ?? []).slice(0, 200),
+    rateCard: coerceRateCard(row.rateCard),
     effectiveDate: isoOrNull(row.effectiveDate),
     expiryDate: isoOrNull(row.expiryDate),
     rateReviewSchedule: enumOr(row.rateReviewSchedule, RATE_SCHEDULES, 'adhoc'),
@@ -225,6 +289,18 @@ function serialize(
     createdAt: isoOrNull(row.createdAt) ?? new Date(0).toISOString(),
     updatedAt: isoOrNull(row.updatedAt) ?? new Date(0).toISOString(),
   };
+}
+
+function readAgreement(
+  row: DbRow,
+  extraction?: ExtractionSourceRow | null,
+): { ok: true; value: z.infer<typeof ContractAgreement> } | { ok: false } {
+  try {
+    const parsed = ContractAgreement.safeParse(serialize(row, extraction));
+    return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
 }
 
 const IdParam = z.object({ id: z.string().uuid() });
@@ -410,11 +486,20 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
         take: 200,
       });
       const extractionSources = await loadExtractionSourceMap(req.auth.orgId, rows);
-      return {
-        items: rows.map((row) =>
-          serialize(row, row.sourceExtractionId ? extractionSources.get(row.sourceExtractionId) : null),
-        ),
-      };
+      const items = [];
+      for (const row of rows) {
+        const read = readAgreement(
+          row,
+          row.sourceExtractionId ? extractionSources.get(row.sourceExtractionId) : null,
+        );
+        if (read.ok) items.push(read.value);
+        else
+          req.log.warn(
+            { agreementId: row.id },
+            'omitted a contract agreement that failed response validation',
+          );
+      }
+      return { items };
     },
   );
 
@@ -485,10 +570,21 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
           action: 'contract_agreement.create',
           targetType: 'contract_agreement',
           targetId: created.id,
-          diff: { accountKey: created.accountKey, kind: created.kind, reference: created.reference },
+          diff: {
+            accountKey: created.accountKey,
+            kind: created.kind,
+            reference: created.reference,
+          },
         },
       });
-      return reply.code(201).send(serialize(created, sourceExtraction));
+      const read = readAgreement(created, sourceExtraction);
+      if (!read.ok) {
+        req.log.error({ agreementId: created.id }, 'saved agreement could not be serialized');
+        throw server.httpErrors.internalServerError(
+          'Saved the agreement, but the response could not be read',
+        );
+      }
+      return reply.code(201).send(read.value);
     },
   );
 
@@ -496,7 +592,11 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
     '/contract-agreements/:id',
     {
       preHandler: [server.requirePermission('accounts:write')],
-      schema: { params: IdParam, body: ContractAgreementPatch, response: { 200: ContractAgreement } },
+      schema: {
+        params: IdParam,
+        body: ContractAgreementPatch,
+        response: { 200: ContractAgreement },
+      },
     },
     async (req) => {
       const existing = await prisma.contractAgreement.findFirst({
@@ -555,10 +655,17 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
           diff: req.body as object,
         },
       });
-      return serialize(
+      const read = readAgreement(
         updated,
         updated.sourceExtractionId ? extractionSources.get(updated.sourceExtractionId) : null,
       );
+      if (!read.ok) {
+        req.log.error({ agreementId: updated.id }, 'updated agreement could not be serialized');
+        throw server.httpErrors.internalServerError(
+          'Saved the agreement, but the response could not be read',
+        );
+      }
+      return read.value;
     },
   );
 
@@ -678,7 +785,14 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
         return agreement;
       });
 
-      return reply.code(201).send(serialize(created, row));
+      const read = readAgreement(created, row);
+      if (!read.ok) {
+        req.log.error({ agreementId: created.id }, 'approved agreement could not be serialized');
+        throw server.httpErrors.internalServerError(
+          'Saved the agreement, but the response could not be read',
+        );
+      }
+      return reply.code(201).send(read.value);
     },
   );
 
