@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { useCompany } from '@/hooks/useCompanies';
 import { formatDate } from '@/lib/format';
 import type { IntelPayload } from '@bidstack/shared';
 
@@ -73,20 +74,40 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
   );
 }
 
-export function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
+export function FinancialHealthCard({
+  intel,
+  companyId,
+}: {
+  intel: IntelPayload;
+  companyId?: string | null;
+}) {
   const f = intel.financial;
   const { t } = useTranslation('crm');
+  const company = useCompany(companyId ?? undefined);
+  const recordedHeadcount = company.data?.employeeCount;
   // The financial block has no source receipt. A stored number is a proxy;
-  // a provider name or raw object is not a query we ran.
+  // a provider name or raw object is not a query we ran. Headcount on the
+  // linked company is the account record, not a market probe.
   const label = (value: unknown) => honestyLabel(t, value);
+  const headcount =
+    typeof recordedHeadcount === 'number'
+      ? t('intelCards.financial.recordedHeadcount', '{{formatted}} recorded on the account', {
+          formatted: recordedHeadcount.toLocaleString('en-US'),
+        })
+      : label(f?.headcount);
   return (
     <Card>
       <SectionHeader
         title={t('intelCards.financial.title', 'Financial health')}
         caption={
-          f
-            ? t('intelCards.financial.sourceNotProbed', 'source not probed')
-            : undefined
+          typeof recordedHeadcount === 'number'
+            ? t(
+                'intelCards.financial.recordedCaption',
+                'Headcount is stored on the account. The other lines have no recorded source.',
+              )
+            : f
+              ? t('intelCards.financial.sourceNotProbed', 'source not probed')
+              : undefined
         }
       />
       <div className="p-5 space-y-3 text-sm">
@@ -101,7 +122,7 @@ export function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
           label={t('intelCards.financial.creditRating', 'Credit rating')}
           value={label(f?.creditRating)}
         />
-        <Row label={t('intelCards.financial.headcount', 'Headcount')} value={label(f?.headcount)} />
+        <Row label={t('intelCards.financial.headcount', 'Headcount')} value={headcount} />
       </div>
     </Card>
   );

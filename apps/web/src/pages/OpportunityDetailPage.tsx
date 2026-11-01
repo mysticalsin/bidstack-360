@@ -378,7 +378,7 @@ export function OpportunityDetailPage() {
       <DataFreshnessRibbon intel={intel} />
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        <FinancialHealthCard intel={intel} />
+        <FinancialHealthCard intel={intel} companyId={data.companyId} />
         <WinPredictionCard intel={intel} />
         <BidScoreCard opportunityId={data.id} />
         <OpportunityAccountIntel accountId={data.companyId} />
