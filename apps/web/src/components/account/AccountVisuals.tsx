@@ -8,6 +8,8 @@ import { ChartCard, SignalShape } from '@/components/viz/ChartCard';
 import { StageBars } from '@/components/viz/charts';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
 import { fmtCompact, stageFunnel, statusMix, type OppRow } from '@/components/viz/viz-data';
+import { peopleMapPageNotes } from '@bidstack/shared';
+
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
@@ -103,7 +105,10 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
       </ChartCard>
       <ChartCard
         title="Relationship map"
-        meta={ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
+        meta={[
+          ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : '',
+          ...peopleMapPageNotes(people.data),
+        ].filter(Boolean).join(' · ') || undefined}
         summary={ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'}
         table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
       >

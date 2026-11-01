@@ -7,6 +7,7 @@ import {
   factIsStale,
   intakeCommitment,
   intakePersonFact,
+  PEOPLE_MAP_PAGE,
   resolvedReportsToId,
   type DealEvidence,
   type FactKind,
@@ -148,14 +149,16 @@ export function assemblePeopleMap(input: {
   };
 }
 
-async function loadNames(orgId: string, ids: string[]): Promise<Map<string, string>> {
-  if (ids.length === 0) return new Map();
+async function loadNames(orgId: string, ids: string[]): Promise<{ names: Map<string, string>; capped: boolean }> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return { names: new Map(), capped: false };
+  const page = unique.slice(0, PEOPLE_MAP_PAGE);
   const rows = await prisma.contact.findMany({
-    where: { orgId, id: { in: ids }, deletedAt: null },
+    where: { orgId, id: { in: page }, deletedAt: null },
     select: { id: true, name: true },
-    take: 200,
+    take: PEOPLE_MAP_PAGE,
   });
-  return new Map(rows.map((row) => [row.id, row.name]));
+  return { names: new Map(rows.map((row) => [row.id, row.name])), capped: unique.length > PEOPLE_MAP_PAGE };
 }
 
 export async function peopleMapForCompany(orgId: string, companyId: string, now = new Date()) {
@@ -164,13 +167,16 @@ export async function peopleMapForCompany(orgId: string, companyId: string, now 
     select: { id: true },
   });
   if (!company) return null;
+  const where = { orgId, companyId, deletedAt: null };
   const people = await prisma.contact.findMany({
-    where: { orgId, companyId, deletedAt: null },
+    where,
     select: { id: true, name: true, role: true },
-    orderBy: { name: 'asc' },
-    take: 200,
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    take: PEOPLE_MAP_PAGE,
   });
-  return finishMap(orgId, people, companyId, null, now);
+  const peopleCapped = people.length === PEOPLE_MAP_PAGE && (await prisma.contact.count({ where })) > PEOPLE_MAP_PAGE;
+  const map = await finishMap(orgId, people, companyId, null, now);
+  return { ...map, peopleCapped };
 }
 
 export async function peopleMapForOpportunity(orgId: string, opportunityId: string, now = new Date()) {
@@ -179,15 +185,19 @@ export async function peopleMapForOpportunity(orgId: string, opportunityId: stri
     select: { id: true, companyId: true },
   });
   if (!opportunity) return null;
+  const where = { orgId, opportunityId, deletedAt: null };
   const links = await prisma.opportunityContact.findMany({
-    where: { orgId, opportunityId, deletedAt: null },
+    where,
     select: {
       contact: { select: { id: true, name: true, role: true } },
     },
-    take: 200,
+    orderBy: [{ contact: { name: 'asc' } }, { id: 'asc' }],
+    take: PEOPLE_MAP_PAGE,
   });
+  const peopleCapped = links.length === PEOPLE_MAP_PAGE && (await prisma.opportunityContact.count({ where })) > PEOPLE_MAP_PAGE;
   const people = links.map((link) => link.contact);
-  return finishMap(orgId, people, opportunity.companyId, opportunityId, now);
+  const map = await finishMap(orgId, people, opportunity.companyId, opportunityId, now);
+  return { ...map, peopleCapped };
 }
 
 async function finishMap(
@@ -198,34 +208,44 @@ async function finishMap(
   now: Date,
 ) {
   const ids = people.map((person) => person.id);
+  const factWhere = { orgId, contactId: { in: ids }, deletedAt: null };
+  const dealWhere = { orgId, contactId: { in: ids }, deletedAt: null };
   const [facts, deals] = await Promise.all([
     ids.length === 0
       ? Promise.resolve([] as FactRow[])
       : prisma.contactFact.findMany({
-          where: { orgId, contactId: { in: ids }, deletedAt: null },
+          where: factWhere,
           select: FACT_SELECT,
-          orderBy: { createdAt: 'asc' },
-          take: 1000,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          take: PEOPLE_MAP_PAGE,
         }),
     ids.length === 0
       ? Promise.resolve([] as DealRow[])
       : prisma.opportunityContact.findMany({
-          where: { orgId, contactId: { in: ids }, deletedAt: null },
+          where: dealWhere,
           select: {
             contactId: true,
             role: true,
             opportunityId: true,
             opportunity: { select: { id: true, name: true } },
           },
-          take: 1000,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          take: PEOPLE_MAP_PAGE,
         }),
   ]);
+  const factsCapped = ids.length > 0 && facts.length === PEOPLE_MAP_PAGE && (await prisma.contactFact.count({ where: factWhere })) > PEOPLE_MAP_PAGE;
+  const dealsCapped = ids.length > 0 && deals.length === PEOPLE_MAP_PAGE && (await prisma.opportunityContact.count({ where: dealWhere })) > PEOPLE_MAP_PAGE;
   const reportIds = facts
     .map((fact) => fact.reportsToContactId)
     .filter((id): id is string => Boolean(id));
-  const names = await loadNames(orgId, reportIds);
-  for (const person of people) names.set(person.id, person.name);
-  return assemblePeopleMap({ companyId, opportunityId, people, facts, deals, names, now });
+  const loadedNames = await loadNames(orgId, reportIds);
+  for (const person of people) loadedNames.names.set(person.id, person.name);
+  return {
+    ...assemblePeopleMap({ companyId, opportunityId, people, facts, deals, names: loadedNames.names, now }),
+    factsCapped,
+    dealsCapped,
+    namesCapped: loadedNames.capped,
+  };
 }
 
 export async function assertContactInOrg(orgId: string, contactId: string) {

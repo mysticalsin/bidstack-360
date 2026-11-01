@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
-import type { ConnectionStanding } from '@bidstack/shared';
+import { peopleMapPageNotes, type ConnectionStanding } from '@bidstack/shared';
 
 import { shapeBuyingGroup, STANDING_LABEL } from './shapeBuyingGroup';
 
@@ -59,6 +59,11 @@ export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
           )}
         />
       ) : null}
+      {peopleMapPageNotes(people.data).map((note) => (
+        <p key={note} className="px-5 pb-2 text-sm text-[var(--fg-secondary)]">
+          {note}
+        </p>
+      ))}
       {diagram ? (
         <div
           className="overflow-x-auto px-4 pb-2"
