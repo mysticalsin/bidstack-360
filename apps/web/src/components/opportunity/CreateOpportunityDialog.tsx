@@ -14,6 +14,8 @@ import {
   OpportunityStage,
 } from '@bidstack/shared';
 
+import { createAmountPayload } from './create-amount';
+
 const STAGES = OpportunityStage.options;
 
 type FieldErrors = Partial<Record<keyof OpportunityCreate, string[]>>;
@@ -80,11 +82,18 @@ export function CreateOpportunityDialog({
     const fd = new FormData(e.currentTarget);
     // A4: customer name comes from the LookupFieldPicker selection; fall back to
     // the hidden input value so FormData serialisation also works.
+    const amount = createAmountPayload(String(fd.get('value') ?? '0'));
+    if (!amount) {
+      setFieldErrors({
+        value: [t('createOpportunity.valueInvalid', 'Enter an amount with up to 6 decimal places.')],
+      });
+      return;
+    }
     const candidate = {
       customer: (selectedCompany?.label ?? String(fd.get('customer') ?? '')).trim(),
       name: String(fd.get('name') ?? '').trim(),
       stage: fd.get('stage'),
-      value: Number(fd.get('value') ?? 0),
+      ...amount,
       probability: Number(fd.get('probability') ?? 0),
       dueDate: (fd.get('dueDate') as string) || null,
       owner: null,
@@ -214,7 +223,7 @@ export function CreateOpportunityDialog({
               htmlFor="value"
               error={fieldErrors.value?.[0]}
             >
-              <Input id="value" name="value" type="number" min={0} step="100" defaultValue="0" />
+              <Input id="value" name="value" type="text" inputMode="decimal" defaultValue="0" />
             </Field>
             <Field
               label={t('createOpportunity.probabilityLabel', 'Probability %')}

@@ -95,6 +95,7 @@ export const OpportunityCreate = Opportunity.omit({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
   pipelineStageId: z.string().uuid().optional().nullable(),
+  valueMicros: z.string().regex(/^\d+$/).optional(),
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
