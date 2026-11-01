@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import { microsToUnits } from '@bidstack/shared';
+
 import { convertMicrosByRates, useCurrencyStore } from './currency';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 
@@ -394,6 +396,25 @@ describe('useCurrencyStore', () => {
       },
     });
     expect(useCurrencyStore.getState().convert(0.1, 'EUR')).toBe(0.11);
+  });
+
+  it('converts a unit count past the safe integer range', async () => {
+    // WHY: this count is not a safe integer, so the rate was skipped and the
+    // figure stayed in the source currency.
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const huge = 9_007_199_254_740_992;
+    expect(Number.isSafeInteger(huge)).toBe(false);
+    const expected = microsToUnits(convertMicrosByRates(BigInt(huge) * 1_000_000n, 1, 1.1)!);
+    expect(useCurrencyStore.getState().convert(huge, 'EUR')).toBe(expected);
+    expect(useCurrencyStore.getState().convert(huge, 'EUR')).not.toBe(huge);
   });
 });
 

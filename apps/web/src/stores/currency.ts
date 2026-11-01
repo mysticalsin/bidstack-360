@@ -81,6 +81,21 @@ function rateRatio(rate: number): { num: bigint; den: bigint } | null {
   return { num, den };
 }
 
+/**
+ * Micros for a unit number. A safe conversion wins. An integer past that range
+ * still converts from the digits the number still has.
+ */
+function unitAmountToMicros(amount: number): bigint | null {
+  const exact = unitsToMicros(amount);
+  if (exact != null) return exact;
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+  try {
+    return BigInt(amount) * 1_000_000n;
+  } catch {
+    return null;
+  }
+}
+
 /** Nearest micros after FX. Equal rates keep every digit, including the cent. */
 export function convertMicrosByRates(micros: bigint, fromRate: number, toRate: number): bigint | null {
   const from = rateRatio(fromRate);
@@ -405,7 +420,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
         const toRate = to === base ? 1.0 : rates.rates[to];
         if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return amount;
         const negative = amount < 0;
-        const micros = unitsToMicros(negative ? -amount : amount);
+        const micros = unitAmountToMicros(negative ? -amount : amount);
         if (micros == null) return amount;
         const converted = convertMicrosByRates(negative ? -micros : micros, fromRate, toRate);
         if (converted == null) return amount;
