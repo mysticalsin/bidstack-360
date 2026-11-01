@@ -87,6 +87,24 @@ export function formatStage(stage: string): string {
  * Compacts ≥ 1M as `$1.2M`, ≥ 1k as `$12k`, otherwise full currency.
  * The string-encoded micros preserve BigInt precision over JSON.
  */
+/** A number Intl can compact. Huge unit counts keep their leading digits instead of a rounded float. */
+function compactValue(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const units = abs / 1_000_000n;
+  const remainder = abs % 1_000_000n;
+  let magnitude: number;
+  if (units <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    magnitude = Number(units) + Number(remainder) / 1_000_000;
+  } else {
+    const digits = units.toString();
+    const significant = digits.slice(0, 15);
+    const exponent = digits.length - significant.length;
+    magnitude = Number(significant) * 10 ** exponent;
+  }
+  return negative ? -magnitude : magnitude;
+}
+
 function currencyAffix(currency: string, locale: string): { symbol: string; symbolFirst: boolean } {
   try {
     const parts = new Intl.NumberFormat(locale, {
@@ -124,10 +142,7 @@ export function formatMoneyMicros(
     const { symbol, symbolFirst } = currencyAffix(resolvedCurrency, resolvedLocale);
     return symbolFirst ? `${symbol}${text}` : `${text} ${symbol}`;
   }
-  const million = BigInt(1_000_000);
-  const whole = asBigInt / million;
-  const remainder = asBigInt % million;
-  const value = Number(whole) + Number(remainder) / 1_000_000;
+  const value = compactValue(asBigInt);
   return new Intl.NumberFormat(resolvedLocale, {
     style: 'currency',
     currency: resolvedCurrency,

@@ -32,6 +32,13 @@ describe('formatMoneyMicros', () => {
     expect(formatted).toContain('457.18');
     expect(formatted).not.toContain('457.19');
   });
+
+  it('compacts an ordinary amount and a unit count past the safe integer range', () => {
+    // WHY: Number(units) is not the compact input once the unit count passes 2^53.
+    expect(formatMoneyMicros(1_500_000_000_000n, 'USD', { locale: 'en' })).toBe('$1.5M');
+    const units = 9_950_000_000_000_000n;
+    expect(formatMoneyMicros(units * 1_000_000n, 'USD', { locale: 'en' })).toBe('$9950T');
+  });
 });
 
 describe('daysUntil', () => {
