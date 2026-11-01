@@ -99,4 +99,16 @@ describe('FinancialHealthSection', () => {
     expect(fmtMoney(-156_444e6, 'NOK')).toBe('-NOK 156.4bn');
     expect(fmtMoney(935e6, 'CAD')).toBe('CAD 935m');
   });
+  it('period ends read as filed (31 Dec, not 30 Dec) and recent data is not flagged stale', () => {
+    state.data = real;
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getAllByText(/period to 31 Dec 2025/).length).toBe(2);
+    expect(screen.queryByTestId('fh-stale')).toBeNull();
+  });
+
+  it('flags statements older than about 18 months as history (CI Financial stopped filing in 2023)', () => {
+    state.data = { ...real, periods: [P(2021, 2730e6, null, 15.1), P(2020, 2050e6, null, 23.2)], signals: [] };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getByTestId('fh-stale').textContent).toContain('Latest filed period is FY2021');
+  });
 });

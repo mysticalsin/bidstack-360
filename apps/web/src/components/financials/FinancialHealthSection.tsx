@@ -20,6 +20,9 @@ import { buildTiles, type Tile } from './financials-format';
 type Signal = AccountFinancials['signals'][number];
 
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+// Period ends are calendar dates: format in UTC so 31 Dec never shows as 30 Dec west of Greenwich.
+const periodFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const STALE_MS = 548 * 24 * 3600 * 1000; // about 18 months
 
 function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
   const last = t.series.at(-1);
@@ -66,7 +69,7 @@ function SignalCard({ s }: { s: Signal }) {
         <span className="wd-row-main">
           <span className="wd-row-title">{noDash(s.title)}</span>
           <span className="wd-row-meta">
-            {CONF[s.confidence]} · period to {dateFmt.format(new Date(`${s.periodEnd}T00:00:00Z`))}
+            {CONF[s.confidence]} · period to {periodFmt.format(new Date(`${s.periodEnd}T00:00:00Z`))}
             {s.sample ? <span className="wd-sample-badge">Sample</span> : null}
           </span>
         </span>
@@ -104,6 +107,10 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
   const d = q.data;
   const general = d?.gate === 'general';
   const tiles = d ? buildTiles(d.periods) : [];
+  const latest = d && !d.sample ? d.periods.reduce<string | null>((m, p) => (!m || p.periodEnd > m ? p.periodEnd : m), null) : null;
+  const latestFy = latest && d ? d.periods.find((p) => p.periodEnd === latest)?.fiscalYear : null;
+  // Measured against the last pull (not the clock) so render stays pure.
+  const stale = latest && d?.lastPulledAt ? new Date(d.lastPulledAt).getTime() - new Date(`${latest}T00:00:00Z`).getTime() > STALE_MS : false;
   const signals = d ? d.signals.slice().sort((a, b) => RANK[a.confidence] - RANK[b.confidence]).slice(0, 3) : [];
   return (
     <div className="wd fh" data-testid="financial-health">
@@ -138,6 +145,11 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
               <>
                 {d.sample ? <p className="wd-row-meta">Example layout. {d.statusCopy ?? 'Real filed numbers replace it after the next pull.'}</p> : null}
                 {!d.sample && d.statusCopy ? <p className="wd-row-meta" role="status">{d.statusCopy}</p> : null}
+                {stale ? (
+                  <p className="wd-row-meta fh-stale" data-testid="fh-stale">
+                    Latest filed period is FY{latestFy}. No newer statements at this source, so read the trend as history.
+                  </p>
+                ) : null}
                 <div className="fh-tiles">
                   {tiles.map((t) => <MetricTile key={t.key} t={t} sample={d.sample} />)}
                 </div>
