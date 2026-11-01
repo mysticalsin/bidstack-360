@@ -2,12 +2,22 @@ import type { AccountFinancials } from '@bidstack/shared';
 
 export type Period = AccountFinancials['periods'][number];
 
+function compactIsExact(amount: number, scale: number, digits: number): boolean {
+  const factor = 10 ** digits;
+  const shown = Math.round((amount / scale) * factor) / factor;
+  return shown * scale === amount;
+}
+
 export function fmtMoney(v: number, ccy: string): string {
-  const a = Math.abs(v);
+  if (!Number.isFinite(v)) return 'amount not readable';
   const sign = v < 0 ? '-' : '';
-  if (a >= 1e9) return `${sign}${ccy} ${(a / 1e9).toFixed(a >= 1e10 ? 1 : 2)}bn`;
-  if (a >= 1e6) return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
-  return `${sign}${ccy} ${Math.round(a).toLocaleString('en-GB')}`;
+  const a = Math.abs(v);
+  if (a >= 1e10 && compactIsExact(a, 1e9, 1)) return `${sign}${ccy} ${(a / 1e9).toFixed(1)}bn`;
+  if (a >= 1e9 && a < 1e10 && compactIsExact(a, 1e9, 2)) return `${sign}${ccy} ${(a / 1e9).toFixed(2)}bn`;
+  if (a >= 1e9 && compactIsExact(a, 1e9, 1)) return `${sign}${ccy} ${(a / 1e9).toFixed(1)}bn`;
+  if (a >= 1e6 && a < 1e9 && compactIsExact(a, 1e6, 0)) return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
+  if (a >= 1e6 && a < 1e9 && compactIsExact(a, 1e6, 2)) return `${sign}${ccy} ${(a / 1e6).toFixed(2)}m`;
+  return `${sign}${ccy} ${a.toLocaleString('en-GB')}`;
 }
 
 export interface Tile {
