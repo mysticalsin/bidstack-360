@@ -125,4 +125,64 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     expect(valueOf(vector!, 'num_emails_sent_received')).toBe(0);
     expect(Number.isFinite(valueOf(vector!, 'days_in_current_stage'))).toBe(true);
   });
+
+  it('does not score a deleted stage, and a lost flag beats a won flag', async () => {
+    // WHY: a removed stage was still a loss in the owner close rate, and a
+    // deal flagged both ways was counted as a win and a loss.
+    const count = vi.fn(async () => 0);
+    const activity = {
+      groupBy: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () => []),
+    };
+    const deleted = {
+      activity,
+      opportunity: {
+        findFirst: vi.fn(async () => ({
+          valueMicros: 1n,
+          probability: 10,
+          dueDate: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          ownerId: 'owner-1',
+          pipelineStage: {
+            probability: 0,
+            isWon: true,
+            isLost: true,
+            deletedAt: new Date('2026-02-01T00:00:00.000Z'),
+          },
+          _count: { contactLinks: 0 },
+          intel: {},
+        })),
+        count,
+      },
+    };
+    const removed = await extractOpportunityFeatures('opp-1', 'org-1', deleted as never);
+    expect(valueOf(removed!, 'is_won')).toBe(0);
+    expect(valueOf(removed!, 'is_lost')).toBe(0);
+    const wheres = count.mock.calls.map(
+      (call) => (call[0] as { where: { pipelineStage: unknown } }).where.pipelineStage,
+    );
+    expect(wheres[0]).toMatchObject({ isWon: true, isLost: false, deletedAt: null });
+    expect(wheres[1]).toMatchObject({ isLost: true, deletedAt: null });
+
+    const both = {
+      activity,
+      opportunity: {
+        findFirst: vi.fn(async () => ({
+          valueMicros: 1n,
+          probability: 10,
+          dueDate: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          ownerId: null,
+          pipelineStage: { probability: 0, isWon: true, isLost: true, deletedAt: null },
+          _count: { contactLinks: 0 },
+          intel: {},
+        })),
+        count,
+      },
+    };
+    const flagged = await extractOpportunityFeatures('opp-2', 'org-1', both as never);
+    expect(valueOf(flagged!, 'is_won')).toBe(0);
+    expect(valueOf(flagged!, 'is_lost')).toBe(1);
+  });
 });

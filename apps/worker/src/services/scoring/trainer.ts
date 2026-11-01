@@ -136,19 +136,20 @@ export async function trainOrgModel(
         orgId,
         deletedAt: null,
         updatedAt: { gte: twelveMonthsAgo },
-        pipelineStage: { OR: [{ isWon: true }, { isLost: true }] },
+        pipelineStage: { deletedAt: null, OR: [{ isWon: true }, { isLost: true }] },
       },
       select: {
         id: true,
-        pipelineStage: { select: { isWon: true, isLost: true } },
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
       },
     });
 
     for (const opp of closedOpps) {
       const fv = await extractOpportunityFeatures(opp.id, orgId, db);
       if (!fv) continue;
+      const live = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
       X.push(fv.values);
-      y.push(opp.pipelineStage?.isWon ? 1 : 0);
+      y.push(live?.isLost ? 0 : live?.isWon ? 1 : 0);
       if (featureNames.length === 0) featureNames = fv.names;
     }
 

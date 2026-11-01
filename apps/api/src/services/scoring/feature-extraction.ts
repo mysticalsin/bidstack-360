@@ -161,7 +161,7 @@ export async function extractOpportunityFeatures(
       dueDate: true,
       createdAt: true,
       ownerId: true,
-      pipelineStage: { select: { probability: true, isWon: true, isLost: true } },
+      pipelineStage: { select: { probability: true, isWon: true, isLost: true, deletedAt: true } },
       _count: { select: { contactLinks: true } },
       intel: true,
     },
@@ -210,13 +210,15 @@ export async function extractOpportunityFeatures(
       db.opportunity.count({
         where: {
           orgId, ownerId: opp.ownerId, deletedAt: null,
-          updatedAt: { gte: ninetyDaysAgo }, pipelineStage: { isWon: true },
+          updatedAt: { gte: ninetyDaysAgo },
+          pipelineStage: { isWon: true, isLost: false, deletedAt: null },
         },
       }),
       db.opportunity.count({
         where: {
           orgId, ownerId: opp.ownerId, deletedAt: null,
-          updatedAt: { gte: ninetyDaysAgo }, pipelineStage: { isLost: true },
+          updatedAt: { gte: ninetyDaysAgo },
+          pipelineStage: { isLost: true, deletedAt: null },
         },
       }),
     ]);
@@ -232,8 +234,9 @@ export async function extractOpportunityFeatures(
   const push = (name: string, value: number) => { names.push(name); values.push(value); };
 
   const valueMicros = Number(opp.valueMicros);
+  const stage = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
   push('log_value_micros', valueMicros > 0 ? Math.log10(valueMicros) : 0);
-  push('stage_probability', Number(opp.pipelineStage?.probability ?? opp.probability) / 100);
+  push('stage_probability', Number(stage?.probability ?? opp.probability) / 100);
   push('days_in_current_stage', daysBetween(lastStageChangeDate, now));
   push('total_age_days', daysBetween(opp.createdAt, now));
   push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 365);
@@ -243,8 +246,8 @@ export async function extractOpportunityFeatures(
   push('last_activity_days_ago', daysSince(lastActivity?.occurredAt ?? null, now));
   push('owner_close_rate_last_90d', ownerCloseRate);
   push('qualification_score_norm', qualScore / 100);
-  push('is_won', opp.pipelineStage?.isWon ? 1 : 0);
-  push('is_lost', opp.pipelineStage?.isLost ? 1 : 0);
+  push('is_won', stage?.isWon && !stage.isLost ? 1 : 0);
+  push('is_lost', stage?.isLost ? 1 : 0);
 
   return { names, values };
 }

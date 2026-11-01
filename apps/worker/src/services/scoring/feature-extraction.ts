@@ -257,7 +257,7 @@ export async function extractOpportunityFeatures(
       updatedAt: true,
       ownerId: true,
       pipelineStage: {
-        select: { name: true, probability: true, isWon: true, isLost: true },
+        select: { name: true, probability: true, isWon: true, isLost: true, deletedAt: true },
       },
       _count: { select: { contactLinks: true } },
       intel: true,
@@ -296,7 +296,7 @@ export async function extractOpportunityFeatures(
           ownerId: opp.ownerId,
           deletedAt: null,
           updatedAt: { gte: ninetyDaysAgo },
-          pipelineStage: { isWon: true },
+          pipelineStage: { isWon: true, isLost: false, deletedAt: null },
         },
       }),
       db.opportunity.count({
@@ -305,7 +305,7 @@ export async function extractOpportunityFeatures(
           ownerId: opp.ownerId,
           deletedAt: null,
           updatedAt: { gte: ninetyDaysAgo },
-          pipelineStage: { isLost: true },
+          pipelineStage: { isLost: true, deletedAt: null },
         },
       }),
     ]);
@@ -331,7 +331,8 @@ export async function extractOpportunityFeatures(
   push('log_value_micros', valueMicros > 0 ? Math.log10(valueMicros) : 0);
 
   // Stage probability from pipeline (if set)
-  push('stage_probability', Number(opp.pipelineStage?.probability ?? opp.probability) / 100);
+  const stage = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
+  push('stage_probability', Number(stage?.probability ?? opp.probability) / 100);
 
   // Time-based features
   push('days_in_current_stage', daysBetween(lastStageChangeDate, now));
@@ -351,8 +352,8 @@ export async function extractOpportunityFeatures(
   push('qualification_score_norm', qualScore / 100);
 
   // Is won / is lost (these are present in historical training only)
-  push('is_won', opp.pipelineStage?.isWon ? 1 : 0);
-  push('is_lost', opp.pipelineStage?.isLost ? 1 : 0);
+  push('is_won', stage?.isWon && !stage.isLost ? 1 : 0);
+  push('is_lost', stage?.isLost ? 1 : 0);
 
   return { names, values };
 }
