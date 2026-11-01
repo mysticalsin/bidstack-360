@@ -116,7 +116,11 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
     name: 'crm_generate_insights',
     desc: 'Generate draft insights from available CRM data for a deal or account.',
   },
-  { group: 'legacy', name: 'opportunities.list', desc: 'List opportunities matching filters.' },
+  {
+    group: 'legacy',
+    name: 'opportunities.list',
+    desc: 'List opportunities. A company id is the account filter; search matches text.',
+  },
   {
     group: 'legacy',
     name: 'opportunities.get',

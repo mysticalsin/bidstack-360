@@ -128,6 +128,53 @@ describeDb('MCP tools', () => {
     expect(row.companyId).toBeNull();
   });
 
+  it('opportunities.list filters by company id, not the customer string', async () => {
+    // WHY: customer text is a label. Dust asking for the account must see the
+    // linked deal and must not see a deal that only repeats the company name.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Opp Co ${randomBytes(4).toString('hex')}` },
+    });
+    const linked = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: 'Stored label',
+        companyId: company.id,
+        name: 'Linked pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const nameOnly = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: company.name,
+        name: 'Name only pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const out = (await tools['opportunities.list'].handler(
+      { companyId: company.id, limit: 20 },
+      ctx,
+    )) as Array<{ id: string }>;
+    expect(out.map((row) => row.id)).toEqual([linked.id]);
+    expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
+
+    await expect(
+      tools['opportunities.list'].handler(
+        { companyId: '00000000-0000-4000-8000-000000000099', limit: 5 },
+        ctx,
+      ),
+    ).rejects.toThrow(/not found/i);
+  });
+
   it('opportunities.get returns a single opp', async () => {
     const out = (await tools['opportunities.get'].handler({ id: oppId }, ctx)) as { id: string };
     expect(out.id).toBe(oppId);

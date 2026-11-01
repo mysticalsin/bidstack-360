@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { requireCompanyLink } from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -18,13 +19,14 @@ const Input = z.object({
   stage: Stage.optional(),
   owner: z.string().email().optional(),
   industry: z.string().optional(),
+  companyId: z.string().uuid().optional(),
   search: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(50),
 });
 
 export const opportunitiesList: Tool<typeof Input> = {
   description:
-    'List opportunities matching filters (stage/owner/industry/search). currency is null and currencyBasis is unspecified when the row has no currency. probability is win likelihood, not account health.',
+    'List opportunities. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. currency is null and currencyBasis is unspecified when the row has no currency. probability is win likelihood, not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -35,18 +37,26 @@ export const opportunitiesList: Tool<typeof Input> = {
       },
       owner: { type: 'string', format: 'email' },
       industry: { type: 'string' },
-      search: { type: 'string' },
+      companyId: { type: 'string', format: 'uuid' },
+      search: {
+        type: 'string',
+        description: 'Text match on customer, name, or code. Not a company link.',
+      },
       limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
     },
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
+    if (args.companyId) {
+      await requireCompanyLink(ctx.orgId, { companyId: args.companyId });
+    }
     const items = await prisma.opportunity.findMany({
       where: {
         orgId: ctx.orgId,
         deletedAt: null, // skip soft-deleted (Review)
         ...(args.stage ? { stage: args.stage as PrismaStage } : {}),
         ...(args.industry ? { industry: args.industry } : {}),
+        ...(args.companyId ? { companyId: args.companyId } : {}),
         ...(args.owner ? { owner: { email: args.owner } } : {}),
         ...(args.search
           ? {
