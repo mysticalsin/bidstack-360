@@ -212,7 +212,7 @@ export function unspecifiedMicrosLabel(micros: string | number | bigint): string
   return `${headlineMicrosLabel(micros)} unspecified`;
 }
 
-/** Compact from integer micros. Unit counts past the safe range keep their leading digits. */
+/** Compact when that label is the same cent. Otherwise the full integer, with the missing-currency mark. */
 export function formatUnspecifiedCompactMicros(micros: string | number | bigint): string {
-  return formatUnspecifiedCompact(compactMicrosMagnitude(asMicros(micros)));
+  return unspecifiedMicrosLabel(micros);
 }

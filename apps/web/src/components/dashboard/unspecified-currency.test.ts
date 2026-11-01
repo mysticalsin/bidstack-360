@@ -106,7 +106,9 @@ describe('exact unspecified amounts', () => {
     ).toBeLessThan(100);
     const summed = recordedMicros(collapsed, smaller) + recordedMicros(collapsed, larger);
     expect(summed).toBe((9007199254740992n + 9007199254740993n) * 1_000_000n);
-    expect(formatUnspecifiedCompactMicros(summed)).toContain('unspecified');
+    expect(formatUnspecifiedCompactMicros(summed)).toBe('18,014,398,509,481,985 unspecified');
+    expect(formatUnspecifiedCompactMicros('12015000000000')).toBe('12,015,000 unspecified');
+    expect(formatUnspecifiedCompactMicros('1500000000000')).toBe('1.5M unspecified');
     expect(recordedMicros(collapsed)).toBe(0n);
   });
 
