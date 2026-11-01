@@ -80,10 +80,15 @@ export function formatDate(iso: string | null | undefined, locale?: string): str
   });
 }
 
-export function daysUntil(iso: string | null | undefined): number | null {
+/** Whole UTC days from today until the due date. Today is 0. A clock past midnight does not make today overdue. */
+export function daysUntil(iso: string | null | undefined, now = Date.now()): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
+  const due = new Date(iso);
+  if (Number.isNaN(due.getTime())) return null;
+  const at = new Date(now);
+  const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return (dueDay - today) / 86_400_000;
 }
 
 export function formatStage(stage: string): string {
