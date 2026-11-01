@@ -9,23 +9,84 @@ export interface PipelineKpis {
   velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
 }
 
-export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
-  const grouped = await prisma.opportunity.groupBy({
-    by: ['stage'],
-    where: { orgId, deletedAt: null },
-    _count: { _all: true },
-    _sum: { valueMicros: true },
-  });
+type StageSum = { stage: string; _count: { _all: number }; _sum: { valueMicros: bigint | number | null } };
 
-  const byStage = grouped.map((g) => ({
-    stage: g.stage,
-    count: g._count._all,
-    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds the
-    // BigInt→Number conversion *before* dividing, so a per-stage aggregate past
-    // Number.MAX_SAFE_INTEGER micros (~$9.007B) silently corrupts. The shared
-    // helper keeps BigInt arithmetic through the whole/remainder split.
-    valueSum: microsToUnits(g._sum.valueMicros ?? 0),
-  }));
+function asMicros(value: bigint | number | null | undefined): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value));
+  return 0n;
+}
+
+/** A lost flag wins over a won flag, matching closedOutcome. */
+function moveFlagged(
+  sums: Map<string, { count: number; micros: bigint }>,
+  rows: readonly StageSum[],
+  into: 'closed_lost' | 'closed_won',
+): void {
+  for (const row of rows) {
+    const micros = asMicros(row._sum.valueMicros);
+    const from = sums.get(row.stage) ?? { count: 0, micros: 0n };
+    from.count -= row._count._all;
+    from.micros -= micros;
+    sums.set(row.stage, from);
+    const dest = sums.get(into) ?? { count: 0, micros: 0n };
+    dest.count += row._count._all;
+    dest.micros += micros;
+    sums.set(into, dest);
+  }
+}
+
+export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
+  const live = { orgId, deletedAt: null };
+  const [grouped, lostFlagged, wonFlagged] = await Promise.all([
+    prisma.opportunity.groupBy({
+      by: ['stage'],
+      where: live,
+      _count: { _all: true },
+      _sum: { valueMicros: true },
+    }),
+    prisma.opportunity.groupBy({
+      by: ['stage'],
+      where: {
+        ...live,
+        NOT: { stage: 'closed_lost' },
+        pipelineStage: { isLost: true },
+      },
+      _count: { _all: true },
+      _sum: { valueMicros: true },
+    }),
+    prisma.opportunity.groupBy({
+      by: ['stage'],
+      where: {
+        ...live,
+        NOT: { stage: 'closed_won' },
+        pipelineStage: { isLost: false, isWon: true },
+      },
+      _count: { _all: true },
+      _sum: { valueMicros: true },
+    }),
+  ]);
+
+  const sums = new Map<string, { count: number; micros: bigint }>();
+  for (const row of grouped) {
+    sums.set(row.stage, { count: row._count._all, micros: asMicros(row._sum.valueMicros) });
+  }
+  // The enum key can still say an open stage after the stage row is marked
+  // lost or won. Those deals belong with the closed outcome, not the open book.
+  moveFlagged(sums, lostFlagged, 'closed_lost');
+  moveFlagged(sums, wonFlagged, 'closed_won');
+
+  const byStage = [...sums.entries()]
+    .filter(([, row]) => row.count > 0)
+    .map(([stage, row]) => ({
+      stage,
+      count: row.count,
+      // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds the
+      // BigInt→Number conversion *before* dividing, so a per-stage aggregate past
+      // Number.MAX_SAFE_INTEGER micros (~$9.007B) silently corrupts. The shared
+      // helper keeps BigInt arithmetic through the whole/remainder split.
+      valueSum: microsToUnits(row.micros),
+    }));
 
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');
 
@@ -50,6 +111,12 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
     WHERE o.org_id = ${orgId}::uuid
       AND o.deleted_at IS NULL
       AND o.stage NOT IN ('closed_won', 'closed_lost')
+      AND NOT EXISTS (
+        SELECT 1 FROM pipeline_stages ps
+        WHERE ps.id = o.pipeline_stage_id
+          AND ps.deleted_at IS NULL
+          AND (ps.is_lost OR ps.is_won)
+      )
   `);
   const weighted = agg?.weighted ?? 0;
   const avgDaysOpen =

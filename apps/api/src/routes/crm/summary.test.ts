@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import { getPipelineKpis } from '../../services/reports/funnel.service.js';
 import { buildServer } from '../../server.js';
+import { invalidateCrmSummaryCache } from './summary.js';
 import {
   createIsolatedOrg,
   dropIsolatedOrg,
@@ -52,6 +54,52 @@ describe('crm summary routes', () => {
     expect(body.pipelineValue).toEqual(expect.any(Number));
     expect(body.recentActivity).toEqual(expect.any(Array));
     expect(body.recentActivity.length).toBeLessThanOrEqual(3);
+  });
+
+  failIfNoDb('a lost stage flag stays out of the open pipeline total', async () => {
+    // WHY: the open total used the enum key alone. A stage marked lost, with
+    // the deal still stored as an open key, was counted as pipeline.
+    const before = await server.inject({ method: 'GET', url: '/api/crm/summary' });
+    expect(before.statusCode).toBe(200);
+    const baseline = before.json() as { openOpportunities: number; pipelineValue: number };
+    const kpisBefore = await getPipelineKpis(orgId);
+
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Lost flag ${Date.now()}` },
+    });
+    const stage = await prisma.pipelineStage.create({
+      data: {
+        orgId,
+        pipelineId: pipeline.id,
+        key: 's1_lead',
+        name: 'Marked lost',
+        isLost: true,
+      },
+    });
+    await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-LOST-${Date.now()}`,
+        customer: 'Lost Flag Co',
+        name: 'Should not be open',
+        stage: 's1_lead',
+        pipelineStageId: stage.id,
+        valueMicros: 5_000_000_000n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    invalidateCrmSummaryCache(orgId);
+
+    const after = await server.inject({ method: 'GET', url: '/api/crm/summary' });
+    expect(after.statusCode).toBe(200);
+    const body = after.json() as { openOpportunities: number; pipelineValue: number };
+    expect(body.openOpportunities).toBe(baseline.openOpportunities);
+    expect(body.pipelineValue).toBe(baseline.pipelineValue);
+
+    const kpisAfter = await getPipelineKpis(orgId);
+    expect(kpisAfter.totalOpen).toBe(kpisBefore.totalOpen);
+    expect(kpisAfter.totalValueOpen).toBe(kpisBefore.totalValueOpen);
   });
 
   failIfNoDb('GET /api/crm/summary rejects invalid limits', async () => {

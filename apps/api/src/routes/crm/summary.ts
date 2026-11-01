@@ -74,17 +74,29 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         (SELECT COUNT(*)::int FROM opportunities WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS opportunities,
         (
           SELECT COUNT(*)::int
-          FROM opportunities
-          WHERE org_id = ${orgId}::uuid
-            AND stage NOT IN ('closed_won', 'closed_lost')
-            AND deleted_at IS NULL
+          FROM opportunities o
+          WHERE o.org_id = ${orgId}::uuid
+            AND o.stage NOT IN ('closed_won', 'closed_lost')
+            AND o.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM pipeline_stages ps
+              WHERE ps.id = o.pipeline_stage_id
+                AND ps.deleted_at IS NULL
+                AND (ps.is_lost OR ps.is_won)
+            )
         ) AS "openOpportunities",
         (
-          SELECT COALESCE(SUM(value_micros), 0)
-          FROM opportunities
-          WHERE org_id = ${orgId}::uuid
-            AND stage NOT IN ('closed_won', 'closed_lost')
-            AND deleted_at IS NULL
+          SELECT COALESCE(SUM(o.value_micros), 0)
+          FROM opportunities o
+          WHERE o.org_id = ${orgId}::uuid
+            AND o.stage NOT IN ('closed_won', 'closed_lost')
+            AND o.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM pipeline_stages ps
+              WHERE ps.id = o.pipeline_stage_id
+                AND ps.deleted_at IS NULL
+                AND (ps.is_lost OR ps.is_won)
+            )
         ) AS "pipelineValueMicros",
         (SELECT COUNT(*)::int FROM tasks WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS tasks,
         (

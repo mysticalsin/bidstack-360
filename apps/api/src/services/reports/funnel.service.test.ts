@@ -39,9 +39,11 @@ describe('getPipelineKpis money precision', () => {
     // 600_000_000_001.
     const bigSumMicros = 600_000_000_001_000_000n;
 
-    opportunityGroupBy.mockResolvedValue([
-      { stage: 'proposal', _count: { _all: 1 }, _sum: { valueMicros: bigSumMicros } },
-    ]);
+    opportunityGroupBy
+      .mockResolvedValueOnce([
+        { stage: 'proposal', _count: { _all: 1 }, _sum: { valueMicros: bigSumMicros } },
+      ])
+      .mockResolvedValue([]);
 
     const result = await getPipelineKpis('org-1');
 
@@ -52,6 +54,34 @@ describe('getPipelineKpis money precision', () => {
     // Sanity: the naive Number(bigint)/1e6 path would have produced a value that
     // is strictly not equal to the exact result — guards the test's own premise.
     expect(Number(bigSumMicros) / 1_000_000).not.toBe(600_000_000_001);
+  });
+
+  it('moves a lost stage flag out of the open book', async () => {
+    // WHY: marking the stage row lost does not rewrite the enum key. The open
+    // total used to keep that deal because the key still looked open.
+    opportunityGroupBy
+      .mockResolvedValueOnce([
+        { stage: 's4_negotiation', _count: { _all: 2 }, _sum: { valueMicros: 3_000_000n } },
+        { stage: 'closed_lost', _count: { _all: 1 }, _sum: { valueMicros: 1_000_000n } },
+      ])
+      .mockResolvedValueOnce([
+        { stage: 's4_negotiation', _count: { _all: 1 }, _sum: { valueMicros: 2_000_000n } },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getPipelineKpis('org-1');
+    expect(result.byStage.find((stage) => stage.stage === 's4_negotiation')).toEqual({
+      stage: 's4_negotiation',
+      count: 1,
+      valueSum: 1,
+    });
+    expect(result.byStage.find((stage) => stage.stage === 'closed_lost')).toEqual({
+      stage: 'closed_lost',
+      count: 2,
+      valueSum: 3,
+    });
+    expect(result.totalOpen).toBe(1);
+    expect(result.totalValueOpen).toBe(1);
   });
 
   it('scopes the groupBy query to the caller org and excludes soft-deleted rows', async () => {
