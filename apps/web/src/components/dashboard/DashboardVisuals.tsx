@@ -155,7 +155,7 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
           <StageFunnel data={data} format={fmtCompact} />
           <div className="viz-hits">
             {data.map((d) => (
-              <button key={d.label} type="button" aria-label={`${d.label}: ${d.count} bid${d.count === 1 ? '' : 's'}, ${fmtCompact(d.value)}. Show bids`}
+              <button key={d.label} type="button" aria-label={`${d.label}: ${d.count} bid${d.count === 1 ? '' : 's'}, ${d.amount}. Show bids`}
                 onClick={() => onDrill({ status: 'open', stage: d.id })} />
             ))}
           </div>
