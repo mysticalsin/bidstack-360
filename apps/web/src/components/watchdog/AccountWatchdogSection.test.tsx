@@ -142,6 +142,24 @@ describe('AccountWatchdogSection', () => {
     expect(screen.getByText('7.86m')).toBeTruthy();
     expect(screen.getByText('250,000.50')).toBeTruthy();
     expect(screen.queryByText('7.9m')).toBeNull();
+    // WHY: the year chart added the unit numbers, so the same cents never reached the figure name.
+    expect(screen.getByRole('img', { name: 'Won and lost value by close year: 2026 won 7.86m, lost 250,000.50' })).toBeTruthy();
+  });
+
+  it('names a close year from the micros sum when the unit numbers collapse', () => {
+    // WHY: each of these wins becomes the same safe integer, so adding them was two short.
+    const one = (9007199254740993n * 1_000_000n).toString();
+    state.data = {
+      ...base,
+      pastProjects: [
+        { id: 'a', name: 'Alpha', outcome: 'won', valueMicros: one, closedAt: '2026-01-15T00:00:00Z' },
+        { id: 'b', name: 'Beta', outcome: 'won', valueMicros: one, closedAt: '2026-06-01T00:00:00Z' },
+      ],
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    const name = screen.getByRole('img', { name: /Won and lost value by close year/ }).getAttribute('aria-label');
+    expect(name).toContain('2026 won 18,014,398,509,481,986');
+    expect(name).not.toContain('18,014,398,509,481,984');
   });
 
   it('folds cross-region meeting flags for this account into signals (task 5)', () => {
