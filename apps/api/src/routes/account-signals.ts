@@ -25,7 +25,15 @@ import {
 import { canReadAccount } from '../lib/account-access.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
-import { closedAtOf, groupMap, loadMomentumInputs, momentumFor, OPP_SELECT, sourceStatus } from '../services/account-signals/load.js';
+import {
+  closedAtOf,
+  groupMap,
+  loadMomentumInputs,
+  momentumFor,
+  OPP_SELECT,
+  recordedOutcome,
+  sourceStatus,
+} from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
 import { loadInitiatives } from '../services/account-signals/initiatives.js';
 import { loadKeyNumbers, loadPositioning } from '../services/account-positioning/load.js';
@@ -144,7 +152,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         }
         const closed = closedAtOf(o);
         if (closed && closed >= from) {
-          const won = o.stage === 'closed_won';
+          const won = recordedOutcome(o) === 'won';
           push({ id: `op:${o.id}:close`, at: closed.toISOString(), lane: 'ours', category: 'deal', title: `${won ? 'Won' : 'Lost'}: ${o.name}`, summary: won ? 'Closed won' : 'Closed lost', source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: won ? 70 : 60, implication: won ? 'OPPORTUNITY' : 'RISK', sample: false });
         }
       }
