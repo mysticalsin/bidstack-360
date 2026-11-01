@@ -117,7 +117,7 @@ export const BriefFacts = z.object({
 });
 export type BriefFacts = z.infer<typeof BriefFacts>;
 
-export const GapKind = z.enum(['senior_contacts', 'no_recent_meeting', 'declining_momentum', 'restructuring', 'competitor', 'no_pipeline', 'stale_data', 'leadership_change']);
+export const GapKind = z.enum(['senior_contacts', 'no_recent_meeting', 'declining_momentum', 'restructuring', 'competitor', 'no_pipeline', 'stale_data', 'leadership_change', 'risk_page']);
 export const AccountGap = z.object({
   kind: GapKind,
   severity: z.enum(['high', 'medium', 'low']),
@@ -212,6 +212,20 @@ export interface KnownPerson {
 
 const SEN_WEIGHT: Record<Seniority, number> = { c_level: 3, vp: 2.5, director: 2, manager: 1, ic: 0.5, unknown: 0.5 };
 const DAY = 86_400_000;
+
+export const JOB_POST_PAGE = 1000;
+export const SCORED_NEWS_PAGE = 1000;
+export const RISK_EVENT_PAGE = 20;
+export const COMPETITOR_MENTION_PAGE = 10;
+
+/** A full page covers a window only when its oldest row reaches the window start. An uncapped page is the whole set. */
+export function readCoversWindow(datesMs: readonly number[], asOfMs: number, days: number, pageCapped: boolean): boolean {
+  if (!pageCapped) return true;
+  if (datesMs.length === 0) return false;
+  let oldest = datesMs[0]!;
+  for (const ms of datesMs) if (ms < oldest) oldest = ms;
+  return oldest <= asOfMs - days * DAY;
+}
 
 /** Up to two people to approach for a theme: role fit first, then seniority, then who we met recently. */
 export function pickApproach(theme: InitiativeTheme, people: KnownPerson[], now: Date): { approach: ApproachPerson[]; gap: string | null } {
@@ -429,6 +443,10 @@ export interface GapInputs {
   dealSampleLimit?: number | null;
   /** When a flag is set, people past that page are not in this list. */
   peoplePage?: { chart?: boolean; contacts?: boolean; meetings?: boolean } | null;
+  /** True when risk events are the latest page, so a missing kind is not an all-clear. */
+  riskPageCapped?: boolean;
+  /** True when competitor mentions are the latest page. */
+  competitorPageCapped?: boolean;
   now: Date;
 }
 
@@ -456,12 +474,13 @@ export function buildGaps(g: GapInputs): AccountGap[] {
   }
   const restr = g.riskEvents.filter((e) => /RESTRUCTURING|LAYOFFS|INSOLVENCY|GUIDANCE_CHANGE/.test(e.kind));
   const finRestr = g.financialRisks.filter((s) => /restructuring_charge|margin_squeeze|guidance_cut|impairment/.test(s.rule));
+  const riskNote = g.riskPageCapped ? ` Shown from the latest ${RISK_EVENT_PAGE} risk events.` : '';
   if (restr.length || finRestr.length) {
     out.push({
       kind: 'restructuring',
       severity: restr.some((e) => !e.sample) || finRestr.some((s) => s.confidence === 'high' && !s.sample) ? 'high' : 'medium',
       title: 'Restructuring or cost pressure',
-      detail: 'Budgets may freeze or shift to cost programmes. Position efficiency and flexible capacity.',
+      detail: `Budgets may freeze or shift to cost programmes. Position efficiency and flexible capacity.${restr.length ? riskNote : ''}`,
       evidence: [
         ...finRestr.slice(0, 2).map((s) => ({ kind: 'financial' as const, label: s.title, url: s.sourceUrl || null, anchor: ANCHOR.financial, at: s.periodEnd, source: g.financialSource ?? 'Filed financials', sample: s.sample })),
         ...restr.slice(0, 2).map((e) => ({ kind: 'news' as const, label: e.title, url: e.url, anchor: ANCHOR.news, at: e.at, source: e.source, sample: e.sample })),
@@ -469,10 +488,16 @@ export function buildGaps(g: GapInputs): AccountGap[] {
     });
   }
   const lead = g.riskEvents.filter((e) => e.kind === 'LEADERSHIP_CHANGE');
-  if (lead.length) out.push({ kind: 'leadership_change', severity: 'medium', title: 'Leadership change', detail: 'New leaders reset priorities and suppliers. Re-map sponsors.', evidence: lead.slice(0, 2).map((e) => ({ kind: 'news' as const, label: e.title, url: e.url, anchor: ANCHOR.news, at: e.at, source: e.source, sample: e.sample })) });
+  if (lead.length) out.push({ kind: 'leadership_change', severity: 'medium', title: 'Leadership change', detail: `New leaders reset priorities and suppliers. Re-map sponsors.${riskNote}`, evidence: lead.slice(0, 2).map((e) => ({ kind: 'news' as const, label: e.title, url: e.url, anchor: ANCHOR.news, at: e.at, source: e.source, sample: e.sample })) });
+  if (!restr.length && !lead.length && g.riskPageCapped) {
+    out.push({ kind: 'risk_page', severity: 'low', title: `Risk events are the latest ${RISK_EVENT_PAGE}`, detail: 'A layoff or leadership change past that page is not in this view.', evidence: [] });
+  }
   if (g.competitorMentions.length) {
     const names = [...new Set(g.competitorMentions.map((c) => c.competitor))];
-    out.push({ kind: 'competitor', severity: 'medium', title: `Competitor activity: ${names.slice(0, 3).join(', ')}`, detail: 'A tracked competitor is linked to this account. Check the deal history before positioning.', evidence: g.competitorMentions.slice(0, 3).map((c) => ({ kind: 'news' as const, label: c.title, url: c.url, anchor: ANCHOR.news, at: c.at, source: c.source, sample: false })) });
+    const competitorDetail = g.competitorPageCapped
+      ? `Latest ${COMPETITOR_MENTION_PAGE} mentions. A tracked competitor is linked to this account. Check the deal history before positioning.`
+      : 'A tracked competitor is linked to this account. Check the deal history before positioning.';
+    out.push({ kind: 'competitor', severity: 'medium', title: `Competitor activity: ${names.slice(0, 3).join(', ')}`, detail: competitorDetail, evidence: g.competitorMentions.slice(0, 3).map((c) => ({ kind: 'news' as const, label: c.title, url: c.url, anchor: ANCHOR.news, at: c.at, source: c.source, sample: false })) });
   }
   if (!g.openDeals) {
     out.push(
@@ -498,6 +523,51 @@ export const PEOPLE_MEETING_PAGE = 200;
 export type PeoplePageCaps = { chart?: boolean; contacts?: boolean; meetings?: boolean };
 
 const groupedCount = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+export function openJobsCopy(
+  pageCapped: boolean,
+  recentComplete: boolean,
+  compareComplete: boolean,
+  postedIn90: number | null,
+): { sub: string; period: string } {
+  if (!pageCapped) {
+    return {
+      sub: `${postedIn90 ?? 0} posted in 90 days`,
+      period: 'Seen in 45 days; trend is last 90 days vs the 90 before',
+    };
+  }
+  const page = groupedCount(JOB_POST_PAGE);
+  return {
+    sub: recentComplete && postedIn90 != null
+      ? `${postedIn90} posted in 90 days, inside the latest ${page} posts`
+      : `latest ${page} posts`,
+    period: !recentComplete
+      ? `Seen in 45 days. The 90-day trend is past the latest ${page} posts.`
+      : compareComplete
+        ? `Seen in 45 days. The latest ${page} posts cover the last 90 days and the 90 before.`
+        : `Seen in 45 days. The latest ${page} posts cover the last 90 days. The 90 days before that are past this page.`,
+  };
+}
+
+export function sentimentCopy(
+  pageCapped: boolean,
+  recentComplete: boolean,
+  priorComplete: boolean,
+  recentCount: number,
+): { sub: string; period: string; compare: boolean } {
+  const counted = `${recentCount} scored item${recentCount === 1 ? '' : 's'}`;
+  if (!pageCapped || (recentComplete && priorComplete)) {
+    return { sub: counted, period: 'Last 90 days vs the 90 before, scale -1 to +1', compare: true };
+  }
+  if (recentComplete) {
+    return { sub: counted, period: 'Last 90 days. The 90 days before that are past this page.', compare: false };
+  }
+  return {
+    sub: `latest ${groupedCount(SCORED_NEWS_PAGE)} scored items`,
+    period: `Latest ${groupedCount(SCORED_NEWS_PAGE)} scored items, not the full 90 days.`,
+    compare: false,
+  };
+}
 
 export function peoplePageIsPartial(page: PeoplePageCaps | null | undefined): boolean {
   return Boolean(page?.chart || page?.contacts || page?.meetings);
