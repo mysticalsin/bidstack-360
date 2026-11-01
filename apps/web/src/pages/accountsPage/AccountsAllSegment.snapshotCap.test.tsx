@@ -177,6 +177,20 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     renderSegment();
 
     expect(screen.queryByText(/from the live dashboard/i)).toBeNull();
+    expect(screen.queryByText(/latest 100 deals/i)).toBeNull();
+  });
+
+  it('names the pipeline as the latest 100 deals when the deal sample is full', () => {
+    // WHY: 100 deals is the server cap. Showing that sum as the portfolio pipeline
+    // hides every older deal.
+    setDashboard(2);
+    const current = dashboardState.current as {
+      data: { dealsSampleCapped?: boolean };
+    };
+    current.data.dealsSampleCapped = true;
+    renderSegment();
+
+    expect(screen.getAllByText(/latest 100 deals/i).length).toBeGreaterThan(0);
   });
 
   it('tells the user search only covers the loaded snapshot when a capped search misses', () => {

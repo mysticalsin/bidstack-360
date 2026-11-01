@@ -237,10 +237,13 @@ export function AccountsAllSegment() {
   }
 
   const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
+  const healthyProviders = dashboard.data.providerHealth.filter((p) => p.status === 'healthy').length;
+  const providerCount = dashboard.data.providerHealth.length;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
   const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
+  const dealsSampleCapped = dashboard.data?.dealsSampleCapped === true;
   const filtersActive = Boolean(search || industry || technology || segment !== 'all' || leverageOnly);
   // True first-run org state: no search/filter narrowing the view AND the
   // underlying snapshot itself has zero rows. Distinct from "filters matched
@@ -280,10 +283,26 @@ export function AccountsAllSegment() {
                 : t('accounts.summary.companyCount_other', '{{count}} companies', {
                     count: rows.length,
                   })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
-              {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: `${formatMicrosAmount(BigInt(totalPipeline))} (${UNSPECIFIED_CURRENCY_BASIS})`,
-              })}
+              ·{' '}
+              {dealsSampleCapped
+                ? t(
+                    'accounts.summary.openDealsCapped',
+                    '{{count}} open deals in the latest 100',
+                    { count: totalOpen },
+                  )
+                : t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })}{' '}
+              ·{' '}
+              {dealsSampleCapped
+                ? t(
+                    'accounts.summary.weightedPipelineCapped',
+                    '{{amount}} from the latest 100 deals',
+                    {
+                      amount: `${formatMicrosAmount(BigInt(totalPipeline))} (${UNSPECIFIED_CURRENCY_BASIS})`,
+                    },
+                  )
+                : t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
+                    amount: `${formatMicrosAmount(BigInt(totalPipeline))} (${UNSPECIFIED_CURRENCY_BASIS})`,
+                  })}
             </>
           }
           actions={
@@ -371,12 +390,27 @@ export function AccountsAllSegment() {
         <StatTile
           label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          sublabel={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
+          sublabel={
+            dealsSampleCapped
+              ? t(
+                  'accounts.stats.openDeals.capped',
+                  'latest 100 deals in this snapshot',
+                )
+              : t('accounts.stats.openDeals.detail', 'External CRM pipeline')
+          }
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
           value={formatMicrosAmount(BigInt(totalPipeline))}
-          sublabel={t('accounts.stats.weightedPipeline.detail', UNSPECIFIED_CURRENCY_BASIS)}
+          sublabel={
+            dealsSampleCapped
+              ? t(
+                  'accounts.stats.weightedPipeline.capped',
+                  'latest 100 deals in this snapshot. {{basis}}',
+                  { basis: UNSPECIFIED_CURRENCY_BASIS },
+                )
+              : t('accounts.stats.weightedPipeline.detail', UNSPECIFIED_CURRENCY_BASIS)
+          }
         />
         <StatTile
           label={t('accounts.stats.coverage.label', 'Profile fields filled')}

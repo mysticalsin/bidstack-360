@@ -243,6 +243,8 @@ export const CrmDashboardSnapshot = z.object({
   cockpit: AccountCockpitSnapshot,
   companies: z.array(CrmCompany),
   deals: z.array(CrmDeal),
+  /** True when the org deal sample stopped at 100 and at least one more deal exists. */
+  dealsSampleCapped: z.boolean().optional(),
   activities: z.array(CrmActivity),
   insights: z.array(AiInsight),
   widgets: z.array(DashboardWidget),

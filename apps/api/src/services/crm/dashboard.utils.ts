@@ -385,3 +385,11 @@ export function buildDataQualityReport(
     issues,
   };
 }
+
+/** The org dashboard loads one extra deal so a full page is not called complete. */
+export const DASHBOARD_DEAL_SAMPLE = 100;
+
+export function capDealSample<T>(rows: readonly T[]): { rows: T[]; capped: boolean } {
+  if (rows.length <= DASHBOARD_DEAL_SAMPLE) return { rows: [...rows], capped: false };
+  return { rows: rows.slice(0, DASHBOARD_DEAL_SAMPLE), capped: true };
+}
