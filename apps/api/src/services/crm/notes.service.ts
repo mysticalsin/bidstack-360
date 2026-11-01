@@ -37,21 +37,54 @@ export async function persistContacts(
   const existing = await tx.contact.findMany({
     where: {
       orgId,
+      deletedAt: null,
       OR: [
         ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
         { name: { in: names, mode: 'insensitive' } },
       ],
     },
-    select: { email: true, name: true },
+    select: { id: true, email: true, name: true, companyId: true },
     take: 1000,
   });
-  const existingEmails = new Set(existing.map((e) => e.email?.toLowerCase()).filter(Boolean));
-  const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
-  const newContacts = contacts.filter((c) => {
-    const emailExists = c.email && existingEmails.has(c.email.toLowerCase());
-    const nameExists = existingNames.has(c.name.toLowerCase());
-    return !emailExists && !nameExists;
-  });
+  const byEmail = new Map<string, typeof existing>();
+  for (const row of existing) {
+    if (!row.email) continue;
+    const key = row.email.toLowerCase();
+    const list = byEmail.get(key) ?? [];
+    list.push(row);
+    byEmail.set(key, list);
+  }
+  const newContacts: MeetingImportedContact[] = [];
+  const linkIds: string[] = [];
+  for (const contact of contacts) {
+    if (contact.email) {
+      const matches = byEmail.get(contact.email.toLowerCase()) ?? [];
+      // One unlinked row with this email can take the company. A person
+      // already on a company stays there. A shared name is not that person.
+      if (matches.length === 1 && matches[0]?.companyId == null && companyId) {
+        linkIds.push(matches[0].id);
+      }
+      if (matches.length > 0) continue;
+      newContacts.push(contact);
+      continue;
+    }
+    const sameAccount = existing.some(
+      (row) =>
+        row.name.toLowerCase() === contact.name.toLowerCase() &&
+        (row.companyId ?? null) === (companyId ?? null),
+    );
+    if (!sameAccount) newContacts.push(contact);
+  }
+  if (linkIds.length > 0 && companyId) {
+    await Promise.all(
+      linkIds.map((id) =>
+        tx.contact.update({
+          where: { id },
+          data: { companyId, customer: companyName },
+        }),
+      ),
+    );
+  }
   if (newContacts.length > 0) {
     await tx.contact.createMany({
       data: newContacts.map((c) => ({

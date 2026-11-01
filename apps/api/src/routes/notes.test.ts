@@ -477,4 +477,64 @@ describe('notes routes (integration)', () => {
     });
     await prisma.company.deleteMany({ where: { id: { in: [other.id, fresh.id] } } });
   });
+
+  skipIfNoDb('POST import-meeting adds a same-named person on another company', async () => {
+    // WHY: dedupe was name or email across the org. Jane at company A hid
+    // Jane at company B, and an email with no company never picked up the link.
+    const stamp = Date.now();
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: `probe-people-${stamp}`, title: 'Probe', bodyMd: 'org' },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = (probe.json() as { id: string }).id;
+    const probeRow = await prisma.note.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const orgId = probeRow!.orgId;
+    const otherName = `Other People ${stamp}`;
+    const companyName = `Fresh People ${stamp}`;
+    const other = await prisma.company.create({ data: { orgId, name: otherName } });
+    const fresh = await prisma.company.create({ data: { orgId, name: companyName } });
+    const sharedName = `Jane Shared ${stamp}`;
+    const otherEmail = `other.${stamp}@example.com`;
+    const freshEmail = `fresh.${stamp}@example.com`;
+    const unlinkedEmail = `unlinked.${stamp}@example.com`;
+    const kept = await prisma.contact.create({
+      data: { orgId, customer: otherName, companyId: other.id, name: sharedName, email: otherEmail },
+    });
+    const unlinked = await prisma.contact.create({
+      data: { orgId, customer: 'Unknown', name: `Unlinked ${stamp}`, email: unlinkedEmail },
+    });
+    const payload = {
+      accountId: companyName,
+      companyName,
+      bodyMd: [
+        `Attendees: ${sharedName} - CFO, ${freshEmail}`,
+        `Attendees: Unlinked ${stamp} - Finance, ${unlinkedEmail}`,
+      ].join('\n'),
+    };
+    const first = await server.inject({ method: 'POST', url: '/api/notes/import-meeting', payload });
+    expect(first.statusCode).toBe(201);
+    const second = await server.inject({ method: 'POST', url: '/api/notes/import-meeting', payload });
+    expect(second.statusCode).toBe(201);
+    const rows = await prisma.contact.findMany({
+      where: { orgId, email: { in: [otherEmail, freshEmail, unlinkedEmail] }, deletedAt: null },
+      select: { id: true, email: true, companyId: true },
+    });
+    const byEmail = new Map(rows.map((row) => [row.email?.toLowerCase(), row]));
+    expect(byEmail.get(otherEmail)?.id).toBe(kept.id);
+    expect(byEmail.get(otherEmail)?.companyId).toBe(other.id);
+    expect(byEmail.get(freshEmail)?.companyId).toBe(fresh.id);
+    expect(rows.filter((row) => row.email?.toLowerCase() === freshEmail)).toHaveLength(1);
+    expect(byEmail.get(unlinkedEmail)?.id).toBe(unlinked.id);
+    expect(byEmail.get(unlinkedEmail)?.companyId).toBe(fresh.id);
+    await prisma.contact.deleteMany({ where: { orgId, id: { in: rows.map((row) => row.id) } } });
+    await prisma.companyEnrichment.deleteMany({
+      where: { orgId, normalizedName: companyName.toLowerCase().replaceAll(' ', '-') },
+    });
+    await prisma.note.deleteMany({
+      where: { orgId, accountId: { in: [companyName.toLowerCase(), `probe-people-${stamp}`] } },
+    });
+    await prisma.company.deleteMany({ where: { id: { in: [other.id, fresh.id] } } });
+  });
 });
