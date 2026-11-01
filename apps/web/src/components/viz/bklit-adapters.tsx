@@ -95,13 +95,13 @@ const shortStage = (l: string) => {
 };
 
 /** Open value per stage as a horizontal funnel. */
-export function StageFunnel({ data, format }: { data: Array<{ label: string; value: number; count: number }>; format: Fmt }) {
+export function StageFunnel({ data, format }: { data: Array<{ label: string; value: number; count: number; amount?: string }>; format: Fmt }) {
   const reduced = useReducedMotion();
   if (!data.length) return null;
   return (
     <div aria-hidden className="viz-bk">
       <FunnelChart
-        data={data.map((d) => ({ label: shortStage(d.label), value: Math.max(d.value, 1), displayValue: `${format(d.value)} · ${d.count}` }))}
+        data={data.map((d) => ({ label: shortStage(d.label), value: Math.max(d.value, 1), displayValue: `${d.amount ?? format(d.value)} · ${d.count}` }))}
         orientation="horizontal"
         color={BRAND}
         layers={2}
