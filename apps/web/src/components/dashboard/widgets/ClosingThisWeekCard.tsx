@@ -24,7 +24,7 @@ import type { Opportunity } from '@bidstack/shared';
 
 import { closedOutcome } from '@/lib/pipeline-stages';
 
-import { formatUnspecifiedAmount } from '../unspecified-currency';
+import { formatRecordedDealAmount } from '../unspecified-currency';
 
 const CLOSING_WINDOW_DAYS = 7;
 const DISPLAY_LIMIT = 6;
@@ -57,7 +57,10 @@ export function ClosingThisWeekCard() {
             {t('closingThisWeek.heading', 'Closing this week')}
           </h2>
         </div>
-        <Link to="/opportunities?due=within7" className="text-xs text-[var(--brand-primary)] hover:underline">
+        <Link
+          to="/opportunities?due=within7"
+          className="text-xs text-[var(--brand-primary)] hover:underline"
+        >
           {t('closingThisWeek.viewAll', 'View all')}
         </Link>
       </div>
@@ -100,9 +103,11 @@ export function ClosingThisWeekCard() {
                 style={{ textDecoration: 'none', color: 'inherit' }}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-[var(--fg-primary)]">{opp.name}</div>
+                  <div className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                    {opp.name}
+                  </div>
                   <div className="truncate text-xs text-[var(--fg-tertiary)]">
-                    {opp.customer} · {formatUnspecifiedAmount(opp.value)}
+                    {opp.customer} · {formatRecordedDealAmount(opp)}
                   </div>
                 </div>
                 <DueDateChip dueDate={opp.dueDate} size="sm" />

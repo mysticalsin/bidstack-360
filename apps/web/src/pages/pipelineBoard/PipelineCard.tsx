@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import { formatRecordedDealAmount } from '@/components/dashboard/unspecified-currency';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
@@ -86,7 +86,7 @@ export const PipelineCard = memo(function PipelineCard({
               code: opp.code,
               name: opp.name,
               stage: stageName,
-              value: formatUnspecifiedCompact(opp.value),
+              value: formatRecordedDealAmount(opp, 'compact'),
             },
           ) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
@@ -103,7 +103,7 @@ export const PipelineCard = memo(function PipelineCard({
             {opp.customer}
           </span>
           <span className="tabular-nums text-[11px] font-bold text-[var(--fg-primary)] shrink-0">
-            {formatUnspecifiedCompact(opp.value)}
+            {formatRecordedDealAmount(opp, 'compact')}
           </span>
         </div>
 

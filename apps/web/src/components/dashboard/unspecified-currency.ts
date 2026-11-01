@@ -44,6 +44,21 @@ export function formatExactUnspecified(micros: string | number | bigint): string
   return `${formatMicrosAmount(asMicros(micros))} unspecified`;
 }
 
+/** A deal amount. The micros string wins when the unit number was stored as zero. */
+export function formatRecordedDealAmount(
+  deal: { value: number; valueMicros?: string | null },
+  mode: 'amount' | 'compact' = 'amount',
+): string {
+  if (deal.valueMicros && /^\d+$/.test(deal.valueMicros)) {
+    return mode === 'compact'
+      ? formatUnspecifiedCompact(unitsFromMicros(deal.valueMicros))
+      : formatMicrosAmount(asMicros(deal.valueMicros));
+  }
+  return mode === 'compact'
+    ? formatUnspecifiedCompact(deal.value)
+    : formatUnspecifiedAmount(deal.value);
+}
+
 /** Integer micros to units. Number(bigint) / 1e6 moves a large amount by one cent. */
 export function unitsFromMicros(micros: string | number | bigint): number {
   const asBigInt =

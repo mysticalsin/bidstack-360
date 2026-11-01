@@ -148,7 +148,9 @@ describe('ClosingThisWeekCard', () => {
 
     renderCard();
 
-    const links = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.startsWith('/opportunities/'));
+    const links = screen
+      .getAllByRole('link')
+      .filter((el) => el.getAttribute('href')?.startsWith('/opportunities/'));
     expect(links.map((el) => el.textContent)).toEqual([
       expect.stringContaining('Soonest bid'),
       expect.stringContaining('Later bid'),
@@ -182,5 +184,21 @@ describe('ClosingThisWeekCard', () => {
     expect(screen.queryByText('Already won')).toBeNull();
     expect(screen.queryByText('Already lost')).toBeNull();
     expect(screen.getByText('Still open')).toBeDefined();
+  });
+
+  it('shows a large closing bid from integer micros when the unit number is zero', () => {
+    hookMocks.data = {
+      items: [
+        makeOpp({
+          id: 'big',
+          name: 'Large bid',
+          value: 0,
+          valueMicros: '8598204328457184962',
+        }),
+      ],
+    };
+    renderCard();
+    expect(screen.getByText(/8,598,204,328,457\.18/)).toBeDefined();
+    expect(screen.queryByText(/457\.19/)).toBeNull();
   });
 });
