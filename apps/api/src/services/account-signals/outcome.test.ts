@@ -94,10 +94,18 @@ describe('annotatePulseRead', () => {
     expect(drivers.find((driver) => driver.key === 'meetings')?.detail).toBe('3 meetings in 60 days (1 before), last today');
     expect(drivers.find((driver) => driver.key === 'hiring')?.detail).toBe('Headcount +8% in 12 months');
     const posts = annotatePulseRead(
-      [{ key: 'hiring', detail: '4 roles posted in 30 days (1 before)' }],
+      [{ key: 'hiring', detail: '4 roles posted in 30 days (1 before), headcount +8% in 12 months' }],
       { postingsCapped: true },
     );
-    expect(posts[0]?.detail).toContain('Latest 1,000 job posts.');
+    // WHY: the page limit was stuck on the end, so headcount looked like it came from those posts.
+    expect(posts[0]?.detail).toBe(
+      '4 roles posted in 30 days (1 before), from the latest 1,000 job posts. Headcount +8% in 12 months',
+    );
+    const headcountOnly = annotatePulseRead(
+      [{ key: 'hiring', detail: 'Headcount +8% in 12 months' }],
+      { postingsCapped: true },
+    );
+    expect(headcountOnly[0]?.detail).toBe('Headcount +8% in 12 months');
     const open = annotatePulseRead(
       [{ key: 'pipeline', detail: '2M open pipeline, flat over 90 days' }],
       {},

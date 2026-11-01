@@ -249,31 +249,44 @@ export function momentumFor(loaded: LoadedSignals | undefined, now: Date): Momen
   return computeMomentum(loaded?.data ?? { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, now);
 }
 
+/** Job-post counts are the page. Headcount is the 12-month figure, not that page. */
+export function hiringPageDetail(detail: string): string {
+  const marker = ', headcount';
+  const at = detail.indexOf(marker);
+  if (at === -1) {
+    if (!detail.toLowerCase().includes('roles posted')) return detail;
+    return `${detail} Latest 1,000 job posts.`;
+  }
+  const roles = detail.slice(0, at);
+  const headcount = detail.slice(at + 2);
+  return `${roles}, from the latest 1,000 job posts. ${headcount.charAt(0).toUpperCase()}${headcount.slice(1)}`;
+}
+
 /** A capped page is not the whole book. Say so on the lines that used that page. */
 export function annotatePulseRead<T extends { key: string; detail: string }>(
   drivers: readonly T[],
   caps: { dealsCapped?: boolean; meetingsCapped?: boolean; postingsCapped?: boolean; newsCapped?: boolean },
 ): T[] {
-  const note = (kind: 'deals' | 'meetings' | 'postings' | 'news') => {
+  const note = (kind: 'deals' | 'meetings' | 'news') => {
     const label = pulsePageNotes({
       dealsCapped: kind === 'deals',
       meetingsCapped: kind === 'meetings',
-      postingsCapped: kind === 'postings',
       newsCapped: kind === 'news',
     })[0];
     return label ? `${label}.` : '';
   };
   return drivers.map((driver) => {
+    if (caps.postingsCapped && driver.key === 'hiring') {
+      return { ...driver, detail: hiringPageDetail(driver.detail) };
+    }
     const suffix =
       caps.dealsCapped && (driver.key === 'pipeline' || driver.key === 'winloss')
         ? note('deals')
         : caps.meetingsCapped && driver.key === 'meetings'
           ? note('meetings')
-          : caps.postingsCapped && driver.key === 'hiring'
-            ? note('postings')
-            : caps.newsCapped && driver.key === 'news'
-              ? note('news')
-              : '';
+          : caps.newsCapped && driver.key === 'news'
+            ? note('news')
+            : '';
     return suffix ? { ...driver, detail: `${driver.detail} ${suffix}` } : driver;
   });
 }
