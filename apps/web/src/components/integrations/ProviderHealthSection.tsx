@@ -160,7 +160,7 @@ export function ProviderHealthSection() {
               <caption className="sr-only">
                 {t('crm.providerHealth.table.caption', 'Provider health statuses')}
               </caption>
-              <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              <thead className="bg-[var(--surface-secondary)] text-xs text-[var(--fg-tertiary)]">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
                     {t('crm.providerHealth.table.provider', 'Provider')}
@@ -204,7 +204,7 @@ function ProviderStat({
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        <span className="text-xs font-medium text-[var(--fg-tertiary)]">
           {label}
         </span>
         <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">

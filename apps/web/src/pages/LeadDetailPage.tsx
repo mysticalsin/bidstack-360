@@ -369,15 +369,8 @@ export function LeadDetailPage() {
                   type="text"
                   serverValue={l.budget ?? ''}
                   commit={(v) => update.mutate({ budget: v || null })}
-                  placeholder={t('leadDetail.placeholderBudget', 'e.g. €500K')}
-                  disabled={!canWrite}
-                  title={canWrite ? undefined : readOnlyHint}
-                  aria-label={
-                    canWrite
-                      ? undefined
-                      : `${t('leadDetail.labelBudget', 'Budget')} — ${readOnlyHint}`
-                  }
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder={t('leadDetail.placeholderBudget', 'Amount and currency, if known')}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
               <div>

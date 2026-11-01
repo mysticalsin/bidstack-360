@@ -240,7 +240,20 @@ export function SerumMissionControlPage() {
             <h2 className="text-base font-semibold text-[var(--fg-primary)]">
               {t('serum.providerHealthTitle', 'Provider health')}
             </h2>
-            <SerumStatusPill status={snapshot.summary.providerConfigured || snapshot.summary.dustConfigured ? 'ready' : 'not_configured'} />
+            <SerumStatusPill
+              status={
+                snapshot.providerHealth.length === 0
+                  ? 'not_configured'
+                  : snapshot.providerHealth.some(
+                      (provider) =>
+                        provider.status === 'blocked' ||
+                        provider.status === 'error' ||
+                        provider.status === 'attention',
+                    )
+                    ? 'attention'
+                    : 'ready'
+              }
+            />
           </div>
           <div className="mt-4 space-y-3">
             {snapshot.providerHealth.length > 0 ? (
@@ -277,7 +290,15 @@ export function SerumMissionControlPage() {
             <h2 className="text-base font-semibold text-[var(--fg-primary)]">
               {t('serum.queueHealthTitle', 'Queue health')}
             </h2>
-            <SerumStatusPill status={snapshot.queueHealth.some((queue) => queue.failed > 0) ? 'attention' : 'ready'} />
+            <SerumStatusPill
+              status={
+                snapshot.queueHealth.length === 0
+                  ? 'empty'
+                  : snapshot.queueHealth.some((queue) => queue.failed > 0)
+                    ? 'attention'
+                    : 'ready'
+              }
+            />
           </div>
           <div className="mt-4 space-y-3">
             {snapshot.queueHealth.length > 0 ? (

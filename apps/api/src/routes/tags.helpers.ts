@@ -90,7 +90,7 @@ export function suggestTagsLocally(
       out.push({
         name: tag.name,
         reason: `Existing tag "${tag.name}" appears in the record content.`,
-        confidence: 0.9,
+        confidence: null,
         existingTagId: tag.id,
       });
       seen.add(key);
@@ -135,7 +135,7 @@ export function suggestTagsLocally(
       out.push({
         name: h.name,
         reason: h.reason,
-        confidence: 0.7,
+        confidence: null,
         existingTagId: existingMatch?.id ?? null,
       });
       seen.add(key);

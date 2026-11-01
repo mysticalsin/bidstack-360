@@ -35,13 +35,15 @@ export async function prepMeeting(
     });
   }
 
-  const { event, safeAttendees, openOpps, recentInteractions, actSummary } =
+  const { event, safeAttendees, openOpps, openOppsOmitted, recentInteractions, actSummary } =
     await buildMeetingContext(opts.orgId, opts.calendarEventId);
+  const omitted =
+    openOppsOmitted > 0 ? ` ${openOppsOmitted} more open deals are not listed.` : '';
 
   const prompt =
     `Prepare meeting brief for: "${event.subject}" on ${event.startAt.toISOString()}.\n` +
     `Attendees: ${safeAttendees.map((a) => `${a.name} (${a.role ?? 'unknown'}) from ${a.company ?? 'unknown'}`).join(', ') || 'unknown'}.\n` +
-    `Open deals: ${openOpps.map((o) => `"${o.title}" (${o.stage})`).join(', ') || 'none'}.\n` +
+    `Open deals: ${openOpps.map((o) => `"${o.title}" (${o.stage})`).join(', ') || 'none'}.${omitted}\n` +
     `Recent interactions: ${actSummary || 'none'}.\n\n` +
     `Return JSON: {"talkingPoints":["..."],"suggestedQuestions":["..."]}`;
 

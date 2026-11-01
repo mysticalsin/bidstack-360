@@ -15,7 +15,7 @@ export const SourceAttribution = z.object({
   label: z.string().min(1),
   sourceUrl: z.string().url().nullable(),
   fetchedAt: z.string().datetime(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
   providerMetadata: z.record(z.unknown()).default({}),
 });
 export type SourceAttribution = z.infer<typeof SourceAttribution>;
@@ -42,7 +42,7 @@ export type CrmLogo = z.infer<typeof CrmLogo>;
 export const TechnicalStackItem = z.object({
   name: z.string().min(1),
   source: z.string().min(1),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
 });
 export type TechnicalStackItemType = z.infer<typeof TechnicalStackItem>;
 

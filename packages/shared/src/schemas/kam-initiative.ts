@@ -77,6 +77,8 @@ export const KamInitiativeDetail = z.object({
   ownerId: z.string().uuid().nullable(),
   priority: PriorityEnum,
   estimatedValueMicros: z.number().nullable(),
+  /** Exact integer. The number is only exact while it fits a safe integer. */
+  estimatedValueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   lastActivityAt: z.string(),
   droppedReason: z.string().nullable(),
   convertedToOpportunityId: z.string().uuid().nullable(),

@@ -39,6 +39,13 @@ import { extractLeadFeatures, extractOpportunityFeatures } from './scoring/featu
 
 const log = pino({ name: 'service:predictive-scoring', level: process.env.LOG_LEVEL ?? 'info' });
 
+/** Same floor as the trainer. A shorter count was a synthetic fit, not this org's deals. */
+export const MIN_REAL_TRAINING_SAMPLES = 50;
+
+export function isRealTrainingSampleCount(sampleCount: number): boolean {
+  return Number.isFinite(sampleCount) && sampleCount >= MIN_REAL_TRAINING_SAMPLES;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export interface ScoreFactor {
@@ -47,19 +54,39 @@ export interface ScoreFactor {
 }
 
 export interface LeadScoreResult {
-  score: number; // 0-100
+  score: number | null;
   factors: ScoreFactor[];
   modelVersion: string;
   scoredAt: string;
 }
 
 export interface OppScoreResult {
-  winProbability: number; // 0-100
+  winProbability: number | null;
   predictedCloseDate: string | null;
   factors: ScoreFactor[];
   recommendation: string;
   modelVersion: string;
   scoredAt: string;
+}
+
+export function unscoredLeadScore(scoredAt: string): LeadScoreResult {
+  return {
+    score: null,
+    factors: [],
+    modelVersion: 'fallback-v0',
+    scoredAt,
+  };
+}
+
+export function unscoredOpportunityScore(scoredAt: string): OppScoreResult {
+  return {
+    winProbability: null,
+    predictedCloseDate: null,
+    factors: [],
+    recommendation: 'No trained model. This is not a win forecast.',
+    modelVersion: 'fallback-v0',
+    scoredAt,
+  };
 }
 
 // ─── Canonical score scale ──────────────────────────────────────────────────
@@ -117,7 +144,7 @@ function scoreCacheKey(orgId: string, entityType: string, entityId: string): str
 
 /**
  * Load and cache active model for an org/entity-type pair.
- * Falls back to null if no model exists yet (score will be 50).
+ * Returns null when no model is stored. Callers must not invent a 50% score.
  */
 async function loadActiveModel(
   orgId: string,
@@ -129,7 +156,8 @@ async function loadActiveModel(
   const cached = await redis.get(cacheKey);
   if (cached) {
     try {
-      return JSON.parse(cached) as ModelArtifact;
+      const artifact = JSON.parse(cached) as ModelArtifact;
+      if (isRealTrainingSampleCount(artifact.sampleCount)) return artifact;
     } catch {
       // Corrupted cache entry — fall through to DB lookup
     }
@@ -140,10 +168,10 @@ async function loadActiveModel(
     orderBy: { trainedAt: 'desc' },
   });
 
-  if (!dbModel) return null;
+  if (!dbModel || !isRealTrainingSampleCount(dbModel.sampleCount)) return null;
 
   const artifact = await loadModelFromS3(dbModel.modelArtifactS3Key);
-  if (!artifact) return null;
+  if (!artifact || !isRealTrainingSampleCount(artifact.sampleCount)) return null;
 
   await redis.setex(cacheKey, MODEL_CACHE_TTL_S, JSON.stringify(artifact));
   return artifact;
@@ -212,26 +240,25 @@ export async function scoreLead(
   const featureVector = await extractLeadFeatures(leadId, orgId);
 
   const scoredAt = new Date().toISOString();
-  // scoreBp is the canonical persisted value (basis points, 0–10000).
-  // Fallback when no model: 0.5 probability → 5000 bp.
-  let scoreBp = probabilityToBasisPoints(0.5);
-  let factors: ScoreFactor[] = [];
-  let modelVersion = 'fallback-v0';
-
-  if (model && featureVector) {
-    // Prefer XGBoost when a trained model is present; fall back to LR.
-    const xgbProb = model.xgboost
-      ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
-      : null;
-    const prob = xgbProb ?? inferScore(model, featureVector.values);
-    scoreBp = probabilityToBasisPoints(prob);
-    factors = (
-      xgbProb !== null
-        ? xgboostShapProxy(model, featureVector.values)
-        : shapAttributions(model, featureVector.values)
-    ).slice(0, 5);
-    modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
+  if (!model || !featureVector) {
+    const unscored = unscoredLeadScore(scoredAt);
+    await redis.setex(cacheKey, SCORE_CACHE_TTL_S, JSON.stringify(unscored));
+    return unscored;
   }
+
+  // A trained model is present. Do not seed scoreBp from 0.5 — that default
+  // used to be persisted and shown as a real lead score.
+  const xgbProb = model.xgboost
+    ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
+    : null;
+  const prob = xgbProb ?? inferScore(model, featureVector.values);
+  const scoreBp = probabilityToBasisPoints(prob);
+  const factors = (
+    xgbProb !== null
+      ? xgboostShapProxy(model, featureVector.values)
+      : shapAttributions(model, featureVector.values)
+  ).slice(0, 5);
+  const modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
 
   // Persist to DB (upsert on orgId+entityType+entityId), in canonical basis points
   await prisma.predictiveScore.upsert({
@@ -296,25 +323,23 @@ export async function scoreOpportunity(
   const featureVector = await extractOpportunityFeatures(opportunityId, orgId);
 
   const scoredAt = new Date().toISOString();
-  // winProbabilityBp is the canonical persisted value (basis points, 0–10000).
-  let winProbabilityBp = probabilityToBasisPoints(0.5);
-  let factors: ScoreFactor[] = [];
-  let modelVersion = 'fallback-v0';
-
-  if (model && featureVector) {
-    // Prefer XGBoost when a trained model is present; fall back to LR.
-    const xgbProb = model.xgboost
-      ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
-      : null;
-    const prob = xgbProb ?? inferScore(model, featureVector.values);
-    winProbabilityBp = probabilityToBasisPoints(prob);
-    factors = (
-      xgbProb !== null
-        ? xgboostShapProxy(model, featureVector.values)
-        : shapAttributions(model, featureVector.values)
-    ).slice(0, 5);
-    modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
+  if (!model || !featureVector) {
+    const unscored = unscoredOpportunityScore(scoredAt);
+    await redis.setex(cacheKey, SCORE_CACHE_TTL_S, JSON.stringify(unscored));
+    return unscored;
   }
+
+  const xgbProb = model.xgboost
+    ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
+    : null;
+  const prob = xgbProb ?? inferScore(model, featureVector.values);
+  const winProbabilityBp = probabilityToBasisPoints(prob);
+  const factors = (
+    xgbProb !== null
+      ? xgboostShapProxy(model, featureVector.values)
+      : shapAttributions(model, featureVector.values)
+  ).slice(0, 5);
+  const modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
 
   // Public 0–100 win probability (see OppScoreResponse in routes/predictive-scoring.ts).
   const winProbability = basisPointsToPercent(winProbabilityBp);

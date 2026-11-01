@@ -53,7 +53,7 @@ export function useCreateReference() {
       title: string;
       description?: string;
       industry?: string;
-      valueMicros?: number;
+      valueMicros?: string | number;
       contactName?: string;
       contactEmail?: string;
       documentUrl?: string;
@@ -73,7 +73,7 @@ export function useUpdateReference() {
       title: string;
       description: string;
       industry: string;
-      valueMicros: number;
+      valueMicros: string | number;
       contactName: string;
       contactEmail: string;
       documentUrl: string;

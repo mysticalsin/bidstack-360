@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import { microsToUnits } from '@bidstack/shared';
+import { microsText } from '../../services/crm/dashboard.cockpit.js';
 
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
@@ -27,6 +29,7 @@ type CrmSummaryPayload = {
   opportunities: number;
   openOpportunities: number;
   pipelineValue: number;
+  pipelineValueMicros: string;
   tasks: number;
   overdueTasks: number;
   serviceCases: number;
@@ -74,17 +77,29 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         (SELECT COUNT(*)::int FROM opportunities WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS opportunities,
         (
           SELECT COUNT(*)::int
-          FROM opportunities
-          WHERE org_id = ${orgId}::uuid
-            AND stage NOT IN ('closed_won', 'closed_lost')
-            AND deleted_at IS NULL
+          FROM opportunities o
+          WHERE o.org_id = ${orgId}::uuid
+            AND o.stage NOT IN ('closed_won', 'closed_lost')
+            AND o.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM pipeline_stages ps
+              WHERE ps.id = o.pipeline_stage_id
+                AND ps.deleted_at IS NULL
+                AND (ps.is_lost OR ps.is_won)
+            )
         ) AS "openOpportunities",
         (
-          SELECT COALESCE(SUM(value_micros), 0)
-          FROM opportunities
-          WHERE org_id = ${orgId}::uuid
-            AND stage NOT IN ('closed_won', 'closed_lost')
-            AND deleted_at IS NULL
+          SELECT COALESCE(SUM(o.value_micros), 0)::text
+          FROM opportunities o
+          WHERE o.org_id = ${orgId}::uuid
+            AND o.stage NOT IN ('closed_won', 'closed_lost')
+            AND o.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM pipeline_stages ps
+              WHERE ps.id = o.pipeline_stage_id
+                AND ps.deleted_at IS NULL
+                AND (ps.is_lost OR ps.is_won)
+            )
         ) AS "pipelineValueMicros",
         (SELECT COUNT(*)::int FROM tasks WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS tasks,
         (
@@ -167,7 +182,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
     serviceCases: 0,
     openServiceCases: 0,
   };
-  const pipelineValueMicros = Number(counts.pipelineValueMicros ?? 0);
+  const pipelineValueMicros = microsText(counts.pipelineValueMicros);
 
   const recentActivity = [
     ...recentOpportunities.map((o) => ({
@@ -208,7 +223,8 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
     leads: counts.leads,
     opportunities: counts.opportunities,
     openOpportunities: counts.openOpportunities,
-    pipelineValue: pipelineValueMicros / 1_000_000,
+    pipelineValue: microsToUnits(BigInt(pipelineValueMicros)),
+    pipelineValueMicros,
     tasks: counts.tasks,
     overdueTasks: counts.overdueTasks,
     serviceCases: counts.serviceCases,
@@ -250,6 +266,7 @@ export async function crmSummaryRoutes(server: FastifyInstance) {
             opportunities: z.number(),
             openOpportunities: z.number(),
             pipelineValue: z.number(),
+            pipelineValueMicros: z.string().regex(/^\d+$/),
             tasks: z.number(),
             overdueTasks: z.number(),
             serviceCases: z.number(),

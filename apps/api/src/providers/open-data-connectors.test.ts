@@ -40,23 +40,36 @@ describe('open data connectors', () => {
 
     expect(connectors.find((c) => c.id === 'sec-edgar')).toMatchObject({
       kind: 'open_api',
-      status: 'healthy',
+      status: 'unverified',
       requiresCredential: false,
     });
     expect(connectors.find((c) => c.id === 'wikidata-wikimedia')).toMatchObject({
       kind: 'open_api',
-      status: 'healthy',
+      status: 'unverified',
       requiresCredential: false,
     });
     expect(connectors.find((c) => c.id === 'tradingview-widgets')).toMatchObject({
       kind: 'official_widget',
-      status: 'healthy',
+      status: 'unverified',
       requiresCredential: false,
     });
     expect(connectors.find((c) => c.id === 'apollo-organizations')).toMatchObject({
       kind: 'credentialed_api',
       status: 'disabled',
       requiresCredential: true,
+    });
+    // Why: Microsoft is the official mailbox, and Gmail stays available now.
+    // A missing client id is disabled, not a live healthy connection.
+    delete process.env.GMAIL_CLIENT_ID;
+    delete process.env.MICROSOFT_GRAPH_CLIENT_ID;
+    const mail = buildConnectorCatalog(now);
+    expect(mail.find((c) => c.id === 'gmail')).toMatchObject({
+      status: 'disabled',
+      message: expect.stringContaining('Gmail stays available'),
+    });
+    expect(mail.find((c) => c.id === 'microsoft')).toMatchObject({
+      status: 'disabled',
+      message: expect.stringContaining('Microsoft is the official account'),
     });
   });
 
@@ -73,8 +86,8 @@ describe('open data connectors', () => {
     process.env.APOLLO_MCP_BEARER_TOKEN = 'oauth-token';
 
     expect(connectorsById(buildConnectorCatalog(now)).get('apollo-organizations')).toMatchObject({
-      status: 'healthy',
-      message: expect.stringContaining('MCP company search enabled'),
+      status: 'unverified',
+      message: expect.stringContaining('Not a live probe'),
     });
   });
 
@@ -96,7 +109,10 @@ describe('open data connectors', () => {
       title: 'Apple Inc. is mapped to AAPL',
       metadata: { cik: '0000320193', ticker: 'AAPL' },
     });
+    expect(signal?.confidence).toBeNull();
     expect(signal?.sourceAttribution[0]?.source).toBe('sec_edgar');
+    expect(signal?.sourceAttribution[0]?.confidence).toBeNull();
+    expect(signal?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
   });
 
   it('maps USAspending awards into funding signals', async () => {
@@ -124,7 +140,11 @@ describe('open data connectors', () => {
       title: 'Mantu award signal',
       metadata: { awardId: 'CONT_A', awardAmount: 1250000 },
     });
+    expect(signals[0]?.summary).toContain('1,250,000 USD reported by USAspending');
+    expect(signals[0]?.summary).not.toContain('$');
+    expect(signals[0]?.confidence).toBeNull();
     expect(signals[0]?.sourceAttribution[0]?.source).toBe('usaspending');
+    expect(signals[0]?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
   });
 
   it('keeps widget data visible when public APIs are unavailable', async () => {

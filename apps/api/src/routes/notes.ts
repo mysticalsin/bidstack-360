@@ -44,6 +44,36 @@ function normalizeAccountId(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+const ACCOUNT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** One exact company name, or null when none or several match. */
+async function companyIdForExactName(orgId: string, companyName: string): Promise<string | null> {
+  const name = companyName.trim();
+  if (!name) return null;
+  const matches = await prisma.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: name, mode: 'insensitive' } },
+    select: { id: true },
+    take: 2,
+  });
+  return matches.length === 1 ? (matches[0]?.id ?? null) : null;
+}
+
+/** A company id already passed in wins. A company UUID used as the account tag is the link. */
+async function companyIdForAccount(
+  orgId: string,
+  accountId: string,
+  explicit?: string | null,
+): Promise<string | null> {
+  if (explicit) return explicit;
+  const normalized = normalizeAccountId(accountId);
+  if (!ACCOUNT_UUID.test(normalized)) return null;
+  const company = await prisma.company.findFirst({
+    where: { id: normalized, orgId, deletedAt: null },
+    select: { id: true },
+  });
+  return company?.id ?? null;
+}
+
 function serializeNote(n: NoteWithAuthor): z.infer<typeof Note> {
   return {
     id: n.id,
@@ -105,8 +135,9 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         orgId: req.auth.orgId,
         deletedAt: null,
       };
-      if (req.query.companyId) {
-        where.OR = [{ companyId: req.query.companyId }, { accountId }];
+      const linkedCompanyId = req.query.companyId ?? (ACCOUNT_UUID.test(accountId) ? accountId : undefined);
+      if (linkedCompanyId) {
+        where.OR = [{ companyId: linkedCompanyId }, { accountId }];
       } else {
         where.accountId = accountId;
       }
@@ -140,11 +171,16 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         accountId: req.body.accountId,
         companyId: req.body.companyId,
       });
+      const companyId = await companyIdForAccount(
+        req.auth.orgId,
+        req.body.accountId,
+        req.body.companyId,
+      );
       const created = await prisma.note.create({
         data: {
           orgId: req.auth.orgId,
           accountId: normalizeAccountId(req.body.accountId),
-          companyId: req.body.companyId ?? null,
+          companyId,
           authorUserId: req.auth.userId,
           title: req.body.title,
           bodyMd: req.body.bodyMd,
@@ -181,7 +217,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       const companyName = req.body.companyName.trim();
       const importedAt = new Date();
       const source = attribution({
-        confidence: 0.86,
+        confidence: null,
         fetchedAt: importedAt,
         label: 'Meeting notes import',
         source: 'meeting_notes_import',
@@ -190,6 +226,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
           accountId,
           companyName,
           characterCount: req.body.bodyMd.length,
+          confidenceBasis: 'not_scored',
         },
       });
       const extracted = extractMeetingNotes(req.body.bodyMd, companyName, source);
@@ -203,11 +240,14 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         }).format(importedAt)}`;
 
       const persisted = await prisma.$transaction(async (tx) => {
+        const companyId =
+          (await companyIdForAccount(req.auth.orgId, req.body.accountId, req.body.companyId)) ??
+          (await companyIdForExactName(req.auth.orgId, companyName));
         const note = await tx.note.create({
           data: {
             orgId: req.auth.orgId,
             accountId,
-            companyId: req.body.companyId ?? null,
+            companyId,
             authorUserId: req.auth.userId,
             title,
             bodyMd: req.body.bodyMd,
@@ -217,7 +257,13 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         });
 
         const created = {
-          contacts: await persistContacts(tx, req.auth.orgId, companyName, extracted.contacts),
+          contacts: await persistContacts(
+            tx,
+            req.auth.orgId,
+            companyName,
+            extracted.contacts,
+            companyId,
+          ),
           risks: await persistRisks(tx, req.auth.orgId, companyName, extracted.risks),
           compliance: await persistCompliance(
             tx,
@@ -225,7 +271,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
             companyName,
             extracted.compliance,
           ),
-          tasks: await persistTasks(tx, req.auth.orgId, extracted.tasks),
+          tasks: await persistTasks(tx, req.auth.orgId, extracted.tasks, companyId),
           techStackItems: extracted.techStack.reduce(
             (sum, category) => sum + category.items.length,
             0,

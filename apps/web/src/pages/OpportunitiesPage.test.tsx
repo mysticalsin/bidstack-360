@@ -166,6 +166,62 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByRole('heading', { name: /Opportunities/i })).toBeTruthy();
     expect(screen.getByText('Acme Upgrade')).toBeTruthy();
     expect(screen.getByText('OP-0001')).toBeTruthy();
+    // The list includes closed rows. The subtitle counts the page, not bids still in flight.
+    expect(
+      screen.getByText('{{count}} on this page · click any cell to edit inline.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/in flight/i)).toBeNull();
+    expect(screen.queryByText('This page is not the full match.')).toBeNull();
+  });
+
+  it('does not call a later page the full search result', () => {
+    // WHY: nextCursor means the row count on screen is a slice, not every match.
+    mockOpportunities({
+      data: {
+        items: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            code: 'OP-0001',
+            name: 'Acme Upgrade',
+            customer: 'Acme Corp',
+            stage: 's1_lead',
+            pipelineStageId: null,
+            pipelineStage: null,
+            value: 10000,
+            probability: 20,
+            dueDate: '2026-10-10',
+            owner: 'owner@example.com',
+            industry: 'Consulting',
+            logo: null,
+            country: 'FR',
+            territoryId: null,
+            territoryName: null,
+            updatedAt: new Date().toISOString(),
+            taskCount: 0,
+            commentCount: 0,
+            viewCount: 0,
+          },
+        ],
+        nextCursor: 'more-matches',
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/opportunities?search=Acme']}>
+          <OpportunitiesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByText('This page is not the full match.').length).toBeGreaterThan(0);
+    expect(screen.getByText(/on this page for/)).toBeTruthy();
+    expect(screen.queryByText(/results for/)).toBeNull();
+    const live = screen.getAllByRole('status').find((el) => el.classList.contains('sr-only'));
+    expect(live?.textContent).toContain('This page is not the full match.');
   });
 
   // A1 (bid clock): the "Due ≤ 7d" quick filter must actually reach the API
@@ -200,7 +256,10 @@ describe('OpportunitiesPage', () => {
 
     const overdueChip = () => screen.getByRole('button', { name: 'Overdue' });
     fireEvent.click(overdueChip());
-    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({ overdue: true });
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({
+      overdue: true,
+      excludeClosed: true,
+    });
 
     // Toggling the same chip again clears the filter — same UX contract as
     // the existing stage-filter chips.
@@ -225,9 +284,9 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByText('No open bids yet')).toBeTruthy();
     expect(screen.getByText(/Convert a qualified lead or log the RFP/)).toBeTruthy();
     // Secondary path must land on the real CSV import wizard in Settings.
-    expect(
-      screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href'),
-    ).toBe('/settings?tab=data-import');
+    expect(screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href')).toBe(
+      '/settings?tab=data-import',
+    );
   });
 });
 
@@ -261,10 +320,12 @@ describe('OpportunitiesPage — opportunities:write gating', () => {
     expect(within(table).queryByRole('button', { name: /Click to change/i })).toBeNull();
     expect(within(table).queryAllByRole('button', { name: /Click to edit/i })).toHaveLength(0);
     expect(within(table).getByText('S1 Lead')).toBeTruthy();
-    // PR #50: amounts carry no recorded currency, so the cell must not claim EUR.
-    expect(
-      within(table).getByText('10,000 (currency not recorded; not a euro forecast)'),
-    ).toBeTruthy();
+    // Amounts carry no recorded currency, so the cell must not claim EUR.
+    const valueCell = within(table).getByText('10,000 unspecified');
+    expect(valueCell.closest('td')?.getAttribute('title')).toContain(
+      'currency not recorded; not a euro forecast',
+    );
+    expect(within(table).queryByText(/EUR/)).toBeNull();
 
     // Selecting a row still works (read-only), but the bulk stage-move/delete
     // controls that would 403 must not render — only Clear survives.

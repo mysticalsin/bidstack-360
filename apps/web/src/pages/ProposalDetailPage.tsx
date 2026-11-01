@@ -14,7 +14,8 @@ import {
   proposalStatusLabel,
   type ProposalStatus,
 } from '@/components/rfp/shared/ProposalStatusChip';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
+import { ProposalApprovalActions } from '@/components/rfp/ProposalApprovalActions';
 
 interface ProposalSection {
   id: string;
@@ -51,6 +52,9 @@ export function ProposalDetailPage() {
   const qc = useQueryClient();
   const { t } = useTranslation('rfp');
   const canWrite = useHasPermission('proposals:write');
+  const capabilities = useCapabilities();
+  // Admin does not imply approver. Match the server grant, not isAdmin.
+  const canApprove = Boolean(capabilities.data?.permissions.includes('proposals:approve'));
   useDocumentTitle();
 
   const {
@@ -120,6 +124,31 @@ export function ProposalDetailPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['proposals'] });
       navigate('/proposals');
+    },
+  });
+
+  const approve = useMutation({
+    mutationFn: async (attestation: string) => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}/approve`, {
+        method: 'POST',
+        body: { attestation },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal & { delivery: string }>(`/api/v1/proposals/${id}/submit`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
     },
   });
 
@@ -339,6 +368,22 @@ export function ProposalDetailPage() {
                   : t('proposalDetail.deleteButton', 'Delete')}
               </button>
             )}
+          </div>
+          <div className="mt-3">
+            <ProposalApprovalActions
+              status={proposal.status}
+              canApprove={canApprove}
+              pending={approve.isPending || submit.isPending}
+              error={
+                approve.isError
+                  ? t('proposalApproval.approveError', 'Could not approve this proposal.')
+                  : submit.isError
+                    ? t('proposalApproval.submitError', 'Could not submit this proposal.')
+                    : null
+              }
+              onApprove={(attestation) => approve.mutate(attestation)}
+              onSubmit={() => submit.mutate()}
+            />
           </div>
           <p className="page-sub">
             {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}

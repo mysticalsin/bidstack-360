@@ -51,6 +51,9 @@ describe('CurrencySelector', () => {
     expect(within(listbox).getAllByRole('option')).toHaveLength(SUPPORTED_CURRENCIES.length);
     expect(listbox.className).not.toContain('overflow-y-auto');
     expect(within(listbox).getByText('Rates updated May 31')).toBeDefined();
+    expect(
+      within(listbox).getByText('Does not apply to amounts whose currency was not recorded.'),
+    ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Auto' })).toBeDefined();
   });
 

@@ -60,6 +60,9 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // One React for the app and for Radix. A prebundled menu that inlines
+      // its own React calls useMemo on a null dispatcher and crashes the page.
+      dedupe: ['react', 'react-dom'],
     },
     server: {
       port: 38081,
@@ -73,6 +76,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     optimizeDeps: {
+      exclude: ['@radix-ui/react-dropdown-menu'],
       esbuildOptions: {
         // Dev dependency optimization does not inherit build.target. Keep
         // modern route-only deps on native syntax during local prebundling.

@@ -7,31 +7,37 @@
  */
 import { type z } from 'zod';
 
-import type {
-  AccountCockpitSnapshot,
-  AiInsight,
-  BidOpportunity,
-  CompanyHealth,
-  CrmActivity,
-  CrmCompany,
-  CrmDashboardSnapshot,
-  SignalFactor,
+import {
+  recordedDecisionRole,
+  type AccountCockpitSnapshot,
+  type AiInsight,
+  type BidOpportunity,
+  type CompanyHealth,
+  type CrmActivity,
+  type CrmCompany,
+  type CrmDashboardSnapshot,
+  type FactStatus,
+  formatMicrosAmount,
+  type PersonFactView,
+  type SignalFactor,
 } from '@bidstack/shared';
 
-import { defaultCompliance, defaultRisks, defaultTechnicalStack } from './dashboard.defaults.js';
 import {
   asComplianceStatus,
   asRiskSeverity,
   asRiskStatus,
-  attribution,
   formatMicrosCompact,
-  mergeTechnicalStack,
+  livePipelineStage,
   normalizeName,
   parseAttribution,
   record,
   titleCase,
 } from './dashboard.utils.js';
-import { TECHNICAL_STACK_FIELD_KEY, parseTechnicalStackOverride } from './technical-stack.service.js';
+import {
+  TECHNICAL_STACK_FIELD_KEY,
+  parseTechnicalStackOverride,
+} from './technical-stack.service.js';
+import { microsWireFields } from '../../lib/micros-wire.js';
 
 const COCKPIT_RISK_LIMIT = 6;
 const COCKPIT_COMPLIANCE_LIMIT = 6;
@@ -41,6 +47,69 @@ const COCKPIT_COMPLIANCE_LIMIT = 6;
 // Each factor carries what it measures and the action a manager should take.
 
 type HealthBandValue = z.infer<typeof SignalFactor>['band'];
+
+function firmographicAction(company: z.infer<typeof CrmCompany>): string {
+  const missing: string[] = [];
+  if (!company.industry) missing.push('industry');
+  if (!company.employeeCount) missing.push('headcount');
+  if (!company.annualRevenueMicros) missing.push('revenue');
+  if ((company.technicalStack?.length ?? 0) === 0) missing.push('tech stack');
+  if (company.strategicIntel?.freshness !== 'fresh') missing.push('external-source freshness');
+  if (missing.length === 0) return 'Recorded firmographics are on file.';
+  return `Still missing: ${missing.join(', ')}.`;
+}
+
+function contactAction(
+  contacts: Array<{ influence: number | null; email: string | null }>,
+): string {
+  if (contacts.length === 0) return 'No stakeholders are linked to this account.';
+  const rated = contacts.filter((contact) => contact.influence != null).length;
+  const withEmail = contacts.filter((contact) => contact.email).length;
+  const ratedLabel =
+    rated === 0 ? 'none have an influence rating' : `${rated} have an influence rating`;
+  const emailLabel =
+    withEmail === contacts.length ? 'all have an email' : `${withEmail} have an email`;
+  const countLabel =
+    contacts.length === 1 ? '1 linked contact' : `${contacts.length} linked contacts`;
+  return `${countLabel}. ${ratedLabel}; ${emailLabel}.`;
+}
+
+function engagementAction(recent: number, openCount: number, onTrack: number): string {
+  const recentLabel =
+    recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
+  if (recent === 0 && openCount === 0) {
+    return 'No tasks in the last 30 days and no open follow-ups.';
+  }
+  if (recent === 0) return 'No tasks in the last 30 days.';
+  const overdue = openCount - onTrack;
+  if (overdue > 0) {
+    const overdueLabel =
+      overdue === 1
+        ? '1 open follow-up is past its due date'
+        : `${overdue} open follow-ups are past their due date`;
+    return `${recentLabel}. ${overdueLabel}.`;
+  }
+  return `${recentLabel}. Open follow-ups are inside their due dates.`;
+}
+
+function pipelineAction(
+  openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>,
+): string {
+  if (openDeals.length === 0) return 'No open deals are linked to this account.';
+  const missingProbability = openDeals.filter((deal) => !(deal.probability > 0)).length;
+  const missingOwner = openDeals.filter((deal) => deal.owner == null).length;
+  const missingDate = openDeals.filter((deal) => deal.dueDate == null).length;
+  const countLabel = openDeals.length === 1 ? '1 open deal' : `${openDeals.length} open deals`;
+  if (missingProbability === 0 && missingOwner === 0 && missingDate === 0) {
+    return `${countLabel} with a probability above 0, an owner, and a close date.`;
+  }
+  const gaps = [
+    missingProbability > 0 ? `${missingProbability} without a probability above 0` : null,
+    missingOwner > 0 ? `${missingOwner} without an owner` : null,
+    missingDate > 0 ? `${missingDate} without a close date` : null,
+  ].filter((gap): gap is string => gap !== null);
+  return `${countLabel}. ${gaps.join('; ')}.`;
+}
 
 function bandFor(score: number): HealthBandValue {
   if (score >= 75) return 'strong';
@@ -83,8 +152,7 @@ function factor(
     key,
     label,
     whatItMeasures,
-    recommendedAction:
-      FACTOR_ACTIONS[key][band === 'strong' || band === 'good' ? 'high' : 'low'],
+    recommendedAction: FACTOR_ACTIONS[key][band === 'strong' || band === 'good' ? 'high' : 'low'],
     score: clamped,
     band,
   };
@@ -133,7 +201,7 @@ export function computeSignalCoverage(input: {
     'engagement',
     'Engagement recency',
     'Activity in the last 30 days and follow-ups still inside their due dates.',
-    Math.min(50, recent * 17) + (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 25),
+    Math.min(50, recent * 17) + (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 0),
   );
 
   const complete = openDeals.filter(
@@ -143,9 +211,13 @@ export function computeSignalCoverage(input: {
     'pipeline',
     'Pipeline data quality',
     'Open deals carrying probability, owner, and an expected close date.',
-    (openDeals.length > 0 ? 40 : 0) +
-      (openDeals.length > 0 ? Math.round((complete / openDeals.length) * 60) : 0),
+    openDeals.length > 0 ? Math.round((complete / openDeals.length) * 100) : 0,
   );
+
+  firmographics.recommendedAction = firmographicAction(company);
+  contactFactor.recommendedAction = contactAction(contacts);
+  engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
+  pipeline.recommendedAction = pipelineAction(openDeals);
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
   // Weights: external intel is the cockpit's backbone; the rest split evenly.
@@ -171,11 +243,23 @@ export interface AccountPerformance {
   winLoss: {
     wonCount: number;
     lostCount: number;
-    wonValueMicros: number;
-    lostValueMicros: number;
-    winRate: number;
+    wonValueMicros: string;
+    lostValueMicros: string;
+    winRate: number | null;
   };
-  revenueEvolution: Array<{ period: string; revenueMicros: number }>;
+  revenueEvolution: Array<{ period: string; revenueMicros: string }>;
+}
+
+/** Integer micros text. Number() moves a sum past 2^53 off the cent. */
+export function microsText(value: bigint | number | string | null | undefined): string {
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'number' && Number.isFinite(value))
+    return BigInt(Math.trunc(value)).toString();
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+    const parsed = BigInt(value);
+    return parsed < 0n ? '0' : parsed.toString();
+  }
+  return '0';
 }
 
 /**
@@ -189,36 +273,51 @@ export function deriveAccountPerformance(
     stage: string;
     valueMicros: bigint | number | unknown;
     dueDate: Date | null | unknown;
-    pipelineStage?: { isWon: boolean; isLost: boolean } | null;
+    pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
   }>,
 ): AccountPerformance {
-  const toMicros = (v: bigint | number | unknown): number =>
-    typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
-  const wonOpps = opps.filter((o) => o.pipelineStage?.isWon || o.stage === 'closed_won');
-  const lostOpps = opps.filter((o) => o.pipelineStage?.isLost || o.stage === 'closed_lost');
+  const toMicros = (v: bigint | number | unknown): bigint => {
+    if (typeof v === 'bigint') return v;
+    if (typeof v === 'number' && Number.isFinite(v)) return BigInt(Math.trunc(v));
+    if (typeof v === 'string' && /^\d+$/.test(v)) return BigInt(v);
+    return 0n;
+  };
+  const lostOpps = opps.filter((o) => {
+    const stage = livePipelineStage(o.pipelineStage);
+    return stage?.isLost === true || o.stage === 'closed_lost';
+  });
+  // Lost wins when the enum and a won flag disagree, and when both flags are set.
+  const wonOpps = opps.filter((o) => {
+    const stage = livePipelineStage(o.pipelineStage);
+    return (
+      stage?.isLost !== true &&
+      o.stage !== 'closed_lost' &&
+      (stage?.isWon === true || o.stage === 'closed_won')
+    );
+  });
   const decided = wonOpps.length + lostOpps.length;
 
-  const revenueByMonth = new Map<string, number>();
+  const revenueByMonth = new Map<string, bigint>();
   for (const o of wonOpps) {
     const when = o.dueDate ?? null;
     if (!when) continue;
     const d = when instanceof Date ? when : new Date(when as string);
     if (Number.isNaN(d.getTime())) continue;
     const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toMicros(o.valueMicros));
+    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0n) + toMicros(o.valueMicros));
   }
   return {
     winLoss: {
       wonCount: wonOpps.length,
       lostCount: lostOpps.length,
-      wonValueMicros: wonOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
-      lostValueMicros: lostOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
-      winRate: decided > 0 ? Math.round((wonOpps.length / decided) * 100) : 0,
+      wonValueMicros: wonOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0n).toString(),
+      lostValueMicros: lostOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0n).toString(),
+      winRate: decided > 0 ? Math.round((wonOpps.length / decided) * 100) : null,
     },
     revenueEvolution: [...revenueByMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-12)
-      .map(([period, revenueMicros]) => ({ period, revenueMicros })),
+      .map(([period, revenueMicros]) => ({ period, revenueMicros: revenueMicros.toString() })),
   };
 }
 
@@ -227,6 +326,41 @@ export function deriveAccountPerformance(
 export interface CockpitFieldOverride {
   fieldKey: string;
   value: unknown;
+}
+
+function revenueOverrideMicros(value: unknown): bigint | null {
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value);
+  return null;
+}
+
+function exactStoredRevenueLabel(company: {
+  annualRevenueMicros?: number | null;
+  annualRevenueMicrosText?: string | null;
+}): string | null {
+  const text = company.annualRevenueMicrosText;
+  if (!text || !/^\d+$/.test(text)) return null;
+  const micros = BigInt(text);
+  if (micros <= 0n) return null;
+  if (
+    company.annualRevenueMicros != null &&
+    Number.isSafeInteger(company.annualRevenueMicros) &&
+    BigInt(company.annualRevenueMicros) === micros
+  ) {
+    return null;
+  }
+  return `${formatMicrosAmount(micros)} unspecified`;
+}
+
+/** Exact revenue text from a manual override, when one is stored. */
+export function revenueOverrideLabel(overrides: CockpitFieldOverride[]): string | null {
+  for (const override of overrides) {
+    if (override.fieldKey !== 'annualRevenueMicros') continue;
+    const micros = revenueOverrideMicros(override.value);
+    if (micros == null || micros <= 0n) continue;
+    return `${formatMicrosAmount(micros)} unspecified`;
+  }
+  return null;
 }
 
 /** Apply manual overrides on top of the (immutable) enrichment-derived company. */
@@ -244,13 +378,12 @@ export function applyFieldOverrides(
     } else if (o.fieldKey === 'employeeCount' && typeof o.value === 'number' && o.value > 0) {
       next.employeeCount = Math.round(o.value);
       overriddenKeys.add('employeeCount');
-    } else if (
-      o.fieldKey === 'annualRevenueMicros' &&
-      typeof o.value === 'number' &&
-      o.value > 0
-    ) {
-      next.annualRevenueMicros = o.value;
+    } else if (o.fieldKey === 'annualRevenueMicros') {
+      const micros = revenueOverrideMicros(o.value);
+      if (micros == null || micros <= 0n) continue;
       overriddenKeys.add('annualRevenueMicros');
+      next.annualRevenueMicrosText = micros.toString();
+      next.annualRevenueMicros = micros <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(micros) : null;
     }
   }
   return { company: next, overriddenKeys };
@@ -264,7 +397,7 @@ function resolveCockpitTechnicalStack(
     overrides.find((override) => override.fieldKey === TECHNICAL_STACK_FIELD_KEY)?.value,
   );
   if (technicalStackOverride) return technicalStackOverride.stack;
-  return mergeTechnicalStack(providerStack, defaultTechnicalStack());
+  return providerStack;
 }
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
@@ -274,7 +407,8 @@ export function buildActivities(
     id: string;
     title: string;
     status: string;
-    opportunity?: { id: string; customer: string; name: string } | null;
+    accountId?: string | null;
+    opportunity?: { id: string; customer: string; name: string; companyId: string | null } | null;
     assignee?: { name: string | null; email: string } | null;
     createdAt: Date;
   }>,
@@ -285,7 +419,7 @@ export function buildActivities(
     subject: task.title,
     body: `Task is ${task.status.replace('_', ' ')}.`,
     kind: 'task',
-    companyId: task.opportunity ? normalizeName(task.opportunity.customer) : null,
+    companyId: task.opportunity?.companyId ?? task.accountId ?? null,
     dealId: task.opportunity?.id ?? null,
     personId: null,
     actorName: task.assignee?.name ?? task.assignee?.email ?? null,
@@ -295,61 +429,38 @@ export function buildActivities(
 
 // ─── Default insights ─────────────────────────────────────────────────────────
 
-export function buildDefaultInsights(
-  opportunities: Array<{
-    id: string;
-    customer: string;
-    name: string;
-    probability: number;
-    updatedAt: Date;
-  }>,
+type StoredInsightRow = {
+  id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  confidenceBps: number;
+  companyName: string | null;
+  opportunityId: string | null;
+  sourceAttribution: unknown;
+  createdAt: Date;
+};
+
+/** Only rows that were stored. An empty list is not a scored stagnation warning. */
+export function mapStoredInsights(
+  rows: readonly StoredInsightRow[],
+  companyIdByOpportunityId: ReadonlyMap<string, string | null> = new Map(),
 ): Array<z.infer<typeof AiInsight>> {
-  const lowest = [...opportunities].sort((a, b) => a.probability - b.probability)[0];
-  const largest = [...opportunities].sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt))[0];
-  return [
-    {
-      id: 'insight-stagnation',
-      kind: 'deal_stagnation',
-      title: 'Deal stagnation watch',
-      summary: lowest
-        ? `${lowest.customer} needs a next-step owner before the close plan ages out.`
-        : 'No open opportunity risk detected.',
-      confidence: 0.78,
-      companyId: lowest ? normalizeName(lowest.customer) : null,
-      companyName: lowest?.customer ?? null,
-      dealId: lowest?.id ?? null,
-      sourceAttribution: [
-        attribution({
-          source: 'bidstack_rules',
-          label: 'Pipeline velocity model',
-          sourceUrl: null,
-          confidence: 0.78,
-        }),
-      ],
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'insight-upsell',
-      kind: 'funding_upsell',
-      title: 'Funding and award upsell signal',
-      summary: largest
-        ? `${largest.customer} has enough active motion to justify a managed-security expansion play.`
-        : 'No funding signal available yet.',
-      confidence: 0.71,
-      companyId: largest ? normalizeName(largest.customer) : null,
-      companyName: largest?.customer ?? null,
-      dealId: largest?.id ?? null,
-      sourceAttribution: [
-        attribution({
-          source: 'verified_source_registry',
-          label: 'SAM/TED/USAspending adapter registry',
-          sourceUrl: null,
-          confidence: 0.71,
-        }),
-      ],
-      createdAt: new Date().toISOString(),
-    },
-  ];
+  return rows.map((insight) => ({
+    id: insight.id,
+    kind: insight.kind as z.infer<typeof AiInsight>['kind'],
+    title: insight.title,
+    summary: insight.summary,
+    confidence: insight.confidenceBps / 10_000,
+    // A stored name is a label. The company id comes from the linked opportunity.
+    companyId: insight.opportunityId
+      ? (companyIdByOpportunityId.get(insight.opportunityId) ?? null)
+      : null,
+    companyName: insight.companyName,
+    dealId: insight.opportunityId,
+    sourceAttribution: parseAttribution(insight.sourceAttribution),
+    createdAt: insight.createdAt.toISOString(),
+  }));
 }
 
 // ─── Risk / compliance serializers ────────────────────────────────────────────
@@ -444,6 +555,7 @@ export function serializeBidOpportunity(row: {
   readinessScore: number | null;
   sourceAttribution: unknown;
 }): z.infer<typeof BidOpportunity> {
+  const value = row.estimatedValueMicros === null ? null : microsWireFields(row.estimatedValueMicros);
   return {
     id: row.id,
     source: row.source,
@@ -454,8 +566,8 @@ export function serializeBidOpportunity(row: {
     region: row.region,
     status: row.status,
     dueDate: row.dueDate?.toISOString() ?? null,
-    estimatedValueMicros:
-      row.estimatedValueMicros === null ? null : Number(row.estimatedValueMicros),
+    estimatedValueMicros: value?.valueMicros ?? null,
+    estimatedValueMicrosText: value?.valueMicrosText ?? null,
     currencyCode: row.currencyCode,
     url: row.url,
     recommendation: row.recommendation as z.infer<typeof BidOpportunity>['recommendation'],
@@ -476,6 +588,8 @@ export function buildCockpit({
   fieldOverrides = [],
   winLossAvailable = false,
   performance,
+  buyingRoleFacts = [],
+  now = new Date(),
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
@@ -492,6 +606,7 @@ export function buildCockpit({
   opportunities: Array<{
     id: string;
     customer: string;
+    companyId: string | null;
     name: string;
     stage: string;
     pipelineStage: {
@@ -501,6 +616,7 @@ export function buildCockpit({
       color: string | null;
       isWon: boolean;
       isLost: boolean;
+      deletedAt?: Date | null;
     } | null;
     valueMicros: bigint | number | unknown;
     probability: number;
@@ -510,6 +626,7 @@ export function buildCockpit({
   contacts: Array<{
     id: string;
     customer: string;
+    companyId: string | null;
     name: string;
     role: string | null;
     email: string | null;
@@ -522,12 +639,14 @@ export function buildCockpit({
     title: string;
     status: string;
     dueDate: Date | null;
-    opportunity: { customer: string; id: string; name: string } | null;
+    accountId?: string | null;
+    opportunity: { customer: string; companyId: string | null; id: string; name: string } | null;
     assignee: { name: string | null; email: string } | null;
     createdAt: Date;
   }>;
   risks: Array<{
     id: string;
+    opportunityId: string | null;
     title: string;
     severity: string;
     owner: string | null;
@@ -538,36 +657,59 @@ export function buildCockpit({
   }>;
   compliance: Array<{
     id: string;
+    opportunityId: string | null;
     label: string;
     status: string;
     owner: string | null;
     sourceAttribution: unknown;
   }>;
+  /** Accepted or not, the builder keeps only one fresh accepted role. */
+  buyingRoleFacts?: Array<{
+    contactId: string;
+    status: string;
+    linkLabel: string | null;
+    opportunityId: string | null;
+    observedAt: Date | null;
+  }>;
+  now?: Date;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
-  const companyOpps = opportunities.filter((opp) => {
-    const opportunityCompanyKey = normalizeName(opp.customer);
-    return opp.customer === company.name || opportunityCompanyKey === company.id;
-  });
-  const openDeals = companyOpps.filter(
-    (opp) =>
-      !opp.pipelineStage?.isWon &&
-      !opp.pipelineStage?.isLost &&
+  const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
+  const accountTasks = tasks.filter(
+    (task) => task.accountId === company.id || task.opportunity?.companyId === company.id,
+  );
+  const openDeals = companyOpps.filter((opp) => {
+    const stage = livePipelineStage(opp.pipelineStage);
+    return (
+      !stage?.isWon &&
+      !stage?.isLost &&
       opp.stage !== 'customer' &&
       opp.stage !== 'closed_won' &&
-      opp.stage !== 'closed_lost',
-  );
-  const annualRevenue = company.annualRevenueMicros
-    ? formatMicrosCompact(company.annualRevenueMicros)
-    : 'Not verified';
+      opp.stage !== 'closed_lost'
+    );
+  });
+  const accountContacts = contacts
+    .filter((contact) => contact.companyId === company.id)
+    .slice()
+    .sort((a, b) => {
+      const influenceDelta = (b.influence ?? -1) - (a.influence ?? -1);
+      if (influenceDelta !== 0) return influenceDelta;
+      return a.name.localeCompare(b.name);
+    });
+  const storedRevenueText = exactStoredRevenueLabel(company);
+  const annualRevenue =
+    revenueOverrideLabel(fieldOverrides) ??
+    storedRevenueText ??
+    (company.annualRevenueMicros
+      ? formatMicrosCompact(company.annualRevenueMicros)
+      : (company.publicFacts?.revenueLabel ?? 'Not verified'));
+  const accountOpportunityIds = new Set(companyOpps.map((opp) => opp.id));
   const companyRisks = risks.filter(
-    (risk) => risk.companyName && normalizeName(risk.companyName) === normalizeName(company.name),
+    (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),
   );
   const visibleRisks = uniqueBy(companyRisks, riskKey).slice(0, COCKPIT_RISK_LIMIT);
-  const companyCompliance = compliance.filter((check) =>
-    parseAttribution(check.sourceAttribution).some(
-      (source) => record(source.providerMetadata).companyName === company.name,
-    ),
+  const companyCompliance = compliance.filter(
+    (check) => check.opportunityId != null && accountOpportunityIds.has(check.opportunityId),
   );
   const visibleCompliance = uniqueBy(companyCompliance, complianceKey).slice(
     0,
@@ -645,7 +787,9 @@ export function buildCockpit({
       {
         label: 'Industry',
         value: company.industry ? titleCase(company.industry) : 'Not verified',
-        detail: company.industry ? 'company profile' : 'connect Apollo to verify',
+        detail: company.industry
+          ? 'recorded industry on this account'
+          : 'not recorded on this account',
         tone: 'blue',
         ...externalField('industry', Boolean(company.industry)),
       },
@@ -654,14 +798,18 @@ export function buildCockpit({
         value: company.employeeCount
           ? `${company.employeeCount.toLocaleString()}+`
           : 'Not verified',
-        detail: company.employeeCount ? 'company headcount' : 'connect Apollo to verify',
+        detail: company.employeeCount
+          ? 'recorded headcount on this account, not a live census'
+          : 'not recorded on this account',
         tone: company.employeeCount ? 'jade' : 'amber',
         ...externalField('employeeCount', Boolean(company.employeeCount)),
       },
       {
         label: 'Annual revenue',
         value: annualRevenue,
-        detail: company.annualRevenueMicros ? 'company revenue' : 'connect Apollo to verify',
+        detail: company.annualRevenueMicros
+          ? 'currency not recorded; not a euro forecast'
+          : 'not recorded on this account',
         tone: company.annualRevenueMicros ? 'purple' : 'amber',
         ...externalField('annualRevenueMicros', Boolean(company.annualRevenueMicros)),
       },
@@ -673,7 +821,9 @@ export function buildCockpit({
             : apolloIntel?.freshness === 'stale'
               ? 'Stale'
               : 'Not synced',
-        detail: apolloIntel ? apolloIntel.creditPolicy.replace('_', ' ') : 'connect in Settings',
+        detail: apolloIntel
+          ? 'stored sync freshness on this account, not a live probe'
+          : 'not synced',
         tone: apolloIntel?.freshness === 'fresh' ? 'jade' : 'amber',
         ...(apolloIntel ? apolloSource : missingApolloSource),
         block: 'external' as const,
@@ -681,7 +831,7 @@ export function buildCockpit({
       {
         label: 'Projects',
         value: companyOpps.length.toString(),
-        detail: 'active and historical',
+        detail: 'count of opportunities matched to this account',
         tone: 'blue',
         ...internalSource,
         block: 'internal' as const,
@@ -689,7 +839,7 @@ export function buildCockpit({
       {
         label: 'Open deals',
         value: openDeals.length.toString(),
-        detail: 'opportunity pipeline',
+        detail: 'count of open opportunities on this account',
         tone: 'amber',
         ...internalSource,
         block: 'internal' as const,
@@ -701,7 +851,7 @@ export function buildCockpit({
             {
               label: 'Won / Lost',
               value: `${wonDeals} / ${lostDeals}`,
-              detail: 'closed outcomes',
+              detail: 'count of recorded closed outcomes on this account',
               tone: 'teal' as const,
               ...internalSource,
               block: 'internal' as const,
@@ -710,43 +860,40 @@ export function buildCockpit({
         : []),
     ],
     technicalStack: resolveCockpitTechnicalStack(company.technicalStack ?? [], fieldOverrides),
-    // Score on THIS company's contacts/tasks only. The org-wide dashboard path
-    // passes every org row; the single-company path passes pre-filtered rows —
-    // scoping here keeps the score identical across both entry points.
+    // Score on THIS company's contacts/tasks only. A matching customer string
+    // is not a link: historical rows keep companyId null until someone confirms
+    // them, and a contact linked to another company must not land here.
     health: computeSignalCoverage({
       company,
-      contacts: contacts.filter((c) => c.customer === company.name),
+      contacts: accountContacts,
       openDeals,
-      tasks: tasks.filter((t) => t.opportunity?.customer === company.name),
+      tasks: accountTasks,
     }),
-    keyContacts: contacts
-      .filter((contact) => contact.customer === company.name)
-      .slice(0, 5)
-      .map((contact) => ({
-        id: contact.id,
-        source: 'external_crm',
-        companyId: company.id,
-        name: contact.name,
-        title: contact.role,
-        email: contact.email,
-        phone: contact.phone,
-        influence: contact.influence,
-        roleInDecision: contact.influence && contact.influence >= 5 ? 'champion' : 'influencer',
-        updatedAt: contact.createdAt.toISOString(),
-      })),
-    recentActivity: buildActivities(
-      tasks.filter((task) => task.opportunity?.customer === company.name),
-    ).slice(0, 5),
-    risks: visibleRisks.length ? visibleRisks.map(serializeRisk) : defaultRisks(),
-    compliance: visibleCompliance.length
-      ? visibleCompliance.map(serializeCompliance)
-      : defaultCompliance(),
-    roadmap: [
-      { id: 'road-q1', quarter: 'Q1 2026', title: 'Windows 11 migration', status: 'in_progress' },
-      { id: 'road-q2', quarter: 'Q2 2026', title: 'Zero Trust initiative', status: 'planned' },
-      { id: 'road-q3', quarter: 'Q3 2026', title: 'Data center modernization', status: 'planned' },
-      { id: 'road-q4', quarter: 'Q4 2026', title: 'Endpoint security upgrade', status: 'planned' },
-    ],
+    keyContacts: accountContacts.slice(0, 5).map((contact) => ({
+      id: contact.id,
+      source: 'external_crm',
+      companyId: contact.companyId,
+      name: contact.name,
+      title: contact.role,
+      email: contact.email,
+      phone: contact.phone,
+      influence: contact.influence,
+      // A job title stays in `title`. Only one fresh accepted buying role
+      // on a deal for this account fills the station.
+      roleInDecision: recordedDecisionRole(
+        buyingRoleFacts
+          .filter((fact) => fact.contactId === contact.id)
+          .map(buyingRoleFactView)
+          .filter((fact): fact is PersonFactView => fact !== null),
+        now,
+        accountOpportunityIds,
+      ),
+      updatedAt: contact.createdAt.toISOString(),
+    })),
+    recentActivity: buildActivities(accountTasks).slice(0, 5),
+    risks: visibleRisks.map(serializeRisk),
+    compliance: visibleCompliance.map(serializeCompliance),
+    roadmap: [],
   };
 }
 
@@ -761,5 +908,26 @@ export function buildCockpitFromCompany(
     ...snapshot.cockpit,
     company,
     keyContacts: snapshot.cockpit.keyContacts.filter((contact) => contact.companyId === company.id),
+  };
+}
+
+const FACT_STATUSES = new Set<FactStatus>(['proposed', 'accepted', 'dismissed', 'needs_review']);
+
+function buyingRoleFactView(fact: {
+  status: string;
+  linkLabel: string | null;
+  opportunityId: string | null;
+  observedAt: Date | null;
+}): PersonFactView | null {
+  if (!FACT_STATUSES.has(fact.status as FactStatus)) return null;
+  return {
+    id: 'buying-role',
+    kind: 'buying_role',
+    status: fact.status as FactStatus,
+    reportsToContactId: null,
+    opportunityId: fact.opportunityId,
+    companyId: null,
+    linkLabel: fact.linkLabel,
+    observedAt: fact.observedAt ? fact.observedAt.toISOString() : null,
   };
 }

@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Aggiungi il tuo primo lead",
-        "description": "Cattura l'interesse in entrata e lascia che Polo PreSales lo valuti automaticamente."
+        "description": "Cattura l'interesse in entrata. Un nuovo lead resta senza punteggio finché non ne viene registrato uno."
       },
       "firstActivity": {
         "label": "Registra la tua prima attività",
@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Esegui la tua prima decisione offrire/non offrire",
-        "description": "Valuta un'opportunità su idoneità, valore e probabilità di vittoria prima di impegnarti."
+        "description": "Valuta un'opportunità su idoneità e valore prima di impegnarti. Una probabilità vuota non è una probabilità di vittoria misurata."
       },
       "firstRfp": {
         "label": "Avvia la tua prima risposta a una RFP",

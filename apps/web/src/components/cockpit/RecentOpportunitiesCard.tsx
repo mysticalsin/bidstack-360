@@ -9,14 +9,58 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
+import {
+  formatUnspecifiedAmount,
+  unspecifiedMicrosLabel,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
+export interface RecentOpportunityItem {
+  id: string;
+  code?: string | null;
+  name: string;
+  customer?: string | null;
+  value: string;
+  stage?: string | null;
+}
+
+/** A recorded deal amount. An unsafe JSON number is already one unit low, so it is not printed. */
+function recentDealAmount(amountMicros: string | number | bigint): string {
+  if (typeof amountMicros === 'number' && !Number.isSafeInteger(amountMicros))
+    return 'Not recorded';
+  return unspecifiedMicrosLabel(amountMicros);
+}
+
+function isOpenDealStage(stage: string): boolean {
+  return stage !== 'closed_won' && stage !== 'closed_lost';
+}
+
+/** Snapshot deals are micros. Closed outcomes stay off the open-opportunity list. */
+export function recentItemsFromDeals(
+  deals: ReadonlyArray<{
+    id: string;
+    name: string;
+    stage: string;
+    amountMicros: string | number;
+    companyName: string | null;
+  }>,
+): RecentOpportunityItem[] {
+  return deals
+    .filter((deal) => isOpenDealStage(deal.stage))
+    .map((deal) => ({
+      id: deal.id,
+      name: deal.name,
+      customer: deal.companyName,
+      value: recentDealAmount(deal.amountMicros),
+      stage: deal.stage,
+    }));
+}
+
 interface Props {
-  opps: ReturnType<typeof useOpportunities>;
+  opps?: ReturnType<typeof useOpportunities>;
   accountName?: string;
-  items?: NonNullable<ReturnType<typeof useOpportunities>['data']>['items'];
+  items?: RecentOpportunityItem[];
 }
 
 export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
@@ -25,9 +69,9 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   items,
 }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
-  const visibleItems = items ?? opps.data?.items ?? [];
+  const visibleItems = items ?? opps?.data?.items ?? [];
+  const loading = items ? false : (opps?.isLoading ?? false);
   const accountScoped = Boolean(accountName);
   return (
     <Card
@@ -46,16 +90,23 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         }
         caption={
           accountScoped
-            ? t('recentOpportunities.accountCaption', 'Open opportunities linked to {{accountName}}', {
-                accountName,
-              })
-            : t('recentOpportunities.recentCaption', 'Latest portfolio activity across all customers')
+            ? t(
+                'recentOpportunities.accountCaption',
+                'Open opportunities linked to {{accountName}}',
+                {
+                  accountName,
+                },
+              )
+            : t(
+                'recentOpportunities.recentCaption',
+                'Latest portfolio activity across all customers',
+              )
         }
         action={
           <Link
             to={
               accountScoped
-                ? `/opportunities?search=${encodeURIComponent(accountName ?? '')}`
+                ? `/opportunities?search=${encodeURIComponent(accountName ?? '')}&excludeClosed=true`
                 : '/opportunities'
             }
             className="link-arrow"
@@ -67,13 +118,16 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
           </Link>
         }
       />
-      {opps.isLoading ? (
+      {loading ? (
         <LoadingSkeleton rows={3} />
       ) : visibleItems.length === 0 ? (
         <EmptyState
           title={
             accountScoped
-              ? t('recentOpportunities.emptyAccountTitle', 'No opportunities for this account yet')
+              ? t(
+                  'recentOpportunities.emptyAccountTitle',
+                  'No open opportunities for this account yet',
+                )
               : t('recentOpportunities.emptyTitle', 'No opportunities yet')
           }
           message={
@@ -97,13 +151,17 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
             >
               <Link to={`/opportunities/${o.id}`} className="proto-row-link">
                 <div className="proto-row-main">
-                  <span className="proto-row-code">{o.code}</span>
+                  {o.code ? <span className="proto-row-code">{o.code}</span> : null}
                   <span className="proto-row-name">{o.name}</span>
                   {!accountScoped ? <span className="proto-row-meta">{o.customer}</span> : null}
                 </div>
                 <div className="proto-row-right">
                   <span className="proto-row-money">
-                    <AnimatedMetric value={formatMoney(o.value, 'EUR')} />
+                    <AnimatedMetric
+                      value={
+                        typeof o.value === 'number' ? formatUnspecifiedAmount(o.value) : o.value
+                      }
+                    />
                   </span>
                   <Badge tone="purple">{formatStage(o.stage ?? 'unknown')}</Badge>
                 </div>

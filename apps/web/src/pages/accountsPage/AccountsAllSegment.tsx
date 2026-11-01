@@ -9,7 +9,8 @@ import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/compo
 import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
@@ -46,7 +47,6 @@ const SNAPSHOT_ACCOUNT_CAP = 200;
 
 export function AccountsAllSegment() {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const dashboard = useCrmDashboard();
   const autopopulate = useAutopopulateSalesCompanies();
   const reducedMotion = useReducedMotion();
@@ -122,7 +122,7 @@ export function AccountsAllSegment() {
   // (rows is already memoized — this just avoids four extra O(n) passes).
   const summaryStats = useMemo(
     () => ({
-      totalPipeline: rows.reduce((acc, r) => acc + r.pipelineMicros, 0),
+      totalPipeline: rows.reduce((acc, r) => acc + BigInt(r.pipelineMicros), 0n).toString(),
       totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
       logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
       enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
@@ -168,14 +168,14 @@ export function AccountsAllSegment() {
 
   const healthDistribution = useMemo(
     () => [
-      { key: 'strong', label: t('accounts.health.strong', 'Strong'), count: rows.filter((row) => row.health === 'strong').length },
-      { key: 'good', label: t('accounts.health.good', 'Good'), count: rows.filter((row) => row.health === 'good').length },
+      { key: 'strong', label: t('accounts.health.strong', 'Strong, proxy'), count: rows.filter((row) => row.health === 'strong').length },
+      { key: 'good', label: t('accounts.health.good', 'Good, proxy'), count: rows.filter((row) => row.health === 'good').length },
       {
         key: 'needs_attention',
-        label: t('accounts.health.watch', 'Watch'),
+        label: t('accounts.health.watch', 'Watch, proxy'),
         count: rows.filter((row) => row.health === 'needs_attention').length,
       },
-      { key: 'critical', label: t('accounts.health.risk', 'At risk'), count: rows.filter((row) => row.health === 'critical').length },
+      { key: 'critical', label: t('accounts.health.risk', 'At risk, proxy'), count: rows.filter((row) => row.health === 'critical').length },
     ],
     [rows, t],
   );
@@ -267,7 +267,7 @@ export function AccountsAllSegment() {
                   })}{' '}
               · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
+                amount: `${formatMicrosAmount(BigInt(totalPipeline))} (${UNSPECIFIED_CURRENCY_BASIS})`,
               })}
             </>
           }
@@ -360,21 +360,30 @@ export function AccountsAllSegment() {
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
-          value={formatMoneyMicros(totalPipeline, 'EUR')}
-          sublabel={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
+          value={formatMicrosAmount(BigInt(totalPipeline))}
+          sublabel={t('accounts.stats.weightedPipeline.detail', UNSPECIFIED_CURRENCY_BASIS)}
         />
         <StatTile
-          label={t('accounts.stats.coverage.label', 'Avg coverage')}
+          label={t('accounts.stats.coverage.label', 'Profile fields filled')}
           value={`${avgCoverage}%`}
-          sublabel={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
-            logos: logoCoverage,
-            tech: techAccounts,
-          })}
+          sublabel={t(
+            'accounts.stats.coverage.detail',
+            'proxy · share of 6 list fields on accounts in this view ({{logos}} with a logo, {{tech}} with a stack)',
+            { logos: logoCoverage, tech: techAccounts },
+          )}
         />
         <StatTile
           label={t('accounts.stats.enrichedProfiles.label', 'Enriched profiles')}
           value={enrichedAccounts.toLocaleString()}
           sublabel={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
+        />
+        <StatTile
+          label={t('accounts.stats.sourcesHealthy.label', 'Catalog rows marked healthy')}
+          value={`${healthyProviders}/${providerCount}`}
+          sublabel={t(
+            'accounts.stats.sourcesHealthy.detail',
+            'configuration status, not a live probe',
+          )}
         />
       </section>
 
@@ -390,6 +399,12 @@ export function AccountsAllSegment() {
             : t('accounts.experience.complete', 'No coverage gaps in the current view.')
         }
       >
+        <p className="mb-3 text-xs text-[var(--fg-secondary)]">
+          {t(
+            'accounts.health.basis',
+            'Bands follow weighted pipeline size on accounts in this view, not a measured health score.',
+          )}
+        </p>
         <div className="account-health-bars">
           {healthDistribution.map((item) => {
             const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
@@ -528,7 +543,7 @@ export function AccountsAllSegment() {
             title={t('accounts.empty.title', 'No accounts yet')}
             message={t(
               'accounts.empty.body',
-              'Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.',
+              'Add an account. Pipeline, health, and technology stay blank until they are recorded on that account.',
             )}
             secondary={
               <EmptyStateLink to="/settings?tab=data-import">

@@ -15,6 +15,7 @@ interface NavItem {
 const navItems: NavItem[] = [];
 
 import { useSignInAction } from '@/lib/auth';
+import { ssoSignInPolicy } from '@/lib/sso-policy';
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -23,8 +24,7 @@ export function Navbar() {
   const [showEmail, setShowEmail] = useState(false);
 
   const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-  const microsoftEnabled = import.meta.env.VITE_SSO_MICROSOFT_ENABLED === 'true';
-  const googleEnabled = import.meta.env.VITE_SSO_GOOGLE_ENABLED === 'true';
+  const { microsoft: microsoftEnabled, google: googleEnabled } = ssoSignInPolicy();
   const microsoftLabel =
     import.meta.env.VITE_SSO_MICROSOFT_LABEL ??
     t('navbar.signInMicrosoft', 'Sign in with Microsoft');
@@ -63,28 +63,33 @@ export function Navbar() {
         <PoloPreSalesLogo variant="full" className="h-16 w-auto -ml-1" />
       </div>
 
-      {/* Right Side — Auth Buttons */}
-      <div className="flex-1 flex justify-end items-center gap-2 md:gap-3">
+      {/* Right Side — Auth Buttons. Microsoft is official; Google stays on. */}
+      <div className="flex flex-1 flex-col items-end gap-1">
+      <div className="flex justify-end items-center gap-2 md:gap-3">
         {isStub ? (
           <>
-            <button
-              type="button"
-              onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
-              aria-label={t('navbar.signInMicrosoft', 'Sign in with Microsoft')}
-              className="flex items-center bg-[rgba(30,50,90,0.8)] text-white rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-pointer hover:bg-[rgba(30,50,90,0.9)] active:scale-[0.98] transition-all"
-            >
-              <MicrosoftLogo />
-              <span className="hidden sm:inline">{microsoftLabel}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
-              aria-label={t('navbar.signInGoogle', 'Sign in with Google')}
-              className="flex items-center bg-white text-[rgba(30,50,90,0.8)] rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal border border-[rgba(30,50,90,0.1)] cursor-pointer hover:bg-gray-50 active:scale-[0.98] transition-all"
-            >
-              <GoogleLogo />
-              <span className="hidden sm:inline">{googleLabel}</span>
-            </button>
+            {microsoftEnabled && (
+              <button
+                type="button"
+                onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
+                aria-label={t('navbar.signInMicrosoft', 'Sign in with Microsoft')}
+                className="flex items-center bg-[rgba(30,50,90,0.8)] text-white rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-pointer hover:bg-[rgba(30,50,90,0.9)] active:scale-[0.98] transition-all"
+              >
+                <MicrosoftLogo />
+                <span className="hidden sm:inline">{microsoftLabel}</span>
+              </button>
+            )}
+            {googleEnabled && (
+              <button
+                type="button"
+                onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
+                aria-label={t('navbar.signInGoogle', 'Sign in with Google')}
+                className="flex items-center bg-white text-[rgba(30,50,90,0.8)] rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal border border-[rgba(30,50,90,0.1)] cursor-pointer hover:bg-gray-50 active:scale-[0.98] transition-all"
+              >
+                <GoogleLogo />
+                <span className="hidden sm:inline">{googleLabel}</span>
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -92,6 +97,15 @@ export function Navbar() {
             {googleEnabled && <GoogleSignInButton label={googleLabel} variant="secondary" />}
           </>
         )}
+      </div>
+      {microsoftEnabled && googleEnabled ? (
+        <p className="max-w-xs text-right text-[11px] leading-4 text-[rgba(30,50,90,0.55)]">
+          {t(
+            'navbar.accountPolicy',
+            'Microsoft is the official account. Google sign-in and Gmail stay available in this version.',
+          )}
+        </p>
+      ) : null}
       </div>
 
       {/* Email toggle (production only) */}

@@ -49,8 +49,8 @@ export interface CallInsight {
   summary: string;
   actionItems: ActionItem[];
   meddicSignals: MeddicSignal[];
-  /** −1.0 to +1.0. Positive = prospect positive, negative = concern/objection. */
-  sentimentScore: number;
+  /** −1.0 to +1.0. Null when the model did not return a score. Zero is neutral. */
+  sentimentScore: number | null;
   /** Per-speaker talk percentages { "Speaker 0": 0.42, ... }. Sum = 1.0. */
   talkRatio: Record<string, number>;
   /**
@@ -183,7 +183,7 @@ export async function analyzeCallTranscript(
     summary: parsed.summary ?? '',
     actionItems: parsed.actionItems ?? [],
     meddicSignals: parsed.meddicSignals ?? [],
-    sentimentScore: Math.max(-1, Math.min(1, parsed.sentimentScore ?? 0)),
+    sentimentScore: recordedSentiment(parsed.sentimentScore),
     talkRatio,
     dealSuggestions: parsed.dealSuggestions ?? [],
   };
@@ -194,6 +194,12 @@ export async function analyzeCallTranscript(
  * WHY: CallSummary.key stores string keys that can also include non-MEDDIC
  * signals (EXECUTIVE_BUYER_PRESENT, BUDGET_DISCUSSED, etc.).
  */
+/** A missing or non-numeric sentiment stays missing. Zero is a real neutral score. */
+export function recordedSentiment(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.max(-1, Math.min(1, value));
+}
+
 export function meddicDimensionToKey(dimension: MeddicSignal['dimension']): string {
   const keyMap: Record<MeddicSignal['dimension'], string> = {
     METRIC: 'MEDDIC_METRIC',

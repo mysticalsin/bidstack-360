@@ -14,13 +14,15 @@ import { prefetchRoute } from '@/lib/prefetch';
 import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { api } from '@/lib/api';
 import { useAppModules } from '@/hooks/useAppModules';
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
-  NAV_SECTIONS,
+  visibleNavSections,
   isNavItemVisible,
+  navBadgeCopy,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -69,7 +71,8 @@ export function Sidebar() {
 
   // Hide module-gated items (agent-studio, Collaborate) unless enabled in
   // Settings → Modules; drop a section that ends up empty after filtering.
-  const sections = NAV_SECTIONS.map((s) => ({
+  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
+  const sections = visibleNavSections(quickStartVisible).map((s) => ({
     ...s,
     items: s.items.filter((it) => isNavItemVisible(it, appModules)),
   })).filter((s) => s.items.length > 0);
@@ -121,7 +124,7 @@ export function Sidebar() {
 
         <div className="sb-brand">
           <div className="sb-mark" aria-hidden>
-            <PoloPreSalesLogo variant="mark" tone="inverse" title="" className="h-5 w-5" />
+            <PoloPreSalesLogo variant="mark" title="" className="h-5 w-5" />
           </div>
           <div>
             <div className="sb-name">
@@ -258,10 +261,26 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
+              const badgePhrase =
+                badgeCopy && badge > 0
+                  ? t(badgeCopy.key, badgeCopy.fallback, { count: badge })
+                  : null;
+              const itemLabel = t(item.labelKey, item.label);
               return (
-                <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
-                  <span>{t(item.labelKey, item.label)}</span>
-                  {badge > 0 && <span className="sb-badge">{badge}</span>}
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className="sb-flyout-item"
+                  aria-label={badgePhrase ? `${itemLabel}, ${badgePhrase}` : itemLabel}
+                >
+                  <span>{itemLabel}</span>
+                  {badge > 0 && (
+                    <span className="sb-badge" title={badgePhrase ?? undefined}>
+                      {badge}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -334,6 +353,10 @@ function SidebarItem({
   const { t } = useTranslation('common');
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
+  const badgePhrase =
+    badgeCopy && badge > 0 ? t(badgeCopy.key, badgeCopy.fallback, { count: badge }) : null;
+  const accessibleName = badgePhrase ? `${label}, ${badgePhrase}` : label;
   const prefetch = () => prefetchRoute(item.to);
 
   const isActive = useMemo(() => {
@@ -362,15 +385,19 @@ function SidebarItem({
       end={item.end}
       aria-current={isActive ? 'page' : undefined}
       className={cn('sb-item', isActive && 'is-active')}
-      aria-label={label}
-      title={collapsed ? undefined : label}
+      aria-label={accessibleName}
+      title={collapsed ? undefined : accessibleName}
       onMouseEnter={prefetch}
       onFocus={prefetch}
       onTouchStart={prefetch}
     >
       <Icon name={item.icon} size={16} />
       <span>{label}</span>
-      {badge > 0 && <span className="sb-badge">{badge}</span>}
+      {badge > 0 && (
+        <span className="sb-badge" title={badgePhrase ?? undefined}>
+          {badge}
+        </span>
+      )}
     </NavLink>
   );
   // Tooltips only when the label is hidden (collapsed mode) — otherwise

@@ -175,7 +175,10 @@ describe('TerritoriesPage', () => {
 
     // Check header and KPI values
     expect(screen.getByRole('heading', { name: 'Territories', level: 1 })).toBeTruthy();
-    expect(screen.getByText('$15K')).toBeTruthy(); // 15,000,000,000 micros = 15,000 EUR, converted to USD and compacted
+    // Why: 15_000_000_000 micros is 15,000 major units and opportunities
+    // store no currency. "$15K" was a converted dollar figure.
+    expect(screen.getByText(/15K unspecified/)).toBeTruthy();
+    expect(screen.queryByText('$15K')).toBeNull();
     expect(screen.getByText('75%')).toBeTruthy();
 
     // Check list entries

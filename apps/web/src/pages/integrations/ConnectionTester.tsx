@@ -162,7 +162,7 @@ export function ConnectionTester({
 
         <div className="space-y-3">
           <label className="block">
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <span className="mb-1 block text-xs font-medium text-[var(--fg-tertiary)]">
               {t('connectionTester.endpointUrlLabel', 'Endpoint URL')}
             </span>
             <div className="flex flex-col gap-2 lg:flex-row">

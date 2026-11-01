@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatRecordedDealAmount } from '@/components/dashboard/unspecified-currency';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
@@ -47,7 +47,6 @@ export const PipelineCard = memo(function PipelineCard({
 }: PipelineCardProps) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
@@ -89,25 +88,16 @@ export const PipelineCard = memo(function PipelineCard({
         aria-label={
           // Base label + an ", overdue" suffix so the past-due state reaches
           // screen-reader users — color alone fails WCAG 1.4.1 (Use of Color).
-          // The "use arrows to move" hint only applies when the signed-in
-          // user actually holds opportunities:write.
-          (canWrite
-            ? t(
-                'crm.pipelineCardAriaLabel',
-                '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
-                {
-                  code: opp.code,
-                  name: opp.name,
-                  stage: stageName,
-                  value: formatMoney(opp.value, 'EUR'),
-                },
-              )
-            : t('crm.pipelineCardAriaLabelReadOnly', '{{code}}: {{name}}, {{stage}}, {{value}}.', {
-                code: opp.code,
-                name: opp.name,
-                stage: stageName,
-                value: formatMoney(opp.value, 'EUR'),
-              })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
+          t(
+            'crm.pipelineCardAriaLabel',
+            '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
+            {
+              code: opp.code,
+              name: opp.name,
+              stage: stageName,
+              value: formatRecordedDealAmount(opp, 'compact'),
+            },
+          ) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
         className={cn(
           'block rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
@@ -123,7 +113,7 @@ export const PipelineCard = memo(function PipelineCard({
             {opp.customer}
           </span>
           <span className="tabular-nums text-[11px] font-bold text-[var(--fg-primary)] shrink-0">
-            {formatMoney(opp.value, 'EUR')}
+            {formatRecordedDealAmount(opp, 'compact')}
           </span>
         </div>
 

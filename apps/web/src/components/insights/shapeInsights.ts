@@ -4,7 +4,7 @@ import {
   getPipelineStages,
 } from '@/lib/pipeline-stages';
 
-import type { Opportunity } from '@bidstack/shared';
+import { microsToUnits, unitsToMicros, type Opportunity } from '@bidstack/shared';
 
 /** Shown whenever a money figure has no ISO currency on the record. */
 export const UNSPECIFIED_CURRENCY_LABEL = 'unspecified';
@@ -21,7 +21,7 @@ export interface PipelineStageRow {
   id: string;
   label: string;
   count: number;
-  /** Sum of opportunity `value` (major units). Not a currency conversion. */
+  /** Sum of recorded deal amounts in major units. Micros win over a zero unit number. */
   amount: number;
   color: string | null;
 }
@@ -71,9 +71,7 @@ export function normalizeCurrencyCode(value: string | null | undefined): string 
  * One currency label for a summed total. A missing code, an invalid code, or
  * mixed codes stay unspecified — summing those into EUR would be invented.
  */
-export function resolveSharedCurrency(
-  records: ReadonlyArray<CurrencyBearing>,
-): string | null {
+export function resolveSharedCurrency(records: ReadonlyArray<CurrencyBearing>): string | null {
   if (records.length === 0) return null;
   const codes = records.map((record) => normalizeCurrencyCode(record.currency));
   const first = codes[0];
@@ -105,19 +103,36 @@ export function formatInsightAmount(
 
 type PipelineInput = Opportunity & CurrencyBearing;
 
+function recordedDealMicros(opp: PipelineInput): bigint {
+  if (opp.valueMicros && /^\d+$/.test(opp.valueMicros)) return BigInt(opp.valueMicros);
+  if (!Number.isFinite(opp.value)) return 0n;
+  return unitsToMicros(opp.value) ?? 0n;
+}
+
+function unitsFromRecordedMicros(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const cents = (abs + 5_000n) / 10_000n;
+  const rounded = microsToUnits(cents * 10_000n);
+  return negative ? -rounded : rounded;
+}
+
 /** Stages with at least one opportunity. Width should follow `count`, amount is separate. */
 export function shapePipelineByStage(opportunities: readonly PipelineInput[]): PipelineVisual {
   const stages = getPipelineStages([...opportunities]);
   const rows: PipelineStageRow[] = [];
   for (const stage of stages) {
     const id = getPipelineStageBusinessKey(stage);
+    if (stage.isWon || stage.isLost) continue;
     const matched = opportunities.filter((opp) => getOpportunityStageBusinessKey(opp) === id);
     if (matched.length === 0) continue;
     rows.push({
       id,
       label: stage.name,
       count: matched.length,
-      amount: matched.reduce((sum, opp) => sum + (Number.isFinite(opp.value) ? opp.value : 0), 0),
+      amount: unitsFromRecordedMicros(
+        matched.reduce((sum, opp) => sum + recordedDealMicros(opp), 0n),
+      ),
       color: stage.color,
     });
   }
@@ -130,6 +145,25 @@ export function shapePipelineByStage(opportunities: readonly PipelineInput[]): P
 
 export function pipelineIsEmpty(visual: PipelineVisual): boolean {
   return visual.opportunityCount === 0 || visual.stages.length === 0;
+}
+
+/** Index of the series that should carry the single accent. Ties keep the earlier row. */
+export function leadStageIndex(stages: ReadonlyArray<{ count: number }>): number {
+  return stages.reduce(
+    (best, stage, index, all) => (stage.count > (all[best]?.count ?? -1) ? index : best),
+    0,
+  );
+}
+
+/**
+ * One accent on the leading series. Other series are neutral steps so a chart
+ * does not become a hue gradient.
+ */
+export function insightSeriesColor(index: number, leadIndex: number): string {
+  if (index === leadIndex) return 'var(--chart-1)';
+  const steps = [62, 46, 34, 24, 16];
+  const mix = steps[Math.min(Math.abs(index - leadIndex) - 1, steps.length - 1)] ?? 16;
+  return `color-mix(in srgb, var(--fg-primary) ${mix}%, var(--surface-card))`;
 }
 
 const UNSPECIFIED_INDUSTRY = 'Unspecified';

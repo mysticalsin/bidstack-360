@@ -179,6 +179,9 @@ describe('upsertCompanyFromDust', () => {
     });
 
     expect(result).toEqual({ id: 'ce-1', created: true });
+    const create = mocks.companyUpsert.mock.calls[0]![0].create as { legalName: string | null; tradeName: string };
+    expect(create.legalName).toBeNull();
+    expect(create.tradeName).toBe('Acme, Inc.');
     expect(mocks.companyFindUnique).toHaveBeenCalledWith({
       where: { orgId_normalizedName: { orgId: ORG_A, normalizedName: 'acme-inc' } },
       select: { id: true },

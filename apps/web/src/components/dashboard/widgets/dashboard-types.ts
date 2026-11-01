@@ -24,7 +24,7 @@ export interface OrgKpi {
 
 export type KpiTone = 'blue' | 'jade' | 'purple' | 'amber' | 'teal' | 'rose';
 
-export type PipelineStagePoint = { stage: string; count: number; valueSum: number };
+export type PipelineStagePoint = { stage: string; count: number; valueSum: number; valueSumMicros?: string };
 
 export type SignalPoint = {
   label: string;

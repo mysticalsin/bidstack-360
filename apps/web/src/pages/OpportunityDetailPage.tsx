@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { DueDateChip } from '@/components/ui/DueDateChip';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
@@ -18,6 +17,7 @@ import {
   InlineEditSelect,
   InlineEditText,
 } from '@/components/opportunity/InlineEdit';
+import { BuyingGroupList } from '@/components/opportunity/BuyingGroupList';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
 import { PresenceAvatars } from '@/components/presence/PresenceAvatars';
 import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
@@ -25,16 +25,24 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { ScheduleReviewDialog } from '@/components/calls/ScheduleReviewDialog';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { Icon } from '@/components/ui/Icon';
-import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
+import { closedOutcome } from '@/lib/pipeline-stages';
+import { useTasks } from '@/hooks/useTasks';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatStage } from '@/lib/format';
-import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
-import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
+import {
+  formatMicrosAmount,
+  presentOpportunityIntel,
+  type OpportunityStage,
+  type IntelPayload,
+  type Task,
+} from '@bidstack/shared';
 
 import {
   DataFreshnessRibbon,
@@ -45,18 +53,8 @@ import {
   NewsCard,
 } from './opportunityDetail/IntelCards';
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
+import { recordedProbability } from './opportunityDetail/intel-honesty';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
-import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
-import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
-
-// Amaris bid-class severity tone (simple C0 → strategic C4).
-const BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
-  C0: 'jade',
-  C1: 'blue',
-  C2: 'amber',
-  C3: 'tomato',
-  C4: 'rose',
-};
 
 export function OpportunityDetailPage() {
   const { t } = useTranslation('crm');
@@ -74,6 +72,7 @@ export function OpportunityDetailPage() {
   ];
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useOpportunity(id);
+  const dealTasks = useTasks(id ? { oppId: id, limit: 20 } : { limit: 1 });
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
   // Delete/patch/stage-move all 403 server-side without opportunities:write
@@ -86,7 +85,7 @@ export function OpportunityDetailPage() {
     'You need opportunities write access to edit this opportunity.',
   );
   const [briefOpen, setBriefOpen] = useState(false);
-  const intel: IntelPayload = data?.intel ?? {};
+  const intel: IntelPayload = presentOpportunityIntel(data?.intel ?? {});
   const nav = useNavigate();
   const qc = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -166,9 +165,11 @@ export function OpportunityDetailPage() {
     );
   }
 
-  const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
-  const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
+  const outcome = closedOutcome(data);
+  const isWon = outcome === 'won';
+  const isLost = outcome === 'lost';
   const isOutcomeLocked = isWon || isLost;
+  const nextTask = pickNextTask(dealTasks.data?.items);
   const moveToOutcome = (stage: 'closed_won' | 'closed_lost') => {
     stageMove.mutate(
       { id: data.id, pipelineStageId: stage },
@@ -182,307 +183,223 @@ export function OpportunityDetailPage() {
 
   return (
     <div className="space-y-6">
-      <GlassCard
-        padding="lg"
-        className="border-none bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-sunken-alpha)] shadow-2xl"
-      >
-        <header>
+      <header className="border-b border-[var(--border-subtle)] pb-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <nav
               aria-label={t('opportunityDetail.breadcrumbAriaLabel', 'Breadcrumb')}
-              className="text-xs text-[var(--fg-tertiary)]"
+              className="text-sm text-[var(--fg-secondary)]"
             >
               <ol className="flex items-center gap-2">
                 <li>
                   <Link
                     to="/opportunities"
-                    className="hover:text-[var(--brand-primary)] transition-colors"
+                    className="inline-flex min-h-11 items-center hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                   >
                     {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
                   </Link>
                 </li>
-                <li aria-hidden="true" className="opacity-30">
+                <li aria-hidden="true" className="text-[var(--fg-tertiary)]">
                   /
                 </li>
-                <li aria-current="page" className="font-mono">
-                  {data.code}
-                </li>
+                <li aria-current="page">{data.code}</li>
               </ol>
             </nav>
-            {/* A3 — who else is looking at this bid right now. */}
             <PresenceAvatars entityType="opportunity" entityId={data.id} />
           </div>
-          {/* basis-80 is load-bearing. `flex-1` alone resolves flex-basis to 0, so
-              the title contributes nothing to the wrap calculation: the action
-              toolbar (which carries min-width:auto and cannot shrink below its
-              min-content ~1140px) claimed the whole row and the title collapsed
-              to a 5px column, wrapping the name one character per line. Giving
-              the title a real basis makes the toolbar wrap BELOW it instead. */}
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="min-w-0 flex-1 basis-80">
-              <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
-                {canWrite ? (
-                  <InlineEditText
-                    value={data.name}
-                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { name: v } })}
-                    label={t('opportunityDetail.editNameLabel', 'Edit opportunity name')}
-                    validate={(v) =>
-                      v.length < 1 ? t('opportunityDetail.nameRequired', 'Name is required') : null
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="min-w-0">
+              <h1 className="text-[28px] font-medium text-[var(--fg-primary)]">
+                <InlineEditText
+                  value={data.name}
+                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { name: v } })}
+                  label={t('opportunityDetail.editNameLabel', 'Edit opportunity name')}
+                  validate={(v) =>
+                    v.length < 1 ? t('opportunityDetail.nameRequired', 'Name is required') : null
+                  }
+                />
+              </h1>
+              <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+                <InlineEditText
+                  value={data.customer}
+                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { customer: v } })}
+                  label={t('opportunityDetail.editCustomerLabel', 'Edit customer name')}
+                  validate={(v) =>
+                    v.length < 1
+                      ? t('opportunityDetail.customerRequired', 'Customer is required')
+                      : null
+                  }
+                />
+              </p>
+            </div>
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-8">
+              <div>
+                <dt className="text-sm text-[var(--fg-secondary)]">
+                  {t('opportunityDetail.valueLabel', 'Value')}
+                </dt>
+                <dd className="mt-1 text-2xl font-medium tabular-nums text-[var(--fg-primary)]">
+                  <InlineEditNumber
+                    value={data.value}
+                    exactMicros={data.valueMicros}
+                    onSaveMicros={(micros) =>
+                      patch.mutateAsync({ id: id!, patch: { valueMicros: micros } })
+                    }
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
+                    label={t(
+                      'opportunityDetail.editValueLabel',
+                      'Edit deal value (currency not recorded)',
+                    )}
+                    min={0}
+                    step={1000}
+                    display={(v) =>
+                      data.valueMicros
+                        ? formatMicrosAmount(BigInt(data.valueMicros))
+                        : formatUnspecifiedAmount(v)
                     }
                   />
-                ) : (
-                  <span title={readOnlyHint}>{data.name}</span>
-                )}
-              </h1>
-              <div className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
-                <span className="flex items-center gap-1.5 font-medium">
-                  <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
-                  {canWrite ? (
-                    <InlineEditText
-                      value={data.customer}
-                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { customer: v } })}
-                      label={t('opportunityDetail.editCustomerLabel', 'Edit customer name')}
-                      validate={(v) =>
-                        v.length < 1
-                          ? t('opportunityDetail.customerRequired', 'Customer is required')
-                          : null
-                      }
-                    />
-                  ) : (
-                    <span title={readOnlyHint}>{data.customer}</span>
-                  )}
-                </span>
-                <span className="opacity-30">|</span>
-                <span className="flex items-center gap-1.5">
-                  <Icon name="reports" size={14} className="text-[var(--info)]" />
-                  {canWrite ? (
-                    <InlineEditText
-                      value={data.industry ?? ''}
-                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
-                      label={t('opportunityDetail.editIndustryLabel', 'Edit industry')}
-                      display={(v) => v || '—'}
-                      placeholder={t('opportunityDetail.industryPlaceholder', 'Industry')}
-                    />
-                  ) : (
-                    <span title={readOnlyHint}>{data.industry || '—'}</span>
-                  )}
-                </span>
-                <span className="opacity-30">|</span>
-                <span className="flex items-center gap-1.5">
-                  <Icon name="globe" size={14} className="text-[var(--success)]" />
-                  {data.territoryName ? (
-                    <Badge tone="teal">{data.territoryName}</Badge>
-                  ) : data.country ? (
-                    <span className="text-sm">{data.country}</span>
-                  ) : (
-                    <span className="text-sm text-[var(--fg-tertiary)]">—</span>
-                  )}
-                </span>
-                {data.bidClass ? (
-                  <>
-                    <span className="opacity-30">|</span>
-                    <span
-                      className="flex items-center gap-1.5"
-                      title={t('opportunityDetail.bidClassHint', 'Amaris bid class (FTE size × commitment)')}
-                    >
-                      <Icon name="shield" size={14} className="text-[var(--fg-tertiary)]" />
-                      <Badge tone={BID_CLASS_TONE[data.bidClass] ?? 'gray'}>{data.bidClass}</Badge>
-                    </span>
-                  </>
+                </dd>
+                <p className="mt-1 max-w-[16rem] text-xs text-[var(--fg-secondary)]">
+                  {UNSPECIFIED_CURRENCY_BASIS}
+                </p>
+              </div>
+              <div>
+                <dt className="text-sm text-[var(--fg-secondary)]">
+                  {t('opportunityDetail.stageLabel', 'Stage')}
+                </dt>
+                <dd className="mt-1">
+                  <InlineEditSelect<OpportunityStage>
+                    value={data.stage as OpportunityStage}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
+                    options={stageOptions}
+                    label={t('opportunityDetail.changeStageLabel', 'Change stage')}
+                    display={(v) => <span className="text-sm text-[var(--fg-primary)]">{formatStage(v)}</span>}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-[var(--fg-secondary)]">
+                  {t('opportunityDetail.nextStepLabel', 'Next step')}
+                </dt>
+                <dd className="mt-1 text-sm text-[var(--fg-primary)]">
+                  {nextTask
+                    ? nextTask.title
+                    : data.dueDate
+                      ? t('opportunityDetail.nextStepDue', 'Due {{date}}', {
+                          date: formatDate(data.dueDate),
+                        })
+                      : t('opportunityDetail.nextStepEmpty', 'No next step')}
+                </dd>
+                {nextTask?.dueDate ? (
+                  <p className="mt-1 text-xs text-[var(--fg-secondary)]">{formatDate(nextTask.dueDate)}</p>
                 ) : null}
               </div>
-            </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2 bg-[var(--surface-sunken-alpha)] p-1 rounded-full border border-[var(--border-subtle)]">
-                <CreateTaskDialog
-                  oppId={data.id}
-                  trigger={
-                    <Button variant="ghost" size="sm" className="rounded-full">
-                      {t('opportunityDetail.addTaskButton', '+ Task')}
-                    </Button>
-                  }
-                />
-                <Link to={`/rfp/${data.id}/pipeline`}>
-                  <Button variant="ghost" size="sm" className="rounded-full">
-                    <Icon name="wand" size={12} className="text-[var(--brand-primary)] mr-1" />
-                    {t('opportunityDetail.rfpPipelineButton', 'RFP Pipeline')}
-                  </Button>
-                </Link>
-                <ScheduleReviewDialog
-                  entityType="OPPORTUNITY"
-                  entityId={data.id}
-                  defaultTopic={t('opportunityDetail.reviewDefaultTopic', 'Go/No-Go review — {{name}}', {
-                    name: data.name,
-                  })}
-                  trigger={
-                    <Button variant="ghost" size="sm" className="rounded-full">
-                      <Icon name="clock" size={12} className="text-[var(--brand-primary)] mr-1" />
-                      {t('opportunityDetail.scheduleReviewButton', 'Schedule review')}
-                    </Button>
-                  }
-                />
-                <MagneticButton
-                  onClick={() => setBriefOpen(true)}
-                  className="h-8 px-4 text-xs shadow-none"
-                >
-                  {t('opportunityDetail.askDustButton', 'Ask Dust')}
-                </MagneticButton>
-                {/* Destructive per-record action — hidden (not just disabled)
-                    for read-only roles, matching CompanyRow's delete gating. */}
-                {canWrite ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full text-[var(--danger)]"
-                    disabled={isDeleting}
-                    onClick={handleDelete}
-                  >
-                    <Icon name="trash" size={13} className="mr-1" />
-                    {isDeleting
-                      ? t('opportunityDetail.deleting', 'Deleting…')
-                      : t('opportunityDetail.deleteButton', 'Delete')}
-                  </Button>
-                ) : null}
-              </div>
-              <div
-                className="flex flex-wrap items-center gap-2"
-                aria-label={t('opportunityDetail.outcomeActionsLabel', 'Opportunity outcome actions')}
+            </dl>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <CreateTaskDialog
+              oppId={data.id}
+              trigger={
+                <Button variant="secondary" size="sm">
+                  {t('opportunityDetail.addTaskButton', 'Add task')}
+                </Button>
+              }
+            />
+            <Link to={`/rfp/${data.id}/pipeline`}>
+              <Button variant="ghost" size="sm">
+                {t('opportunityDetail.rfpPipelineButton', 'RFP pipeline')}
+              </Button>
+            </Link>
+            <ScheduleReviewDialog
+              entityType="OPPORTUNITY"
+              entityId={data.id}
+              defaultTopic={t('opportunityDetail.reviewDefaultTopic', 'Go/No-Go review — {{name}}', {
+                name: data.name,
+              })}
+              trigger={
+                <Button variant="ghost" size="sm">
+                  {t('opportunityDetail.scheduleReviewButton', 'Schedule review')}
+                </Button>
+              }
+            />
+            <Button variant="ghost" size="sm" onClick={() => setBriefOpen(true)}>
+              {t('opportunityDetail.askDustButton', 'Ask Dust')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[var(--danger)]"
+              disabled={!canWrite || isDeleting}
+              title={canWrite ? undefined : readOnlyHint}
+              onClick={handleDelete}
+            >
+              {isDeleting
+                ? t('opportunityDetail.deleting', 'Deleting…')
+                : t('opportunityDetail.deleteButton', 'Delete')}
+            </Button>
+            {isWon ? (
+              <Button variant="success" size="sm" disabled>
+                {t('opportunityDetail.wonStatusButton', 'Won')}
+              </Button>
+            ) : (
+              <Button
+                variant="success"
+                size="sm"
+                disabled={!canWrite || stageMove.isPending || isOutcomeLocked}
+                title={canWrite ? undefined : readOnlyHint}
+                onClick={() => moveToOutcome('closed_won')}
               >
-                {isWon ? (
-                  <Button variant="success" size="sm" disabled className="rounded-full">
-                    <Icon name="trophy" size={13} />
-                    {t('opportunityDetail.wonStatusButton', 'Won')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="success"
-                    size="sm"
-                    className="rounded-full"
-                    disabled={stageMove.isPending || isOutcomeLocked || !canWrite}
-                    title={canWrite ? undefined : readOnlyHint}
-                    aria-label={
-                      canWrite
-                        ? undefined
-                        : `${t('opportunityDetail.markWonButton', 'Mark Won')} — ${readOnlyHint}`
+                {stageMove.isPending
+                  ? t('opportunityDetail.markWonPendingButton', 'Closing...')
+                  : t('opportunityDetail.markWonButton', 'Mark won')}
+              </Button>
+            )}
+            {isLost ? (
+              <Button variant="destructive" size="sm" disabled>
+                {t('opportunityDetail.lostStatusButton', 'Lost')}
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={!canWrite || stageMove.isPending || isOutcomeLocked}
+                title={canWrite ? undefined : readOnlyHint}
+                onClick={() => moveToOutcome('closed_lost')}
+              >
+                {stageMove.isPending
+                  ? t('opportunityDetail.markLostPendingButton', 'Closing...')
+                  : t('opportunityDetail.markLostButton', 'Mark lost')}
+              </Button>
+            )}
+            <span className="inline-flex min-h-11 items-center gap-2 text-sm text-[var(--fg-secondary)]">
+              {recordedProbability(data.probability) !== null ? (
+                <>
+                  <InlineEditNumber
+                    value={data.probability}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
+                    label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
+                    min={0}
+                    max={100}
+                    step={5}
+                    display={(v) =>
+                      v === 0
+                        ? t('opportunities.probabilityUnrecorded', 'Not recorded')
+                        : `${v}%`
                     }
-                    onClick={() => moveToOutcome('closed_won')}
-                  >
-                    <Icon name="trophy" size={13} />
-                    {stageMove.isPending
-                      ? t('opportunityDetail.markWonPendingButton', 'Closing...')
-                      : t('opportunityDetail.markWonButton', 'Mark Won')}
-                  </Button>
-                )}
-                {isLost ? (
-                  <Button variant="destructive" size="sm" disabled className="rounded-full">
-                    <Icon name="close" size={13} />
-                    {t('opportunityDetail.lostStatusButton', 'Lost')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="rounded-full"
-                    disabled={stageMove.isPending || isOutcomeLocked || !canWrite}
-                    title={canWrite ? undefined : readOnlyHint}
-                    aria-label={
-                      canWrite
-                        ? undefined
-                        : `${t('opportunityDetail.markLostButton', 'Mark Lost')} — ${readOnlyHint}`
-                    }
-                    onClick={() => moveToOutcome('closed_lost')}
-                  >
-                    <Icon name="close" size={13} />
-                    {stageMove.isPending
-                      ? t('opportunityDetail.markLostPendingButton', 'Closing...')
-                      : t('opportunityDetail.markLostButton', 'Mark Lost')}
-                  </Button>
-                )}
-              </div>
-              {canWrite ? (
-                <InlineEditSelect<OpportunityStage>
-                  value={data.stage as OpportunityStage}
-                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
-                  options={stageOptions}
-                  label={t('opportunityDetail.changeStageLabel', 'Change stage')}
-                  display={(v) => (
-                    <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
-                      {formatStage(v)}
-                    </Badge>
-                  )}
-                />
-              ) : (
-                <span title={readOnlyHint}>
-                  <Badge
-                    tone={stageTone(data.stage as OpportunityStage)}
-                    className="px-4 py-1 text-xs uppercase tracking-wider"
-                  >
-                    {formatStage(data.stage as OpportunityStage)}
-                  </Badge>
-                </span>
-              )}
-              <div className="text-right border-l border-[var(--border-subtle)] pl-4">
-                <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
-                  {canWrite ? (
-                    <InlineEditNumber
-                      value={data.value}
-                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
-                      label={t(
-                        'opportunityDetail.editValueLabel',
-                        'Edit deal value (currency not recorded)',
-                      )}
-                      min={0}
-                      step={1000}
-                      display={(v) =>
-                        `${formatUnspecifiedAmount(v)} (currency not recorded; not a euro forecast)`
-                      }
-                    />
-                  ) : (
-                    <span title={readOnlyHint}>
-                      {`${formatUnspecifiedAmount(data.value)} (currency not recorded; not a euro forecast)`}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-end gap-2 text-xs text-[var(--fg-tertiary)] mt-1">
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-[var(--success)]">
-                      {canWrite ? (
-                        <InlineEditNumber
-                          value={data.probability}
-                          onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
-                          label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
-                          min={0}
-                          max={100}
-                          step={5}
-                          suffix="%"
-                        />
-                      ) : (
-                        <span title={readOnlyHint}>{data.probability}%</span>
-                      )}
-                    </span>
-                    <span>{t('opportunityDetail.likely', 'likely')}</span>
+                  />
+                  <span>
+                    {t('opportunityDetail.storedProbabilityProxy', 'not a measured win chance')}
                   </span>
-                  <span className="opacity-30">·</span>
-                  <span className="flex items-center gap-2">
-                    <Icon name="clock" size={12} />
-                    {canWrite ? (
-                      <InlineEditDate
-                        value={data.dueDate}
-                        onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
-                        label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
-                        display={(v) => formatDate(v)}
-                      />
-                    ) : (
-                      <span title={readOnlyHint}>{formatDate(data.dueDate)}</span>
-                    )}
-                    <DueDateChip dueDate={data.dueDate} size="lg" />
-                  </span>
-                </div>
-              </div>
-            </div>
+                </>
+              ) : null}
+              <InlineEditDate
+                value={data.dueDate}
+                onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
+                label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
+                display={(v) => formatDate(v)}
+              />
+              <DueDateChip dueDate={data.dueDate} size="lg" />
+            </span>
           </div>
         </header>
-      </GlassCard>
 
       <BriefingDialog
         opportunityId={data.id}
@@ -494,10 +411,10 @@ export function OpportunityDetailPage() {
       <DataFreshnessRibbon intel={intel} />
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        <FinancialHealthCard intel={intel} />
+        <FinancialHealthCard intel={intel} companyId={data.companyId} />
         <WinPredictionCard intel={intel} />
         <BidScoreCard opportunityId={data.id} />
-        <OpportunityAccountIntel accountId={data.customer} />
+        <OpportunityAccountIntel accountId={data.companyId} />
       </div>
 
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
@@ -507,15 +424,7 @@ export function OpportunityDetailPage() {
 
       <NewsCard intel={intel} />
 
-      {/* Amaris Bid Office governance lives ON the record: the class, the gates
-          that class requires, and the formal sign-offs against them. */}
-      <BidGovernancePanel opportunityId={data.id} saved={data} />
-
-      {/* Stage 10 — renders only once the bid is closed. */}
-      <LessonsLearnedCard
-        opportunityId={data.id}
-        outcome={isWon ? 'won' : isLost ? 'lost' : null}
-      />
+      <BuyingGroupList opportunityId={data.id} />
 
       <OpportunityTabs
         oppId={data.id}
@@ -539,4 +448,10 @@ export function OpportunityDetailPage() {
       <CreateTaskDialog oppId={data.id} open={taskOpen} onOpenChange={setTaskOpen} />
     </div>
   );
+}
+
+function pickNextTask(items: Task[] | undefined): Task | undefined {
+  return (items ?? [])
+    .filter((task) => task.status !== 'done')
+    .sort((a, b) => (a.dueDate ?? '9999-99-99').localeCompare(b.dueDate ?? '9999-99-99'))[0];
 }

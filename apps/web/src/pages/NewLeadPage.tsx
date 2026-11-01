@@ -295,6 +295,9 @@ export function NewLeadPage() {
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
                 {t('newLead.labelScore', 'Score')}
+                <span className="mt-0.5 block font-normal text-[var(--fg-tertiary)]">
+                  {t('newLead.scoreHint', 'Leave at 0 if this lead has not been scored')}
+                </span>
               </label>
               <input
                 id="lead-score"

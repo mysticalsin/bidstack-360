@@ -4,6 +4,7 @@ import {
   applyFactDecision,
   connectionStanding,
   intakePersonFact,
+  recordedDecisionRole,
   resolvedReportsToId,
   type PersonFactView,
 } from './standing.js';
@@ -85,6 +86,62 @@ describe('connectionStanding', () => {
         NOW,
       ),
     ).toBe('needs_review');
+  });
+
+  it('fills a buying role only from one fresh accepted label on this account', () => {
+    const deals = new Set(['deal-1']);
+    const accepted = fact({
+      status: 'accepted',
+      kind: 'buying_role',
+      opportunityId: 'deal-1',
+      linkLabel: 'Buyer',
+    });
+    expect(recordedDecisionRole([accepted], NOW, deals)).toBe('buyer');
+    // A title is not an input, and a free-text label is not the role enum.
+    expect(
+      recordedDecisionRole(
+        [fact({ ...accepted, id: 'label', linkLabel: 'Economic buyer' })],
+        NOW,
+        deals,
+      ),
+    ).toBeNull();
+    expect(
+      recordedDecisionRole(
+        [fact({ ...accepted, id: 'suggested', status: 'proposed' })],
+        NOW,
+        deals,
+      ),
+    ).toBeNull();
+    expect(
+      recordedDecisionRole(
+        [fact({ ...accepted, id: 'old', observedAt: '2025-01-01T00:00:00.000Z' })],
+        NOW,
+        deals,
+      ),
+    ).toBeNull();
+    expect(
+      recordedDecisionRole(
+        [fact({ ...accepted, id: 'other', opportunityId: 'other-deal' })],
+        NOW,
+        deals,
+      ),
+    ).toBeNull();
+    expect(
+      recordedDecisionRole(
+        [
+          accepted,
+          fact({
+            id: 'champion',
+            status: 'accepted',
+            kind: 'buying_role',
+            opportunityId: 'deal-1',
+            linkLabel: 'champion',
+          }),
+        ],
+        NOW,
+        deals,
+      ),
+    ).toBeNull();
   });
 
   it('refuses to accept a needs-review fact until a person is named', () => {

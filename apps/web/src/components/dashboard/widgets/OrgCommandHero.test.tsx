@@ -24,10 +24,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('framer-motion', () => ({
-  motion: new Proxy(
-    {},
-    { get: () => (props: Record<string, unknown>) => <div {...props} /> },
-  ),
+  motion: new Proxy({}, { get: () => (props: Record<string, unknown>) => <div {...props} /> }),
   useReducedMotion: () => true,
 }));
 
@@ -76,9 +73,30 @@ const report = {
 // still inside the window — the won deal must be excluded from the count.
 const closingPage = {
   items: [
-    { id: 'o1', name: 'Bid A', customer: 'Acme', value: 40_000, stage: 'proposal', dueDate: '2026-07-08' },
-    { id: 'o2', name: 'Bid B', customer: 'Beta', value: 10_000, stage: 's4_negotiation', dueDate: '2026-07-07' },
-    { id: 'o3', name: 'Old win', customer: 'Acme', value: 99_000, stage: 'closed_won', dueDate: '2026-07-06' },
+    {
+      id: 'o1',
+      name: 'Bid A',
+      customer: 'Acme',
+      value: 40_000,
+      stage: 'proposal',
+      dueDate: '2026-07-08',
+    },
+    {
+      id: 'o2',
+      name: 'Bid B',
+      customer: 'Beta',
+      value: 10_000,
+      stage: 's4_negotiation',
+      dueDate: '2026-07-07',
+    },
+    {
+      id: 'o3',
+      name: 'Old win',
+      customer: 'Acme',
+      value: 99_000,
+      stage: 'closed_won',
+      dueDate: '2026-07-06',
+    },
   ],
 };
 
@@ -110,9 +128,77 @@ describe('OrgCommandHero', () => {
     expect(screen.getByText(/50,000 at stake/)).toBeDefined();
     // Weighted coverage = 200k / 500k = 40% of the gross open value.
     expect(screen.getByText('40% of gross open value')).toBeDefined();
+    expect(screen.getByText('200,000 unspecified')).toBeDefined();
     // Velocity footer surfaces the report's real numbers, rounded.
     expect(screen.getByText('21 days')).toBeDefined();
     expect(screen.getByText('2 of 12 tasks')).toBeDefined();
+  });
+
+  it('counts a large closing bid from integer micros when the unit number is zero', () => {
+    // WHY: a large deal is stored as micros with value 0, so summing value missed it.
+    mockQueries({
+      closingState: {
+        data: {
+          items: [
+            {
+              id: 'big',
+              name: 'Big bid',
+              customer: 'Acme',
+              value: 0,
+              valueMicros: '8598204328457184962',
+              stage: 'proposal',
+              dueDate: '2026-07-08',
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      },
+    });
+    render(<OrgCommandHero summary={summary} />);
+    expect(screen.getByText(/8,598,204,328,457\.18 at stake/)).toBeDefined();
+    expect(screen.queryByText(/457\.19 at stake/)).toBeNull();
+  });
+
+  it('prints a weighted total from micros when the unit number collapses', () => {
+    // WHY: format of the unit number showed 9,007,199,254,740,992. The stored
+    // weighted total is one unit higher.
+    const units = 9007199254740993n;
+    const micros = (units * 1_000_000n).toString();
+    mockQueries({
+      reportState: {
+        data: {
+          ...report,
+          totalValueOpen: Number(units),
+          totalValueOpenMicros: micros,
+          weightedPipeline: Number(units),
+          weightedPipelineMicros: micros,
+        },
+        isLoading: false,
+        isError: false,
+      },
+    });
+    render(<OrgCommandHero summary={summary} />);
+    expect(screen.getByText('9,007,199,254,740,993 unspecified')).toBeDefined();
+    expect(screen.queryByText('9,007,199,254,740,992')).toBeNull();
+  });
+
+  it('keeps a weighted cent instead of rounding the unit number', () => {
+    // WHY: formatting the unit number turned 200,000.50 into 200,001.
+    mockQueries({
+      reportState: {
+        data: {
+          ...report,
+          weightedPipeline: 200_000.5,
+          weightedPipelineMicros: '200000500000',
+        },
+        isLoading: false,
+        isError: false,
+      },
+    });
+    render(<OrgCommandHero summary={summary} />);
+    expect(screen.getByText('200,000.50 unspecified')).toBeDefined();
+    expect(screen.queryByText('200,001 unspecified')).toBeNull();
   });
 
   it('skeletons the report-backed signals while the pipeline report loads', () => {
@@ -146,8 +232,6 @@ describe('OrgCommandHero', () => {
 
     mockQueries();
     render(<OrgCommandHero summary={{ ...summary, overdueTasks: 0 }} />);
-    expect(
-      screen.getByText('2 bids close within 7 days — run those reviews first.'),
-    ).toBeDefined();
+    expect(screen.getByText('2 bids close within 7 days — run those reviews first.')).toBeDefined();
   });
 });

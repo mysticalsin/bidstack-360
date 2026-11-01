@@ -43,7 +43,7 @@ function daysBetween(a: Date, b: Date): number {
 }
 
 function daysSince(d: Date | null | undefined, now = new Date()): number {
-  if (!d) return 999;
+  if (!d) return 0;
   return daysBetween(d, now);
 }
 
@@ -76,11 +76,11 @@ const ESTABLISHED_DOMAINS = new Set([
 const NEW_DOMAIN_TLDS = ['.io', '.ai', '.xyz', '.app', '.dev'];
 
 function emailDomainAgeBucket(email: string | null | undefined): number {
-  if (!email) return 2;
+  if (!email) return 0;
   const domain = email.split('@')[1]?.toLowerCase() ?? '';
   if (ESTABLISHED_DOMAINS.has(domain)) return 3;
   if (NEW_DOMAIN_TLDS.some((tld) => domain.endsWith(tld))) return 1;
-  return 2;
+  return 0;
 }
 
 // ─── Lead feature extraction ──────────────────────────────────────────────
@@ -140,6 +140,7 @@ export async function extractLeadFeatures(
     const val = (intel[field] as string | undefined) ?? 'unknown';
     push(`bant_${field}`, bantMap[val] ?? 0);
   }
+  push('activity_recency_observed', lastActivityDate ? 1 : 0);
 
   return { names, values };
 }
@@ -157,11 +158,12 @@ export async function extractOpportunityFeatures(
     where: { id: opportunityId, orgId, deletedAt: null },
     select: {
       valueMicros: true,
+      stage: true,
       probability: true,
       dueDate: true,
       createdAt: true,
       ownerId: true,
-      pipelineStage: { select: { probability: true, isWon: true, isLost: true } },
+      pipelineStage: { select: { probability: true, isWon: true, isLost: true, deletedAt: true } },
       _count: { select: { contactLinks: true } },
       intel: true,
     },
@@ -203,48 +205,73 @@ export async function extractOpportunityFeatures(
   const emailsCount = countFor(['email', 'email_opened', 'email_clicked']);
   const lastStageChangeDate = lastStageChange?.occurredAt ?? opp.createdAt;
 
-  let ownerCloseRate = 0.5;
+  let ownerCloseRate = 0;
+  let ownerCloseRateObserved = 0;
   if (opp.ownerId) {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 86_400_000);
     const [won, lost] = await Promise.all([
       db.opportunity.count({
         where: {
           orgId, ownerId: opp.ownerId, deletedAt: null,
-          updatedAt: { gte: ninetyDaysAgo }, pipelineStage: { isWon: true },
+          updatedAt: { gte: ninetyDaysAgo },
+          NOT: {
+            OR: [
+              { stage: 'closed_lost' },
+              { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+            ],
+          },
+          OR: [
+            { stage: 'closed_won' },
+            { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+          ],
         },
       }),
       db.opportunity.count({
         where: {
           orgId, ownerId: opp.ownerId, deletedAt: null,
-          updatedAt: { gte: ninetyDaysAgo }, pipelineStage: { isLost: true },
+          updatedAt: { gte: ninetyDaysAgo },
+          OR: [
+            { stage: 'closed_lost' },
+            { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+          ],
         },
       }),
     ]);
     const total = won + lost;
-    ownerCloseRate = total > 0 ? won / total : 0.5;
+    if (total > 0) {
+      ownerCloseRate = won / total;
+      ownerCloseRateObserved = 1;
+    }
   }
 
   const intel = (opp.intel ?? {}) as Record<string, unknown>;
-  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : 50;
+  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : null;
 
   const names: string[] = [];
   const values: number[] = [];
   const push = (name: string, value: number) => { names.push(name); values.push(value); };
 
   const valueMicros = Number(opp.valueMicros);
+  const stage = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
   push('log_value_micros', valueMicros > 0 ? Math.log10(valueMicros) : 0);
-  push('stage_probability', Number(opp.pipelineStage?.probability ?? opp.probability) / 100);
+  push('stage_probability', Number(stage?.probability ?? opp.probability) / 100);
   push('days_in_current_stage', daysBetween(lastStageChangeDate, now));
   push('total_age_days', daysBetween(opp.createdAt, now));
-  push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 365);
+  push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 0);
   push('num_contacts_on_account', opp._count.contactLinks);
   push('num_meetings_held', meetingsCount);
   push('num_emails_sent_received', emailsCount);
   push('last_activity_days_ago', daysSince(lastActivity?.occurredAt ?? null, now));
   push('owner_close_rate_last_90d', ownerCloseRate);
-  push('qualification_score_norm', qualScore / 100);
-  push('is_won', opp.pipelineStage?.isWon ? 1 : 0);
-  push('is_lost', opp.pipelineStage?.isLost ? 1 : 0);
+  push('qualification_score_norm', qualScore == null ? 0 : qualScore / 100);
+  const lost = opp.stage === 'closed_lost' || stage?.isLost === true;
+  const won = !lost && (opp.stage === 'closed_won' || stage?.isWon === true);
+  push('is_won', won ? 1 : 0);
+  push('is_lost', lost ? 1 : 0);
+  push('owner_close_rate_observed', ownerCloseRateObserved);
+  push('qualification_score_observed', qualScore == null ? 0 : 1);
+  push('days_to_expected_close_observed', opp.dueDate ? 1 : 0);
+  push('last_activity_observed', lastActivity?.occurredAt ? 1 : 0);
 
   return { names, values };
 }

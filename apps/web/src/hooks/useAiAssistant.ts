@@ -29,9 +29,9 @@ export interface EmailDraftResult {
 
 export interface DealSentimentResult {
   sessionId: string;
-  /** -1 (hostile) … 1 (champion). */
-  score: number;
-  label: 'positive' | 'neutral' | 'negative';
+  /** -1 to 1 when a model returned one. Null when no score was produced. */
+  score: number | null;
+  label: 'positive' | 'neutral' | 'negative' | null;
   summary: string;
   riskFlags: string[];
   suggestedActions: string[];
@@ -40,8 +40,8 @@ export interface DealSentimentResult {
 
 export interface AccountIntelResult {
   sessionId: string;
-  /** 0–100 relationship health. */
-  healthScore: number;
+  /** 0–100 when a model returned one. Null when no score was produced. */
+  healthScore: number | null;
   summary: string;
   expansionOpportunities: string[];
   churnRisks: string[];

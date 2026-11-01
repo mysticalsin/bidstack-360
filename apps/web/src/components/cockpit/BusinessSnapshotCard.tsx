@@ -1,17 +1,21 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  unspecifiedMicrosLabel,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
-import { headquartersFor, labelForBand } from './_tokens';
+import type { PublicCompanyFacts } from '@bidstack/shared';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -33,12 +37,13 @@ interface SnapshotRow {
 // avoids re-render churn when sibling cards refetch).
 export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const c = cockpit.company;
-  const headquarters = headquartersFor(c.name);
+  const facts: PublicCompanyFacts | null = c.publicFacts ?? null;
+  const headquarters = facts?.headquarters ?? null;
   const sourceCount = c.sourceAttribution.length;
   const notVerified = t('businessSnapshot.value.notVerified', 'Not verified');
+  const revenueLabel = recordedRevenueLabel(c);
   const strategic = c.strategicIntel;
   const latestSource = latestAttribution(c.sourceAttribution);
   const intentSummary = strategic?.intentTopics.length
@@ -56,31 +61,47 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       })
     : notVerified;
   const rows: SnapshotRow[] = [
+    ...(facts?.description
+      ? [
+          {
+            label: t('businessSnapshot.row.description', 'Public description'),
+            value: facts.description,
+            source: publicSource(c.sourceAttribution, t),
+          },
+        ]
+      : []),
     {
       label: t('businessSnapshot.row.legalName', 'Legal name'),
-      value: c.legalName ?? c.name,
+      value: c.legalName ?? notVerified,
       source: c.legalName
-        ? attributionSource(latestSource, {
-            fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
-            missingHint: t(
-              'businessSnapshot.source.noRegistry',
-              'No registry attribution is attached.',
+        ? c.legalNameSource === 'account'
+          ? {
+              label: t('businessSnapshot.source.accountRecord', 'Account record'),
+              state: 'crm' as const,
+              hint: t(
+                'businessSnapshot.source.accountLegalName',
+                'Saved on the account record. This replaces the public official name.',
+              ),
+            }
+          : fieldSource(c.sourceAttribution, latestSource, t, {
+              fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
+              missingHint: t(
+                'businessSnapshot.source.noRegistry',
+                'No registry attribution is attached.',
+              ),
+            })
+        : missingSource(
+            t(
+              'businessSnapshot.source.missingLegalName',
+              'No legal name is on file. The account name is not a legal name.',
             ),
-          })
-        : {
-            label: t('businessSnapshot.source.crm', 'CRM'),
-            state: 'crm',
-            hint: t(
-              'businessSnapshot.source.crmNameHint',
-              'Name is carried by the Polo PreSales account record.',
-            ),
-          },
+          ),
     },
     {
       label: t('businessSnapshot.row.founded', 'Founded'),
-      value: c.incorporationDate ? c.incorporationDate.slice(0, 4) : notVerified,
+      value: c.incorporationDate ?? notVerified,
       source: c.incorporationDate
-        ? attributionSource(latestSource, {
+        ? fieldSource(c.sourceAttribution, latestSource, t, {
             fallbackLabel: t('businessSnapshot.source.companyRegistry', 'Registry'),
             missingHint: t(
               'businessSnapshot.source.noRegistry',
@@ -98,46 +119,59 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.headquarters', 'Headquarters'),
       value: headquarters ?? notVerified,
       source: headquarters
-        ? {
-            label: t('businessSnapshot.source.derived', 'Derived'),
-            state: 'crm',
-            hint: t(
-              'businessSnapshot.source.derivedHeadquarters',
-              'Derived from Polo PreSales account geography rules.',
-            ),
-          }
+        ? publicSource(c.sourceAttribution, t)
         : missingSource(
-            t('businessSnapshot.source.missingHeadquarters', 'No headquarters source is attached.'),
+            t(
+              'businessSnapshot.source.missingHeadquarters',
+              'No headquarters is on the public profile.',
+            ),
           ),
     },
+    ...(facts?.chiefExecutive
+      ? [
+          {
+            label: t('businessSnapshot.row.chiefExecutive', 'Chief executive'),
+            value: facts.chiefExecutive,
+            source: publicSource(c.sourceAttribution, t),
+          },
+        ]
+      : []),
+    ...(facts?.stockExchange
+      ? [
+          {
+            label: t('businessSnapshot.row.stockExchange', 'Stock exchange'),
+            value: facts.stockExchange,
+            source: publicSource(c.sourceAttribution, t),
+          },
+        ]
+      : []),
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
-      value: c.annualRevenueMicros
-        ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
-        : notVerified,
-      source: cockpitKpiSource(
-        cockpit.kpis,
-        'annualRevenueMicros',
-        Boolean(c.annualRevenueMicros),
-        {
-          fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
-          missingHint: t(
-            'businessSnapshot.source.missingRevenue',
-            'No revenue source is attached.',
-          ),
-        },
-      ),
+      value: facts?.revenueLabel ?? revenueLabel ?? notVerified,
+      source: facts?.revenueLabel
+        ? publicSource(c.sourceAttribution, t)
+        : revenueLabel
+          ? withCurrencyBasis(
+              cockpitKpiSource(cockpit.kpis, 'annualRevenueMicros', true, {
+                fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+                missingHint: t(
+                  'businessSnapshot.source.missingRevenue',
+                  'No revenue source is attached.',
+                ),
+              }),
+            )
+          : cockpitKpiSource(cockpit.kpis, 'annualRevenueMicros', false, {
+              fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+              missingHint: t(
+                'businessSnapshot.source.missingRevenue',
+                'No revenue source is attached.',
+              ),
+            }),
     },
     {
       label: t('businessSnapshot.row.employees', 'Employees'),
       value: c.employeeCount ? c.employeeCount.toLocaleString() : notVerified,
-      source: cockpitKpiSource(cockpit.kpis, 'employeeCount', Boolean(c.employeeCount), {
-        fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
-        missingHint: t(
-          'businessSnapshot.source.missingEmployees',
-          'No headcount source is attached.',
-        ),
-      }),
+      source: employeeSource(cockpit.kpis, c, t),
     },
     {
       label: t('businessSnapshot.row.intentTopics', 'Intent topics'),
@@ -208,65 +242,128 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.confidence', 'Confidence'),
-      value: `${Math.round(c.confidence * 100)}%`,
-      source:
-        sourceCount > 0
-          ? {
-              label: t('businessSnapshot.source.confidence', 'Confidence'),
-              state: c.confidence >= 0.85 ? 'verified' : 'crm',
-              hint: t(
-                'businessSnapshot.source.confidenceHint',
-                'Confidence is derived from attached source receipts.',
-              ),
-            }
-          : {
-              label: t('businessSnapshot.source.crm', 'CRM'),
-              state: 'crm',
-              hint: t(
-                'businessSnapshot.source.crmConfidenceHint',
-                'Confidence is derived from the current account record.',
-              ),
-            },
+      value: (() => {
+        const scored = c.sourceAttribution.filter(
+          (source) => typeof source.confidence === 'number',
+        );
+        if (scored.length === 0) return t('businessSnapshot.value.notScored', 'Not scored');
+        const average =
+          scored.reduce((sum, source) => sum + (source.confidence ?? 0), 0) / scored.length;
+        return `${Math.round(average * 100)}%`;
+      })(),
+      source: c.sourceAttribution.some((source) => typeof source.confidence === 'number')
+        ? {
+            label: t('businessSnapshot.source.confidence', 'Receipts'),
+            state: 'crm',
+            hint: t(
+              'businessSnapshot.source.confidenceHint',
+              'Average of attached source receipts. The stored company confidence is not shown.',
+            ),
+          }
+        : {
+            label: t('businessSnapshot.source.crm', 'CRM'),
+            state: 'crm',
+            hint: t(
+              'businessSnapshot.source.crmConfidenceHint',
+              sourceCount > 0
+                ? 'A source receipt is attached, but it is not a scored source.'
+                : 'No source receipts are attached, so this is not scored.',
+            ),
+          },
     },
   ];
+  const notSynced = t('businessSnapshot.value.notSynced', 'Not synced');
+  const recorded = rows.filter(
+    (row) => row.source.state !== 'missing' && row.value !== notVerified && row.value !== notSynced,
+  );
+  const missing = rows.filter((row) => !recorded.includes(row));
+  const recordedShare = rows.length === 0 ? 0 : Math.round((recorded.length / rows.length) * 100);
+
   return (
     <Card role="region" aria-label={t('businessSnapshot.region.ariaLabel', 'Business snapshot')}>
       <SectionHeader
         title={t('businessSnapshot.title', 'Business snapshot')}
-        caption={t('businessSnapshot.caption', 'Health: {{band}} - score {{score}}/100', {
-          band: labelForBand(cockpit.health.band),
-          score: cockpit.health.score,
-        })}
+        caption={t(
+          'businessSnapshot.caption',
+          '{{recorded}} of {{total}} fields on this card are filled. The bar is {{share}}% of those fields.',
+          {
+            recorded: recorded.length,
+            total: rows.length,
+            share: recordedShare,
+          },
+        )}
       />
       <div style={{ padding: '14px 18px 18px' }}>
-        <dl className="kvlist">
-          {rows.map((row, index) => (
-            <motion.div
-              key={row.label}
-              className="kv"
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.032 }}
-            >
-              <dt>{row.label}</dt>
-              <dd>
-                <span className="kv-value">
-                  <AnimatedMetric value={row.value} />
-                </span>
-                <SourceBadge
-                  label={row.source.label}
-                  state={row.source.state}
-                  hint={row.source.hint}
-                  className="kv-source"
-                />
-              </dd>
-            </motion.div>
-          ))}
-        </dl>
+        <div className="mb-3">
+          <div className="mb-1 flex items-baseline justify-between text-xs text-[var(--fg-secondary)]">
+            <span>
+              {t('businessSnapshot.recordedCount', '{{count}} recorded', {
+                count: recorded.length,
+              })}
+            </span>
+            <span>
+              {t('businessSnapshot.missingCount', '{{count}} not recorded', {
+                count: missing.length,
+              })}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]" aria-hidden>
+            <span
+              className="block h-full rounded-full bg-[var(--brand-primary)]"
+              style={{ width: `${recordedShare}%` }}
+            />
+          </div>
+        </div>
+        <SnapshotRows rows={recorded} reducedMotion={reducedMotion} />
+        {missing.length > 0 ? (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm text-[var(--fg-secondary)]">
+              {t('businessSnapshot.missingSummary', '{{count}} fields not recorded', {
+                count: missing.length,
+              })}
+            </summary>
+            <SnapshotRows rows={missing} reducedMotion={reducedMotion} />
+          </details>
+        ) : null}
       </div>
     </Card>
   );
 });
+
+function SnapshotRows({
+  rows,
+  reducedMotion,
+}: {
+  rows: SnapshotRow[];
+  reducedMotion: boolean | null;
+}) {
+  return (
+    <dl className="kvlist">
+      {rows.map((row, index) => (
+        <motion.div
+          key={row.label}
+          className="kv"
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.032 }}
+        >
+          <dt>{row.label}</dt>
+          <dd>
+            <span className="kv-value">
+              <AnimatedMetric value={row.value} />
+            </span>
+            <SourceBadge
+              label={row.source.label}
+              state={row.source.state}
+              hint={row.source.hint}
+              className="kv-source"
+            />
+          </dd>
+        </motion.div>
+      ))}
+    </dl>
+  );
+}
 
 function latestAttribution(sources: SourceAttribution[]): SourceAttribution | null {
   let latest: SourceAttribution | null = null;
@@ -274,6 +371,53 @@ function latestAttribution(sources: SourceAttribution[]): SourceAttribution | nu
     if (!latest || source.fetchedAt > latest.fetchedAt) latest = source;
   }
   return latest;
+}
+
+function hasPublicRecord(sources: SourceAttribution[]): boolean {
+  return sources.some((item) => item.source === 'wikidata' || item.source === 'wikipedia');
+}
+
+function fieldSource(
+  sources: SourceAttribution[],
+  latest: SourceAttribution | null,
+  t: TFunction,
+  fallback: { fallbackLabel: string; missingHint: string },
+): FieldSource {
+  return hasPublicRecord(sources) ? publicSource(sources, t) : attributionSource(latest, fallback);
+}
+
+function employeeSource(
+  kpis: CockpitKpi[],
+  company: AccountCockpitSnapshot['company'],
+  t: TFunction,
+): FieldSource {
+  const overridden = kpis.some((item) => item.fieldKey === 'employeeCount' && item.overridden);
+  if (!overridden && company.employeeCount && hasPublicRecord(company.sourceAttribution)) {
+    return publicSource(company.sourceAttribution, t);
+  }
+  return cockpitKpiSource(kpis, 'employeeCount', Boolean(company.employeeCount), {
+    fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+    missingHint: t('businessSnapshot.source.missingEmployees', 'No headcount source is attached.'),
+  });
+}
+
+function publicSource(sources: SourceAttribution[], t: TFunction): FieldSource {
+  const source =
+    sources.find((item) => item.source === 'wikidata') ??
+    sources.find((item) => item.source === 'wikipedia') ??
+    null;
+  if (!source) {
+    return {
+      label: t('businessSnapshot.source.public', 'Public'),
+      state: 'verified',
+      hint: t('businessSnapshot.source.publicHint', 'Copied from the public company profile.'),
+    };
+  }
+  return {
+    label: source.source === 'wikipedia' ? 'Wikipedia' : 'Wikidata',
+    state: 'verified',
+    hint: source.label,
+  };
 }
 
 function missingSource(hint: string): FieldSource {
@@ -287,9 +431,28 @@ function attributionSource(
   if (!source) return missingSource(fallback.missingHint);
   return {
     label: source.label || fallback.fallbackLabel,
-    state: source.confidence >= 0.88 ? 'verified' : 'crm',
-    hint: `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)} at ${Math.round(source.confidence * 100)}% confidence.`,
+    state: source.confidence != null && source.confidence >= 0.88 ? 'verified' : 'crm',
+    hint:
+      source.confidence == null
+        ? `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)}. Not scored.`
+        : `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)} at ${Math.round(source.confidence * 100)}% confidence.`,
   };
+}
+
+/** Stored revenue, compact while the unit count fits. A collapsed JSON number adds nothing. */
+function recordedRevenueLabel(company: AccountCockpitSnapshot['company']): string | null {
+  const text = company.annualRevenueMicrosText;
+  if (text && /^\d+$/.test(text)) return unspecifiedMicrosLabel(text);
+  const micros = company.annualRevenueMicros;
+  if (typeof micros === 'number' && Number.isSafeInteger(micros) && micros > 0) {
+    return unspecifiedMicrosLabel(micros);
+  }
+  return null;
+}
+
+function withCurrencyBasis(source: FieldSource): FieldSource {
+  if (source.hint.includes(UNSPECIFIED_CURRENCY_BASIS)) return source;
+  return { ...source, hint: `${UNSPECIFIED_CURRENCY_BASIS}. ${source.hint}` };
 }
 
 function cockpitKpiSource(

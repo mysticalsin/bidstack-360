@@ -1,3 +1,13 @@
+/**
+ * Shared 3D bar-depth geometry — the single source of truth for the
+ * perspective math used by BOTH `<Bar perspective>` (which shrinks a
+ * bar's front-face top) AND the bar-depth surfaces (`<BarDepthBack>`'s side +
+ * lid). Keeping the formula here means the front face and the 3D lid can never
+ * drift out of alignment.
+ */
+
+/** Hard ceiling on side-face thickness in px. Capped further by the column gap
+ * so depth never bleeds past the next bar's leading edge. */
 export const BAR_DEPTH_MAX_PX = 7;
 /** The side parallelogram's back edge lifts by `depth * this ratio`, giving a
  * subtle head-on perspective slope. */

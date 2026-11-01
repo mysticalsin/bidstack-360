@@ -42,6 +42,24 @@ function normalizeAccountId(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+const ACCOUNT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** A passed company id wins. A company UUID used as the account tag is the link. */
+export async function resolveFileCompanyId(
+  orgId: string,
+  accountId: string,
+  explicit?: string | null,
+): Promise<string | null> {
+  if (explicit) return explicit;
+  const normalized = normalizeAccountId(accountId);
+  if (!ACCOUNT_UUID.test(normalized)) return null;
+  const company = await prisma.company.findFirst({
+    where: { id: normalized, orgId, deletedAt: null },
+    select: { id: true },
+  });
+  return company?.id ?? null;
+}
+
 /**
  * RFC 5987 safe Content-Disposition filename encoding. Rejects control chars
  * outright and percent-encodes everything else that isn't a safe token char.
@@ -232,6 +250,11 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const accountId = normalizeAccountId(req.body.accountId);
+      const companyId = await resolveFileCompanyId(
+        req.auth.orgId,
+        req.body.accountId,
+        req.body.companyId,
+      );
       // Atomic create + audit so a crash can't leave a file row without a
       // paper trail.
       const fileId = randomUUID();
@@ -241,7 +264,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
             id: fileId,
             orgId: req.auth.orgId,
             accountId,
-            companyId: req.body.companyId ?? null,
+            companyId,
             name: req.body.name,
             contentType: req.body.contentType,
             bytes: metadata.bytes,
@@ -285,7 +308,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
               orgId: req.auth.orgId,
               documentId: fileId,
               accountId,
-              companyId: req.body.companyId ?? null,
+              companyId,
               status: 'pending',
               extractedData: {},
             },
@@ -346,14 +369,16 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         companyId: req.query.companyId,
       });
       const accountId = normalizeAccountId(req.query.accountId);
+      const linkedCompanyId =
+        req.query.companyId ?? (ACCOUNT_UUID.test(accountId) ? accountId : undefined);
       const items = await prisma.fileAttachment.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
           // MSA library files are served only through /msa (msa:read).
           contractVersions: { none: {} },
-          ...(req.query.companyId
-            ? { OR: [{ companyId: req.query.companyId }, { accountId }] }
+          ...(linkedCompanyId
+            ? { OR: [{ companyId: linkedCompanyId }, { accountId }] }
             : { accountId }),
         },
         include: { uploader: { select: { email: true } } },

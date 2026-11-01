@@ -17,7 +17,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { extractOpportunityFeatures } from './feature-extraction.js';
+import { extractLeadFeatures, extractOpportunityFeatures } from './feature-extraction.js';
 
 type GroupByRow = { type: string; _count: { _all: number } };
 
@@ -123,6 +123,145 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     // from createdAt (a finite, non-negative number, not NaN).
     expect(valueOf(vector!, 'num_meetings_held')).toBe(0);
     expect(valueOf(vector!, 'num_emails_sent_received')).toBe(0);
+    // No closes and no qualification score are not a 50% rate or a score of 50.
+    expect(valueOf(vector!, 'owner_close_rate_last_90d')).toBe(0);
+    expect(valueOf(vector!, 'owner_close_rate_observed')).toBe(0);
+    expect(valueOf(vector!, 'qualification_score_norm')).toBe(0);
+    expect(valueOf(vector!, 'qualification_score_observed')).toBe(0);
+    expect(valueOf(vector!, 'days_to_expected_close')).toBe(0);
+    expect(valueOf(vector!, 'days_to_expected_close_observed')).toBe(0);
+    expect(valueOf(vector!, 'last_activity_days_ago')).toBe(0);
+    expect(valueOf(vector!, 'last_activity_observed')).toBe(0);
     expect(Number.isFinite(valueOf(vector!, 'days_in_current_stage'))).toBe(true);
+  });
+
+  it('does not score a deleted stage, and a lost flag beats a won flag', async () => {
+    // WHY: a removed stage was still a loss in the owner close rate, and a
+    // deal flagged both ways was counted as a win and a loss.
+    const count = vi.fn(async () => 0);
+    const activity = {
+      groupBy: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () => []),
+    };
+    const deleted = {
+      activity,
+      opportunity: {
+        findFirst: vi.fn(async () => ({
+          valueMicros: 1n,
+          probability: 10,
+          dueDate: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          ownerId: 'owner-1',
+          stage: 's2_sent',
+          pipelineStage: {
+            probability: 0,
+            isWon: true,
+            isLost: true,
+            deletedAt: new Date('2026-02-01T00:00:00.000Z'),
+          },
+          _count: { contactLinks: 0 },
+          intel: {},
+        })),
+        count,
+      },
+    };
+    const removed = await extractOpportunityFeatures('opp-1', 'org-1', deleted as never);
+    expect(valueOf(removed!, 'is_won')).toBe(0);
+    expect(valueOf(removed!, 'is_lost')).toBe(0);
+    expect(valueOf(removed!, 'owner_close_rate_last_90d')).toBe(0);
+    expect(valueOf(removed!, 'owner_close_rate_observed')).toBe(0);
+    const wheres = count.mock.calls.map((call) => (call[0] as { where: unknown }).where);
+    expect(wheres[0]).toMatchObject({
+      NOT: {
+        OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+      },
+      OR: [
+        { stage: 'closed_won' },
+        { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+      ],
+    });
+    expect(wheres[1]).toMatchObject({
+      OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+    });
+
+    const both = {
+      activity,
+      opportunity: {
+        findFirst: vi.fn(async () => ({
+          valueMicros: 1n,
+          probability: 10,
+          dueDate: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          ownerId: null,
+          stage: 'closed_won',
+          pipelineStage: { probability: 0, isWon: true, isLost: true, deletedAt: null },
+          _count: { contactLinks: 0 },
+          intel: { qualificationScore: 80 },
+        })),
+        count,
+      },
+    };
+    const flagged = await extractOpportunityFeatures('opp-2', 'org-1', both as never);
+    expect(valueOf(flagged!, 'is_won')).toBe(0);
+    expect(valueOf(flagged!, 'is_lost')).toBe(1);
+    expect(valueOf(flagged!, 'qualification_score_norm')).toBe(0.8);
+    expect(valueOf(flagged!, 'qualification_score_observed')).toBe(1);
+
+    const enumWon = {
+      activity,
+      opportunity: {
+        findFirst: vi.fn(async () => ({
+          valueMicros: 1n,
+          probability: 10,
+          dueDate: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          ownerId: null,
+          stage: 'closed_won',
+          pipelineStage: null,
+          _count: { contactLinks: 0 },
+          intel: {},
+        })),
+        count,
+      },
+    };
+    const recorded = await extractOpportunityFeatures('opp-3', 'org-1', enumWon as never);
+    expect(valueOf(recorded!, 'is_won')).toBe(1);
+    expect(valueOf(recorded!, 'is_lost')).toBe(0);
+  });
+
+  it('does not invent a domain age or an activity age for a bare lead', async () => {
+    // WHY: a missing email was a medium-aged domain, and no activity was 999 days ago.
+    const db = {
+      lead: {
+        findFirst: vi.fn(async () => ({
+          source: null,
+          title: null,
+          email: null,
+          intel: {},
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        })),
+      },
+      activity: { findMany: vi.fn(async () => []) },
+    };
+    const vector = await extractLeadFeatures('lead-1', 'org-1', db as never);
+    expect(valueOf(vector!, 'email_domain_age_bucket')).toBe(0);
+    expect(valueOf(vector!, 'activity_recency_days')).toBe(0);
+    expect(valueOf(vector!, 'activity_recency_observed')).toBe(0);
+    const known = await extractLeadFeatures('lead-2', 'org-1', {
+      lead: {
+        findFirst: vi.fn(async () => ({
+          source: null,
+          title: null,
+          email: 'ada@example.io',
+          intel: {},
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        })),
+      },
+      activity: { findMany: vi.fn(async () => []) },
+    } as never);
+    expect(valueOf(known!, 'email_domain_age_bucket')).toBe(1);
   });
 });

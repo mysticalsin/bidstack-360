@@ -14,6 +14,7 @@ import {
 } from '@bidstack/shared';
 import { MemOSService } from '@bidstack/memos';
 import { defendBidScore } from '../services/ai/dust-agent.service.js';
+import { applyOpportunityCalibration } from './bid-scores.reasoning.js';
 import { isUniqueViolation } from './opportunities.helpers.js';
 
 function serializeBidScore(row: {
@@ -302,7 +303,10 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       const { opportunityId } = req.params;
       const opp = await prisma.opportunity.findFirst({
         where: { orgId: req.auth.orgId, id: opportunityId, deletedAt: null },
-        include: { territory: true },
+        include: {
+          territory: true,
+          pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+        },
       });
       if (!opp) {
         return reply.notFound('Opportunity not found');
@@ -365,32 +369,23 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
 
-      // Opportunity-specific boosts
-      if (opp) {
-        if (opp.probability && opp.probability > 70) {
-          calibratedCriteria.relationship = Math.min(5, (calibratedCriteria.relationship ?? 3) + 1);
-        }
-        if (opp.valueMicros > 10_000_000_000_000) {
-          // > 10M EUR in micros (10M × 1e6 — the old 1e10 bound fired at €10k)
-          calibratedCriteria.deal_size = 5;
-        }
-      }
+      const opportunityCalibration = applyOpportunityCalibration(calibratedCriteria, opp);
 
       const { totalScore, categoryScores, recommendation } =
-        computeBidComposite(calibratedCriteria);
+        computeBidComposite(opportunityCalibration.criteria);
 
       const reasoning = [
         `Calibrated from ${policies.length} MemOS policy(ies) and ${worldModels.length} world model(s).`,
         hasDust
           ? 'Dust AI layer available for deeper analysis.'
           : 'Dust AI layer in stub mode; using heuristic calibration.',
-        opp ? `Opportunity stage: ${opp.stage}, probability: ${opp.probability}%.` : '',
+        opportunityCalibration.line,
       ]
         .filter(Boolean)
         .join(' ');
 
       return {
-        criteria: calibratedCriteria,
+        criteria: opportunityCalibration.criteria,
         totalScore,
         categoryScores,
         recommendation,

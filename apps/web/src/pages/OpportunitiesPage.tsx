@@ -23,6 +23,7 @@ import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
+import { recordedMicros } from '@/components/dashboard/unspecified-currency';
 import { useTableSort } from '@/hooks/useTableSort';
 import { api, downloadFromApi } from '@/lib/api';
 import {
@@ -50,6 +51,7 @@ export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
+  const excludeClosed = searchParams.get('excludeClosed') === 'true';
   const qc = useQueryClient();
   // useTransition: typing in the search box (URL state) is urgent; the
   // table re-render is non-urgent.
@@ -73,7 +75,8 @@ export function OpportunitiesPage() {
   // A1 (bid clock) quick filters — "due" is independent of stage, so both can
   // be active together (e.g. "S2 Sent, overdue").
   const dueParam = searchParams.get('due');
-  const dueFilter: DueQuickFilter = dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
+  const dueFilter: DueQuickFilter =
+    dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
   const setDueFilter = (next: DueQuickFilter) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set('due', next);
@@ -83,7 +86,7 @@ export function OpportunitiesPage() {
   };
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
-  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
+  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}|${excludeClosed}`);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -96,8 +99,14 @@ export function OpportunitiesPage() {
           : {}
       : {}),
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
+    // Overdue means an open bid whose date has passed. A lost or won stage
+    // is not missed work. The Due ≤ 7d chip stays a plain date window.
+    ...(dueFilter === 'overdue' || excludeClosed ? { excludeClosed: true } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
+  // A cursor page is the whole result only on page 1 with no next page.
+  // Page 2 with a null next cursor is still a slice of a larger filter.
+  const pageIsPartial = Boolean(pager.cursor || data?.nextCursor);
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
   const orgSummary = useOrgSummary();
@@ -129,7 +138,7 @@ export function OpportunitiesPage() {
       name: (o: Opportunity) => o.name,
       customer: (o: Opportunity) => o.customer,
       stage: (o: Opportunity) => resolvePipelineStage(o).name,
-      value: (o: Opportunity) => o.value,
+      value: (o: Opportunity) => recordedMicros(o.value, o.valueMicros),
       probability: (o: Opportunity) => o.probability,
       dueDate: (o: Opportunity) => o.dueDate,
     }),
@@ -309,18 +318,22 @@ export function OpportunitiesPage() {
     const stamp = new Date().toISOString().slice(0, 10);
     setIsExporting(true);
     try {
-      await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
-        // Mirror the list query's stage branching: a configured stage is a UUID
-        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
-        // legacy enum as pipelineStageId 400s the export.
-        querystring: stageFilter
-          ? isPipelineStageIdUuid(stageFilter)
-            ? { pipelineStageId: stageFilter }
-            : isLegacyOpportunityStage(stageFilter)
-              ? { stage: stageFilter }
-              : {}
-          : {},
-      });
+      await downloadFromApi(
+        '/api/opportunities/export',
+        `polo-presales-opportunities-${stamp}.csv`,
+        {
+          // Mirror the list query's stage branching: a configured stage is a UUID
+          // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
+          // legacy enum as pipelineStageId 400s the export.
+          querystring: stageFilter
+            ? isPipelineStageIdUuid(stageFilter)
+              ? { pipelineStageId: stageFilter }
+              : isLegacyOpportunityStage(stageFilter)
+                ? { stage: stageFilter }
+                : {}
+            : {},
+        },
+      );
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
       toast.error(t('opportunities.toast.exportFailed', 'Export failed'), {
@@ -346,43 +359,55 @@ export function OpportunitiesPage() {
           ))}
         </div>
       ) : data && data.items.length > 0 ? (
-        <OppKpiBar opps={data.items} summary={orgSummary.data} />
+        <OppKpiBar
+          opps={data.items}
+          partial={pageIsPartial}
+          summary={
+            search || stageFilter || dueFilter || excludeClosed ? undefined : orgSummary.data
+          }
+        />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? search
-            ? data.items.length === 1
-              ? t(
-                  'opportunities.liveRegion.matchingOne',
-                  '{{count}} opportunity matching "{{search}}"',
-                  { count: data.items.length, search },
-                )
-              : t(
-                  'opportunities.liveRegion.matchingMany',
-                  '{{count}} opportunities matching "{{search}}"',
-                  { count: data.items.length, search },
-                )
-            : stageFilter
+          ? pageIsPartial
+            ? t(
+                'opportunities.liveRegion.pagePartial',
+                '{{count}} on this page. This page is not the full match.',
+                { count: data.items.length },
+              )
+            : search
               ? data.items.length === 1
                 ? t(
-                    'opportunities.liveRegion.inStageOne',
-                    '{{count}} opportunity in selected stage',
-                    { count: data.items.length },
+                    'opportunities.liveRegion.matchingOne',
+                    '{{count}} opportunity matching "{{search}}"',
+                    { count: data.items.length, search },
                   )
                 : t(
-                    'opportunities.liveRegion.inStageMany',
-                    '{{count}} opportunities in selected stage',
-                    { count: data.items.length },
+                    'opportunities.liveRegion.matchingMany',
+                    '{{count}} opportunities matching "{{search}}"',
+                    { count: data.items.length, search },
                   )
-              : data.items.length === 1
-                ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', {
-                    count: data.items.length,
-                  })
-                : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', {
-                    count: data.items.length,
-                  })
+              : stageFilter
+                ? data.items.length === 1
+                  ? t(
+                      'opportunities.liveRegion.inStageOne',
+                      '{{count}} opportunity in selected stage',
+                      { count: data.items.length },
+                    )
+                  : t(
+                      'opportunities.liveRegion.inStageMany',
+                      '{{count}} opportunities in selected stage',
+                      { count: data.items.length },
+                    )
+                : data.items.length === 1
+                  ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', {
+                      count: data.items.length,
+                    })
+                  : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', {
+                      count: data.items.length,
+                    })
           : ''}
       </p>
 
@@ -392,6 +417,7 @@ export function OpportunitiesPage() {
         stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
+        partial={pageIsPartial}
         isExporting={isExporting}
         onClearSearch={clearSearch}
         onClearStageFilter={() => setStageFilter(null)}
@@ -444,9 +470,7 @@ export function OpportunitiesPage() {
         ) : isError ? (
           <ErrorState
             title={t('opportunities.error.title', "Couldn't load opportunities")}
-            message={
-              error?.message ?? t('opportunities.error.message', 'Try again in a moment.')
-            }
+            message={error?.message ?? t('opportunities.error.message', 'Try again in a moment.')}
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
@@ -454,7 +478,7 @@ export function OpportunitiesPage() {
             title={t('opportunities.empty.headline', 'No open bids yet')}
             message={t(
               'opportunities.empty.body',
-              "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
+              "Convert a qualified lead or log the RFP you're chasing. Stage, value, and a stored probability are tracked from day one.",
             )}
             action={<CreateOpportunityDialog />}
             secondary={
@@ -465,12 +489,26 @@ export function OpportunitiesPage() {
           />
         ) : (
           <div className="overflow-x-auto">
+            {excludeClosed ? (
+              <p className="px-1 pb-2 text-sm text-[var(--fg-secondary)]">
+                {t(
+                  'opportunities.openOnly',
+                  'Open deals only. Closed won and lost stay off this list.',
+                )}
+              </p>
+            ) : null}
             <table className="w-full min-w-[980px] text-left text-sm">
               <caption className="sr-only">
                 {search
-                  ? t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
-                      search,
-                    })
+                  ? excludeClosed
+                    ? t(
+                        'opportunities.caption.matchingOpen',
+                        'Open opportunities matching "{{search}}"',
+                        { search },
+                      )
+                    : t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
+                        search,
+                      })
                   : t(
                       'opportunities.caption.all',
                       'All opportunities, sorted by most recent activity. Cells are inline-editable.',

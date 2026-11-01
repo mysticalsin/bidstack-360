@@ -8,17 +8,18 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  unspecifiedMicrosLabel,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useTerritorySegments } from '@/hooks/useTerritories';
 import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySegmentBreakdown';
 
 export function OppIndustryBreakdown() {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
-
   return (
     <Card>
       <button
@@ -31,11 +32,15 @@ export function OppIndustryBreakdown() {
           <Icon name="globe" size={15} ariaHidden />
           {t('oppIndustryBreakdown.title', 'Pipeline by industry')}
           {totals ? (
-            <span className="text-xs font-normal text-[var(--fg-tertiary)]">
+            <span
+              className="text-xs font-normal text-[var(--fg-tertiary)]"
+              title={UNSPECIFIED_CURRENCY_BASIS}
+            >
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatMoneyMicros(totals.totalValueMicros, 'EUR')}
+              · {unspecifiedMicrosLabel(totals.totalValueMicros)}{' '}
+              {t('oppIndustryBreakdown.portfolioScope', 'in the portfolio')}
             </span>
           ) : null}
         </span>
@@ -48,6 +53,13 @@ export function OppIndustryBreakdown() {
       </button>
       {open ? (
         <div className="border-t border-[var(--border-subtle)] p-4">
+          <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
+            {t(
+              'oppIndustryBreakdown.chartBasis',
+              'Org opportunities grouped by the account industry. Bar length is share of the largest industry. {{basis}}',
+              { basis: UNSPECIFIED_CURRENCY_BASIS },
+            )}
+          </p>
           <TerritorySegmentBreakdown
             dimension="industry"
             segments={segments.data?.items ?? []}
@@ -55,7 +67,6 @@ export function OppIndustryBreakdown() {
             isError={segments.isError}
             errorMessage={segments.error instanceof Error ? segments.error.message : undefined}
             onRetry={() => void segments.refetch()}
-            formatMoneyMicros={formatMoneyMicros}
           />
         </div>
       ) : null}

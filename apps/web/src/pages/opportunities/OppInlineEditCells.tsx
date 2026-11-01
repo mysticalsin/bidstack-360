@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { cn } from '@/lib/cn';
 
+import { microsToUnitsText, unitsTextToMicros } from '@bidstack/shared';
+
 import type { PipelineStage } from '@bidstack/shared';
 
 // ── StageCell ────────────────────────────────────────────────────────────────
@@ -101,6 +103,8 @@ export function StageCell({
 export function NumberCell({
   value,
   onSave,
+  exactMicros,
+  onSaveMicros,
   format,
   min,
   max,
@@ -111,6 +115,9 @@ export function NumberCell({
 }: {
   value: number;
   onSave: (next: number) => void;
+  /** Stored micros. The editor commits this integer instead of a rounded unit number. */
+  exactMicros?: string;
+  onSaveMicros?: (micros: string) => void;
   format: (v: number) => string;
   min?: number;
   max?: number;
@@ -125,9 +132,16 @@ export function NumberCell({
 }) {
   const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(value));
+  const [draft, setDraft] = useState(exactMicros ? microsToUnitsText(exactMicros) : String(value));
 
   const commit = () => {
+    if (exactMicros && onSaveMicros) {
+      const micros = unitsTextToMicros(draft);
+      if (micros == null) return;
+      setEditing(false);
+      if (micros.toString() !== exactMicros) onSaveMicros(micros.toString());
+      return;
+    }
     const next = Number(draft);
     setEditing(false);
     if (Number.isFinite(next) && next !== value) {
@@ -148,7 +162,7 @@ export function NumberCell({
       <button
         type="button"
         onClick={() => {
-          setDraft(String(value));
+          setDraft(exactMicros ? microsToUnitsText(exactMicros) : String(value));
           setEditing(true);
         }}
         disabled={isSaving}
@@ -169,7 +183,8 @@ export function NumberCell({
   return (
     <input
       autoFocus
-      type="number"
+      type={exactMicros ? 'text' : 'number'}
+      inputMode={exactMicros ? 'decimal' : undefined}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}

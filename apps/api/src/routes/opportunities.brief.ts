@@ -1,9 +1,19 @@
+import { formatMicrosAmount } from '@bidstack/shared';
+
+interface BriefStage {
+  isWon: boolean;
+  isLost: boolean;
+  deletedAt: Date | null;
+}
+
 interface BriefOpportunity {
   code: string;
   customer: string;
   name: string;
   stage: string;
   pipelineStageName: string | null;
+  /** Live flags close the deal. A deleted stage does not. */
+  pipelineStage?: BriefStage | null;
   valueMicros: bigint | number;
   probability: number;
   dueDate: Date | null;
@@ -40,12 +50,7 @@ export interface OpportunityBriefInput {
 }
 
 function formatMoneyMicros(valueMicros: bigint | number): string {
-  const value = Number(valueMicros) / 1_000_000;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
+  return `${formatMicrosAmount(valueMicros)} unspecified`;
 }
 
 function formatDate(value: Date | null): string {
@@ -62,17 +67,48 @@ function stakeholderLine(contact: BriefContact): string {
   return [
     contact.name,
     contact.role ? `(${contact.role})` : '',
-    contact.influence !== null ? `influence ${contact.influence}/100` : '',
+    contact.influence !== null ? `influence ${contact.influence}/5` : '',
     contact.sentiment ? `sentiment ${contact.sentiment}` : '',
   ]
     .filter(Boolean)
     .join(' ');
 }
 
+/** Blank probability is stored as 0. That is not a measured win chance. */
+function probabilityPhrase(probability: number): string {
+  if (probability === 0) return 'no probability is recorded';
+  return `a stored probability of ${probability}%`;
+}
+
+function probabilityLabel(probability: number): string {
+  return probability === 0 ? 'not recorded' : `${probability}%`;
+}
+
+/** Lost wins when the enum and a live stage flag disagree. A deleted stage does not close the deal. */
+function briefOutcome(opportunity: BriefOpportunity): 'open' | 'won' | 'lost' {
+  const stage =
+    opportunity.pipelineStage && opportunity.pipelineStage.deletedAt == null
+      ? opportunity.pipelineStage
+      : null;
+  if (opportunity.stage === 'closed_lost' || stage?.isLost === true) return 'lost';
+  if (opportunity.stage === 'closed_won' || stage?.isWon === true) return 'won';
+  return 'open';
+}
+
 function riskLine(input: OpportunityBriefInput): string {
   const { opportunity, tasks, contacts } = input;
   const risks: string[] = [];
-  if (opportunity.probability < 40) risks.push('low win probability requires bid/no-bid challenge');
+  const outcome = briefOutcome(opportunity);
+  if (outcome === 'lost') {
+    risks.push('the deal is recorded as lost, so do not draft it as an open pursuit');
+  } else if (outcome === 'won') {
+    risks.push('the deal is recorded as won, so do not draft it as an open pursuit');
+  }
+  if (opportunity.probability === 0) {
+    risks.push('no probability is recorded');
+  } else if (opportunity.probability < 40) {
+    risks.push('stored probability is below 40, so challenge bid/no-bid before drafting');
+  }
   if (!opportunity.dueDate) risks.push('no due date is recorded');
   if (tasks.some((task) => task.status === 'blocked')) risks.push('blocked pursuit tasks need escalation');
   if (contacts.length === 0) risks.push('stakeholder map is incomplete');
@@ -84,9 +120,29 @@ export function estimateBriefTokens(brief: string): number {
   return Math.ceil(brief.length / 4);
 }
 
+/** A configured stage name wins. Otherwise the stored key is shown as words. */
+export function stageWords(name: string | null | undefined, stage: string): string {
+  const configured = name?.trim();
+  if (configured) return configured;
+  return stage
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export function buildOpportunityBrief(input: OpportunityBriefInput): string {
   const { opportunity, tasks, contacts, notes } = input;
-  const stage = opportunity.pipelineStageName ?? opportunity.stage;
+  const stageName =
+    opportunity.pipelineStage?.deletedAt != null ? null : opportunity.pipelineStageName;
+  const stage = stageWords(stageName, opportunity.stage);
+  const outcome = briefOutcome(opportunity);
+  const pursuit =
+    outcome === 'lost'
+      ? `${opportunity.customer} recorded ${opportunity.name} as lost.`
+      : outcome === 'won'
+        ? `${opportunity.customer} recorded ${opportunity.name} as won.`
+        : `${opportunity.customer} is pursuing ${opportunity.name}.`;
   const activeTasks = tasks.filter((task) => task.status !== 'done');
   const latestNote = notes[0];
 
@@ -96,7 +152,7 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
 
   const taskLines = activeTasks.length
     ? activeTasks
-        .map((task) => `- ${task.title} (${task.status}, due ${formatDate(task.dueDate)})`)
+        .map((task) => `- ${task.title} (${stageWords(null, task.status)}, due ${formatDate(task.dueDate)})`)
         .join('\n')
     : '- No open pursuit tasks found. Create owners for proposal, legal, finance, delivery, and submission QA.';
 
@@ -115,11 +171,13 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
     `> Source-grounded account brief | Updated: ${opportunity.updatedAt.toISOString()}`,
     '',
     `**Opportunity:** ${opportunity.name} (${opportunity.code})`,
-    `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Probability:** ${opportunity.probability}% | **Due:** ${formatDate(opportunity.dueDate)}`,
-    opportunity.industry ? `**Industry:** ${opportunity.industry}` : '**Industry:** not set',
+    `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Stored probability:** ${probabilityLabel(opportunity.probability)} | **Due:** ${formatDate(opportunity.dueDate)}`,
+    opportunity.industry
+      ? `**Industry:** ${stageWords(null, opportunity.industry)}`
+      : '**Industry:** not set',
     '',
     '## Current Read',
-    `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, ${opportunity.probability}% win probability, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
+    `${pursuit} The CRM signal shows ${stage} maturity, ${probabilityPhrase(opportunity.probability)}, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
     '',
     '## Stakeholders',
     stakeholders,

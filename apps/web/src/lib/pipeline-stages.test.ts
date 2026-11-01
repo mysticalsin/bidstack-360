@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  celebratesWonMove,
+  closedOutcome,
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
   getPipelineStages,
@@ -98,5 +100,45 @@ describe('pipeline stage normalization', () => {
     expect(getPipelineStageBusinessKey(s2Stages[0])).toBe('s2_sent');
     expect(getOpportunityStageBusinessKey(legacyS2)).toBe('s2_sent');
     expect(getOpportunityStageBusinessKey(canonicalS2)).toBe('s2_sent');
+  });
+});
+
+describe('closedOutcome', () => {
+  it('keeps a lost stage key closed when the stage row is missing', () => {
+    // WHY: optional chaining on a missing stage row used to treat closed_lost as open.
+    expect(closedOutcome({ stage: 'closed_lost', pipelineStage: null })).toBe('lost');
+    expect(closedOutcome({ stage: 'closed_won', pipelineStage: null })).toBe('won');
+    expect(closedOutcome({ stage: 's2_sent', pipelineStage: null })).toBeNull();
+    expect(
+      closedOutcome({
+        stage: 's2_sent',
+        pipelineStage: { isWon: false, isLost: true, deletedAt: '2026-02-01T00:00:00.000Z' },
+      }),
+    ).toBeNull();
+  });
+
+  it('counts both flags as lost', () => {
+    // WHY: the deal page showed Won and Lost together. Lost wins, including
+    // when the stored key says won.
+    expect(
+      closedOutcome({
+        stage: 'closed_won',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+      }),
+    ).toBe('lost');
+    expect(
+      closedOutcome({
+        stage: 's4_negotiation',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+      }),
+    ).toBe('lost');
+  });
+
+  it('does not celebrate a stage that is also lost', () => {
+    // WHY: moving a bid onto a both-flagged stage used to fire the won toast.
+    expect(celebratesWonMove({ isWon: true, isLost: false })).toBe(true);
+    expect(celebratesWonMove({ isWon: true, isLost: true })).toBe(false);
+    expect(celebratesWonMove({ isWon: false, isLost: true })).toBe(false);
+    expect(celebratesWonMove(undefined)).toBe(false);
   });
 });

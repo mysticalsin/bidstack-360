@@ -118,8 +118,9 @@ describe('territories analytics — money precision', () => {
       // a DELTA against a baseline read rather than an absolute total.
       const before = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
       expect(before.statusCode).toBe(200);
-      const baseline = (before.json() as { totals: { totalValueMicros: number } }).totals
-        .totalValueMicros;
+      const baseline = BigInt(
+        (before.json() as { totals: { totalValueMicros: string } }).totals.totalValueMicros,
+      );
 
       const suffix = randomUUID().slice(0, 8);
       const created = await prisma.opportunity.createMany({
@@ -144,23 +145,134 @@ describe('territories analytics — money precision', () => {
             country: 'FR',
             valueMicros: 987_654_321n,
           },
+          {
+            orgId: orgId!,
+            code: `OP-${suffix}3`,
+            customer: 'Precision Co C',
+            name: 'Precision fixture C',
+            stage: 's1_lead',
+            probability: 30,
+            country: 'DE',
+            valueMicros: 8_598_204_328_457_184_962n,
+          },
         ],
       });
-      expect(created.count).toBe(2);
+      expect(created.count).toBe(3);
 
       try {
         const res = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
         expect(res.statusCode).toBe(200);
-        const body = res.json() as { totals: { totalValueMicros: number } };
+        const body = res.json() as { totals: { totalValueMicros: string } };
         // Exact BigInt sum, independent of the route's own arithmetic.
-        expect(body.totals.totalValueMicros - baseline).toBe(123_456_789 + 987_654_321);
+        expect(BigInt(body.totals.totalValueMicros) - baseline).toBe(
+          123_456_789n + 987_654_321n + 8_598_204_328_457_184_962n,
+        );
       } finally {
         await prisma.opportunity.deleteMany({
-          where: { orgId: orgId!, code: { in: [`OP-${suffix}1`, `OP-${suffix}2`] } },
+          where: { orgId: orgId!, code: { in: [`OP-${suffix}1`, `OP-${suffix}2`, `OP-${suffix}3`] } },
         });
       }
     },
   );
+});
+
+describe('territories analytics — open stage probability', () => {
+  skipIfNoDb('a lost deal stays out and a linked stage supplies the average', async () => {
+    // WHY: the map averaged every deal's own probability, including lost
+    // deals. The number on the map is the live stage probability for open deals.
+    const stamp = Date.now();
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `Map ${stamp}` },
+    });
+    const stage = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 's2_sent',
+        name: 'Sent',
+        probability: 70,
+      },
+    });
+    const lostStage = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'price_lost',
+        name: 'Price lost',
+        isLost: true,
+        probability: 90,
+      },
+    });
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId: orgId!,
+          code: `OP-MAP1-${stamp}`,
+          customer: 'Map Co',
+          name: 'On the stage',
+          stage: 's2_sent',
+          pipelineStageId: stage.id,
+          probability: 10,
+          country: 'ZZ',
+          valueMicros: 2_000_000n,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-MAP2-${stamp}`,
+          customer: 'Map Co',
+          name: 'Lost flag',
+          stage: 's2_sent',
+          pipelineStageId: lostStage.id,
+          probability: 90,
+          country: 'ZZ',
+          valueMicros: 9_000_000n,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-MAP3-${stamp}`,
+          customer: 'Map Co',
+          name: 'No stage',
+          stage: 's1_lead',
+          probability: 40,
+          country: 'ZY',
+          valueMicros: 1_000_000n,
+          intel: {},
+        },
+      ],
+    });
+    try {
+      const res = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        items: Array<{
+          countryCode: string;
+          opportunityCount: number;
+          totalValueMicros: string;
+          avgProbability: number;
+        }>;
+      };
+      const linked = body.items.find((item) => item.countryCode === 'ZZ');
+      const stored = body.items.find((item) => item.countryCode === 'ZY');
+      expect(linked).toMatchObject({
+        opportunityCount: 1,
+        totalValueMicros: '2000000',
+        avgProbability: 70,
+      });
+      expect(stored).toMatchObject({
+        opportunityCount: 1,
+        totalValueMicros: '1000000',
+        avgProbability: 40,
+      });
+    } finally {
+      await prisma.opportunity.deleteMany({
+        where: { orgId: orgId!, code: { in: [`OP-MAP1-${stamp}`, `OP-MAP2-${stamp}`, `OP-MAP3-${stamp}`] } },
+      });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
+      await prisma.pipeline.delete({ where: { id: pipeline.id } });
+    }
+  });
 });
 
 describe('forecast owner scoping', () => {

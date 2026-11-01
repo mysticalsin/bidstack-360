@@ -15,11 +15,41 @@ function jsonObject(value: Record<string, unknown>): Prisma.InputJsonObject {
   return value as Prisma.InputJsonObject;
 }
 
+/**
+ * A health number only when a case count or an NPS response exists.
+ * An empty queue plus a missing survey is not a score of 70.
+ */
+export function healthScoreFromSignals(input: {
+  openCases: number;
+  criticalCases: number;
+  npsScore: number | null;
+}): number | null {
+  const hasCases = input.openCases > 0 || input.criticalCases > 0;
+  const hasNps = input.npsScore != null;
+  if (!hasCases && !hasNps) return null;
+  const parts: number[] = [];
+  if (hasCases) parts.push(clampScore(100 - input.openCases * 4 - input.criticalCases * 8));
+  if (input.npsScore != null) parts.push(clampScore((input.npsScore + 100) / 2));
+  return clampScore(parts.reduce((sum, part) => sum + part, 0) / parts.length);
+}
+
+/** A first score has no direction. Stable means the new score stayed within 5 points. */
+export function healthTrend(
+  current: number,
+  previous: number | null,
+): 'IMPROVING' | 'STABLE' | 'DECLINING' | null {
+  if (previous == null) return null;
+  const delta = current - previous;
+  if (delta >= 5) return 'IMPROVING';
+  if (delta <= -5) return 'DECLINING';
+  return 'STABLE';
+}
+
 export async function computeAndPersistHealthScore(
   orgId: string,
   accountId: string,
   log: Logger,
-): Promise<number> {
+): Promise<number | null> {
   const [subscriptionCount, openCases, criticalCases, latestNps, previousScore] = await Promise.all([
     prisma.subscription.count({
       where: { orgId, accountId, status: 'ACTIVE', deletedAt: null },
@@ -53,23 +83,21 @@ export async function computeAndPersistHealthScore(
     }),
   ]);
 
-  const npsScore = latestNps?.score ?? 0;
+  const npsScore = latestNps?.score ?? null;
   const supportPenalty = openCases * 4 + criticalCases * 8;
-  const subscriptionSignal = subscriptionCount > 0 ? 10 : -15;
-  const score = clampScore(70 + subscriptionSignal + npsScore * 0.15 - supportPenalty);
-  const trend =
-    previousScore && score > previousScore.score + 3
-      ? 'IMPROVING'
-      : previousScore && score < previousScore.score - 3
-        ? 'DECLINING'
-        : 'STABLE';
+  const score = healthScoreFromSignals({ openCases, criticalCases, npsScore });
+  if (score == null) {
+    log.debug({ orgId, accountId }, 'cs.health: no measured inputs; not storing a score');
+    return null;
+  }
+  const trend = healthTrend(score, previousScore?.score ?? null);
 
   await prisma.healthScore.create({
     data: {
       orgId,
       accountId,
       score,
-      trend,
+      ...(trend ? { trend } : {}),
       factors: jsonObject({
         subscriptionCount,
         openCases,
@@ -165,52 +193,34 @@ export async function sendQuarterlyNpsSurveys(orgId: string, log: Logger): Promi
 }
 
 export async function runOrgChurnDetection(orgId: string, log: Logger): Promise<number> {
-  const latestScores = await prisma.healthScore.findMany({
-    where: { orgId },
-    distinct: ['accountId'],
-    orderBy: [{ accountId: 'asc' }, { capturedAt: 'desc' }],
-    select: { accountId: true, score: true },
-  });
+  // A stored health score is not product usage. LOW_USAGE would name the wrong
+  // cause, and the enum has no health-drop kind without a migration.
+  log.info({ orgId, created: 0 }, 'cs.churn: health scores are not stored as usage signals');
+  return 0;
+}
 
-  let created = 0;
-  for (const score of latestScores) {
-    if (score.score >= 50) continue;
-
-    const existing = await prisma.churnSignal.findFirst({
-      where: {
-        orgId,
-        accountId: score.accountId,
-        kind: 'LOW_USAGE',
-        resolvedAt: null,
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
-    if (existing) continue;
-
-    await prisma.churnSignal.create({
-      data: {
-        orgId,
-        accountId: score.accountId,
-        kind: 'LOW_USAGE',
-        severity: score.score < 30 ? 'CRITICAL' : 'HIGH',
-        evidence: jsonObject({ healthScore: score.score, threshold: 50 }),
-      },
-    });
-    created++;
+/** Latest score per account, then the ones at or above the threshold. */
+export function accountsAtLeast(
+  rows: Array<{ accountId: string; score: number; capturedAt?: Date }>,
+  threshold: number,
+): Array<{ accountId: string; score: number }> {
+  const latest = new Map<string, { score: number; capturedAt: number }>();
+  for (const row of rows) {
+    const at = row.capturedAt?.getTime() ?? 0;
+    const prior = latest.get(row.accountId);
+    if (!prior || at >= prior.capturedAt) latest.set(row.accountId, { score: row.score, capturedAt: at });
   }
-
-  log.info({ orgId, created }, 'cs.churn: signals detected');
-  return created;
+  return [...latest.entries()]
+    .filter(([, row]) => row.score >= threshold)
+    .map(([accountId, row]) => ({ accountId, score: row.score }));
 }
 
 export async function surfaceExpansionOpportunities(orgId: string, log: Logger): Promise<number> {
-  const healthyAccounts = await prisma.healthScore.findMany({
-    where: { orgId, score: { gte: 80 } },
-    distinct: ['accountId'],
-    orderBy: [{ accountId: 'asc' }, { capturedAt: 'desc' }],
-    select: { accountId: true, score: true },
+  const rows = await prisma.healthScore.findMany({
+    where: { orgId },
+    select: { accountId: true, score: true, capturedAt: true },
   });
+  const healthyAccounts = accountsAtLeast(rows, 80);
 
   let created = 0;
   for (const account of healthyAccounts) {
@@ -230,7 +240,8 @@ export async function surfaceExpansionOpportunities(orgId: string, log: Logger):
         orgId,
         accountId: account.accountId,
         kind: 'CROSS_SELL',
-        notes: `Auto-surfaced from account health score ${account.score}.`,
+        currency: 'XXX',
+        notes: `Auto-surfaced from account health score ${account.score}. Amount is unset.`,
       },
     });
     created++;

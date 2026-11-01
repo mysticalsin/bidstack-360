@@ -19,7 +19,13 @@ export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props)
   if (cockpit.keyContacts.length === 0) return null;
   return (
     <Card>
-      <SectionHeader title={t('keyContacts.title', 'Key contacts')} />
+      <SectionHeader
+        title={t('keyContacts.title', 'Key contacts')}
+        caption={t(
+          'keyContacts.caption',
+          'Up to 5 people linked to this account, highest recorded influence first.',
+        )}
+      />
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {cockpit.keyContacts.slice(0, 5).map((person, index) => (
           <motion.li

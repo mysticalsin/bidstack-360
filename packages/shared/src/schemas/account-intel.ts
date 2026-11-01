@@ -45,6 +45,8 @@ export const AccountProduct = z.object({
   description: z.string().nullable(),
   category: z.string(),
   priceRangeMicros: z.number().int().nullable(),
+  /** Exact integer. The number is only exact while it fits a safe integer. */
+  priceRangeMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   currency: z.string(),
   status: z.string(),
   extractedFromDocumentId: z.string().uuid().nullable(),

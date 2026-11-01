@@ -6,10 +6,10 @@
  * `dueWithinDays`, see apps/api/src/routes/opportunities.ts) so a lead can
  * spot slippage risk without opening the full pipeline table.
  *
- * Closed deals are excluded client-side (not by the API filter, which is a
- * pure date-window match reused by the "Due ≤ 7d" list chip) — a Closed
- * Won/Lost bid with a stale dueDate inside the window isn't "closing", it's
- * already closed, and showing it here would read as a bug.
+ * The request asks the server to leave decided stages out. A page of lost
+ * deals would otherwise fill the 25-row window and hide an open bid. The
+ * Due ≤ 7d list chip still uses the date window without that flag. The
+ * client filter remains so a stale cached row cannot appear as closing.
  */
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -18,23 +18,28 @@ import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { DueDateChip, daysUntilDueUtc } from '@/components/ui/DueDateChip';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { springSoft } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
+
+import { closedOutcome } from '@/lib/pipeline-stages';
+
+import { formatRecordedDealAmount } from '../unspecified-currency';
 
 const CLOSING_WINDOW_DAYS = 7;
 const DISPLAY_LIMIT = 6;
 
 function isOpenOpp(o: Opportunity): boolean {
-  if (o.pipelineStage) return !o.pipelineStage.isWon && !o.pipelineStage.isLost;
-  return o.stage !== 'closed_won' && o.stage !== 'closed_lost';
+  return closedOutcome(o) === null;
 }
 
 export function ClosingThisWeekCard() {
   const { t } = useTranslation('crm');
-  const { formatMoney } = useFormatMoney();
-  const closing = useOpportunities({ dueWithinDays: CLOSING_WINDOW_DAYS, limit: 25 });
+  const closing = useOpportunities({
+    dueWithinDays: CLOSING_WINDOW_DAYS,
+    excludeClosed: true,
+    limit: 25,
+  });
 
   const items = (closing.data?.items ?? [])
     .filter(isOpenOpp)
@@ -52,7 +57,10 @@ export function ClosingThisWeekCard() {
             {t('closingThisWeek.heading', 'Closing this week')}
           </h2>
         </div>
-        <Link to="/opportunities?due=within7" className="text-xs text-[var(--brand-primary)] hover:underline">
+        <Link
+          to="/opportunities?due=within7"
+          className="text-xs text-[var(--brand-primary)] hover:underline"
+        >
           {t('closingThisWeek.viewAll', 'View all')}
         </Link>
       </div>
@@ -95,9 +103,11 @@ export function ClosingThisWeekCard() {
                 style={{ textDecoration: 'none', color: 'inherit' }}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-[var(--fg-primary)]">{opp.name}</div>
+                  <div className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                    {opp.name}
+                  </div>
                   <div className="truncate text-xs text-[var(--fg-tertiary)]">
-                    {opp.customer} · {formatMoney(opp.value, 'EUR')}
+                    {opp.customer} · {formatRecordedDealAmount(opp)}
                   </div>
                 </div>
                 <DueDateChip dueDate={opp.dueDate} size="sm" />

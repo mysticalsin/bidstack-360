@@ -10,6 +10,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 
+import { compareMicros, microsSharePercent } from '@/components/dashboard/unspecified-currency';
 import { cn } from '@/lib/cn';
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
@@ -17,17 +18,19 @@ export function KpiTile({
   label,
   value,
   tone,
+  detail,
 }: {
   label: string;
   value: string;
   tone: 'blue' | 'jade' | 'amber' | 'purple';
+  detail?: string;
 }) {
   const config = {
     blue: {
       dot: 'var(--brand-primary)',
       bg: 'var(--brand-primary-tint)',
       fg: 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]',
-      icon: 'dollar' as IconName,
+      icon: 'briefcase' as IconName,
     },
     jade: {
       dot: '#059669',
@@ -68,6 +71,11 @@ export function KpiTile({
           <div className="text-xl font-extrabold text-[var(--fg-primary)] tabular-nums tracking-tight">
             {value}
           </div>
+          {detail ? (
+            <p className="max-w-[16rem] text-[10px] font-medium normal-case tracking-normal text-[var(--fg-tertiary)]">
+              {detail}
+            </p>
+          ) : null}
         </div>
         <div
           className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
@@ -87,14 +95,14 @@ export function CountryDetailPanel({
   onClear,
 }: {
   selected: TerritoryAnalyticsItem | null;
-  formatMoneyMicros: (micros: number, currency: string) => string;
-  globalTotals?: { totalValueMicros: number } | null;
+  formatMoneyMicros: (micros: number | string) => string;
+  globalTotals?: { totalValueMicros: number | string } | null;
   onClear?: () => void;
 }) {
   const { t } = useTranslation('crm');
   const sharePct =
-    selected && globalTotals && globalTotals.totalValueMicros > 0
-      ? (selected.totalValueMicros / globalTotals.totalValueMicros) * 100
+    selected && globalTotals && compareMicros(globalTotals.totalValueMicros, 0) > 0
+      ? microsSharePercent(selected.totalValueMicros, globalTotals.totalValueMicros)
       : 0;
 
   return (
@@ -139,16 +147,16 @@ export function CountryDetailPanel({
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
-                <Icon name="dollar" size={10} />
+                <Icon name="briefcase" size={10} />
                 {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
-                {formatMoneyMicros(selected.totalValueMicros, 'EUR')}
+                {formatMoneyMicros(selected.totalValueMicros)}
               </div>
             </div>
           </div>
 
-          {globalTotals && globalTotals.totalValueMicros > 0 && (
+          {globalTotals && compareMicros(globalTotals.totalValueMicros, 0) > 0 && (
             <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 <span className="flex items-center gap-1.5">

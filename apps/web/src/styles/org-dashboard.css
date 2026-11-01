@@ -52,7 +52,7 @@
 
 .health-gauge-core span {
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 500;
   font-family: var(--font-display);
   line-height: 1;
 }
@@ -98,9 +98,8 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--brand-primary), var(--success), var(--warning));
-  opacity: 0.6;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
 .insights-grid {
@@ -142,8 +141,7 @@
 }
 
 .insight-pill:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  background: var(--surface-hover);
 }
 
 /* Enhanced glass card hover shine */
@@ -249,6 +247,14 @@
 .kpi-strip-item.is-primary .kpi-strip-value {
   color: var(--brand-primary);
 }
+.kpi-signal-bar {
+  display: block;
+  width: clamp(5px, 8%, 7px);
+  min-height: 7px;
+  border-radius: 999px;
+  background: var(--signal-color);
+  transform-origin: bottom;
+}
 
 @media (max-width: 1100px) {
   .kpi-strip {
@@ -305,7 +311,6 @@
   min-width: 8px;
   border-radius: 999px;
   background: var(--stage-color);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--stage-color) 28%, transparent);
   transform-origin: center bottom;
 }
 
@@ -338,8 +343,6 @@
 .quick-action-btn:hover {
   background: var(--surface-hover);
   border-color: var(--border-default);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--action-glow, rgba(0, 0, 0, 0.06));
 }
 
 /* ─── Sales Funnel Visualization ─────────────────────────────────────────── */
@@ -379,21 +382,8 @@
   overflow: hidden;
 }
 
-.funnel-stage-bar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
-  pointer-events: none;
-}
-
 .funnel-stage-bar:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  background: var(--surface-hover);
 }
 
 .funnel-stage-label {
@@ -404,20 +394,14 @@
 
 .funnel-stage-value {
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 500;
   font-family: var(--font-display);
 }
 
 /* ─── Health Gauge Pulse ─────────────────────────────────────────────────── */
 
 .health-gauge-visual::after {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
-  animation: health-pulse 3s ease-in-out infinite;
-  pointer-events: none;
+  content: none;
 }
 
 @keyframes health-pulse {

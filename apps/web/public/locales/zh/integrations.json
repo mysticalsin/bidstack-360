@@ -163,6 +163,8 @@
     "header": {
       "title": "连接器目录",
       "caption": "Polo PreSales 可访问的外部数据源。开放数据源无需密钥即可运行；授权数据源需要凭据。",
+      "sourcesBadge_one": "{{count}} 个数据源",
+      "sourcesBadge_other": "{{count}} 个数据源",
       "sourcesBadge": "{{count}} 个数据源"
     },
     "error": {

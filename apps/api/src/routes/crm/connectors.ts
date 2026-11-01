@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { CrmConnector, OpenDataSignalsResponse } from '@bidstack/shared';
+import { CrmConnector, OpenDataSignal, OpenDataSignalsResponse, SourceAttribution } from '@bidstack/shared';
 
 import {
   buildConnectorCatalog,
@@ -17,6 +17,21 @@ const OpenDataSignalsQuery = z.object({
   ticker: z.string().trim().optional(),
 });
 
+// A ticker match or award row is not a scored source. The shared signal schema
+// still requires a number; this route allows null and records confidenceBasis.
+const UnscoredOpenDataSignalsResponse = OpenDataSignalsResponse.extend({
+  signals: z.array(
+    OpenDataSignal.extend({
+      confidence: z.number().min(0).max(1).nullable(),
+      sourceAttribution: z.array(
+        SourceAttribution.extend({
+          confidence: z.number().min(0).max(1).nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+
 export const crmConnectorRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/crm/connectors',
@@ -30,7 +45,7 @@ export const crmConnectorRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'companies:read' },
       schema: {
         querystring: OpenDataSignalsQuery,
-        response: { 200: OpenDataSignalsResponse },
+        response: { 200: UnscoredOpenDataSignalsResponse },
       },
     },
     async (req) => {

@@ -5,7 +5,7 @@
  * and are used from create, import, and lead conversion handlers.
  */
 import { Prisma } from '@bidstack/db';
-import { normalizeName } from '@bidstack/shared';
+import { normalizeName, unitsToMicros } from '@bidstack/shared';
 
 type MaxOpportunityCodeRow = {
   maxCode: number | bigint | null;
@@ -61,6 +61,37 @@ export function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
+ * Open book. A live pipeline stage marked lost or won is closed even when the
+ * enum key still looks open. A soft-deleted stage row does not close the deal.
+ */
+export function excludeClosedOutcome(): Prisma.OpportunityWhereInput {
+  return {
+    stage: { notIn: ['closed_won', 'closed_lost'] },
+    NOT: {
+      pipelineStage: {
+        is: {
+          deletedAt: null,
+          OR: [{ isLost: true }, { isWon: true }],
+        },
+      },
+    },
+  };
+}
+
+/** Won book. Lost wins when the enum or the live stage flag says lost. */
+export function wonOutcomeWhere(): Prisma.OpportunityWhereInput {
+  return {
+    NOT: {
+      OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+    },
+    OR: [
+      { stage: 'closed_won' },
+      { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+    ],
+  };
+}
+
+/**
  * Builds a normalizedName → Company.id index for an org (one query).
  *
  * WHY in code, not SQL: Company has no `normalizedName` column, so the
@@ -68,10 +99,22 @@ export function isUniqueViolation(err: unknown): boolean {
  * source of truth used by the seed, worker, and CRM cockpit). Used by the
  * import path to resolve all rows from a single fetch instead of N+1.
  */
+/** One id per normalized name. A second different id clears the link. */
+export function rememberCompanyName(
+  index: Map<string, string | null>,
+  company: { id: string; name: string },
+): void {
+  const key = normalizeName(company.name);
+  if (!key) return;
+  const prior = index.get(key);
+  if (prior === undefined) index.set(key, company.id);
+  else if (prior !== company.id) index.set(key, null);
+}
+
 export async function loadCompanyNameIndex(
   db: Prisma.TransactionClient,
   orgId: string,
-): Promise<Map<string, string>> {
+): Promise<Map<string, string | null>> {
   // Build the full normalizedName -> id index in BOUNDED pages. A single
   // unbounded findMany here is both a 100k-scale memory hazard and — because
   // every request runs under the query-guard (plugins/query-guard.ts) — gets
@@ -80,7 +123,7 @@ export async function loadCompanyNameIndex(
   // pagination keeps every query <= PAGE (guard-safe: take <= 1000) while still
   // producing the complete index callers depend on.
   const PAGE = 1000;
-  const index = new Map<string, string>();
+  const index = new Map<string, string | null>();
   let cursor: string | undefined;
   for (;;) {
     const page = await db.company.findMany({
@@ -90,15 +133,26 @@ export async function loadCompanyNameIndex(
       take: PAGE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    for (const c of page) {
-      const key = normalizeName(c.name);
-      // First match wins so re-runs are stable when two names normalize alike.
-      if (key && !index.has(key)) index.set(key, c.id);
-    }
+    for (const c of page) rememberCompanyName(index, c);
     if (page.length < PAGE) break;
     cursor = page[page.length - 1]!.id;
   }
   return index;
+}
+
+/**
+ * Match a pipeline stage id only while that stage row is still live.
+ * Deleting a stage leaves the id on the deal. The read hides it, so a list
+ * filter for that id must not return the row.
+ */
+export function livePipelineStageFilter(
+  pipelineStageId: string | undefined,
+): Prisma.OpportunityWhereInput {
+  if (!pipelineStageId) return {};
+  return {
+    pipelineStageId,
+    pipelineStage: { is: { deletedAt: null } },
+  };
 }
 
 /**
@@ -108,6 +162,42 @@ export async function loadCompanyNameIndex(
  * duplicates). Keeps `opportunity.companyId` consistent with `customer` so the
  * /accounts and cockpit rollups (which group by companyId) stay correct.
  */
+/**
+ * Stored micros for a value edit. An explicit micros string wins so a large
+ * amount is not rounded through `value * 1e6`.
+ */
+export function patchedValueMicros(body: {
+  value?: number;
+  valueMicros?: string;
+}): bigint | undefined {
+  if (body.valueMicros !== undefined) return BigInt(body.valueMicros);
+  if (body.value !== undefined) {
+    const micros = unitsToMicros(body.value);
+    if (micros == null) throw new Error('value is too large to store as a JSON number');
+    return micros;
+  }
+  return undefined;
+}
+
+/** A stage move that did not happen is not an event. Lost and won both count. */
+export function stageMoveDiff(
+  before: { stage: string; pipelineStageId: string | null },
+  after: { stage: string; pipelineStageId: string | null },
+): {
+  fromStage: string;
+  toStage: string;
+  fromPipelineStageId: string | null;
+  toPipelineStageId: string | null;
+} | null {
+  if (before.stage === after.stage && before.pipelineStageId === after.pipelineStageId) return null;
+  return {
+    fromStage: before.stage,
+    toStage: after.stage,
+    fromPipelineStageId: before.pipelineStageId,
+    toPipelineStageId: after.pipelineStageId,
+  };
+}
+
 export async function resolveCompanyIdByName(
   db: Prisma.TransactionClient,
   orgId: string,

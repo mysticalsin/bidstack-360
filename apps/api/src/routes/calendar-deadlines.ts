@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
+import { excludeClosedOutcome } from './opportunities.helpers.js';
 
 const DeadlineQuery = z.object({
   /** Inclusive start of the window (date-only — dueDate columns are @db.Date). */
@@ -62,11 +63,9 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
             orgId,
             deletedAt: null,
             dueDate: { gte: from, lt: to },
-            // Closed bids have no live deadline — filter on BOTH the legacy
-            // stage enum and the Phase-5 pipelineStage flags, since either may
-            // be the source of truth depending on the org's data vintage.
-            stage: { notIn: ['closed_won', 'closed_lost'] },
-            OR: [{ pipelineStageId: null }, { pipelineStage: { isWon: false, isLost: false } }],
+            // Closed bids have no live deadline. A live lost or won flag closes
+            // the deal. A soft-deleted stage row does not.
+            ...excludeClosedOutcome(),
           },
           orderBy: { dueDate: 'asc' },
           take: 200,

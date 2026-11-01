@@ -15,6 +15,14 @@ import type { IconName } from '@/components/ui/Icon';
 
 export type NavBadgeKey = 'openBids' | 'overdueTasks';
 
+/** The badge number is not the list total. Open bids and overdue tasks need that said. */
+export function navBadgeCopy(badgeKey: NavBadgeKey): { key: string; fallback: string } {
+  if (badgeKey === 'openBids') {
+    return { key: 'nav.badgeOpenBids', fallback: '{{count}} open' };
+  }
+  return { key: 'nav.badgeOverdueTasks', fallback: '{{count}} overdue' };
+}
+
 /** Admin-toggled module a nav item belongs to (hidden until enabled in Settings). */
 export type NavFeatureKey = 'agentStudio' | 'appflowy' | 'serum';
 
@@ -42,6 +50,14 @@ export interface NavSection {
   titleKey: string;
   icon: IconName;
   items: NavItem[];
+}
+
+/** Quick Start stays out of the nav until this person turns it on. */
+export function visibleNavSections(quickStartVisible: boolean): NavSection[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.to !== '/quick-start' || quickStartVisible),
+  })).filter((section) => section.items.length > 0);
 }
 
 export const NAV_SECTIONS: NavSection[] = [

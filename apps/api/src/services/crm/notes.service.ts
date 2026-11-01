@@ -29,6 +29,7 @@ export async function persistContacts(
   orgId: string,
   companyName: string,
   contacts: MeetingImportedContact[],
+  companyId?: string | null,
 ): Promise<number> {
   if (contacts.length === 0) return 0;
   const emails = contacts.map((c) => c.email).filter((e): e is string => !!e);
@@ -36,32 +37,68 @@ export async function persistContacts(
   const existing = await tx.contact.findMany({
     where: {
       orgId,
+      deletedAt: null,
       OR: [
         ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
         { name: { in: names, mode: 'insensitive' } },
       ],
     },
-    select: { email: true, name: true },
+    select: { id: true, email: true, name: true, companyId: true },
     take: 1000,
   });
-  const existingEmails = new Set(existing.map((e) => e.email?.toLowerCase()).filter(Boolean));
-  const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
-  const newContacts = contacts.filter((c) => {
-    const emailExists = c.email && existingEmails.has(c.email.toLowerCase());
-    const nameExists = existingNames.has(c.name.toLowerCase());
-    return !emailExists && !nameExists;
-  });
+  const byEmail = new Map<string, typeof existing>();
+  for (const row of existing) {
+    if (!row.email) continue;
+    const key = row.email.toLowerCase();
+    const list = byEmail.get(key) ?? [];
+    list.push(row);
+    byEmail.set(key, list);
+  }
+  const newContacts: MeetingImportedContact[] = [];
+  const linkIds: string[] = [];
+  for (const contact of contacts) {
+    if (contact.email) {
+      const matches = byEmail.get(contact.email.toLowerCase()) ?? [];
+      // One unlinked row with this email can take the company. A person
+      // already on a company stays there. A shared name is not that person.
+      const onlyMatch = matches[0];
+      if (matches.length === 1 && onlyMatch && onlyMatch.companyId == null && companyId) {
+        linkIds.push(onlyMatch.id);
+      }
+      if (matches.length > 0) continue;
+      newContacts.push(contact);
+      continue;
+    }
+    const sameAccount = existing.some(
+      (row) =>
+        row.name.toLowerCase() === contact.name.toLowerCase() &&
+        (row.companyId ?? null) === (companyId ?? null),
+    );
+    if (!sameAccount) newContacts.push(contact);
+  }
+  if (linkIds.length > 0 && companyId) {
+    await Promise.all(
+      linkIds.map((id) =>
+        tx.contact.update({
+          where: { id },
+          data: { companyId, customer: companyName },
+        }),
+      ),
+    );
+  }
   if (newContacts.length > 0) {
     await tx.contact.createMany({
       data: newContacts.map((c) => ({
         orgId,
         customer: companyName,
+        companyId: companyId ?? null,
         name: c.name,
         role: c.title,
         email: c.email,
         phone: c.phone,
-        influence: influenceFromRole(c.roleInDecision),
-        sentiment: c.roleInDecision === 'blocker' ? 'cold' : 'warm',
+        // A title or a guessed decision-role word is not temperature or influence.
+        influence: null,
+        sentiment: null,
       })),
     });
   }
@@ -80,6 +117,7 @@ export async function persistRisks(
     where: {
       orgId,
       companyName,
+      deletedAt: null,
       title: { in: titles, mode: 'insensitive' },
     },
     select: { title: true },
@@ -93,7 +131,8 @@ export async function persistRisks(
         orgId,
         companyName,
         title: r.title,
-        severity: r.severity,
+        // The column cannot be empty. This token is not a rank.
+        severity: r.severity ?? 'unspecified',
         owner: r.owner,
         mitigation: r.mitigation,
         dueDate: r.dueDate ? new Date(`${r.dueDate}T00:00:00.000Z`) : null,
@@ -112,23 +151,34 @@ export async function persistCompliance(
 ): Promise<number> {
   if (compliance.length === 0) return 0;
   const labels = compliance.map((c) => c.label);
+  const companyKey = companyName.trim().toLowerCase();
   const existing = await tx.complianceCheck.findMany({
-    where: { orgId, label: { in: labels, mode: 'insensitive' } },
-    select: { id: true, label: true },
+    where: { orgId, deletedAt: null, label: { in: labels, mode: 'insensitive' } },
+    select: { id: true, label: true, sourceAttribution: true },
     take: 1000,
   });
-  const existingByLabel = new Map(existing.map((e) => [e.label.toLowerCase(), e.id]));
-  const toUpdate = compliance.filter((c) => existingByLabel.has(c.label.toLowerCase()));
-  const toCreate = compliance.filter((c) => !existingByLabel.has(c.label.toLowerCase()));
+  const toUpdate: Array<{ id: string; check: ComplianceCheck }> = [];
+  const toCreate: ComplianceCheck[] = [];
+  for (const check of compliance) {
+    const matches = existing.filter(
+      (row) =>
+        row.label.toLowerCase() === check.label.toLowerCase() &&
+        attributedCompanyName(row.sourceAttribution) === companyKey,
+    );
+    if (matches.length === 0) toCreate.push(check);
+    else for (const row of matches) toUpdate.push({ id: row.id, check });
+  }
   if (toUpdate.length > 0) {
     await Promise.all(
-      toUpdate.map((c) =>
+      toUpdate.map(({ id, check }) =>
         tx.complianceCheck.update({
-          where: { id: existingByLabel.get(c.label.toLowerCase())! },
+          where: { id },
           data: {
-            status: c.status,
-            owner: c.owner,
-            sourceAttribution: asJsonArray(c.sourceAttribution),
+            // A later note that only names the framework must not wipe a
+            // status or an owner, and must not edit another company's row.
+            ...(check.status ? { status: check.status } : {}),
+            ...(check.owner ? { owner: check.owner } : {}),
+            sourceAttribution: asJsonArray(check.sourceAttribution),
           },
         }),
       ),
@@ -139,7 +189,8 @@ export async function persistCompliance(
       data: toCreate.map((c) => ({
         orgId,
         label: c.label,
-        status: c.status,
+        // The column cannot be empty. This token is not a status.
+        status: c.status ?? 'unspecified',
         owner: c.owner,
         sourceAttribution: asJsonArray(c.sourceAttribution),
       })),
@@ -152,11 +203,19 @@ export async function persistTasks(
   tx: Prisma.TransactionClient,
   orgId: string,
   tasks: MeetingImportedTask[],
+  companyId?: string | null,
 ): Promise<number> {
   if (tasks.length === 0) return 0;
   const titles = tasks.map((t) => t.title);
+  // The same action on another account is a different follow-up. A deleted
+  // row does not count as already recorded.
   const existing = await tx.task.findMany({
-    where: { orgId, title: { in: titles, mode: 'insensitive' } },
+    where: {
+      orgId,
+      deletedAt: null,
+      accountId: companyId ?? null,
+      title: { in: titles, mode: 'insensitive' },
+    },
     select: { title: true },
     take: 1000,
   });
@@ -166,6 +225,7 @@ export async function persistTasks(
     await tx.task.createMany({
       data: newTasks.map((t) => ({
         orgId,
+        accountId: companyId ?? null,
         title: t.title,
         dueDate: t.dueDate ? new Date(`${t.dueDate}T00:00:00.000Z`) : null,
         status: TaskStatus[t.status],
@@ -205,13 +265,16 @@ export async function persistMeetingTechStack(
   const website = input.domain ? `https://${input.domain}/` : null;
 
   const data = {
+    // The enrichment column cannot be empty. This is the name on the note,
+    // not a registry legal name. Public-source tagging stays off unless
+    // public facts are already stored.
     legalName: existing?.legalName ?? input.companyName,
     tradeName: existing?.tradeName ?? input.companyName,
     domain: existing?.domain ?? input.domain,
     website: existing?.website ?? website,
     logoUrl: existing?.logoUrl ?? (input.domain ? faviconUrl(input.domain) : null),
     logoSource: existing?.logoSource ?? (input.domain ? 'favicon' : null),
-    confidenceBps: Math.max(existing?.confidenceBps ?? 0, input.techStack.length ? 7_400 : 5_800),
+    confidenceBps: existing?.confidenceBps ?? 0,
     sourceAttribution: asJsonArray(sourceAttribution),
     providerMetadata: asJsonObject({
       ...existingMetadata,
@@ -257,7 +320,7 @@ export function attribution({
   source: string;
   label: string;
   sourceUrl: string | null;
-  confidence: number;
+  confidence: number | null;
   fetchedAt?: Date;
   providerMetadata?: Record<string, unknown>;
 }): SourceAttributionType {
@@ -303,11 +366,15 @@ export function asJsonArray(value: unknown[]): Prisma.InputJsonArray {
 
 // ─── Persistence-private helpers ──────────────────────────────────────────────
 
-function influenceFromRole(role: MeetingImportedContact['roleInDecision']): number | null {
-  if (role === 'champion' || role === 'buyer') return 5;
-  if (role === 'blocker') return 2;
-  if (role === 'influencer') return 4;
-  if (role === 'user') return 3;
+function attributedCompanyName(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const meta = (item as { providerMetadata?: unknown }).providerMetadata;
+    if (!meta || typeof meta !== 'object') continue;
+    const name = (meta as { companyName?: unknown }).companyName;
+    if (typeof name === 'string' && name.trim()) return name.trim().toLowerCase();
+  }
   return null;
 }
 
@@ -321,7 +388,9 @@ function mergeTechStack(
     for (const item of category.items) {
       const key = item.name.toLowerCase();
       const previous = itemMap.get(key);
-      itemMap.set(key, previous && previous.confidence > item.confidence ? previous : item);
+      const previousScore = previous?.confidence ?? -1;
+      const nextScore = item.confidence ?? -1;
+      itemMap.set(key, previous && previousScore > nextScore ? previous : item);
     }
     byCategory.set(category.label, itemMap);
   }
@@ -333,7 +402,9 @@ function parseTechStackMetadata(value: unknown): TechnicalStackCategory[] {
     .array(
       z.object({
         label: z.string(),
-        items: z.array(z.object({ name: z.string(), source: z.string(), confidence: z.number() })),
+        items: z.array(
+          z.object({ name: z.string(), source: z.string(), confidence: z.number().nullable() }),
+        ),
       }),
     )
     .safeParse(value);

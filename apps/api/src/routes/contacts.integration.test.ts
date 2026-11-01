@@ -159,6 +159,72 @@ describe('contacts routes', () => {
     expect(body.customer).toBe(newCustomer);
   });
 
+  skipIfNoDb('PATCH customer moves the company id and a name edit does not', async () => {
+    // WHY: Dust lists people by company id. Renaming the customer label used
+    // to leave the old id, so the person stayed on the previous account.
+    const from = await prisma.company.create({
+      data: { orgId: orgId!, name: `From Co ${Date.now()}` },
+    });
+    const to = await prisma.company.create({
+      data: { orgId: orgId!, name: `To Co ${Date.now()}` },
+    });
+    const twin = `Twin Co ${Date.now()}`;
+    await prisma.company.create({ data: { orgId: orgId!, name: twin } });
+    await prisma.company.create({ data: { orgId: orgId!, name: twin.toLowerCase() } });
+
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/contacts',
+      payload: {
+        customer: 'Stored label',
+        companyId: from.id,
+        name: 'Moved Person',
+        role: null,
+        email: null,
+        phone: null,
+        influence: null,
+        sentiment: null,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const id = (created.json() as { id: string }).id;
+    createdContactIds.push(id);
+
+    const renamed = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { name: 'Moved Person Jr' },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json()).toMatchObject({ companyId: from.id, linkState: 'linked' });
+
+    const moved = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { customer: to.name },
+    });
+    expect(moved.statusCode).toBe(200);
+    expect(moved.json()).toMatchObject({ customer: to.name, companyId: to.id, linkState: 'linked' });
+
+    const cleared = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { customer: 'No such company' },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json()).toMatchObject({ companyId: null, linkState: 'needs_review' });
+
+    await prisma.contact.update({ where: { id }, data: { companyId: from.id } });
+    const refused = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { customer: twin },
+    });
+    expect(refused.statusCode).toBe(409);
+    const stored = await prisma.contact.findUnique({ where: { id }, select: { companyId: true, customer: true } });
+    expect(stored).toMatchObject({ companyId: from.id, customer: 'No such company' });
+  });
+
   skipIfNoDb('DELETE /api/contacts/:id removes the contact and writes audit', async () => {
     const createRes = await server.inject({
       method: 'POST',

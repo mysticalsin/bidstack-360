@@ -1,16 +1,22 @@
 /**
  * ai-assistant.deals.service.test.ts — OmniRoute direct-LLM fallback for
- * deal sentiment + account intel.
+ * deal sentiment + account intel, and the honest stub when that fallback is empty.
  *
- * WHY: when Dust is unconfigured, these two functions used to drop straight
- * to a canned stub. They must now try completeChatOrNull (the OmniRoute
- * fallback) first and only fall through to the stub when that also returns
- * null. These tests assert the OmniRoute completion is what actually reaches
- * the parsed result — if the wiring reverts to "stub first" or drops the
- * fallback call, the assertions on `summary`/`score`/`healthScore` fail.
+ * WHY: when Dust is unconfigured, these two functions try completeChatOrNull
+ * first. A missing model result must not invent a sentiment or a health score
+ * from activity counts. These tests fail if the wiring drops the OmniRoute
+ * call, or if the empty path starts scoring a count as a feeling.
  */
 import type { Logger as PinoLogger } from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  parseAccountHealthScore,
+  parseDealSentimentLabel,
+  parseDealSentimentScore,
+  recordedAccountIntel,
+  recordedDealSentiment,
+} from './ai-assistant.deals.service.js';
 
 const mocks = vi.hoisted(() => ({
   checkDailyCap: vi.fn(),
@@ -28,7 +34,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./ai-assistant.helpers.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./ai-assistant.helpers.js')>();
   return {
-    ...actual, // keep estimateCost real — it's a pure function, no reason to fake it
+    ...actual,
     checkDailyCap: mocks.checkDailyCap,
     buildDustClient: mocks.buildDustClient,
     resolveAgentId: mocks.resolveAgentId,
@@ -41,6 +47,8 @@ vi.mock('./ai-assistant.helpers.js', async (importOriginal) => {
 vi.mock('./ai-assistant.context.js', () => ({
   buildSentimentContext: mocks.buildSentimentContext,
   buildAccountIntelContext: mocks.buildAccountIntelContext,
+  countRecordedDealOutcomes: () => ({ won: 1, lost: 0 }),
+  formatDealForPrompt: () => '',
 }));
 
 const { analyzeDealSentiment, summarizeAccountIntel } = await import(
@@ -56,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   (log.child as ReturnType<typeof vi.fn>).mockReturnValue(log);
   mocks.checkDailyCap.mockResolvedValue({ allowed: true });
-  mocks.buildDustClient.mockResolvedValue({ client: null, creds: null }); // Dust unconfigured
+  mocks.buildDustClient.mockResolvedValue({ client: null, creds: null });
   mocks.resolveAgentId.mockReturnValue(undefined);
   mocks.persistSession.mockResolvedValue('session-1');
   mocks.recordCost.mockResolvedValue(undefined);
@@ -84,26 +92,25 @@ describe('analyzeDealSentiment', () => {
 
     const result = await analyzeDealSentiment(opts, log);
 
-    // Proves the fallback was actually invoked with the same prompt Dust would've gotten.
     expect(mocks.completeChatOrNull).toHaveBeenCalledWith(
       opts.orgId,
       expect.objectContaining({ responseFormat: 'json_object' }),
       log,
     );
-    // If this reverted to "stub first", score/summary would be the heuristic values
-    // (0.3 / "1 activities recorded for this deal."), not these OmniRoute values.
     expect(result.score).toBe(0.75);
     expect(result.summary).toBe('OmniRoute-generated summary');
     expect(result.suggestedActions).toEqual(['Send proposal']);
   });
 
-  it('falls through to the static stub when OmniRoute also returns null', async () => {
+  it('records the activity count without a score when OmniRoute also returns null', async () => {
     mocks.completeChatOrNull.mockResolvedValue(null);
 
     const result = await analyzeDealSentiment(opts, log);
 
     expect(mocks.completeChatOrNull).toHaveBeenCalled();
-    expect(result.summary).toBe('1 activities recorded for this deal.');
+    expect(result.summary).toContain('1 activities recorded');
+    expect(result.score).toBeNull();
+    expect(result.label).toBeNull();
   });
 });
 
@@ -134,19 +141,67 @@ describe('summarizeAccountIntel', () => {
       expect.objectContaining({ responseFormat: 'json_object' }),
       log,
     );
-    // Heuristic stub would compute healthScore 100 (1 won, 0 lost) — 88 only
-    // appears if the OmniRoute completion was actually used.
     expect(result.healthScore).toBe(88);
     expect(result.summary).toBe('OmniRoute account summary');
     expect(result.expansionOpportunities).toEqual(['Upsell tier 2']);
   });
 
-  it('falls through to the static stub when OmniRoute also returns null', async () => {
+  it('does not invent a health score when OmniRoute also returns null', async () => {
     mocks.completeChatOrNull.mockResolvedValue(null);
 
     const result = await summarizeAccountIntel(opts, log);
 
     expect(mocks.completeChatOrNull).toHaveBeenCalled();
-    expect(result.healthScore).toBe(100); // 1 won, 0 lost -> (1+1)/(1+0+1)*100
+    expect(result.healthScore).toBeNull();
+    expect(result.expansionOpportunities).toEqual([]);
+    expect(result.summary).toContain('No health score was produced');
+  });
+});
+
+describe('recorded deal sentiment', () => {
+  it('does not turn an activity count into a sentiment score', () => {
+    const none = recordedDealSentiment(0);
+    const many = recordedDealSentiment(5);
+    expect(none.score).toBeNull();
+    expect(none.label).toBeNull();
+    expect(none.riskFlags).toEqual([]);
+    expect(none.suggestedActions).toEqual([]);
+    expect(none.summary).toContain('0 activities recorded');
+    expect(many.summary).toContain('5 activities recorded');
+    expect(many.score).toBeNull();
+  });
+
+  it('keeps a model score only inside -1 to 1 and a known label', () => {
+    expect(parseDealSentimentScore(-0.2)).toBe(-0.2);
+    expect(parseDealSentimentScore(2)).toBeNull();
+    expect(parseDealSentimentScore(undefined)).toBeNull();
+    expect(parseDealSentimentLabel('neutral')).toBe('neutral');
+    expect(parseDealSentimentLabel('unknown')).toBeNull();
+  });
+});
+
+describe('recorded account intel', () => {
+  it('does not invent a health score or a play from deal counts', () => {
+    const intel = recordedAccountIntel({
+      opportunityCount: 7,
+      wonCount: 4,
+      lostCount: 2,
+      contactCount: 3,
+    });
+    expect(intel.healthScore).toBeNull();
+    expect(intel.expansionOpportunities).toEqual([]);
+    expect(intel.churnRisks).toEqual([]);
+    expect(intel.summary).toContain('4 won');
+    expect(intel.summary).toContain('2 lost');
+    expect(intel.summary).toContain('No health score was produced');
+  });
+
+  it('keeps only a finite score from 0 to 100', () => {
+    expect(parseAccountHealthScore(71.2)).toBe(71);
+    expect(parseAccountHealthScore(0)).toBe(0);
+    expect(parseAccountHealthScore(undefined)).toBeNull();
+    expect(parseAccountHealthScore(50.5)).toBe(51);
+    expect(parseAccountHealthScore(Number.NaN)).toBeNull();
+    expect(parseAccountHealthScore(120)).toBeNull();
   });
 });

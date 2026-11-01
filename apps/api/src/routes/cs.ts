@@ -18,7 +18,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Logger as PinoLogger } from 'pino';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { getLatestHealthScore } from '../services/cs/health-score.service.js';
 import { listRenewalOpportunities } from '../services/cs/renewal.service.js';
 import { recordNpsResponse } from '../services/cs/nps.service.js';
@@ -48,9 +48,9 @@ const NpsRespondBody = z.object({
 
 const HealthScoreResponse = z.object({
   accountId: z.string().uuid(),
-  score: z.number(),
+  score: z.number().nullable(),
   factors: z.record(z.unknown()),
-  trend: z.enum(['IMPROVING', 'STABLE', 'DECLINING']),
+  trend: z.enum(['IMPROVING', 'STABLE', 'DECLINING']).nullable(),
 });
 
 const MessageResponse = z.object({ message: z.string() });
@@ -265,6 +265,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
         activeSubscriptions,
         openChurnSignals,
         pendingRenewals,
+        healthBuckets,
         recentHealthScores,
       ] = await Promise.all([
         prisma.subscription.count({ where: { orgId, status: 'ACTIVE', deletedAt: null } }),
@@ -276,25 +277,71 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
             deletedAt: null,
           },
         }),
-        prisma.healthScore.findMany({
-          where: { orgId },
-          orderBy: { capturedAt: 'desc' },
-          take: 50,
-          distinct: ['accountId'],
-          select: { accountId: true, score: true, trend: true, capturedAt: true },
-        }),
+        prisma.$queryRaw<
+          Array<{ healthy: number; atRisk: number; critical: number }>
+        >(Prisma.sql`
+          SELECT
+            COUNT(*) FILTER (WHERE score >= 75)::int AS healthy,
+            COUNT(*) FILTER (WHERE score >= 50 AND score < 75)::int AS "atRisk",
+            COUNT(*) FILTER (WHERE score < 50)::int AS critical
+          FROM (
+            SELECT DISTINCT ON (account_id) score
+            FROM health_scores
+            WHERE org_id = ${orgId}::uuid
+            ORDER BY account_id, captured_at DESC
+          ) latest
+        `),
+        prisma.$queryRaw<
+          Array<{
+            accountId: string;
+            score: number;
+            trend: 'IMPROVING' | 'STABLE' | 'DECLINING';
+            capturedAt: Date;
+          }>
+        >(Prisma.sql`
+          SELECT "accountId", score, trend, "capturedAt"
+          FROM (
+            SELECT DISTINCT ON (account_id)
+              account_id AS "accountId",
+              score,
+              trend::text AS trend,
+              captured_at AS "capturedAt"
+            FROM health_scores
+            WHERE org_id = ${orgId}::uuid
+            ORDER BY account_id, captured_at DESC
+          ) latest
+          ORDER BY "capturedAt" DESC
+          LIMIT 10
+        `),
       ]);
 
-      const healthy = recentHealthScores.filter((h) => h.score >= 75).length;
-      const atRisk = recentHealthScores.filter((h) => h.score >= 50 && h.score < 75).length;
-      const critical = recentHealthScores.filter((h) => h.score < 50).length;
+      const bucket = healthBuckets[0] ?? { healthy: 0, atRisk: 0, critical: 0 };
+      const accountIds = recentHealthScores.map((row) => row.accountId);
+      const counts =
+        accountIds.length === 0
+          ? []
+          : await prisma.healthScore.groupBy({
+              by: ['accountId'],
+              where: { orgId, accountId: { in: accountIds } },
+              _count: { _all: true },
+            });
+      const snapshots = new Map(counts.map((row) => [row.accountId, row._count._all]));
+      const latestHealthScores = recentHealthScores.map((row) => ({
+        ...row,
+        // One snapshot has no earlier score. The column default is not a trend.
+        trend: (snapshots.get(row.accountId) ?? 0) < 2 ? null : row.trend,
+      }));
 
       return {
         activeSubscriptions,
         openChurnSignals,
         pendingRenewals,
-        accountsByHealth: { healthy, atRisk, critical },
-        latestHealthScores: recentHealthScores.slice(0, 10),
+        accountsByHealth: {
+          healthy: Number(bucket.healthy),
+          atRisk: Number(bucket.atRisk),
+          critical: Number(bucket.critical),
+        },
+        latestHealthScores,
       };
     },
   );

@@ -17,6 +17,13 @@ export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Res
 export interface DustClientOptions {
   apiKey: string;
   workspaceId: string;
+  /**
+   * Dust space `sId` that owns the data source. Current document APIs are
+   * `/v1/w/{workspace}/spaces/{space}/data_sources/{dataSource}/...`.
+   * A display name is not an id. Omit it and document calls fail before
+   * hitting the removed workspace-level path.
+   */
+  spaceId?: string;
   baseUrl?: string;
   timeoutMs?: number;
   logger?: pino.Logger;
@@ -45,6 +52,7 @@ export type DustDocument = z.infer<typeof DustDocument>;
 export const DustDocumentDetail = DustDocument.extend({
   text: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  tags: z.array(z.string()).optional(),
 });
 export type DustDocumentDetail = z.infer<typeof DustDocumentDetail>;
 
@@ -86,6 +94,7 @@ export class DustError extends Error {
 export class DustClient {
   private readonly apiKey: string;
   private readonly workspaceId: string;
+  private readonly spaceId: string | undefined;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly log: pino.Logger;
@@ -96,6 +105,7 @@ export class DustClient {
     if (!opts.workspaceId) throw new Error('DustClient: workspaceId required');
     this.apiKey = opts.apiKey;
     this.workspaceId = opts.workspaceId;
+    this.spaceId = opts.spaceId?.trim() || undefined;
     this.baseUrl = opts.baseUrl ?? DUST_DEFAULT_BASE;
     this.timeoutMs = opts.timeoutMs ?? 10_000;
     this.log = opts.logger ?? pino({ name: 'dust-client' });
@@ -105,7 +115,7 @@ export class DustClient {
   async listDocuments(dataSourceId: string): Promise<DustDocument[]> {
     const data = await this.request<{ documents: unknown[] }>(
       'GET',
-      `/v1/w/${this.workspaceId}/data_sources/${dataSourceId}/documents`,
+      this.documentsPath(dataSourceId),
     );
     return z.array(DustDocument).parse(data.documents);
   }
@@ -113,9 +123,14 @@ export class DustClient {
   async getDocument(dataSourceId: string, documentId: string): Promise<DustDocumentDetail> {
     const data = await this.request<{ document: unknown }>(
       'GET',
-      `/v1/w/${this.workspaceId}/data_sources/${dataSourceId}/documents/${encodeURIComponent(documentId)}`,
+      this.documentsPath(dataSourceId, documentId),
     );
-    return DustDocumentDetail.parse(data.document);
+    const parsed = DustDocumentDetail.parse(data.document);
+    // Current Dust documents carry routing keys as tags (`key:value`), not a
+    // metadata object. Fold those tags back so the poller can still route.
+    if (parsed.metadata && Object.keys(parsed.metadata).length > 0) return parsed;
+    const metadata = tagsToMetadata(parsed.tags);
+    return Object.keys(metadata).length > 0 ? { ...parsed, metadata } : parsed;
   }
 
   async listAgents(
@@ -146,10 +161,33 @@ export class DustClient {
   ): Promise<DustDocument> {
     const data = await this.request<{ document: unknown }>(
       'POST',
-      `/v1/w/${this.workspaceId}/data_sources/${dataSourceId}/documents`,
-      { document_id: documentId, text, metadata },
+      this.documentsPath(dataSourceId, documentId),
+      {
+        title: documentTitle(documentId, metadata),
+        mime_type: 'text/markdown',
+        text,
+        tags: metadataToTags(metadata),
+        light_document_output: true,
+      },
     );
     return DustDocument.parse(data.document);
+  }
+
+  /**
+   * Current Dust OpenAPI (docs.dust.tt, datasources): documents live under
+   * the space. The old `/v1/w/{workspace}/data_sources/{id}/documents` path
+   * is not in that spec. Missing space id is a config error, not a request.
+   */
+  private documentsPath(dataSourceId: string, documentId?: string): string {
+    if (!this.spaceId) {
+      throw new DustError(
+        'Dust document calls need DUST_SPACE_ID (the space sId, not the space name). Current path: /v1/w/<workspace>/spaces/<space>/data_sources/<dataSource>/documents/<documentId>.',
+        400,
+        null,
+      );
+    }
+    const base = `/v1/w/${encodeURIComponent(this.workspaceId)}/spaces/${encodeURIComponent(this.spaceId)}/data_sources/${encodeURIComponent(dataSourceId)}/documents`;
+    return documentId ? `${base}/${encodeURIComponent(documentId)}` : base;
   }
 
   async runAgent(
@@ -249,6 +287,39 @@ export class DustClient {
       externalSignal?.removeEventListener('abort', abortFromExternal);
     }
   }
+}
+
+function documentTitle(documentId: string, metadata: Record<string, unknown>): string {
+  if (typeof metadata.title === 'string' && metadata.title.trim()) return metadata.title.trim();
+  if (typeof metadata.opportunity_name === 'string' && metadata.opportunity_name.trim()) {
+    return metadata.opportunity_name.trim();
+  }
+  return documentId;
+}
+
+function metadataToTags(metadata: Record<string, unknown>): string[] {
+  const tags: string[] = [];
+  for (const [key, value] of Object.entries(metadata)) {
+    if (key === 'title') continue;
+    if (typeof value === 'string') {
+      if (value.length > 0) tags.push(`${key}:${value}`);
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      tags.push(`${key}:${String(value)}`);
+    }
+  }
+  return tags;
+}
+
+function tagsToMetadata(tags: string[] | undefined): Record<string, string> {
+  const metadata: Record<string, string> = {};
+  for (const tag of tags ?? []) {
+    const splitAt = tag.indexOf(':');
+    if (splitAt <= 0) continue;
+    const key = tag.slice(0, splitAt);
+    const value = tag.slice(splitAt + 1);
+    if (key && value) metadata[key] = value;
+  }
+  return metadata;
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

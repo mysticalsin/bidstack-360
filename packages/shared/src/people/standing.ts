@@ -100,6 +100,36 @@ export function acceptedFactsConflict(facts: PersonFactView[]): boolean {
  * Draw a reporting line only from one fresh accepted target. Two targets,
  * a suggestion, or a stale claim draw nothing — the line stays unknown.
  */
+const DECISION_ROLES = ['buyer', 'blocker', 'champion', 'influencer', 'user'] as const;
+export type DecisionRole = (typeof DECISION_ROLES)[number];
+
+function isDecisionRole(value: string): value is DecisionRole {
+  return (DECISION_ROLES as readonly string[]).includes(value);
+}
+
+/**
+ * One fresh accepted buying role on a deal that belongs to this account.
+ * A job title, a free-text label, a suggestion, a stale fact, or two
+ * disagreeing roles leave the station empty.
+ */
+export function recordedDecisionRole(
+  facts: PersonFactView[],
+  now: Date,
+  accountOpportunityIds: ReadonlySet<string>,
+): DecisionRole | null {
+  const roles = new Set<DecisionRole>();
+  for (const fact of facts) {
+    if (fact.kind !== 'buying_role' || fact.status !== 'accepted') continue;
+    if (factIsStale(fact, now)) continue;
+    if (!fact.opportunityId || !accountOpportunityIds.has(fact.opportunityId)) continue;
+    const label = fact.linkLabel?.trim().toLowerCase() ?? '';
+    if (!isDecisionRole(label)) continue;
+    roles.add(label);
+  }
+  if (roles.size !== 1) return null;
+  return [...roles][0] ?? null;
+}
+
 export function resolvedReportsToId(facts: PersonFactView[], now: Date): string | null {
   const accepted = facts.filter(
     (fact) =>

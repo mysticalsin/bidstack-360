@@ -93,6 +93,7 @@ describeDb('MCP tools', () => {
 
   afterAll(async () => {
     await prisma.auditLog.deleteMany({ where: { orgId } });
+    await prisma.activity.deleteMany({ where: { orgId } });
     await prisma.note.deleteMany({ where: { orgId } });
     await prisma.task.deleteMany({ where: { orgId } });
     await prisma.lead.deleteMany({ where: { orgId } });
@@ -118,14 +119,421 @@ describeDb('MCP tools', () => {
       currencyBasis: string;
       companyId: string | null;
       health: string;
-      probability: number;
+      probability: number | null;
     };
     // WHY: probability is win likelihood. Reporting it as account health, or
     // the value as EUR, would make a Dust read a false forecast.
+    expect(row.probability).toBe(50);
     expect(row.currency).toBeNull();
     expect(row.currencyBasis).toBe('unspecified');
     expect(row.health).toBe('not_account_health');
     expect(row.companyId).toBeNull();
+  });
+
+  it('opportunities.list filters by company id, not the customer string', async () => {
+    // WHY: customer text is a label. Dust asking for the account must see the
+    // linked deal and must not see a deal that only repeats the company name.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Opp Co ${randomBytes(4).toString('hex')}` },
+    });
+    const linked = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: 'Stored label',
+        companyId: company.id,
+        name: 'Linked pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const nameOnly = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: company.name,
+        name: 'Name only pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const out = (await tools['opportunities.list'].handler(
+      { companyId: company.id, limit: 20 },
+      ctx,
+    )) as Array<{ id: string; probability: number | null; stageName: string }>;
+    expect(out.map((row) => row.id)).toEqual([linked.id]);
+    expect(out[0]?.probability).toBeNull();
+    expect(out[0]?.stageName).toBe('S1 Lead');
+    expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
+
+    await expect(
+      tools['opportunities.list'].handler(
+        { companyId: '00000000-0000-4000-8000-000000000099', limit: 5 },
+        ctx,
+      ),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it('opportunities.get returns the company link and does not name a currency', async () => {
+    // WHY: Dust reading one deal saw a customer string and a bare number.
+    // The company id is the link, and the amount has no recorded currency.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Get Co ${randomBytes(4).toString('hex')}` },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: 'Stored label',
+        companyId: company.id,
+        name: 'Linked get',
+        stage: 's3_technical_iteration',
+        valueMicros: 1_240_000_000_000n,
+        probability: 65,
+        intel: {},
+      },
+    });
+    const out = (await tools['opportunities.get'].handler({ id: opp.id }, ctx)) as {
+      companyId: string | null;
+      currency: null;
+      currencyBasis: string;
+      stage: string;
+      stageName: string;
+      health: string;
+    };
+    expect(out.companyId).toBe(company.id);
+    expect(out.currency).toBeNull();
+    expect(out.currencyBasis).toBe('unspecified');
+    expect(out.stage).toBe('s3_technical_iteration');
+    expect(out.stageName).toBe('S3 Technical Iteration');
+    expect(out.health).toBe('not_account_health');
+  });
+
+  it('opportunities.get and list report a lost flag even when the stage key looks open', async () => {
+    // WHY: Dust was reading the stored key. A stage marked lost still looked
+    // like an open deal, and a stage marked both won and lost looked won.
+    const token = randomBytes(4).toString('hex');
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Outcome ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    const both = await prisma.pipelineStage.create({
+      data: {
+        orgId,
+        pipelineId: pipeline.id,
+        key: 'both_flags',
+        name: 'Both',
+        isWon: true,
+        isLost: true,
+      },
+    });
+    const lostOpp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OL1-${token}`,
+        customer: 'Outcome Co',
+        name: 'Looks open',
+        stage: 's2_sent',
+        pipelineStageId: lost.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const bothOpp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OL2-${token}`,
+        customer: 'Outcome Co',
+        name: 'Both flags',
+        stage: 's4_negotiation',
+        pipelineStageId: both.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const one = (await tools['opportunities.get'].handler({ id: lostOpp.id }, ctx)) as {
+      stage: string;
+      outcome: string;
+    };
+    expect(one.stage).toBe('s2_sent');
+    expect(one.outcome).toBe('lost');
+
+    const listed = (await tools['opportunities.list'].handler(
+      { search: `OP-OL`, limit: 20 },
+      ctx,
+    )) as Array<{ id: string; outcome: string }>;
+    expect(listed.find((row) => row.id === lostOpp.id)?.outcome).toBe('lost');
+    expect(listed.find((row) => row.id === bothOpp.id)?.outcome).toBe('lost');
+
+    const renamed = (await tools['crm_update_deal'].handler(
+      { id: lostOpp.id, patch: { name: 'Still lost' } },
+      ctx,
+    )) as { stage: string; outcome: string };
+    expect(renamed.stage).toBe('s2_sent');
+    expect(renamed.outcome).toBe('lost');
+  });
+
+  it('opportunities.list can keep a lost flag out of the open stage', async () => {
+    // WHY: filtering by the stored key returned a lost deal as if it were still
+    // open. Dust asking for open deals in that stage must not see it. Deleting
+    // the stage puts the deal back in the open list.
+    const token = randomBytes(4).toString('hex');
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Open filter ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    const open = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OF1-${token}`,
+        customer: 'Filter Co',
+        name: `Still open ${token}`,
+        stage: 's2_sent',
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const flagged = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OF2-${token}`,
+        customer: 'Filter Co',
+        name: `Flagged lost ${token}`,
+        stage: 's2_sent',
+        pipelineStageId: lost.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    try {
+      const openRows = (await tools['opportunities.list'].handler(
+        { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
+        ctx,
+      )) as Array<{ id: string }>;
+      expect(openRows.map((row) => row.id)).toEqual([open.id]);
+
+      const lostRows = (await tools['opportunities.list'].handler(
+        { outcome: 'lost', search: token, limit: 20 },
+        ctx,
+      )) as Array<{ id: string }>;
+      expect(lostRows.map((row) => row.id)).toEqual([flagged.id]);
+
+      const beforeDelete = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {
+        stageName: string;
+        probability: number | null;
+      };
+      expect(beforeDelete.stageName).toBe('Price lost');
+      expect(beforeDelete.probability).toBeNull();
+
+      await prisma.pipelineStage.update({ where: { id: lost.id }, data: { deletedAt: new Date() } });
+      const afterGet = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {
+        stageName: string;
+        outcome: string;
+      };
+      expect(afterGet.outcome).toBe('open');
+      expect(afterGet.stageName).toBe('S2 Sent');
+      const afterDelete = (await tools['opportunities.list'].handler(
+        { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
+        ctx,
+      )) as Array<{ id: string }>;
+      expect(afterDelete.map((row) => row.id).sort()).toEqual([flagged.id, open.id].sort());
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { id: { in: [open.id, flagged.id] } } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
+      await prisma.pipeline.delete({ where: { id: pipeline.id } });
+    }
+  });
+
+  it('crm_create_deal links the one live stage with that key', async () => {
+    // WHY: create stored the enum and reported open. A stage key whose only
+    // live row is lost must come back lost. Two rows with that key are refused
+    // so the first one is not treated as the outcome.
+    const openKeys = [
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
+    ] as const;
+    const free: string[] = [];
+    for (const key of openKeys) {
+      const n = await prisma.pipelineStage.count({ where: { orgId, key, deletedAt: null } });
+      if (n === 0) free.push(key);
+    }
+    expect(free.length).toBeGreaterThanOrEqual(2);
+    const lostKey = free[0]!;
+    const ambiguousKey = free[1]!;
+    const token = randomBytes(4).toString('hex');
+    const company = await prisma.company.create({
+      data: { orgId, name: `Create Co ${token}` },
+    });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Create ${token}` },
+    });
+    const other = await prisma.pipeline.create({
+      data: { orgId, name: `Create other ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: lostKey, name: 'Lost key', isLost: true },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: ambiguousKey, name: 'Neg A' },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: other.id, key: ambiguousKey, name: 'Neg B' },
+    });
+
+    try {
+      const created = (await tools['crm_create_deal'].handler(
+        {
+          customer: company.name,
+          companyId: company.id,
+          name: `Flagged create ${token}`,
+          stage: lostKey,
+          value: 0,
+        },
+        ctx,
+      )) as { id: string; stage: string; outcome: string };
+      expect(created.stage).toBe(lostKey);
+      expect(created.outcome).toBe('lost');
+      const row = await prisma.opportunity.findFirst({
+        where: { id: created.id, orgId },
+        select: { pipelineStageId: true },
+      });
+      expect(row?.pipelineStageId).toBe(lost.id);
+
+      await expect(
+        tools['crm_create_deal'].handler(
+          {
+            customer: company.name,
+            companyId: company.id,
+            name: `Ambiguous ${token}`,
+            stage: ambiguousKey,
+            value: 0,
+          },
+          ctx,
+        ),
+      ).rejects.toThrow(/more than one pipeline stage/);
+      const leftover = await prisma.opportunity.count({
+        where: { orgId, name: `Ambiguous ${token}` },
+      });
+      expect(leftover).toBe(0);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { orgId, companyId: company.id } });
+      await prisma.auditLog.deleteMany({ where: { orgId, targetType: 'opportunity' } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: { in: [pipeline.id, other.id] } } });
+      await prisma.pipeline.deleteMany({ where: { id: { in: [pipeline.id, other.id] } } });
+      await prisma.company.delete({ where: { id: company.id } });
+    }
+  });
+
+  it('a stage change leaves the previous lost flag behind', async () => {
+    // WHY: changing the stored key left the old stage row attached, so a lost
+    // flag still decided the outcome after the deal had moved.
+    const openKeys = [
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
+    ] as const;
+    const free: string[] = [];
+    for (const key of openKeys) {
+      const n = await prisma.pipelineStage.count({ where: { orgId, key, deletedAt: null } });
+      if (n === 0) free.push(key);
+    }
+    expect(free.length).toBeGreaterThanOrEqual(4);
+    const lostKey = free[0]!;
+    const openKey = free[1]!;
+    const bareKey = free[2]!;
+    const ambiguousKey = free[3]!;
+    const token = randomBytes(4).toString('hex');
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Move ${token}` },
+    });
+    const other = await prisma.pipeline.create({
+      data: { orgId, name: `Move other ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: lostKey, name: 'Lost', isLost: true },
+    });
+    const open = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: openKey, name: 'Open', isLost: false },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: ambiguousKey, name: 'A' },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: other.id, key: ambiguousKey, name: 'B' },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-MV-${token}`,
+        customer: 'Move Co',
+        name: `Stage move ${token}`,
+        stage: lostKey as 's1_lead',
+        pipelineStageId: lost.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    try {
+      const moved = (await tools['opportunity.update'].handler(
+        { id: opp.id, patch: { stage: openKey } },
+        ctx,
+      )) as { stage: string; outcome: string };
+      expect(moved.stage).toBe(openKey);
+      expect(moved.outcome).toBe('open');
+      const linked = await prisma.opportunity.findFirst({
+        where: { id: opp.id, orgId },
+        select: { pipelineStageId: true, stage: true },
+      });
+      expect(linked?.pipelineStageId).toBe(open.id);
+
+      const cleared = (await tools['crm_update_deal'].handler(
+        { id: opp.id, patch: { stage: bareKey } },
+        ctx,
+      )) as { stage: string; outcome: string };
+      expect(cleared.stage).toBe(bareKey);
+      expect(cleared.outcome).toBe('open');
+      const unlinked = await prisma.opportunity.findFirst({
+        where: { id: opp.id, orgId },
+        select: { pipelineStageId: true },
+      });
+      expect(unlinked?.pipelineStageId).toBeNull();
+
+      await expect(
+        tools['crm_update_deal'].handler({ id: opp.id, patch: { stage: ambiguousKey } }, ctx),
+      ).rejects.toThrow(/more than one pipeline stage/);
+      const stayed = await prisma.opportunity.findFirst({
+        where: { id: opp.id, orgId },
+        select: { stage: true, pipelineStageId: true },
+      });
+      expect(stayed?.stage).toBe(bareKey);
+      expect(stayed?.pipelineStageId).toBeNull();
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { orgId, targetId: opp.id } });
+      await prisma.opportunity.deleteMany({ where: { id: opp.id } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: { in: [pipeline.id, other.id] } } });
+      await prisma.pipeline.deleteMany({ where: { id: { in: [pipeline.id, other.id] } } });
+    }
   });
 
   it('opportunities.get returns a single opp', async () => {
@@ -147,9 +555,146 @@ describeDb('MCP tools', () => {
     expect(audit).toBeTruthy();
   });
 
+  it('opportunity.update moves the company id when the customer name changes', async () => {
+    // WHY: Dust lists deals by company id. A customer rename that left the old
+    // id kept the deal on the previous account after the label had moved.
+    const token = randomBytes(4).toString('hex');
+    const from = await prisma.company.create({
+      data: { orgId, name: `From Deal ${token}` },
+    });
+    const to = await prisma.company.create({
+      data: { orgId, name: `To Deal ${token}` },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-relink-${token}`,
+        customer: 'Stored label',
+        companyId: from.id,
+        name: 'Relink deal',
+        stage: 's1_lead',
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const moved = (await tools['opportunity.update'].handler(
+      { id: opp.id, patch: { customer: to.name } },
+      ctx,
+    )) as { companyId: string | null; customer: string };
+    expect(moved.customer).toBe(to.name);
+    expect(moved.companyId).toBe(to.id);
+
+    const same = (await tools['crm_update_deal'].handler(
+      { id: opp.id, patch: { name: 'Relink deal renamed' } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(same.companyId).toBe(to.id);
+
+    const cleared = (await tools['crm_update_deal'].handler(
+      { id: opp.id, patch: { customer: `Nobody ${token}` } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(cleared.companyId).toBeNull();
+
+    await prisma.opportunity.update({ where: { id: opp.id }, data: { companyId: from.id } });
+    await prisma.company.create({ data: { orgId, name: `Twin Deal ${token}` } });
+    await prisma.company.create({ data: { orgId, name: `twin deal ${token}` } });
+    await expect(
+      tools['opportunity.update'].handler(
+        { id: opp.id, patch: { customer: `Twin Deal ${token}` } },
+        ctx,
+      ),
+    ).rejects.toThrow('Company name matches more than one company');
+    const stored = await prisma.opportunity.findUnique({
+      where: { id: opp.id },
+      select: { companyId: true, customer: true },
+    });
+    expect(stored).toMatchObject({ companyId: from.id, customer: `Nobody ${token}` });
+  });
+
+  it('opportunity.update records a lost stage move and ignores the same stage', async () => {
+    // WHY: the deal timeline reads opportunity.stage. A Dust stage write that
+    // only stored the new value left the lost move unnamed.
+    const token = randomBytes(4).toString('hex');
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-lost-${token}`,
+        customer: 'Lost Co',
+        name: 'Lost move',
+        stage: 's4_negotiation',
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    const closed = (await tools['opportunity.update'].handler(
+      { id: opp.id, patch: { stage: 'closed_lost' } },
+      ctx,
+    )) as { outcome: string };
+    expect(closed.outcome).toBe('lost');
+    const moved = await prisma.auditLog.findFirst({
+      where: { orgId, targetId: opp.id, action: 'opportunity.stage' },
+      orderBy: { at: 'desc' },
+    });
+    expect(moved?.diff).toMatchObject({ fromStage: 's4_negotiation', toStage: 'closed_lost' });
+
+    await tools['crm_update_deal'].handler(
+      { id: opp.id, patch: { stage: 'closed_lost' } },
+      ctx,
+    );
+    const repeats = await prisma.auditLog.count({
+      where: { orgId, targetId: opp.id, action: 'opportunity.stage' },
+    });
+    expect(repeats).toBe(1);
+  });
+
   it('contacts.list returns empty when no contacts', async () => {
     const out = (await tools['contacts.list'].handler({ limit: 10 }, ctx)) as unknown[];
     expect(Array.isArray(out)).toBe(true);
+  });
+
+  it('contacts.list returns people linked by company id, not the customer string', async () => {
+    // WHY: a matching customer label is not a company link. Dust asking for
+    // the account must see the linked person and must not see the name-only row.
+    const company = await prisma.company.create({
+      data: { orgId, name: `List Co ${randomBytes(4).toString('hex')}` },
+    });
+    await prisma.contact.create({
+      data: { orgId, customer: 'Stored label', companyId: company.id, name: 'Linked Person' },
+    });
+    await prisma.contact.create({
+      data: { orgId, customer: company.name, name: 'Name Only Person' },
+    });
+
+    const byName = (await tools['contacts.list'].handler(
+      { customer: company.name, limit: 20 },
+      ctx,
+    )) as Array<{ name: string; companyId: string | null }>;
+    expect(byName.map((contact) => contact.name)).toEqual(['Linked Person']);
+    expect(byName[0]?.companyId).toBe(company.id);
+
+    const byId = (await tools['contacts.list'].handler(
+      { companyId: company.id, limit: 20 },
+      ctx,
+    )) as Array<{ name: string }>;
+    expect(byId.map((contact) => contact.name)).toEqual(['Linked Person']);
+  });
+
+  it('contacts.list refuses a customer name that is not one company', async () => {
+    // Names are unique per org, so the ambiguous case is two casings of one label.
+    const token = randomBytes(4).toString('hex');
+    await prisma.company.create({ data: { orgId, name: `Twin ${token}` } });
+    await prisma.company.create({ data: { orgId, name: `twin ${token}` } });
+    await expect(
+      tools['contacts.list'].handler({ customer: `Missing ${token}` }, ctx),
+    ).rejects.toThrow(/company id/);
+    await expect(
+      tools['contacts.list'].handler({ customer: `Twin ${token}` }, ctx),
+    ).rejects.toThrow(/company id/);
   });
 
   it('tasks.create creates a task and writes audit_log', async () => {
@@ -189,15 +734,94 @@ describeDb('MCP tools', () => {
         score: 0,
       },
       ctx,
-    )) as { id: string; firstName: string; status: string };
+    )) as { id: string; firstName: string; status: string; companyId: string | null };
     expect(out.firstName).toBe('Alice');
     expect(out.status).toBe('new');
+    expect(out.companyId).toBeNull();
 
     const audit = await prisma.auditLog.findFirst({
       where: { orgId, targetType: 'lead', action: 'lead.create.mcp' },
       orderBy: { at: 'desc' },
     });
     expect(audit).toBeTruthy();
+  });
+
+  it('leads.create stores a company id only when the name is one company', async () => {
+    // WHY: a new prospect often has no company row. The name stays a label.
+    // One match becomes the link. Two casings must not pick a company.
+    const name = `Linked Lead ${randomBytes(4).toString('hex')}`;
+    const company = await prisma.company.create({ data: { orgId, name } });
+    const linked = (await tools['leads.create'].handler(
+      {
+        firstName: 'Lia',
+        lastName: 'Link',
+        companyName: name,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { companyId: string | null };
+    expect(linked.companyId).toBe(company.id);
+
+    const token = randomBytes(4).toString('hex');
+    await prisma.company.create({ data: { orgId, name: `Twin Lead ${token}` } });
+    await prisma.company.create({ data: { orgId, name: `twin lead ${token}` } });
+    await expect(
+      tools['leads.create'].handler(
+        {
+          firstName: 'Amy',
+          lastName: 'Big',
+          companyName: `Twin Lead ${token}`,
+          source: 'website',
+          priority: 'medium',
+          score: 0,
+        },
+        ctx,
+      ),
+    ).rejects.toThrow(/company id/);
+  });
+
+  it('leads.list filters by company id, not the company name', async () => {
+    // WHY: a matching company name is not a link. Dust asking for the
+    // account must see the linked lead and must not see the name-only row.
+    const company = await prisma.company.create({
+      data: { orgId, name: `List Lead ${randomBytes(4).toString('hex')}` },
+    });
+    const linked = (await tools['leads.create'].handler(
+      {
+        firstName: 'Ned',
+        lastName: 'Linked',
+        companyName: 'Stored label',
+        companyId: company.id,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { id: string };
+    const nameOnly = (await tools['leads.create'].handler(
+      {
+        firstName: 'Una',
+        lastName: 'Label',
+        companyName: company.name,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { id: string; companyId: string | null };
+    // The name matches one company, so create stores the link. Clear it to
+    // prove the list does not treat the name as membership.
+    await prisma.lead.update({ where: { id: nameOnly.id }, data: { companyId: null } });
+
+    const out = (await tools['leads.list'].handler({ companyId: company.id, limit: 20 }, ctx)) as Array<{
+      id: string;
+      companyId: string | null;
+    }>;
+    expect(out.map((row) => row.id)).toContain(linked.id);
+    expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
+    expect(out.every((row) => row.companyId === company.id)).toBe(true);
   });
 
   it('leads.list returns leads for the org', async () => {
@@ -218,12 +842,21 @@ describeDb('MCP tools', () => {
       },
       ctx,
     )) as { id: string };
+    const company = await prisma.company.create({
+      data: { orgId, name: `Lead Co ${randomBytes(4).toString('hex')}` },
+    });
+    await prisma.lead.update({ where: { id: created.id }, data: { companyId: company.id } });
     const out = (await tools['leads.get'].handler({ id: created.id }, ctx)) as {
       id: string;
       firstName: string;
+      companyId: string | null;
+      companyName: string;
     };
     expect(out.id).toBe(created.id);
     expect(out.firstName).toBe('Bob');
+    // WHY: the company name on the lead is a label. Dust needs the id to know the link.
+    expect(out.companyName).toBe('Beta Corp');
+    expect(out.companyId).toBe(company.id);
   });
 
   it('leads.update patches a lead', async () => {
@@ -246,12 +879,54 @@ describeDb('MCP tools', () => {
     expect(out.status).toBe('qualified');
   });
 
-  it('contacts.create creates a contact and writes audit_log', async () => {
-    const out = (await tools['contacts.create'].handler(
-      { customer: 'Acme Inc', name: 'Alice Smith', email: 'alice@acme.com' },
+  it('leads.update relinks from the company name and clears a name that matches none', async () => {
+    // WHY: renaming the label used to leave the old company id in place,
+    // so Dust still listed the lead under the previous account.
+    const name = `Update Lead ${randomBytes(4).toString('hex')}`;
+    const company = await prisma.company.create({ data: { orgId, name } });
+    const created = (await tools['leads.create'].handler(
+      {
+        firstName: 'Ren',
+        lastName: 'Ame',
+        companyName: name,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
       ctx,
-    )) as { id: string; name: string };
+    )) as { id: string; companyId: string | null };
+    expect(created.companyId).toBe(company.id);
+
+    const cleared = (await tools['leads.update'].handler(
+      { id: created.id, patch: { companyName: `Nobody ${randomBytes(4).toString('hex')}` } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(cleared.companyId).toBeNull();
+
+    const restored = (await tools['leads.update'].handler(
+      { id: created.id, patch: { companyName: name } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(restored.companyId).toBe(company.id);
+
+    const scored = (await tools['leads.update'].handler(
+      { id: created.id, patch: { score: 3 } },
+      ctx,
+    )) as { companyId: string | null; score: number };
+    expect(scored.score).toBe(3);
+    expect(scored.companyId).toBe(company.id);
+  });
+
+  it('contacts.create creates a contact and writes audit_log', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Acme Inc Tools' },
+    });
+    const out = (await tools['contacts.create'].handler(
+      { customer: 'ignored', companyId: company.id, name: 'Alice Smith', email: 'alice@acme.com' },
+      ctx,
+    )) as { id: string; name: string; companyId: string | null };
     expect(out.name).toBe('Alice Smith');
+    expect(out.companyId).toBe(company.id);
 
     const audit = await prisma.auditLog.findFirst({
       where: { orgId, targetType: 'contact', action: 'contact.create.mcp' },
@@ -260,17 +935,162 @@ describeDb('MCP tools', () => {
     expect(audit).toBeTruthy();
   });
 
+  it('contacts.create refuses a name that is not one company', async () => {
+    await expect(
+      tools['contacts.create'].handler({ customer: 'Nobody Ltd', name: 'No Link' }, ctx),
+    ).rejects.toThrow(/company id/);
+  });
+
   it('contacts.get returns a single contact', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Beta Corp Tools' },
+    });
     const created = (await tools['contacts.create'].handler(
-      { customer: 'Beta Corp', name: 'Bob Jones' },
+      { customer: company.name, name: 'Bob Jones' },
       ctx,
-    )) as { id: string };
+    )) as { id: string; companyId: string | null };
+    expect(created.companyId).toBe(company.id);
     const out = (await tools['contacts.get'].handler({ id: created.id }, ctx)) as {
       id: string;
       name: string;
+      companyId: string | null;
+      linkState: string;
     };
     expect(out.id).toBe(created.id);
     expect(out.name).toBe('Bob Jones');
+    expect(out.companyId).toBe(company.id);
+    expect(out.linkState).toBe('linked');
+  });
+
+  it('crm_list_activities returns linked events, not a customer-name match', async () => {
+    // WHY: the timeline used to be follow-up tasks on opportunity.companyId.
+    // A logged meeting on the account was invisible, and a deal that only
+    // repeated the company name could be treated as the account.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Activity Co ${randomBytes(4).toString('hex')}` },
+    });
+    const linked = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: 'Stored label',
+        companyId: company.id,
+        name: 'Linked pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const nameOnly = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: company.name,
+        name: 'Name only pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const person = await prisma.contact.create({
+      data: { orgId, customer: 'Stored label', companyId: company.id, name: 'Linked Person' },
+    });
+    const stranger = await prisma.contact.create({
+      data: { orgId, customer: company.name, name: 'Name Only Person' },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'meeting',
+        subject: 'Linked meeting',
+        entityType: 'opportunity',
+        entityId: linked.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'call',
+        subject: 'Name only call',
+        entityType: 'opportunity',
+        entityId: nameOnly.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'note',
+        subject: 'Company note',
+        entityType: 'company',
+        entityId: company.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'email',
+        subject: 'Linked email',
+        entityType: 'contact',
+        entityId: person.id,
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'email',
+        subject: 'Name only email',
+        entityType: 'contact',
+        entityId: stranger.id,
+      },
+    });
+    await prisma.task.create({
+      data: { orgId, accountId: company.id, title: 'Account task' },
+    });
+
+    const out = (await tools['crm_list_activities'].handler(
+      { company: company.id, limit: 20 },
+      ctx,
+    )) as Array<{ subject: string | null }>;
+    const subjects = out.map((row) => row.subject);
+    expect(subjects).toEqual(
+      expect.arrayContaining(['Linked meeting', 'Company note', 'Linked email', 'Account task']),
+    );
+    expect(subjects).not.toContain('Name only call');
+    expect(subjects).not.toContain('Name only email');
+
+    const otherDeal = (await tools['crm_list_activities'].handler(
+      { company: company.id, dealId: nameOnly.id, limit: 20 },
+      ctx,
+    )) as unknown[];
+    expect(otherDeal).toEqual([]);
+  });
+
+  it('tasks.list includes a pursuit task through the opportunity company', async () => {
+    // WHY: pursuit tasks often have only oppId. Filtering Task.accountId
+    // alone hid them from Dust when it asked for the company.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Task Co ${randomBytes(4).toString('hex')}` },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: company.name,
+        companyId: company.id,
+        name: 'Linked pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    await tools['tasks.create'].handler({ oppId: opp.id, title: 'Pursuit follow-up' }, ctx);
+    const out = (await tools['tasks.list'].handler({ accountId: company.id, limit: 20 }, ctx)) as Array<{
+      title: string;
+    }>;
+    expect(out.some((task) => task.title === 'Pursuit follow-up')).toBe(true);
   });
 
   it('tasks.list returns tasks for the org', async () => {
@@ -291,16 +1111,26 @@ describeDb('MCP tools', () => {
   });
 
   it('notes.create creates a note and writes audit_log', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Notes Co' },
+    });
     const out = (await tools['notes.create'].handler(
       {
-        accountId: 'Acme Inc',
+        accountId: company.id,
         title: 'Meeting notes',
         bodyMd: '# Notes\n\nDiscussed pricing.',
         pinned: false,
       },
       ctx,
-    )) as { id: string; title: string };
+    )) as { id: string; title: string; companyId: string | null };
     expect(out.title).toBe('Meeting notes');
+    expect(out.companyId).toBe(company.id);
+    await expect(
+      tools['notes.create'].handler(
+        { accountId: 'Acme Inc', title: 'Nope', bodyMd: 'Name is not a link.', pinned: false },
+        ctx,
+      ),
+    ).rejects.toThrow(/UUID/);
 
     const audit = await prisma.auditLog.findFirst({
       where: { orgId, targetType: 'note', action: 'note.create.mcp' },
@@ -329,6 +1159,28 @@ describeDb('MCP tools', () => {
     await expect(
       tools['notes.list'].handler({ accountId: 'Beta Corp', limit: 10 }, ctx),
     ).rejects.toThrow(/UUID/);
+  });
+
+  it('notes.list finds a lowercase account tag when the company id is uppercase', async () => {
+    // WHY: the account page stores the company id in lowercase. Dust often
+    // sends the same id in another case, and the note has no companyId yet.
+    const author = await prisma.user.findFirst({ where: { orgId }, select: { id: true } });
+    const accountId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+    await prisma.note.create({
+      data: {
+        orgId,
+        accountId,
+        companyId: null,
+        authorUserId: author!.id,
+        title: 'Lowercase tag',
+        bodyMd: 'Saved from the account page.',
+      },
+    });
+    const out = (await tools['notes.list'].handler(
+      { accountId: accountId.toUpperCase(), limit: 10 },
+      ctx,
+    )) as Array<{ title: string; companyId: string | null }>;
+    expect(out.some((note) => note.title === 'Lowercase tag')).toBe(true);
   });
 
   it('crm_search_companies returns a company id and does not invent confidence for text-only matches', async () => {

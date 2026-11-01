@@ -61,7 +61,7 @@ export const Forecast = z.object({
   ownerName: z.string().nullable(),
   period: z.string().min(1),
   category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
-  amountMicros: z.number().int().nonnegative(),
+  amountMicros: z.string().regex(/^\d+$/),
   currency: z.string().length(3),
   note: z.string().nullable(),
   createdAt: z.string().datetime(),
@@ -71,28 +71,29 @@ export type Forecast = z.infer<typeof Forecast>;
 
 // ─── Pipeline-weighted forecast projection (Salesforce/Clari model) ──────────
 // Derived from OPEN opportunities (value × stage win-probability), bucketed by
-// close-date quarter and owner. Money is EUR micros on the wire (formatted at
-// the edge); weighted values may be fractional, so no `.int()` constraint.
+// close-date quarter and owner. Opportunity amounts have no currency; the
+// projection reports XXX. Open, weighted, and won totals are integer micros
+// strings so a large deal is not rounded through a JS number.
 
 export const ForecastProjectionOwner = z.object({
   // Null when the opportunity has no owner (rolled up as "Unassigned").
   ownerId: z.string().uuid().nullable(),
   ownerName: z.string(),
-  openMicros: z.number().nonnegative(),
-  weightedMicros: z.number().nonnegative(),
-  wonMicros: z.number().nonnegative(),
+  openMicros: z.string(),
+  weightedMicros: z.string(),
+  wonMicros: z.string(),
 });
 export type ForecastProjectionOwner = z.infer<typeof ForecastProjectionOwner>;
 
 export const ForecastProjectionPeriod = z.object({
   period: z.string().min(1), // "2026-Q2"
   label: z.string().min(1), // "Q2 2026"
-  openMicros: z.number().nonnegative(),
-  weightedMicros: z.number().nonnegative(),
-  wonMicros: z.number().nonnegative(),
+  openMicros: z.string(),
+  weightedMicros: z.string(),
+  wonMicros: z.string(),
   // Manual commit forecast for this period, when a rep has set one — the
   // override that takes precedence over the derived baseline. Null = none.
-  manualCommitMicros: z.number().nonnegative().nullable(),
+  manualCommitMicros: z.string().regex(/^\d+$/).nullable(),
   byOwner: z.array(ForecastProjectionOwner),
 });
 export type ForecastProjectionPeriod = z.infer<typeof ForecastProjectionPeriod>;

@@ -14,18 +14,18 @@ export function IntegrationMotionRail({
   const visible = providers.length
     ? providers.slice(0, 8)
     : [
-        { name: 'ERP', status: 'healthy' },
-        { name: 'External CRM', status: 'healthy' },
+        { name: 'ERP', status: 'unverified' },
+        { name: 'External CRM', status: 'unverified' },
         { name: 'External Intelligence', status: 'disabled' },
-        { name: 'Market data', status: 'healthy' },
+        { name: 'Market data', status: 'unverified' },
       ];
   return (
     <div
       className="integration-motion-rail"
-      aria-label={t('accountDashboardWidgets.railAriaLabel', 'CRM integration status')}
+      aria-label={t('accountDashboardWidgets.railAriaLabel', 'Connector catalog status')}
     >
       <span className="rail-label">
-        {t('accountDashboardWidgets.railLabel', 'Integration activity')}
+        {t('accountDashboardWidgets.railLabel', 'Connector catalog')}
       </span>
       <div className="rail-track" aria-hidden>
         {visible.map((provider, index) => (
@@ -39,7 +39,7 @@ export function IntegrationMotionRail({
         ))}
       </div>
       <span className="rail-caption">
-        {t('accountDashboardWidgets.railCaption', 'ERP, External CRM, verified data connectors')}
+        {t('accountDashboardWidgets.railCaption', 'Configuration status, not a live probe')}
       </span>
     </div>
   );

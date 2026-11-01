@@ -50,6 +50,15 @@ type ActivityItem = {
   url: string | null;
 };
 
+/** Stage and status keys are stored with underscores. The feed shows words. */
+export function activitySubtitle(value: string): string {
+  return value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
   const { t } = useTranslation('crm');
   const visible = activity.slice(0, 8);
@@ -111,7 +120,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
                   {a.subtitle && (
                     <>
                       <span>·</span>
-                      <Badge tone="gray">{a.subtitle}</Badge>
+                      <Badge tone="gray">{activitySubtitle(a.subtitle)}</Badge>
                     </>
                   )}
                 </div>

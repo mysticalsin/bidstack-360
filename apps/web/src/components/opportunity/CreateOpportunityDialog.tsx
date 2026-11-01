@@ -15,6 +15,8 @@ import {
   OpportunityStage,
 } from '@bidstack/shared';
 
+import { createAmountPayload } from './create-amount';
+
 const STAGES = OpportunityStage.options;
 
 type FieldErrors = Partial<Record<keyof OpportunityCreate, string[]>>;
@@ -94,11 +96,18 @@ export function CreateOpportunityDialog({
     const fd = new FormData(e.currentTarget);
     // A4: customer name comes from the LookupFieldPicker selection; fall back to
     // the hidden input value so FormData serialisation also works.
+    const amount = createAmountPayload(String(fd.get('value') ?? '0'));
+    if (!amount) {
+      setFieldErrors({
+        value: [t('createOpportunity.valueInvalid', 'Enter an amount with up to 6 decimal places.')],
+      });
+      return;
+    }
     const candidate = {
       customer: (selectedCompany?.label ?? String(fd.get('customer') ?? '')).trim(),
       name: String(fd.get('name') ?? '').trim(),
       stage: fd.get('stage'),
-      value: Number(fd.get('value') ?? 0),
+      ...amount,
       probability: Number(fd.get('probability') ?? 0),
       dueDate: (fd.get('dueDate') as string) || null,
       owner: null,
@@ -160,7 +169,7 @@ export function CreateOpportunityDialog({
         title={t('createOpportunity.dialogTitle', 'New opportunity')}
         description={t(
           'createOpportunity.dialogDescription',
-          'Add a bid to your pipeline. You can refine intel after Dust data verification runs.',
+          'Add a bid to your pipeline. The amount does not store a currency.',
         )}
       >
         <form key={formKey} onSubmit={submit} className="space-y-4">
@@ -230,14 +239,19 @@ export function CreateOpportunityDialog({
           </div>
           <div className="grid grid-cols-4 gap-3">
             <Field
-              label={t('createOpportunity.valueLabel', 'Value (EUR)')}
+              label={t('createOpportunity.valueLabel', 'Value')}
+              hint={t('createOpportunity.valueHint', 'Currency not recorded')}
               htmlFor="value"
               error={fieldErrors.value?.[0]}
             >
-              <Input id="value" name="value" type="number" min={0} step="100" defaultValue="0" />
+              <Input id="value" name="value" type="text" inputMode="decimal" defaultValue="0" />
             </Field>
             <Field
               label={t('createOpportunity.probabilityLabel', 'Probability %')}
+              hint={t(
+                'createOpportunity.probabilityHint',
+                'Blank is stored as 0 and adds nothing to weighted pipeline. It is not a measured win chance.',
+              )}
               htmlFor="probability"
               error={fieldErrors.probability?.[0]}
             >
@@ -248,7 +262,7 @@ export function CreateOpportunityDialog({
                 min={0}
                 max={100}
                 step="5"
-                defaultValue="20"
+                placeholder="0"
               />
             </Field>
             <Field
@@ -318,11 +332,13 @@ function Field({
   htmlFor,
   children,
   error,
+  hint,
 }: {
   label: string;
   htmlFor: string;
   children: React.ReactNode;
   error?: string;
+  hint?: string;
 }) {
   const errorId = error ? `${htmlFor}-error` : undefined;
   return (
@@ -331,6 +347,9 @@ function Field({
         {label}
       </span>
       {children}
+      {hint && !error ? (
+        <span className="mt-1 block text-[10px] text-[var(--fg-tertiary)]">{hint}</span>
+      ) : null}
       {error ? (
         <span
           id={errorId}

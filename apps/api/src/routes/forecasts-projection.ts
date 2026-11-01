@@ -21,7 +21,9 @@ import {
 } from './forecasts-projection.helpers.js';
 
 const FORWARD_QUARTERS = 2; // current quarter + next 2 = 3-period rolling window
-const FORECAST_CURRENCY = 'EUR'; // micros are EUR at rest (CLAUDE.md money convention)
+// Opportunities do not store a currency. XXX is the ISO code for no currency.
+// Older forecast rows were written as EUR by the form default; they are the same bucket.
+const FORECAST_CURRENCY = 'XXX';
 const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
 
 export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -41,7 +43,16 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
       const rows = await prisma.$queryRaw<ProjectionRow[]>(Prisma.sql`
         SELECT
           CASE
-            WHEN o.stage = 'closed_won' THEN
+            WHEN (
+              o.stage = 'closed_won'
+              OR EXISTS (
+                SELECT 1 FROM pipeline_stages ps
+                WHERE ps.id = o.pipeline_stage_id
+                  AND ps.deleted_at IS NULL
+                  AND ps.is_won
+                  AND NOT ps.is_lost
+              )
+            ) THEN
               CASE
                 WHEN o.due_date >= ${curStart}::date AND o.due_date < ${winEnd}::date
                   THEN to_char(o.due_date, 'YYYY"-Q"Q')
@@ -58,14 +69,39 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
           END AS period,
           o.owner_id AS "ownerId",
           COALESCE(u.name, 'Unassigned') AS "ownerName",
-          o.stage::text AS stage,
+          CASE
+            WHEN (
+              o.stage = 'closed_won'
+              OR EXISTS (
+                SELECT 1 FROM pipeline_stages ps
+                WHERE ps.id = o.pipeline_stage_id
+                  AND ps.deleted_at IS NULL
+                  AND ps.is_won
+                  AND NOT ps.is_lost
+              )
+            ) THEN 'closed_won'
+            ELSE o.stage::text
+          END AS stage,
+          CASE
+            WHEN live.id IS NULL THEN NULL
+            ELSE live.probability::float8
+          END AS "stageProbability",
           COALESCE(SUM(o.value_micros), 0)::text AS "valueMicros"
         FROM opportunities o
         LEFT JOIN users u ON u.id = o.owner_id AND u.org_id = o.org_id
+        LEFT JOIN pipeline_stages live
+          ON live.id = o.pipeline_stage_id
+         AND live.deleted_at IS NULL
         WHERE o.org_id = ${orgId}::uuid
           AND o.deleted_at IS NULL
           AND o.stage <> 'closed_lost'
-        GROUP BY 1, o.owner_id, u.name, o.stage
+          AND NOT EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND ps.is_lost
+          )
+        GROUP BY 1, o.owner_id, u.name, 4, 5
       `);
 
       const [stageProbabilities, manualCommitByPeriod] = await Promise.all([
@@ -79,7 +115,7 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
   );
 };
 
-/** Org's configurable stage win-probabilities, keyed by stage key (first wins). */
+/** Fallback win-probabilities for deals with no live stage, keyed by stage key (first wins). */
 async function loadStageProbabilities(orgId: string): Promise<Map<string, number>> {
   const stages = await prisma.pipelineStage.findMany({
     where: { orgId, deletedAt: null },
@@ -102,7 +138,7 @@ async function loadManualCommit(
   periods: string[],
   currency: string,
   logger: FastifyBaseLogger,
-): Promise<Map<string, number>> {
+): Promise<Map<string, bigint>> {
   const rows = await prisma.forecast.findMany({
     where: { orgId, deletedAt: null, category: 'commit', period: { in: periods } },
     select: { period: true, amountMicros: true, currency: true },

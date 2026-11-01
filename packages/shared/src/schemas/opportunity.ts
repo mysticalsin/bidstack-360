@@ -58,11 +58,14 @@ export const Opportunity = z.object({
   // schemas below still enforce the canonical OP-NNNN format for supplied codes.
   code: OpportunityCode,
   customer: z.string().min(1).max(255),
+  companyId: z.string().uuid().nullable(),
   name: z.string().min(1).max(255),
   stage: z.string().nullable(),
   pipelineStageId: z.string().uuid().nullable(),
   pipelineStage: PipelineStage.nullable(),
   value: z.number().nonnegative().max(1_000_000_000_000),
+  /** Integer micros. The unit number cannot keep a cent past a safe integer. */
+  valueMicros: z.string().regex(/^\d+$/).optional(),
   probability: z.number().int().min(0).max(100),
   dueDate: z.string().date().nullable(),
   owner: z.string().email().nullable(),
@@ -90,6 +93,7 @@ export type Opportunity = z.infer<typeof Opportunity>;
 
 export const OpportunityCreate = Opportunity.omit({
   id: true,
+  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
@@ -99,16 +103,19 @@ export const OpportunityCreate = Opportunity.omit({
   bidClass: true,
   fteEstimate: true,
   commitmentLevel: true,
+  valueMicros: true,
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
   pipelineStageId: z.string().uuid().optional().nullable(),
+  valueMicros: z.string().regex(/^\d+$/).optional(),
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
 export const OpportunityPatch = Opportunity.partial().omit({
   id: true,
   code: true,
+  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
@@ -118,7 +125,9 @@ export const OpportunityPatch = Opportunity.partial().omit({
   bidClass: true,
   fteEstimate: true,
   commitmentLevel: true,
+  valueMicros: true,
 }).extend({
+  valueMicros: z.string().regex(/^\d+$/).optional(),
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and
   // the API 409s when the row changed since — without it, concurrent
@@ -161,6 +170,9 @@ export const OpportunityFilter = z.object({
   // can be combined by a caller if that's ever useful.
   dueWithinDays: z.coerce.number().int().min(0).max(365).optional(),
   overdue: z.coerce.boolean().optional(),
+  // Closing-this-week asks for open deals only. A date window without this
+  // flag still returns decided deals, which is the Due ≤ 7d list chip.
+  excludeClosed: z.coerce.boolean().optional(),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 

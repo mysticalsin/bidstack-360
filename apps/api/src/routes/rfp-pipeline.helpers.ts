@@ -103,16 +103,34 @@ export const ResumeDraftingResponse = z.object({
 
 // ─── Rate-limit helper ────────────────────────────────────────────────────────
 
+export type RfpUploadQuota =
+  | { allowed: true }
+  | { allowed: false; reason: 'limit' | 'unavailable' };
+
+/** Production refuses an RFP upload when the quota store cannot be read. */
+export function rfpUploadQuotaFailsClosed(env: NodeJS.ProcessEnv = process.env): boolean {
+  // An explicit false must not reopen the cap once the process is production.
+  if (env.NODE_ENV === 'production') return true;
+  const explicit = env.RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
+  if (explicit === 'true' || explicit === '1') return true;
+  if (explicit === 'false' || explicit === '0') return false;
+  return false;
+}
+
 /**
  * Check and increment the per-org upload rate limit in Redis.
- * Returns true if the request is within quota, false if the limit is exceeded.
+ * `limit` means the org is over the hourly cap. `unavailable` means Redis
+ * could not answer and the deployment is fail-closed, so the upload is refused.
  *
- * WHY Redis INCR + EXPIRE: atomic check-and-increment with sliding window.
+ * WHY Redis INCR + EXPIRE: atomic check-and-increment with a fixed window.
  * INCR on a missing key returns 1 and we set TTL immediately after; the 2-call
  * sequence is safe here because a missed TTL set (crash between calls) just means
  * the key lives forever until its next write, never causes silent over-counting.
  */
-export async function checkRfpUploadRateLimit(orgId: string): Promise<boolean> {
+export async function checkRfpUploadRateLimit(
+  orgId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<RfpUploadQuota> {
   const key = `rfp:upload:${orgId}`;
   try {
     const current = await redis.incr(key);
@@ -120,13 +138,14 @@ export async function checkRfpUploadRateLimit(orgId: string): Promise<boolean> {
       // First upload in this window — set TTL so the counter expires.
       await redis.expire(key, RFP_UPLOAD_RATE_LIMIT_TTL_SECONDS);
     }
-    return current <= RFP_UPLOAD_RATE_LIMIT_MAX;
+    return current <= RFP_UPLOAD_RATE_LIMIT_MAX ? { allowed: true } : { allowed: false, reason: 'limit' };
   } catch (err) {
-    // Redis unavailable — fail-open so uploads still work, log the anomaly.
-    // WHY fail-open: rate limiting is best-effort protection; blocking all uploads
-    // when Redis is down is worse than allowing a few extra uploads.
-    log.warn({ err, orgId }, 'rfp upload rate-limit Redis check failed — fail-open');
-    return true;
+    if (rfpUploadQuotaFailsClosed(env)) {
+      log.warn({ err, orgId }, 'rfp upload quota store unavailable — upload refused');
+      return { allowed: false, reason: 'unavailable' };
+    }
+    log.warn({ err, orgId }, 'rfp upload quota store unavailable — development allows the upload');
+    return { allowed: true };
   }
 }
 

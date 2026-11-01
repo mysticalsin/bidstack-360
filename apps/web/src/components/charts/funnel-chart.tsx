@@ -247,7 +247,7 @@ function HSegment({
 
   const rings = Array.from({ length: layers }, (_, l) => {
     const scale = 1 - (l / layers) * 0.35;
-    const opacity = 0.18 + (l / (layers - 1 || 1)) * 0.65;
+    const opacity = layers <= 1 ? 1 : 0.18 + (l / (layers - 1)) * 0.65;
     return {
       d: hSegmentPath(normStart, normEnd, segW, fullH, scale, straight),
       opacity,
@@ -458,7 +458,7 @@ function VSegment({
 
   const rings = Array.from({ length: layers }, (_, l) => {
     const scale = 1 - (l / layers) * 0.35;
-    const opacity = 0.18 + (l / (layers - 1 || 1)) * 0.65;
+    const opacity = layers <= 1 ? 1 : 0.18 + (l / (layers - 1)) * 0.65;
     return {
       d: vSegmentPath(normStart, normEnd, segH, fullW, scale, straight),
       opacity,
@@ -748,7 +748,7 @@ export function FunnelChart({
   data,
   orientation = "horizontal",
   color = "var(--chart-1)",
-  layers = 3,
+  layers = 1,
   className,
   style,
   showPercentage = true,

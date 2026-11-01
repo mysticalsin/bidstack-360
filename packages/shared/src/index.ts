@@ -14,3 +14,4 @@ export * from './workflow-engine.js';
 // Provider catalogue only (pure data). The LLM wire client stays behind the
 // '@bidstack/shared/llm' subpath and must never enter the web bundle.
 export * from './llm-catalog/index.js';
+export * from './intel/present-opportunity-intel.js';

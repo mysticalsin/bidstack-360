@@ -16,7 +16,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
-import { NAV_SECTIONS } from '@/components/layout/navConfig';
+import { visibleNavSections } from '@/components/layout/navConfig';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { buildQuickAddOptions, chooseQuickAdd } from '@/components/quickadd/quickAddOptions';
 import { useAppModules } from '@/hooks/useAppModules';
 import { useCommandContextStore } from '@/hooks/useCommandContext';
@@ -130,9 +131,10 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   // buildNavTargets' doc comment for the drift bug this replaces. isAdmin
   // gates the one hand-added permission-restricted palette-only route
   // (/audit-log) the same way SettingsLayout gates its `admin: true` tabs.
+  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
   const navTargets = useMemo(
-    () => buildNavTargets(NAV_SECTIONS, appModules.data, isAdmin),
-    [appModules.data, isAdmin],
+    () => buildNavTargets(visibleNavSections(quickStartVisible), appModules.data, isAdmin),
+    [appModules.data, isAdmin, quickStartVisible],
   );
 
   const quickAddOptions = useMemo(() => buildQuickAddOptions(t), [t]);

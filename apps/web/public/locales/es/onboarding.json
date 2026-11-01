@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "Añade tu primer prospecto",
-        "description": "Captura el interés entrante y deja que Polo PreSales lo puntúe automáticamente."
+        "description": "Captura el interés entrante. Un prospecto nuevo queda sin puntuar hasta que se registre una puntuación."
       },
       "firstActivity": {
         "label": "Registra tu primera actividad",
@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Ejecuta tu primer pujar/no pujar",
-        "description": "Puntúa una oportunidad según ajuste, valor y probabilidad de ganar antes de comprometerte."
+        "description": "Puntúa una oportunidad según ajuste y valor antes de comprometerte. Una probabilidad en blanco no es una probabilidad de cierre medida."
       },
       "firstRfp": {
         "label": "Inicia tu primera respuesta a RFP",
