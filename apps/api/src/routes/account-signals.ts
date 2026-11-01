@@ -122,7 +122,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetingPage, oppPage, bids, eventPage, earnings, postings] = await Promise.all([
+      const [meetingPage, oppPage, bidPage, eventPage, earnings, postings] = await Promise.all([
         (async () => {
           const where = { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] };
           const rows = await prisma.meetingIntel.findMany({
@@ -145,11 +145,17 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           const capped = rows.length === 1000 && pageIsCapped(rows.length, await prisma.opportunity.count({ where }), 1000);
           return { rows, capped };
         })(),
-        prisma.bidOpportunity.findMany({
-          where: { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] },
-          select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
-          take: 100,
-        }),
+        (async () => {
+          const where = { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' as const }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] };
+          const rows = await prisma.bidOpportunity.findMany({
+            where,
+            select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
+            orderBy: { importedAt: 'desc' },
+            take: 100,
+          });
+          const capped = rows.length === 100 && pageIsCapped(rows.length, await prisma.bidOpportunity.count({ where }), 100);
+          return { rows, capped };
+        })(),
         (async () => {
           const where = { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' as const }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) };
           const rows = await prisma.accountWatchEvent.findMany({
@@ -193,6 +199,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           push({ id: `op:${o.id}:close`, at: closed.toISOString(), lane: 'ours', category: 'deal', title: `${won ? 'Won' : 'Lost'}: ${o.name}`, summary: won ? 'Closed won' : 'Closed lost', source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: won ? 70 : 60, implication: won ? 'OPPORTUNITY' : 'RISK', sample: false });
         }
       }
+      const bids = bidPage.rows;
       for (const b of bids) {
         push({ id: `bid:${b.id}`, at: (b.dueDate ?? b.importedAt).toISOString(), lane: 'ours', category: 'bid', title: `Bid: ${b.title}`, summary: b.dueDate ? `Due ${b.dueDate.toISOString().slice(0, 10)}, ${b.status}` : b.status, source: 'Bids', sourceUrl: b.url, href: '/bid-matrix', importance: 50, implication: 'NEUTRAL', sample: false });
       }
@@ -248,7 +255,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       );
       const tally: Record<string, number> = {};
       for (const i of grouped) tally[i.category] = (tally[i.category] ?? 0) + 1;
-      const shown = (wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped).slice(0, 300);
+      const pool = wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped;
+      const shown = pool.slice(0, 300);
       return {
         companyId: company.id,
         from: from.toISOString(),
@@ -258,6 +266,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         dealsCapped: oppPage.capped,
         meetingsCapped: meetingPage.capped,
         newsCapped: eventPage.capped,
+        bidsCapped: bidPage.capped,
+        marksCapped: pool.length > shown.length,
       };
     },
   );
