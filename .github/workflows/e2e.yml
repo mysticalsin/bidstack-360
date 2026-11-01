@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: '10'
+  PNPM_VERSION: '10.27.0'
   NODE_VERSION_FILE: .nvmrc
 
 # Least-privilege default token — these jobs only read + upload artifacts.

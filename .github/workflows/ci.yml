@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: '10'
+  PNPM_VERSION: '10.27.0'
 
 # Least-privilege default token — no job here writes to the repo.
 permissions:

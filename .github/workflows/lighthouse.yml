@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: '10'
+  PNPM_VERSION: '10.27.0'
 
 # Least-privilege default token. The lighthouse job re-grants pull-requests:write
 # at job level for its PR comment.
