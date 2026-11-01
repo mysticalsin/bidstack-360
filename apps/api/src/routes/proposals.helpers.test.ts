@@ -39,4 +39,16 @@ describe('opportunityDraftLines', () => {
     expect(lines).not.toContain('Outcome:');
     expect(lines).not.toContain('Value:');
   });
+
+  it('keeps a large amount on the exact cent', () => {
+    const lines = opportunityDraftLines({
+      name: 'Wide book',
+      stage: 's1_lead',
+      probability: 40,
+      valueMicros: 8_598_204_328_457_184_962n,
+    });
+
+    expect(lines).toContain('Value: 8,598,204,328,457.18 (currency not recorded)');
+    expect(lines).not.toContain('8,598,204,328,457.19');
+  });
 });

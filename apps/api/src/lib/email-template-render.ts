@@ -7,6 +7,7 @@
 
 import { prisma } from '@bidstack/db';
 import {
+  formatMicrosAmount,
   PLACEHOLDER_TOKEN_SET,
   type EmailTemplateRenderRequest,
   type EmailTemplateRenderResponse,
@@ -176,9 +177,8 @@ function resolveToken(token: string, ctx: RenderContext): unknown {
 
 /** Whole units plus an explicit missing-currency mark. Not a euro or dollar figure. */
 export function formatOpportunityAmount(valueMicros: bigint | number): string {
-  const num = Number(valueMicros) / 1_000_000;
-  if (!Number.isFinite(num) || num === 0) return '';
-  const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(num);
+  const amount = formatMicrosAmount(valueMicros);
+  if (amount === '0') return '';
   return `${amount} unspecified`;
 }
 

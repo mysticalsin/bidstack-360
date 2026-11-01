@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { microsToUnits, sumMicros } from './money.js';
+import { formatMicrosAmount, microsToUnits, sumMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -29,6 +29,12 @@ describe('microsToUnits', () => {
     expect(naive).not.toBe(9_007_199_254.740993); // demonstrates the bug exists
 
     expect(microsToUnits(micros)).toBe(9_007_199_254.740993);
+  });
+
+  it('prints a large amount on the exact cent without a float', () => {
+    expect(formatMicrosAmount(8_598_204_328_457_184_962n)).toBe('8,598,204,328,457.18');
+    expect(formatMicrosAmount(2_500_000_000_000n)).toBe('2,500,000');
+    expect(formatMicrosAmount(0n)).toBe('0');
   });
 
   it('reconstructs negative amounts exactly, including the fractional remainder', () => {

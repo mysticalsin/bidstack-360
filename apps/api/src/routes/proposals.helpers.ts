@@ -7,7 +7,7 @@
  */
 import { type z } from 'zod';
 
-import { type Proposal, type ProposalStatus } from '@bidstack/shared';
+import { formatMicrosAmount, type Proposal, type ProposalStatus } from '@bidstack/shared';
 
 export const DEFAULT_SECTIONS = [
   { key: 'executive_summary', title: 'Executive Summary', sortOrder: 0, required: true },
@@ -69,7 +69,7 @@ export function opportunityDraftLines(
   ];
   if (outcome !== 'open') lines.push(`Outcome: ${outcome}`);
   if (opp.valueMicros) {
-    const amount = (Number(opp.valueMicros) / 1_000_000).toLocaleString('en-US');
+    const amount = formatMicrosAmount(opp.valueMicros);
     lines.push(`Value: ${amount} (currency not recorded)`);
   }
   if (opp.territory?.name) lines.push(`Territory: ${opp.territory.name}`);

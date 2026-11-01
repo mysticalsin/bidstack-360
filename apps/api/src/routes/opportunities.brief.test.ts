@@ -137,6 +137,30 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('is pursuing');
   });
 
+  it('keeps a large amount on the exact cent in the compact figure', () => {
+    const brief = buildOpportunityBrief({
+      opportunity: {
+        code: 'OP-3006',
+        customer: 'Northwind',
+        name: 'Wide book',
+        stage: 's1_lead',
+        pipelineStageName: 'Lead',
+        valueMicros: 8_598_204_328_457_184_962n,
+        probability: 40,
+        dueDate: new Date('2026-08-01T00:00:00.000Z'),
+        industry: null,
+        updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+      },
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect(brief).toContain('8,598,204,328,457.18 unspecified');
+    expect(brief).not.toContain('8457.19');
+    expect(brief).not.toMatch(/EUR|€/);
+  });
+
   it('names a both-flagged live stage as lost', () => {
     const brief = buildOpportunityBrief({
       opportunity: {

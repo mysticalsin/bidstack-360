@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/StateMessages';
 import {
   formatUnspecifiedCompact,
+  unitsFromMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { useWorkload } from '@/hooks/useWorkload';
@@ -45,7 +46,7 @@ export function WorkloadPage() {
     {
       key: 'weighted',
       label: t('workload.totalWeighted', 'Weighted pipeline'),
-      value: formatUnspecifiedCompact(Number(totals.weightedValueMicros) / 1_000_000),
+      value: formatUnspecifiedCompact(unitsFromMicros(totals.weightedValueMicros)),
       alert: false,
     },
     {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { formatMicrosAmount } from '@bidstack/shared';
 
 import { searchReferences, type RankedReference } from '../lib/reference-search.js';
 
@@ -178,12 +179,7 @@ interface DraftCitation {
 }
 
 function formatMoneyMicros(valueMicros: bigint | number): string {
-  const value = Number(valueMicros) / 1_000_000;
-  const amount = new Intl.NumberFormat('en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
-  return `${amount} unspecified`;
+  return `${formatMicrosAmount(valueMicros)} unspecified`;
 }
 
 function formatDate(value: Date | null): string {

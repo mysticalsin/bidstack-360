@@ -32,6 +32,19 @@ function toBigIntMicros(micros: bigint | number): bigint {
  * micros) — nine orders of magnitude beyond where the naive
  * `Number(micros) / 1_000_000` starts corrupting values (~$9.007B).
  */
+/** en-US amount rounded to the cent in integer micros. No currency symbol. */
+export function formatMicrosAmount(micros: bigint | number): string {
+  const value = toBigIntMicros(micros);
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const cents = (abs + 5_000n) / 10_000n;
+  const units = cents / 100n;
+  const frac = cents % 100n;
+  const body = units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const text = frac === 0n ? body : `${body}.${frac.toString().padStart(2, '0')}`;
+  return negative ? `-${text}` : text;
+}
+
 export function microsToUnits(micros: bigint | number): number {
   const value = toBigIntMicros(micros);
   const whole = value / MICROS_PER_UNIT;

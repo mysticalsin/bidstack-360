@@ -10,7 +10,7 @@ import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.j
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
-import { presentOpportunityIntel } from '@bidstack/shared';
+import { formatMicrosAmount, presentOpportunityIntel } from '@bidstack/shared';
 import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 import {
   type DustStatusPayload,
@@ -374,11 +374,9 @@ export function serializeOpportunityToMarkdown(opp: {
   intel: unknown;
 }): string {
   const value =
-    typeof opp.valueMicros === 'bigint'
-      ? (Number(opp.valueMicros) / 1_000_000).toString()
-      : typeof opp.valueMicros === 'number'
-        ? (opp.valueMicros / 1_000_000).toString()
-        : String(opp.valueMicros);
+    typeof opp.valueMicros === 'bigint' || typeof opp.valueMicros === 'number'
+      ? formatMicrosAmount(opp.valueMicros)
+      : String(opp.valueMicros);
 
   return [
     `# ${opp.name}`,
