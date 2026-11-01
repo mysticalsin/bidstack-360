@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { runFinancialsScan, syncFinancialsSchedule } from './scan.js';
 import { buildVocab, detectFinancialSignals, findTextCues, fmtMoney, repairSplitWords, sentenceAround, type SignalPeriod } from './signals.js';
 import { entityNameMatches, pacer, pullEdgar, pullEsef, type FinFetch } from './sources.js';
-import { buildPeriods, derived, factsFromCompanyFacts, factsFromXbrlJson, type CompanyFacts, type XbrlJson } from './xbrl.js';
+import { buildPeriods, derived, factsFromCompanyFacts, factsFromXbrlJson, filedAmount, type CompanyFacts, type XbrlJson } from './xbrl.js';
 
 // ── fixtures (shapes copied from real EDGAR / filings.xbrl.org responses, numbers made up) ──
 
@@ -86,6 +86,20 @@ describe('xbrl parsing', () => {
     expect(ps[0]!.metrics.revenue?.value).toBe(1000);
     expect(ps[0]!.metrics.cash?.value).toBe(40);
     expect(derived(ps[0]!.metrics)).toEqual({ operatingMargin: 15, netMargin: null, freeCashFlow: null });
+  });
+
+  it('omits a filing integer Number would round and keeps one it can hold', () => {
+    // WHY: Number("9007199254740993") is 9007199254740992, which would be filed as revenue.
+    expect(filedAmount('9007199254740993')).toBeNull();
+    expect(filedAmount('90649000000')).toBe(90_649_000_000);
+    const rounded = esefDoc(2025, { revenue: 1, op: 150, capex: 80, cash: 40 });
+    rounded.facts.a!.value = '9007199254740993';
+    const facts = factsFromXbrlJson(rounded, null);
+    expect(facts.some((fact) => fact.concept === 'ifrs-full:Revenue')).toBe(false);
+    expect(facts.find((fact) => fact.concept.endsWith('ProfitLossFromOperatingActivities'))?.value).toBe(150);
+    const held = esefDoc(2025, { revenue: 1, op: 150, capex: 80, cash: 40 });
+    held.facts.a!.value = '90649000000';
+    expect(factsFromXbrlJson(held, null).find((fact) => fact.concept === 'ifrs-full:Revenue')?.value).toBe(90_649_000_000);
   });
 
   it('keeps one concept per metric across years when a filer retags a line', () => {
