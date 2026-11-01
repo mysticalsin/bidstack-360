@@ -56,6 +56,10 @@ describe('formatMoneyMicros', () => {
     expect(formatMoneyMicros(7_860_000_000_000n, 'USD', { locale: 'en' })).toBe('$7.86M');
     const units = 9_950_000_000_000_000n;
     expect(formatMoneyMicros(units * 1_000_000n, 'USD', { locale: 'en' })).toBe('$9950T');
+    // WHY: two compact digits turned 12,015,000 into $12.02M.
+    const moved = formatMoneyMicros(12_015_000_000_000n, 'USD', { locale: 'en' });
+    expect(moved).toContain('12,015,000');
+    expect(moved).not.toContain('12.02');
   });
 });
 

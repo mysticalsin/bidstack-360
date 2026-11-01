@@ -147,7 +147,11 @@ export function formatMoneyMicros(
         ? BigInt(Math.trunc(micros))
         : BigInt(micros);
   const abs = asBigInt < 0n ? -asBigInt : asBigInt;
-  const compact = options.compact ?? abs >= 1_000n * 1_000_000n;
+  const requested = options.compact ?? abs >= 1_000n * 1_000_000n;
+  const units = abs / 1_000_000n;
+  const safeUnits = units <= BigInt(Number.MAX_SAFE_INTEGER);
+  const shortFormIsExact = headlineMicrosLabel(asBigInt, resolvedLocale) !== formatMicrosAmount(asBigInt);
+  const compact = requested && (!safeUnits || shortFormIsExact);
   if (!compact) {
     const text = formatMicrosAmount(asBigInt);
     const { symbol, symbolFirst } = currencyAffix(resolvedCurrency, resolvedLocale);
