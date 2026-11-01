@@ -46,6 +46,7 @@ export const LeadSummary = z.object({
   email: z.string().email().nullable(),
   phone: z.string().nullable(),
   companyName: z.string(),
+  companyId: z.string().uuid().nullable(),
   title: z.string().nullable(),
   source: z.string(),
   status: LeadStatus,

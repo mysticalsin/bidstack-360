@@ -20,6 +20,8 @@ import {
   LeadPatch,
 } from '@bidstack/shared';
 
+import { resolveLeadCompanyId } from './leads.company-link.js';
+
 export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
 
   // RBAC: gate every route in this plugin. requirePermission throws 403 when the
@@ -47,6 +49,10 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
         if (!owner) throw server.httpErrors.badRequest('Owner must belong to your organization');
       }
+      const linkedCompanyId = await resolveLeadCompanyId(req.auth.orgId, body.companyName);
+      if (linkedCompanyId === 'ambiguous') {
+        throw server.httpErrors.conflict('Company name matches more than one company');
+      }
       const created = await prisma.$transaction(async (tx) => {
         const lead = await tx.lead.create({
           data: {
@@ -56,6 +62,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
             email: body.email ?? null,
             phone: body.phone ?? null,
             companyName: body.companyName,
+            companyId: linkedCompanyId,
             title: body.title ?? null,
             source: body.source,
             priority: body.priority,
@@ -106,6 +113,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         email: created.email,
         phone: created.phone,
         companyName: created.companyName,
+        companyId: created.companyId,
         title: created.title,
         source: created.source,
         status: created.status,
@@ -159,7 +167,14 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
       if (body.lastName !== undefined) data.lastName = body.lastName;
       if (body.email !== undefined) data.email = body.email;
       if (body.phone !== undefined) data.phone = body.phone;
-      if (body.companyName !== undefined) data.companyName = body.companyName;
+      if (body.companyName !== undefined) {
+        const linkedCompanyId = await resolveLeadCompanyId(req.auth.orgId, body.companyName);
+        if (linkedCompanyId === 'ambiguous') {
+          throw server.httpErrors.conflict('Company name matches more than one company');
+        }
+        data.companyName = body.companyName;
+        data.companyId = linkedCompanyId;
+      }
       if (body.title !== undefined) data.title = body.title;
       if (body.source !== undefined) data.source = body.source;
       if (body.status !== undefined) data.status = body.status as LeadStatus;
@@ -231,6 +246,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         email: updated.email,
         phone: updated.phone,
         companyName: updated.companyName,
+        companyId: updated.companyId,
         title: updated.title,
         source: updated.source,
         status: updated.status,

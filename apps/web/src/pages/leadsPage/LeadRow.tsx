@@ -84,7 +84,18 @@ export function LeadRow({
         </Link>
         {lead.email && <div className="text-xs text-[var(--fg-tertiary)]">{lead.email}</div>}
       </td>
-      <td className="px-4 py-3 text-[var(--fg-secondary)]">{lead.companyName ?? '—'}</td>
+      <td className="px-4 py-3 text-[var(--fg-secondary)]">
+        {lead.companyId ? (
+          <Link
+            to={`/companies/${lead.companyId}`}
+            className="hover:text-[var(--brand-primary)]"
+          >
+            {lead.companyName}
+          </Link>
+        ) : (
+          (lead.companyName ?? '—')
+        )}
+      </td>
       {/* A2 — status is inline-editable. Read mode shows the styled badge;
           edit mode swaps in a <select> and blur/Enter commits immediately. */}
       <td className="px-4 py-3">

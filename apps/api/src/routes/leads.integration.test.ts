@@ -125,12 +125,57 @@ describe('leads routes', () => {
     expect(body.id).toBeDefined();
     expect(body.firstName).toBe('Integration');
     expect(body.status).toBe('new');
+    expect(body.companyId).toBeNull();
     createdLeadIds.push(body.id);
 
     const audit = await prisma.auditLog.findFirst({
       where: { targetType: 'lead', targetId: body.id, action: 'lead.create' },
     });
     expect(audit).toBeTruthy();
+  });
+
+  skipIfNoDb('POST /api/leads stores companyId when the name matches one company', async () => {
+    // WHY: the screen create path used to keep companyId null even when the
+    // name was exactly one company, so the lead never joined that account.
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Org',
+        lastName: 'Probe',
+        companyName: `Probe ${randomUUID()}`,
+        source: 'website',
+        priority: 'low',
+        score: 0,
+      },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = probe.json().id as string;
+    createdLeadIds.push(probeId);
+    const row = await prisma.lead.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const name = `Only Co ${randomUUID().slice(0, 8)}`;
+    const company = await prisma.company.create({
+      data: { orgId: row!.orgId, name },
+    });
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Linked',
+        lastName: 'Lead',
+        companyName: name,
+        source: 'website',
+        priority: 'low',
+        score: 0,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.companyId).toBe(company.id);
+    createdLeadIds.push(body.id);
+    await prisma.lead.delete({ where: { id: body.id } });
+    createdLeadIds.pop();
+    await prisma.company.delete({ where: { id: company.id } });
   });
 
   skipIfNoDb('PATCH /api/leads/:id updates fields', async () => {
