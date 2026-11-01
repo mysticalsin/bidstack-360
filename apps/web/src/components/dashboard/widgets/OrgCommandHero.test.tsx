@@ -160,6 +160,36 @@ describe('OrgCommandHero', () => {
     expect(screen.queryByText(/457\.19 at stake/)).toBeNull();
   });
 
+  it('does not treat the closing page as every bid due this week', () => {
+    // WHY: the hero counted the loaded rows. A further page means more bids close.
+    mockQueries({
+      closingState: {
+        data: {
+          items: [
+            {
+              id: 'o1',
+              name: 'Bid A',
+              customer: 'Acme',
+              value: 40_000,
+              stage: 'proposal',
+              dueDate: '2026-07-08',
+            },
+          ],
+          nextCursor: 'more',
+        },
+        isLoading: false,
+        isError: false,
+      },
+    });
+    render(<OrgCommandHero summary={{ ...summary, overdueTasks: 0 }} />);
+    expect(screen.getByText('1+')).toBeDefined();
+    expect(screen.getByText('at least 40,000 at stake')).toBeDefined();
+    expect(
+      screen.getByText('More bids close within 7 days than the 1 loaded here — run those reviews first.'),
+    ).toBeDefined();
+    expect(screen.queryByText('1 bids close within 7 days — run those reviews first.')).toBeNull();
+  });
+
   it('prints a weighted total from micros when the unit number collapses', () => {
     // WHY: format of the unit number showed 9,007,199,254,740,992. The stored
     // weighted total is one unit higher.

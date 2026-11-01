@@ -4116,7 +4116,10 @@
     "viewAll": "View all",
     "errorMessage": "Couldn't load bids closing this week.",
     "retry": "Retry",
-    "empty": "No bids closing this week."
+    "empty": "No bids closing this week.",
+    "emptyBeyond": "More bids close this week than this page shows.",
+    "showingPage": "Showing {{shown}} of {{total}}.",
+    "moreBeyond": "Showing {{shown}} soonest. More bids close this week."
   },
   "crm": {
     "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}, {{stage}}, {{value}}.",
