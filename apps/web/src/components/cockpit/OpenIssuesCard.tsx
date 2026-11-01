@@ -17,6 +17,44 @@ import {
   type OpenRiskSeverityCounts,
 } from './open-risk-headline';
 
+/** The caption names risks and checks separately so it matches the risk mix. */
+export function openIssuesCaption(input: {
+  recorded: number;
+  openRisks: number;
+  openChecks: number;
+  pageCapped: boolean;
+}): { key: string; text: string } {
+  const total = input.openRisks + input.openChecks;
+  if (input.recorded === 0 && total === 0) {
+    return {
+      key: 'openIssues.captionNoneRecorded',
+      text: 'No risks or compliance checks recorded on this account',
+    };
+  }
+  if (total === 0) {
+    return input.pageCapped
+      ? {
+          key: 'openIssues.captionNoneOpenPage',
+          text: 'No open items in the latest 50 rows. Older rows are outside this page.',
+        }
+      : {
+          key: 'openIssues.captionNoneOpen',
+          text: 'No open items in the recorded register',
+        };
+  }
+  const parts: string[] = [];
+  if (input.openRisks > 0) {
+    parts.push(`${input.openRisks} open risk${input.openRisks === 1 ? '' : 's'}`);
+  }
+  if (input.openChecks > 0) {
+    parts.push(`${input.openChecks} open check${input.openChecks === 1 ? '' : 's'}`);
+  }
+  const body = parts.join(' and ');
+  return input.pageCapped
+    ? { key: 'openIssues.captionSplitPage', text: `Latest 50 rows. ${body} on the account.` }
+    : { key: 'openIssues.captionSplit', text: body };
+}
+
 interface Props {
   risks: RiskItem[];
   compliance: ComplianceCheck[];
@@ -44,9 +82,17 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
   const openCompliance = compliance.filter(
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
   );
-  const total = (openRiskCount ?? openRisks.length) + (openComplianceCount ?? openCompliance.length);
+  const riskTotal = openRiskCount ?? openRisks.length;
+  const checkTotal = openComplianceCount ?? openCompliance.length;
+  const total = riskTotal + checkTotal;
   const recorded = risks.length + compliance.length;
   const pageCapped = Boolean(risksCapped || complianceCapped);
+  const caption = openIssuesCaption({
+    recorded,
+    openRisks: riskTotal,
+    openChecks: checkTotal,
+    pageCapped,
+  });
   // Register counts are open risks on the loaded deals. Without them, the
   // visible rows are the only book.
   const severity = severityBucketCounts(openRisks, openRiskSeverity);
@@ -98,30 +144,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
     <Card role="region" aria-label={t('openIssues.regionLabel', 'Open issues by severity')}>
       <SectionHeader
         title={t('openIssues.title', 'Open issues')}
-        caption={
-          recorded === 0 && total === 0
-            ? t(
-                'openIssues.captionNoneRecorded',
-                'No risks or compliance checks recorded on this account',
-              )
-            : total === 0
-              ? t(
-                  'openIssues.captionNoneOpen',
-                  pageCapped
-                    ? 'No open items in the latest 50 rows. Older rows are outside this page.'
-                    : 'No open items in the recorded register',
-                )
-              : t(
-                  'openIssues.captionItemsToAction',
-                  pageCapped
-                    ? `Latest 50 rows. ${total} open items on the account.`
-                    : '{{count}} open item{{plural}}',
-                  {
-                    count: total,
-                    plural: total === 1 ? '' : 's',
-                  },
-                )
-        }
+        caption={t(caption.key, caption.text)}
       />
       <div style={{ padding: '8px 18px 14px' }}>
         {showRiskMix ? (
