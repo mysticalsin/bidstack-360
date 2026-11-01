@@ -34,7 +34,7 @@ async function canToggle(orgId: string, userId: string, role: string): Promise<b
   return (await userHasPermission(orgId, userId, 'accounts:write')) && (await userHasAnyRole(orgId, userId, TRACK_FINANCIALS_ROLES));
 }
 
-async function load(orgId: string, companyId: string, toggle: boolean): Promise<AccountFinancials> {
+export async function loadAccountFinancials(orgId: string, companyId: string, toggle: boolean): Promise<AccountFinancials> {
   const c = await prisma.company.findFirst({
     where: { id: companyId, orgId, deletedAt: null },
     select: {
@@ -102,7 +102,7 @@ export const accountFinancialsRoutes: FastifyPluginAsyncZod = async (server) => 
       if (!company) throw server.httpErrors.notFound('Account not found');
       const access = await canReadAccount({ orgId, userId, companyId, accountName: company.name });
       if (!access.allowed) throw server.httpErrors.notFound('Account not found');
-      return load(orgId, companyId, await canToggle(orgId, userId, role));
+      return loadAccountFinancials(orgId, companyId, await canToggle(orgId, userId, role));
     },
   );
 
@@ -133,7 +133,7 @@ export const accountFinancialsRoutes: FastifyPluginAsyncZod = async (server) => 
         });
       }
       await syncAccountFinancialsSchedule(orgId, companyId);
-      return load(orgId, companyId, true);
+      return loadAccountFinancials(orgId, companyId, true);
     },
   );
 };

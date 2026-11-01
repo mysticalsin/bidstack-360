@@ -167,23 +167,6 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
         </TransitionPanel>
       </div>
 
-      <p className="sg-sources">
-        <span>Watching</span>
-        {pulse.sources.map((s) => (
-          <span key={s.id} className="sg-source" data-on={s.active}>
-            <i aria-hidden />
-            {s.label}
-            <span className="sr-only">{s.active ? ' (on)' : ' (off)'}</span>
-          </span>
-        ))}
-      </p>
-      {pulse.sources
-        .filter((s) => s.hint)
-        .map((s) => (
-          <p key={`hint-${s.id}`} className="sg-source-hint">
-            {s.hint}
-          </p>
-        ))}
     </section>
   );
 }

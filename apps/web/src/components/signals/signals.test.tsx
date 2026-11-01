@@ -37,7 +37,7 @@ const pulse: AccountPulse = {
 };
 
 describe('PulseView', () => {
-  it('answers in one look: score, trend, verdict, top 3 drivers, sample badge, sources', () => {
+  it('answers in one look: score, trend, verdict, top 3 drivers, sample badge; sources live in Settings', () => {
     wrap(<PulseView pulse={pulse} />);
     expect(screen.getByRole('heading', { name: 'Account pulse' })).toBeTruthy();
     expect(screen.getByText('78')).toBeTruthy();
@@ -47,8 +47,8 @@ describe('PulseView', () => {
     expect(drivers.map((d) => d.textContent)).toEqual(['Pipeline+9', 'Meetings+7', 'News-4']);
     expect(screen.getByRole('img', { name: /Momentum over 13 weeks: from 60 to 72/ })).toBeTruthy();
     expect(screen.getByText('Sample')).toBeTruthy();
-    expect(screen.getByText(/\(off\)/)).toBeTruthy();
-    expect(screen.getByText('Add a website or stock ticker to this account to get news.')).toBeTruthy();
+    expect(screen.queryByText(/\(off\)/)).toBeNull();
+    expect(screen.queryByText('Watching')).toBeNull();
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
   });
 

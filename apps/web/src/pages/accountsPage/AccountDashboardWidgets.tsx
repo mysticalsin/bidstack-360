@@ -1,7 +1,5 @@
-// Small display-only widget used in the Accounts page header strip.
-// The per-stat cards now come from the shared StatTile primitive in
-// AccountsChrome.tsx; this file keeps the integration-status rail, which is
-// specific to the "All accounts" segment.
+// Integration-status rail. Since v24 it is shown only in Settings >
+// Integrations (IntegrationActivityPanel), not on account pages.
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -27,6 +27,8 @@ import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSection';
 import { FinancialHealthSection } from '@/components/financials/FinancialHealthSection';
 import { PulseHero } from '@/components/signals/PulseHero';
+import { KeyNumbersStrip } from '@/components/positioning/KeyNumbersStrip';
+import { WhatToPosition } from '@/components/positioning/WhatToPosition';
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
 import { WhoWeMetCard } from '@/components/meetings/WhoWeMetCard';
@@ -331,7 +333,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               <InfoSearchLeadsCard account={cockpit.company.name} />
             </Reveal>
           )}
-          {show('kpiSidebar') && (
+          {show('kpiSidebar') && !isAccountView && (
             <Reveal delay={0.04}>
               <KpiSidebar
                 snapshot={snapshot}
@@ -393,7 +395,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           name and next move the header already carries, so it is org-only. */}
       {isAccountView && cockpit.company.id ? (
         <>
-          <PulseHero companyId={cockpit.company.id} />
+          <KeyNumbersStrip companyId={cockpit.company.id} />
+          <WhatToPosition companyId={cockpit.company.id} />
+          <div id="pulse" style={{ scrollMarginTop: 80 }}>
+            <PulseHero companyId={cockpit.company.id} />
+          </div>
           <Suspense fallback={sectionSkeleton(318)}>
             <SignalsTimeline companyId={cockpit.company.id} />
           </Suspense>
@@ -401,20 +407,30 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           <Suspense fallback={sectionSkeleton(280)}>
             <InitiativesBoard companyId={cockpit.company.id} />
           </Suspense>
-          <FinancialHealthSection companyId={cockpit.company.id} />
-          <FirmographicsStrip companyId={cockpit.company.id} />
+          <div id="financial-health" style={{ scrollMarginTop: 80 }}>
+            <FinancialHealthSection companyId={cockpit.company.id} />
+          </div>
+          <div id="firmographics" style={{ scrollMarginTop: 80 }}>
+            <FirmographicsStrip companyId={cockpit.company.id} />
+          </div>
         </>
       ) : null}
       {isAccountView && cockpit.company.id ? (
         <div className="en-row2" style={{ marginBottom: 24 }}>
-          <HiringNowCard companyId={cockpit.company.id} />
+          <div id="hiring-now" style={{ scrollMarginTop: 80, minWidth: 0 }}>
+            <HiringNowCard companyId={cockpit.company.id} />
+          </div>
           <PotentialProjectsCard companyId={cockpit.company.id} />
         </div>
       ) : null}
       {isAccountView && cockpit.company.id ? (
         <>
-          <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} onDrill={setDrill} />
-          <WhoWeMetCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
+          <div id="deals" style={{ scrollMarginTop: 80 }}>
+            <AccountVisuals companyId={cockpit.company.id} companyName={cockpit.company.name} onDrill={setDrill} />
+          </div>
+          <div id="who-we-met" style={{ scrollMarginTop: 80 }}>
+            <WhoWeMetCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
+          </div>
           <OrgChartCard companyId={cockpit.company.id} />
           <AgreementsSummaryCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
           <OppDrill

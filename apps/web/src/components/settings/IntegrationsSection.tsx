@@ -32,6 +32,7 @@ import { WebhookEventsCard } from '@/pages/integrations/WebhookEventsCard';
 import { buildIntegrationSummary } from '@/pages/integrations/integration-helpers';
 import { MCP_TOOLS } from '@/pages/integrations/types';
 import type { DustStatus, IntegrationSetupGuide, WebhookEvent } from '@/pages/integrations/types';
+import { IntegrationActivityPanel } from './IntegrationActivityPanel';
 
 export function IntegrationsSection() {
   const { t } = useTranslation('settings');
@@ -96,6 +97,8 @@ export function IntegrationsSection() {
           }
         />
       ) : null}
+
+      {isAdmin ? <IntegrationActivityPanel /> : null}
 
       <ConnectionRunway />
 

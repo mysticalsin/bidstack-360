@@ -13,7 +13,6 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
-import { IntegrationMotionRail } from './AccountDashboardWidgets';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
@@ -223,10 +222,6 @@ export function AccountsAllSegment() {
   }
 
   const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
-  const healthyProviders = dashboard.data.providerHealth.filter(
-    (p) => p.status === 'healthy',
-  ).length;
-  const providerCount = dashboard.data.providerHealth.length;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
@@ -351,7 +346,7 @@ export function AccountsAllSegment() {
 
       <section
         aria-label={t('accounts.stats.regionLabel', 'Account source coverage')}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
       >
         <StatTile
           label={t('accounts.stats.accounts.label', 'Accounts')}
@@ -381,18 +376,7 @@ export function AccountsAllSegment() {
           value={enrichedAccounts.toLocaleString()}
           sublabel={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
         />
-        <StatTile
-          label={t('accounts.stats.sourcesHealthy.label', 'Sources healthy')}
-          value={`${healthyProviders}/${providerCount}`}
-          sublabel={t('accounts.stats.sourcesHealthy.detail', 'API mesh')}
-        />
       </section>
-      <IntegrationMotionRail
-        providers={dashboard.data.providerHealth.map((provider) => ({
-          name: provider.provider,
-          status: provider.status,
-        }))}
-      />
 
       <InsightPanel
         ariaLabel={t('accounts.experience.regionLabel', 'Portfolio cockpit')}

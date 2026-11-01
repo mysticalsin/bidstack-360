@@ -7,18 +7,16 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
   AccountInitiatives,
+  AccountKeyNumbers,
+  AccountPositioning,
   AccountPulse,
   AccountTimeline,
   categoryForKind,
   cleanText,
-  OFFERING_HOOKS,
   PortfolioMomentum,
   SignalCategory,
   stripSamplePrefix,
-  themeForText,
   type Implication,
-  type Initiative,
-  type InitiativeTheme,
   type PortfolioAlert,
   type TimelineItem,
   collapseMarketNotes,
@@ -29,6 +27,8 @@ import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import { closedAtOf, groupMap, loadMomentumInputs, momentumFor, OPP_SELECT, sourceStatus } from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
+import { loadInitiatives } from '../services/account-signals/initiatives.js';
+import { loadKeyNumbers, loadPositioning } from '../services/account-positioning/load.js';
 
 const DAY = 86_400_000;
 const params = z.object({ companyId: z.string().uuid() });
@@ -214,114 +214,28 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const company = await readable(req, req.params.companyId);
       const scope = await getAccessScope(orgId, userId);
-      const now = new Date();
-      const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
-      const live = await companiesWithLiveSignals(orgId, ids);
-      const [firmo, events, solutions, meetings] = await Promise.all([
-        prisma.companyFirmographics.findFirst({ where: { orgId, companyId: company.id }, select: { projects: true } }),
-        prisma.accountWatchEvent.findMany({
-          where: {
-            orgId,
-            companyId: { in: ids },
-            status: { not: 'DISMISSED' },
-            occurredAt: { gte: new Date(now.getTime() - 365 * DAY) },
-            ...hideSampleWhere(live),
-            kind: { in: ['STRATEGIC_INITIATIVE', 'PRODUCT_LAUNCH', 'FUNDING_ROUND', 'PARTNERSHIP', 'M_AND_A', 'LAYOFFS', 'RESTRUCTURING', 'HIRING_SPIKE'] },
-          },
-          orderBy: { occurredAt: 'desc' },
-          take: 100,
-        }),
-        prisma.accountSolution.findMany({ where: { orgId, companyId: company.id, deletedAt: null }, select: { name: true, category: true }, take: 100 }),
-        prisma.meetingIntel.findMany({
-          where: { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: new Date(now.getTime() - 365 * DAY) } }] },
-          select: { id: true, title: true, heldAt: true, opportunities: true, challenges: true },
-          take: 100,
-        }),
-      ]);
-      const soldThemes = new Set<InitiativeTheme>(solutions.map((s) => themeForText(`${s.category} ${s.name}`)));
-      const byTheme = new Map<InitiativeTheme, Initiative>();
-      const confScore = { high: 0.85, medium: 0.6, low: 0.35 } as const;
-      const label = (s: number): Initiative['confidence'] => (s >= 0.75 ? 'high' : s >= 0.5 ? 'medium' : 'low');
-      const make = (theme: InitiativeTheme, title: string, rationale: string, score: number, sample: boolean): Initiative => {
-        const hook = OFFERING_HOOKS[theme];
-        return {
-          id: `init:${theme}`,
-          title,
-          theme,
-          themeLabel: hook.label,
-          rationale,
-          confidence: label(score),
-          confidenceScore: score,
-          firstSeen: null,
-          lastSeen: null,
-          evidence: [],
-          hook: { offering: hook.offering, pitch: hook.pitch, nextStep: hook.nextStep, alreadySold: soldThemes.has(theme) },
-          sample,
-        };
-      };
-      const seen = (it: Initiative, at: string | null) => {
-        if (!at) return;
-        if (!it.firstSeen || at < it.firstSeen) it.firstSeen = at;
-        if (!it.lastSeen || at > it.lastSeen) it.lastSeen = at;
-      };
-      // 1. Hiring-based potential projects (existing reverse engineering).
-      const projects = Array.isArray(firmo?.projects) ? (firmo.projects as Array<Record<string, unknown>>) : [];
-      for (const p of projects) {
-        const name = String(p.name ?? '');
-        if (!name) continue;
-        const theme = themeForText(`${String(p.kind ?? '')} ${name} ${Array.isArray(p.skills) ? p.skills.join(' ') : ''}`);
-        const conf = (p.confidence === 'high' || p.confidence === 'medium' || p.confidence === 'low' ? p.confidence : 'low') as keyof typeof confScore;
-        let it = byTheme.get(theme);
-        if (!it) {
-          it = make(theme, name, String(p.rationale ?? 'Inferred from hiring.'), confScore[conf], false);
-          byTheme.set(theme, it);
-        } else it.confidenceScore = Math.max(it.confidenceScore, confScore[conf]);
-        const ev = Array.isArray(p.evidence) ? (p.evidence as Array<Record<string, unknown>>) : [];
-        for (const e of ev.slice(0, 4)) {
-          const at = typeof e.postedAt === 'string' ? e.postedAt : null;
-          it.evidence.push({ kind: 'hiring', title: String(e.title ?? 'Job posting'), url: typeof e.url === 'string' ? e.url : null, at, source: String(e.source ?? 'enrichment'), sample: false });
-          seen(it, at);
-        }
-      }
-      // 2. Announcements (news, press, provider, filings).
-      for (const e of events) {
-        const title = cleanText(stripSamplePrefix(e.title));
-        const theme = themeForText(`${title} ${e.summary}`);
-        const cat = categoryForKind(e.kind, e.implication as Implication);
-        let it = byTheme.get(theme);
-        const imp = importanceOf(e);
-        if (!it) {
-          it = make(theme, title, e.implicationRationale ?? e.summary, imp >= 70 ? 0.6 : 0.4, e.sample);
-          byTheme.set(theme, it);
-        } else {
-          it.confidenceScore = Math.min(0.95, it.confidenceScore + 0.1);
-          if (!e.sample) it.sample = false;
-        }
-        const kind = cat === 'funding' ? 'funding' : cat === 'launch' ? 'launch' : e.source === 'sec_edgar' || e.source === 'companies_house' ? 'filing' : 'news';
-        const at = e.occurredAt.toISOString();
-        it.evidence.push({ kind, title, url: e.sourceUrl || null, at, source: e.source, sample: e.sample });
-        seen(it, at);
-      }
-      // 3. What they told us in meetings (only themes already on the board).
-      for (const m of meetings) {
-        for (const line of [...m.opportunities, ...m.challenges].slice(0, 6)) {
-          const it = byTheme.get(themeForText(line));
-          if (!it) continue;
-          it.confidenceScore = Math.min(0.95, it.confidenceScore + 0.1);
-          const at = m.heldAt.toISOString();
-          it.evidence.push({ kind: 'meeting', title: `${m.title}: ${line}`.slice(0, 200), url: null, at, source: 'Meeting intel', sample: false });
-          seen(it, at);
-        }
-      }
-      const items = [...byTheme.values()]
-        .map((it) => {
-          const kinds = new Set(it.evidence.map((e) => e.kind));
-          const score = Math.min(0.95, it.confidenceScore + (kinds.size >= 2 ? 0.1 : 0));
-          return { ...it, confidenceScore: Math.round(score * 100) / 100, confidence: label(score), evidence: it.evidence.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).slice(0, 8) };
-        })
-        .sort((a, b) => b.confidenceScore - a.confidenceScore || (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''))
-        .slice(0, 8);
+      const items = await loadInitiatives(orgId, scope, company, new Date());
       return { companyId: company.id, items };
+    },
+  );
+
+  server.get(
+    '/accounts/:companyId/positioning',
+    { preHandler: [server.requirePermission('accounts:read')], schema: { params, response: { 200: AccountPositioning } } },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const company = await readable(req, req.params.companyId);
+      return loadPositioning(orgId, await getAccessScope(orgId, userId), company.id);
+    },
+  );
+
+  server.get(
+    '/accounts/:companyId/key-numbers',
+    { preHandler: [server.requirePermission('accounts:read')], schema: { params, response: { 200: AccountKeyNumbers } } },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const company = await readable(req, req.params.companyId);
+      return loadKeyNumbers(orgId, await getAccessScope(orgId, userId), company.id);
     },
   );
 
