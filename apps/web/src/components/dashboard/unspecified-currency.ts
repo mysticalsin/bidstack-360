@@ -122,25 +122,18 @@ function compactMicrosMagnitude(micros: bigint): number {
   return negative ? -magnitude : magnitude;
 }
 
-/** Decimal-digit zeros. Eastern Arabic, Persian, and Bengali are not 0-9. */
-const DECIMAL_DIGIT_ZERO = [
-  0x30, 0x660, 0x6f0, 0x7c0, 0x966, 0x9e6, 0xa66, 0xae6, 0xb66, 0xbe6, 0xc66, 0xce6, 0xd66, 0xe50,
-  0xed0, 0xf20, 0x1040, 0x1090, 0x17e0, 0x1810, 0x1946, 0x19d0, 0x1a80, 0x1a90, 0x1b50, 0x1bb0,
-  0x1c40, 0x1c50, 0xa620, 0xa8d0, 0xa900, 0xa9d0, 0xaa50, 0xabf0, 0xff10,
-];
-
+/** A decimal digit's value. The zero is the start of its contiguous digit run, not a fixed list. */
 function asciiNumerals(value: string): string | null {
   let out = '';
   for (const ch of value) {
+    if (!/^\p{Nd}$/u.test(ch)) return null;
     const code = ch.codePointAt(0);
     if (code == null) return null;
-    if (code >= 0x30 && code <= 0x39) {
-      out += ch;
-      continue;
-    }
-    const zero = DECIMAL_DIGIT_ZERO.find((start) => code >= start && code < start + 10);
-    if (zero == null) return null;
-    out += String(code - zero);
+    let zero = code;
+    while (zero > 0 && /^\p{Nd}$/u.test(String.fromCodePoint(zero - 1))) zero -= 1;
+    const digit = code - zero;
+    if (digit > 9) return null;
+    out += String(digit);
   }
   return out;
 }

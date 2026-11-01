@@ -50,6 +50,13 @@ describe('exact unspecified amounts', () => {
     const bn = new Intl.NumberFormat('bn', { notation: 'compact', maximumFractionDigits: 2 });
     expect(headlineMicrosLabel('7860000000000', 'bn')).toBe(bn.format(7_860_000));
     expect(headlineMicrosLabel('12015000000000', 'bn')).toBe('12,015,000');
+    // WHY: Adlam digits sit outside the old zero list, so this exact label became the full integer.
+    const adlam = new Intl.NumberFormat('ff-Adlm', {
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    });
+    expect(headlineMicrosLabel('7860000000000', 'ff-Adlm')).toBe(adlam.format(7_860_000));
+    expect(headlineMicrosLabel('12015000000000', 'ff-Adlm')).toBe('12,015,000');
   });
 
   it('prints a deal from micros when the unit number is zero', () => {
