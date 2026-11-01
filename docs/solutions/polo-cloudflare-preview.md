@@ -21,7 +21,9 @@ look down after Access succeeds.
   the container's `/dev/shm` is 64MB.
 - A cron request every minute renews the container so it does not sleep.
 - Route `/api`, `/readyz`, `/livez`, `/health`, `/metrics`, `/webhooks` to
-  the API. Everything else is the built SPA.
+  the API. Everything else is the built SPA. `.js` and `.mjs` responses
+  must be `text/javascript`; an empty type makes the browser drop the
+  module and the shell falls through to the error boundary.
 - Keep migration `v1` (`Relay`) unchanged. Add classes only in a later tag.
   Do not `wrangler deploy` from CI. `RELAY_KEY` stays a Worker secret.
 

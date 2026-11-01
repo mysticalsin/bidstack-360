@@ -20,6 +20,7 @@ import { useAppModules } from '@/hooks/useAppModules';
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
+  NAV_SECTIONS,
   visibleNavSections,
   isNavItemVisible,
   navBadgeCopy,
