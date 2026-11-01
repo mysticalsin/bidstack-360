@@ -4,6 +4,7 @@ import {
   formatStage,
   formatMoney,
   formatMoneyMicros,
+  formatConvertedMicros,
   formatUsdMicros,
   daysUntil,
 } from './format.js';
@@ -42,8 +43,21 @@ describe('formatMoneyMicros', () => {
   it('compacts an ordinary amount and a unit count past the safe integer range', () => {
     // WHY: Number(units) is not the compact input once the unit count passes 2^53.
     expect(formatMoneyMicros(1_500_000_000_000n, 'USD', { locale: 'en' })).toBe('$1.5M');
+    // WHY: one compact digit turned 7.86M into $7.9M.
+    expect(formatMoneyMicros(7_860_000_000_000n, 'USD', { locale: 'en' })).toBe('$7.86M');
     const units = 9_950_000_000_000_000n;
     expect(formatMoneyMicros(units * 1_000_000n, 'USD', { locale: 'en' })).toBe('$9950T');
+  });
+});
+
+describe('formatConvertedMicros', () => {
+  it('keeps a cent and does not compact an amount the two digits would move', () => {
+    // WHY: currency format under 1M dropped the cent, and 12,015,000 became 12.02M.
+    expect(formatConvertedMicros(457_180_000n, 'USD')).toContain('457.18');
+    expect(formatConvertedMicros(457_180_000n, 'USD')).not.toMatch(/\$457(?!\.)/);
+    expect(formatConvertedMicros(12_015_000_000_000n, 'USD')).toContain('12,015,000');
+    expect(formatConvertedMicros(12_015_000_000_000n, 'USD')).not.toContain('12.02');
+    expect(formatConvertedMicros(7_860_000_000_000n, 'USD')).toContain('7.86');
   });
 });
 

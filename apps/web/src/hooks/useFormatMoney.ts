@@ -51,7 +51,11 @@ export function formatStoredMicros(
       : unspecifiedMicrosLabel(asBigInt);
   }
   if (convertMicros) {
-    return formatMoneyMicros(convertMicros(asBigInt, source).toString(), displayCurrency, options);
+    const converted = convertMicros(asBigInt, source);
+    if (options?.compact === false) {
+      return formatMoneyMicros(converted.toString(), displayCurrency, { compact: false });
+    }
+    return formatConvertedMicros(converted, displayCurrency);
   }
   // No integer converter. A unit count past the safe range has already lost digits
   // inside a JavaScript number, so print the stored integer in its own currency.

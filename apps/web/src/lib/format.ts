@@ -1,4 +1,6 @@
-import { formatMicrosAmount, microsToUnits } from '@bidstack/shared';
+import { formatMicrosAmount } from '@bidstack/shared';
+
+import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
 
 // Locale-aware formatters used across cards and tables. All public functions
 // accept an optional `locale` string so they're safe to call from both React
@@ -59,13 +61,13 @@ export function formatMoney(value: number, currency?: string, locale?: string): 
   }).format(value);
 }
 
-/** Full integer when the unit count does not fit. Otherwise the usual currency format. */
+/** Full integer when compact rounding or a zero-decimal format would move the cent. */
 export function formatConvertedMicros(micros: bigint, currency: string): string {
-  const abs = micros < 0n ? -micros : micros;
-  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) {
+  const plain = headlineMicrosLabel(micros);
+  if (plain === formatMicrosAmount(micros)) {
     return formatMoneyMicros(micros, currency, { compact: false });
   }
-  return formatMoney(microsToUnits(micros), currency);
+  return formatMoneyMicros(micros, currency);
 }
 
 export function formatDate(iso: string | null | undefined, locale?: string): string {
@@ -156,7 +158,7 @@ export function formatMoneyMicros(
     style: 'currency',
     currency: resolvedCurrency,
     notation: 'compact',
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
