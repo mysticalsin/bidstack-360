@@ -24,9 +24,10 @@ export interface MintOpportunityInput {
   customer: string;
   name: string;
   /**
-   * Set for KAM (initiative.companyId). When omitted (e.g. lead-convert), the
-   * mint resolves an EXISTING Company by normalized `customer` name — link-only,
-   * never auto-created — so converted opps roll up into the account views (F2).
+   * Set when the caller already has the company (KAM initiative, or a lead
+   * whose companyId is stored). When omitted or null, the mint resolves an
+   * EXISTING Company by normalized `customer` name — link-only, never
+   * auto-created — so converted opps roll up into the account views (F2).
    */
   companyId?: string | null;
   valueMicros?: bigint;

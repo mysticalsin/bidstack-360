@@ -302,6 +302,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           data: {
             orgId: req.auth.orgId,
             customer: lead.companyName,
+            companyId: lead.companyId,
             name: `${lead.firstName} ${lead.lastName}`,
             role: lead.title,
             email: lead.email,
@@ -310,13 +311,13 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
 
         // 2. Create Opportunity via the shared mint primitive (code mint +
-        //    stage resolution). No explicit companyId, so the mint links to an
-        //    EXISTING Company by normalized customer name (link-only; never
-        //    auto-created) so converted opps roll up into the account views (F2).
-        //    See services/opportunities/mint.ts.
+        //    stage resolution). A stored lead.companyId is the link. When it
+        //    is null, the mint links an existing company only if the name
+        //    matches one. It never creates a company.
         const opp = await mintOpportunityTx(tx, {
           orgId: req.auth.orgId,
           customer: lead.companyName,
+          companyId: lead.companyId,
           name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
           valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
           ownerId: lead.ownerId,

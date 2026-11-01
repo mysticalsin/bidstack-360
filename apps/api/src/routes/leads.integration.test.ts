@@ -19,6 +19,7 @@ const createdLeadIds: string[] = [];
 // run. See docs/solutions/idempotent-integration-fixtures.md.
 const createdOpportunityIds: string[] = [];
 const createdContactIds: string[] = [];
+const createdCompanyIds: string[] = [];
 // Stable prefix → beforeAll can purge leftovers from a prior interrupted run;
 // per-run suffix → each run's convert fixtures are unique in the shared test DB.
 const CONVERT_COMPANY_PREFIX = 'ConvertCorp';
@@ -54,6 +55,9 @@ afterAll(async () => {
       }
       if (createdContactIds.length > 0) {
         await prisma.contact.deleteMany({ where: { id: { in: createdContactIds } } });
+      }
+      if (createdCompanyIds.length > 0) {
+        await prisma.company.deleteMany({ where: { id: { in: createdCompanyIds } } });
       }
     } catch {
       /* ignore */
@@ -201,6 +205,67 @@ describe('leads routes', () => {
     });
     expect(patch.statusCode).toBe(200);
     expect(patch.json()).toMatchObject({ id, score: 99, status: 'qualified' });
+  });
+
+  skipIfNoDb('POST /api/leads/:id/convert keeps the lead company id', async () => {
+    // WHY: the mint used to resolve the deal from the company name. A lead
+    // already linked to a company, with a different label, lost that link.
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Org',
+        lastName: 'ConvertProbe',
+        companyName: `Probe ${randomUUID()}`,
+        source: 'website',
+        priority: 'low',
+        score: 0,
+      },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = probe.json().id as string;
+    createdLeadIds.push(probeId);
+    const row = await prisma.lead.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const company = await prisma.company.create({
+      data: { orgId: row!.orgId, name: `Convert Co ${randomUUID().slice(0, 8)}` },
+    });
+    createdCompanyIds.push(company.id);
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Keep',
+        lastName: 'Link',
+        companyName: `Label ${randomUUID().slice(0, 8)}`,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const leadId = createRes.json().id as string;
+    createdLeadIds.push(leadId);
+    await prisma.lead.update({ where: { id: leadId }, data: { companyId: company.id } });
+
+    const convert = await server.inject({
+      method: 'POST',
+      url: `/api/leads/${leadId}/convert`,
+      payload: { opportunityName: 'Kept link', stage: 's1_lead' },
+    });
+    expect(convert.statusCode).toBe(200);
+    const body = convert.json() as { opportunityId: string; contactId: string };
+    createdOpportunityIds.push(body.opportunityId);
+    createdContactIds.push(body.contactId);
+    const opp = await prisma.opportunity.findUnique({
+      where: { id: body.opportunityId },
+      select: { companyId: true },
+    });
+    const contact = await prisma.contact.findUnique({
+      where: { id: body.contactId },
+      select: { companyId: true },
+    });
+    expect(opp?.companyId).toBe(company.id);
+    expect(contact?.companyId).toBe(company.id);
   });
 
   skipIfNoDb('POST /api/leads/:id/convert creates opp + contact', async () => {
