@@ -30,13 +30,37 @@ import { serializeOpportunity, serializeOpportunityFull } from '../serializers/o
 import {
   excludeClosedOutcome,
   livePipelineStageFilter,
+  opportunityListWhere,
   patchedValueMicros,
   resolveCompanyIdByName,
   stageMoveDiff,
+  weightedOpenMicros,
+  wonOutcomeWhere,
 } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
+
+const WEIGHTED_PAGE = 500;
+
+async function sumWeightedPages(where: Prisma.OpportunityWhereInput): Promise<bigint> {
+  let cursor: string | undefined;
+  let total = 0n;
+  for (;;) {
+    const page = await prisma.opportunity.findMany({
+      where,
+      select: { id: true, valueMicros: true, probability: true },
+      orderBy: { id: 'asc' },
+      take: WEIGHTED_PAGE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    total += weightedOpenMicros(page);
+    if (page.length < WEIGHTED_PAGE) return total;
+    const last = page[page.length - 1];
+    if (!last) return total;
+    cursor = last.id;
+  }
+}
 
 export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/opportunities
@@ -86,25 +110,16 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         async () => {
           const items = await prisma.opportunity.findMany({
             where: applyOpportunityScope(
-              {
+              opportunityListWhere({
                 orgId: req.auth.orgId,
-                deletedAt: null,
-                ...livePipelineStageFilter(pipelineStageId),
-                ...(stage ? { stage } : {}),
-                ...(industry ? { industry } : {}),
-                ...(owner ? { owner: { email: owner } } : {}),
-                ...(dueDateFilter ? { dueDate: dueDateFilter } : {}),
-                ...(excludeClosed ? excludeClosedOutcome() : {}),
-                ...(search
-                  ? {
-                      OR: [
-                        { customer: { contains: search, mode: 'insensitive' } },
-                        { name: { contains: search, mode: 'insensitive' } },
-                        { code: { contains: search, mode: 'insensitive' } },
-                      ],
-                    }
-                  : {}),
-              },
+                pipelineStageId,
+                stage,
+                industry,
+                ownerEmail: owner,
+                search,
+                dueDate: dueDateFilter,
+                excludeClosed,
+              }),
               accessScope,
             ),
             // Explicit select (not include) so the large `intel` JSONB column
@@ -234,6 +249,87 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           return { count };
         },
         { ttlSeconds: 20, tags: ['opportunities-count', scopeCacheTag(accessScope)] },
+      );
+    },
+  );
+
+  // GET /api/opportunities/summary — full filtered totals, not the cursor page.
+  const OpportunityMatchSummary = z.object({
+    count: z.number().int().nonnegative(),
+    wonMicros: z.string().regex(/^\d+$/),
+    openMicros: z.string().regex(/^\d+$/),
+    weightedMicros: z.string().regex(/^\d+$/),
+  });
+  server.get(
+    '/opportunities/summary',
+    {
+      config: { permission: 'opportunities:read' },
+      schema: {
+        querystring: OpportunityFilter.omit({ cursor: true, limit: true }),
+        response: { 200: OpportunityMatchSummary },
+      },
+    },
+    async (req) => {
+      const {
+        pipelineStageId,
+        stage,
+        owner,
+        industry,
+        search,
+        dueWithinDays,
+        overdue,
+        excludeClosed,
+      } = req.query;
+      const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const now = new Date();
+      const startOfTodayUTC = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      const dueDate =
+        dueWithinDays !== undefined
+          ? {
+              gte: startOfTodayUTC,
+              lte: new Date(startOfTodayUTC.getTime() + dueWithinDays * 86_400_000),
+            }
+          : overdue
+            ? { lt: startOfTodayUTC }
+            : undefined;
+      const where = applyOpportunityScope(
+        opportunityListWhere({
+          orgId: req.auth.orgId,
+          pipelineStageId,
+          stage,
+          industry,
+          ownerEmail: owner,
+          search,
+          dueDate,
+          excludeClosed,
+        }),
+        accessScope,
+      );
+      return req.cache(
+        async () => {
+          const [counted, won, open] = await Promise.all([
+            prisma.opportunity.count({ where }),
+            prisma.opportunity.aggregate({
+              where: { AND: [where, wonOutcomeWhere()] },
+              _sum: { valueMicros: true },
+            }),
+            prisma.opportunity.aggregate({
+              where: { AND: [where, excludeClosedOutcome()] },
+              _sum: { valueMicros: true },
+            }),
+          ]);
+          const weighted = await sumWeightedPages({ AND: [where, excludeClosedOutcome()] });
+          const text = (value: bigint | null) => (value ?? 0n).toString();
+          return {
+            count: counted,
+            wonMicros: text(won._sum.valueMicros),
+            openMicros: text(open._sum.valueMicros),
+            weightedMicros: weighted.toString(),
+          };
+        },
+        { ttlSeconds: 20, tags: ['opportunities-summary', scopeCacheTag(accessScope)] },
       );
     },
   );

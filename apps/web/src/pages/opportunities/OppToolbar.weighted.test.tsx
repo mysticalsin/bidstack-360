@@ -94,6 +94,35 @@ describe('OppKpiBar weighted tile', () => {
     expect(screen.getByText('1,240,000')).toBeTruthy();
   });
 
+  it('uses the server total when the filter has more than one page', () => {
+    // WHY: the visible page can be 1 row while the filter matches 51.
+    const open = {
+      value: 0,
+      valueMicros: '1240000000000',
+      probability: 65,
+      pipelineStage: null,
+      stage: 's3_technical_iteration',
+    } as Opportunity;
+    render(
+      <OppKpiBar
+        opps={[open]}
+        partial
+        match={{
+          count: 51,
+          wonMicros: '0',
+          openMicros: '2480000000000',
+          weightedMicros: '1612000000000',
+        }}
+      />,
+    );
+    expect(screen.getByText('Matching')).toBeTruthy();
+    expect(screen.getByText('51')).toBeTruthy();
+    expect(screen.getByText('2,480,000')).toBeTruthy();
+    expect(screen.getByText('1,612,000')).toBeTruthy();
+    expect(screen.queryByText('This page is not the full match.')).toBeNull();
+    expect(screen.queryByText('Opportunities (page)')).toBeNull();
+  });
+
   it('prints the open pipeline from integer micros', () => {
     // WHY: Number(sum) / 1e6 moved this portfolio total to the next cent.
     render(

@@ -17,7 +17,11 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
+import {
+  useOpportunities,
+  useOpportunityMatchSummary,
+  usePatchOpportunity,
+} from '@/hooks/useOpportunities';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
@@ -87,9 +91,8 @@ export function OpportunitiesPage() {
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
   const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}|${excludeClosed}`);
-  const { data, isLoading, isError, error } = useOpportunities({
-    limit: 50,
-    ...(pager.cursor ? { cursor: pager.cursor } : {}),
+  const filtered = Boolean(search || stageFilter || dueFilter || excludeClosed);
+  const listFilter = {
     ...(search ? { search } : {}),
     ...(stageFilter
       ? isPipelineStageIdUuid(stageFilter)
@@ -103,7 +106,13 @@ export function OpportunitiesPage() {
     // is not missed work. The Due ≤ 7d chip stays a plain date window.
     ...(dueFilter === 'overdue' || excludeClosed ? { excludeClosed: true } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
+  };
+  const { data, isLoading, isError, error } = useOpportunities({
+    limit: 50,
+    ...(pager.cursor ? { cursor: pager.cursor } : {}),
+    ...listFilter,
   });
+  const matchSummary = useOpportunityMatchSummary(filtered ? listFilter : undefined);
   // A cursor page is the whole result only on page 1 with no next page.
   // Page 2 with a null next cursor is still a slice of a larger filter.
   const pageIsPartial = Boolean(pager.cursor || data?.nextCursor);
@@ -361,10 +370,9 @@ export function OpportunitiesPage() {
       ) : data && data.items.length > 0 ? (
         <OppKpiBar
           opps={data.items}
-          partial={pageIsPartial}
-          summary={
-            search || stageFilter || dueFilter || excludeClosed ? undefined : orgSummary.data
-          }
+          partial={pageIsPartial && !matchSummary.data}
+          match={matchSummary.data}
+          summary={filtered ? undefined : orgSummary.data}
         />
       ) : null}
 

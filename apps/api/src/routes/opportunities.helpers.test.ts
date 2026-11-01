@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { patchedValueMicros, rememberCompanyName, stageMoveDiff } from './opportunities.helpers';
+import {
+  patchedValueMicros,
+  rememberCompanyName,
+  stageMoveDiff,
+  weightedOpenMicros,
+} from './opportunities.helpers';
+
+describe('weightedOpenMicros', () => {
+  it('weights the whole open book from integer micros, including rows past the first page', () => {
+    // WHY: the list page holds 50 rows. A filtered total that sums only that page
+    // under-reports the book as soon as a next cursor exists.
+    const pageOne = { valueMicros: 1_240_000_000_000n, probability: 65 };
+    const pageTwo = { valueMicros: 8_598_204_328_457_184_962n, probability: 100 };
+    const unscored = { valueMicros: 500_000_000n, probability: 0 };
+    expect(weightedOpenMicros([pageOne, pageTwo, unscored])).toBe(
+      806_000_000_000n + 8_598_204_328_457_184_962n,
+    );
+  });
+});
 
 describe('patchedValueMicros', () => {
   it('keeps an explicit micros string instead of rounding the unit number', () => {
