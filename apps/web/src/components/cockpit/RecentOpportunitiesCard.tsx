@@ -106,7 +106,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
           <Link
             to={
               accountScoped
-                ? `/opportunities?search=${encodeURIComponent(accountName ?? '')}`
+                ? `/opportunities?search=${encodeURIComponent(accountName ?? '')}&excludeClosed=true`
                 : '/opportunities'
             }
             className="link-arrow"

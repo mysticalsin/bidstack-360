@@ -50,6 +50,7 @@ export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
+  const excludeClosed = searchParams.get('excludeClosed') === 'true';
   const qc = useQueryClient();
   // useTransition: typing in the search box (URL state) is urgent; the
   // table re-render is non-urgent.
@@ -68,7 +69,8 @@ export function OpportunitiesPage() {
   // A1 (bid clock) quick filters — "due" is independent of stage, so both can
   // be active together (e.g. "S2 Sent, overdue").
   const dueParam = searchParams.get('due');
-  const dueFilter: DueQuickFilter = dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
+  const dueFilter: DueQuickFilter =
+    dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
   const setDueFilter = (next: DueQuickFilter) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set('due', next);
@@ -78,7 +80,7 @@ export function OpportunitiesPage() {
   };
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
-  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
+  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}|${excludeClosed}`);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -93,7 +95,8 @@ export function OpportunitiesPage() {
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
     // Overdue means an open bid whose date has passed. A lost or won stage
     // is not missed work. The Due ≤ 7d chip stays a plain date window.
-    ...(dueFilter === 'overdue' ? { overdue: true, excludeClosed: true } : {}),
+    ...(dueFilter === 'overdue' || excludeClosed ? { excludeClosed: true } : {}),
+    ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
@@ -306,18 +309,22 @@ export function OpportunitiesPage() {
     const stamp = new Date().toISOString().slice(0, 10);
     setIsExporting(true);
     try {
-      await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
-        // Mirror the list query's stage branching: a configured stage is a UUID
-        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
-        // legacy enum as pipelineStageId 400s the export.
-        querystring: stageFilter
-          ? isPipelineStageIdUuid(stageFilter)
-            ? { pipelineStageId: stageFilter }
-            : isLegacyOpportunityStage(stageFilter)
-              ? { stage: stageFilter }
-              : {}
-          : {},
-      });
+      await downloadFromApi(
+        '/api/opportunities/export',
+        `polo-presales-opportunities-${stamp}.csv`,
+        {
+          // Mirror the list query's stage branching: a configured stage is a UUID
+          // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
+          // legacy enum as pipelineStageId 400s the export.
+          querystring: stageFilter
+            ? isPipelineStageIdUuid(stageFilter)
+              ? { pipelineStageId: stageFilter }
+              : isLegacyOpportunityStage(stageFilter)
+                ? { stage: stageFilter }
+                : {}
+            : {},
+        },
+      );
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
       toast.error(t('opportunities.toast.exportFailed', 'Export failed'), {
@@ -440,9 +447,7 @@ export function OpportunitiesPage() {
         ) : isError ? (
           <ErrorState
             title={t('opportunities.error.title', "Couldn't load opportunities")}
-            message={
-              error?.message ?? t('opportunities.error.message', 'Try again in a moment.')
-            }
+            message={error?.message ?? t('opportunities.error.message', 'Try again in a moment.')}
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
@@ -461,12 +466,26 @@ export function OpportunitiesPage() {
           />
         ) : (
           <div className="overflow-x-auto">
+            {excludeClosed ? (
+              <p className="px-1 pb-2 text-sm text-[var(--fg-secondary)]">
+                {t(
+                  'opportunities.openOnly',
+                  'Open deals only. Closed won and lost stay off this list.',
+                )}
+              </p>
+            ) : null}
             <table className="w-full min-w-[980px] text-left text-sm">
               <caption className="sr-only">
                 {search
-                  ? t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
-                      search,
-                    })
+                  ? excludeClosed
+                    ? t(
+                        'opportunities.caption.matchingOpen',
+                        'Open opportunities matching "{{search}}"',
+                        { search },
+                      )
+                    : t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
+                        search,
+                      })
                   : t(
                       'opportunities.caption.all',
                       'All opportunities, sorted by most recent activity. Cells are inline-editable.',
