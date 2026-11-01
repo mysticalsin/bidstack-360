@@ -236,15 +236,23 @@ export function WinRateTrendCard({ rows, headingLevel, rowsCapped = false }: { r
 
 export function TopAccountsBarCard({ rows, headingLevel, onDrill, rowsCapped = false }: { rows: OppRow[]; headingLevel?: 2 | 3; onDrill?: OnDrill; rowsCapped?: boolean }) {
   const data = accountBars(rows);
+  const openCompany = (key: string) => {
+    const hit = data.find((bar) => bar.companyId === key) ?? data.find((bar) => bar.label === key);
+    if (hit) onDrill?.({ status: 'all', companyId: hit.companyId, account: hit.label });
+  };
   return (
     <ChartCard headingLevel={headingLevel} title="Top accounts" meta={rowsCapped ? 'Won plus open value in the latest 100 updated bids' : 'Won plus open value'}
-      summary={data.map((d) => `${d.label}: won ${d.wonLabel}, open ${d.openLabel}`).join('; ')}
+      summary={data.map((d) => `${d.label}: won ${d.wonLabel}, open ${d.openLabel}`).join('; ') || 'No bids linked to a company'}
       table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, d.wonLabel, d.openLabel]) }}>
-      <HBars data={data} format={fmtCompact} onSelect={onDrill ? (label) => onDrill({ status: 'all', account: label }) : undefined} />
-      {onDrill ? (
+      {data.length ? (
+        <HBars data={data} format={fmtCompact} onSelect={onDrill ? openCompany : undefined} />
+      ) : (
+        <p className="viz-empty">{rowsCapped ? 'No linked companies in the latest 100 updated bids.' : 'No bids linked to a company.'}</p>
+      )}
+      {onDrill && data.length ? (
         <ul className="dash-chips" aria-label="Open an account's bids">
           {data.map((d) => (
-            <li key={d.label}><button type="button" className="dash-chip" onClick={() => onDrill({ status: 'all', account: d.label })}>{d.label} <b>{d.totalLabel}</b></button></li>
+            <li key={d.companyId}><button type="button" className="dash-chip" onClick={() => onDrill({ status: 'all', companyId: d.companyId, account: d.label })}>{d.label} <b>{d.totalLabel}</b></button></li>
           ))}
         </ul>
       ) : null}

@@ -50,11 +50,26 @@ describe('viz-data', () => {
   });
 
   it('ranks accounts by won + open and ignores lost value', () => {
-    expect(accountBars(rows).map(({ label, open, won, openMicros, wonMicros }) => ({
+    const linked = rows.map((deal) => ({ ...deal, companyId: `id-${deal.customer}` }));
+    expect(accountBars(linked).map(({ label, open, won, openMicros, wonMicros }) => ({
       label, open, won, openMicros, wonMicros,
     }))).toEqual([
       { label: 'B', open: 400, won: 300, openMicros: '400000000', wonMicros: '300000000' },
       { label: 'A', open: 10, won: 200, openMicros: '10000000', wonMicros: '200000000' },
+    ]);
+  });
+
+  it('keeps two companies apart when they share a customer name', () => {
+    // WHY: the top-accounts chart added every bid with the same customer string into one bar.
+    const shared = [
+      row({ companyId: 'co-1', customer: 'Acme', stage: 's2_sent', value: 10 }),
+      row({ companyId: 'co-1', customer: 'Acme Holdings', stage: 'closed_won', value: 40, dueDate: '2026-02-01', closedAt: '2026-02-01' }),
+      row({ companyId: 'co-2', customer: 'Acme', stage: 's2_sent', value: 25 }),
+      row({ companyId: null, customer: 'Acme', stage: 's2_sent', value: 90 }),
+    ];
+    expect(accountBars(shared).map(({ companyId, label, open, won }) => ({ companyId, label, open, won }))).toEqual([
+      { companyId: 'co-1', label: 'Acme Holdings', open: 10, won: 40 },
+      { companyId: 'co-2', label: 'Acme', open: 25, won: 0 },
     ]);
   });
 
@@ -74,9 +89,10 @@ describe('viz-data', () => {
       value: 80,
       dueDate: '2026-01-01',
       customer: 'C',
+      companyId: 'co-c',
       pipelineStage: { isWon: false, isLost: true, deletedAt: null },
     });
-    const open = row({ stage: 's2_sent', value: 20, dueDate: '2026-01-02', customer: 'C' });
+    const open = row({ stage: 's2_sent', value: 20, dueDate: '2026-01-02', customer: 'C', companyId: 'co-c' });
     const flaggedOpenKey = row({
       stage: 's4_negotiation',
       value: 5,
@@ -141,8 +157,8 @@ describe('viz-data', () => {
     const lowMicros = (9007199254740992n * 1_000_000n).toString();
     const highMicros = (hugeUnit * 1_000_000n).toString();
     const ranked = accountBars([
-      row({ customer: 'Low', stage: 's2_sent', value: 0, valueMicros: lowMicros }),
-      row({ customer: 'High', stage: 's2_sent', value: 0, valueMicros: highMicros }),
+      row({ customer: 'Low', companyId: 'low', stage: 's2_sent', value: 0, valueMicros: lowMicros }),
+      row({ customer: 'High', companyId: 'high', stage: 's2_sent', value: 0, valueMicros: highMicros }),
     ]);
     // WHY: both unit numbers collapse to the same safe integer, so number sort kept Low first.
     expect(ranked.map((bar) => bar.label)).toEqual(['High', 'Low']);
@@ -151,9 +167,10 @@ describe('viz-data', () => {
     expect(ranked[0]?.totalLabel).toBe('9,007,199,254,740,993');
     expect(ranked[0]?.totalLabel).not.toBe(fmtCompact(ranked[0]?.open ?? 0));
     const summed = accountBars([
-      row({ customer: 'Sum', stage: 's2_sent', value: 0, valueMicros: highMicros }),
+      row({ customer: 'Sum', companyId: 'sum', stage: 's2_sent', value: 0, valueMicros: highMicros }),
       row({
         customer: 'Sum',
+        companyId: 'sum',
         stage: 'closed_won',
         value: 0,
         valueMicros: '1000000',
