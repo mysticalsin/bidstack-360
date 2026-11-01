@@ -430,4 +430,51 @@ describe('notes routes (integration)', () => {
       where: { orgId, accountId: { in: [companyName.toLowerCase(), `probe-compliance-${stamp}`] } },
     });
   });
+
+  skipIfNoDb('POST import-meeting keeps a follow-up when another account has the same title', async () => {
+    // WHY: task dedupe was the title alone. Company B's action was dropped
+    // because company A already had those words.
+    const stamp = Date.now();
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: `probe-task-${stamp}`, title: 'Probe', bodyMd: 'org' },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = (probe.json() as { id: string }).id;
+    const probeRow = await prisma.note.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const orgId = probeRow!.orgId;
+    const otherName = `Other Tasks ${stamp}`;
+    const companyName = `Fresh Tasks ${stamp}`;
+    const other = await prisma.company.create({ data: { orgId, name: otherName } });
+    const fresh = await prisma.company.create({ data: { orgId, name: companyName } });
+    const title = `Send the shared plan ${stamp} by 2026-06-15`;
+    const existing = await prisma.task.create({
+      data: { orgId, accountId: other.id, title, status: 'open' },
+    });
+    const payload = {
+      accountId: companyName,
+      companyName,
+      bodyMd: `Action: ${title}`,
+    };
+    const first = await server.inject({ method: 'POST', url: '/api/notes/import-meeting', payload });
+    expect(first.statusCode).toBe(201);
+    const second = await server.inject({ method: 'POST', url: '/api/notes/import-meeting', payload });
+    expect(second.statusCode).toBe(201);
+    const tasks = await prisma.task.findMany({
+      where: { orgId, title, deletedAt: null },
+      select: { id: true, accountId: true },
+    });
+    expect(tasks.map((task) => task.accountId).sort()).toEqual([other.id, fresh.id].sort());
+    expect(tasks.filter((task) => task.accountId === fresh.id)).toHaveLength(1);
+    expect(tasks.some((task) => task.id === existing.id)).toBe(true);
+    await prisma.task.deleteMany({ where: { orgId, title } });
+    await prisma.companyEnrichment.deleteMany({
+      where: { orgId, normalizedName: companyName.toLowerCase().replaceAll(' ', '-') },
+    });
+    await prisma.note.deleteMany({
+      where: { orgId, accountId: { in: [companyName.toLowerCase(), `probe-task-${stamp}`] } },
+    });
+    await prisma.company.deleteMany({ where: { id: { in: [other.id, fresh.id] } } });
+  });
 });

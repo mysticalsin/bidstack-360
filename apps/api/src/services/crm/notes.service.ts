@@ -172,8 +172,15 @@ export async function persistTasks(
 ): Promise<number> {
   if (tasks.length === 0) return 0;
   const titles = tasks.map((t) => t.title);
+  // The same action on another account is a different follow-up. A deleted
+  // row does not count as already recorded.
   const existing = await tx.task.findMany({
-    where: { orgId, title: { in: titles, mode: 'insensitive' } },
+    where: {
+      orgId,
+      deletedAt: null,
+      accountId: companyId ?? null,
+      title: { in: titles, mode: 'insensitive' },
+    },
     select: { title: true },
     take: 1000,
   });
