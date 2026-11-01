@@ -4,11 +4,12 @@ import './enrichment.css';
 
 import { useState } from 'react';
 
+import { fmtMoney } from '@/components/financials/financials-format';
 import { Spark } from '@/components/viz/charts';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { awaitingRefresh, useCompanyEnrichment, useRefreshEnrichment } from '@/hooks/useCompanyEnrichment';
 import { trendPct } from '@/lib/enrichment/aggregate';
-import { fmtAsOf, fmtMoney } from '@/lib/enrichment/client';
+import { fmtAsOf } from '@/lib/enrichment/client';
 
 import { SampleBadge, SourceNote } from './SourceNote';
 
