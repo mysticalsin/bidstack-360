@@ -198,6 +198,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
     const t = out.get(group.root);
     if (!t) continue;
     t.dealsCapped = group.capped;
+    if (group.capped) t.data.dealsArePage = true;
     for (const o of group.rows) {
       t.data.opps.push(toMomentumOpp(o));
       t.openPipelineMicros += openBookMicros(o);
@@ -209,6 +210,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
     if (group.capped) {
       t.feedsCapped = true;
       t.meetingsCapped = true;
+      t.data.meetingsArePage = true;
     }
     for (const m of group.rows) t.data.meetings.push(m.heldAt);
   }
@@ -228,6 +230,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
     if (group.capped) {
       t.feedsCapped = true;
       t.newsCapped = true;
+      t.data.newsArePage = true;
     }
     for (const e of group.rows) {
       t.data.events.push({

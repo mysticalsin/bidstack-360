@@ -141,6 +141,35 @@ describe('computeMomentum', () => {
     expect(keptDetail).not.toMatch(/12\.0/);
   });
 
+  it('does not let a newest-first page invent a trend', () => {
+    // WHY: ordering by newest drops the prior window first, so the ratio looked like growth.
+    const empty = { opps: [] as MomentumData['opps'], meetings: [] as Date[], postings: [] as Date[], events: [] as MomentumData['events'], headcountGrowth12m: null };
+    const deal = computeMomentum({
+      ...empty,
+      opps: [{ createdAt: daysAgo(10), closedAt: null, outcome: 'open', valueMicros: 2_000_000_000_000n }],
+    }, NOW);
+    const dealPage = computeMomentum({
+      ...empty,
+      dealsArePage: true,
+      opps: [{ createdAt: daysAgo(10), closedAt: null, outcome: 'open', valueMicros: 2_000_000_000_000n }],
+    }, NOW);
+    expect(deal.drivers.find((driver) => driver.key === 'pipeline')?.signal).toBeGreaterThan(0);
+    expect(dealPage.score).toBe(50);
+    expect(dealPage.drivers.find((driver) => driver.key === 'pipeline')?.signal).toBe(0);
+    expect(dealPage.drivers.find((driver) => driver.key === 'pipeline')?.detail).not.toMatch(/up|down/);
+    const meetings = [daysAgo(40), daysAgo(40), daysAgo(40)];
+    const met = computeMomentum({ ...empty, meetings }, NOW);
+    const metPage = computeMomentum({ ...empty, meetings, meetingsArePage: true }, NOW);
+    expect(met.drivers.find((driver) => driver.key === 'meetings')?.signal).toBeGreaterThan(0);
+    expect(metPage.drivers.find((driver) => driver.key === 'meetings')?.signal).toBe(0);
+    const news = [{ occurredAt: daysAgo(10), importance: 75, sentiment: 0.8, category: 'funding' as const }];
+    const tone = computeMomentum({ ...empty, events: news }, NOW);
+    const tonePage = computeMomentum({ ...empty, events: news, newsArePage: true }, NOW);
+    expect(tone.drivers.find((driver) => driver.key === 'news')?.signal).toBeGreaterThan(0);
+    expect(tonePage.score).toBe(50);
+    expect(tonePage.drivers.find((driver) => driver.key === 'news')?.signal).toBe(0);
+  });
+
   it('does not let a capped job-post page move the score', () => {
     // WHY: the newest 1,000 posts drop the prior month, so the ratio looked like a hiring spike.
     const postings = Array.from({ length: 20 }, () => daysAgo(5));
