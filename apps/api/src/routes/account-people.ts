@@ -13,6 +13,7 @@ import {
   FactDecisionBody,
   PeopleMap,
   PersonFact,
+  WORK_PAGE,
 } from '@bidstack/shared';
 
 import { apiKeyScopeSatisfiesPermission } from '../lib/api-key-scopes.js';
@@ -78,36 +79,46 @@ async function loadWork(orgId: string, where: { companyId?: string; opportunityI
         ],
       };
   const [commitments, tasks] = await Promise.all([
-    prisma.customerCommitment.findMany({
-      where: commitmentWhere,
-      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
-      take: 100,
-      select: {
-        id: true,
-        promise: true,
-        dueDate: true,
-        status: true,
-        ownerContactId: true,
-        opportunityId: true,
-        sourceNote: true,
-        ownerContact: { select: { name: true } },
-      },
-    }),
-    prisma.task.findMany({
-      where: taskWhere,
-      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
-      take: 100,
-      select: {
-        id: true,
-        title: true,
-        dueDate: true,
-        status: true,
-        assignee: { select: { email: true } },
-      },
-    }),
+    (async () => {
+      const rows = await prisma.customerCommitment.findMany({
+        where: commitmentWhere,
+        orderBy: [{ dueDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }, { id: 'asc' }],
+        take: WORK_PAGE,
+        select: {
+          id: true,
+          promise: true,
+          dueDate: true,
+          status: true,
+          ownerContactId: true,
+          opportunityId: true,
+          sourceNote: true,
+          ownerContact: { select: { name: true } },
+        },
+      });
+      const capped = rows.length === WORK_PAGE && (await prisma.customerCommitment.count({ where: commitmentWhere })) > WORK_PAGE;
+      return { rows, capped };
+    })(),
+    (async () => {
+      const rows = await prisma.task.findMany({
+        where: taskWhere,
+        orderBy: [{ dueDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }, { id: 'asc' }],
+        take: WORK_PAGE,
+        select: {
+          id: true,
+          title: true,
+          dueDate: true,
+          status: true,
+          assignee: { select: { email: true } },
+        },
+      });
+      const capped = rows.length === WORK_PAGE && (await prisma.task.count({ where: taskWhere })) > WORK_PAGE;
+      return { rows, capped };
+    })(),
   ]);
   return {
-    commitments: commitments.map((row) => ({
+    commitmentsCapped: commitments.capped,
+    tasksCapped: tasks.capped,
+    commitments: commitments.rows.map((row) => ({
       recordKind: 'customer_commitment' as const,
       id: row.id,
       promise: row.promise,
@@ -118,7 +129,7 @@ async function loadWork(orgId: string, where: { companyId?: string; opportunityI
       opportunityId: row.opportunityId,
       sourceNote: row.sourceNote,
     })),
-    internalTasks: tasks.map((row) => ({
+    internalTasks: tasks.rows.map((row) => ({
       recordKind: 'internal_task' as const,
       id: row.id,
       title: row.title,
