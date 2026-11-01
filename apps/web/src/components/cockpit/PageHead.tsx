@@ -12,7 +12,7 @@ import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
-import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
+import { cumulativeOpen, oppStatus, runningWinRate, type OppRow } from '@/components/viz/viz-data';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { MetricSpark } from '@/components/viz/lazy-bklit';
 import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
@@ -82,8 +82,18 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
-  const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
-  const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
+  // The list stage is the live stage name. A lost flag is not the enum key.
+  const sparkRows: OppRow[] = accountOpps.map((o) => ({
+    id: o.id,
+    stage: o.stage,
+    value: o.value,
+    dueDate: o.dueDate ?? null,
+    closedAt: o.closedAt ?? null,
+    customer: o.customer,
+    pipelineStage: o.pipelineStage,
+  }));
+  const openOpps = sparkRows.filter((o) => oppStatus(o) === 'open');
+  const openValue = openOpps.reduce((sum, o) => sum + (o.value ?? 0), 0);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
   const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
   const winLoss = cockpit.winLoss;
@@ -91,7 +101,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
   // Sparklines (real rows only): open value accumulated by due date, running
   // win rate across closed bids in close order, open risks by severity.
-  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer }));
   const openSpark = cumulativeOpen(sparkRows);
   const winSpark = runningWinRate(sparkRows);
   const riskSpark = (['low', 'medium', 'high', 'critical'] as const).map((sev) => openRisks.filter((r) => r.severity === sev).length);
