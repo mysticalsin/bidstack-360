@@ -46,6 +46,8 @@ describe('extractMsaFields', () => {
     // WHY: Math.round(amount * 1e6) cannot hold a cap past the safe integer range.
     expect(contractMicros('250,000.50')).toBe(250_000_500_000);
     expect(contractMicros('250,000')).toBe(250_000_000_000);
+    expect(contractMicros('1,234,567')).toBe(1_234_567_000_000);
+    expect(contractMicros('1234,567')).toBe(1_234_567_000);
     expect(contractMicros('250,50')).toBe(250_500_000);
     expect(contractMicros('1.250,50')).toBe(1_250_500_000);
     expect(contractMicros('1.015')).toBe(1_015_000);
