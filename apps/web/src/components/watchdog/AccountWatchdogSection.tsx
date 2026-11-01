@@ -1,6 +1,8 @@
-// Account page: watchdog signals (2/3) beside upcoming results (1/3), then one
-// "Track record" surface (won/lost summary, expandable projects, one quiet
-// timeline). Direction: Tony 13:12 BRT + /workspace/fleet/polo-DESIGN.md.
+// Account page: watchdog feed (2/3) beside upcoming results (1/3), then one
+// "Track record" surface (won/lost summary, expandable projects). v21: the
+// feed is ordered by importance (Latest on toggle), each row carries its
+// category, outlet count and a Sample badge; the signal strip and the track
+// record timeline moved into the Signals timeline above. Direction: Tony 13:12 BRT + /workspace/fleet/polo-DESIGN.md.
 // Density rules: top 3 signals by default, one line + one meta line per row,
 // details on click, a single tinted pill instead of severity dots.
 import '@/components/viz/viz.css';
@@ -11,8 +13,9 @@ import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
-import { SignalLegend } from '@/components/viz/ChartCard';
-import { MiniCalendar, SignalStrip, YearBars } from '@/components/viz/charts';
+import { MiniCalendar, YearBars } from '@/components/viz/charts';
+import { CATEGORY_LABEL, noDash, sourceLabel } from '@/components/signals/category';
+import type { SignalCategory } from '@bidstack/shared';
 import { fmtCompact } from '@/components/viz/viz-data';
 import { useAccountWatchdog, useSetWatchEventStatus, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
 import { useHasPermission } from '@/hooks/useCapabilities';
@@ -39,7 +42,7 @@ const SOURCE: Record<string, string> = {
 };
 
 const TOP_SIGNALS = 3;
-const TOP_TIMELINE = 4;
+const ALERT_LINE = 70;
 
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 const shortFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
@@ -76,9 +79,16 @@ type WatchEvent = AccountWatchdog['events'][number];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isStored = (e: WatchEvent) => UUID.test(e.id) && !/^sample:/i.test(e.title);
 
+const titleOf = (e: WatchEvent) => noDash(e.displayTitle ?? e.title);
+const isSample = (e: WatchEvent) => e.sample ?? /^sample:/i.test(e.title);
+const importanceOf = (e: WatchEvent) => e.importance ?? e.severity * 20;
+const sourceName = (s: string) => SOURCE[s] ?? sourceLabel(s);
+
 function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: (e: WatchEvent) => void }) {
   const [open, setOpen] = useState(false);
   const id = useId();
+  const category = e.category && e.category in CATEGORY_LABEL ? CATEGORY_LABEL[e.category as SignalCategory] : null;
+  const important = importanceOf(e) >= ALERT_LINE;
   return (
     <li className="wd-row wd-arrive" style={stagger(i)}>
       <button
@@ -89,19 +99,25 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
         onClick={() => setOpen((v) => !v)}
       >
         <span className="wd-row-main">
-          <span className="wd-row-title">{e.title}</span>
+          <span className="wd-row-title">
+            {important ? <span className="wd-imp" title="High importance">Important</span> : null}
+            {titleOf(e)}
+          </span>
           <span className="wd-row-meta">
-            {SOURCE[e.source] ?? e.source} · <time dateTime={e.occurredAt}>{dateFmt.format(new Date(e.occurredAt))}</time>
+            {category ? `${category} · ` : ''}
+            {sourceName(e.source)}
+            {e.mentions && e.mentions > 1 ? ` · ${e.mentions} outlets` : ''} · <time dateTime={e.occurredAt}>{dateFmt.format(new Date(e.occurredAt))}</time>
             {e.status === 'NEW' ? <span className="wd-new"> · New</span> : null}
+            {isSample(e) ? <span className="wd-sample-badge">Sample</span> : null}
           </span>
         </span>
         <Pill kind={e.implication}>{PILL[e.implication]}</Pill>
         <ChevronDown className="wd-chev" size={16} strokeWidth={1.5} aria-hidden />
       </button>
       <div id={`${id}-d`} className="wd-detail" data-open={open} hidden={!open}>
-        <p>{e.summary}</p>
+        <p>{noDash(e.summary)}</p>
         {e.implicationRationale ? <p className="wd-row-meta">{e.implicationRationale}</p> : null}
-        {e.sourceUrl.startsWith('/') ? (
+        {!e.sourceUrl ? null : e.sourceUrl.startsWith('/') ? (
           <Link className="wd-link" to={e.sourceUrl}>{INTERNAL_LINK[e.source] ?? 'Open'}</Link>
         ) : (
           <a className="wd-link" href={e.sourceUrl} target="_blank" rel="noreferrer">
@@ -109,7 +125,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
           </a>
         )}
         {onDismiss ? (
-          <button type="button" className="wd-more wd-dismiss" onClick={() => onDismiss(e)} aria-label={`Dismiss signal: ${e.title}`}>
+          <button type="button" className="wd-more wd-dismiss" onClick={() => onDismiss(e)} aria-label={`Dismiss signal: ${titleOf(e)}`}>
             Dismiss
           </button>
         ) : null}
@@ -120,6 +136,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
 
 function Signals({ data }: { data: AccountWatchdog }) {
   const [all, setAll] = useState(false);
+  const [order, setOrder] = useState<'important' | 'latest'>('important');
   const listId = useId();
   const canDismiss = useHasPermission('accounts:write');
   const setStatus = useSetWatchEventStatus(data.companyId);
@@ -130,7 +147,7 @@ function Signals({ data }: { data: AccountWatchdog }) {
   };
   const undoBar = undo ? (
     <p className="wd-row-meta wd-undo" role="status">
-      Dismissed “{undo.title}”.{' '}
+      Dismissed “{titleOf(undo)}”.{' '}
       <button
         type="button"
         className="wd-more"
@@ -158,34 +175,25 @@ function Signals({ data }: { data: AccountWatchdog }) {
       </>
     );
   }
-  const shown = all ? data.events : data.events.slice(0, TOP_SIGNALS);
-  const to = new Date();
-  // Axis spans the oldest signal (max 12 months back, min 6) up to today.
-  const oldest = Math.min(...data.events.map((e) => new Date(e.occurredAt).getTime()));
-  const floor = new Date(to.getFullYear(), to.getMonth() - 11, 1).getTime();
-  const sixAgo = new Date(to.getFullYear(), to.getMonth() - 5, 1).getTime();
-  const start = new Date(Math.max(floor, Math.min(sixAgo, oldest)));
-  const from = new Date(start.getFullYear(), start.getMonth(), 1);
-  const counts = { OPPORTUNITY: 0, NEUTRAL: 0, RISK: 0 } as Record<string, number>;
-  for (const e of data.events) counts[e.implication] = (counts[e.implication] ?? 0) + 1;
-  const sample = data.events.some((e) => /^sample:/i.test(e.title));
+  const sorted = [...data.events].sort((a, b) =>
+    order === 'latest'
+      ? b.occurredAt.localeCompare(a.occurredAt)
+      : importanceOf(b) - importanceOf(a) || b.occurredAt.localeCompare(a.occurredAt),
+  );
+  const shown = all ? sorted : sorted.slice(0, TOP_SIGNALS);
+  const important = data.events.filter((e) => importanceOf(e) >= ALERT_LINE).length;
   return (
     <>
-      <figure
-        className="wd-strip viz-figure"
-        role="img"
-        aria-label={`Signals since ${from.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}: ${counts.OPPORTUNITY} opportunity, ${counts.NEUTRAL} watch, ${counts.RISK} risk. Listed below.`}
-      >
-        <SignalStrip
-          events={data.events.map((e) => ({ id: e.id, at: e.occurredAt, kind: e.implication, title: e.title }))}
-          from={from}
-          to={to}
-        />
-        <figcaption className="wd-strip-cap">
-          <SignalLegend />
-          {sample ? <span className="viz-sample" title='Local demo signals (titles start with "Sample:")'>Sample</span> : null}
-        </figcaption>
-      </figure>
+      <div className="wd-toolbar">
+        <span className="wd-row-meta">
+          {data.events.length} {data.events.length === 1 ? 'signal' : 'signals'}
+          {important ? `, ${important} important` : ''}
+        </span>
+        <div className="wd-seg" role="group" aria-label="Order signals">
+          <button type="button" aria-pressed={order === 'important'} onClick={() => setOrder('important')}>Most important</button>
+          <button type="button" aria-pressed={order === 'latest'} onClick={() => setOrder('latest')}>Latest</button>
+        </div>
+      </div>
       <ul className="wd-list" id={listId} aria-live="polite">
         {shown.map((e, i) => (
           <SignalRow key={e.id} e={e} i={i} onDismiss={canDismiss && isStored(e) ? dismiss : undefined} />
@@ -239,15 +247,12 @@ const amount = (micros: bigint) => formatUnspecifiedAmount(Number(micros / 1_000
 
 function TrackRecord({ data }: { data: AccountWatchdog }) {
   const [projectsOpen, setProjectsOpen] = useState(false);
-  const [timelineAll, setTimelineAll] = useState(false);
   const projectsId = useId();
-  const timelineId = useId();
   const won = data.pastProjects.filter((p) => p.outcome === 'won');
   const lost = data.pastProjects.length - won.length;
   const total = data.pastProjects.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonValue = won.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonShare = total > 0n ? Number((wonValue * 1000n) / total) / 10 : 0;
-  const timeline = timelineAll ? data.history : data.history.slice(0, TOP_TIMELINE);
   const byYear = new Map<string, { won: number; lost: number }>();
   for (const p of data.pastProjects) {
     const y = String(new Date(p.closedAt).getUTCFullYear());
@@ -315,25 +320,6 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
         </div>
       )}
 
-      <h3 className="wd-sub-h">Timeline</h3>
-      {data.history.length === 0 ? (
-        <p className="wd-empty"><span>No history yet</span>Filings and closed bids build the timeline.</p>
-      ) : (
-        <>
-          <ol className="wd-timeline" id={timelineId}>
-            {timeline.map((h) => (
-              <li key={h.id} data-type={h.type}>
-                <time dateTime={h.at}>{shortFmt.format(new Date(h.at))}</time>
-                <span className="wd-row-main">
-                  <span className="wd-row-title">{h.title}</span>
-                  <span className="wd-row-meta">{h.type === 'filing' ? (/^enrichment\b/.test(h.detail) ? 'Hiring signal' : 'Public filing') : 'Bid'} · {h.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-          <ShowMore total={data.history.length} shown={TOP_TIMELINE} open={timelineAll} onToggle={() => setTimelineAll((v) => !v)} noun="events" controls={timelineId} />
-        </>
-      )}
     </section>
   );
 }
@@ -354,9 +340,9 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
   return (
     <div className="wd" data-testid="account-watchdog">
       <div className="wd-grid">
-        <section className="wd-surface" aria-labelledby="wd-feed-h">
+        <section id="watchdog" className="wd-surface" style={{ scrollMarginTop: 80 }} aria-labelledby="wd-feed-h">
           <header className="wd-head">
-            <h2 id="wd-feed-h" className="wd-h">Signals</h2>
+            <h2 id="wd-feed-h" className="wd-h">Watchdog</h2>
             {q.data ? (
               <span className="wd-row-meta">
                 {fresh > 0 ? `${fresh} new` : 'Up to date'}

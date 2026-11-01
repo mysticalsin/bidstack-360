@@ -1,6 +1,6 @@
 import '../styles/cockpit.css';
 
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -25,6 +25,7 @@ import {
 } from '@/components/cockpit';
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSection';
+import { PulseHero } from '@/components/signals/PulseHero';
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
 import { WhoWeMetCard } from '@/components/meetings/WhoWeMetCard';
@@ -64,6 +65,16 @@ import { ApiError } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import type { CrmDashboardSnapshot } from '@bidstack/shared';
+
+// v21: the timeline and initiatives sit below the fold, so they load as their
+// own chunks behind fixed-height skeletons (no layout shift).
+const SignalsTimeline = lazy(() => import('@/components/signals/SignalsTimeline'));
+const InitiativesBoard = lazy(() => import('@/components/signals/InitiativesBoard'));
+const sectionSkeleton = (h: number) => (
+  <div className="sg" aria-busy="true" style={{ marginBottom: 24 }}>
+    <div className="sg-skel" style={{ minHeight: h }} />
+  </div>
+);
 
 // DashboardPage doubles as both the org-wide /dashboard view (no
 // accountId) and the per-customer /accounts/:accountId cockpit. The
@@ -375,11 +386,23 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
       )}
       <PageHead cockpit={cockpit} accountView={isAccountView} onDrill={isAccountView ? (status) => setDrill({ status }) : undefined} />
-      {/* Account view: one header (name, health sentence, 3 numbers), then the
-          watchdog signals, then details. The command-center hero repeated the
+      {/* Account view (v21): header, then the pulse (traction or decline in five
+          seconds), the signals timeline, the watchdog feed and the initiatives
+          board; firmographics, hiring and the rest follow, details fold last. The command-center hero repeated the
           name and next move the header already carries, so it is org-only. */}
-      {isAccountView && cockpit.company.id && <FirmographicsStrip companyId={cockpit.company.id} />}
-      {isAccountView && cockpit.company.id && <AccountWatchdogSection companyId={cockpit.company.id} />}
+      {isAccountView && cockpit.company.id ? (
+        <>
+          <PulseHero companyId={cockpit.company.id} />
+          <Suspense fallback={sectionSkeleton(318)}>
+            <SignalsTimeline companyId={cockpit.company.id} />
+          </Suspense>
+          <AccountWatchdogSection companyId={cockpit.company.id} />
+          <Suspense fallback={sectionSkeleton(280)}>
+            <InitiativesBoard companyId={cockpit.company.id} />
+          </Suspense>
+          <FirmographicsStrip companyId={cockpit.company.id} />
+        </>
+      ) : null}
       {isAccountView && cockpit.company.id ? (
         <div className="en-row2" style={{ marginBottom: 24 }}>
           <HiringNowCard companyId={cockpit.company.id} />

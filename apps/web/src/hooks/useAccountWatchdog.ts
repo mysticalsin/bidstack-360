@@ -24,6 +24,16 @@ export interface AccountWatchdog {
     implicationRationale: string | null;
     severity: number;
     status: string;
+    /** v21: 0..100 importance (the feed is ordered by it). */
+    importance?: number;
+    /** v21: funding, launch, initiative, exec_move, risk, earnings, hiring, ... */
+    category?: string;
+    /** v21: how many outlets carried the same story after dedupe. */
+    mentions?: number;
+    /** v21: demo data seeded with no live source. */
+    sample?: boolean;
+    /** v21: title without the "Sample: " prefix. */
+    displayTitle?: string;
   }>;
   earnings: Array<{
     id: string;

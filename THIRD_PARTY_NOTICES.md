@@ -91,6 +91,15 @@ SOFTWARE.
 - Considered, not used: `animated-group` (the Needs-you list already staggers
   with a CSS `--i` delay; a second motion layer adds weight, not clarity).
 - Licence: MIT
+- v21: also took `transition-panel` (same commit, MIT) into
+  `apps/web/src/components/motion-primitives/transition-panel.tsx` for the
+  account pulse driver drill and the timeline detail. Polo changes: default
+  variants are a 6px rise with opacity, 200ms on the Polo easing, and a plain
+  instant fade under reduced motion. Considered, not used: `sliding-number`
+  (needs react-use-measure, a new dependency for one digit effect).
+- v21 also considered kokonutui `metric-card` (MIT, 4d497b7) and deferred it:
+  867 lines for a card the pulse hero already covers with AnimatedNumber and
+  the bklit AreaSparkline.
 
 ```
 MIT License

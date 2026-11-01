@@ -1,7 +1,7 @@
 import '../../styles/org-dashboard.css';
 import '@/components/viz/viz.css';
 
-import { memo, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -25,9 +25,12 @@ import { KpiRow } from './widgets/KpiRow';
 import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { QuickLinksCard } from './widgets/SidebarCards';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
-import { DashboardHero, NeedsYou, PerformanceCard, PipelineCard, SignalsCard } from './DashboardVisuals';
+import { DashboardHero, NeedsYou, PerformanceCard, PipelineCard } from './DashboardVisuals';
 import { OppDrill, type OppDrillFilter } from '@/components/drill/OppDrill';
 import { GettingStarted } from './widgets/GettingStarted';
+
+// v21: portfolio momentum + top watchdog alerts, its own chunk.
+const PortfolioMomentum = lazy(() => import('@/components/signals/PortfolioMomentum'));
 
 // ─── OrgDashboard ─────────────────────────────────────────────────────────────
 // Layout-only orchestrator. Every widget component lives in ./widgets/.
@@ -261,10 +264,17 @@ export const OrgDashboard = memo(function OrgDashboard() {
           />
           <NeedsYou rows={oppRows} overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
         </div>
-        <div className="viz-grid-2">
-          <PipelineCard rows={oppRows} onDrill={setDrill} />
-          <SignalsCard feed={feed.data} />
-        </div>
+        <Suspense
+          fallback={
+            <div className="sg viz-grid-3" aria-busy="true">
+              <div className="sg-skel" style={{ minHeight: 440 }} />
+              <div className="sg-skel" style={{ minHeight: 440 }} />
+            </div>
+          }
+        >
+          <PortfolioMomentum />
+        </Suspense>
+        <PipelineCard rows={oppRows} onDrill={setDrill} />
         <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 

@@ -51,12 +51,13 @@ describe('AccountWatchdogSection', () => {
     render(<AccountWatchdogSection companyId="c1" />);
     const rows = screen.getAllByRole('button', { name: /exit costs/ });
     expect(rows).toHaveLength(3);
-    // One pill per row (the strip legend repeats the words, so scope to pills).
+    // One pill per row.
     expect(screen.getAllByText('Risk', { selector: '.wd-pill' })).toHaveLength(1);
     expect(screen.getByText('Opportunity', { selector: '.wd-pill' })).toBeTruthy();
     expect(screen.getByText('Watch', { selector: '.wd-pill' })).toBeTruthy();
-    // The time-axis strip has a text alternative.
-    expect(screen.getByRole('img', { name: /^Signals since/ })).toBeTruthy();
+    // v21: the strip moved into the Signals timeline; the feed has an order toggle instead.
+    expect(screen.queryByRole('img', { name: /^Signals since/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Most important' }).getAttribute('aria-pressed')).toBe('true');
     // No severity dots, no description until expanded.
     expect(screen.queryByRole('img', { name: /Severity/ })).toBeNull();
     expect(screen.getByText('Restructuring announced 1.').closest('[hidden]')).toBeTruthy();
@@ -68,7 +69,7 @@ describe('AccountWatchdogSection', () => {
     expect(screen.getAllByRole('button', { name: /exit costs/ })).toHaveLength(4);
   });
 
-  it('summarises past projects first and keeps one timeline (no tabs)', () => {
+  it('summarises past projects; the old timeline lives in the Signals timeline now', () => {
     state.data = {
       ...base,
       pastProjects: [
@@ -85,7 +86,8 @@ describe('AccountWatchdogSection', () => {
     expect(screen.getByText('Data pilot').closest('[hidden]')).toBeTruthy();
     fireEvent.click(toggle);
     expect(screen.getByText('Data pilot').closest('[hidden]')).toBeNull();
-    expect(screen.getByText(/Bid · Closed won/)).toBeTruthy();
+    expect(screen.queryByText(/Bid · Closed won/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Timeline' })).toBeNull();
   });
 
   it('folds cross-region meeting flags for this account into signals (task 5)', () => {
@@ -108,13 +110,34 @@ describe('AccountWatchdogSection', () => {
     state.data = base;
     enr.data = mockEnrichment('c1');
     render(<MemoryRouter><AccountWatchdogSection companyId="c1" /></MemoryRouter>);
-    const rows = screen.getAllByRole('button', { name: /Sample: Potential project:/ });
+    const rows = screen.getAllByRole('button', { name: /^Potential project:/ });
+    // The "Sample: " prefix becomes a badge.
+    expect(screen.getAllByText('Sample', { selector: '.wd-sample-badge' }).length).toBe(rows.length);
     expect(rows.length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Hiring signals ·/).length).toBe(rows.length);
     fireEvent.click(rows[0]!);
     const link = screen.getByRole('link', { name: 'See the evidence postings' });
     expect(link.getAttribute('href')).toMatch(/^\/accounts\/c1#enrichment-project-/);
     enr.data = undefined;
+  });
+
+  it('orders by importance with a Latest toggle and shows category, outlets and Sample', () => {
+    state.data = {
+      ...base,
+      events: [
+        { ...ev(1), title: 'Older funding', occurredAt: '2026-09-01T00:00:00Z', importance: 90, category: 'funding', mentions: 4, source: 'gdelt' },
+        { ...ev(2), title: 'Sample: Newer hiring note', displayTitle: 'Newer hiring note', occurredAt: '2026-10-25T00:00:00Z', importance: 30, category: 'hiring', sample: true },
+        { ...ev(3), title: 'Middle filing \u2014 restated', occurredAt: '2026-10-01T00:00:00Z', importance: 60 },
+      ],
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    const titles = () => screen.getAllByRole('button', { expanded: false }).map((b) => b.querySelector('.wd-row-title')?.textContent ?? '').filter(Boolean);
+    expect(titles()).toEqual(['ImportantOlder funding', 'Middle filing, restated', 'Newer hiring note']);
+    expect(screen.getByText(/Funding · News · 4 outlets ·/)).toBeTruthy();
+    expect(screen.getByText('Sample', { selector: '.wd-sample-badge' })).toBeTruthy();
+    expect(screen.getByText(/1 important/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Latest' }));
+    expect(titles()).toEqual(['Newer hiring note', 'Middle filing, restated', 'ImportantOlder funding']);
   });
 
   it('dismisses a stored signal with undo; browser-merged and read-only rows have no Dismiss', () => {
