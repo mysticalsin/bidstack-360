@@ -175,15 +175,19 @@ describe('accounts routes', () => {
     expect(row).toMatchObject({
       openDeals: 1,
       wonValue: 2,
+      wonValueMicros: '2000000',
       opportunityCount: 3,
       totalValue: 1,
+      totalValueMicros: '1000000',
     });
     const stats = await fetchAccountStats(orgId!, [company.id]);
     expect(stats.get(company.id)).toMatchObject({
       openDeals: 1,
       wonValue: 2,
+      wonValueMicros: '2000000',
       opportunityCount: 3,
       totalValue: 1,
+      totalValueMicros: '1000000',
     });
   });
 
@@ -236,11 +240,21 @@ describe('accounts routes', () => {
         url: `/api/accounts/top?search=${encodeURIComponent(name)}&limit=5`,
       });
       expect(res.statusCode).toBe(200);
-      const body = res.json() as { items: Array<{ name: string; totalValue: number; wonValue: number }> };
+      const body = res.json() as {
+        items: Array<{
+          name: string;
+          totalValue: number;
+          totalValueMicros: string;
+          wonValue: number;
+          wonValueMicros: string;
+        }>;
+      };
       const row = body.items.find((item) => item.name === name);
       expect(row?.totalValue.toFixed(2)).toBe('8598204328457.18');
       expect(row?.totalValue.toFixed(2)).not.toBe('8598204328457.19');
+      expect(row?.totalValueMicros).toBe(micros.toString());
       expect(row?.wonValue).toBe(0);
+      expect(row?.wonValueMicros).toBe('0');
     } finally {
       await prisma.opportunity.deleteMany({ where: { companyId: company.id } });
       await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });

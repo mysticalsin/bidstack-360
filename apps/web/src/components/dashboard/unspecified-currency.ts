@@ -93,3 +93,30 @@ export function formatUnspecifiedCompact(value: number): string {
   }).format(Number.isFinite(value) ? value : 0);
   return `${amount} unspecified`;
 }
+
+/**
+ * The micros digit string wins. A unit number is only a fallback, and only
+ * while it converts exactly. A number past the safe integer range adds nothing.
+ */
+export function recordedMicros(value: number, micros?: string | null): bigint {
+  if (micros && /^\d+$/.test(micros)) return BigInt(micros);
+  return unitsToMicros(value) ?? 0n;
+}
+
+/** Compact from integer micros. Unit counts past the safe range keep their leading digits. */
+export function formatUnspecifiedCompactMicros(micros: string | number | bigint): string {
+  const value = asMicros(micros);
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const units = abs / 1_000_000n;
+  const remainder = abs % 1_000_000n;
+  let magnitude: number;
+  if (units <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    magnitude = Number(units) + Number(remainder) / 1_000_000;
+  } else {
+    const digits = units.toString();
+    const significant = digits.slice(0, 15);
+    magnitude = Number(significant) * 10 ** (digits.length - significant.length);
+  }
+  return formatUnspecifiedCompact(negative ? -magnitude : magnitude);
+}

@@ -11,6 +11,11 @@ import { prisma, Prisma } from '@bidstack/db';
 import { microsToUnits, TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
 
 import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
+
+/** A SQL `::text` bigint sum. Anything else is not an amount. */
+function sqlMicros(text: string): string {
+  return /^\d+$/.test(text) ? text : '0';
+}
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 
 const KeyAccountResponse = z.object({
@@ -24,6 +29,7 @@ const KeyAccountResponse = z.object({
   keyAccountOwnerId: z.string().nullable(),
   keyAccountNotes: z.string().nullable(),
   totalValue: z.number(),
+  totalValueMicros: z.string(),
   openDeals: z.number(),
   contactCount: z.number(),
   opportunityCount: z.number(),
@@ -32,6 +38,7 @@ const KeyAccountResponse = z.object({
 const TopAccountResponse = KeyAccountResponse.extend({
   topAccountRank: z.number(),
   wonValue: z.number(),
+  wonValueMicros: z.string(),
 });
 
 export const accountsRoutes: FastifyPluginAsync = async (server) => {
@@ -114,6 +121,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           keyAccountOwnerId: c.keyAccountOwnerId,
           keyAccountNotes: c.keyAccountNotes,
           totalValue: o.totalValue,
+          totalValueMicros: o.totalValueMicros,
           openDeals: o.openDeals,
           contactCount: o.contactCount,
           opportunityCount: o.opportunityCount,
@@ -190,7 +198,9 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
             // topAccountRank is non-null by the where clause above; ?? 0 keeps TS honest.
             topAccountRank: c.topAccountRank ?? 0,
             totalValue: s.totalValue,
+            totalValueMicros: s.totalValueMicros,
             wonValue: s.wonValue,
+            wonValueMicros: s.wonValueMicros,
             openDeals: s.openDeals,
             contactCount: s.contactCount,
             opportunityCount: s.opportunityCount,
@@ -345,23 +355,29 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       });
       const contactMap = new Map(contacts.map((c) => [c.companyId, c._count.id]));
 
-      const items = rows.map((row, index) => ({
-        id: row.id,
-        name: row.name,
-        domain: row.domain,
-        industry: row.industry,
-        logoUrl: row.logoUrl,
-        tier: row.tier,
-        keyAccountSince: row.keyAccountSince?.toISOString() ?? null,
-        keyAccountOwnerId: row.keyAccountOwnerId,
-        keyAccountNotes: row.keyAccountNotes,
-        topAccountRank: index + 1, // rank = position in result (sorted by totalValue DESC)
-        totalValue: microsToUnits(BigInt(row.openValueMicros)),
-        wonValue: microsToUnits(BigInt(row.wonValueMicros)),
-        openDeals: Number(row.openDeals),
-        contactCount: contactMap.get(row.id) ?? 0,
-        opportunityCount: Number(row.opportunityCount),
-      }));
+      const items = rows.map((row, index) => {
+        const openMicros = sqlMicros(row.openValueMicros);
+        const wonMicros = sqlMicros(row.wonValueMicros);
+        return {
+          id: row.id,
+          name: row.name,
+          domain: row.domain,
+          industry: row.industry,
+          logoUrl: row.logoUrl,
+          tier: row.tier,
+          keyAccountSince: row.keyAccountSince?.toISOString() ?? null,
+          keyAccountOwnerId: row.keyAccountOwnerId,
+          keyAccountNotes: row.keyAccountNotes,
+          topAccountRank: index + 1, // rank = position in result (sorted by totalValue DESC)
+          totalValueMicros: openMicros,
+          wonValueMicros: wonMicros,
+          totalValue: microsToUnits(BigInt(openMicros)),
+          wonValue: microsToUnits(BigInt(wonMicros)),
+          openDeals: Number(row.openDeals),
+          contactCount: contactMap.get(row.id) ?? 0,
+          opportunityCount: Number(row.opportunityCount),
+        };
+      });
 
       return reply.send({ items, source: 'auto' as const });
     },

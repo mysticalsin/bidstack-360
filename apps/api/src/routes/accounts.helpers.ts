@@ -11,7 +11,9 @@ import { excludeClosedOutcome, wonOutcomeWhere } from './opportunities.helpers.j
 
 export interface AccountStats {
   totalValue: number;
+  totalValueMicros: string;
   wonValue: number;
+  wonValueMicros: string;
   openDeals: number;
   opportunityCount: number;
   contactCount: number;
@@ -19,11 +21,22 @@ export interface AccountStats {
 
 const EMPTY_STATS: AccountStats = {
   totalValue: 0,
+  totalValueMicros: '0',
   wonValue: 0,
+  wonValueMicros: '0',
   openDeals: 0,
   opportunityCount: 0,
   contactCount: 0,
 };
+
+/** Digit string for a Postgres bigint sum. A non-integer never becomes a pipeline total. */
+function microsDigits(value: bigint | number | null | undefined): string {
+  if (typeof value === 'bigint') return value >= 0n ? value.toString() : '0';
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return BigInt(Math.trunc(value)).toString();
+  }
+  return '0';
+}
 
 /**
  * Aggregates pipeline value, won value, open-deal/opportunity counts and
@@ -78,13 +91,19 @@ export async function fetchAccountStats(
   }
   for (const row of won) {
     if (!row.companyId) continue;
-    statsFor(row.companyId).wonValue = microsToUnits(row._sum.valueMicros ?? 0);
+    const wonMicros = microsDigits(row._sum.valueMicros);
+    const wonStats = statsFor(row.companyId);
+    wonStats.wonValueMicros = wonMicros;
+    wonStats.wonValue = microsToUnits(BigInt(wonMicros));
   }
   for (const row of open) {
     if (!row.companyId) continue;
     const s = statsFor(row.companyId);
     // Pipeline on the account list is the open book. Lost and won stay out.
-    s.totalValue = microsToUnits(row._sum.valueMicros ?? 0);
+    // The digit string is the total. The unit number is only for older readers.
+    const openMicros = microsDigits(row._sum.valueMicros);
+    s.totalValueMicros = openMicros;
+    s.totalValue = microsToUnits(BigInt(openMicros));
     s.openDeals = row._count._all;
   }
   for (const c of contacts) {

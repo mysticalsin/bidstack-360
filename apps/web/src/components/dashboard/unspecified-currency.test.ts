@@ -4,6 +4,8 @@ import {
   compareMicros,
   formatExactUnspecified,
   formatRecordedDealAmount,
+  formatUnspecifiedCompactMicros,
+  recordedMicros,
   sumRecordedDealUnits,
   microsSharePercent,
   shareBarWidth,
@@ -40,6 +42,24 @@ describe('exact unspecified amounts', () => {
     expect(
       sumRecordedDealUnits([{ value: 0, valueMicros: '8598204328457184962' }]).toFixed(2),
     ).toBe('8598204328457.18');
+  });
+
+  it('keeps two account totals apart when their unit numbers collapse', () => {
+    // WHY: key and top lists used to add the unit number. Past the safe integer
+    // those two amounts become one number, so the shorter bar read as full.
+    const smaller = (9007199254740992n * 1_000_000n).toString();
+    const larger = (9007199254740993n * 1_000_000n).toString();
+    const collapsed = Number(9007199254740993n);
+    expect(collapsed).toBe(9007199254740992);
+    expect(recordedMicros(collapsed, smaller).toString()).toBe(smaller);
+    expect(recordedMicros(collapsed, larger).toString()).toBe(larger);
+    expect(microsSharePercent(recordedMicros(collapsed, smaller), recordedMicros(collapsed, larger))).toBeLessThan(
+      100,
+    );
+    const summed = recordedMicros(collapsed, smaller) + recordedMicros(collapsed, larger);
+    expect(summed).toBe((9007199254740992n + 9007199254740993n) * 1_000_000n);
+    expect(formatUnspecifiedCompactMicros(summed)).toContain('unspecified');
+    expect(recordedMicros(collapsed)).toBe(0n);
   });
 
   it('draws no bar for a zero share and keeps a floor for a thin positive share', () => {

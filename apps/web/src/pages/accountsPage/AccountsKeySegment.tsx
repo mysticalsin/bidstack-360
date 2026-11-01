@@ -18,7 +18,10 @@ import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
-  formatUnspecifiedCompact,
+  compareMicros,
+  formatUnspecifiedCompactMicros,
+  microsSharePercent,
+  recordedMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
@@ -71,8 +74,12 @@ export function AccountsKeySegment() {
   const unclassifiedIndustry = t('keyAccounts.unclassifiedIndustry', 'Unclassified');
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
-  const totalPipeline = useMemo(
-    () => items.reduce((sum, account) => sum + account.totalValue, 0),
+  const totalPipelineMicros = useMemo(
+    () =>
+      items.reduce(
+        (sum, account) => sum + recordedMicros(account.totalValue, account.totalValueMicros),
+        0n,
+      ),
     [items],
   );
   const openDeals = useMemo(() => items.reduce((sum, account) => sum + account.openDeals, 0), [items]);
@@ -85,20 +92,25 @@ export function AccountsKeySegment() {
     [items],
   );
   const industryBreakdown = useMemo(() => {
-    const byIndustry = new Map<string, { count: number; pipeline: number }>();
+    const byIndustry = new Map<string, { count: number; pipelineMicros: bigint }>();
     for (const account of signalItems) {
       const key = account.industry || unclassifiedIndustry;
-      const current = byIndustry.get(key) ?? { count: 0, pipeline: 0 };
+      const current = byIndustry.get(key) ?? { count: 0, pipelineMicros: 0n };
       current.count += 1;
-      current.pipeline += account.totalValue;
+      current.pipelineMicros += recordedMicros(account.totalValue, account.totalValueMicros);
       byIndustry.set(key, current);
     }
     return [...byIndustry.entries()]
       .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => b.pipeline - a.pipeline || b.count - a.count)
+      .sort(
+        (a, b) => compareMicros(b.pipelineMicros, a.pipelineMicros) || b.count - a.count,
+      )
       .slice(0, 6);
   }, [signalItems, unclassifiedIndustry]);
-  const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
+  const maxIndustryMicros = industryBreakdown.reduce(
+    (max, item) => (compareMicros(item.pipelineMicros, max) > 0 ? item.pipelineMicros : max),
+    0n,
+  );
   const selectedIndustryStats = industryBreakdown.find((item) => item.name === industry);
   const leadingIndustry = selectedIndustryStats ?? industryBreakdown[0] ?? null;
 
@@ -189,7 +201,7 @@ export function AccountsKeySegment() {
             }
             sub={
               leadingIndustry
-                ? `${labeledAccountCount(leadingIndustry.count)} / ${formatUnspecifiedCompact(leadingIndustry.pipeline)}`
+                ? `${labeledAccountCount(leadingIndustry.count)} / ${formatUnspecifiedCompactMicros(leadingIndustry.pipelineMicros)}`
                 : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
             }
           >
@@ -217,14 +229,23 @@ export function AccountsKeySegment() {
                     <span className="text-right font-medium tabular-nums text-[var(--fg-tertiary)]">
                       {labeledAccountCount(item.count)}
                       {' · '}
-                      {formatUnspecifiedCompact(item.pipeline)}
+                      {formatUnspecifiedCompactMicros(item.pipelineMicros)}
                     </span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                     <motion.span
                       className="block h-full rounded-full bg-[var(--brand-primary)]"
                       initial={reducedMotion ? false : { width: 0 }}
-                      animate={{ width: `${Math.max(8, Math.round((item.pipeline / maxIndustryPipeline) * 100))}%` }}
+                      animate={{
+                        width: `${Math.max(
+                          8,
+                          Math.round(
+                            maxIndustryMicros > 0n
+                              ? microsSharePercent(item.pipelineMicros, maxIndustryMicros)
+                              : 0,
+                          ),
+                        )}%`,
+                      }}
                       transition={springSoft}
                     />
                   </div>
@@ -268,7 +289,7 @@ export function AccountsKeySegment() {
             />
             <StatTile
               label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
-              value={formatUnspecifiedCompact(totalPipeline)}
+              value={formatUnspecifiedCompactMicros(totalPipelineMicros)}
               sublabel={UNSPECIFIED_CURRENCY_BASIS}
             />
             <StatTile
@@ -361,7 +382,9 @@ export function AccountsKeySegment() {
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">
-                              {formatUnspecifiedCompact(account.totalValue)}
+                              {formatUnspecifiedCompactMicros(
+                                recordedMicros(account.totalValue, account.totalValueMicros),
+                              )}
                             </span>{' '}
                             {t('keyAccounts.metricPipeline', 'pipeline · {{basis}}', {
                               basis: UNSPECIFIED_CURRENCY_BASIS,
