@@ -319,6 +319,9 @@ export function computeSignalCoverage(
   contactFactor.recommendedAction = contactAction(contacts, pages?.contactsCapped);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
   pipeline.recommendedAction = pipelineAction(openDeals, pages?.dealsCapped ? pages.openDealCount : undefined);
+  const pipelineUnseen =
+    Boolean(pages?.dealsCapped) && openDeals.length === 0 && (pages?.openDealCount ?? 0) > 0;
+  if (pipelineUnseen) pipeline.scored = false;
   if (pages?.contactsCapped) {
     contactFactor.whatItMeasures += ` Scored from the ${COCKPIT_CONTACT_PAGE} highest-influence contacts.`;
   }
@@ -330,20 +333,28 @@ export function computeSignalCoverage(
   }
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
-  // Weights: external intel is the cockpit's backbone; the rest split evenly.
-  const score = Math.round(
-    firmographics.score * 0.3 +
-      contactFactor.score * 0.25 +
-      engagement.score * 0.2 +
-      pipeline.score * 0.25,
-  );
+  const weighted = [
+    { factor: firmographics, weight: 0.3 },
+    { factor: contactFactor, weight: 0.25 },
+    { factor: engagement, weight: 0.2 },
+    { factor: pipeline, weight: 0.25 },
+  ];
+  const measured = weighted.filter((row) => row.factor.scored !== false);
+  const weightSum = measured.reduce((sum, row) => sum + row.weight, 0);
+  // An unseen pipeline is not a measured zero. The other weights fill its share.
+  const score = weightSum === 0
+    ? 0
+    : Math.round(measured.reduce((sum, row) => sum + row.factor.score * row.weight, 0) / weightSum);
   const counts: Record<string, number> = {
     strong: 0,
     good: 0,
     needs_attention: 0,
     critical: 0,
   };
-  for (const f of factors) counts[f.band] = (counts[f.band] ?? 0) + 1;
+  for (const f of factors) {
+    if (f.scored === false) continue;
+    counts[f.band] = (counts[f.band] ?? 0) + 1;
+  }
   return { score, band: bandFor(score), counts, factors };
 }
 

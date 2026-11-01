@@ -44,6 +44,8 @@ export const SignalFactor = z.object({
   recommendedAction: z.string().min(1),
   score: z.number().int().min(0).max(100),
   band: HealthBand,
+  /** False when the page could not measure this factor. Zero is not a measured zero. */
+  scored: z.boolean().optional(),
 });
 export type SignalFactor = z.infer<typeof SignalFactor>;
 
