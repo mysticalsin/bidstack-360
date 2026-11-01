@@ -21,6 +21,7 @@
 import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 import { seedRolesAndPermissions } from './seed.rbac.js';
+import { seedSigningEntities } from './seed-signing-entities.js';
 
 /**
  * A Prisma client capable of running the seed. Accepts either the top-level
@@ -152,6 +153,15 @@ const COMPANIES: CompanySpec[] = [
     country: 'SE',
     employeeCount: 9_800,
     revenueBillions: 13,
+  },
+  {
+    name: 'Northwind Pharma',
+    domain: 'northwind-pharma.example',
+    industry: 'Healthcare',
+    country: 'FR',
+    employeeCount: 1_200,
+    revenueBillions: 1,
+    keyAccountNotes: 'Synthetic fixture: HEMA MSA, no IT pipeline. Used for leverage demos and tests.',
   },
 ];
 
@@ -369,6 +379,15 @@ const CONTACTS: ContactSpec[] = [
     phone: '+44 20 7946 0102',
     influence: 4,
     sentiment: 'neutral',
+  },
+  {
+    customer: 'Northwind Pharma',
+    name: 'Alex Buyer',
+    role: 'Head of Procurement',
+    emailLocal: 'alex.buyer',
+    phone: '+33 4 7200 0100',
+    influence: 5,
+    sentiment: 'warm',
   },
   {
     customer: 'Stellantis',
@@ -740,6 +759,67 @@ async function seedContacts(
   }
 }
 
+async function seedHemaLeverageMsa(
+  prisma: SeedClient,
+  orgId: string,
+  visitorId: string,
+  companyByName: Map<string, string>,
+): Promise<void> {
+  const hema = await prisma.signingEntity.findFirst({
+    where: { orgId, slug: 'hema', deletedAt: null },
+    select: { id: true },
+  });
+  const companyId = companyByName.get('Northwind Pharma');
+  if (!hema || !companyId) return;
+  await prisma.contractAgreement.create({
+    data: {
+      orgId,
+      accountKey: normalizeName('Northwind Pharma'),
+      companyId,
+      kind: 'msa',
+      title: 'HEMA master services agreement',
+      reference: 'NW-PHARMA-MSA-2026',
+      counterparty: 'Northwind Pharma SAS',
+      status: 'active',
+      effectiveDate: new Date('2026-03-01T00:00:00Z'),
+      expiryDate: new Date('2029-03-01T00:00:00Z'),
+      autoRenew: true,
+      noticePeriodDays: 90,
+      governingLaw: 'France',
+      liabilityCapMicros: 250_000_000_000n,
+      liabilityCapCurrency: 'EUR',
+      paymentTerms: 'Net 60 days from invoice',
+      termMonths: 36,
+      renewalTerms: 'Auto-renews for 12-month periods unless 90 days notice',
+      indexation: 'There is no indexation.',
+      scopeOfServices:
+        'Health economics, market access and related life-sciences advisory. The scope does not include information technology, software engineering or digital transformation services.',
+      affiliatesClause:
+        'This Agreement applies only to the Client entity named above. Affiliates may not order services without a written amendment.',
+      exclusivity: 'Exclusive provider of health economics services in France for the term.',
+      nonSolicit: 'Neither party shall solicit the other party employees for 24 months after expiry.',
+      insurance: 'Professional indemnity insurance of at least 2,000,000 EUR.',
+      ipClause: 'Each party retains pre-existing IP. Work product is assigned to the Client.',
+      confidentiality: 'Confidential information is kept secret for five years after disclosure.',
+      parties: [
+        {
+          name: 'Northwind Pharma SAS',
+          role: 'client',
+          address: '14 Avenue des Sciences, 69007 Lyon, France',
+          email: 'contracts@northwind-pharma.example',
+        },
+        { name: 'Amaris Consulting SAS / HEMA', role: 'ours', address: null, email: null },
+      ],
+      fieldCitations: {
+        scopeOfServices: { page: 1, clause: 'Clause 3', excerpt: 'does not include information technology' },
+        affiliatesClause: { page: 1, clause: 'Clause 4', excerpt: 'Affiliates of the Client may not' },
+      },
+      signingEntityId: hema.id,
+      createdById: visitorId,
+    },
+  });
+}
+
 async function seedLeads(
   prisma: SeedClient,
   orgId: string,
@@ -800,6 +880,7 @@ export async function seedOrgData(
   // Create the org's Roles + Permissions (empty map → no fixture-user grants),
   // then grant our demo users explicitly so permission gates resolve.
   await seedRolesAndPermissions(prisma, orgId, new Map());
+  await seedSigningEntities(prisma, orgId);
   await grantRole(prisma, orgId, visitorId, 'Admin');
   for (const t of TEAMMATES) {
     const id = byInitials.get(t.initials);
@@ -808,6 +889,7 @@ export async function seedOrgData(
 
   const companyByName = await seedCompanies(prisma, orgId, visitorId);
   await seedCompanyEnrichments(prisma, orgId);
+  await seedHemaLeverageMsa(prisma, orgId, visitorId, companyByName);
 
   const oppByCode = await seedOpps(prisma, orgId, byInitials, companyByName);
   await seedProposals(prisma, orgId, byInitials, oppByCode, visitorId);

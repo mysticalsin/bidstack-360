@@ -38,6 +38,7 @@ export const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'));
 export const WorkspaceInsightsPage = lazy(() => import('@/pages/WorkspaceInsightsPage'));
 export const AgreementsPage = lazy(() => import('@/pages/agreements/AgreementsPage'));
 export const AgreementDetailPage = lazy(() => import('@/pages/agreements/AgreementDetailPage'));
+export const IntakeReviewPage = lazy(() => import('@/pages/agreements/IntakeReviewPage'));
 export const MeetingsPage = lazy(() => import('@/pages/meetings/MeetingsPage'));
 export const MeetingDetailPage = lazy(() => import('@/pages/meetings/MeetingDetailPage'));
 export const OrgChartPage = lazy(() => import('@/pages/accounts/OrgChartPage'));

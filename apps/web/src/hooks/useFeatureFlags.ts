@@ -12,6 +12,7 @@ const ALL_OFF: FeatureFlags = {
   lms360Enabled: false,
   serumEnabled: false,
   serumDemoModeEnabled: false,
+  msaLlmExtractEnabled: false,
 };
 
 /**

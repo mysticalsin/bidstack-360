@@ -44,6 +44,7 @@ function renderAt(path: string) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/agreements" element={<AgreementsPage />} />
+          <Route path="/agreements/intake/:id" element={<div data-testid="msa-intake-review">review</div>} />
           <Route path="/agreements/:id" element={<AgreementDetailPage />} />
           <Route path="/msa/:id" element={<MsaRedirect />} />
           <Route path="/accounts/:id" element={<AgreementsSummaryCard companyId={CI} companyName="CI Financial" />} />
@@ -67,6 +68,7 @@ describe('headline / applyView', () => {
     expect(applyView(rows, new URLSearchParams('view=notice')).map((r) => r.reference)).toEqual(['CIF-SOW-07']);
     expect(applyView(rows, new URLSearchParams(`companyId=${CI}`)).map((r) => r.reference)).toEqual(['CIF-NDA-2022', 'CIF-MSA-2023']);
     expect(applyView(rows, new URLSearchParams('q=sow')).map((r) => r.reference)).toEqual(['CIF-SOW-07', 'CIF-SOW-08']);
+    expect(applyView(rows, new URLSearchParams('leverage=1'))).toEqual([]);
   });
 });
 
@@ -74,6 +76,7 @@ describe('AgreementsPage', () => {
   it('shows Sample banner, headline numbers, strip and table; a number filters the table via the URL', async () => {
     renderAt('/agreements');
     expect(await screen.findByTestId('agreements-sample-banner')).toBeTruthy();
+    expect(screen.getByTestId('msa-intake-dropzone')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: 'Agreements' })).toBeTruthy();
     expect(within(screen.getByTestId('agreements-expiring-strip')).getAllByRole('link')).toHaveLength(4);
     expect(within(screen.getByTestId('agreements-table')).getAllByRole('row')).toHaveLength(1 + 6);

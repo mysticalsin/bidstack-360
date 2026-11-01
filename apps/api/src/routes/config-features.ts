@@ -19,6 +19,7 @@ export const configFeaturesRoutes: FastifyPluginAsyncZod = async (server) => {
         lms360Enabled: env.LMS_360L_ENABLED === 'true',
         serumEnabled: env.SERUM_ENABLED === 'true',
         serumDemoModeEnabled: env.SERUM_DEMO_MODE_ENABLED === 'true',
+        msaLlmExtractEnabled: env.MSA_LLM_EXTRACT_ENABLED === 'true',
       };
     },
   );

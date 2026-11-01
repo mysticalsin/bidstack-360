@@ -8,9 +8,11 @@ import { useId, useState } from 'react';
 
 import { composeBrief, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
 
+import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { fmtMoney } from '@/components/financials/financials-format';
 import { useAccountPositioning } from '@/hooks/useAccountPositioning';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 
 const CONF_LABEL: Record<PositioningPlay['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
 const CONF_BARS: Record<PositioningPlay['confidence'], number> = { high: 3, medium: 2, low: 1 };
@@ -158,6 +160,7 @@ function Gap({ g }: { g: AccountGap }) {
 
 export function WhatToPosition({ companyId }: { companyId: string }) {
   const q = useAccountPositioning(companyId);
+  const leverage = useMsaLeverage(companyId);
   const money = useFormatMoney();
   // Pipeline micros are EUR at rest; show them in the user's display currency.
   const micros = (m: string) => money.formatMoneyMicros(m, 'EUR', { compact: true });
@@ -181,6 +184,9 @@ export function WhatToPosition({ companyId }: { companyId: string }) {
         <span className="sg-meta">From signals, filings, people and pipeline in Polo</span>
       </div>
       <p className="wp-brief" data-testid="account-brief">{brief}</p>
+      {(leverage.data?.items ?? []).map((flag) => (
+        <LeverageFlag key={flag.msaId} flag={flag} />
+      ))}
       {d.plays.length ? (
         <ol className="wp-plays">
           {d.plays.map((p) => <PlayCard key={p.theme} play={p} micros={micros} />)}

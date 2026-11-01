@@ -28,6 +28,7 @@ import { RecentActivityCard } from './widgets/RecentActivityCard';
 import { DashboardHero, NeedsYou, PerformanceCard, PipelineCard } from './DashboardVisuals';
 import { OppDrill, type OppDrillFilter } from '@/components/drill/OppDrill';
 import { GettingStarted } from './widgets/GettingStarted';
+import { HemaLeverageTile } from './HemaLeverageTile';
 
 // v21: portfolio momentum + top watchdog alerts, its own chunk.
 const PortfolioMomentum = lazy(() => import('@/components/signals/PortfolioMomentum'));
@@ -274,6 +275,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
         >
           <PortfolioMomentum />
         </Suspense>
+        <HemaLeverageTile />
         <PipelineCard rows={oppRows} onDrill={setDrill} />
         <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />

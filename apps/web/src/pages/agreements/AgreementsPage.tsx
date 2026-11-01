@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { DocumentHits } from '@/components/agreements/DocumentHits';
+import { IntakeDropzone } from '@/components/agreements/IntakeDropzone';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
@@ -83,6 +84,7 @@ export default function AgreementsPage() {
           <Icon name="plus" size={16} /> New agreement
         </Button>
       </header>
+      <IntakeDropzone disabledReason={disabledReason} />
       {sample ? <SampleBanner /> : null}
       {list.isLoading ? <LoadingSkeleton rows={6} /> : list.isError ? (
         <ErrorState title="Couldn't load agreements" message={list.error instanceof Error ? list.error.message : 'Try again in a moment.'} />
@@ -134,6 +136,10 @@ export default function AgreementsPage() {
                 <option value="">Any type</option>
                 {MSA_KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
               </select>
+              <select aria-label="Leverage" value={params.get('leverage') ?? ''} onChange={(e) => set('leverage', e.target.value || null)}>
+                <option value="">Any leverage</option>
+                <option value="1">Under-leveraged MSA</option>
+              </select>
               {filtered ? <button type="button" className="drill-more" onClick={() => setParams(new URLSearchParams(), { replace: true })}>Clear filters</button> : null}
             </div>
             <p className="agr-caption" aria-live="polite" data-testid="agreements-count">
@@ -150,7 +156,7 @@ export default function AgreementsPage() {
                     {shown.map((r) => (
                       <tr key={r.id}>
                         <td><Link to={`/agreements/${r.id}`}>{r.title}</Link><span className="drill-sub">{KIND_LABEL[r.kind]} · {r.reference}</span></td>
-                        <td>{r.companyId ? <Link to={`/accounts/${r.companyId}`}>{r.companyName}</Link> : '—'}</td>
+                        <td>{r.companyId ? <Link to={`/accounts/${r.companyId}`}>{r.companyName}</Link> : '—'}{r.underLeveraged ? <span className="drill-sub">Under-leveraged</span> : null}</td>
                         <td><MsaStatusBadge status={r.status} /></td>
                         <td>{fmtDate(r.expiryDate)}{r.daysToExpiry != null ? <span className="drill-sub"><Days days={r.daysToExpiry} /></span> : null}</td>
                         <td>{fmtDate(r.noticeDeadline)}</td>

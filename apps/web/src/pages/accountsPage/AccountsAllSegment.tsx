@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
@@ -10,6 +11,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { formatMicrosAmount } from '@bidstack/shared';
 import { springSoft } from '@/lib/motion';
 
@@ -55,6 +57,9 @@ export function AccountsAllSegment() {
   const [segment, setSegment] = useState<AccountSegmentKey>('all');
   const [technology, setTechnology] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>('pipeline');
+  const [params] = useSearchParams();
+  const [leverageOnly, setLeverageOnly] = useState(() => params.get('leverage') === 'hema');
+  const leverage = useMsaLeverage(undefined, true);
   const [page, setPage] = useState(0);
   const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
 
@@ -68,9 +73,19 @@ export function AccountsAllSegment() {
       .map((company) => deriveAccount(company, dashboard.data!.deals));
   }, [dashboard.data]);
 
+  const leverageIds = useMemo(
+    () => new Set((leverage.data?.items ?? []).map((item) => item.companyId)),
+    [leverage.data],
+  );
+  const leverageMissing = useMemo(() => {
+    const known = new Set(allRows.map((row) => row.company.id));
+    return (leverage.data?.items ?? []).filter((item) => !known.has(item.companyId));
+  }, [allRows, leverage.data]);
+
   const rows = useMemo(() => {
     return allRows
       .filter((row) => {
+        if (leverageOnly && !leverageIds.has(row.company.id)) return false;
         if (industry && row.company.industry !== industry) return false;
         if (!segmentMatches(row, segment)) return false;
         if (
@@ -99,12 +114,12 @@ export function AccountsAllSegment() {
         return true;
       })
       .sort((a, b) => sortRows(a, b, sort));
-  }, [allRows, search, industry, segment, technology, sort]);
+  }, [allRows, search, industry, segment, technology, sort, leverageOnly, leverageIds]);
 
   // Reset to the first page whenever the filtered/sorted view changes, without an
   // effect — the react-hooks linter rejects effect-driven resets, so the active
   // page is clamped in render (mirrors useCursorPagination's token-reset pattern).
-  const pageToken = `${search} ${industry} ${segment} ${technology} ${sort}`;
+  const pageToken = `${search} ${industry} ${segment} ${technology} ${sort} ${leverageOnly}`;
   const [pageTokenState, setPageTokenState] = useState(pageToken);
   const activePage = pageTokenState === pageToken ? page : 0;
   const pageCount = Math.max(1, Math.ceil(rows.length / ACCOUNTS_PAGE_SIZE));
@@ -226,7 +241,7 @@ export function AccountsAllSegment() {
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
   const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
-  const filtersActive = Boolean(search || industry || technology || segment !== 'all');
+  const filtersActive = Boolean(search || industry || technology || segment !== 'all' || leverageOnly);
   // True first-run org state: no search/filter narrowing the view AND the
   // underlying snapshot itself has zero rows. Distinct from "filters matched
   // nothing" — that case keeps the existing filter-miss copy below.
@@ -461,9 +476,10 @@ export function AccountsAllSegment() {
             setIndustry(null);
             setTechnology(null);
             setSegment('all');
+            setLeverageOnly(false);
           }}
           resetLabel={t('accounts.filters.reset', 'Reset')}
-          showReset={Boolean(search || industry || technology || segment !== 'all')}
+          showReset={Boolean(search || industry || technology || segment !== 'all' || leverageOnly)}
         >
           <FilterSelect
             ariaLabel={t('accounts.filters.industry.label', 'Industry')}
@@ -488,6 +504,16 @@ export function AccountsAllSegment() {
                 {option}
               </option>
             ))}
+          </FilterSelect>
+          <FilterSelect
+            ariaLabel={t('accounts.filters.leverage.label', 'MSA leverage')}
+            value={leverageOnly ? 'hema' : ''}
+            onChange={(value) => setLeverageOnly(value === 'hema')}
+          >
+            <option value="">{t('accounts.filters.leverage.all', 'Any MSA leverage')}</option>
+            <option value="hema">
+              {t('accounts.filters.leverage.hema', 'Under-leveraged HEMA / pharma MSA')}
+            </option>
           </FilterSelect>
           <FilterSelect
             ariaLabel={t('accounts.filters.sort.label', 'Sort')}
@@ -521,6 +547,22 @@ export function AccountsAllSegment() {
             ? t('accounts.liveRegion.count_one', '{{count}} account', { count: rows.length })
             : t('accounts.liveRegion.count_other', '{{count}} accounts', { count: rows.length })}
       </p>
+
+      {leverageOnly && leverageMissing.length > 0 ? (
+        <p role="status" className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-sm" data-testid="accounts-leverage-outside-snapshot">
+          {t(
+            'accounts.leverage.outsideSnapshot',
+            '{{count}} under-leveraged accounts sit outside this dashboard snapshot.',
+            { count: leverageMissing.length },
+          )}
+          {' '}
+          {leverageMissing.slice(0, 8).map((item) => (
+            <Link key={item.companyId} to={`/accounts/${item.companyId}`} className="mr-2 underline">
+              {item.companyName}
+            </Link>
+          ))}
+        </p>
+      ) : null}
 
       {snapshotCapped ? (
         <p

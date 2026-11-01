@@ -90,6 +90,7 @@ const ROW_SELECT = {
   createdById: true,
   company: { select: { name: true } },
   owner: { select: USER_SELECT },
+  signingEntity: { select: { name: true } },
   _count: { select: { children: { where: { deletedAt: null } } } },
   fileVersions: {
     where: { deletedAt: null },
@@ -162,6 +163,8 @@ function serializeRow(r: Row): MsaSummaryRow {
     tags: r.tags,
     childCount: r._count.children,
     latestVersion: r.fileVersions[0] ? serializeVersion(r.fileVersions[0]) : null,
+    signingEntityName: r.signingEntity?.name ?? null,
+    underLeveraged: false,
     updatedAt: r.updatedAt.toISOString(),
   };
 }
@@ -284,6 +287,12 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
           ],
         });
       }
+      if (q.leverage === 'true') {
+        const { listLeverageFlags } = await import('../services/msa-leverage.js');
+        const flags = await listLeverageFlags(req.auth.orgId, scope);
+        const ids = flags.map((f) => f.msaId);
+        and.push({ id: { in: ids.length ? ids : ['00000000-0000-4000-8000-000000000000'] } });
+      }
       const where: Prisma.ContractAgreementWhereInput = { AND: and };
       const orderBy: Prisma.ContractAgreementOrderByWithRelationInput[] =
         q.sort === 'title'
@@ -306,7 +315,13 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         returned: rows.length,
       });
       const next = q.cursor + rows.length;
-      return { items: rows.map(serializeRow), nextCursor: next < total ? next : null, total };
+      const { listLeverageFlags } = await import('../services/msa-leverage.js');
+      const leveraged = new Set((await listLeverageFlags(req.auth.orgId, scope)).map((f) => f.msaId));
+      return {
+        items: rows.map((r) => ({ ...serializeRow(r), underLeveraged: leveraged.has(r.id) })),
+        nextCursor: next < total ? next : null,
+        total,
+      };
     },
   );
 
@@ -393,6 +408,29 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
             currency: true,
             countries: true,
             createdAt: true,
+            signingEntityId: true,
+            termMonths: true,
+            renewalTerms: true,
+            ipClause: true,
+            confidentiality: true,
+            nonSolicit: true,
+            exclusivity: true,
+            insurance: true,
+            indexation: true,
+            scopeOfServices: true,
+            affiliatesClause: true,
+            parties: true,
+            fieldCitations: true,
+            signingEntity: {
+              select: {
+                id: true,
+                slug: true,
+                name: true,
+                brandFamily: true,
+                businessLines: true,
+                verificationStatus: true,
+              },
+            },
           },
         }),
         prisma.contractAgreement.findMany({
@@ -436,6 +474,22 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         children: children.map(serializeRow),
         versions: versions.map(serializeVersion),
         createdAt: extra.createdAt.toISOString(),
+        signingEntity: extra.signingEntity,
+        termMonths: extra.termMonths,
+        renewalTerms: extra.renewalTerms,
+        ipClause: extra.ipClause,
+        confidentiality: extra.confidentiality,
+        nonSolicit: extra.nonSolicit,
+        exclusivity: extra.exclusivity,
+        insurance: extra.insurance,
+        indexation: extra.indexation,
+        scopeOfServices: extra.scopeOfServices,
+        affiliatesClause: extra.affiliatesClause,
+        parties: Array.isArray(extra.parties) ? extra.parties : [],
+        fieldCitations:
+          extra.fieldCitations && typeof extra.fieldCitations === 'object' && !Array.isArray(extra.fieldCitations)
+            ? extra.fieldCitations
+            : {},
       };
     },
   );
@@ -488,6 +542,17 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
           ownerId: b.ownerId === undefined ? req.auth.userId : b.ownerId,
           tags: [...new Set(b.tags)],
           notes: b.notes ?? null,
+          signingEntityId: b.signingEntityId ?? null,
+          termMonths: b.termMonths ?? null,
+          renewalTerms: b.renewalTerms ?? null,
+          ipClause: b.ipClause ?? null,
+          confidentiality: b.confidentiality ?? null,
+          nonSolicit: b.nonSolicit ?? null,
+          exclusivity: b.exclusivity ?? null,
+          insurance: b.insurance ?? null,
+          indexation: b.indexation ?? null,
+          scopeOfServices: b.scopeOfServices ?? null,
+          affiliatesClause: b.affiliatesClause ?? null,
           createdById: req.auth.userId,
         },
       });
@@ -536,6 +601,17 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(b.ownerId !== undefined ? { ownerId: b.ownerId } : {}),
         ...(b.tags !== undefined ? { tags: [...new Set(b.tags)] } : {}),
         ...(b.notes !== undefined ? { notes: b.notes } : {}),
+        ...(b.signingEntityId !== undefined ? { signingEntityId: b.signingEntityId } : {}),
+        ...(b.termMonths !== undefined ? { termMonths: b.termMonths } : {}),
+        ...(b.renewalTerms !== undefined ? { renewalTerms: b.renewalTerms } : {}),
+        ...(b.ipClause !== undefined ? { ipClause: b.ipClause } : {}),
+        ...(b.confidentiality !== undefined ? { confidentiality: b.confidentiality } : {}),
+        ...(b.nonSolicit !== undefined ? { nonSolicit: b.nonSolicit } : {}),
+        ...(b.exclusivity !== undefined ? { exclusivity: b.exclusivity } : {}),
+        ...(b.insurance !== undefined ? { insurance: b.insurance } : {}),
+        ...(b.indexation !== undefined ? { indexation: b.indexation } : {}),
+        ...(b.scopeOfServices !== undefined ? { scopeOfServices: b.scopeOfServices } : {}),
+        ...(b.affiliatesClause !== undefined ? { affiliatesClause: b.affiliatesClause } : {}),
       };
       const changed: Record<string, { from: unknown; to: unknown }> = {};
       const plain = (v: unknown) =>

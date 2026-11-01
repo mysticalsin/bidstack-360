@@ -67,7 +67,10 @@ function toRow(s: Seed, now: number): MsaSummaryRow {
     noticeDeadline: expiryDate && notice != null ? iso((s.expiry ?? 0) - notice, now) : null,
     daysToExpiry: s.expiry, owner, tags: s.tags ?? [],
     childCount: SEEDS.filter((c) => c.parentId === s.id).length,
-    latestVersion: versions.at(-1) ?? null, updatedAt: versions.at(-1)?.createdAt ?? iso(-3, now),
+    latestVersion: versions.at(-1) ?? null,
+    signingEntityName: null,
+    underLeveraged: false,
+    updatedAt: versions.at(-1)?.createdAt ?? iso(-3, now),
   };
 }
 
@@ -124,6 +127,19 @@ export function sampleDetail(id: string, now = Date.now()): MsaDetail | null {
     children: rows.filter((r) => r.parentId === id),
     versions: versionsFor(s, now).reverse(),
     createdAt: iso((s.effective ?? -30) - 30, now),
+    signingEntity: null,
+    termMonths: null,
+    renewalTerms: null,
+    ipClause: null,
+    confidentiality: null,
+    nonSolicit: null,
+    exclusivity: null,
+    insurance: null,
+    indexation: null,
+    scopeOfServices: null,
+    affiliatesClause: null,
+    parties: [],
+    fieldCitations: {},
   };
 }
 

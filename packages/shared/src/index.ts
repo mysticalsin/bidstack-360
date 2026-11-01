@@ -15,3 +15,4 @@ export * from './workflow-engine.js';
 // '@bidstack/shared/llm' subpath and must never enter the web bundle.
 export * from './llm-catalog/index.js';
 export * from './intel/present-opportunity-intel.js';
+export * from './msa/index.js';

@@ -37,5 +37,6 @@ export function applyView(rows: MsaSummaryRow[], p: URLSearchParams, now = Date.
   if (view === 'expiring') out = out.filter((r) => r.status === 'active' && r.daysToExpiry != null && r.daysToExpiry >= 0 && r.daysToExpiry <= 90);
   if (view === 'notice') out = out.filter((r) => r.status === 'active' && r.noticeDeadline && Date.parse(r.noticeDeadline) >= now - 86_400_000 && Date.parse(r.noticeDeadline) <= now + 30 * 86_400_000);
   if (view === 'open') out = out.filter((r) => r.status === 'draft' || r.status === 'in_negotiation' || r.status === 'pending');
+  if (p.get('leverage') === '1') out = out.filter((r) => r.underLeveraged);
   return out;
 }

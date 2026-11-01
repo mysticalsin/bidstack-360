@@ -6,14 +6,18 @@ import '@/components/drill/drill.css';
 
 import { Link } from 'react-router-dom';
 
+import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
+import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { useMsaAccountSummary } from '@/hooks/useMsa';
 import { fmtDate, fmtDays, urgency } from '@/lib/msa/labels';
 
 export function AgreementsSummaryCard({ companyId, companyName }: { companyId: string; companyName?: string }) {
   const q = useMsaAccountSummary(companyId, companyName);
+  const leverage = useMsaLeverage(companyId, Boolean(q.data) && !q.data?.sample);
   const base = `/agreements?companyId=${encodeURIComponent(companyId)}`;
   const s = q.data?.data;
+  const flag = leverage.data?.items[0];
   return (
     <section className="agr-section" aria-labelledby="agr-acct" data-testid="account-agreements-card">
       <div className="agr-head" style={{ alignItems: 'center' }}>
@@ -22,6 +26,7 @@ export function AgreementsSummaryCard({ companyId, companyName }: { companyId: s
         </h2>
         <Link className="drill-more" to={base}>View all</Link>
       </div>
+      {flag ? <LeverageFlag flag={flag} compact /> : null}
       {q.isLoading ? <p className="drill-empty">Loading…</p> : q.isError || !s ? (
         <p className="drill-empty">Agreements are unavailable right now.</p>
       ) : s.total === 0 ? (

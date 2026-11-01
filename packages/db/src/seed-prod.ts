@@ -25,6 +25,7 @@ import dotenvFlow from 'dotenv-flow';
 
 import { PrismaClient } from '../generated/client/index.js';
 import { seedRolesAndPermissions } from './seed.rbac.js';
+import { seedSigningEntities } from './seed-signing-entities.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
@@ -67,6 +68,7 @@ async function main() {
   });
 
   await seedRolesAndPermissions(prisma, org.id, new Map());
+  await seedSigningEntities(prisma, org.id);
 
   const roleCount = await prisma.role.count({
     where: { orgId: org.id, isSystem: true, deletedAt: null },

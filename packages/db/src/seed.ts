@@ -23,6 +23,7 @@ import {
   intelFor,
 } from './seed-data.js';
 import { seedRolesAndPermissions } from './seed.rbac.js';
+import { seedSigningEntities } from './seed-signing-entities.js';
 
 // PERMISSION_SEEDS, ROLE_SEEDS, LEGACY_ROLE_ASSIGNMENTS, helper functions,
 // and seedRolesAndPermissions() extracted to ./seed.rbac.ts (BS-R1)
@@ -139,6 +140,8 @@ async function main() {
   console.log('  ✓ booking page: test-slug');
 
   await seedRolesAndPermissions(prisma, org.id, usersByInitials);
+  const signingCount = await seedSigningEntities(prisma, org.id);
+  console.log(`  ✓ signing entities: ${signingCount}`);
 
   // Opportunities
   for (const o of fixtureOpps) {
@@ -538,6 +541,66 @@ async function main() {
     companyIdByNorm.set(normalizeName(c.name), c.id);
   }
   console.log(`  ✓ companies: ${fixtureCompanies.length}`);
+
+  const hema = await prisma.signingEntity.findFirst({
+    where: { orgId: org.id, slug: 'hema', deletedAt: null },
+    select: { id: true },
+  });
+  const northwindId = 'c0000000-0000-4000-8000-0000000000aa';
+  const northwindMsaId = 'a0000000-0000-4000-8000-0000000000aa';
+  if (hema) {
+    await prisma.contractAgreement.upsert({
+      where: { id: northwindMsaId },
+      create: {
+        id: northwindMsaId,
+        orgId: org.id,
+        accountKey: normalizeName('Northwind Pharma'),
+        companyId: northwindId,
+        kind: 'msa',
+        title: 'HEMA master services agreement',
+        reference: 'NW-PHARMA-MSA-2026',
+        counterparty: 'Northwind Pharma SAS',
+        status: 'active',
+        effectiveDate: new Date('2026-03-01T00:00:00Z'),
+        expiryDate: new Date('2029-03-01T00:00:00Z'),
+        autoRenew: true,
+        noticePeriodDays: 90,
+        governingLaw: 'France',
+        liabilityCapMicros: 250_000_000_000n,
+        liabilityCapCurrency: 'EUR',
+        paymentTerms: 'Net 60 days from invoice',
+        termMonths: 36,
+        renewalTerms: 'Auto-renews for 12-month periods unless 90 days notice',
+        indexation: 'There is no indexation.',
+        scopeOfServices:
+          'Health economics, market access and related life-sciences advisory. The scope does not include information technology, software engineering or digital transformation services.',
+        affiliatesClause:
+          'This Agreement applies only to the Client entity named above. Affiliates may not order services without a written amendment.',
+        exclusivity: 'Exclusive provider of health economics services in France for the term.',
+        nonSolicit: 'Neither party shall solicit the other party employees for 24 months after expiry.',
+        insurance: 'Professional indemnity insurance of at least 2,000,000 EUR.',
+        ipClause: 'Each party retains pre-existing IP. Work product is assigned to the Client.',
+        confidentiality: 'Confidential information is kept secret for five years after disclosure.',
+        parties: [
+          { name: 'Northwind Pharma SAS', role: 'client', address: '14 Avenue des Sciences, 69007 Lyon, France', email: 'contracts@northwind-pharma.example' },
+          { name: 'Amaris Consulting SAS / HEMA', role: 'ours', address: null, email: null },
+        ],
+        fieldCitations: {
+          scopeOfServices: { page: 1, clause: 'Clause 3', excerpt: 'does not include information technology' },
+          affiliatesClause: { page: 1, clause: 'Clause 4', excerpt: 'Affiliates of the Client may not' },
+        },
+        signingEntityId: hema.id,
+        createdById: seedUserId,
+      },
+      update: {
+        status: 'active',
+        signingEntityId: hema.id,
+        scopeOfServices:
+          'Health economics, market access and related life-sciences advisory. The scope does not include information technology, software engineering or digital transformation services.',
+      },
+    });
+    console.log('  ✓ synthetic HEMA MSA: Northwind Pharma');
+  }
 
   // Backfill: link every opportunity (fixtures, history, and any pre-existing)
   // to its Company by normalized customer name. Idempotent — writes only when the

@@ -200,6 +200,8 @@ model Org {
   projectReferences             ProjectReference[]
   contractAgreements            ContractAgreement[]
   contractFileVersions          ContractFileVersion[]
+  signingEntities               SigningEntity[]
+  msaIntakeDrafts               MsaIntakeDraft[]
   meetingSourceConnections      MeetingSourceConnection[]
   meetingIngestItems            MeetingIngestItem[]
   meetingIntel                  MeetingIntel[]
@@ -340,6 +342,7 @@ model User {
   notifications            Notification[]
   contractsOwned           ContractAgreement[]       @relation("ContractOwner")
   contractVersionsAdded    ContractFileVersion[]     @relation("ContractFileVersionCreatedBy")
+  msaIntakeDrafts          MsaIntakeDraft[]          @relation("MsaIntakeDraftCreatedBy")
   meetingSourceConnections MeetingSourceConnection[]
   orgChartNodesOwned       OrgChartNode[]            @relation("OrgChartNodeOwner")
 
@@ -1445,6 +1448,7 @@ model FileAttachment {
   documentVersions   DocumentVersion[]
   contractAgreements ContractAgreement[]   @relation("ContractSourceFile")
   contractVersions   ContractFileVersion[] @relation("ContractFileVersionFile")
+  msaIntakeDrafts    MsaIntakeDraft[]      @relation("MsaIntakeDraftFile")
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -5321,21 +5325,105 @@ model ContractAgreement {
   ownerId              String?  @map("owner_id") @db.Uuid
   tags                 String[] @default([])
 
-  org          Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sourceFile   FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
-  company      Company?              @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
-  parent       ContractAgreement?    @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children     ContractAgreement[]   @relation("ContractHierarchy")
-  owner        User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  fileVersions ContractFileVersion[]
+  // Intake + leverage (2026-11). signingEntityId is OUR brand/branch that
+  // signed; commercial clause fields stay blank when the document does not
+  // contain them. parties/fieldCitations are provenance, never invented.
+  signingEntityId    String?  @map("signing_entity_id") @db.Uuid
+  termMonths         Int?     @map("term_months")
+  renewalTerms       String?  @map("renewal_terms") @db.VarChar(500)
+  ipClause           String?  @map("ip_clause")
+  confidentiality    String?
+  nonSolicit         String?  @map("non_solicit")
+  exclusivity        String?
+  insurance          String?
+  indexation         String?  @db.VarChar(500)
+  scopeOfServices    String?  @map("scope_of_services")
+  affiliatesClause   String?  @map("affiliates_clause")
+  parties            Json     @default("[]")
+  fieldCitations     Json     @default("{}") @map("field_citations")
+
+  org            Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceFile     FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  company        Company?              @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
+  parent         ContractAgreement?    @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children       ContractAgreement[]   @relation("ContractHierarchy")
+  owner          User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  signingEntity  SigningEntity?        @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
+  fileVersions   ContractFileVersion[]
+  intakeDrafts   MsaIntakeDraft[]
 
   @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
   @@index([orgId, companyId], map: "contract_agreements_org_company_idx")
   @@index([orgId, status], map: "contract_agreements_org_status_idx")
   @@index([orgId, parentId], map: "contract_agreements_org_parent_idx")
   @@index([orgId, expiryDate], map: "contract_agreements_org_expiry_idx")
+  @@index([orgId, signingEntityId], map: "contract_agreements_org_signing_entity_idx")
   @@index([deletedAt])
   @@map("contract_agreements")
+}
+
+// Admin-editable list of Mantu group brands and Amaris branches that can sign
+// an MSA. Seeded from public brand sites only; unverified rows stay marked.
+model SigningEntity {
+  id                 String    @id @default(uuid()) @db.Uuid
+  orgId              String    @map("org_id") @db.Uuid
+  slug               String    @db.VarChar(80)
+  name               String    @db.VarChar(200)
+  legalName          String?   @map("legal_name") @db.VarChar(300)
+  brandFamily        String    @map("brand_family") @db.VarChar(40)
+  aliases            String[]  @default([])
+  businessLines      String[]  @default([]) @map("business_lines")
+  sourceUrl          String    @map("source_url") @db.VarChar(500)
+  verificationStatus String    @map("verification_status") @db.VarChar(20)
+  notes              String?   @db.VarChar(1000)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org        Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  agreements ContractAgreement[]
+
+  @@unique([orgId, slug], map: "signing_entities_org_slug_uq")
+  @@index([orgId, brandFamily], map: "signing_entities_org_family_idx")
+  @@index([deletedAt])
+  @@map("signing_entities")
+}
+
+// One-drop intake draft. The uploaded file is stored, fields are extracted,
+// and nothing becomes a ContractAgreement until the user confirms.
+model MsaIntakeDraft {
+  id                    String    @id @default(uuid()) @db.Uuid
+  orgId                 String    @map("org_id") @db.Uuid
+  status                String    @default("pending_review") @db.VarChar(24)
+  fileName              String    @map("file_name") @db.VarChar(255)
+  contentType           String    @map("content_type") @db.VarChar(100)
+  bytes                 Int
+  sha256                String    @db.VarChar(64)
+  storageKey            String    @map("storage_key") @db.VarChar(500)
+  fileAttachmentId      String?   @map("file_attachment_id") @db.Uuid
+  extractedText         String?   @map("extracted_text")
+  pageCount             Int?      @map("page_count")
+  needsOcr              Boolean   @default(false) @map("needs_ocr")
+  usedLlm               Boolean   @default(false) @map("used_llm")
+  extractedFields       Json      @default("{}") @map("extracted_fields")
+  accountMatches        Json      @default("[]") @map("account_matches")
+  signingEntityMatches  Json      @default("[]") @map("signing_entity_matches")
+  warnings              Json      @default("[]")
+  confirmedContractId   String?   @map("confirmed_contract_id") @db.Uuid
+  createdById           String    @map("created_by_id") @db.Uuid
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org            Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  fileAttachment FileAttachment?    @relation("MsaIntakeDraftFile", fields: [fileAttachmentId], references: [id], onDelete: SetNull)
+  confirmed      ContractAgreement? @relation(fields: [confirmedContractId], references: [id], onDelete: SetNull)
+  createdBy      User               @relation("MsaIntakeDraftCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, status], map: "msa_intake_drafts_org_status_idx")
+  @@index([orgId, createdById], map: "msa_intake_drafts_org_creator_idx")
+  @@index([deletedAt])
+  @@map("msa_intake_drafts")
 }
 
 // One uploaded file version of a contract (MSA, SOW, amendment, addendum).

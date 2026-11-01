@@ -8,6 +8,12 @@ vi.mock('@/hooks/useAccountPositioning', () => ({
   useAccountPositioning: () => ({ isLoading: false, isError: false, data: state.pos, refetch: vi.fn() }),
   useAccountKeyNumbers: () => ({ isLoading: false, isError: false, data: state.kn, refetch: vi.fn() }),
 }));
+vi.mock('@/hooks/useMsaLeverage', () => ({
+  useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
+  useMsaLeverageSummary: () => ({ isLoading: false, isError: false, data: { underLeveragedAccounts: 0, hemaPharmaAccounts: 0 } }),
+  useAgreementLeverage: () => ({ isLoading: false, isError: false, data: { flag: null } }),
+  useMsaValuePanel: () => ({ isLoading: false, isError: false, data: { msaId: '', items: [] } }),
+}));
 
 import { KeyNumbersStrip } from './KeyNumbersStrip';
 import { directionOf, formatDelta, formatValue, sparkPoints, toneOf } from './positioning-format';

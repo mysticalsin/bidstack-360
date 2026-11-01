@@ -70,6 +70,8 @@ export const MsaSummaryRow = z.object({
   tags: z.array(z.string()),
   childCount: z.number().int(),
   latestVersion: MsaFileVersion.nullable(),
+  signingEntityName: z.string().nullable(),
+  underLeveraged: z.boolean(),
   updatedAt: IsoDate,
 });
 export type MsaSummaryRow = z.infer<typeof MsaSummaryRow>;
@@ -85,6 +87,41 @@ export const MsaDetail = MsaSummaryRow.extend({
   children: z.array(MsaSummaryRow),
   versions: z.array(MsaFileVersion),
   createdAt: IsoDate,
+  signingEntity: z
+    .object({
+      id: z.string().uuid(),
+      slug: z.string(),
+      name: z.string(),
+      brandFamily: z.string(),
+      businessLines: z.array(z.string()),
+      verificationStatus: z.string(),
+    })
+    .nullable(),
+  termMonths: z.number().int().nullable(),
+  renewalTerms: z.string().nullable(),
+  ipClause: z.string().nullable(),
+  confidentiality: z.string().nullable(),
+  nonSolicit: z.string().nullable(),
+  exclusivity: z.string().nullable(),
+  insurance: z.string().nullable(),
+  indexation: z.string().nullable(),
+  scopeOfServices: z.string().nullable(),
+  affiliatesClause: z.string().nullable(),
+  parties: z.array(
+    z.object({
+      name: z.string(),
+      role: z.enum(['client', 'ours', 'unknown']),
+      address: z.string().nullable(),
+      email: z.string().nullable(),
+    }),
+  ),
+  fieldCitations: z.record(
+    z.object({
+      page: z.number().int().nullable(),
+      clause: z.string().nullable(),
+      excerpt: z.string(),
+    }),
+  ),
 });
 export type MsaDetail = z.infer<typeof MsaDetail>;
 
@@ -104,6 +141,8 @@ export const MsaListQuery = z.object({
   /** true (default): top-level agreements only; false: include children. */
   topLevel: z.enum(['true', 'false']).default('true'),
   expiringWithinDays: z.coerce.number().int().min(1).max(3650).optional(),
+  /** When true, only agreements that raise an MSA leverage flag. */
+  leverage: z.enum(['true', 'false']).optional(),
   /** Matches title, reference and counterparty (case-insensitive). Use /msa/search for file text. */
   q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(['expiry', 'updated', 'title']).default('expiry'),
@@ -134,6 +173,17 @@ const MsaWritableFields = {
   ownerId: z.string().uuid().nullable().optional(),
   tags: z.array(Tag).max(30).default([]),
   notes: z.string().max(4000).nullable().optional(),
+  signingEntityId: z.string().uuid().nullable().optional(),
+  termMonths: z.number().int().min(0).max(600).nullable().optional(),
+  renewalTerms: z.string().trim().max(500).nullable().optional(),
+  ipClause: z.string().trim().max(4000).nullable().optional(),
+  confidentiality: z.string().trim().max(4000).nullable().optional(),
+  nonSolicit: z.string().trim().max(4000).nullable().optional(),
+  exclusivity: z.string().trim().max(4000).nullable().optional(),
+  insurance: z.string().trim().max(4000).nullable().optional(),
+  indexation: z.string().trim().max(500).nullable().optional(),
+  scopeOfServices: z.string().trim().max(4000).nullable().optional(),
+  affiliatesClause: z.string().trim().max(4000).nullable().optional(),
 };
 
 export const MsaCreate = z.object({
@@ -160,6 +210,17 @@ export const MsaPatch = z
     ownerId: MsaWritableFields.ownerId,
     tags: z.array(Tag).max(30).optional(),
     notes: MsaWritableFields.notes,
+    signingEntityId: MsaWritableFields.signingEntityId,
+    termMonths: MsaWritableFields.termMonths,
+    renewalTerms: MsaWritableFields.renewalTerms,
+    ipClause: MsaWritableFields.ipClause,
+    confidentiality: MsaWritableFields.confidentiality,
+    nonSolicit: MsaWritableFields.nonSolicit,
+    exclusivity: MsaWritableFields.exclusivity,
+    insurance: MsaWritableFields.insurance,
+    indexation: MsaWritableFields.indexation,
+    scopeOfServices: MsaWritableFields.scopeOfServices,
+    affiliatesClause: MsaWritableFields.affiliatesClause,
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'PATCH body must contain at least one field' });
 export type MsaPatch = z.infer<typeof MsaPatch>;
