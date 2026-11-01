@@ -22,6 +22,7 @@ import {
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
+import { closedOutcome } from '@/lib/pipeline-stages';
 import { useTranslation } from 'react-i18next';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -38,12 +39,15 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  */
 export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
   const { t } = useTranslation('crm');
-  const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
+  const openOpps = opps.filter((o) => closedOutcome(o) === null);
+  const wonValue = opps
+    .filter((o) => closedOutcome(o) === 'won')
+    .reduce((acc, o) => acc + o.value, 0);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
   const currencyDetail = t('oppToolbar.kpiCurrencyBasis', UNSPECIFIED_CURRENCY_BASIS);
   const weightedDetail = t(
     'oppToolbar.kpiWeightedRevenueDetail',
-    'Open rows on this page × stored stage probability. {{basis}}',
+    'Open rows on this page × stored probability. {{basis}}',
     { basis: UNSPECIFIED_CURRENCY_BASIS },
   );
   const kpis: Array<{ label: string; value: string; detail?: string }> = summary
@@ -75,8 +79,8 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           value: String(opps.length),
         },
         {
-          label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0)),
+          label: t('oppToolbar.kpiRevenuePage', 'Won (page)'),
+          value: formatUnspecifiedAmount(wonValue),
           detail: currencyDetail,
         },
         {

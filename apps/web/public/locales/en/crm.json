@@ -2163,7 +2163,7 @@
     "kpiOpenCount": "Open",
     "kpiOpenPipeline": "Open pipeline",
     "kpiWeightedRevenuePage": "Weighted (page)",
-    "kpiWeightedRevenueDetail": "Open rows on this page × stored stage probability. {{basis}}",
+    "kpiWeightedRevenueDetail": "Open rows on this page × stored probability. {{basis}}",
     "kpiCurrencyBasis": "currency not recorded; not a euro forecast",
     "kpiOpportunitiesPage": "Opportunities (page)",
     "kpiRevenuePage": "Revenue (page)",

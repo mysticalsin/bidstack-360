@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  closedOutcome,
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
   getPipelineStages,
@@ -98,5 +99,14 @@ describe('pipeline stage normalization', () => {
     expect(getPipelineStageBusinessKey(s2Stages[0])).toBe('s2_sent');
     expect(getOpportunityStageBusinessKey(legacyS2)).toBe('s2_sent');
     expect(getOpportunityStageBusinessKey(canonicalS2)).toBe('s2_sent');
+  });
+});
+
+describe('closedOutcome', () => {
+  it('keeps a lost stage key closed when the stage row is missing', () => {
+    // WHY: optional chaining on a missing stage row used to treat closed_lost as open.
+    expect(closedOutcome({ stage: 'closed_lost', pipelineStage: null })).toBe('lost');
+    expect(closedOutcome({ stage: 'closed_won', pipelineStage: null })).toBe('won');
+    expect(closedOutcome({ stage: 's2_sent', pipelineStage: null })).toBeNull();
   });
 });
