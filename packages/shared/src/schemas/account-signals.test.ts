@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   momentumVerdict,
+  AccountTimeline,
   collapseMarketNotes,
   importanceScore as importanceScoreV221,
   isMarketCommentary,
@@ -346,5 +347,21 @@ describe('market / analyst classification (v22.1)', () => {
       merge: (g, title) => ({ id: `grp:${g.map((x) => x.id).join('')}:${title}`, m: true, at: g[0]!.at }),
     });
     expect(out.map((o) => o.id)).toEqual(['grp:acd:3 analyst notes this week', 'b', 'e']);
+  });
+});
+
+describe('AccountTimeline earnings page', () => {
+  it('keeps the capped flag on the wire', () => {
+    // WHY: the response schema drops a field it does not name, so the timeline
+    // would show 20 results dates and read as the whole calendar.
+    const parsed = AccountTimeline.parse({
+      companyId: 'c1',
+      from: '2025-11-01T00:00:00.000Z',
+      to: '2026-11-01T00:00:00.000Z',
+      items: [],
+      counts: {},
+      earningsCapped: true,
+    });
+    expect(parsed.earningsCapped).toBe(true);
   });
 });

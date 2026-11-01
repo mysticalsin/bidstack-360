@@ -86,9 +86,9 @@ describe('TimelineView', () => {
     item({ id: 'l1', category: 'launch', title: 'New mobile app', at: '2026-08-01T00:00:00Z' }),
   ];
   it('draws two lanes with a mark per event, filter chips and an sr summary', () => {
-    // WHY: an unordered take of 500 deals hid a close that was not in that slice.
-    wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" dealsCapped meetingsCapped newsCapped bidsCapped bidsSearchCapped marksCapped postingsCapped />);
-    expect(screen.getByText('Latest 1,000 deals · Latest 200 meetings · Latest 300 news items · Latest 100 bids · Bid name search stopped at 1,000 · Latest 300 marks · Latest 1,000 job posts')).toBeTruthy();
+    // WHY: an unordered take of 20 earnings dates hid the rest of the results calendar.
+    wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" dealsCapped meetingsCapped newsCapped bidsCapped bidsSearchCapped marksCapped postingsCapped earningsCapped />);
+    expect(screen.getByText('Latest 1,000 deals · Latest 200 meetings · Latest 300 news items · Latest 100 bids · Bid name search stopped at 1,000 · Latest 300 marks · Latest 1,000 job posts · Latest 20 earnings dates')).toBeTruthy();
     expect(screen.getByText('Our activity')).toBeTruthy();
     expect(screen.getByText('Their news')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /^(Meeting|Funding|Launch),/ })).toHaveLength(3);

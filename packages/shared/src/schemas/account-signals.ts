@@ -880,6 +880,8 @@ export const AccountTimeline = z.object({
   marksCapped: z.boolean().optional(),
   /** True when hiring spikes used the latest 1,000 job posts. */
   postingsCapped: z.boolean().optional(),
+  /** True when results dates are the latest 20 in the window. */
+  earningsCapped: z.boolean().optional(),
 });
 export type AccountTimeline = z.infer<typeof AccountTimeline>;
 
