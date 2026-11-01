@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contractMicros, extractMsaFields, storableLiabilityCap, storableRateCard } from './extract-fields.js';
+import { contractMicros, extractMsaFields, rateCardLineText, storableLiabilityCap, storableRateCard } from './extract-fields.js';
 import { SYNTHETIC_NORTHWIND_MSA_TEXT } from './synthetic-msa.js';
 
 describe('extractMsaFields', () => {
@@ -90,6 +90,15 @@ describe('extractMsaFields', () => {
       unit: 'day',
     });
     expect(storableRateCard(card).map((row) => row.role)).toEqual(['Specialist']);
+    const large = extractMsaFields('Director: 1000000.01 EUR per day');
+    const largeCard = large.rateCard.value as Array<{ role: string; rateMicros: number | null; unit: string }>;
+    const director = largeCard.find((row) => row.role === 'Director');
+    expect(director?.rateMicros).toBe(1_000_000_010_000);
+    expect(rateCardLineText('Director', director?.rateMicros ?? null, 'day')).toBe(
+      'Director: 1,000,000.01 / day, too large to store',
+    );
+    expect(storableRateCard(largeCard)).toEqual([]);
+    expect(rateCardLineText('Director', 1_000_000_000_000, 'day')).toBe('Director: 1,000,000 / day');
   });
 
   it('returns blank not-found fields when the document has no commercial terms', () => {
