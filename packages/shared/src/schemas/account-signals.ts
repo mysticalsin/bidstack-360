@@ -666,8 +666,13 @@ const THEME_RULES: Array<{ theme: InitiativeTheme; re: RegExp }> = [
   { theme: 'expansion', re: /\b(expan\w*|new office|new market|opens?|growth|funding|raises?|series [a-h])\b/i },
 ];
 
+/** A theme the words actually name. Null when the text matches no rule. */
+export function matchedTheme(text: string): InitiativeTheme | null {
+  return THEME_RULES.find((r) => r.re.test(text))?.theme ?? null;
+}
+
 export function themeForText(text: string): InitiativeTheme {
-  return THEME_RULES.find((r) => r.re.test(text))?.theme ?? 'expansion';
+  return matchedTheme(text) ?? 'expansion';
 }
 
 // ── API contracts ───────────────────────────────────────────────────────────

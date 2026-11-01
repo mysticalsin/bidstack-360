@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { confirmThemeFromProbes, evidencePageCapped, meetingEvidenceLines, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
+import type { Initiative, InitiativeTheme } from '@bidstack/shared';
+
+import { applyMeetingEvidence, confirmThemeFromProbes, evidencePageCapped, meetingEvidenceLines, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
 
 describe('evidencePageCapped', () => {
   it('names a full news or meeting page only when another row exists', () => {
@@ -60,4 +62,76 @@ describe('evidencePageCapped', () => {
     expect(lines).toHaveLength(7);
     expect(lines[6]).toBe('seven');
   });
+
+  it('opens a theme a meeting names and skips chatter', () => {
+    // WHY: dropping an unmatched line used to be required, because the old default turned chatter into expansion.
+    const board = new Map<InitiativeTheme, Initiative>();
+    applyMeetingEvidence(
+      board,
+      {
+        title: 'Q3 review',
+        heldAt: new Date('2026-10-01T12:00:00.000Z'),
+        opportunities: ['Kubernetes landing zone', 'follow up next week'],
+        challenges: ['Kubernetes cost review'],
+      },
+      (theme, title, rationale, score, sample) => blankInitiative(theme, title, rationale, score, sample),
+      (it, at) => {
+        it.lastSeen = at;
+      },
+    );
+    expect([...board.keys()]).toEqual(['cloud']);
+    const cloud = board.get('cloud');
+    expect(cloud?.confidenceScore).toBe(0.35);
+    expect(cloud?.title).toBe('Kubernetes landing zone');
+    expect(cloud?.rationale).toBe('Raised in a meeting: Q3 review');
+    expect(cloud?.evidence.map((item) => item.title)).toEqual([
+      'Q3 review: Kubernetes landing zone',
+      'Q3 review: Kubernetes cost review',
+    ]);
+    expect(cloud?.lastSeen).toBe('2026-10-01T12:00:00.000Z');
+  });
+
+  it('raises confidence once when the meeting repeats a theme already on the board', () => {
+    const board = new Map<InitiativeTheme, Initiative>();
+    const existing = blankInitiative('cloud', 'Cloud practice', 'From hiring', 0.6, false);
+    board.set('cloud', existing);
+    applyMeetingEvidence(
+      board,
+      {
+        title: 'Q3 review',
+        heldAt: new Date('2026-10-01T12:00:00.000Z'),
+        opportunities: ['Kubernetes landing zone'],
+        challenges: ['Azure migration'],
+      },
+      (theme, title, rationale, score, sample) => blankInitiative(theme, title, rationale, score, sample),
+      () => undefined,
+    );
+    expect(board.size).toBe(1);
+    expect(existing.confidenceScore).toBeCloseTo(0.7);
+    expect(existing.evidence).toHaveLength(2);
+    expect(existing.title).toBe('Cloud practice');
+  });
 });
+
+function blankInitiative(
+  theme: InitiativeTheme,
+  title: string,
+  rationale: string,
+  score: number,
+  sample: boolean,
+): Initiative {
+  return {
+    id: `init:${theme}`,
+    title,
+    theme,
+    themeLabel: theme,
+    rationale,
+    confidence: 'low',
+    confidenceScore: score,
+    firstSeen: null,
+    lastSeen: null,
+    evidence: [],
+    hook: { offering: '', pitch: '', nextStep: '', alreadySold: false },
+    sample,
+  };
+}

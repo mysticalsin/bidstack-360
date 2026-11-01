@@ -5,6 +5,7 @@ import {
   cleanText,
   OFFERING_HOOKS,
   stripSamplePrefix,
+  matchedTheme,
   themeForText,
   type Implication,
   type Initiative,
@@ -49,6 +50,42 @@ export function themeConfirmedByRows(
 /** Every opportunity and challenge line. A meeting is not shortened to six. */
 export function meetingEvidenceLines(meeting: { opportunities: string[]; challenges: string[] }): string[] {
   return [...meeting.opportunities, ...meeting.challenges];
+}
+
+/**
+ * A line that names a theme opens that initiative. A line that names none is
+ * skipped, so chatter does not become an expansion initiative.
+ */
+export function applyMeetingEvidence(
+  byTheme: Map<InitiativeTheme, Initiative>,
+  meeting: { title: string; heldAt: Date; opportunities: string[]; challenges: string[] },
+  make: (theme: InitiativeTheme, title: string, rationale: string, score: number, sample: boolean) => Initiative,
+  seen: (it: Initiative, at: string | null) => void,
+): void {
+  const bumped = new Set<InitiativeTheme>();
+  for (const line of meetingEvidenceLines(meeting)) {
+    const theme = matchedTheme(line);
+    if (!theme) continue;
+    let it = byTheme.get(theme);
+    if (!it) {
+      it = make(theme, line.slice(0, 120), `Raised in a meeting: ${meeting.title}`, 0.35, false);
+      byTheme.set(theme, it);
+      bumped.add(theme);
+    } else if (!bumped.has(theme)) {
+      bumped.add(theme);
+      it.confidenceScore = Math.min(0.95, it.confidenceScore + 0.1);
+    }
+    const at = meeting.heldAt.toISOString();
+    it.evidence.push({
+      kind: 'meeting',
+      title: `${meeting.title}: ${line}`.slice(0, 200),
+      url: null,
+      at,
+      source: 'Meeting intel',
+      sample: false,
+    });
+    seen(it, at);
+  }
 }
 
 /** Each probe word is its own lookup, so one noisy word cannot hide the next. */
@@ -289,29 +326,8 @@ export async function loadInitiatives(
     });
     seen(it, at);
   }
-  // 3. What they told us in meetings (only themes already on the board).
-  for (const m of meetings) {
-    const bumped = new Set<InitiativeTheme>();
-    for (const line of meetingEvidenceLines(m)) {
-      const theme = themeForText(line);
-      const it = byTheme.get(theme);
-      if (!it) continue;
-      if (!bumped.has(theme)) {
-        bumped.add(theme);
-        it.confidenceScore = Math.min(0.95, it.confidenceScore + 0.1);
-      }
-      const at = m.heldAt.toISOString();
-      it.evidence.push({
-        kind: 'meeting',
-        title: `${m.title}: ${line}`.slice(0, 200),
-        url: null,
-        at,
-        source: 'Meeting intel',
-        sample: false,
-      });
-      seen(it, at);
-    }
-  }
+  // 3. What they told us in meetings. A named theme opens; unmatched chatter does not.
+  for (const m of meetings) applyMeetingEvidence(byTheme, m, make, seen);
   const items = [...byTheme.values()]
     .map((it) => {
       const kinds = new Set(it.evidence.map((e) => e.kind));
