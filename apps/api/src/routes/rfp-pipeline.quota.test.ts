@@ -36,9 +36,20 @@ describe('checkRfpUploadRateLimit', () => {
     expect(result).toEqual({ allowed: false, reason: 'unavailable' });
   });
 
-  it('still allows a development upload when the quota store is down', async () => {
+  it('refuses a development upload when the quota store is down', async () => {
+    // WHY: the preview and local API run as development. A Redis outage there
+    // used to allow the upload and skip the hourly org cap.
     incr.mockRejectedValue(new Error('ECONNREFUSED'));
     const result = await checkRfpUploadRateLimit('org-1', { NODE_ENV: 'development' });
+    expect(result).toEqual({ allowed: false, reason: 'unavailable' });
+  });
+
+  it('allows a development upload only when fail-open is explicit', async () => {
+    incr.mockRejectedValue(new Error('ECONNREFUSED'));
+    const result = await checkRfpUploadRateLimit('org-1', {
+      NODE_ENV: 'development',
+      RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED: 'false',
+    });
     expect(result).toEqual({ allowed: true });
   });
 

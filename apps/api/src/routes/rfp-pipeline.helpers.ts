@@ -107,14 +107,13 @@ export type RfpUploadQuota =
   | { allowed: true }
   | { allowed: false; reason: 'limit' | 'unavailable' };
 
-/** Production refuses an RFP upload when the quota store cannot be read. */
+/** Refuse an RFP upload when the quota store cannot be read. */
 export function rfpUploadQuotaFailsClosed(env: NodeJS.ProcessEnv = process.env): boolean {
   // An explicit false must not reopen the cap once the process is production.
   if (env.NODE_ENV === 'production') return true;
   const explicit = env.RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
-  if (explicit === 'true' || explicit === '1') return true;
   if (explicit === 'false' || explicit === '0') return false;
-  return false;
+  return true;
 }
 
 /**
@@ -144,7 +143,7 @@ export async function checkRfpUploadRateLimit(
       log.warn({ err, orgId }, 'rfp upload quota store unavailable — upload refused');
       return { allowed: false, reason: 'unavailable' };
     }
-    log.warn({ err, orgId }, 'rfp upload quota store unavailable — development allows the upload');
+    log.warn({ err, orgId }, 'rfp upload quota store unavailable — upload allowed by explicit fail-open');
     return { allowed: true };
   }
 }
