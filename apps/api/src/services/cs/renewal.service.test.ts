@@ -15,7 +15,7 @@ vi.mock('@bidstack/db', () => ({
   },
 }));
 
-const { listRenewalOpportunities } = await import('./renewal.service.js');
+const { listRenewalOpportunities, renewalDaysOut } = await import('./renewal.service.js');
 
 beforeEach(() => {
   subscriptionFindMany.mockReset().mockResolvedValue([{ id: 'sub-1' }]);
@@ -43,5 +43,14 @@ describe('listRenewalOpportunities query bounds', () => {
     expect(renewalArgs.take!).toBeGreaterThan(0);
     expect(renewalArgs.take!).toBeLessThanOrEqual(1000);
     expect(renewalArgs.where).toMatchObject({ orgId: 'org-1' });
+  });
+});
+
+describe('renewalDaysOut', () => {
+  it('keeps a 91-day renewal outside the 90-day trigger in the afternoon', () => {
+    // WHY: floor of the clock made this 90 days, so the 90-day renewal row was created a day early.
+    const now = Date.parse('2026-11-01T15:00:00.000Z');
+    expect(renewalDaysOut(new Date('2027-01-31T00:00:00.000Z'), now)).toBe(91);
+    expect(renewalDaysOut(new Date('2026-11-01T00:00:00.000Z'), now)).toBe(0);
   });
 });
