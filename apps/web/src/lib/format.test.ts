@@ -23,9 +23,18 @@ describe('formatMoney', () => {
     expect(out).toMatch(/1\.24\s*M/);
   });
 
-  it('uses zero-decimal notation under 1M', () => {
-    const out = formatMoney(320_000, 'EUR');
-    expect(out).toMatch(/320,000/);
+  it('compacts an exact amount under 1M', () => {
+    expect(formatMoney(320_000, 'EUR', 'en')).toMatch(/320K/);
+  });
+
+  it('keeps a cent and does not compact an amount two digits would move', () => {
+    // WHY: amounts under 1M dropped the cent, and 12,015,000 became 12.02M.
+    const cents = formatMoney(320_000.5, 'EUR', 'en');
+    expect(cents).toContain('320,000.50');
+    expect(cents).not.toMatch(/320,000(?!\.)/);
+    const moved = formatMoney(12_015_000, 'EUR', 'en');
+    expect(moved).toContain('12,015,000');
+    expect(moved).not.toContain('12.02');
   });
 });
 

@@ -1,4 +1,4 @@
-import { formatMicrosAmount } from '@bidstack/shared';
+import { formatMicrosAmount, unitsToMicros } from '@bidstack/shared';
 
 import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
 
@@ -47,18 +47,18 @@ function detectCurrency(): string {
 export function formatMoney(value: number, currency?: string, locale?: string): string {
   const resolvedCurrency = currency ?? detectCurrency();
   const resolvedLocale = locale ?? detectLocale();
-  if (value >= 1_000_000)
-    return new Intl.NumberFormat(resolvedLocale, {
-      style: 'currency',
-      currency: resolvedCurrency,
-      maximumFractionDigits: 2,
-      notation: 'compact',
-    }).format(value);
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: 'currency',
-    currency: resolvedCurrency,
-    maximumFractionDigits: 0,
-  }).format(value);
+  if (!Number.isFinite(value)) return 'amount not readable';
+  const negative = value < 0;
+  const magnitude = unitsToMicros(Math.abs(value));
+  const micros = magnitude == null
+    ? BigInt(Math.trunc(Math.abs(value))) * 1_000_000n
+    : magnitude;
+  const signed = negative ? -micros : micros;
+  const compactMovesCent = headlineMicrosLabel(signed, resolvedLocale) === formatMicrosAmount(signed);
+  return formatMoneyMicros(signed, resolvedCurrency, {
+    compact: magnitude != null && !compactMovesCent,
+    locale: resolvedLocale,
+  });
 }
 
 /** Full integer when compact rounding or a zero-decimal format would move the cent. */
