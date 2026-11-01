@@ -2,11 +2,28 @@ import type { AccountFinancials } from '@bidstack/shared';
 
 export type Period = AccountFinancials['periods'][number];
 
+function compactIsExact(amount: number, divisor: number, digits: number): boolean {
+  const shown = digits === 0 ? Math.round(amount / divisor) : Number((amount / divisor).toFixed(digits));
+  return shown * divisor === amount;
+}
+
 export function fmtMoney(v: number, ccy: string): string {
-  const a = Math.abs(v);
+  if (!Number.isFinite(v)) return `${ccy} —`;
   const sign = v < 0 ? '-' : '';
-  if (a >= 1e9) return `${sign}${ccy} ${(a / 1e9).toFixed(a >= 1e10 ? 1 : 2)}bn`;
-  if (a >= 1e6) return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
+  const a = Math.abs(v);
+  const full = `${sign}${ccy} ${a.toLocaleString('en-GB')}`;
+  if (!Number.isSafeInteger(a)) return full;
+  if (a >= 1e9) {
+    const digits = a >= 1e10 ? 1 : 2;
+    if (compactIsExact(a, 1e9, digits)) {
+      return `${sign}${ccy} ${(a / 1e9).toFixed(digits)}bn`;
+    }
+    return full;
+  }
+  if (a >= 1e6 && compactIsExact(a, 1e6, 0)) {
+    return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
+  }
+  if (a >= 1e6) return full;
   return `${sign}${ccy} ${Math.round(a).toLocaleString('en-GB')}`;
 }
 
