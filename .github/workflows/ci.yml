@@ -63,8 +63,33 @@ jobs:
         # from dist/.
         run: pnpm typecheck
 
-      - name: Test (no DB — all packages except api and mcp-server)
-        run: pnpm --filter '!@bidstack/api' --filter '!@bidstack/mcp-server' -r test
+      - name: Test (no DB — all packages except api, mcp-server, worker)
+        run: pnpm --filter '!@bidstack/api' --filter '!@bidstack/mcp-server' --filter '!@bidstack/worker' -r test
+
+      # Worker suites that import Prisma or fail-loud on DATABASE_URL belong in
+      # the integration job. Do not revert v24/MARS tests to silent skips.
+      - name: Test (no DB — worker, DB-dependent suites excluded)
+        run: >-
+          pnpm --filter @bidstack/worker exec vitest run --passWithNoTests
+          --pool=forks --no-file-parallelism --isolate=true
+          --exclude src/account-enrichment/job.test.ts
+          --exclude src/agent/facts.contract.test.ts
+          --exclude src/lib/org-llm.test.ts
+          --exclude src/mars/sync-powerbi.test.ts
+          --exclude src/mars/sync.test.ts
+          --exclude src/meeting-intel/pipeline.test.ts
+          --exclude src/org-chart/seed.test.ts
+          --exclude src/queues/account-watchdog.contract.test.ts
+          --exclude src/queues/ai-audit-retention.contract.test.ts
+          --exclude src/queues/calendar-sync-cron.test.ts
+          --exclude src/queues/calendar-sync-microsoft.test.ts
+          --exclude src/queues/calendar-sync-push-idempotency.test.ts
+          --exclude src/queues/document-extract.contract.test.ts
+          --exclude src/queues/msa-reminders.test.ts
+          --exclude src/queues/msa-text-extract.test.ts
+          --exclude src/queues/queues.test.ts
+          --exclude src/queues/sms.test.ts
+          --exclude src/queues/tenant-export.contract.test.ts
 
       # kam-tools.test.ts is fail-loud when Postgres is missing (intentional
       # "do not silently skip"). It belongs in the integration job below.
