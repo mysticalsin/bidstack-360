@@ -46,6 +46,17 @@ export function themeConfirmedByRows(
   return rows.some((row) => themeForText(`${row.category} ${row.name}`) === theme);
 }
 
+/** Each probe word is its own lookup, so one noisy word cannot hide the next. */
+export async function confirmThemeFromProbes(
+  theme: InitiativeTheme,
+  load: (word: string) => Promise<readonly { name: string; category: string }[]>,
+): Promise<boolean> {
+  for (const word of THEME_PROBES[theme] ?? []) {
+    if (themeConfirmedByRows(theme, await load(word))) return true;
+  }
+  return false;
+}
+
 /** Read bounded pages until a short page, or stop and say the list is capped. */
 export async function readBoundedPages<T extends { id: string }>(
   load: (cursor: string | undefined) => Promise<T[]>,
@@ -149,19 +160,18 @@ export async function loadInitiatives(
   if (solutionsCapped) {
     const missing = (Object.keys(THEME_PROBES) as InitiativeTheme[]).filter((theme) => !soldThemes.has(theme));
     await Promise.all(missing.map(async (theme) => {
-      const probes = THEME_PROBES[theme] ?? [];
-      const hits = await prisma.accountSolution.findMany({
+      const confirmed = await confirmThemeFromProbes(theme, async (word) => prisma.accountSolution.findMany({
         where: {
           ...solutionWhere,
-          OR: probes.flatMap((word) => [
+          OR: [
             { name: { contains: word, mode: 'insensitive' as const } },
             { category: { contains: word, mode: 'insensitive' as const } },
-          ]),
+          ],
         },
         select: { name: true, category: true },
-        take: 20,
-      });
-      if (themeConfirmedByRows(theme, hits)) soldThemes.add(theme);
+        take: 5,
+      }));
+      if (confirmed) soldThemes.add(theme);
     }));
   }
   const byTheme = new Map<InitiativeTheme, Initiative>();
