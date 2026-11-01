@@ -204,6 +204,14 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
       )}
       <PageHead cockpit={cockpit} accountView={isAccountView} />
+      <CommandCenter cockpit={cockpit} />
+      {(show('revenueEvolution') || show('winLoss') || show('pipelineStage')) && (
+        <div className="mb-4 grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          {show('revenueEvolution') && <RevenueEvolutionCard cockpit={cockpit} />}
+          {show('winLoss') && <WinLossCard cockpit={cockpit} />}
+          {show('pipelineStage') && <AccountStageBars deals={companyDeals} />}
+        </div>
+      )}
       {isAccountView && (
         <AccountWorkStrip
           people={cockpit.keyContacts}
@@ -235,15 +243,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
       )}
       <KpiRow cockpit={cockpit} />
-      <CommandCenter cockpit={cockpit} />
-
-      {(show('revenueEvolution') || show('winLoss') || show('pipelineStage')) && (
-        <div className="mb-4 grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-          {show('revenueEvolution') && <RevenueEvolutionCard cockpit={cockpit} />}
-          {show('winLoss') && <WinLossCard cockpit={cockpit} />}
-          {show('pipelineStage') && <AccountStageBars deals={companyDeals} />}
-        </div>
-      )}
 
       <section className="cockpit-grid" aria-label={t('dashboard.accountCockpitAria', 'Account cockpit')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
