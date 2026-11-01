@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ElementType, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -68,5 +68,31 @@ describe('HealthScoreCard', () => {
     expect(screen.getByText('Signal mix')).toBeTruthy();
     expect(screen.getByText('Most factors')).toBeTruthy();
     expect(SIGNAL_COVERAGE_WEIGHTS).not.toMatch(/account-list|recorded-field/i);
+  });
+
+  it('does not print an unscored factor as zero', () => {
+    // WHY: a pipeline score of 0 meant the open deals failed. They were not on the page.
+    const cockpit = {
+      health: {
+        score: 40,
+        band: 'needs_attention',
+        counts: { strong: 1, good: 0, needs_attention: 0, critical: 0 },
+        factors: [
+          {
+            key: 'pipeline',
+            label: 'Pipeline data quality',
+            whatItMeasures: 'Open deals on the latest page.',
+            recommendedAction: '40 open deals are on this account.',
+            score: 0,
+            band: 'critical',
+            scored: false,
+          },
+        ],
+      },
+    } as AccountCockpitSnapshot;
+    render(<HealthScoreCard cockpit={cockpit} />);
+    fireEvent.click(screen.getByRole('button', { name: /What drives this score/ }));
+    expect(screen.getByText('Not scored')).toBeTruthy();
+    expect(screen.queryByText('0/100')).toBeNull();
   });
 });

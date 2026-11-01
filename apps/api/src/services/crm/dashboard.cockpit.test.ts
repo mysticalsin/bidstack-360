@@ -282,6 +282,30 @@ describe('applyFieldOverrides', () => {
     expect(cockpit.health.factors?.find((factor) => factor.key === 'pipeline')?.recommendedAction).toBe(
       '40 open deals are on this account. None of them are in the latest opportunity page.',
     );
+    // WHY: a zero here was a measured failure. The open deals were not on the page.
+    const pipeline = cockpit.health.factors?.find((factor) => factor.key === 'pipeline');
+    expect(pipeline?.scored).toBe(false);
+    expect(cockpit.health.counts.critical).toBe(
+      (cockpit.health.factors ?? []).filter((factor) => factor.band === 'critical' && factor.scored !== false).length,
+    );
+    const covered = computeSignalCoverage(
+      {
+        company: company({
+          industry: 'technology',
+          employeeCount: 5000,
+          annualRevenueMicros: 2_000_000_000_000,
+          technicalStack: [{ category: 'Cloud', items: ['AWS'] }] as never,
+          strategicIntel: { freshness: 'fresh' } as never,
+        }),
+        contacts: [{ influence: 5, email: 'a@x.com' }],
+        openDeals: [],
+        tasks: [{ status: 'open', dueDate: new Date(Date.now() + 86_400_000), createdAt: new Date() }],
+      },
+      { dealsCapped: true, openDealCount: 40 },
+    );
+    // WHY: counting the unseen pipeline as 0 pulled a covered account down by a quarter.
+    expect(covered.factors?.find((factor) => factor.key === 'pipeline')?.scored).toBe(false);
+    expect(covered.score).toBe(81);
     // WHY: Projects used the loaded page, so a full page of 100 read as the whole account.
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('140');
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.detail).toContain('latest page');
