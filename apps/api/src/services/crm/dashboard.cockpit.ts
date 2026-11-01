@@ -640,6 +640,7 @@ export function buildCockpit({
   complianceTotal,
   blockedCount,
   registerDealsCapped = false,
+  registerDealIds,
   risksCapped,
   complianceCapped,
   buyingRolesCapped = false,
@@ -737,6 +738,8 @@ export function buildCockpit({
   blockedCount?: number;
   /** Register counts stopped at REGISTER_DEAL_PAGE deal ids. */
   registerDealsCapped?: boolean;
+  /** Deal ids the register was loaded for. The 100-deal card is not this set. */
+  registerDealIds?: readonly string[];
   risksCapped?: boolean;
   complianceCapped?: boolean;
   /** Accepted buying-role facts filled their page, so one role is not the whole set. */
@@ -780,12 +783,13 @@ export function buildCockpit({
     if (fact.status === 'accepted') acceptedRoleContactIds.add(fact.contactId);
   }
   const keyContactRows = orderKeyContacts(accountContacts, acceptedRoleContactIds);
+  const registerIds = registerDealIds ? new Set(registerDealIds) : accountOpportunityIds;
   const companyRisks = risks.filter(
-    (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),
+    (risk) => risk.opportunityId != null && registerIds.has(risk.opportunityId),
   );
   const visibleRisks = uniqueBy(companyRisks, riskKey).slice(0, COCKPIT_RISK_LIMIT);
   const companyCompliance = compliance.filter(
-    (check) => check.opportunityId != null && accountOpportunityIds.has(check.opportunityId),
+    (check) => check.opportunityId != null && registerIds.has(check.opportunityId),
   );
   const visibleCompliance = uniqueBy(companyCompliance, complianceKey).slice(
     0,
