@@ -544,4 +544,10 @@ export {
 
 export { buildCockpitFromCompany } from './dashboard.cockpit.js';
 
-export { buildCompanyCockpit, getCompaniesOnly, serializeWidget } from './dashboard.queries.js';
+export {
+  buildCompanyCockpit,
+  companiesForLookup,
+  getCompaniesOnly,
+  searchCrmCompanies,
+  serializeWidget,
+} from './dashboard.queries.js';
