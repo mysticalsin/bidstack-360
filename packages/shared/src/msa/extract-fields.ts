@@ -153,7 +153,7 @@ function cleanParty(raw: string): string {
 
 /**
  * Contract text to a dot-decimal unit string.
- * `250,000` is thousands. A leading group longer than three, such as `1234,567`, is cents.
+ * Groups of three are thousands, with a dot or a comma. `1.50` stays one euro and fifty cents.
  */
 export function normalizeContractAmount(raw: string): string {
   const text = raw.replace(/[\s\u00a0\u202f]/g, '');
@@ -171,6 +171,12 @@ export function normalizeContractAmount(raw: string): string {
     const grouped = head.length >= 1 && head.length <= 3 && parts.slice(1).every((part) => part.length === 3);
     if (grouped && parts.length > 1) return parts.join('');
     return `${parts.slice(0, -1).join('')}.${parts[parts.length - 1] ?? ''}`;
+  }
+  if (lastDot >= 0) {
+    const parts = text.split('.');
+    const head = parts[0] ?? '';
+    const grouped = head.length >= 1 && head.length <= 3 && parts.slice(1).every((part) => part.length === 3);
+    if (grouped && parts.length > 1) return parts.join('');
   }
   return text;
 }
