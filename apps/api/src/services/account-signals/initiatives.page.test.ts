@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evidencePageCapped, readBoundedPages } from './initiatives';
+import { evidencePageCapped, readBoundedPages, soldThemesFromSolutions } from './initiatives';
 
 describe('evidencePageCapped', () => {
   it('names a full news or meeting page only when another row exists', () => {
@@ -25,5 +25,10 @@ describe('evidencePageCapped', () => {
     const result = await readBoundedPages(async () => [{ id: 'x', name: 'loop' }, ...Array.from({ length: 999 }, (_, index) => ({ id: `b${index}`, name: 'other' }))], 1000, 2000);
     expect(result.capped).toBe(true);
     expect(result.rows.length).toBeGreaterThanOrEqual(2000);
+  });
+
+  it('marks cloud sold from a solution the page ceiling would hide', () => {
+    // WHY: themeForText on "Cloud practice" is cloud, so a probe that fetches that row must count it as sold.
+    expect(soldThemesFromSolutions([{ name: 'Cloud practice', category: 'general' }]).has('cloud')).toBe(true);
   });
 });

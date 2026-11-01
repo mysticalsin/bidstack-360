@@ -20,6 +20,12 @@ const DAY = 86_400_000;
 const EVIDENCE_PAGE = 100;
 const SOLUTION_PAGE = 1000;
 const SOLUTION_LIMIT = 5000;
+/** Retrieval net for a sold theme that sits past the read ceiling. Classification still uses themeForText. */
+const SOLUTION_PROBES = ['cloud', 'cyber', 'security', 'analytics', 'kubernetes', 'sap', 'compliance', 'layoff', 'acquisition', 'erp'];
+
+export function soldThemesFromSolutions(rows: readonly { name: string; category: string }[]): Set<InitiativeTheme> {
+  return new Set(rows.map((row) => themeForText(`${row.category} ${row.name}`)));
+}
 
 /** Read bounded pages until a short page, or stop and say the list is capped. */
 export async function readBoundedPages<T extends { id: string }>(
@@ -120,9 +126,21 @@ export async function loadInitiatives(
     meetings.length < EVIDENCE_PAGE ? meetings.length : await prisma.meetingIntel.count({ where: meetingWhere }),
   );
   const solutionsCapped = solutions.capped;
-  const soldThemes = new Set<InitiativeTheme>(
-    solutions.rows.map((s) => themeForText(`${s.category} ${s.name}`)),
-  );
+  const soldThemes = soldThemesFromSolutions(solutions.rows);
+  if (solutionsCapped) {
+    const extra = await prisma.accountSolution.findMany({
+      where: {
+        ...solutionWhere,
+        OR: SOLUTION_PROBES.flatMap((word) => [
+          { name: { contains: word, mode: 'insensitive' as const } },
+          { category: { contains: word, mode: 'insensitive' as const } },
+        ]),
+      },
+      select: { name: true, category: true },
+      take: 100,
+    });
+    for (const theme of soldThemesFromSolutions(extra)) soldThemes.add(theme);
+  }
   const byTheme = new Map<InitiativeTheme, Initiative>();
   const confScore = { high: 0.85, medium: 0.6, low: 0.35 } as const;
   const label = (s: number): Initiative['confidence'] =>
