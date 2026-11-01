@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -52,5 +52,13 @@ describe('viz-data', () => {
 
   it('flags open bids past their due date', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
+  });
+
+  it('keeps a pipeline amount when one compact digit would move it', () => {
+    // WHY: 7,860,000 was 7.9M, and 12,015,000 was 12.0M, on the dashboard charts.
+    expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
+    expect(fmtCompact(7_860_000)).toMatch(/7\.86/);
+    expect(fmtCompact(12_015_000)).toBe('12,015,000');
+    expect(fmtCompact(1_500_000)).toMatch(/1\.5/);
   });
 });

@@ -1,5 +1,6 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -144,9 +145,12 @@ export function cumulativeOpen(rows: OppRow[]) {
   return [0, ...open.map((o) => (run += o.value ?? 0))];
 }
 
-const compact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
-/** Currency-free compact amount (opportunity rows carry no currency). */
-export const fmtCompact = (v: number) => compact.format(v);
+/** Currency-free amount. Compact only when that label names the same unit. */
+export function fmtCompact(v: number): string {
+  if (!Number.isFinite(v)) return '—';
+  if (!Number.isSafeInteger(v)) return v.toLocaleString('en-GB');
+  return headlineMicrosLabel(BigInt(v) * 1_000_000n, 'en-GB');
+}
 
 export type OppStatus = 'open' | 'won' | 'lost';
 export function oppStatus(o: OppRow): OppStatus {
