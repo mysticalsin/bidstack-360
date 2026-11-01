@@ -234,6 +234,11 @@ export const AccountCockpitSnapshot = z.object({
   recentActivity: z.array(CrmActivity),
   risks: z.array(RiskItem),
   compliance: z.array(ComplianceCheck),
+  /** Exact open counts. Set when the register page is not the whole list. */
+  openRiskCount: z.number().int().nonnegative().optional(),
+  openComplianceCount: z.number().int().nonnegative().optional(),
+  risksCapped: z.boolean().optional(),
+  complianceCapped: z.boolean().optional(),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;

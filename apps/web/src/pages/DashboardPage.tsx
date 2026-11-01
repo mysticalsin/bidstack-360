@@ -231,7 +231,14 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               <div className="dash-row-3">
                 {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
                 {show('openIssues') && (
-                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
+                  <OpenIssuesCard
+                    risks={cockpit.risks}
+                    compliance={cockpit.compliance}
+                    openRiskCount={cockpit.openRiskCount}
+                    openComplianceCount={cockpit.openComplianceCount}
+                    risksCapped={cockpit.risksCapped}
+                    complianceCapped={cockpit.complianceCapped}
+                  />
                 )}
               </div>
             </Reveal>

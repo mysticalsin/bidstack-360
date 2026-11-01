@@ -37,6 +37,20 @@ describe('OpenIssuesCard', () => {
     expect(screen.queryByText('All clear')).toBeNull();
   });
 
+  it('does not call a full page of closed rows an empty register', () => {
+    // WHY: status order loaded mitigated rows first, so an open risk past 50 read as none open.
+    render(
+      <OpenIssuesCard
+        risks={[]}
+        compliance={[]}
+        openRiskCount={3}
+        risksCapped
+      />,
+    );
+    expect(screen.getByText('Latest 50 rows. 3 open items on the account.')).toBeTruthy();
+    expect(screen.queryByText('Nothing recorded')).toBeNull();
+  });
+
   it('does not mark an unranked risk as low', () => {
     // WHY: a missing severity used to fall through to the low initial.
     expect(severityShort(null)).toBe('–');

@@ -331,6 +331,88 @@ export async function resolveCockpitCompany(
  *
  * Returns null when the company cannot be found (caller should throw 404).
  */
+export const ISSUE_PAGE = 50;
+const RISK_OPEN = ['open', 'in_progress'] as const;
+const COMPLIANCE_OPEN = ['blocked', 'in_progress', 'not_started'] as const;
+
+/** Open rows first, so a page of closed items cannot hide an open one. */
+export async function loadRegisterPage<T, W extends Record<string, unknown>>(
+  find: (where: W, take: number) => Promise<T[]>,
+  count: (where: W) => Promise<number>,
+  where: W,
+  openStatuses: readonly string[],
+): Promise<{ rows: T[]; openCount: number; capped: boolean }> {
+  const openWhere = { ...where, status: { in: [...openStatuses] } } as W;
+  const openRows = await find(openWhere, ISSUE_PAGE);
+  const openCount = openRows.length < ISSUE_PAGE ? openRows.length : await count(openWhere);
+  let rows = openRows;
+  if (openCount <= ISSUE_PAGE && rows.length < ISSUE_PAGE) {
+    const restWhere = { ...where, status: { notIn: [...openStatuses] } } as W;
+    rows = [...rows, ...(await find(restWhere, ISSUE_PAGE - rows.length))];
+  }
+  const capped =
+    openCount > ISSUE_PAGE ||
+    (rows.length === ISSUE_PAGE && (await count(where)) > ISSUE_PAGE);
+  return { rows, openCount, capped };
+}
+
+const riskSelect = {
+  id: true,
+  opportunityId: true,
+  title: true,
+  severity: true,
+  owner: true,
+  mitigation: true,
+  dueDate: true,
+  status: true,
+  companyName: true,
+} as const;
+
+const complianceSelect = {
+  id: true,
+  opportunityId: true,
+  label: true,
+  status: true,
+  owner: true,
+  sourceAttribution: true,
+} as const;
+
+export function loadAccountRisks(
+  prismaClient: PrismaClient,
+  where: { orgId: string; deletedAt: null; opportunityId: { in: string[] } },
+) {
+  return loadRegisterPage(
+    (pageWhere, take) =>
+      prismaClient.riskRegisterItem.findMany({
+        where: pageWhere,
+        select: riskSelect,
+        orderBy: { updatedAt: 'desc' },
+        take,
+      }),
+    (pageWhere) => prismaClient.riskRegisterItem.count({ where: pageWhere }),
+    where,
+    RISK_OPEN,
+  );
+}
+
+export function loadAccountCompliance(
+  prismaClient: PrismaClient,
+  where: { orgId: string; deletedAt: null; opportunityId: { in: string[] } },
+) {
+  return loadRegisterPage(
+    (pageWhere, take) =>
+      prismaClient.complianceCheck.findMany({
+        where: pageWhere,
+        select: complianceSelect,
+        orderBy: { updatedAt: 'desc' },
+        take,
+      }),
+    (pageWhere) => prismaClient.complianceCheck.count({ where: pageWhere }),
+    where,
+    COMPLIANCE_OPEN,
+  );
+}
+
 export async function buildCompanyCockpit(
   orgId: string,
   companyId: string,
@@ -468,40 +550,14 @@ export async function buildCompanyCockpit(
 
   const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
   const contactIds = contacts.map((contact) => contact.id);
-  const [riskRows, complianceRows, buyingRoleFacts] = await Promise.all([
+  const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
+  const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
-      ? []
-      : prismaClient.riskRegisterItem.findMany({
-          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-          select: {
-            id: true,
-            opportunityId: true,
-            title: true,
-            severity: true,
-            owner: true,
-            mitigation: true,
-            dueDate: true,
-            status: true,
-            companyName: true,
-          },
-          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-          take: 50,
-        }),
+      ? { rows: [], openCount: 0, capped: false }
+      : loadAccountRisks(prismaClient, registerWhere),
     accountOpportunityIds.length === 0
-      ? []
-      : prismaClient.complianceCheck.findMany({
-          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-          select: {
-            id: true,
-            opportunityId: true,
-            label: true,
-            status: true,
-            owner: true,
-            sourceAttribution: true,
-          },
-          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-          take: 50,
-        }),
+      ? { rows: [], openCount: 0, capped: false }
+      : loadAccountCompliance(prismaClient, registerWhere),
     fetchBuyingRoleFacts(orgId, contactIds, prismaClient),
   ]);
 
@@ -513,8 +569,12 @@ export async function buildCompanyCockpit(
     opportunities,
     contacts,
     tasks,
-    risks: riskRows,
-    compliance: complianceRows,
+    risks: riskPage.rows,
+    compliance: compliancePage.rows,
+    openRiskCount: riskPage.openCount,
+    openComplianceCount: compliancePage.openCount,
+    risksCapped: riskPage.capped,
+    complianceCapped: compliancePage.capped,
     buyingRoleFacts,
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
