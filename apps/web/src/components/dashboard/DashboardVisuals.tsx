@@ -218,13 +218,13 @@ export function TopAccountsBarCard({ rows, headingLevel, onDrill }: { rows: OppR
   const data = accountBars(rows);
   return (
     <ChartCard headingLevel={headingLevel} title="Top accounts" meta="Won plus open value"
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}, open ${fmtCompact(d.open)}`).join('; ')}
-      table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.open)]) }}>
+      summary={data.map((d) => `${d.label}: won ${d.wonLabel}, open ${d.openLabel}`).join('; ')}
+      table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, d.wonLabel, d.openLabel]) }}>
       <HBars data={data} format={fmtCompact} onSelect={onDrill ? (label) => onDrill({ status: 'all', account: label }) : undefined} />
       {onDrill ? (
         <ul className="dash-chips" aria-label="Open an account's bids">
           {data.map((d) => (
-            <li key={d.label}><button type="button" className="dash-chip" onClick={() => onDrill({ status: 'all', account: d.label })}>{d.label} <b>{fmtCompact(d.won + d.open)}</b></button></li>
+            <li key={d.label}><button type="button" className="dash-chip" onClick={() => onDrill({ status: 'all', account: d.label })}>{d.label} <b>{d.totalLabel}</b></button></li>
           ))}
         </ul>
       ) : null}

@@ -283,11 +283,13 @@ export function Donut({ data, center, centerLabel }: {
 
 /* ---------- horizontal bars (top accounts) ---------- */
 export function HBars({ data, format, onSelect }: {
-  data: Array<{ label: string; open: number; won: number }>; format: (v: number) => string;
+  data: Array<{ label: string; open: number; won: number; openLabel?: string; wonLabel?: string; totalLabel?: string }>;
+  format: (v: number) => string;
   /** Pointer shortcut into a drill; keyboard users get the same via the card's drill list. */
   onSelect?: (label: string) => void;
 }) {
   const reduced = useReducedMotion();
+  const labeled = data.some((d) => d.totalLabel);
   return (
     <ResponsiveContainer width="100%" height={Math.max(140, data.length * 36 + 8)}>
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 56, bottom: 0, left: 0 }} barCategoryGap={8}
@@ -296,12 +298,29 @@ export function HBars({ data, format, onSelect }: {
         <XAxis type="number" hide />
         <YAxis type="category" dataKey="label" width={150} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }}
           tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />
-        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<ChartTip format={format} />} />
+        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={labeled ? <AccountBarTip rows={data} /> : <ChartTip format={format} />} />
         <Bar dataKey="won" name="Won" stackId="a" fill="color-mix(in srgb, var(--success, #177048) 75%, transparent)" {...anim(reduced)} />
         <Bar dataKey="open" name="Open" stackId="a" fill="color-mix(in srgb, var(--brand-primary, #006b4f) 22%, transparent)" radius={[0, 4, 4, 0]} {...anim(reduced)}
-          label={{ position: 'right', formatter: (_: unknown, __?: unknown, i?: number) => (i !== undefined && data[i] ? format(data[i].open + data[i].won) : ''), fill: 'var(--viz-muted)', fontSize: 12 }} />
+          label={{ position: 'right', formatter: (_: unknown, __?: unknown, i?: number) => (i !== undefined && data[i] ? (data[i].totalLabel ?? format(data[i].open + data[i].won)) : ''), fill: 'var(--viz-muted)', fontSize: 12 }} />
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+function AccountBarTip({ active, label, rows }: {
+  active?: boolean;
+  label?: string | number;
+  rows: Array<{ label: string; openLabel?: string; wonLabel?: string }>;
+}) {
+  if (!active || label === undefined) return null;
+  const row = rows.find((d) => d.label === String(label));
+  if (!row) return null;
+  return (
+    <div className="viz-tip">
+      <div style={{ marginBottom: 4 }}><b>{label}</b></div>
+      <div>Won: {row.wonLabel}</div>
+      <div>Open: {row.openLabel}</div>
+    </div>
   );
 }
 
