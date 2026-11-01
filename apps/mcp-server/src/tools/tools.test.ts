@@ -287,6 +287,32 @@ describeDb('MCP tools', () => {
     expect(out.name).toBe('Bob Jones');
   });
 
+  it('tasks.list includes a pursuit task through the opportunity company', async () => {
+    // WHY: pursuit tasks often have only oppId. Filtering Task.accountId
+    // alone hid them from Dust when it asked for the company.
+    const company = await prisma.company.create({
+      data: { orgId, name: `Task Co ${randomBytes(4).toString('hex')}` },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-${randomBytes(2).toString('hex')}`,
+        customer: company.name,
+        companyId: company.id,
+        name: 'Linked pursuit',
+        stage: 's1_lead',
+        valueMicros: 0,
+        probability: 0,
+        intel: {},
+      },
+    });
+    await tools['tasks.create'].handler({ oppId: opp.id, title: 'Pursuit follow-up' }, ctx);
+    const out = (await tools['tasks.list'].handler({ accountId: company.id, limit: 20 }, ctx)) as Array<{
+      title: string;
+    }>;
+    expect(out.some((task) => task.title === 'Pursuit follow-up')).toBe(true);
+  });
+
   it('tasks.list returns tasks for the org', async () => {
     await tools['tasks.create'].handler({ oppId, title: 'Task A' }, ctx);
     const out = (await tools['tasks.list'].handler({ limit: 10 }, ctx)) as Array<{ title: string }>;

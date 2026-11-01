@@ -14,7 +14,7 @@ const Input = z.object({
 
 export const tasksList: Tool<typeof Input> = {
   description:
-    'List tasks, optionally filtered by opportunity, company accountId (Task.accountId UUID), status, or assignee. A company name is not accepted.',
+    'List tasks, optionally filtered by opportunity, company id, status, or assignee. A company id matches Task.accountId or the opportunity company. A company name is not accepted.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -39,7 +39,14 @@ export const tasksList: Tool<typeof Input> = {
         orgId: ctx.orgId,
         deletedAt: null, // skip soft-deleted (Review)
         ...(args.oppId ? { oppId: args.oppId } : {}),
-        ...(args.accountId ? { accountId: args.accountId } : {}),
+        ...(args.accountId
+          ? {
+              OR: [
+                { accountId: args.accountId },
+                { opportunity: { companyId: args.accountId, deletedAt: null } },
+              ],
+            }
+          : {}),
         ...(args.status ? { status: args.status as PrismaTaskStatus } : {}),
         ...(assignee ? { assigneeId: assignee.id } : {}),
       },
