@@ -110,7 +110,26 @@ describe('buildGaps', () => {
       now,
     });
     expect(gaps.map((g) => g.kind)).toEqual(expect.arrayContaining(['senior_contacts', 'no_recent_meeting', 'declining_momentum', 'restructuring', 'no_pipeline']));
+    expect(gaps.find((g) => g.kind === 'no_pipeline')?.title).toBe('No open pipeline');
     expect(gaps[0]!.severity).toBe('high');
+  });
+
+  it('does not call a full sample an empty account', () => {
+    // WHY: zero open rows inside the latest 500 is not proof the account has no pipeline.
+    const gaps = buildGaps({
+      people: [],
+      lastMeetingAt: null,
+      momentum: null,
+      openDeals: 0,
+      riskEvents: [],
+      competitorMentions: [],
+      financialRisks: [],
+      financialStaleFy: null,
+      financialSource: null,
+      dealSampleLimit: 500,
+      now,
+    });
+    expect(gaps.find((g) => g.kind === 'no_pipeline')?.title).toBe('No open deal in the latest sample');
   });
 });
 
@@ -132,9 +151,28 @@ describe('composeBrief', () => {
     expect(txt).toContain('NOS is a Strategic account in Telecom, based in PT.');
     expect(txt).toContain('EUR 1.7bn in FY2024 (up 5% on the year), operating margin 18.3% (-1.1 pts)');
     expect(txt).toContain('no open deals; 1 won and 0 lost');
+    expect(txt).not.toContain('latest');
     expect(txt).toContain('No contacts are mapped yet.');
     expect(txt).not.toMatch(/employees/);
     expect(txt).not.toContain('\u2014');
+  });
+
+  it('names the sample when the open count is not the whole book', () => {
+    // WHY: a silent take of 500 was read aloud as every open deal.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 2, openMicros: '100', won24m: 0, lost24m: 0, latest: 500 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+    };
+    const txt = composeBrief(f, (v) => String(v), (m) => m);
+    expect(txt).toContain('2 open deals worth 100 among the latest 500 deals');
   });
 });
 

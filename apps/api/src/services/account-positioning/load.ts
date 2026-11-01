@@ -4,7 +4,7 @@
 import { prisma } from '@bidstack/db';
 import { recordedOutcome } from '../account-signals/load.js';
 import { wonOutcomeWhere } from '../../routes/opportunities.helpers.js';
-import { sumMicrosAsNumber } from './micros.js';
+import { capDealSample, POSITIONING_DEAL_SAMPLE, sumMicrosAsNumber } from './micros.js';
 import {
   buildGaps,
   buildPlays,
@@ -143,7 +143,8 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
         updatedAt: true,
         pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
       },
-      take: 500,
+      orderBy: { updatedAt: 'desc' },
+      take: POSITIONING_DEAL_SAMPLE + 1,
     }),
     prisma.opportunity.findMany({
       where: { orgId, deletedAt: null, valueMicros: { gt: 0n }, ...wonOutcomeWhere() },
@@ -186,9 +187,11 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const won: WonDeal[] = wonOrg.map((o) => ({ name: o.name, valueMicros: o.valueMicros ?? 0n, here: !!o.companyId && ids.includes(o.companyId) }));
   const plays = buildPlays({ initiatives, financialSignals: finSignals, financialSource: finSource, people, won, themeOf: themeForText, now });
 
-  const outcomeOf = (o: (typeof opps)[number]) => recordedOutcome(o);
-  const open = opps.filter((o) => outcomeOf(o) === 'open');
-  const closed24 = opps.filter((o) => {
+  const dealSample = capDealSample(opps);
+  const deals = dealSample.rows;
+  const outcomeOf = (o: (typeof deals)[number]) => recordedOutcome(o);
+  const open = deals.filter((o) => outcomeOf(o) === 'open');
+  const closed24 = deals.filter((o) => {
     if (outcomeOf(o) === 'open') return false;
     return (o.closedAt ?? o.updatedAt) >= since24;
   });
@@ -225,6 +228,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       openMicros: open.reduce((s, o) => s + (o.valueMicros ?? 0n), 0n).toString(),
       won24m: closed24.filter((o) => outcomeOf(o) === 'won').length,
       lost24m: closed24.filter((o) => outcomeOf(o) === 'lost').length,
+      latest: dealSample.capped ? POSITIONING_DEAL_SAMPLE : null,
     },
     people: {
       known: people.length,
@@ -244,6 +248,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     financialRisks: finSignals.filter((s) => fin.signals.find((x) => x.rule === s.rule && x.title === s.title)?.implication === 'RISK'),
     financialStaleFy: stale && latest ? latest.fiscalYear : null,
     financialSource: finSource,
+    dealSampleLimit: dealSample.capped ? POSITIONING_DEAL_SAMPLE : null,
     now,
   });
   return { companyId, plays, brief, gaps, sample: plays.length > 0 && plays.every((p) => p.sample), computedAt: now.toISOString() };
@@ -299,7 +304,8 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
         updatedAt: true,
         pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
       },
-      take: 500,
+      orderBy: { updatedAt: 'desc' },
+      take: POSITIONING_DEAL_SAMPLE + 1,
     }),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, sentiment: { not: null }, occurredAt: { gte: d180, lte: now }, ...hideSampleWhere(live) },
@@ -373,11 +379,13 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   } else items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', goodWhen: 'down', source: 'Meeting intel and logged meetings', period: 'Last 24 months', missing: 'No meeting logged' }));
 
   // Pipeline value and trend: open value now vs reconstructed 90 days ago.
-  const outcomeOf = (o: (typeof opps)[number]) => recordedOutcome(o);
-  const open = opps.filter((o) => outcomeOf(o) === 'open');
+  const dealSample = capDealSample(opps);
+  const deals = dealSample.rows;
+  const outcomeOf = (o: (typeof deals)[number]) => recordedOutcome(o);
+  const open = deals.filter((o) => outcomeOf(o) === 'open');
   const openAt = (t: Date) =>
     sumMicrosAsNumber(
-      opps
+      deals
         .filter((o) => o.createdAt <= t && (outcomeOf(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
         .map((o) => o.valueMicros),
     );
@@ -408,7 +416,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
         delta: pctChange(nowOpen, ago),
         deltaUnit: 'pct',
         series: series.filter((point): point is number => point != null),
-        sub: `${open.length} open deals`,
+        sub: dealSample.capped ? `${open.length} open deals in the latest ${POSITIONING_DEAL_SAMPLE}` : `${open.length} open deals`,
         source: 'Polo pipeline',
         period: 'Now, change vs 90 days ago',
         anchor: 'deals',

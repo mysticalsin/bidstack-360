@@ -92,7 +92,14 @@ export const BriefFacts = z.object({
       stale: z.boolean(),
     })
     .nullable(),
-  pipeline: z.object({ openCount: z.number().int(), openMicros: z.string(), won24m: z.number().int(), lost24m: z.number().int() }),
+  pipeline: z.object({
+    openCount: z.number().int(),
+    openMicros: z.string(),
+    won24m: z.number().int(),
+    lost24m: z.number().int(),
+    /** Set when the counts are the latest N deals, not the whole book. */
+    latest: z.number().int().positive().nullable().optional(),
+  }),
   people: z.object({ known: z.number().int(), senior: z.number().int(), metLast12m: z.number().int(), lastMeeting: z.object({ at: Iso, title: z.string() }).nullable() }),
   topSignal: z.object({ title: z.string(), at: Iso.nullable(), source: z.string(), sample: z.boolean() }).nullable(),
 });
@@ -393,6 +400,8 @@ export interface GapInputs {
   financialRisks: FinancialSignalLite[];
   financialStaleFy: number | null;
   financialSource: string | null;
+  /** When set, openDeals is counted inside this latest-N sample. */
+  dealSampleLimit?: number | null;
   now: Date;
 }
 
@@ -430,7 +439,13 @@ export function buildGaps(g: GapInputs): AccountGap[] {
     const names = [...new Set(g.competitorMentions.map((c) => c.competitor))];
     out.push({ kind: 'competitor', severity: 'medium', title: `Competitor activity: ${names.slice(0, 3).join(', ')}`, detail: 'A tracked competitor is linked to this account. Check the deal history before positioning.', evidence: g.competitorMentions.slice(0, 3).map((c) => ({ kind: 'news' as const, label: c.title, url: c.url, anchor: ANCHOR.news, at: c.at, source: c.source, sample: false })) });
   }
-  if (!g.openDeals) out.push({ kind: 'no_pipeline', severity: 'low', title: 'No open pipeline', detail: 'No open opportunity at this account. The plays above are the starting point.', evidence: [] });
+  if (!g.openDeals) {
+    out.push(
+      g.dealSampleLimit
+        ? { kind: 'no_pipeline', severity: 'low', title: 'No open deal in the latest sample', detail: `None of the latest ${g.dealSampleLimit} deals are open. Older deals are outside this view.`, evidence: [] }
+        : { kind: 'no_pipeline', severity: 'low', title: 'No open pipeline', detail: 'No open opportunity at this account. The plays above are the starting point.', evidence: [] },
+    );
+  }
   if (g.financialStaleFy) out.push({ kind: 'stale_data', severity: 'low', title: `Financials stop at FY${g.financialStaleFy}`, detail: 'The issuer no longer files at this source. Read the numbers as history.', evidence: [] });
   return out.sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
 }
@@ -458,7 +473,8 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   }
   const p = f.pipeline;
   const hist = p.won24m || p.lost24m ? `; ${p.won24m} won and ${p.lost24m} lost in the last 24 months` : '';
-  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${hist}.` : `We have no open deals${hist}.`);
+  const sample = p.latest ? ` among the latest ${p.latest} deals` : '';
+  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${hist}${sample}.` : `We have no open deals${hist}${sample}.`);
   const pe = f.people;
   if (pe.known) {
     const last = pe.lastMeeting ? `, last meeting on ${pe.lastMeeting.at.slice(0, 10)} (${pe.lastMeeting.title})` : ', no meeting logged';
