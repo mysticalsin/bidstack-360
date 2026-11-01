@@ -12,7 +12,9 @@ import {
 } from './shapeInsights';
 import type { Opportunity } from '@bidstack/shared';
 
-const opportunity = (patch: Partial<Opportunity> & { currency?: string | null }): Opportunity & {
+const opportunity = (
+  patch: Partial<Opportunity> & { currency?: string | null },
+): Opportunity & {
   currency?: string | null;
 } => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -81,6 +83,16 @@ describe('pipeline empty state', () => {
     expect(pipelineIsEmpty(visual)).toBe(true);
     expect(visual.stages).toEqual([]);
     expect(visual.currency).toBeNull();
+  });
+
+  it('sums a large deal from micros when the unit number is zero', () => {
+    // WHY: the chart added value, so this deal contributed nothing.
+    const visual = shapePipelineByStage([
+      opportunity({ value: 0, valueMicros: '8598204328457184962' }),
+    ]);
+    const label = formatInsightAmount(visual.stages[0]!.amount, null);
+    expect(label).toContain('8,598,204,328,457.18');
+    expect(label).not.toContain('457.19');
   });
 
   it('leaves closed won and lost out of the open pipeline chart', () => {

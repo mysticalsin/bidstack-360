@@ -4,7 +4,7 @@ import {
   getPipelineStages,
 } from '@/lib/pipeline-stages';
 
-import type { Opportunity } from '@bidstack/shared';
+import { microsToUnits, unitsToMicros, type Opportunity } from '@bidstack/shared';
 
 /** Shown whenever a money figure has no ISO currency on the record. */
 export const UNSPECIFIED_CURRENCY_LABEL = 'unspecified';
@@ -21,7 +21,7 @@ export interface PipelineStageRow {
   id: string;
   label: string;
   count: number;
-  /** Sum of opportunity `value` (major units). Not a currency conversion. */
+  /** Sum of recorded deal amounts in major units. Micros win over a zero unit number. */
   amount: number;
   color: string | null;
 }
@@ -71,9 +71,7 @@ export function normalizeCurrencyCode(value: string | null | undefined): string 
  * One currency label for a summed total. A missing code, an invalid code, or
  * mixed codes stay unspecified — summing those into EUR would be invented.
  */
-export function resolveSharedCurrency(
-  records: ReadonlyArray<CurrencyBearing>,
-): string | null {
+export function resolveSharedCurrency(records: ReadonlyArray<CurrencyBearing>): string | null {
   if (records.length === 0) return null;
   const codes = records.map((record) => normalizeCurrencyCode(record.currency));
   const first = codes[0];
@@ -105,6 +103,20 @@ export function formatInsightAmount(
 
 type PipelineInput = Opportunity & CurrencyBearing;
 
+function recordedDealMicros(opp: PipelineInput): bigint {
+  if (opp.valueMicros && /^\d+$/.test(opp.valueMicros)) return BigInt(opp.valueMicros);
+  if (!Number.isFinite(opp.value)) return 0n;
+  return unitsToMicros(opp.value) ?? 0n;
+}
+
+function unitsFromRecordedMicros(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const cents = (abs + 5_000n) / 10_000n;
+  const rounded = microsToUnits(cents * 10_000n);
+  return negative ? -rounded : rounded;
+}
+
 /** Stages with at least one opportunity. Width should follow `count`, amount is separate. */
 export function shapePipelineByStage(opportunities: readonly PipelineInput[]): PipelineVisual {
   const stages = getPipelineStages([...opportunities]);
@@ -118,7 +130,9 @@ export function shapePipelineByStage(opportunities: readonly PipelineInput[]): P
       id,
       label: stage.name,
       count: matched.length,
-      amount: matched.reduce((sum, opp) => sum + (Number.isFinite(opp.value) ? opp.value : 0), 0),
+      amount: unitsFromRecordedMicros(
+        matched.reduce((sum, opp) => sum + recordedDealMicros(opp), 0n),
+      ),
       color: stage.color,
     });
   }
