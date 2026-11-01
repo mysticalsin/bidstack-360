@@ -13,10 +13,10 @@
 //   storage cost:    60 ints per active API key. TTL self-cleans expired
 //                    buckets, so no manual sweep is needed.
 //
-// Failure mode: production fails CLOSED by default when Redis is unreachable
-// because MCP tools can mutate CRM data and must keep their shared budget
-// enforcement. Development/test fail open unless MCP_RATE_LIMIT_FAIL_CLOSED
-// is explicitly enabled, so local Redis outages do not block ordinary work.
+// Failure mode: Redis errors deny MCP traffic. Tools can mutate CRM data,
+// so a missed shared budget is a skipped cap. Outside production,
+// MCP_RATE_LIMIT_FAIL_CLOSED=false reopens the calls. Production ignores
+// that override.
 
 import { createHash } from 'node:crypto';
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
@@ -46,10 +46,10 @@ interface RateLimitEnv {
 }
 
 export function mcpRateLimitFailsClosed(env: RateLimitEnv = process.env): boolean {
+  if (env.NODE_ENV === 'production') return true;
   const explicit = env.MCP_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
-  if (explicit === 'true' || explicit === '1') return true;
   if (explicit === 'false' || explicit === '0') return false;
-  return env.NODE_ENV === 'production';
+  return true;
 }
 
 function hashedKeyFor(req: FastifyRequest): string {
