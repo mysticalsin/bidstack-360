@@ -12,6 +12,7 @@ import {
   buyingRoleSlots,
   groupWorkstreams,
   peopleWithoutDecisionRole,
+  workstreamBarValues,
   type BuyingRole,
   type BuyingRolePerson,
   type LiveWorkstream,
@@ -54,6 +55,7 @@ export function AccountWorkstreamBoard({
       valueMicros: micros?.toString() ?? null,
     };
   });
+  const barValues = workstreamBarValues(laneTotals);
   const chartLabel = laneTotals
     .map((row) => {
       const name = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
@@ -85,9 +87,9 @@ export function AccountWorkstreamBoard({
       </div>
       <div className="deal-chart" role="img" aria-label={chartLabel}>
         <BarChart
-          data={laneTotals.map((row) => ({
+          data={laneTotals.map((row, index) => ({
             lane: t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane)),
-            value: row.value,
+            value: barValues[index] ?? 0,
           }))}
           xDataKey="lane"
           orientation="horizontal"

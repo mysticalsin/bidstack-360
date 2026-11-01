@@ -5,6 +5,7 @@ import {
   classifyWorkstream,
   groupWorkstreams,
   peopleWithoutDecisionRole,
+  workstreamBarValues,
   type WorkDeal,
 } from './accountWorkstreams';
 
@@ -43,6 +44,32 @@ describe('account workstreams stay independent', () => {
     expect(classifyWorkstream(deal({ id: 'w', name: 'FY plan', isWon: true, stage: 'proposal' }))).toBe(
       'outcome',
     );
+  });
+
+  it('sizes lanes from integer micros when float calls the amounts equal', () => {
+    // WHY: Number() collapses these two micros, so the bars used to match.
+    const smaller = '9007199254740992';
+    const larger = '9007199254740993';
+    expect(Number(smaller) === Number(larger)).toBe(true);
+    const [smallBar, largeBar, emptyBar] = workstreamBarValues([
+      { value: Number(smaller), valueMicros: smaller },
+      { value: Number(larger), valueMicros: larger },
+      { value: 0, valueMicros: '0' },
+    ]);
+    expect(largeBar).toBe(100);
+    expect(smallBar).toBeLessThan(100);
+    expect(smallBar).toBeGreaterThan(99);
+    expect(emptyBar).toBe(0);
+  });
+
+  it('keeps unit shares when a lane has no micros string', () => {
+    expect(
+      workstreamBarValues([
+        { value: 25, valueMicros: null },
+        { value: 100, valueMicros: null },
+        { value: 0, valueMicros: null },
+      ]),
+    ).toEqual([25, 100, 0]);
   });
 
   it('leaves a missing buying role as an empty slot instead of inventing a person', () => {

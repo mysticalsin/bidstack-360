@@ -4,6 +4,8 @@
  * separate only when the stage says so — a title is not a workstream.
  */
 
+import { compareMicros, microsSharePercent } from '@/components/dashboard/unspecified-currency';
+
 export const BUYING_ROLES = ['buyer', 'champion', 'influencer', 'user', 'blocker'] as const;
 export type BuyingRole = (typeof BUYING_ROLES)[number];
 
@@ -18,7 +20,7 @@ export interface WorkDeal {
   isWon?: boolean;
   isLost?: boolean;
   value: number;
-  /** Integer micros when the cockpit deal still has them. The chart scale uses value. */
+  /** Integer micros. The bar length uses this when every lane has it. */
   valueMicros?: string;
   owner: string | null;
 }
@@ -37,6 +39,29 @@ export function classifyWorkstream(deal: WorkDeal): WorkstreamLane {
   if (stage.includes('expan') || stage.includes('upsell')) return 'expansion';
   if (stage.includes('customer') || stage.includes('deliver')) return 'delivery';
   return 'pursuit';
+}
+
+/**
+ * Bar lengths as a share of the largest lane. Integer micros win when every
+ * occupied lane has them, so two amounts that collapse as JS numbers still
+ * draw different bars. A zero lane is 0.
+ */
+export function workstreamBarValues(
+  rows: ReadonlyArray<{ value: number; valueMicros: string | null }>,
+): number[] {
+  const useMicros =
+    rows.some((row) => row.valueMicros != null && row.valueMicros !== '0') &&
+    rows.every((row) => row.valueMicros != null || row.value === 0);
+  if (useMicros) {
+    const max = rows.reduce((best, row) => {
+      const micros = row.valueMicros ?? '0';
+      return compareMicros(micros, best) > 0 ? micros : best;
+    }, '0');
+    return rows.map((row) => microsSharePercent(row.valueMicros ?? '0', max));
+  }
+  const maxUnits = rows.reduce((best, row) => Math.max(best, row.value), 0);
+  if (maxUnits <= 0) return rows.map(() => 0);
+  return rows.map((row) => (row.value <= 0 ? 0 : (row.value / maxUnits) * 100));
 }
 
 export function groupWorkstreams(deals: readonly WorkDeal[]): Record<WorkstreamLane, WorkDeal[]> {
