@@ -102,12 +102,15 @@ export function serializeCompany(enrichment: {
   const metadata = record(enrichment.providerMetadata);
   const industryCodes = stringArray(enrichment.industryCodes);
   const sourceAttribution = parseAttribution(enrichment.sourceAttribution);
+  const publicLegalName = parsePublicFacts(metadata.publicFacts) ? enrichment.legalName : null;
   return {
     id: enrichment.id,
     source: 'verified_data',
     name,
-    legalName: enrichment.legalName,
-    legalNameSource: enrichment.legalName && parsePublicFacts(metadata.publicFacts) ? 'public' : null,
+    // The column is required, so a meeting import stores the typed name there.
+    // That string is not a legal name until public facts or the account record say so.
+    legalName: publicLegalName,
+    legalNameSource: publicLegalName ? 'public' : null,
     domain: enrichment.domain,
     website: enrichment.website,
     industry: industryCodes[0] ?? null,

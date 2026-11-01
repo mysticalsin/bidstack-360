@@ -400,6 +400,41 @@ describe('unscored company shells', () => {
     expect(company?.legalNameSource).toBe('account');
   });
 
+  it('does not present a meeting-note name as a legal name', () => {
+    // WHY: the enrichment column cannot be empty, so an import stores the
+    // typed company name there. Without public facts that string is not a
+    // registry name.
+    const [company] = buildCompanies(
+      [],
+      [
+        {
+          id: 'enrich-meeting',
+          tradeName: 'Linked Import',
+          legalName: 'Linked Import',
+          domain: null,
+          website: null,
+          industryCodes: [],
+          providerMetadata: { meetingTechStack: [] },
+          employeeCount: null,
+          annualRevenueMicros: null,
+          status: null,
+          registryIds: {},
+          formerNames: [],
+          incorporationDate: null,
+          logoUrl: null,
+          logoSource: null,
+          confidenceBps: 0,
+          sourceAttribution: [],
+          updatedAt: new Date('2026-11-01T00:00:00.000Z'),
+        },
+      ],
+      [],
+    );
+    expect(company?.name).toBe('Linked Import');
+    expect(company?.legalName).toBeNull();
+    expect(company?.legalNameSource).toBeNull();
+  });
+
   it('does not invent Mantu headcount or revenue on the placeholder account', () => {
     const mantu = fallbackCompany('Mantu');
     expect(mantu.legalName).toBeNull();
