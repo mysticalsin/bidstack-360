@@ -416,6 +416,24 @@ describe('useCurrencyStore', () => {
     expect(useCurrencyStore.getState().convert(huge, 'EUR')).toBe(expected);
     expect(useCurrencyStore.getState().convert(huge, 'EUR')).not.toBe(huge);
   });
+
+  it('converts a fractional unit amount past the safe range', async () => {
+    // WHY: multiplying this fraction by 1e6 is not a safe integer, so the rate was skipped.
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const fractional = 9_007_199_254_740.992;
+    const micros = 9_007_199_254_740_992n * 1_000n;
+    const expected = microsToUnits(convertMicrosByRates(micros, 1, 1.1)!);
+    expect(useCurrencyStore.getState().convert(fractional, 'EUR')).toBe(expected);
+    expect(useCurrencyStore.getState().convert(fractional, 'EUR')).not.toBe(fractional);
+  });
 });
 
 describe('useFormatMoney hook integration', () => {

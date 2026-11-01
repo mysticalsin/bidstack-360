@@ -82,18 +82,41 @@ function rateRatio(rate: number): { num: bigint; den: bigint } | null {
 }
 
 /**
- * Micros for a unit number. A safe conversion wins. An integer past that range
- * still converts from the digits the number still has.
+ * Micros from the significant digits a number still has. Used when multiplying
+ * by 1e6 is no longer a safe integer.
+ */
+function digitsToMicros(amount: number): bigint | null {
+  const match = /^(\d)\.(\d+)e([+-]?\d+)$/i.exec(amount.toExponential(15));
+  if (!match) return null;
+  const digits = (match[1] + match[2]).replace(/0+$/, '') || '0';
+  const exp = Number(match[3]);
+  if (!Number.isSafeInteger(exp)) return null;
+  const shift = exp - (digits.length - 1) + 6;
+  let micros = BigInt(digits);
+  if (shift >= 0) micros *= 10n ** BigInt(shift);
+  else {
+    const divisor = 10n ** BigInt(-shift);
+    micros = (micros + divisor / 2n) / divisor;
+  }
+  return micros;
+}
+
+/**
+ * Micros for a unit number. A safe conversion wins. Past that range, an integer
+ * uses BigInt and a fraction uses the digits the number still has.
  */
 function unitAmountToMicros(amount: number): bigint | null {
   const exact = unitsToMicros(amount);
   if (exact != null) return exact;
-  if (!Number.isInteger(amount) || amount <= 0) return null;
-  try {
-    return BigInt(amount) * 1_000_000n;
-  } catch {
-    return null;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (Number.isInteger(amount)) {
+    try {
+      return BigInt(amount) * 1_000_000n;
+    } catch {
+      return null;
+    }
   }
+  return digitsToMicros(amount);
 }
 
 /** Nearest micros after FX. Equal rates keep every digit, including the cent. */
