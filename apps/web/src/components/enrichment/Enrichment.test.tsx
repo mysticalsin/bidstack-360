@@ -11,6 +11,7 @@ vi.mock('@/lib/api', async (orig) => ({
 }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
 
+import { fmtMoney } from '@/components/financials/financials-format';
 import { mockEnrichment } from '@/lib/enrichment/mock';
 
 import { FirmographicsStrip } from './FirmographicsStrip';
@@ -29,6 +30,10 @@ describe('enrichment cards', () => {
     const strip = await screen.findByTestId('account-firmographics');
     for (const t of ['Revenue', 'Headcount', 'Industry', 'Locations']) expect(within(strip).getByText(t)).toBeTruthy();
     expect(strip.querySelectorAll('.en-src time').length).toBe(4);
+    const revenue = mockEnrichment('acct-1').firmographics.revenue?.value;
+    // WHY: the strip used to compact revenue to one decimal, so 7.86 million read as 7.9 million.
+    expect(revenue?.amount).toEqual(expect.any(Number));
+    expect(within(strip).getByText(fmtMoney(revenue!.amount!, revenue!.currency))).toBeTruthy();
     expect(within(strip).getByText('Sample')).toBeTruthy();
     expect(within(strip).getByText(/not configured/)).toBeTruthy();
     // No provider: nothing to refresh.

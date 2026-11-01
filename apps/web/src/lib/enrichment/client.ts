@@ -35,8 +35,3 @@ export function refreshEnrichment(companyId: string, force = false): Promise<Ref
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 export const fmtAsOf = (iso: string) => dateFmt.format(new Date(iso));
 
-export function fmtMoney(amount: number, currency: string): string {
-  const abs = Math.abs(amount);
-  const [v, s] = abs >= 1e9 ? [amount / 1e9, 'B'] : abs >= 1e6 ? [amount / 1e6, 'M'] : abs >= 1e3 ? [amount / 1e3, 'k'] : [amount, ''];
-  return `${currency} ${v.toLocaleString('en-GB', { maximumFractionDigits: 1 })}${s}`;
-}
