@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 import { microsText } from '../../services/crm/dashboard.cockpit.js';
-import { recordedDealStage } from '../../services/crm/dashboard.utils.js';
+import { livePipelineStage, recordedDealStage } from '../../services/crm/dashboard.utils.js';
 
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
@@ -52,17 +52,21 @@ type CrmSummaryCacheEntry = {
 const CRM_SUMMARY_CACHE_TTL_MS = 10_000;
 const crmSummaryCache = new Map<string, CrmSummaryCacheEntry>();
 
-/** Lost and won flags close the deal in the feed. A deleted stage row does not. */
+/** Lost and won flags close the deal. An open stage keeps its name. A deleted row does not. */
 export function opportunityActivitySubtitle(opportunity: {
   stage: string;
   pipelineStage: {
     key: string;
+    name?: string | null;
     isWon: boolean;
     isLost: boolean;
     deletedAt?: Date | null;
   } | null;
 }): string {
-  return recordedDealStage(opportunity);
+  const outcome = recordedDealStage(opportunity);
+  if (outcome === 'closed_lost' || outcome === 'closed_won') return outcome;
+  const name = livePipelineStage(opportunity.pipelineStage)?.name?.trim();
+  return name || outcome;
 }
 
 /** Newest `limit` rows across sources. Each source must already be its own newest `limit`. */
@@ -151,7 +155,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
           stage: true,
           updatedAt: true,
           pipelineStage: {
-            select: { key: true, isWon: true, isLost: true, deletedAt: true },
+            select: { key: true, name: true, isWon: true, isLost: true, deletedAt: true },
           },
           company: { select: { id: true, name: true } },
         },
