@@ -6,7 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
@@ -19,8 +19,8 @@ interface StageColumnProps {
   /** Reserved for future per-stage colour theming. */
   stageColor: string | null;
   items: Opportunity[];
-  /** Sum of the cards in this column. Not a conversion rate and not the org total. */
-  total: number;
+  /** Sum of the cards in this column, as integer micros. */
+  totalMicros: string;
   isHoverTarget: boolean;
   draggingId: string | null;
   focusedId: string | null;
@@ -39,7 +39,7 @@ export const StageColumn = memo(function StageColumn({
   stageName,
   stageColor: _stageColor,
   items,
-  total,
+  totalMicros,
   isHoverTarget,
   draggingId,
   focusedId,
@@ -71,7 +71,7 @@ export const StageColumn = memo(function StageColumn({
         <span className="text-[10px] text-[var(--fg-tertiary)] tabular-nums">
           {items.length}
           {' · '}
-          {formatUnspecifiedCompact(total)}
+          {unspecifiedMicrosLabel(totalMicros)}
         </span>
       </div>
       <GlassCard

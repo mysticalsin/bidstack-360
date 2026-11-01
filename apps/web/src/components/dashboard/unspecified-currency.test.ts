@@ -6,6 +6,7 @@ import {
   formatRecordedDealAmount,
   formatUnspecifiedCompactMicros,
   recordedMicros,
+  sumRecordedDealMicros,
   sumRecordedDealUnits,
   microsSharePercent,
   shareBarWidth,
@@ -49,6 +50,13 @@ describe('exact unspecified amounts', () => {
   it('sums a stage from micros when one card has a zero unit number', () => {
     // WHY: the kanban column added value, so this card did not change the total.
     expect(sumRecordedDealUnits([{ value: 10_000 }, { value: 40_000 }])).toBe(50_000);
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    expect(
+      sumRecordedDealMicros([
+        { value: 0, valueMicros: huge },
+        { value: 0, valueMicros: huge },
+      ]),
+    ).toBe(9007199254740993n * 2_000_000n);
     expect(
       sumRecordedDealUnits([{ value: 0, valueMicros: '8598204328457184962' }]).toFixed(2),
     ).toBe('8598204328457.18');

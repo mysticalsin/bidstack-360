@@ -59,7 +59,7 @@ describe('StageColumn', () => {
           stageName="S1 Lead"
           stageColor={null}
           items={[opp('a', 100_000), opp('b', 25_000)]}
-          total={125_000}
+          totalMicros="125000000000"
           isHoverTarget={false}
           draggingId={null}
           focusedId={null}
@@ -80,6 +80,35 @@ describe('StageColumn', () => {
     expect(screen.getByLabelText('S1 Lead column with 2 opportunities')).toBeTruthy();
   });
 
+  it('prints a column past the safe unit count in full', () => {
+    // WHY: compacting the collapsed unit number prints one unit low.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    render(
+      <MemoryRouter>
+        <StageColumn
+          stageId="s1_lead"
+          stageName="S1 Lead"
+          stageColor={null}
+          items={[opp('a', 0)]}
+          totalMicros={huge}
+          isHoverTarget={false}
+          draggingId={null}
+          focusedId={null}
+          onDragOver={vi.fn()}
+          onDragLeave={vi.fn()}
+          onDrop={vi.fn()}
+          onCardDragStart={vi.fn()}
+          onCardDragEnd={vi.fn()}
+          onCardFocus={vi.fn()}
+          onCardBlur={vi.fn()}
+          onCardKey={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/9,007,199,254,740,993 unspecified/)).toBeTruthy();
+    expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
+  });
+
   it('uses the singular opportunity label when the column has one card', () => {
     render(
       <MemoryRouter>
@@ -88,7 +117,7 @@ describe('StageColumn', () => {
           stageName="S1 Lead"
           stageColor={null}
           items={[opp('a', 100_000)]}
-          total={100_000}
+          totalMicros="100000000000"
           isHoverTarget={false}
           draggingId={null}
           focusedId={null}

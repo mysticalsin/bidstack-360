@@ -44,15 +44,18 @@ export function formatExactUnspecified(micros: string | number | bigint): string
   return `${formatMicrosAmount(asMicros(micros))} unspecified`;
 }
 
+/** Column total in integer micros. The digit string wins over the unit number. */
+export function sumRecordedDealMicros(
+  deals: readonly { value: number; valueMicros?: string | null }[],
+): bigint {
+  return deals.reduce((sum, deal) => sum + recordedMicros(deal.value, deal.valueMicros), 0n);
+}
+
 /** Column total in major units. Micros win, then the sum is rounded to the cent. */
 export function sumRecordedDealUnits(
   deals: readonly { value: number; valueMicros?: string | null }[],
 ): number {
-  const micros = deals.reduce((sum, deal) => {
-    if (deal.valueMicros && /^\d+$/.test(deal.valueMicros)) return sum + BigInt(deal.valueMicros);
-    if (!Number.isFinite(deal.value)) return sum;
-    return sum + (unitsToMicros(deal.value) ?? 0n);
-  }, 0n);
+  const micros = sumRecordedDealMicros(deals);
   const cents = (micros + 5_000n) / 10_000n;
   return microsToUnits(cents * 10_000n);
 }

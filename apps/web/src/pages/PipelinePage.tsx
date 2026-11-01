@@ -24,7 +24,7 @@ import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import {
-  sumRecordedDealUnits,
+  sumRecordedDealMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { PipelineMetricStrip } from '@/components/dashboard/widgets/PipelineMetricStrip';
@@ -300,7 +300,7 @@ export function PipelinePage() {
         >
           {visibleStages.map((stage) => {
             const items = byStage.get(stage.id) ?? [];
-            const total = sumRecordedDealUnits(items);
+            const totalMicros = sumRecordedDealMicros(items).toString();
             const isHover = hoverStageId === stage.id;
             return (
               <StageColumn
@@ -309,7 +309,7 @@ export function PipelinePage() {
                 stageName={stage.name}
                 stageColor={stage.color}
                 items={items}
-                total={total}
+                totalMicros={totalMicros}
                 isHoverTarget={isHover}
                 draggingId={draggingId}
                 focusedId={focusedId}
