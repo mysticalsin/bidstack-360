@@ -295,10 +295,11 @@ async function writeOpportunity(
 ): Promise<string | null> {
   const name = asTrimmed(t['opportunity.name']);
   if (!name) throw new Error('opportunity.name is required');
-  const customer =
-    asTrimmed(t['opportunity.companyName']) ?? asTrimmed(t['opportunity.customer']) ?? 'Unknown';
+  const providedCustomer =
+    asTrimmed(t['opportunity.companyName']) ?? asTrimmed(t['opportunity.customer']);
+  const customer = providedCustomer ?? 'Unknown';
   if (ctx.dedupStrategy !== 'duplicate') {
-    const existing = await prisma.opportunity.findFirst({
+    const rows = await prisma.opportunity.findMany({
       where: {
         orgId: ctx.orgId,
         name: { equals: name, mode: 'insensitive' },
@@ -306,11 +307,16 @@ async function writeOpportunity(
         deletedAt: null,
       },
       select: { id: true },
+      take: 2,
     });
-    if (existing) {
+    const match = soleCompanyId(rows.map((row) => row.id));
+    if (match.ambiguous) {
+      throw new Error(`opportunity.name matches more than one deal: ${name}`);
+    }
+    if (match.id) {
       if (ctx.dedupStrategy === 'skip') return null;
       await prisma.opportunity.update({
-        where: { id: existing.id },
+        where: { id: match.id },
         data: {
           valueMicros: asMicros(t['opportunity.valueMicros']) ?? undefined,
           probability: asInt(t['opportunity.probability']) ?? undefined,
@@ -320,6 +326,9 @@ async function writeOpportunity(
       return null;
     }
   }
+  const company = providedCustomer
+    ? soleCompanyId(await companiesNamed(ctx.orgId, providedCustomer))
+    : null;
   // Bounded retry on (orgId, code) unique collisions — same pattern as the
   // API's create route.
   const stage = mapStage(t['opportunity.stage']);
@@ -333,6 +342,7 @@ async function writeOpportunity(
             code,
             name,
             customer,
+            companyId: company?.ambiguous ? null : (company?.id ?? null),
             stage: stage as never,
             valueMicros: asMicros(t['opportunity.valueMicros']) ?? 0n,
             probability: asInt(t['opportunity.probability']) ?? 0,
