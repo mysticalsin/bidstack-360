@@ -11,7 +11,7 @@
 // Design: fleet/polo-mars-integration.md.
 import { createHash } from 'node:crypto';
 
-import { Prisma, prisma } from '@bidstack/db';
+import { type Prisma, prisma } from '@bidstack/db';
 import {
   type ChartPersonRef,
   dedupePeople,
@@ -92,7 +92,7 @@ async function meetingsWithPeople(caller: ToolCaller, scope: AccessScope, compan
     ? await prisma.meetingIngestItem.findMany({
         where: { orgId: caller.orgId, source: 'mars', status: 'processed', meetingIntelId: { in: meetings.map((m) => m.id) } },
         select: { meetingIntelId: true, payload: true },
-        take: 5000,
+        take: 1000,
       })
     : [];
   const hints = new Map<string, { linkedinUrl?: string; reportsTo?: { name: string; email?: string } }>();
@@ -228,6 +228,6 @@ export async function callMarsTool(caller: ToolCaller, name: string, rawArgs: un
     chartVersion: chart?.version ?? null,
     peopleConsidered: people.length,
     suggestions: suggestions.map((x) => ({ ...x, personKey: opaque(caller.orgId, x.personKey), managerKey: opaque(caller.orgId, x.managerKey) })),
-    howToApply: 'Suggestions are not applied. An admin moves a node with POST /org-chart/nodes/:id/move, or adds missing people with POST /companies/:id/org-chart/seed.',
+    howToApply: 'Suggestions are not applied. An admin moves a node with POST /org-chart/nodes/:nodeId/move, or adds missing people with POST /companies/:id/org-chart/seed.',
   };
 }

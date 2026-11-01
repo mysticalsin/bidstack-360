@@ -243,7 +243,8 @@ export interface MergedPerson {
  * Same person when email or LinkedIn handle match. A sighting with neither
  * joins a group only by exact normalized name within the same company, and
  * only when exactly one group carries that name (two "J. Smith" stay apart).
- * The newest sighting wins for title, department, country and manager hint.
+ * The newest sighting wins for title, department, country and manager hint;
+ * the fullest spelling wins for the name.
  */
 export function dedupePeople(sightings: readonly PersonSighting[]): MergedPerson[] {
   const parent = sightings.map((_, i) => i);
@@ -284,7 +285,8 @@ export function dedupePeople(sightings: readonly PersonSighting[]): MergedPerson
     const mgr = latest('reportsTo') as PersonSighting['reportsTo'];
     out.push({
       key: emails[0] ? `email:${emails[0]}` : li ? `linkedin:${li}` : `name:${newest.companyId}:${normalizePersonName(newest.name)}`,
-      name: newest.name.trim(),
+      // Fullest spelling wins ("Lukas Brandt" over "L. Brandt"), newest on a tie.
+      name: [...sorted].reverse().reduce((a, b) => (normalizePersonName(b.name).length > normalizePersonName(a.name).length ? b : a)).name.trim(),
       emails,
       linkedinHandle: li,
       companyId: newest.companyId,
@@ -416,9 +418,11 @@ export function inferReportingLines(input: {
         ((p.reportsTo.email && m.emails.includes(p.reportsTo.email.toLowerCase())) || normalizePersonName(p.reportsTo.name) === normalizePersonName(m.name));
       if (stated) { score += 6; reasons.push('Logged in MARS as their manager'); }
       else {
-        if (m.seniority === 'unknown' || p.seniority === 'unknown' || theirs >= mine) continue;
+        const isCeo = ceo.includes(m);
+        // Only someone more senior, except the chief executive over other C-level people.
+        if (m.seniority === 'unknown' || p.seniority === 'unknown' || (theirs >= mine && !(isCeo && p.seniority === 'c_level'))) continue;
         const gap = mine - theirs;
-        if (ceo.includes(m) && (p.seniority === 'c_level' || !fn.get(p.key))) { score += 2; reasons.push('Chief executive of the account'); }
+        if (isCeo && (p.seniority === 'c_level' || !fn.get(p.key))) { score += 2; reasons.push('Chief executive of the account'); }
         if (fn.get(p.key) && fn.get(p.key) === fn.get(m.key)) { score += 2; reasons.push(`Same function (${fn.get(p.key)})`); }
         if (gap === 1) { score += 1; reasons.push('One seniority level above'); }
         else if (gap > 2) score -= 1;

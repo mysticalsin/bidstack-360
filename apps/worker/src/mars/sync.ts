@@ -18,7 +18,7 @@
  * a new version: same title and day merges into the existing meeting; a moved
  * or retitled entry replaces the older MARS-only meeting.
  */
-import { Prisma, prisma } from '@bidstack/db';
+import { type Prisma, prisma } from '@bidstack/db';
 import {
   emailDomain,
   isMarsEnabled,
