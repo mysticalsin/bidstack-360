@@ -24,6 +24,54 @@ export {
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
+const CONTACT_PAGE = 1000;
+
+type ContactIdentity = { id: string; email: string | null; name: string; companyId: string | null };
+
+/**
+ * One unlinked row with this email can take the company. A person already on
+ * a company stays there. A full page is not proof that the email is new.
+ */
+export function planContactWrites(
+  contacts: MeetingImportedContact[],
+  emailRows: readonly ContactIdentity[],
+  nameRows: readonly ContactIdentity[],
+  companyId: string | null | undefined,
+  pages: { emailsCapped: boolean; namesCapped: boolean },
+): { linkIds: string[]; create: MeetingImportedContact[] } {
+  const byEmail = new Map<string, ContactIdentity[]>();
+  for (const row of emailRows) {
+    if (!row.email) continue;
+    const key = row.email.toLowerCase();
+    const list = byEmail.get(key) ?? [];
+    list.push(row);
+    byEmail.set(key, list);
+  }
+  const linkIds: string[] = [];
+  const create: MeetingImportedContact[] = [];
+  for (const contact of contacts) {
+    if (contact.email) {
+      if (pages.emailsCapped) continue;
+      const matches = byEmail.get(contact.email.toLowerCase()) ?? [];
+      const onlyMatch = matches[0];
+      if (matches.length === 1 && onlyMatch && onlyMatch.companyId == null && companyId) {
+        linkIds.push(onlyMatch.id);
+      }
+      if (matches.length > 0) continue;
+      create.push(contact);
+      continue;
+    }
+    if (pages.namesCapped) continue;
+    const sameAccount = nameRows.some(
+      (row) =>
+        row.name.toLowerCase() === contact.name.toLowerCase() &&
+        (row.companyId ?? null) === (companyId ?? null),
+    );
+    if (!sameAccount) create.push(contact);
+  }
+  return { linkIds, create };
+}
+
 export async function persistContacts(
   tx: Prisma.TransactionClient,
   orgId: string,
@@ -33,49 +81,35 @@ export async function persistContacts(
 ): Promise<number> {
   if (contacts.length === 0) return 0;
   const emails = contacts.map((c) => c.email).filter((e): e is string => !!e);
-  const names = contacts.map((c) => c.name);
-  const existing = await tx.contact.findMany({
-    where: {
-      orgId,
-      deletedAt: null,
-      OR: [
-        ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
-        { name: { in: names, mode: 'insensitive' } },
-      ],
-    },
+  const emailWhere = { orgId, deletedAt: null, email: { in: emails } };
+  const emailRows = emails.length === 0 ? [] : await tx.contact.findMany({
+    where: emailWhere,
     select: { id: true, email: true, name: true, companyId: true },
-    take: 1000,
+    orderBy: { id: 'asc' },
+    take: CONTACT_PAGE,
   });
-  const byEmail = new Map<string, typeof existing>();
-  for (const row of existing) {
-    if (!row.email) continue;
-    const key = row.email.toLowerCase();
-    const list = byEmail.get(key) ?? [];
-    list.push(row);
-    byEmail.set(key, list);
-  }
-  const newContacts: MeetingImportedContact[] = [];
-  const linkIds: string[] = [];
-  for (const contact of contacts) {
-    if (contact.email) {
-      const matches = byEmail.get(contact.email.toLowerCase()) ?? [];
-      // One unlinked row with this email can take the company. A person
-      // already on a company stays there. A shared name is not that person.
-      const onlyMatch = matches[0];
-      if (matches.length === 1 && onlyMatch && onlyMatch.companyId == null && companyId) {
-        linkIds.push(onlyMatch.id);
-      }
-      if (matches.length > 0) continue;
-      newContacts.push(contact);
-      continue;
-    }
-    const sameAccount = existing.some(
-      (row) =>
-        row.name.toLowerCase() === contact.name.toLowerCase() &&
-        (row.companyId ?? null) === (companyId ?? null),
-    );
-    if (!sameAccount) newContacts.push(contact);
-  }
+  const emailsCapped = emailRows.length === CONTACT_PAGE && (await tx.contact.count({ where: emailWhere })) > CONTACT_PAGE;
+  const bareNames = [...new Set(contacts.filter((c) => !c.email).map((c) => c.name))];
+  const nameWhere = {
+    orgId,
+    deletedAt: null,
+    name: { in: bareNames, mode: 'insensitive' as const },
+    companyId: companyId ?? null,
+  };
+  const nameRows = bareNames.length === 0 ? [] : await tx.contact.findMany({
+    where: nameWhere,
+    select: { id: true, email: true, name: true, companyId: true },
+    orderBy: { id: 'asc' },
+    take: CONTACT_PAGE,
+  });
+  const namesCapped = nameRows.length === CONTACT_PAGE && (await tx.contact.count({ where: nameWhere })) > CONTACT_PAGE;
+  const { linkIds, create: newContacts } = planContactWrites(
+    contacts,
+    emailRows,
+    nameRows,
+    companyId,
+    { emailsCapped, namesCapped },
+  );
   if (linkIds.length > 0 && companyId) {
     await Promise.all(
       linkIds.map((id) =>
