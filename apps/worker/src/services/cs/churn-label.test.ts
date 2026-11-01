@@ -41,4 +41,16 @@ describe('customer-success honesty', () => {
     expect(data.currency).toBe('XXX');
     expect(data.valueMicros).toBeUndefined();
   });
+
+  it('does not expand from an old high score after the latest score dropped', async () => {
+    // WHY: the query kept any row at 80 or above. A stale 90 still opened
+    // an expansion after the current score was 40.
+    healthFindMany.mockResolvedValue([
+      { accountId: 'acct-1', score: 90, capturedAt: new Date('2026-01-01T00:00:00.000Z') },
+      { accountId: 'acct-1', score: 40, capturedAt: new Date('2026-06-01T00:00:00.000Z') },
+    ]);
+    const created = await surfaceExpansionOpportunities('org-1', log);
+    expect(created).toBe(0);
+    expect(expansionCreate).not.toHaveBeenCalled();
+  });
 });

@@ -199,13 +199,28 @@ export async function runOrgChurnDetection(orgId: string, log: Logger): Promise<
   return 0;
 }
 
+/** Latest score per account, then the ones at or above the threshold. */
+export function accountsAtLeast(
+  rows: Array<{ accountId: string; score: number; capturedAt?: Date }>,
+  threshold: number,
+): Array<{ accountId: string; score: number }> {
+  const latest = new Map<string, { score: number; capturedAt: number }>();
+  for (const row of rows) {
+    const at = row.capturedAt?.getTime() ?? 0;
+    const prior = latest.get(row.accountId);
+    if (!prior || at >= prior.capturedAt) latest.set(row.accountId, { score: row.score, capturedAt: at });
+  }
+  return [...latest.entries()]
+    .filter(([, row]) => row.score >= threshold)
+    .map(([accountId, row]) => ({ accountId, score: row.score }));
+}
+
 export async function surfaceExpansionOpportunities(orgId: string, log: Logger): Promise<number> {
-  const healthyAccounts = await prisma.healthScore.findMany({
-    where: { orgId, score: { gte: 80 } },
-    distinct: ['accountId'],
-    orderBy: [{ accountId: 'asc' }, { capturedAt: 'desc' }],
-    select: { accountId: true, score: true },
+  const rows = await prisma.healthScore.findMany({
+    where: { orgId },
+    select: { accountId: true, score: true, capturedAt: true },
   });
+  const healthyAccounts = accountsAtLeast(rows, 80);
 
   let created = 0;
   for (const account of healthyAccounts) {
