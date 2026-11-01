@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Initiative, InitiativeTheme } from '@bidstack/shared';
 
-import { applyMeetingEvidence, confirmThemeFromProbes, evidencePageCapped, meetingEvidenceLines, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
+import { applyMeetingEvidence, confirmThemeFromProbes, evidencePageCapped, meetingEvidenceLines, readBoundedPages, SOLUTION_PROBE_PAGE, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
 
 describe('evidencePageCapped', () => {
   it('names a full news or meeting page only when another row exists', () => {
@@ -51,6 +51,52 @@ describe('evidencePageCapped', () => {
     });
     expect(confirmed).toBe(true);
     expect(words).toEqual(['cloud', 'kubernetes']);
+  });
+
+  it('reads the next page when a full probe page is noise', async () => {
+    // WHY: the first thousand Cloudflare rows used to be the whole cloud lookup.
+    const cursors: Array<string | undefined> = [];
+    const confirmed = await confirmThemeFromProbes('cloud', async (word, cursor) => {
+      if (word !== 'cloud') return [];
+      cursors.push(cursor);
+      if (!cursor) {
+        return Array.from({ length: SOLUTION_PROBE_PAGE }, (_, index) => ({
+          id: `c${index}`,
+          name: 'Cloudflare DNS',
+          category: 'general',
+        }));
+      }
+      return [{ id: 'hit', name: 'Cloud practice', category: 'general' }];
+    });
+    expect(confirmed).toBe(true);
+    expect(cursors).toEqual([undefined, `c${SOLUTION_PROBE_PAGE - 1}`]);
+  });
+
+  it('finds an SAP practice the erp and workday words miss', async () => {
+    // WHY: a sold SAP rollout was invisible when the probe list never said sap.
+    const words: string[] = [];
+    const confirmed = await confirmThemeFromProbes('erp_finance', async (word) => {
+      words.push(word);
+      if (word === 'sap') return [{ id: 'sap', name: 'SAP S/4 rollout', category: 'general' }];
+      return [{ id: word, name: 'unrelated', category: 'general' }];
+    });
+    expect(confirmed).toBe(true);
+    expect(words).toEqual(['erp', 'workday', 'sap']);
+  });
+
+  it('stops a probe word that never runs out of noise', async () => {
+    let calls = 0;
+    const confirmed = await confirmThemeFromProbes('cloud', async (word) => {
+      if (word !== 'cloud') return [];
+      calls += 1;
+      return Array.from({ length: SOLUTION_PROBE_PAGE }, (_, index) => ({
+        id: `n${calls}-${index}`,
+        name: 'Cloudflare DNS',
+        category: 'general',
+      }));
+    });
+    expect(confirmed).toBe(false);
+    expect(calls).toBe(5);
   });
 
   it('keeps the seventh line from a meeting', () => {
