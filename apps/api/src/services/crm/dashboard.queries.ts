@@ -21,7 +21,14 @@ import type {
 } from '@bidstack/shared';
 
 import { buildCompanies } from './company-enrichment.service.js';
-import { buildCockpit, microsText, type AccountPerformance } from './dashboard.cockpit.js';
+import {
+  buildCockpit,
+  COCKPIT_CONTACT_PAGE,
+  COCKPIT_OPP_PAGE,
+  COCKPIT_TASK_PAGE,
+  microsText,
+  type AccountPerformance,
+} from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
 import { asProviderStatus, normalizeName, record, recordedDealStage } from './dashboard.utils.js';
 import {
@@ -30,6 +37,7 @@ import {
   type AccessScope,
 } from '../../lib/access-scope.js';
 import { canReadAccount } from '../../lib/account-access.js';
+import { excludeClosedOutcome } from '../../routes/opportunities.helpers.js';
 
 // ─── Row serializers ──────────────────────────────────────────────────────────
 
@@ -379,7 +387,7 @@ export async function buildCompanyCockpit(
           },
         },
         orderBy: { updatedAt: 'desc' },
-        take: 100,
+        take: COCKPIT_OPP_PAGE,
       }),
       prismaClient.contact.findMany({
         where: { orgId, companyId, deletedAt: null },
@@ -395,7 +403,7 @@ export async function buildCompanyCockpit(
           createdAt: true,
         },
         orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
-        take: 20,
+        take: COCKPIT_CONTACT_PAGE,
       }),
       prismaClient.task.findMany({
         where: {
@@ -414,7 +422,7 @@ export async function buildCompanyCockpit(
           assignee: { select: { name: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: COCKPIT_TASK_PAGE,
       }),
       fetchAccountPerformance(orgId, company.id, prismaClient, scope),
       // WHY: folded into the Promise.all (was a 7th serial query after it) so the
@@ -426,6 +434,37 @@ export async function buildCompanyCockpit(
         take: 10,
       }),
     ]);
+
+  const taskWhere = {
+    orgId,
+    deletedAt: null,
+    OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
+  };
+  const [dealsCapped, contactsCapped, tasksCapped, openDealCount] = await Promise.all([
+    opportunities.length < COCKPIT_OPP_PAGE
+      ? Promise.resolve(false)
+      : prismaClient.opportunity.count({ where: opportunityWhere }).then((total) => total > COCKPIT_OPP_PAGE),
+    contacts.length < COCKPIT_CONTACT_PAGE
+      ? Promise.resolve(false)
+      : prismaClient.contact.count({ where: { orgId, companyId, deletedAt: null } }).then((total) => total > COCKPIT_CONTACT_PAGE),
+    tasks.length < COCKPIT_TASK_PAGE
+      ? Promise.resolve(false)
+      : prismaClient.task.count({ where: taskWhere }).then((total) => total > COCKPIT_TASK_PAGE),
+    opportunities.length < COCKPIT_OPP_PAGE
+      ? Promise.resolve(undefined)
+      : (async () => {
+          const total = await prismaClient.opportunity.count({ where: opportunityWhere });
+          if (total <= COCKPIT_OPP_PAGE) return undefined;
+          const { NOT } = excludeClosedOutcome();
+          return prismaClient.opportunity.count({
+            where: {
+              ...opportunityWhere,
+              stage: { notIn: ['closed_won', 'closed_lost', 'customer'] },
+              NOT,
+            },
+          });
+        })(),
+  ]);
 
   const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
   const contactIds = contacts.map((contact) => contact.id);
@@ -480,6 +519,8 @@ export async function buildCompanyCockpit(
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
     performance,
+    coveragePages: { contactsCapped, dealsCapped, tasksCapped },
+    openDealCount,
   });
 }
 
