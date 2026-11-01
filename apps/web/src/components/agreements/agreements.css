@@ -78,7 +78,7 @@
 
 .agr-drop-lg { min-height: 176px; }
 .agr-intake .agr-drop { background: var(--surface-sunken); }
-.agr-cite { font-size: 12px; color: var(--fg-tertiary); }
+.agr-cite { display: block; font-size: 12px; color: var(--fg-tertiary); }
 .agr-review-terms { grid-template-columns: 1fr; }
 .agr-review-terms div { padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
 .agr-review-terms div:last-child { border-bottom: 0; }

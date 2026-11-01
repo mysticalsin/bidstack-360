@@ -29,7 +29,15 @@ function display(field: MsaExtractedField): string {
   }
   if (Array.isArray(field.value)) {
     return field.value
-      .map((row) => (row && typeof row === 'object' && 'name' in row ? String((row as { name: string }).name) : JSON.stringify(row)))
+      .map((row) => {
+        if (!row || typeof row !== 'object') return JSON.stringify(row);
+        const item = row as { name?: string; role?: string; rateMicros?: number; unit?: string };
+        if (item.role && item.rateMicros != null) {
+          return `${item.role}: ${(item.rateMicros / 1_000_000).toLocaleString('en-GB')} / ${item.unit ?? 'day'}`;
+        }
+        if (item.name) return item.name;
+        return JSON.stringify(row);
+      })
       .join(' · ');
   }
   return JSON.stringify(field.value);
@@ -94,8 +102,8 @@ export default function IntakeReviewPage() {
     setError(null);
     try {
       const body = resolvedCompany
-        ? { companyId: resolvedCompany, signingEntityId: resolvedEntity || null, status: 'active' as const }
-        : { createCompany: { name: createName.trim() || clientGuess || 'New account' }, signingEntityId: resolvedEntity || null, status: 'active' as const };
+        ? { companyId: resolvedCompany, signingEntityId: resolvedEntity || null, status: 'active' as const, kind: 'msa' as const }
+        : { createCompany: { name: createName.trim() || clientGuess || 'New account' }, signingEntityId: resolvedEntity || null, status: 'active' as const, kind: 'msa' as const };
       const out = await confirm.mutateAsync({ id: d.id, body });
       if (queue[0]) navigate(`/agreements/intake/${queue[0]}${queue.length > 1 ? `?queue=${queue.slice(1).join(',')}` : ''}`);
       else navigate(`/agreements/${out.contractId}`);
@@ -169,8 +177,10 @@ export default function IntakeReviewPage() {
             return (
               <div key={key} data-low={low || undefined} data-missing={!field.found || undefined}>
                 <dt>{label}</dt>
-                <dd>{display(field)}</dd>
-                <span className="agr-cite">{cite(field)}{low ? ' · low confidence' : ''}</span>
+                <dd>
+                  {display(field)}
+                  <span className="agr-cite">{cite(field)}{low ? ' · low confidence' : ''}</span>
+                </dd>
               </div>
             );
           })}
