@@ -25,8 +25,16 @@ import { resolveLeadCompanyId } from './leads.company-link.js';
 /** Stored deal micros for a lead conversion. A digit string keeps a large amount. */
 export function convertOpportunityMicros(value: string | number | undefined): bigint {
   if (value === undefined) return 0n;
-  if (typeof value === 'string') return BigInt(value);
-  return BigInt(Math.trunc(value));
+  if (typeof value === 'string') {
+    if (!/^\d+$/.test(value)) throw new Error('opportunityValueMicros is not an integer amount');
+    return BigInt(value);
+  }
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(
+      'opportunityValueMicros is too large to store as a JSON number; send the micros as text',
+    );
+  }
+  return BigInt(value);
 }
 
 export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
@@ -299,6 +307,14 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
       }
 
       const body = req.body;
+      let valueMicros: bigint;
+      try {
+        valueMicros = convertOpportunityMicros(body.opportunityValueMicros);
+      } catch (err) {
+        throw server.httpErrors.badRequest(
+          err instanceof Error ? err.message : 'opportunityValueMicros is not an amount',
+        );
+      }
       // Bounded retry on (orgId, code) collisions — mintNextCode reads inside
       // the transaction, so a concurrent convert/create can race it; the whole
       // transaction (contact + opportunity + lead flip) rolls back and re-runs.
@@ -326,7 +342,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           customer: lead.companyName,
           companyId: lead.companyId,
           name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
-          valueMicros: convertOpportunityMicros(body.opportunityValueMicros),
+          valueMicros,
           ownerId: lead.ownerId,
           pipelineStageId: body.pipelineStageId,
           stageKey: body.stage,
