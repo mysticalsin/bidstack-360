@@ -120,7 +120,7 @@ function extractTechStack(bodyMd: string): TechnicalStackCategory[] {
     category.set(candidate.name.toLowerCase(), {
       name: candidate.name,
       source: 'meeting_notes_import',
-      confidence: 0.86,
+      confidence: null,
     });
     byCategory.set(candidate.category, category);
   }
@@ -164,7 +164,7 @@ function extractContacts(bodyMd: string): MeetingImportedContact[] {
       email,
       phone,
       roleInDecision: roleFromText(chunk),
-      confidence: email ? 0.86 : 0.62,
+      confidence: null,
     };
     byEmailOrName.set(email ?? name.toLowerCase(), contact);
   }
@@ -176,7 +176,7 @@ function extractRisks(bodyMd: string): RiskItem[] {
   const lines = bodyMd
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => /risk|concern|blocker|issue|challenge|delay|security|compliance/i.test(line));
+    .filter((line) => /\b(risk|concern|issue|challenge|delay)\b/i.test(line));
   const seen = new Set<string>();
   const risks: RiskItem[] = [];
 
@@ -222,11 +222,18 @@ function extractCompliance(
       .split('\n')
       .find((line) => item.aliases.some((alias) => line.toLowerCase().includes(alias)));
     if (!item.aliases.some((alias) => lower.includes(alias))) continue;
+    // Status and owner come from the clause that names this framework.
+    // The rest of the line, and the rest of the note, belong to other facts.
+    const clause =
+      matchingLine
+        ?.split(/[,;]+/)
+        .map((part) => part.trim())
+        .find((part) => item.aliases.some((alias) => part.toLowerCase().includes(alias))) ?? null;
     checks.push({
       id: `meeting-compliance-${slug(item.label)}`,
       label: item.label,
-      status: complianceStatusFromText(matchingLine ?? bodyMd),
-      owner: ownerFromText(matchingLine ?? bodyMd),
+      status: clause ? complianceStatusFromText(clause) : null,
+      owner: clause ? ownerFromText(clause) : null,
       sourceAttribution: [
         {
           ...source,
@@ -268,7 +275,7 @@ function extractTasks(bodyMd: string): MeetingImportedTask[] {
           : /progress|working/i.test(line)
             ? 'in_progress'
             : 'open',
-      confidence: 0.82,
+      confidence: null,
     });
   }
 
@@ -293,22 +300,33 @@ function severityFromText(value: string): RiskItem['severity'] {
   if (/critical|urgent|blocker|sev\s*1/i.test(value)) return 'critical';
   if (/high|major|red/i.test(value)) return 'high';
   if (/low|minor|watch/i.test(value)) return 'low';
-  return 'medium';
+  return null;
 }
 
 function complianceStatusFromText(value: string): ComplianceCheck['status'] {
   if (/blocked|missing|failed|gap/i.test(value)) return 'blocked';
+  if (/\bnot started\b|\bnot yet\b/i.test(value)) return 'not_started';
   if (/progress|review|pending|in flight|working/i.test(value)) return 'in_progress';
   if (/compliant|complete|completed|certified|approved|done/i.test(value)) return 'compliant';
-  return 'not_started';
+  return null;
 }
 
 function roleFromText(value: string): MeetingImportedContact['roleInDecision'] {
-  if (/champion/i.test(value)) return 'champion';
-  if (/blocker/i.test(value)) return 'blocker';
-  if (/buyer|procurement|economic/i.test(value)) return 'buyer';
-  if (/user|technical/i.test(value)) return 'user';
-  if (/influencer|stakeholder|owner/i.test(value)) return 'influencer';
+  // A name, a job title, or a contact-line marker is not a buying role.
+  // Only an explicit label on the note is.
+  const labeled = value.match(
+    /\b(?:decision role|buying role|role in decision)\s*[:=-]\s*(buyer|blocker|champion|influencer|user)\b/i,
+  );
+  const role = labeled?.[1]?.toLowerCase();
+  if (
+    role === 'buyer' ||
+    role === 'blocker' ||
+    role === 'champion' ||
+    role === 'influencer' ||
+    role === 'user'
+  ) {
+    return role;
+  }
   return null;
 }
 

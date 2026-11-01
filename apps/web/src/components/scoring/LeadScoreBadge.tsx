@@ -103,6 +103,13 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
 
   if (isLoading) return <ScoreSkeleton size={size} />;
   if (isError || score === undefined) return null;
+  if (score === null) {
+    return (
+      <span className="inline-flex min-h-[44px] items-center px-2 text-xs text-[var(--fg-tertiary)]">
+        {t('leadScoreBadge.notScored', 'Not scored')}
+      </span>
+    );
+  }
 
   const colorClasses = SCORE_TONE_CLASSES[leadScoreTone(score)];
   const label = scoreLabel(score, t);

@@ -216,6 +216,11 @@ model Org {
   bidFactCitations BidFactCitation[]
   bidFactDecisions BidFactDecision[]
 
+  // People map — suggested facts until a human accepts them, and customer
+  // promises kept off the internal Task list.
+  contactFacts         ContactFact[]
+  customerCommitments  CustomerCommitment[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -394,6 +399,8 @@ model Company {
   kamHandoffs      KamHandoff[]
   kamProspections  KamProspection[]
   kamTasks         Task[]            @relation("CompanyKamTasks")
+  contactFacts        ContactFact[]
+  customerCommitments CustomerCommitment[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -512,6 +519,8 @@ model Opportunity {
   tasks                Task[]
   documents            Document[]
   contactLinks         OpportunityContact[]
+  contactFacts         ContactFact[]
+  customerCommitments  CustomerCommitment[]
   bidDocuments         BidDocument[]
   requirements         Requirement[]
   complianceMatrixRows ComplianceMatrixRow[]
@@ -619,18 +628,28 @@ model Contact {
   sentiment Sentiment?
   /// When true: PII for this contact MUST NOT be included in AI prompts.
   aiOptOut  Boolean    @default(false) @map("ai_opt_out")
+  /// Write-time cache of a single accepted reports-to fact. A job title never
+  /// sets this. Conflicting, missing, or stale evidence clears it. The people
+  /// map reads facts, not this column, so a title cannot become authority.
+  reportsToContactId String? @map("reports_to_contact_id") @db.Uuid
   createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
   org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company? @relation(fields: [companyId], references: [id])
+  reportsTo Contact? @relation("ContactReportsTo", fields: [reportsToContactId], references: [id], onDelete: SetNull)
+  directReports Contact[] @relation("ContactReportsTo")
 
   opportunityLinks  OpportunityContact[]
   activityAttendees ActivityAttendee[]
+  facts             ContactFact[] @relation("FactSubject")
+  reportedByFacts   ContactFact[] @relation("FactReportsTo")
+  ownedCommitments  CustomerCommitment[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([orgId])
   @@index([orgId, companyId])
+  @@index([reportsToContactId])
   @@index([orgId, customer], map: "contacts_org_customer_idx")
   // P1 #25: contacts list + Zapier NEW_CONTACT trigger both filter by orgId and
   // order by createdAt DESC — full table scan without this index.
@@ -638,6 +657,100 @@ model Contact {
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "contacts_org_email_hash_idx")
   @@map("contacts")
+}
+
+/// A suggested fact about a person. It is not evidence until a human accepts
+/// it. Ambiguous text stays needs_review and is stored with no link target.
+/// Pattern follows the Comp AI CRM fact ledger (MIT); this is Polo's model.
+enum ContactFactKind {
+  reports_to
+  buying_role
+  company_link
+
+  @@map("contact_fact_kind")
+}
+
+enum ContactFactStatus {
+  proposed
+  accepted
+  dismissed
+  needs_review
+
+  @@map("contact_fact_status")
+}
+
+model ContactFact {
+  id                  String            @id @default(uuid()) @db.Uuid
+  orgId               String            @map("org_id") @db.Uuid
+  contactId           String            @map("contact_id") @db.Uuid
+  kind                ContactFactKind
+  status              ContactFactStatus @default(proposed)
+  claim               String
+  reportsToContactId  String?           @map("reports_to_contact_id") @db.Uuid
+  opportunityId       String?           @map("opportunity_id") @db.Uuid
+  companyId           String?           @map("company_id") @db.Uuid
+  /// Label on a company–contact–deal link. A label is not decision authority.
+  linkLabel           String?           @map("link_label") @db.VarChar(80)
+  evidenceDetail      String?           @map("evidence_detail")
+  observedAt          DateTime?         @map("observed_at") @db.Timestamptz(6)
+  decidedByUserId     String?           @map("decided_by_user_id") @db.Uuid
+  decidedAt           DateTime?         @map("decided_at") @db.Timestamptz(6)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact     Contact      @relation("FactSubject", fields: [contactId], references: [id], onDelete: Cascade)
+  reportsTo   Contact?     @relation("FactReportsTo", fields: [reportsToContactId], references: [id], onDelete: SetNull)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  company     Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, contactId, status], map: "contact_facts_org_contact_status_idx")
+  @@index([reportsToContactId])
+  @@index([opportunityId])
+  @@index([companyId])
+  @@index([deletedAt])
+  @@map("contact_facts")
+}
+
+/// What the customer promised, by when, and who on their side owns it.
+/// Not a Task: tasks are internal follow-ups. Not a KamInitiative.
+enum CustomerCommitmentStatus {
+  open
+  met
+  missed
+  needs_review
+
+  @@map("customer_commitment_status")
+}
+
+model CustomerCommitment {
+  id               String                    @id @default(uuid()) @db.Uuid
+  orgId            String                    @map("org_id") @db.Uuid
+  companyId        String                    @map("company_id") @db.Uuid
+  opportunityId    String?                   @map("opportunity_id") @db.Uuid
+  promise          String
+  dueDate          DateTime?                 @map("due_date") @db.Date
+  ownerContactId   String?                   @map("owner_contact_id") @db.Uuid
+  status           CustomerCommitmentStatus  @default(open)
+  /// Kept when the source text was ambiguous. Those rows are needs_review
+  /// and are not linked to a deal.
+  sourceNote       String?                   @map("source_note")
+  createdByUserId  String?                   @map("created_by_user_id") @db.Uuid
+  createdAt        DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?                 @map("deleted_at") @db.Timestamptz(6)
+
+  org          Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  ownerContact Contact?     @relation(fields: [ownerContactId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, companyId, status], map: "customer_commitments_org_company_status_idx")
+  @@index([orgId, opportunityId], map: "customer_commitments_org_opp_idx")
+  @@index([ownerContactId])
+  @@index([deletedAt])
+  @@map("customer_commitments")
 }
 
 enum TaskStatus {

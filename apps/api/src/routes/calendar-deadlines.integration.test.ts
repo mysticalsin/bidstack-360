@@ -169,6 +169,59 @@ describe('calendar deadlines route', () => {
     },
   );
 
+  skipIfNoSeed(
+    'GET /calendar/deadlines keeps a lost stage off the week and a deleted stage on it',
+    async (app) => {
+      // WHY: the week lane used the stage row even after it was deleted, so a
+      // removed lost flag hid a bid that is open again. A live lost flag still
+      // has no deadline.
+      const stamp = Date.now();
+      const pipeline = await prisma.pipeline.create({
+        data: { orgId: orgId!, name: `Deadlines ${stamp}` },
+      });
+      const lost = await prisma.pipelineStage.create({
+        data: {
+          orgId: orgId!,
+          pipelineId: pipeline.id,
+          key: 'price_lost',
+          name: 'Price lost',
+          isLost: true,
+        },
+      });
+      const flagged = await prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-DL${stamp}`,
+          customer: 'Deadline Corp',
+          name: 'Flagged lost bid',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          dueDate: new Date('2031-04-11'),
+        },
+        select: { id: true },
+      });
+      const hidden = await app.inject({
+        method: 'GET',
+        url: `/api/v1/calendar/deadlines?from=${WINDOW_FROM}&to=${WINDOW_TO}`,
+      });
+      expect(hidden.statusCode).toBe(200);
+      const hiddenIds = (hidden.json() as { items: Array<{ id: string }> }).items.map((item) => item.id);
+      expect(hiddenIds).not.toContain(flagged.id);
+
+      await prisma.pipelineStage.update({
+        where: { id: lost.id },
+        data: { deletedAt: new Date() },
+      });
+      const shown = await app.inject({
+        method: 'GET',
+        url: `/api/v1/calendar/deadlines?from=${WINDOW_FROM}&to=${WINDOW_TO}`,
+      });
+      expect(shown.statusCode).toBe(200);
+      const shownIds = (shown.json() as { items: Array<{ id: string }> }).items.map((item) => item.id);
+      expect(shownIds).toContain(flagged.id);
+    },
+  );
+
   skipIfNoSeed('GET /calendar/deadlines rejects an inverted window', async (app) => {
     const res = await app.inject({
       method: 'GET',

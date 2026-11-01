@@ -6,8 +6,8 @@
  *   NO such prop. Approval is handled internally via useMutation → api().
  * - The Approve button is rendered at all times but is disabled unless:
  *     stage === 'awaiting_approval' AND all 5 review checkboxes are checked
- *     AND isAdmin=true AND proposalId is non-null.
- * - Mocking strategy: vi.mock the store selector, useIsAdmin, and useRfpDraft.
+ *     AND proposals:approve is granted AND proposalId is non-null.
+ * - Mocking strategy: vi.mock the store selector, useCapabilities, and useRfpDraft.
  *   react-query is wrapped in a QueryClientProvider.
  *
  * We mock react-i18next to return the translation key as the label
@@ -35,8 +35,8 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/lib/auth', () => ({
-  useIsAdmin: vi.fn(() => false),
+vi.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: vi.fn(() => ({ data: { permissions: [] } })),
 }));
 
 // The store is mocked at module level; individual tests override via
@@ -83,7 +83,7 @@ vi.mock('@/components/ui/Card', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-import { useIsAdmin } from '@/lib/auth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useRfpDraft } from '@/hooks/rfp/useRfpDraft';
 
@@ -127,7 +127,7 @@ function renderGate() {
 beforeEach(() => {
   vi.clearAllMocks();
   // Default: non-admin, idle stage, no proposalId
-  vi.mocked(useIsAdmin).mockReturnValue(false);
+  vi.mocked(useCapabilities).mockReturnValue({ data: { permissions: [] } } as any);
   vi.mocked(useRfpPipelineStore).mockImplementation((selector) =>
     selector(makePipelineState({ stage: 'idle', bidWorkspaceId: null })),
   );
@@ -169,14 +169,16 @@ describe('ApprovalGate — stage gate', () => {
 
 describe('ApprovalGate — admin role gate', () => {
   it('shows a role-gate alert when the user is not an admin', () => {
-    vi.mocked(useIsAdmin).mockReturnValue(false);
+    vi.mocked(useCapabilities).mockReturnValue({ data: { permissions: [] } } as any);
     renderGate();
     // Non-admin sees an alert
     expect(screen.getByRole('alert')).toBeDefined();
   });
 
-  it('does NOT show the role-gate alert when the user is an admin', () => {
-    vi.mocked(useIsAdmin).mockReturnValue(true);
+  it('does NOT show the role-gate alert when the user can approve', () => {
+    vi.mocked(useCapabilities).mockReturnValue({
+      data: { permissions: ['proposals:approve'] },
+    } as any);
     vi.mocked(useRfpPipelineStore).mockImplementation((selector) =>
       selector(makePipelineState({ stage: 'awaiting_approval' })),
     );
@@ -212,7 +214,7 @@ describe('ApprovalGate — Approve button', () => {
   });
 
   it('button is disabled for non-admin even when stage is awaiting_approval', () => {
-    vi.mocked(useIsAdmin).mockReturnValue(false);
+    vi.mocked(useCapabilities).mockReturnValue({ data: { permissions: [] } } as any);
     vi.mocked(useRfpPipelineStore).mockImplementation((selector) =>
       selector(makePipelineState({ stage: 'awaiting_approval' })),
     );
@@ -228,7 +230,9 @@ describe('ApprovalGate — Approve button', () => {
   });
 
   it('button is disabled when not all review checkboxes are checked', () => {
-    vi.mocked(useIsAdmin).mockReturnValue(true);
+    vi.mocked(useCapabilities).mockReturnValue({
+      data: { permissions: ['proposals:approve'] },
+    } as any);
     vi.mocked(useRfpPipelineStore).mockImplementation((selector) =>
       selector(makePipelineState({ stage: 'awaiting_approval' })),
     );

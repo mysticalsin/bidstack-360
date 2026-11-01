@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
-import { deriveAccount, segmentMatches, techStackPillsFor } from './accountUtils';
+import { deriveAccount, healthLabel, segmentMatches, techStackPillsFor } from './accountUtils';
 
 const now = '2026-06-16T12:00:00.000Z';
 
@@ -39,7 +39,7 @@ function deal(overrides: Partial<CrmDeal> = {}): CrmDeal {
     companyName: 'Acme',
     name: 'Expansion',
     stage: 'proposal',
-    amountMicros: 1_000_000_000_000,
+    amountMicros: '1000000000000',
     currencyCode: 'EUR',
     probability: 50,
     closeDate: null,
@@ -97,5 +97,77 @@ describe('accountUtils', () => {
     expect(row.coverage.nextAction).toBe('Assign an industry to unlock sector routing.');
     expect(segmentMatches(row, 'needs_data')).toBe(true);
     expect(segmentMatches(row, 'watch')).toBe(true);
+  });
+
+  it('does not attach a deal that only shares the account name', () => {
+    // Why: a customer string used to count as this account's pipeline, so an
+    // unlinked deal with the same name inflated open deals and the proxy band.
+    const row = deriveAccount(company(), [
+      deal({ id: 'unlinked', companyId: null, companyName: 'Acme', amountMicros: '5000000000000' }),
+      deal({ id: 'other', companyId: 'co-other', companyName: 'Acme' }),
+    ]);
+    expect(row.openDeals).toBe(0);
+    expect(row.totalDeals).toBe(0);
+    expect(row.pipelineMicros).toBe('0');
+  });
+
+  it('does not treat a missing probability as 50 percent', () => {
+    // Why: a blank probability used to count as half the amount, so the
+    // weighted pipeline and the proxy band invented a forecast.
+    const row = deriveAccount(company(), [
+      deal({
+        id: 'unweighted',
+        stage: 'proposal',
+        probability: null,
+        amountMicros: '1000000000000',
+      }),
+    ]);
+    expect(row.openDeals).toBe(1);
+    expect(row.openDealsMissingProbability).toBe(1);
+    expect(row.pipelineMicros).toBe('0');
+    expect(row.health).toBe('critical');
+  });
+
+  it('counts a stored zero as no recorded probability', () => {
+    // WHY: the column stores a blank as 0. Weighting that deal at 0% still
+    // reads as a measured chance of zero.
+    const row = deriveAccount(company(), [
+      deal({
+        id: 'blank',
+        stage: 'proposal',
+        probability: 0,
+        amountMicros: '1000000000000',
+      }),
+      deal({
+        id: 'recorded',
+        stage: 'proposal',
+        probability: 40,
+        amountMicros: '1000000000000',
+      }),
+    ]);
+    expect(row.openDeals).toBe(2);
+    expect(row.openDealsMissingProbability).toBe(1);
+    expect(row.pipelineMicros).toBe('400000000000');
+  });
+
+  it('weights a large amount from the integer micros', () => {
+    // WHY: amount * probability in JS numbers moved this book off the cent.
+    const row = deriveAccount(company(), [
+      deal({
+        id: 'large',
+        stage: 'proposal',
+        probability: 100,
+        amountMicros: '8598204328457184962',
+      }),
+    ]);
+    expect(row.pipelineMicros).toBe('8598204328457184962');
+    expect(row.health).toBe('strong');
+  });
+
+  it('keeps the pipeline band from reading as a measured health score', () => {
+    // Why: the list only has weighted pipeline size. Calling that Strong
+    // without a proxy mark is the misleading health the safety gate forbids.
+    expect(healthLabel('strong')).toContain('proxy');
+    expect(healthLabel('critical')).toContain('proxy');
   });
 });

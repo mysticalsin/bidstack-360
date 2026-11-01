@@ -106,6 +106,7 @@
       "exportFailed": "导出失败",
       "exportFailedDescription": "请稍后重试。"
     },
+    "probabilityUnrecorded": "未记录",
     "confirmDelete": {
       "titleOne": "删除 {{count}} 个商机？",
       "titleMany": "删除 {{count}} 个商机？",
@@ -291,7 +292,7 @@
   },
   "contacts": {
     "title": "联系人",
-    "subtitle": "决策单位中有 {{count}} 人。",
+    "subtitle": "本页 {{count}} 位联系人。",
     "actions": {
       "importCsv": {
         "label": "导入 CSV",
@@ -359,6 +360,8 @@
       "deleted": "已删除 {{name}}"
     },
     "linkedTitle": "关联联系人",
+    "countCaption_one": "{{count}} 个联系人",
+    "countCaption_other": "{{count}} 个联系人",
     "countCaption": "{{count}} 个联系人",
     "linkAction": "+ 关联联系人",
     "selectPlaceholder": "选择联系人…",
@@ -387,6 +390,8 @@
     "summary": {
       "companyCount_one": "{{count}} 家公司",
       "companyCount_other": "{{count}} 家公司",
+      "openDeals_one": "{{count}} 个进行中的交易",
+      "openDeals_other": "{{count}} 个进行中的交易",
       "openDeals": "{{count}} 个进行中的交易",
       "weightedPipeline": "{{amount}} 加权销售管道"
     },
@@ -648,6 +653,8 @@
     "toastExtractApplied": "已应用提取的字段——保存前请核对",
     "toastMissingReferenceTitle": "缺少参考编号",
     "toastMissingReferenceDesc": "必须填写合同参考编号。",
+    "toastMissingCurrencyTitle": "必须填写币种",
+    "toastMissingCurrencyDesc": "请输入协议上印制的 3 位币种代码。",
     "toastAgreementRecorded": "协议已记录",
     "toastCouldNotSave": "无法保存",
     "addAgreement": "添加协议",
@@ -664,7 +671,7 @@
     "scheduleQuarterly": "每季度费率复审",
     "scheduleAdhoc": "临时费率复审",
     "fieldExpiryDate": "到期日期",
-    "placeholderCurrency": "货币（EUR）",
+    "placeholderCurrency": "3 位货币代码",
     "fieldCurrency": "货币",
     "sourceDocument": "源文档",
     "removeAttachedDocument": "移除附加文档",
@@ -920,8 +927,10 @@
     "errorMessage": "请重试。",
     "retry": "重试",
     "decisionUnitEmptyTitle": "暂无决策单元成员",
-    "decisionUnitEmptyMessage": "从联系人页面添加联系人或从 Dust 同步。",
+    "decisionUnitEmptyMessage": "将联系人关联到此商机。职务不是购买角色。",
     "decisionUnitTitle": "决策单元",
+    "stakeholdersCount_one": "{{count}} 位干系人",
+    "stakeholdersCount_other": "{{count}} 位干系人",
     "stakeholdersCount": "{{count}} 位干系人",
     "dustBadge": "Dust",
     "influenceAriaLabel": "影响力 {{value}}（满分 5）",
@@ -1065,7 +1074,7 @@
     "labelSource": "来源",
     "bantHeading": "BANT 资格评估",
     "labelBudget": "预算",
-    "placeholderBudget": "例如 €500K",
+    "placeholderBudget": "如已知，填写金额和币种",
     "labelAuthority": "决策权",
     "placeholderAuthority": "决策者",
     "labelNeed": "需求",
@@ -1625,7 +1634,7 @@
     "scheduleReviewButton": "安排评审",
     "askDustButton": "询问 Dust",
     "changeStageLabel": "更改阶段",
-    "editValueLabel": "编辑交易金额（欧元）",
+    "editValueLabel": "编辑交易金额（未记录币种）",
     "editProbabilityLabel": "编辑成交概率",
     "likely": "可能性",
     "editDueDateLabel": "编辑截止日期",
@@ -1769,14 +1778,15 @@
   "createOpportunity": {
     "triggerButton": "+ 新商机",
     "dialogTitle": "新商机",
-    "dialogDescription": "将一个投标添加到您的管道。Dust 数据验证运行后，您可以完善情报。",
+    "dialogDescription": "将一个投标添加到您的管道。金额不记录币种。",
     "customerLabel": "客户",
     "customerPlaceholder": "搜索公司…",
     "nameLabel": "商机名称",
     "namePlaceholder": "Acme — IT 现代化",
     "stageLabel": "阶段",
     "industryLabel": "行业",
-    "valueLabel": "金额 (欧元)",
+    "valueLabel": "金额",
+    "valueHint": "未记录币种",
     "probabilityLabel": "概率 %",
     "dueDateLabel": "截止日期",
     "countryLabel": "国家",
@@ -1800,6 +1810,8 @@
       "domain": "域名"
     },
     "meta": {
+      "employees_one": "{{count}} 名员工",
+      "employees_other": "{{count}} 名员工",
       "employees": "{{count}} 名员工",
       "taxId": "税号：{{taxId}}",
       "parent": "母公司："
@@ -1840,7 +1852,7 @@
     "editTitle": "编辑 {{name}}",
     "newTitle": "新建联系人",
     "editDescription": "修补会更新记录并写入审计条目。",
-    "newDescription": "将一个人添加到决策单元。",
+    "newDescription": "添加联系人。职务不是购买角色。",
     "errorRequired": "客户和姓名为必填项",
     "errorSaveFailed": "保存失败",
     "fieldCustomer": "客户 / 账户",
@@ -1889,6 +1901,8 @@
     "allIndustries": "所有行业",
     "filterTagAriaLabel": "按标签筛选",
     "allTags": "所有标签",
+    "resultCount_one": "{{count}} 条参考资料",
+    "resultCount_other": "{{count}} 条参考资料",
     "resultCount": "{{count}} 条参考资料",
     "errorTitle": "无法加载参考资料",
     "errorMessage": "请稍后重试。",
@@ -1955,7 +1969,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "正在加载模型...",
-    "modelTableEmpty": "尚未训练任何 {{entityType}} 模型。点击\"立即重新训练\"以训练第一个模型。",
+    "modelTableEmpty": "未保存 {{entityType}} 模型。训练至少需要本组织 50 条已关闭记录。",
     "modelTableCaption": "{{entityType}} 预测模型历史记录",
     "colVersion": "版本",
     "colAccuracyMetrics": "准确率指标",
@@ -2009,7 +2023,10 @@
     "tableHeaderContribution": "贡献",
     "title": "机器学习评分分析",
     "chartAria": "影响{{label}}的前{{count}}个因素",
-    "footer": "模型 v{{modelVersion}} · 逻辑回归 · 每小时更新",
+    "footer": "模型 {{modelVersion}} · 逻辑回归 · 缓存一小时",
+    "footerBoosted": "模型 {{modelVersion}} · 梯度提升 · 缓存一小时",
+    "footerUnscored": "没有已训练的模型。这不是预测。",
+    "titleUnscored": "评分",
     "labelLeadScore": "线索评分",
     "labelWinProbability": "赢单概率"
   },
@@ -2110,6 +2127,8 @@
     "kpiOpportunities": "商机",
     "kpiRevenue": "收入",
     "kpiWeightedRevenue": "加权",
+    "kpiWeightedRevenuePage": "加权（本页）",
+    "kpiWeightedRevenueDetail": "本页未结行 × 已记录的阶段概率。{{basis}}",
     "kpiOpen": "进行中",
     "kpiRegionLabel": "商机关键指标摘要",
     "title": "商机",
@@ -2117,7 +2136,7 @@
     "clear": "清除",
     "stageOpportunities": "{{stage}}商机",
     "clearFilter": "清除筛选",
-    "bidsInFlight": "{{count}} 个进行中的投标 · 点击任意单元格即可行内编辑。",
+    "bidsInFlight": "本页 {{count}} 条 · 点击任意单元格即可行内编辑。",
     "exportingLabel": "正在导出商机…",
     "exportLabel": "将可见商机导出为 CSV",
     "exporting": "正在导出…",
@@ -2176,6 +2195,8 @@
     "allIndustries": "所有行业",
     "industryLoadError": "无法加载行业筛选器。",
     "retry": "重试",
+    "resultCount_one": "{{count}} 个账户",
+    "resultCount_other": "{{count}} 个账户",
     "resultCount": "{{count}} 个账户",
     "errorTitle": "无法加载热门账户",
     "errorMessage": "无法加载重点客户。",
@@ -2183,7 +2204,11 @@
     "emptyMessage": "添加带数值的商机以查看按管道排名的热门账户。",
     "totalPipeline": "总管道",
     "won": "已赢",
+    "openDeals_one": "{{count}} 个进行中的交易",
+    "openDeals_other": "{{count}} 个进行中的交易",
     "openDeals": "{{count}} 个进行中的交易",
+    "contacts_one": "{{count}} 个联系人",
+    "contacts_other": "{{count}} 个联系人",
     "contacts": "{{count}} 个联系人",
     "sourceCurated": "精选前10名",
     "sourceAuto": "自动排名",
@@ -2230,7 +2255,7 @@
       "ariaLabel": "客户决策信号"
     },
     "badge": {
-      "ready": "就绪 {{count}}%",
+      "ready": "估计 {{count}}%",
       "stackSignals": "{{count}} 个技术栈信号"
     },
     "signal": {
@@ -2263,8 +2288,14 @@
       "advance": "借助现有客户背景和责任人共识推进提案的下一步。"
     },
     "committee": {
+      "champions_one": "已识别 {{count}} 位内部支持者",
+      "champions_other": "已识别 {{count}} 位内部支持者",
       "champions": "已识别 {{count}} 位内部支持者",
+      "buyers_one": "已识别 {{count}} 位采购方",
+      "buyers_other": "已识别 {{count}} 位采购方",
       "buyers": "已识别 {{count}} 位采购方",
+      "stakeholders_one": "已识别 {{count}} 位相关方",
+      "stakeholders_other": "已识别 {{count}} 位相关方",
       "stakeholders": "已识别 {{count}} 位相关方",
       "empty": "识别采购方与内部支持者"
     },
@@ -2274,7 +2305,7 @@
         "pending": "管道待定"
       },
       "weightedValue": {
-        "label": "加权客户价值",
+        "label": "已申报年收入",
         "notVerified": "未验证"
       },
       "ownerMap": {
@@ -2968,7 +2999,8 @@
     "caption": "交易为何成交——以及整个组织的规律",
     "errorTitle": "无法加载输赢规律",
     "errorMessage": "请稍后再试。",
-    "recordedCount": "已记录 {{won}} 个赢单 · {{lost}} 个输单",
+    "recordedCount": "全组织已记录 {{won}} 个赢单原因和 {{lost}} 个输单原因",
+    "accountClosed": "此账户有 {{count}} 个已关闭交易。关闭阶段不是原因。",
     "patternBadge": "规律",
     "mostLossesCitePrefix": "大多数输单归因于 ",
     "noReasonsYet": "尚未记录任何输单原因——记录一些以呈现规律。",
@@ -3080,7 +3112,7 @@
     "coverage": "覆盖率",
     "strongestBand": "最强覆盖区间",
     "noSignal": "无信号",
-    "healthBands": "健康区间",
+    "healthBands": "覆盖区间",
     "whatDrivesScore": "影响此评分的因素",
     "scoreFactors": "评分因素",
     "nextLabel": "下一步：",
@@ -3191,7 +3223,11 @@
     "emptyFilteredTitle": "没有标记为“{{sector}}”的课程",
     "emptyTitle": "尚未发布课程",
     "emptyMessage": "Mantu Academy 发布带有行业标签的课程后，课程将显示在此处。",
+    "resultCount_one": "{{count}} 门课程",
+    "resultCount_other": "{{count}} 门课程",
     "resultCount": "{{count}} 门课程",
+    "resultCountInSector_one": "{{sector}} 中有 {{count}} 门课程",
+    "resultCountInSector_other": "{{sector}} 中有 {{count}} 门课程",
     "resultCountInSector": "{{sector}} 中有 {{count}} 门课程",
     "filterGroupLabel": "按行业筛选",
     "allSectors": "所有行业",
@@ -3349,7 +3385,8 @@
     "unknownIndustry": "未知行业",
     "dataSourcesAria": "{{name}} 数据源",
     "openDeals": "进行中交易",
-    "pipeline": "销售管道",
+    "pipeline": "加权销售管道",
+    "pipelineMissingProbability": "{{count}} 个进行中交易没有记录的概率，未计入加权销售管道。",
     "totalDeals": "交易总数",
     "employees": "员工",
     "confidence": "置信度",
@@ -3358,15 +3395,19 @@
   "openIssues": {
     "regionLabel": "按严重程度划分的未解决问题",
     "title": "未解决的问题",
-    "captionAllClear": "一切正常",
-    "captionItemsToAction": "{{count}} 个待处理项{{plural}}",
+    "captionAllClear": "已记录清单中没有未处理项",
+    "captionNoneRecorded": "此账户没有记录的风险或合规检查",
+    "captionNoneOpen": "已记录清单中没有未处理项",
+    "captionItemsToAction": "{{count}} 个未处理项{{plural}}",
     "bucketsLabel": "严重程度分组",
     "severityCritical": "严重",
     "severityHigh": "高",
     "severityMedium": "中",
     "severityLow": "低",
-    "emptyTitle": "没有未解决的问题",
-    "emptyMessage": "这里一切正常。",
+    "emptyTitle": "没有记录",
+    "emptyMessage": "此账户没有风险或合规记录。这不是已通过检查。",
+    "noneOpenTitle": "没有未处理项",
+    "noneOpenMessage": "已记录清单中没有未处理的风险或合规检查。",
     "unassigned": "未分配",
     "dueSuffix": " - 截止 {{dueDate}}",
     "noOwner": "无负责人"
@@ -3389,6 +3430,8 @@
   "activityTimeline": {
     "regionLabel": "近期活动",
     "title": "近期活动",
+    "itemCount_one": "最近 {{count}} 项",
+    "itemCount_other": "最近 {{count}} 项",
     "itemCount": "最近 {{count}} 项",
     "emptyTitle": "暂无内容",
     "emptyMessage": "此账户的任务、邮件和 Dust 运行将显示在此处。"
@@ -3439,6 +3482,8 @@
     "qualityWarningDetail": "{{total}} 个客户中有 {{classified}} 个带有 ABC 行业分类——在 ABC 覆盖率提高之前，请将这些划分视为方向性参考。",
     "accountCountOne": "{{count}} 个客户",
     "accountCountOther": "{{count}} 个客户",
+    "geoIndustryMeta_one": "{{count}} 个商机 · {{value}}",
+    "geoIndustryMeta_other": "{{count}} 个商机 · {{value}}",
     "fteValue": "{{value}} 全职当量",
     "fteUnknown": "全职当量未知",
     "fteUnknownTooltip": "该行业中没有客户的已知员工人数",
@@ -3456,7 +3501,8 @@
     "columnTerritory": "地区",
     "columnStage": "阶段",
     "columnValue": "金额",
-    "columnProbability": "概率",
+    "columnProbability": "已记录概率",
+    "columnProbabilityTitle": "记在商机上。空白会存成 0，不是测得的赢单概率。",
     "columnDue": "到期"
   },
   "territorySegmentBreakdown": {
@@ -3483,7 +3529,8 @@
     "opportunityNameLabel": "商机名称",
     "opportunityNamePlaceholderWithCompany": "{{companyName}} — 商机",
     "opportunityNamePlaceholder": "商机名称",
-    "valueLabel": "金额（欧元）",
+    "valueLabel": "金额",
+    "valueHint": "未记录币种",
     "stageLabel": "阶段",
     "stageDiscovery": "发现",
     "stageQualified": "已确认",
@@ -3722,7 +3769,7 @@
   },
   "businessSnapshot": {
     "title": "业务概览",
-    "caption": "健康度：{{band}} - 评分 {{score}}/100",
+    "caption": "信号覆盖：{{band}} · {{score}}/100。不是已测量的关系健康度。",
     "region": {
       "ariaLabel": "业务概览"
     },
@@ -3835,12 +3882,18 @@
     "noTitleOrEmail": "无"
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} 笔交易",
+    "dealCount_other": "{{count}} 笔交易",
+    "openCaption": "仅含进行中的阶段。赢单和输单计入赢单率。",
+    "emptyOpen": "没有进行中的商机。",
     "heading": "按阶段划分的销售管道"
   },
   "microsoftSignInButton": {
     "label": "使用 Microsoft 登录"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} 条记录",
+    "recordCountLabel_other": "{{count}} 条记录",
     "recordCountLabel": "{{count}} 条记录"
   },
   "alert": {
@@ -3858,12 +3911,14 @@
   },
   "oppIndustryBreakdown": {
     "title": "按行业划分的销售管道",
+    "sectorCount_one": "{{count}} 个行业",
+    "sectorCount_other": "{{count}} 个行业",
     "sectorCount": "{{count}} 个行业"
   },
   "revenueEvolution": {
     "regionLabel": "收入演变",
     "title": "收入演变",
-    "caption": "该客户每月赢单收入",
+    "caption": "每月赢单金额。未记录币种；不是欧元预测。",
     "srSummary": "{{count}} 个月的赢单收入。峰值 {{period}}。",
     "barsListLabel": "每月赢单收入",
     "barLabel": "{{period}}：{{amount}}"
@@ -3871,7 +3926,7 @@
   "winLoss": {
     "regionLabel": "赢单 / 输单",
     "title": "赢单 / 输单",
-    "caption": "此客户已决断的交易",
+    "caption": "此客户已决断的交易。未记录币种；不是欧元预测。",
     "winRateLabel": "赢单率",
     "wonCount": "{{count}} 个赢单",
     "lostCount": "{{count}} 个输单",

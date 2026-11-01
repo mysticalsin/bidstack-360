@@ -34,6 +34,7 @@ describe('extractContractFieldsLLM', () => {
         rateReviewSchedule: 'Annual',
         rateCard: [
           { role: 'Senior Consultant', rate: 850, unit: 'day', currency: 'eur' },
+          { role: 'Principal', rate: '850.50', unit: 'day', currency: 'EUR' },
           { role: 'zero', rate: 0, unit: 'day' }, // non-positive → dropped
         ],
       }),
@@ -50,8 +51,10 @@ describe('extractContractFieldsLLM', () => {
     expect(draft!.rateReviewSchedule).toBe('annual');
     expect(draft!.rateCard).toEqual([
       { role: 'Senior Consultant', rateMicros: 850_000_000, unit: 'day', currency: 'EUR' },
+      { role: 'Principal', rateMicros: 850_500_000, unit: 'day', currency: 'EUR' },
     ]);
-    expect(draft!.confidenceBps).toBe(8500);
+    expect(draft!.confidenceBps).toBeNull();
+    expect(draft!.method).toBe('llm');
     expect(draft!.warnings[0]).toContain('review');
   });
 

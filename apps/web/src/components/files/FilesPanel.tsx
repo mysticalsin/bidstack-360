@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useDeleteFile, useFiles, useUploadFile } from '@/hooks/useFiles';
 import { downloadFromApi } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
@@ -168,10 +168,11 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
           message={list.error?.message ?? t('files.unknownError', 'Unknown error')}
         />
       ) : list.data && list.data.items.length === 0 ? (
-        <EmptyState
-          title={t('files.emptyTitle', 'No files yet')}
-          message={t('files.emptyMessage', 'Upload to attach documents to this account.')}
-        />
+        <p className="px-4 py-8 text-sm text-[var(--fg-secondary)]">
+          {t('files.emptyTitle', 'No files yet')}
+          {'. '}
+          {t('files.emptyMessage', 'Upload to attach documents to this account.')}
+        </p>
       ) : (
         <div className="divide-y divide-[var(--border-subtle)]">
           {grouped.map(({ category, files }) => (

@@ -17,6 +17,7 @@ import type { ProviderHealth } from '@bidstack/shared';
 const STATUS_TONE: Record<ProviderHealth['status'], BadgeTone> = {
   healthy: 'jade',
   degraded: 'amber',
+  unverified: 'amber',
   down: 'tomato',
   disabled: 'gray',
 };
@@ -24,8 +25,9 @@ const STATUS_TONE: Record<ProviderHealth['status'], BadgeTone> = {
 const STATUS_ORDER: Record<ProviderHealth['status'], number> = {
   down: 0,
   degraded: 1,
-  healthy: 2,
-  disabled: 3,
+  unverified: 2,
+  healthy: 3,
+  disabled: 4,
 };
 
 export function ProviderHealthSection() {
@@ -66,12 +68,14 @@ export function ProviderHealthSection() {
 
   const downCount = items.filter((p) => p.status === 'down').length;
   const degradedCount = items.filter((p) => p.status === 'degraded').length;
+  const unverifiedCount = items.filter((p) => p.status === 'unverified').length;
   const caption = getCaption(t, {
     isLoading,
     isFetching,
     providerCount: items.length,
     downCount,
     degradedCount,
+    unverifiedCount,
   });
 
   return (
@@ -156,7 +160,7 @@ export function ProviderHealthSection() {
               <caption className="sr-only">
                 {t('crm.providerHealth.table.caption', 'Provider health statuses')}
               </caption>
-              <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              <thead className="bg-[var(--surface-secondary)] text-xs text-[var(--fg-tertiary)]">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
                     {t('crm.providerHealth.table.provider', 'Provider')}
@@ -200,7 +204,7 @@ function ProviderStat({
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        <span className="text-xs font-medium text-[var(--fg-tertiary)]">
           {label}
         </span>
         <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
@@ -238,8 +242,17 @@ function ProviderRow({ provider }: { provider: ProviderHealth }) {
       </td>
       <td className="px-5 py-4">
         <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
-          {provider.message ||
-            t('crm.providerHealth.row.normalResponse', 'Provider returned a normal health response.')}
+          {provider.status === 'unverified'
+            ? provider.message ||
+              t(
+                'crm.providerHealth.row.unverified',
+                'Configuration is not a live probe.',
+              )
+            : provider.message ||
+              t(
+                'crm.providerHealth.row.normalResponse',
+                'Provider returned a normal health response.',
+              )}
         </p>
       </td>
       <td className="px-5 py-4 text-xs tabular-nums text-[var(--text-secondary)]">
@@ -262,6 +275,8 @@ function statusLabel(t: TFunction, status: ProviderHealth['status']): string {
       return t('crm.providerHealth.status.down', 'down');
     case 'disabled':
       return t('crm.providerHealth.status.disabled', 'disabled');
+    case 'unverified':
+      return t('crm.providerHealth.status.unverified', 'unverified');
   }
 }
 
@@ -282,17 +297,26 @@ function getCaption(
     providerCount,
     downCount,
     degradedCount,
+    unverifiedCount,
   }: {
     isLoading: boolean;
     isFetching: boolean;
     providerCount: number;
     downCount: number;
     degradedCount: number;
+    unverifiedCount: number;
   },
 ) {
   if (isLoading) return t('crm.providerHealth.caption.loading', 'Checking provider status...');
   if (providerCount === 0)
     return t('crm.providerHealth.caption.none', 'No providers configured yet.');
+  if (unverifiedCount > 0 && downCount + degradedCount === 0) {
+    return t(
+      'crm.providerHealth.caption.unverified',
+      '{{count}} providers are unverified. Configuration is not a live probe.',
+      { count: unverifiedCount },
+    );
+  }
   if (downCount + degradedCount === 0) {
     return t(
       'crm.providerHealth.caption.allHealthy',

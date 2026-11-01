@@ -28,10 +28,12 @@ import {
   assertUserInOrg as assertUserInOrgShared,
 } from './kam-access.js';
 import { mintOpportunityTx, withOpportunityCodeRetry } from '../services/opportunities/mint.js';
+import { handoffValueFields } from './kam-handoff-value.js';
 
 type InitiativeRow = Prisma.KamInitiativeGetPayload<{ include: { handoff: { select: { id: true } } } }>;
 
 function toDetail(row: InitiativeRow): z.infer<typeof KamInitiativeDetail> {
+  const value = row.estimatedValueMicros == null ? null : handoffValueFields(row.estimatedValueMicros);
   return {
     id: row.id,
     companyId: row.companyId,
@@ -41,7 +43,8 @@ function toDetail(row: InitiativeRow): z.infer<typeof KamInitiativeDetail> {
     stage: row.stage as InitiativeStageValue,
     ownerId: row.ownerId,
     priority: row.priority,
-    estimatedValueMicros: row.estimatedValueMicros == null ? null : Number(row.estimatedValueMicros),
+    estimatedValueMicros: value?.valueMicros ?? null,
+    estimatedValueMicrosText: value?.valueMicrosText ?? null,
     lastActivityAt: row.lastActivityAt.toISOString(),
     droppedReason: row.droppedReason,
     convertedToOpportunityId: row.convertedToOpportunityId,
@@ -272,7 +275,7 @@ export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
                   title: init.title,
                   companyId: init.companyId,
                   companyName: company.name,
-                  estimatedValueMicros: Number(valueMicros),
+                  ...handoffValueFields(valueMicros),
                   opportunityId: opp.id,
                   opportunityCode: opp.code,
                 } as Prisma.InputJsonValue,

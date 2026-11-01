@@ -159,6 +159,72 @@ describe('contacts routes', () => {
     expect(body.customer).toBe(newCustomer);
   });
 
+  skipIfNoDb('PATCH customer moves the company id and a name edit does not', async () => {
+    // WHY: Dust lists people by company id. Renaming the customer label used
+    // to leave the old id, so the person stayed on the previous account.
+    const from = await prisma.company.create({
+      data: { orgId: orgId!, name: `From Co ${Date.now()}` },
+    });
+    const to = await prisma.company.create({
+      data: { orgId: orgId!, name: `To Co ${Date.now()}` },
+    });
+    const twin = `Twin Co ${Date.now()}`;
+    await prisma.company.create({ data: { orgId: orgId!, name: twin } });
+    await prisma.company.create({ data: { orgId: orgId!, name: twin.toLowerCase() } });
+
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/contacts',
+      payload: {
+        customer: 'Stored label',
+        companyId: from.id,
+        name: 'Moved Person',
+        role: null,
+        email: null,
+        phone: null,
+        influence: null,
+        sentiment: null,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const id = (created.json() as { id: string }).id;
+    createdContactIds.push(id);
+
+    const renamed = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { name: 'Moved Person Jr' },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json()).toMatchObject({ companyId: from.id, linkState: 'linked' });
+
+    const moved = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { customer: to.name },
+    });
+    expect(moved.statusCode).toBe(200);
+    expect(moved.json()).toMatchObject({ customer: to.name, companyId: to.id, linkState: 'linked' });
+
+    const cleared = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { customer: 'No such company' },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json()).toMatchObject({ companyId: null, linkState: 'needs_review' });
+
+    await prisma.contact.update({ where: { id }, data: { companyId: from.id } });
+    const refused = await server.inject({
+      method: 'PATCH',
+      url: `/api/contacts/${id}`,
+      payload: { customer: twin },
+    });
+    expect(refused.statusCode).toBe(409);
+    const stored = await prisma.contact.findUnique({ where: { id }, select: { companyId: true, customer: true } });
+    expect(stored).toMatchObject({ companyId: from.id, customer: 'No such company' });
+  });
+
   skipIfNoDb('DELETE /api/contacts/:id removes the contact and writes audit', async () => {
     const createRes = await server.inject({
       method: 'POST',
@@ -182,6 +248,121 @@ describe('contacts routes', () => {
 
     const getRes = await server.inject({ method: 'GET', url: `/api/contacts/${id}` });
     expect(getRes.statusCode).toBe(404);
+  });
+
+  skipIfNoDb('POST links a contact only on an exact unique company name or an explicit id', async () => {
+    // WHY: free-text customer used to be the only association, so Dust could
+    // not tell a real company link from an ambiguous name. Zero or many name
+    // matches must stay needs_review and must not rewrite older rows.
+    const unique = await prisma.company.create({
+      data: { orgId: orgId!, name: `Unique Link ${Date.now()}` },
+    });
+    const ambiguousName = `Ambiguous Co ${Date.now()}`;
+    // (org_id, name) is unique, so two exact strings cannot exist. Two casings
+    // still match one case-insensitive lookup, which must not pick a winner.
+    await prisma.company.create({ data: { orgId: orgId!, name: ambiguousName } });
+    await prisma.company.create({ data: { orgId: orgId!, name: ambiguousName.toLowerCase() } });
+
+    const linked = await server.inject({
+      method: 'POST',
+      url: '/api/contacts',
+      payload: {
+        customer: unique.name,
+        name: 'Linked Person',
+        role: null,
+        email: null,
+        phone: null,
+        influence: null,
+        sentiment: null,
+      },
+    });
+    expect(linked.statusCode).toBe(201);
+    const linkedBody = linked.json() as {
+      id: string;
+      customer: string;
+      companyId: string | null;
+      linkState: string;
+    };
+    createdContactIds.push(linkedBody.id);
+    expect(linkedBody.customer).toBe(unique.name);
+    expect(linkedBody.companyId).toBe(unique.id);
+    expect(linkedBody.linkState).toBe('linked');
+
+    const ambiguous = await server.inject({
+      method: 'POST',
+      url: '/api/contacts',
+      payload: {
+        customer: ambiguousName,
+        name: 'Ambiguous Person',
+        role: null,
+        email: null,
+        phone: null,
+        influence: null,
+        sentiment: null,
+      },
+    });
+    expect(ambiguous.statusCode).toBe(201);
+    const ambiguousBody = ambiguous.json() as {
+      id: string;
+      customer: string;
+      companyId: string | null;
+      linkState: string;
+    };
+    createdContactIds.push(ambiguousBody.id);
+    expect(ambiguousBody.customer).toBe(ambiguousName);
+    expect(ambiguousBody.companyId).toBeNull();
+    expect(ambiguousBody.linkState).toBe('needs_review');
+
+    const explicit = await server.inject({
+      method: 'POST',
+      url: '/api/contacts',
+      payload: {
+        customer: 'Free text stays',
+        companyId: unique.id,
+        name: 'Explicit Person',
+        role: null,
+        email: null,
+        phone: null,
+        influence: null,
+        sentiment: null,
+      },
+    });
+    expect(explicit.statusCode).toBe(201);
+    const explicitBody = explicit.json() as { id: string; companyId: string | null; customer: string };
+    createdContactIds.push(explicitBody.id);
+    expect(explicitBody.customer).toBe('Free text stays');
+    expect(explicitBody.companyId).toBe(unique.id);
+
+    const missing = await server.inject({
+      method: 'POST',
+      url: '/api/contacts',
+      payload: {
+        customer: 'Nobody',
+        companyId: '00000000-0000-4000-8000-000000000099',
+        name: 'Missing Company',
+        role: null,
+        email: null,
+        phone: null,
+        influence: null,
+        sentiment: null,
+      },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const historical = await prisma.contact.create({
+      data: {
+        orgId: orgId!,
+        customer: unique.name,
+        name: 'Historical Person',
+        companyId: null,
+      },
+    });
+    createdContactIds.push(historical.id);
+    const read = await server.inject({ method: 'GET', url: `/api/contacts/${historical.id}` });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({ companyId: null, linkState: 'needs_review', customer: unique.name });
+    const stored = await prisma.contact.findUnique({ where: { id: historical.id } });
+    expect(stored?.companyId).toBeNull();
   });
 
   skipIfNoDb('PATCH /api/contacts/:id returns 404 for unknown id', async () => {

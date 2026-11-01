@@ -80,6 +80,7 @@ describe('DustClient', () => {
     const dust = new DustClient({
       apiKey: 'sk_test',
       workspaceId: 'workspace-1',
+      spaceId: 'space-1',
       baseUrl: 'https://dust.example/api',
       timeoutMs: 1000,
       logger,
@@ -150,5 +151,88 @@ describe('DustClient', () => {
 
     const [, opts] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  // WHY: docs.dust.tt now upserts at
+  // /api/v1/w/{wId}/spaces/{spaceId}/data_sources/{dsId}/documents/{documentId}
+  // with Bearer auth. The old workspace-level collection URL 404s, so a
+  // configured key would still fail to push deals.
+  it('upserts on the space-scoped document path with a bearer token', async () => {
+    const injected = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ document: { document_id: 'doc-1', data_source_id: 'ds-1' } }),
+          { status: 200 },
+        ),
+    );
+    const dust = new DustClient({
+      apiKey: 'sk_test',
+      workspaceId: 'workspace-1',
+      spaceId: 'space-1',
+      baseUrl: 'https://eu.dust.tt/api',
+      timeoutMs: 1000,
+      logger,
+      fetchImpl: injected,
+    });
+
+    await dust.upsertDocument('ds-1', 'doc-1', '# Deal', { opportunity_code: 'OP-1' });
+
+    expect(injected).toHaveBeenCalledWith(
+      'https://eu.dust.tt/api/v1/w/workspace-1/spaces/space-1/data_sources/ds-1/documents/doc-1',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer sk_test' }),
+      }),
+    );
+    const [, init] = injected.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      mime_type: 'text/markdown',
+      text: '# Deal',
+      tags: ['opportunity_code:OP-1'],
+    });
+  });
+
+  it('does not call Dust when the space id is missing', async () => {
+    const injected = vi.fn();
+    const dust = new DustClient({
+      apiKey: 'sk_test',
+      workspaceId: 'workspace-1',
+      baseUrl: 'https://dust.tt/api',
+      timeoutMs: 1000,
+      logger,
+      fetchImpl: injected,
+    });
+
+    await expect(dust.listDocuments('ds-1')).rejects.toBeInstanceOf(DustError);
+    expect(injected).not.toHaveBeenCalled();
+  });
+
+  it('folds Dust document tags back into metadata for poll routing', async () => {
+    const injected = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            document: {
+              document_id: 'doc-1',
+              data_source_id: 'ds-1',
+              tags: ['opportunity_code:OP-1'],
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const dust = new DustClient({
+      apiKey: 'sk_test',
+      workspaceId: 'workspace-1',
+      spaceId: 'space-1',
+      baseUrl: 'https://dust.tt/api',
+      timeoutMs: 1000,
+      logger,
+      fetchImpl: injected,
+    });
+
+    await expect(dust.getDocument('ds-1', 'doc-1')).resolves.toMatchObject({
+      metadata: { opportunity_code: 'OP-1' },
+    });
   });
 });

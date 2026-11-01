@@ -24,14 +24,14 @@ export interface ScoreFactor {
 }
 
 export interface LeadScore {
-  score: number; // 0-100
+  score: number | null;
   factors: ScoreFactor[];
   modelVersion: string;
   scoredAt: string;
 }
 
 export interface OppScore {
-  winProbability: number; // 0-100
+  winProbability: number | null;
   predictedCloseDate: string | null;
   factors: ScoreFactor[];
   recommendation: string;

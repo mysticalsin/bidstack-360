@@ -10,6 +10,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
+import { formatExactUnspecified } from '@/components/dashboard/unspecified-currency';
 import { Card } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
@@ -34,16 +35,10 @@ interface RfpAnalytics {
   byOwner: OwnerRow[];
 }
 
-// Money is stored + transported in micros (CLAUDE.md convention). Format to a
-// whole-euro currency string at the edge for display.
-function formatEur(micros: string): string {
-  const eur = Number(micros) / 1e6;
-  if (!Number.isFinite(eur)) return '—';
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(eur);
+/** Linked opportunity value has no currency column. */
+export function formatLinkedOpportunityValue(micros: string): string {
+  if (!/^\d+$/.test(micros)) return '—';
+  return formatExactUnspecified(micros);
 }
 
 export function RfpAnalyticsSection() {
@@ -82,9 +77,12 @@ export function RfpAnalyticsSection() {
         />
         <KpiTile
           label={t('rfpAnalytics.kpiPipelineLabel', 'Pipeline value')}
-          value={q.isLoading ? '…' : formatEur(q.data?.totalValueMicros ?? '0')}
-          detail={t('rfpAnalytics.kpiPipelineDetail', 'linked opportunity value')}
-          icon="dollar"
+          value={q.isLoading ? '…' : formatLinkedOpportunityValue(q.data?.totalValueMicros ?? '0')}
+          detail={t(
+            'rfpAnalytics.kpiPipelineDetail',
+            'linked opportunity value; currency not recorded',
+          )}
+          icon="growth"
         />
         <KpiTile
           label={t('rfpAnalytics.kpiWinRateLabel', 'Win rate')}
@@ -155,7 +153,10 @@ export function RfpAnalyticsSection() {
             {t('rfpAnalytics.byOwnerTitle', 'By owner')}
           </h3>
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            {t('rfpAnalytics.byOwnerSubtitle', 'Who owns what, and the pipeline value behind it.')}
+            {t(
+              'rfpAnalytics.byOwnerSubtitle',
+              'Who owns what. Amounts are linked opportunity value; currency is not recorded.',
+            )}
           </p>
         </div>
         {q.isLoading ? (
@@ -211,7 +212,7 @@ export function RfpAnalyticsSection() {
                       {o.count}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-secondary)]">
-                      {formatEur(o.totalValueMicros)}
+                      {formatLinkedOpportunityValue(o.totalValueMicros)}
                     </td>
                   </tr>
                 ))}

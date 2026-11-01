@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import { fetchAccountStats } from './accounts.helpers.js';
 import {
   createIsolatedOrg,
   dropIsolatedOrg,
@@ -84,6 +85,181 @@ describe('accounts routes', () => {
       } else {
         expect(body.items[0].totalValue).toBeGreaterThanOrEqual(body.items[1].totalValue);
       }
+    }
+  });
+
+  skipIfNoDb('GET /api/accounts/top leaves a lost stage flag out of open deals', async () => {
+    // WHY: the leaderboard counted any enum that was not closed_won or
+    // closed_lost. A stage marked lost still looked like an open deal.
+    const name = `Top Lost ${Date.now()}`;
+    const company = await prisma.company.create({
+      data: { orgId: orgId!, name },
+    });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `${name} pipeline` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'price_lost',
+        name: 'Price lost',
+        isLost: true,
+      },
+    });
+    const won = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'verbal_won',
+        name: 'Verbal won',
+        isWon: true,
+      },
+    });
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId: orgId!,
+          code: `OP-TL1-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Still looks open',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          valueMicros: 9_000_000n,
+          probability: 40,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-TL2-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Actually open',
+          stage: 's1_lead',
+          valueMicros: 1_000_000n,
+          probability: 10,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-TL3-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Flagged won',
+          stage: 's3_technical_iteration',
+          pipelineStageId: won.id,
+          valueMicros: 2_000_000n,
+          probability: 80,
+          intel: {},
+        },
+      ],
+    });
+
+    // Seeded ranks switch the route to the curated list, which never sees this
+    // company. Clear them so the value leaderboard SQL is what we assert.
+    await prisma.company.updateMany({
+      where: { orgId: orgId!, topAccountRank: { not: null } },
+      data: { topAccountRank: null },
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/accounts/top?search=${encodeURIComponent(name)}&limit=5`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      items: Array<{ name: string; openDeals: number; wonValue: number; opportunityCount: number }>;
+    };
+    const row = body.items.find((item) => item.name === name);
+    expect(row).toMatchObject({
+      openDeals: 1,
+      wonValue: 2,
+      wonValueMicros: '2000000',
+      opportunityCount: 3,
+      totalValue: 1,
+      totalValueMicros: '1000000',
+    });
+    const stats = await fetchAccountStats(orgId!, [company.id]);
+    expect(stats.get(company.id)).toMatchObject({
+      openDeals: 1,
+      wonValue: 2,
+      wonValueMicros: '2000000',
+      opportunityCount: 3,
+      totalValue: 1,
+      totalValueMicros: '1000000',
+    });
+  });
+
+  skipIfNoDb('GET /api/accounts/top keeps a large open amount on the exact cent', async () => {
+    // WHY: the leaderboard divided the micros sum as float8. This amount then
+    // read one cent high. A lost flag still adds nothing to the open total.
+    const name = `Wide Top ${Date.now()}`;
+    const micros = 8_598_204_328_457_184_962n;
+    const company = await prisma.company.create({ data: { orgId: orgId!, name } });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `${name} pipeline` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId: orgId!, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId: orgId!,
+          code: `OP-TW1-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Large open',
+          stage: 's1_lead',
+          valueMicros: micros,
+          probability: 100,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-TW2-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Large lost',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          valueMicros: micros,
+          probability: 100,
+          intel: {},
+        },
+      ],
+    });
+    await prisma.company.updateMany({
+      where: { orgId: orgId!, topAccountRank: { not: null } },
+      data: { topAccountRank: null },
+    });
+    try {
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/accounts/top?search=${encodeURIComponent(name)}&limit=5`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        items: Array<{
+          name: string;
+          totalValue: number;
+          totalValueMicros: string;
+          wonValue: number;
+          wonValueMicros: string;
+        }>;
+      };
+      const row = body.items.find((item) => item.name === name);
+      expect(row?.totalValue.toFixed(2)).toBe('8598204328457.18');
+      expect(row?.totalValue.toFixed(2)).not.toBe('8598204328457.19');
+      expect(row?.totalValueMicros).toBe(micros.toString());
+      expect(row?.wonValue).toBe(0);
+      expect(row?.wonValueMicros).toBe('0');
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { companyId: company.id } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
+      await prisma.pipeline.delete({ where: { id: pipeline.id } });
+      await prisma.company.delete({ where: { id: company.id } });
     }
   });
 

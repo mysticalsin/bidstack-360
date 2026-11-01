@@ -14,6 +14,7 @@ import { useNotes } from '@/hooks/useNotes';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
+import { storedProbabilityLabel } from '@/lib/stored-probability';
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
@@ -173,7 +174,12 @@ export function ContactDetailPage() {
                     <span className="rounded bg-[var(--surface-subtle)] px-1.5 py-0.5">
                       {o.stage}
                     </span>
-                    <span>{o.probability}%</span>
+                    <span>
+                      {storedProbabilityLabel(
+                        o.probability,
+                        t('opportunities.probabilityUnrecorded', 'Not recorded'),
+                      )}
+                    </span>
                   </div>
                 </li>
               ))}

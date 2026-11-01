@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 
 import type { SortState } from '@/components/ui/SortableHeader';
 
-type Accessor<T> = (row: T) => string | number | null | undefined;
+type Accessor<T> = (row: T) => string | number | bigint | null | undefined;
 
 interface Options<K extends string> {
   initial?: SortState<K>;
@@ -56,6 +56,11 @@ export function useTableSort<T, K extends string>(
       if (vb == null) return -1;
       if (typeof va === 'number' && typeof vb === 'number') {
         return (va - vb) * dirFactor;
+      }
+      // BigInt subtraction is exact. Number(micros) collapses past 2^53, so two
+      // different amounts would sort as a tie.
+      if (typeof va === 'bigint' && typeof vb === 'bigint') {
+        return (va > vb ? 1 : va < vb ? -1 : 0) * dirFactor;
       }
       // String compare uses locale rules so accents sort correctly for our
       // EU customer base.

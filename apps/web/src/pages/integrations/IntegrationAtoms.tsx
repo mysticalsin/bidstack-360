@@ -22,7 +22,7 @@ import type { IntegrationProbeResult } from './types';
 export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <div className="text-xs font-medium text-[var(--fg-tertiary)]">
         {label}
       </div>
       <div className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">
@@ -53,7 +53,7 @@ export function EndpointBox({ label, value }: { label: string; value: string }) 
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
+        <div className="text-xs font-medium text-[var(--fg-secondary)]">
           {label}
         </div>
         <CopyButton value={value} label={t('integrationAtoms.copyEndpoint', 'Copy endpoint')} />
@@ -72,7 +72,7 @@ export function SnippetBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
+        <div className="text-xs font-medium text-[var(--fg-secondary)]">
           {label}
         </div>
         <CopyButton value={value} label={t('integrationAtoms.copySnippet', 'Copy snippet')} />

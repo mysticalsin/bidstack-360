@@ -7,7 +7,7 @@ The backend integrates with **Dust** in three ways. All three must work for the 
 The backend pulls + pushes data via Dust's REST API.
 
 - **Auth:** `Authorization: Bearer ${DUST_API_KEY}`
-- **Workspace:** `${DUST_WORKSPACE_ID}` (e.g. `mantu-presales`)
+- **Workspace:** `${DUST_WORKSPACE_ID}` — the id in `https://dust.tt/w/<id>` or `https://eu.dust.tt/w/<id>`, not a display name
 - **Pull cycle:** every 5 min (BullMQ repeating job). Pulls deltas via `?updated_since=`.
 - **Push cycle:** opportunity create/update fires a job that mirrors the row to a Dust **document** in the `bidstack-opportunities` data source, so Dust agents have current context.
 
@@ -15,8 +15,8 @@ Endpoints we use:
 
 | Verb | Path | Purpose |
 |---|---|---|
-| `GET`  | `/v1/w/{ws}/data_sources/{ds}/documents`        | List indexed docs |
-| `POST` | `/v1/w/{ws}/data_sources/{ds}/documents`        | Upsert opportunity-as-document |
+| `GET`  | `/v1/w/{ws}/spaces/{space}/data_sources/{ds}/documents` | List indexed docs |
+| `POST` | `/v1/w/{ws}/spaces/{space}/data_sources/{ds}/documents/{documentId}` | Upsert opportunity-as-document |
 | `POST` | `/v1/w/{ws}/assistant/agent_configurations/{id}/runs` | Run the "exec brief" agent |
 | `GET`  | `/v1/w/{ws}/assistant/conversations/{cid}`      | Stream agent reply for the in-app sidebar |
 
@@ -24,7 +24,7 @@ The package `packages/dust-client` wraps these with retries (exp backoff), 429 h
 
 ## 2. Webhooks (inbound)
 
-Dust posts events to `POST /webhooks/dust`.
+Dust’s product webhooks are inbound to Dust (Spaces > Triggers). They do not push `document.created` to Polo. Polo still accepts a signed `POST /webhooks/dust` when `DUST_WEBHOOK_SECRET` is set, for a sender you control.
 
 - **Verify:** `X-Dust-Signature: sha256=…` against `DUST_WEBHOOK_SECRET`. Reject mismatched.
 - **Deduplicate:** insert event id into a Redis set with 7-day TTL; reject duplicates.
@@ -44,4 +44,4 @@ See `mcp.tools.md` for the tool definitions. Implement with `@modelcontextprotoc
 
 ## Deployment
 
-The MCP server lives in `apps/mcp-server` and deploys as its own Fly app. Public URL must terminate TLS and be configured in Dust under **Workspace → Tools → External MCP**.
+The MCP server lives in `apps/mcp-server` and deploys as its own Fly app. Public URL must terminate TLS. In Dust open **Spaces > Tools > Add Tool > Add MCP Server**, paste the HTTPS URL that ends in `/mcp`, and choose **Bearer token**. localhost cannot be registered with Dust cloud. Do not use a menu named External MCP, and do not use Automatic OAuth.

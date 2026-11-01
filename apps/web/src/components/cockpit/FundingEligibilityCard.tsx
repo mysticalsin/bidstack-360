@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/StateMessages';
 import { TechLogo } from '@/components/company/TechLogo';
 import { useCompanyTechnicalStack } from '@/hooks/useCompanyTechnicalStack';
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -26,6 +25,7 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
       ? ts.data.effectiveStack
       : cockpit.technicalStack;
   const programs = useMemo(() => deriveFundingPrograms(stack), [stack]);
+  if (programs.length === 0) return null;
 
   return (
     <Card>
@@ -34,15 +34,6 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
         caption={t('fundingEligibility.caption', 'Vendor co-funding signals from the technical stack')}
       />
       <div className="px-5 pb-5">
-        {programs.length === 0 ? (
-          <EmptyState
-            title={t('fundingEligibility.emptyTitle', 'No co-funding signal yet')}
-            message={t(
-              'fundingEligibility.emptyMessage',
-              'No Microsoft, AWS, or Google footprint detected in the current stack.',
-            )}
-          />
-        ) : (
           <ul className="space-y-3">
             {programs.map((p) => (
               <li
@@ -77,7 +68,6 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
               </li>
             ))}
           </ul>
-        )}
       </div>
     </Card>
   );

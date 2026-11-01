@@ -23,7 +23,7 @@ const Input = z.object({
 
 export const spotlightRef: Tool<typeof Input> = {
   description:
-    'Spotlight Ref — semantic search over the reference library (past delivered projects, case studies, success stories) to surface the best references for an RFP requirement or section. Ranks by vector similarity, falling back to keyword search when embeddings are unavailable. Returns ranked references with title, description, industry, deal value, usage count, and a relevance score (basis points).',
+    'Spotlight Ref — semantic search over the reference library (past delivered projects, case studies, success stories) to surface the best references for an RFP requirement or section. Ranks by vector similarity, falling back to keyword search when embeddings are unavailable. Returns ranked references with title, description, industry, valueMicros (integer micros; currency is not recorded), usage count, and a relevance score (basis points).',
   input: Input,
   inputJsonSchema: {
     type: 'object',

@@ -158,6 +158,8 @@
     "header": {
       "title": "Catalogo connettori",
       "caption": "Fonti di dati esterne raggiungibili da Polo PreSales. I feed aperti funzionano senza chiavi; i feed con licenza richiedono credenziali.",
+      "sourcesBadge_one": "{{count}} fonte",
+      "sourcesBadge_other": "{{count}} fonti",
       "sourcesBadge": "{{count}} fonti"
     },
     "error": {

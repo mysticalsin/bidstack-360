@@ -209,6 +209,15 @@ describe('boot environment validation', () => {
     expect(env.S3_BUCKET).toBe('bidstack-prod-files');
   });
 
+  it('rejects an explicit RFP quota fail-open in production', async () => {
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED: 'false',
+      }),
+    ).rejects.toThrow('RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
+  });
+
   it('requires the tenant-scope guard set to warn or enforce in production', async () => {
     // BIDSTACK_TENANT_SCOPE_GUARD defaults 'off' for backward compatibility, but
     // an unscoped tenant-table query in production is an all-tenants data leak

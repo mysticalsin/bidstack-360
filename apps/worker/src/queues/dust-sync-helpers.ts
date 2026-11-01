@@ -117,7 +117,7 @@ export async function upsertCompanyFromDust(
     create: {
       orgId,
       normalizedName,
-      legalName: companyName,
+      legalName: null,
       tradeName: companyName,
       providerMetadata: {
         dustDocId: doc.document_id,

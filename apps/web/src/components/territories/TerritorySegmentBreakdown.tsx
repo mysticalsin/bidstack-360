@@ -6,6 +6,13 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
+import {
+  compareMicros,
+  formatExactUnspecified,
+  microsSharePercent,
+  shareBarWidth,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
 
 export function TerritorySegmentBreakdown({
@@ -15,7 +22,6 @@ export function TerritorySegmentBreakdown({
   isError,
   errorMessage,
   onRetry,
-  formatMoneyMicros,
 }: {
   dimension: SegmentDimension;
   segments: TerritorySegment[];
@@ -23,7 +29,6 @@ export function TerritorySegmentBreakdown({
   isError: boolean;
   errorMessage?: string;
   onRetry: () => void;
-  formatMoneyMicros: (micros: number, currency: string) => string;
 }) {
   const { t } = useTranslation('crm');
 
@@ -69,7 +74,10 @@ export function TerritorySegmentBreakdown({
   }
 
   // Bar width is proportional to value share of the largest segment.
-  const maxValue = Math.max(...segments.map((s) => s.totalValueMicros), 1);
+  const maxValue = segments.reduce<string | number | bigint>(
+    (max, segment) => (compareMicros(segment.totalValueMicros, max) > 0 ? segment.totalValueMicros : max),
+    0,
+  );
   // Cap the visible rows; surface the overflow rather than silently truncating.
   const VISIBLE = 18;
   const shown = segments.slice(0, VISIBLE);
@@ -77,9 +85,16 @@ export function TerritorySegmentBreakdown({
 
   return (
     <div className="p-4">
+      <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
+        {t(
+          'territorySegmentBreakdown.basis',
+          'Scope: {{noun}} segments in this view. Bar length is share of the largest. Amount is opportunity value. {{basis}}. Probability is the stored average, not a measured win rate.',
+          { noun: dimensionNoun[dimension], basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
+      </p>
       <ul className="space-y-2">
         {shown.map((s) => {
-          const widthPct = Math.max(2, Math.round((s.totalValueMicros / maxValue) * 100));
+          const widthPct = shareBarWidth(microsSharePercent(s.totalValueMicros, maxValue), 2);
           return (
             <li
               key={s.key}
@@ -90,7 +105,7 @@ export function TerritorySegmentBreakdown({
                   {s.label}
                 </span>
                 <span className="shrink-0 text-sm font-semibold text-[var(--fg-primary)]">
-                  {formatMoneyMicros(s.totalValueMicros, 'EUR')}
+                  {formatExactUnspecified(s.totalValueMicros)}
                 </span>
               </div>
               {/* Value bar */}
@@ -113,9 +128,11 @@ export function TerritorySegmentBreakdown({
                 </span>
                 <span aria-hidden>·</span>
                 <span>
-                  {t('territorySegmentBreakdown.avgProbability', '{{percent}}% avg probability', {
-                    percent: s.avgProbability,
-                  })}
+                  {t(
+                    'territorySegmentBreakdown.avgProbability',
+                    '{{percent}}% open-stage probability',
+                    { percent: s.avgProbability },
+                  )}
                 </span>
                 {s.ownerNames.length > 0 ? (
                   <>

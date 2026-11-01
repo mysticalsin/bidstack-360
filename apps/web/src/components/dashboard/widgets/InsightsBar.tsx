@@ -11,8 +11,10 @@ import { Link } from 'react-router-dom';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
-import { formatMoney } from '@/lib/format';
-import { useCurrencyStore } from '@/stores/currency';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '../unspecified-currency';
 
 // ─── InsightsBar ─────────────────────────────────────────────────────────────
 
@@ -28,10 +30,6 @@ export function InsightsBar({
   pipelineValue: number;
 }) {
   const { t } = useTranslation('crm');
-  // Match the rest of the dashboard: convert the EUR-base pipeline figure into
-  // the user-selected currency and format it via the shared compact formatter,
-  // instead of hardcoding a € symbol (which mismatched the USD-default KPI cards).
-  const { currency, convert } = useCurrencyStore();
 
   const insights: Array<{
     tone: 'rose' | 'amber' | 'jade' | 'blue';
@@ -71,7 +69,7 @@ export function InsightsBar({
       tone: 'blue',
       icon: 'trending-up',
       message: t('insightsBar.pipelineValue', '{{value}} pipeline value', {
-        value: formatMoney(convert(pipelineValue, 'EUR'), currency),
+        value: `${formatUnspecifiedAmount(pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
       }),
       href: '/pipeline',
     });

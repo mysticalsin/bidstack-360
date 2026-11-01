@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
+import { ssoSignInPolicy } from '@/lib/sso-policy';
 
 export function SecuritySection() {
   const { t } = useTranslation('settings');
@@ -13,7 +14,7 @@ export function SecuritySection() {
   const { user } = useUser();
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
   const ssoDomains = import.meta.env.VITE_SSO_ALLOWED_EMAIL_DOMAINS ?? 'any';
-  const microsoftEnabled = import.meta.env.VITE_SSO_MICROSOFT_ENABLED === 'true';
+  const { microsoft: microsoftEnabled, google: googleEnabled } = ssoSignInPolicy();
   const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
 
   return (
@@ -26,12 +27,21 @@ export function SecuritySection() {
         <dl className="divide-y divide-[var(--border-subtle)] text-sm">
           <DetailRow label={t('security.signInMethod.label', 'Sign-in method')}>
             {microsoftEnabled ? (
-              <Badge tone="jade">{t('security.signInMethod.microsoftSso', 'Microsoft SSO')}</Badge>
+              <Badge tone="jade">
+                {t('security.signInMethod.microsoftOfficial', 'Microsoft, official')}
+              </Badge>
             ) : usingClerk ? (
               <Badge tone="blue">{t('security.signInMethod.clerk', 'Clerk')}</Badge>
             ) : (
               <Badge tone="gray">{t('security.signInMethod.devStub', 'Dev stub')}</Badge>
             )}
+          </DetailRow>
+          <DetailRow label={t('security.googleSignIn.label', 'Google sign-in')}>
+            <Badge tone={googleEnabled ? 'blue' : 'gray'}>
+              {googleEnabled
+                ? t('security.googleSignIn.available', 'Available in this version, including Gmail')
+                : t('security.googleSignIn.off', 'Turned off')}
+            </Badge>
           </DetailRow>
           <DetailRow label={t('security.authProvider.label', 'Auth provider')}>
             <span className="text-[var(--fg-secondary)]">
@@ -67,7 +77,7 @@ export function SecuritySection() {
             title={t('security.microsoftSso.title', 'Microsoft SSO')}
             caption={t(
               'security.microsoftSso.caption',
-              'Your Microsoft identity is linked to this account.',
+              'Microsoft is the official account. Google sign-in and Gmail stay available in this version.',
             )}
           />
           <div className="p-5">
@@ -75,7 +85,12 @@ export function SecuritySection() {
               <MicrosoftLogo />
               <div>
                 <div className="text-sm font-medium text-[var(--fg-primary)]">
-                  {t('security.microsoftSso.connected', 'Microsoft account connected')}
+                  {usingClerk
+                    ? t('security.microsoftSso.connected', 'Microsoft account connected')
+                    : t(
+                        'security.microsoftSso.officialNotLive',
+                        'Microsoft is the official account. This dev session is not a Microsoft login.',
+                      )}
                 </div>
                 <div className="text-xs text-[var(--fg-secondary)]">
                   {t('security.microsoftSso.signedInAs', 'Signed in as {{email}}', {
@@ -83,8 +98,10 @@ export function SecuritySection() {
                   })}
                 </div>
               </div>
-              <Badge tone="jade" className="ml-auto">
-                {t('security.microsoftSso.active', 'Active')}
+              <Badge tone={usingClerk ? 'jade' : 'gray'} className="ml-auto">
+                {usingClerk
+                  ? t('security.microsoftSso.active', 'Active')
+                  : t('security.microsoftSso.notLive', 'Not live')}
               </Badge>
             </div>
           </div>

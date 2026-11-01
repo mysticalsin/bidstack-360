@@ -51,6 +51,8 @@ export const KamHandoffPayload = z.object({
       id: z.string().uuid(),
       code: z.string(),
       valueMicros: z.number(),
+      /** Exact integer. valueMicros is only exact while it fits a safe integer. */
+      valueMicrosText: z.string().regex(/^\d+$/).optional(),
       currency: z.string(),
     })
     .nullable(),

@@ -16,6 +16,8 @@ export const DustStatus = z.object({
   pulled24h: z.number().int(),
   pushed24h: z.number().int(),
   configured: z.boolean(),
+  /** stub = secrets missing. configured_unverified = secrets present, no live probe. */
+  connectionState: z.enum(['stub', 'configured_unverified']),
   agentsError: z.string().nullable(),
   agents: z.array(
     z.object({ id: z.string(), label: z.string(), description: z.string().nullable() }),
@@ -43,6 +45,8 @@ export const IntegrationSetupGuide = z.object({
     configured: z.boolean(),
     workspaceId: z.string().nullable(),
     dataSourceConfigured: z.boolean(),
+    /** True when DUST_SPACE_ID is set. Document upserts need the space sId. */
+    spaceConfigured: z.boolean(),
     webhookReceiverUrl: z.string(),
   }),
   mcp: z.object({
@@ -51,6 +55,8 @@ export const IntegrationSetupGuide = z.object({
     wellKnownUrl: z.string(),
     transport: z.literal('streamable-http'),
     configured: z.boolean(),
+    /** True when the advertised URL is loopback. Dust cloud cannot call it. */
+    localOnly: z.boolean(),
     readScopes: z.array(z.string()),
     writeScopes: z.array(z.string()),
   }),

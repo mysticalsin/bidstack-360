@@ -10,6 +10,8 @@ import { springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
+import { SIGNAL_COVERAGE_WEIGHTS } from './_tokens';
+
 const ORDER = ['strong', 'good', 'needs_attention', 'critical'] as const;
 
 interface Props {
@@ -36,7 +38,11 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
     >
       <SectionHeader
         title={t('healthScore.title', 'Signal coverage')}
-        caption={t('healthScore.signalsScored', '{{count}} account signals scored', { count: total })}
+        caption={t(
+          'healthScore.signalsScored',
+          '{{count}} factors. {{weights}} The number beside a band is how many factors landed there.',
+          { count: total, weights: SIGNAL_COVERAGE_WEIGHTS },
+        )}
         action={
           <Badge tone={badgeTone(cockpit.health.band)}>
             {labelForHealth(cockpit.health.band, t)}
@@ -46,22 +52,17 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
       <div className="health-card-body">
         <motion.div
           className="health-stage"
-          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={springSoft}
-          aria-label={t('healthScore.gaugeLabel', 'Account signal coverage {{score}} out of 100', {
-            score: cockpit.health.score,
-          })}
+          initial={{ opacity: reducedMotion ? 1 : 0 }}
+          animate={{ opacity: 1 }}
+          transition={reducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.2, 0, 0, 1] }}
+          aria-label={t(
+            'healthScore.gaugeLabel',
+            'Weighted signal mix {{score}} out of 100. {{weights}}',
+            { score: cockpit.health.score, weights: SIGNAL_COVERAGE_WEIGHTS },
+          )}
           role="img"
         >
           <svg className="health-gauge" viewBox="0 0 180 180" aria-hidden>
-            <defs>
-              <linearGradient id="health-gauge-gradient" x1="20" x2="160" y1="160" y2="20">
-                <stop offset="0%" stopColor="var(--danger)" />
-                <stop offset="42%" stopColor="var(--warning)" />
-                <stop offset="100%" stopColor="var(--success)" />
-              </linearGradient>
-            </defs>
             <circle className="health-gauge-track" cx="90" cy="90" r="72" pathLength="1" />
             <motion.circle
               className="health-gauge-progress"
@@ -72,27 +73,32 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
               initial={{ strokeDashoffset: 1 }}
               animate={{ strokeDashoffset: 1 - scorePct }}
               transition={
-                reducedMotion ? { duration: 0 } : { duration: 1.05, ease: [0.2, 0.8, 0.2, 1] }
+                reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.2, 0, 0, 1] }
               }
             />
           </svg>
           <div className="health-core">
-            <span>{t('healthScore.coverage', 'Coverage')}</span>
+            <span>{t('healthScore.coverage', 'Signal mix')}</span>
             <strong>
               <AnimatedMetric value={cockpit.health.score.toLocaleString()} />
             </strong>
             <small>/100</small>
           </div>
-          <div className="health-pulse" aria-hidden />
         </motion.div>
         <div className="health-summary">
           <div className="health-summary-head">
-            <span>{t('healthScore.strongestBand', 'Strongest coverage band')}</span>
+            <span>{t('healthScore.strongestBand', 'Most factors')}</span>
             <strong>
               {strongest ? labelForHealth(strongest.key, t) : t('healthScore.noSignal', 'No signal')}
             </strong>
           </div>
-          <ul className="health-legend" aria-label={t('healthScore.healthBands', 'Health bands')}>
+          <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
+            {t(
+              'healthScore.notRelationshipHealth',
+              'Bands: 75+ strong, 50+ good, 25+ watch, below 25 at risk. Not measured relationship health.',
+            )}
+          </p>
+          <ul className="health-legend" aria-label={t('healthScore.healthBands', 'Coverage bands')}>
             {segments.map((segment, index) => (
               <motion.li
                 key={segment.key}
@@ -139,7 +145,7 @@ function SignalFactorPanel({
     <div className="border-t border-[var(--border)] px-5 pb-4">
       <button
         type="button"
-        className="flex min-h-[44px] w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+        className="flex min-h-11 w-full items-center justify-between text-left text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
@@ -173,10 +179,10 @@ function SignalFactorPanel({
 }
 
 function labelForHealth(key: (typeof ORDER)[number], t: TFunction): string {
-  if (key === 'strong') return t('healthScore.band.strong', 'Strong');
-  if (key === 'good') return t('healthScore.band.good', 'Good');
-  if (key === 'needs_attention') return t('healthScore.band.needsAttention', 'Needs attention');
-  return t('healthScore.band.critical', 'Critical');
+  if (key === 'strong') return t('healthScore.band.strong', 'Strong, proxy');
+  if (key === 'good') return t('healthScore.band.good', 'Good, proxy');
+  if (key === 'needs_attention') return t('healthScore.band.needsAttention', 'Watch, proxy');
+  return t('healthScore.band.critical', 'At risk, proxy');
 }
 
 function badgeTone(key: (typeof ORDER)[number]) {

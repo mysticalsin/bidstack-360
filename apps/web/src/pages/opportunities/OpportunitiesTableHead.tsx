@@ -9,6 +9,7 @@
  */
 import { useTranslation } from 'react-i18next';
 
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { getSortableHeaderAriaSort, SortableHeader } from '@/components/ui/SortableHeader';
 
 type OppSortKey = 'code' | 'name' | 'customer' | 'stage' | 'value' | 'probability' | 'dueDate';
@@ -88,6 +89,7 @@ export function OpportunitiesTableHead({
         <th
           scope="col"
           aria-sort={getSortableHeaderAriaSort('value', sortState)}
+          title={t('opportunitiesTableHead.columnValueTitle', UNSPECIFIED_CURRENCY_BASIS)}
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader columnKey="value" state={sortState} onChange={setSortState} align="right">
@@ -97,6 +99,10 @@ export function OpportunitiesTableHead({
         <th
           scope="col"
           aria-sort={getSortableHeaderAriaSort('probability', sortState)}
+          title={t(
+            'opportunitiesTableHead.columnProbabilityTitle',
+            'Stored on the deal. A blank is saved as 0 and is not a measured win chance.',
+          )}
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader
@@ -105,7 +111,7 @@ export function OpportunitiesTableHead({
             onChange={setSortState}
             align="right"
           >
-            {t('opportunitiesTableHead.columnProbability', 'Probability')}
+            {t('opportunitiesTableHead.columnProbability', 'Stored probability')}
           </SortableHeader>
         </th>
         <th

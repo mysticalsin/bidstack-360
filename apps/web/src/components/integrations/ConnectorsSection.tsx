@@ -70,6 +70,7 @@ export function ConnectorsSection() {
     const acc: Record<CrmConnector['status'], number> = {
       healthy: 0,
       degraded: 0,
+      unverified: 0,
       down: 0,
       disabled: 0,
     };
@@ -186,7 +187,7 @@ function ConnectorStat({
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        <span className="text-xs font-medium text-[var(--fg-tertiary)]">
           {label}
         </span>
         <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
@@ -365,7 +366,9 @@ function StatusBadge({ status }: { status: CrmConnector['status'] }) {
         ? 'amber'
         : status === 'down'
           ? 'tomato'
-          : 'gray';
+          : status === 'unverified'
+            ? 'amber'
+            : 'gray';
   const label =
     status === 'healthy'
       ? t('connectors.status.healthy', 'healthy')
@@ -373,7 +376,9 @@ function StatusBadge({ status }: { status: CrmConnector['status'] }) {
         ? t('connectors.status.degraded', 'degraded')
         : status === 'down'
           ? t('connectors.status.down', 'down')
-          : t('connectors.status.disabled', 'disabled');
+          : status === 'unverified'
+            ? t('connectors.status.unverified', 'unverified')
+            : t('connectors.status.disabled', 'disabled');
   return <Badge tone={tone}>{label}</Badge>;
 }
 

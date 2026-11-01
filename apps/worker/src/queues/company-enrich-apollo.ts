@@ -18,14 +18,13 @@ import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { COMPANY_ENRICH_APOLLO } from '@bidstack/shared';
+import { COMPANY_ENRICH_APOLLO, microsToSafeNumber, unitsToMicros } from '@bidstack/shared';
 
 export const QUEUE_NAME = COMPANY_ENRICH_APOLLO.name;
 
 const APOLLO_ENDPOINT = 'https://api.apollo.io/api/v1/organizations/enrich';
 const APOLLO_PEOPLE_SEARCH_ENDPOINT = 'https://api.apollo.io/api/v1/mixed_people/api_search';
 const GDELT_DOC_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc';
-const APOLLO_CONFIDENCE_BPS = 8500;
 const APOLLO_TIMEOUT_MS = 10_000;
 const APOLLO_CONCURRENCY = 5;
 const APOLLO_COMPANY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -135,7 +134,7 @@ export interface MappedEnrichment {
   industryCodes: string[];
   formerNames: string[];
   strategicIntel: ApolloStrategicIntel;
-  technicalStack: Array<{ name: string; source: string; confidence: number }>;
+  technicalStack: Array<{ name: string; source: string; confidence: number | null }>;
 }
 
 type ApolloSyncMode =
@@ -162,7 +161,7 @@ interface ApolloStrategicSignal {
   detail: string | null;
   observedAt: string;
   source: string;
-  confidence: number;
+  confidence: number | null;
   url: string | null;
   metadata: Record<string, unknown>;
 }
@@ -209,12 +208,12 @@ export function mapApolloOrganization(
 ): MappedEnrichment {
   const now = context.now ?? new Date();
   const employees = coerceInt(org.estimated_num_employees);
-  const revenue = coerceNumber(org.annual_revenue ?? org.organization_revenue);
+  const revenue = revenueToMicros(org.annual_revenue ?? org.organization_revenue);
   const foundedYear = coerceInt(org.founded_year);
   const jobPostings = context.jobPostings ?? org.job_postings;
   const executives = context.executives ?? org.senior_leadership ?? org.leadership_changes;
   const technicalStack = extractTechnologyStack(org);
-  const annualRevenueMicros = revenue === null ? null : BigInt(Math.round(revenue * 1_000_000));
+  const annualRevenueMicros = revenue;
   const strategicIntel = buildApolloStrategicIntel({
     org,
     now,
@@ -228,7 +227,8 @@ export function mapApolloOrganization(
   });
 
   return {
-    legalName: org.name ?? null,
+    // Apollo `name` is the organization label, not a legal-name field.
+    legalName: null,
     domain: normalizeDomain(org.primary_domain ?? null),
     website: org.website_url ?? null,
     industry: org.industry ?? null,
@@ -299,7 +299,7 @@ function buildApolloStrategicIntel({
       label: topic,
       detail: 'Company-level buying intent topic from Apollo.',
       observedAt,
-      confidence: 0.78,
+      confidence: null,
     }),
   );
   const signals = [
@@ -327,7 +327,7 @@ function buildApolloStrategicIntel({
     freshness: 'fresh',
     employeeTrend,
     employeeCount,
-    annualRevenueMicros: annualRevenueMicros === null ? null : Number(annualRevenueMicros),
+    annualRevenueMicros: microsToSafeNumber(annualRevenueMicros),
     intentTopics,
     hiringSignals,
     leadershipSignals,
@@ -382,6 +382,11 @@ export function verifyApolloEnrichJobSignature(
   );
 }
 
+function revenueToMicros(value: unknown): bigint | null {
+  if (typeof value === 'number' || typeof value === 'string') return unitsToMicros(value);
+  return null;
+}
+
 function coerceNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = typeof value === 'number' ? value : Number(value);
@@ -420,7 +425,7 @@ function signal({
   detail = null,
   observedAt,
   source = 'apollo_io',
-  confidence = 0.75,
+  confidence = null,
   url = null,
   metadata = {},
 }: Omit<ApolloStrategicSignal, 'source' | 'detail' | 'confidence' | 'url' | 'metadata'> &
@@ -434,7 +439,7 @@ function signal({
     detail,
     observedAt,
     source,
-    confidence: Math.max(0, Math.min(1, confidence)),
+    confidence: confidence == null ? null : Math.max(0, Math.min(1, confidence)),
     url: validUrl(url),
     metadata: sanitizeApolloPayload(metadata) as Record<string, unknown>,
   };
@@ -450,14 +455,14 @@ function extractIntentTopics(org: ApolloOrganization): string[] {
 
 function extractTechnologyStack(
   org: ApolloOrganization,
-): Array<{ name: string; source: string; confidence: number }> {
+): Array<{ name: string; source: string; confidence: null }> {
   return uniqueStrings([
     ...labelsFromUnknown(org.technologies),
     ...labelsFromUnknown(org.current_technologies),
     ...labelsFromUnknown(org.organization_technologies),
   ])
     .slice(0, 24)
-    .map((name) => ({ name, source: 'apollo_io', confidence: 0.82 }));
+    .map((name) => ({ name, source: 'apollo_io', confidence: null }));
 }
 
 function extractHiringSignals(
@@ -478,7 +483,7 @@ function extractHiringSignals(
         label: title,
         detail: department ? `Hiring in ${department}` : 'Open job posting detected.',
         observedAt: stringDate(postedAt) ?? observedAt,
-        confidence: 0.76,
+        confidence: null,
         url: firstString(row, ['url', 'job_url', 'source_url']),
         metadata: row,
       });
@@ -493,7 +498,7 @@ function extractHiringSignals(
       label,
       detail: 'Headcount movement returned by Apollo.',
       observedAt,
-      confidence: 0.68,
+      confidence: null,
     }),
   );
 
@@ -517,7 +522,7 @@ function extractLeadershipSignals(
         detail: change ?? 'Executive or senior leadership signal returned by Apollo.',
         observedAt:
           stringDate(firstString(row, ['observed_at', 'updated_at', 'created_at'])) ?? observedAt,
-        confidence: 0.72,
+        confidence: null,
         url: firstString(row, ['linkedin_url', 'url', 'source_url']),
         metadata: row,
       });
@@ -540,8 +545,8 @@ function extractRevenueSignals(
         label: 'Annual revenue returned',
         detail: 'Apollo returned company annual revenue.',
         observedAt,
-        confidence: 0.78,
-        metadata: { annualRevenueMicros: Number(annualRevenueMicros) },
+        confidence: null,
+        metadata: { annualRevenueMicros: annualRevenueMicros.toString() },
       }),
     );
   }
@@ -554,7 +559,7 @@ function extractRevenueSignals(
         label: 'Funding total returned',
         detail: 'Apollo returned total funding data.',
         observedAt: stringDate(org.latest_funding_round_date) ?? observedAt,
-        confidence: 0.75,
+        confidence: null,
         metadata: { totalFunding },
       }),
     );
@@ -577,12 +582,12 @@ function extractNewsSignals(
   ];
   const crossCheckRows = rowsFromUnknown(newsCrossCheck);
   const rows = [
-    ...apolloRows.map((row) => ({ row, source: 'apollo_io' as const, confidence: 0.7 })),
-    ...crossCheckRows.map((row) => ({ row, source: 'gdelt_news' as const, confidence: 0.66 })),
+    ...apolloRows.map((row) => ({ row, source: 'apollo_io' as const })),
+    ...crossCheckRows.map((row) => ({ row, source: 'gdelt_news' as const })),
   ];
 
   return rows
-    .map(({ row, source, confidence }, index) => {
+    .map(({ row, source }, index) => {
       const title = firstString(row, [
         'title',
         'headline',
@@ -619,7 +624,7 @@ function extractNewsSignals(
         detail,
         observedAt: observed,
         source,
-        confidence: kind === 'funding' ? Math.max(confidence, 0.74) : confidence,
+        confidence: null,
         url: firstString(row, ['url', 'source_url', 'article_url', 'link']),
         metadata: row,
       });
@@ -1383,7 +1388,7 @@ export async function startCompanyEnrichApollo(
               : 'Apollo MCP company intelligence',
           sourceUrl,
           fetchedAt: nowIso,
-          confidence: 0.85,
+          confidence: null,
           providerMetadata: {
             transport: syncMode.startsWith('apollo_mcp') ? 'mcp_streamable_http' : 'rest_api',
             endpoint: syncMode.startsWith('apollo_mcp') ? '/mcp' : APOLLO_ENDPOINT,
@@ -1413,7 +1418,7 @@ export async function startCompanyEnrichApollo(
         create: {
           orgId: data.orgId,
           normalizedName,
-          legalName: mapped.legalName ?? data.companyName,
+          legalName: mapped.legalName,
           tradeName: organization.name ?? data.companyName,
           domain: mapped.domain ?? data.domain ?? null,
           website: mapped.website ?? sourceUrl,
@@ -1426,7 +1431,7 @@ export async function startCompanyEnrichApollo(
           employeeCount: mapped.employeeCount,
           annualRevenueMicros: mapped.annualRevenueMicros,
           status: 'active',
-          confidenceBps: APOLLO_CONFIDENCE_BPS,
+          confidenceBps: 0,
           sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
           providerMetadata: {
             apollo: apolloMetadata,
@@ -1437,7 +1442,7 @@ export async function startCompanyEnrichApollo(
           cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
         },
         update: {
-          legalName: mapped.legalName ?? data.companyName,
+          ...(mapped.legalName ? { legalName: mapped.legalName } : {}),
           tradeName: organization.name ?? data.companyName,
           domain: mapped.domain ?? data.domain ?? null,
           website: mapped.website ?? sourceUrl,
@@ -1449,7 +1454,7 @@ export async function startCompanyEnrichApollo(
           employeeCount: mapped.employeeCount,
           annualRevenueMicros: mapped.annualRevenueMicros,
           status: 'active',
-          confidenceBps: APOLLO_CONFIDENCE_BPS,
+          confidenceBps: 0,
           sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
           providerMetadata: {
             apollo: apolloMetadata,
@@ -1482,7 +1487,6 @@ export async function startCompanyEnrichApollo(
           industry: mapped.industry ?? undefined,
           employeeCount: mapped.employeeCount ?? undefined,
           source: 'apollo_io',
-          confidence: APOLLO_CONFIDENCE_BPS / 10_000,
           enrichedAt: new Date(nowIso),
         },
       });

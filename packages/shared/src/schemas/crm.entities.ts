@@ -60,17 +60,33 @@ export const CompanyStrategicIntel = z.object({
 });
 export type CompanyStrategicIntel = z.infer<typeof CompanyStrategicIntel>;
 
+/** Facts copied from a public source such as Wikidata. Absent fields stay null. */
+export const PublicCompanyFacts = z.object({
+  description: z.string().nullable(),
+  headquarters: z.string().nullable(),
+  chiefExecutive: z.string().nullable(),
+  stockExchange: z.string().nullable(),
+  revenueLabel: z.string().nullable(),
+  revenueCurrency: z.string().length(3).nullable(),
+});
+export type PublicCompanyFacts = z.infer<typeof PublicCompanyFacts>;
+
 export const CrmCompany = z.object({
   id: z.string(),
   source: CrmObjectSource.default('external_crm'),
   name: z.string().min(1),
   legalName: z.string().nullable(),
+  /** account = saved on the company record. public = copied from a public profile. */
+  legalNameSource: z.enum(['public', 'account']).nullable().optional(),
   domain: z.string().nullable(),
   website: z.string().url().nullable(),
   industry: z.string().nullable(),
+  publicFacts: PublicCompanyFacts.nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: z.number().int().nonnegative().nullable(),
+  /** Exact stored micros when the number field cannot hold every digit. */
+  annualRevenueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   status: z.string().nullable(),
   registryIds: z.record(z.string()).default({}),
   formerNames: z.array(z.string()).default([]),
@@ -78,7 +94,7 @@ export const CrmCompany = z.object({
   logo: CrmLogo.nullable(),
   technicalStack: z.array(TechnicalStackCategory).optional(),
   strategicIntel: CompanyStrategicIntel.optional(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
   sourceAttribution: z.array(SourceAttribution).default([]),
   updatedAt: z.string().datetime(),
 });
@@ -104,6 +120,7 @@ export const CrmDealStage = z.enum([
   'meeting',
   'proposal',
   'customer',
+  'unspecified',
   'closed_won',
   'closed_lost',
 ]);
@@ -116,8 +133,11 @@ export const CrmDeal = z.object({
   companyName: z.string().nullable(),
   name: z.string().min(1),
   stage: CrmDealStage,
-  amountMicros: z.number().int().nonnegative(),
-  currencyCode: z.string().length(3),
+  /** Live pipeline stage label. Absent when the deal has no live stage row. */
+  stageName: z.string().min(1).nullable().optional(),
+  /** Integer micros. A JS number rounds a deal past 2^53. */
+  amountMicros: z.string().regex(/^\d+$/),
+  currencyCode: z.string().length(3).nullable(),
   probability: z.number().int().min(0).max(100).nullable(),
   closeDate: z.string().date().nullable(),
   ownerId: z.string().nullable(),

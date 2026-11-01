@@ -123,6 +123,19 @@ describe('api fetch wrapper', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('reads a JSON body that starts with a byte-order mark', async () => {
+    // WHY: a BOM used to fail JSON.parse and the agreements card showed
+    // "Invalid JSON response from server".
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '\uFEFF{"items":[]}',
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api('/api/contract-agreements?accountKey=acme')).resolves.toEqual({ items: [] });
+  });
+
   it('uses error payloads when APIs return legacy error bodies', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ error: 'SMS disabled for this org' }, 403));
     vi.stubGlobal('fetch', fetchMock);

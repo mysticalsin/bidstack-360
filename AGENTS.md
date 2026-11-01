@@ -191,3 +191,15 @@ Per Tony's `design-standards.md` and the Apple HIG referenced in the handoff:
 - WCAG 2.2 AA: 4.5:1 normal text, 3:1 large text, 44×44px touch targets, full keyboard nav, `prefers-reduced-motion` respected
 - Performance: LCP < 2.5s, INP < 200ms, CLS < 0.1
 - Images: WebP/AVIF, lazy loading, responsive `srcset`
+
+## Cursor Cloud specific instructions
+
+- Node 24 is required (`engines` plus `.npmrc` `engine-strict`). Use nvm Node `24.22.2` and pnpm `10.27.0` (`packageManager`). Agent shells may put `/exec-daemon/node` (Node 22) ahead of nvm; prepend `$NVM_DIR/versions/node/v24.22.2/bin` before `pnpm` or `node`.
+- Postgres 16 with pgvector and Redis 7 are installed natively. PID 1 is not systemd: start them with `pg_ctlcluster 16 main start` and `redis-server /etc/redis/redis.conf`. The local role and database are `bidstack` on `127.0.0.1:5432`. Redis is `redis://127.0.0.1:6379`. Compose publishes `5433` and `6380`; those host ports are for Docker, which this VM does not run.
+- `dotenv-flow` does not expand the `${POSTGRES_*}` placeholders in `.env.example`. Write a root `.env` with a literal `DATABASE_URL` and `REDIS_URL` when it is missing. Leave `CLERK_SECRET_KEY` empty for stub auth.
+- The web dev server is `http://localhost:38081` (`apps/web/vite.config.ts` uses `strictPort`). API is `http://localhost:4000` (`/readyz`). Worker health is port `4002`. MCP is port `4001`, health port `4003`.
+- Do not boot the stack with root `pnpm dev`. That script also starts `@bidstack/marketing`, whose Vite dev server exits on an esbuild target error and takes the parallel run down. Start `@bidstack/api`, `@bidstack/web`, `@bidstack/worker`, and `@bidstack/mcp-server` directly.
+- Stub auth accepts loopback only. Exercise the API through the Vite `/api` proxy or `curl` to `127.0.0.1`.
+- Official accounts are Microsoft (Entra sign-in and Outlook). Google sign-in and the Gmail mailbox stay available in this version. Do not remove either path. Hide one only when its `VITE_SSO_*_ENABLED` flag is `false`.
+- Dust reads Polo through MCP. In Dust the path is Spaces > Tools > Add Tool > Add MCP Server. Paste a public HTTPS URL ending in `/mcp` and choose Bearer token (`Authorization: Bearer`), not Automatic OAuth. Polo has no Dust OAuth callback. `DUST_WORKSPACE_ID` is the id in `https://dust.tt/w/<id>` or `https://eu.dust.tt/w/<id>`, not a display name. EU workspaces set `DUST_BASE_URL=https://eu.dust.tt/api`. Document upserts need `DUST_SPACE_ID` (the space `sId`) at `/v1/w/<workspace>/spaces/<space>/data_sources/<dataSource>/documents/<documentId>`. localhost cannot be registered with Dust cloud; a loopback `DUST_MCP_PUBLIC_URL` keeps `mcp.configured` false. Leave Dust secrets unset and the status stays stub / `configured_unverified`, never healthy, with `nextSyncAt` null.
+- Before the API can boot, run `pnpm db:generate` and build `@bidstack/shared`, `@bidstack/db`, `@bidstack/dust-client`, `@bidstack/memos`, and `@bidstack/odoo-mcp-client`. They are consumed from `dist/`. Apply schema with `pnpm --filter @bidstack/db exec prisma migrate deploy`, then `pnpm db:seed`. `pnpm db:migrate` is interactive `prisma migrate dev`.

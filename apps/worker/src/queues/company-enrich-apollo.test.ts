@@ -76,7 +76,8 @@ describe('mapApolloOrganization', () => {
       former_names: ['Amaris Consulting'],
     });
 
-    expect(mapped.legalName).toBe('Mantu Group SA');
+    // The organization label stays off the legal-name field.
+    expect(mapped.legalName).toBeNull();
     // domain is normalized — lowercased, www-stripped
     expect(mapped.domain).toBe('mantu.com');
     expect(mapped.website).toBe('https://mantu.com/');
@@ -102,6 +103,24 @@ describe('mapApolloOrganization', () => {
     // 7,500,000.5 USD → 7,500,000,500,000 micros (rounded)
     expect(mapped.annualRevenueMicros).toBe(7_500_000_500_000n);
     expect(mapped.incorporationDate?.getUTCFullYear()).toBe(1998);
+  });
+
+  it('keeps a large revenue string as integer micros', () => {
+    // WHY: Math.round(Number(text) * 1e6) cannot store this remainder.
+    const mapped = mapApolloOrganization({
+      name: 'Large Co',
+      annual_revenue: '8598204328457.184962',
+    });
+    expect(mapped.annualRevenueMicros).toBe(8_598_204_328_457_184_962n);
+    expect(mapped.strategicIntel.annualRevenueMicros).toBeNull();
+  });
+
+  it('stores a safe public-scale revenue without dropping it', () => {
+    const mapped = mapApolloOrganization({
+      name: 'DNB',
+      annual_revenue: 54_857_000_000,
+    });
+    expect(mapped.annualRevenueMicros).toBe(54_857_000_000_000_000n);
   });
 
   it('falls back to organization_revenue when annual_revenue is absent', () => {

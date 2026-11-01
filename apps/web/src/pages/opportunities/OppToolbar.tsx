@@ -15,13 +15,22 @@ import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportun
 import { ImportOpportunitiesDialog } from '@/components/opportunity/ImportOpportunitiesDialog';
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 import { Button } from '@/components/ui/Button';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
+import { closedOutcome } from '@/lib/pipeline-stages';
 import { useTranslation } from 'react-i18next';
 
-import type { Opportunity, PipelineStage } from '@bidstack/shared';
+import {
+  formatMicrosAmount,
+  unitsToMicros,
+  type Opportunity,
+  type PipelineStage,
+} from '@bidstack/shared';
 
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
@@ -29,16 +38,49 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  * Headline KPIs. Tenant-wide counts/pipeline come from the server aggregate
  * (`/api/crm/summary`) so they reflect the whole org, not just the current 50-row
  * cursor page — at 100k-company scale a page-derived total under-reports the
- * pipeline by orders of magnitude. Weighted revenue has no server aggregate, so
- * it stays page-derived and is explicitly labelled "(page)" to avoid
- * misrepresenting it as a tenant total.
+ * pipeline by orders of magnitude. The weighted figure has no server aggregate,
+ * so it stays page-derived and is labelled "(page)". It is value × stored
+ * stage probability for open rows on this page.
  */
-export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
+function dealMicros(opp: Opportunity): bigint {
+  if (opp.valueMicros != null && /^\d+$/.test(opp.valueMicros)) return BigInt(opp.valueMicros);
+  return unitsToMicros(opp.value) ?? 0n;
+}
+
+function sumDealMicros(rows: Opportunity[], weight: boolean): bigint {
+  return rows.reduce((sum, opp) => {
+    const micros = dealMicros(opp);
+    if (!weight) return sum + micros;
+    if (opp.probability <= 0) return sum;
+    return sum + (micros * BigInt(opp.probability)) / 100n;
+  }, 0n);
+}
+
+export function OppKpiBar({
+  opps,
+  summary,
+  partial = false,
+}: {
+  opps: Opportunity[];
+  summary?: OrgSummary;
+  /** True when this cursor page is not the whole filtered result. */
+  partial?: boolean;
+}) {
   const { t } = useTranslation('crm');
-  const { formatMoney } = useFormatMoney();
-  const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
-  const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
-  const kpis = summary
+  const openOpps = opps.filter((o) => closedOutcome(o) === null);
+  const wonMicros = sumDealMicros(
+    opps.filter((o) => closedOutcome(o) === 'won'),
+    false,
+  );
+  const weightedMicros = sumDealMicros(openOpps, true);
+  const openMicros = sumDealMicros(openOpps, false);
+  const currencyDetail = t('oppToolbar.kpiCurrencyBasis', UNSPECIFIED_CURRENCY_BASIS);
+  const weightedDetail = t(
+    'oppToolbar.kpiWeightedRevenueDetail',
+    'Open rows on this page × stored probability. {{basis}}',
+    { basis: UNSPECIFIED_CURRENCY_BASIS },
+  );
+  const kpis: Array<{ label: string; value: string; detail?: string }> = summary
     ? [
         {
           label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
@@ -50,11 +92,15 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: formatMoney(summary.pipelineValue, 'EUR'),
+          value: summary.pipelineValueMicros
+            ? formatMicrosAmount(BigInt(summary.pipelineValueMicros))
+            : formatUnspecifiedAmount(summary.pipelineValue),
+          detail: currencyDetail,
         },
         {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: formatMoney(weighted, 'EUR'),
+          label: t('oppToolbar.kpiWeightedRevenuePage', 'Weighted (page)'),
+          value: formatMicrosAmount(weightedMicros),
+          detail: weightedDetail,
         },
       ]
     : [
@@ -65,22 +111,19 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           value: String(opps.length),
         },
         {
-          label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: formatMoney(
-            opps.reduce((acc, o) => acc + o.value, 0),
-            'EUR',
-          ),
+          label: t('oppToolbar.kpiRevenuePage', 'Won (page)'),
+          value: formatMicrosAmount(wonMicros),
+          detail: currencyDetail,
         },
         {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: formatMoney(weighted, 'EUR'),
+          label: t('oppToolbar.kpiWeightedRevenuePage', 'Weighted (page)'),
+          value: formatMicrosAmount(weightedMicros),
+          detail: weightedDetail,
         },
         {
           label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: formatMoney(
-            openOpps.reduce((acc, o) => acc + o.value, 0),
-            'EUR',
-          ),
+          value: formatMicrosAmount(openMicros),
+          detail: currencyDetail,
         },
       ];
   return (
@@ -89,6 +132,11 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
       aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"
     >
+      {!summary && partial ? (
+        <p className="col-span-2 text-sm text-[var(--fg-secondary)] sm:col-span-4">
+          {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+        </p>
+      ) : null}
       {kpis.map((kpi) => (
         <div
           key={kpi.label}
@@ -100,6 +148,11 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           <div className="mt-1 text-lg font-bold tabular-nums text-[var(--fg-primary)]">
             {kpi.value}
           </div>
+          {kpi.detail ? (
+            <div className="mt-0.5 text-[11px] leading-snug text-[var(--fg-tertiary)]">
+              {kpi.detail}
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
@@ -114,6 +167,7 @@ export function OppPageHeader({
   stageOptions,
   itemCount,
   hasData,
+  partial = false,
   isExporting = false,
   onClearSearch,
   onClearStageFilter,
@@ -124,6 +178,8 @@ export function OppPageHeader({
   stageOptions: PipelineStage[];
   itemCount: number;
   hasData: boolean;
+  /** True when earlier or later pages hold more rows for this filter. */
+  partial?: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
   onClearSearch: () => void;
@@ -142,17 +198,25 @@ export function OppPageHeader({
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h1 className="gradient-text text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
-          {t('oppToolbar.title', 'Opportunities')}
-        </h1>
+        <h1 className="page-title">{t('oppToolbar.title', 'Opportunities')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {search ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
-              {t('oppToolbar.resultsFor', 'results for')}{' '}
+              {partial
+                ? t('oppToolbar.pageForSearch', 'on this page for')
+                : t('oppToolbar.resultsFor', 'results for')}{' '}
               <span className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-mono text-xs">
                 &ldquo;{search}&rdquo;
-              </span>{' '}
+              </span>
+              {partial ? (
+                <>
+                  {'. '}
+                  <span>
+                    {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+                  </span>
+                </>
+              ) : null}{' '}
               <button type="button" onClick={onClearSearch} className={clearBtnClass}>
                 {t('oppToolbar.clear', 'clear')}
               </button>
@@ -160,18 +224,39 @@ export function OppPageHeader({
           ) : stageFilter ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
-              {t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
-                stage: stageFilterLabel.toLowerCase(),
-              })}
+              {partial ? (
+                <>
+                  {t('oppToolbar.stageOnPage', 'on this page.')}{' '}
+                  <span>
+                    {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+                  </span>
+                </>
+              ) : (
+                t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
+                  stage: stageFilterLabel.toLowerCase(),
+                })
+              )}
               <button type="button" onClick={onClearStageFilter} className={clearBtnClass}>
                 {t('oppToolbar.clearFilter', 'clear filter')}
               </button>
             </>
           ) : (
             <>
-              {t('oppToolbar.bidsInFlight', '{{count}} bids in flight · click any cell to edit inline.', {
-                count: itemCount,
-              })}
+              {t(
+                'oppToolbar.bidsInFlight',
+                '{{count}} on this page · click any cell to edit inline.',
+                {
+                  count: itemCount,
+                },
+              )}
+              {partial ? (
+                <>
+                  {' '}
+                  <span>
+                    {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+                  </span>
+                </>
+              ) : null}
             </>
           )}
         </p>

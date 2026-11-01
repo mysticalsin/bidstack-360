@@ -84,7 +84,7 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
       <p className="text-sm text-[var(--fg-secondary)] py-4">
         {t(
           'predictiveAdmin.modelTableEmpty',
-          'No {{entityType}} models trained yet. Click "Retrain Now" to train the first model.',
+          'No {{entityType}} model is stored. Training needs at least 50 closed records from this org.',
           { entityType: filter },
         )}
       </p>
@@ -191,7 +191,10 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
             {t('predictiveAdmin.sectionHeading', '{{entityType}} Scoring Model', { entityType })}
           </h2>
           <p className="text-xs text-[var(--fg-tertiary)] mt-0.5">
-            {t('predictiveAdmin.sectionSubtitle', 'Logistic regression · per-org · retrained weekly')}
+            {t(
+              'predictiveAdmin.sectionSubtitle',
+              'Stored only after 50 closed records. Weekly queue: Sunday 02:00 UTC.',
+            )}
           </p>
         </div>
 
@@ -266,7 +269,7 @@ export default function PredictiveAdminPage() {
         <p className="text-sm text-[var(--fg-secondary)] mt-1">
           {t(
             'predictiveAdmin.pageSubtitle',
-            "ML-based lead and opportunity scoring — trained on your org's closed deal history. Models are automatically retrained every Sunday at 02:00 UTC.",
+            'A lead or opportunity stays unscored until a model is trained on this org’s closed records. Fewer than 50 closed records stores no model.',
           )}
         </p>
       </div>

@@ -1,10 +1,6 @@
-// Regression: the world map's legend/tooltip/aria-label money figures must
-// track the user's selected display currency (via useCurrencyStore), not a
-// hardcoded EUR. WHY: WorldMap is shared by Territories + Sector View, where
-// every other money surface already converts — the map showing '€1M' while the
-// KPI tiles show '$2M' for the same portfolio is a silently-wrong figure to a
-// bid director, not a cosmetic mismatch. Fails if the component reverts to the
-// module-level formatMoneyMicros with a hardcoded output currency.
+// Opportunities do not store a currency. The map scale counts opportunities.
+// Hover amounts say "unspecified". A display-currency conversion, or a
+// currencyKnown flag that turned the same micros into euros, invented a forecast.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,7 +32,7 @@ const item: TerritoryAnalyticsItem = {
   countryCode: 'FR',
   countryCodeA3: 'FRA',
   opportunityCount: 3,
-  totalValueMicros: 1_000_000_000_000, // €1,000,000 at rest
+  totalValueMicros: 1_000_000_000_000,
   avgProbability: 60,
   territories: ['EMEA'],
   ownerNames: ['Alex'],
@@ -55,12 +51,12 @@ beforeEach(() => {
 });
 
 describe('WorldMap currency display', () => {
-  it('renders the pipeline legend in the user-selected currency, converted from EUR', () => {
+  it('does not draw a converted currency on the opportunity scale', () => {
+    // Why: the scale counts opportunities. Treating the micros as euros and
+    // converting them into the header currency invented a dollar pipeline.
     render(<WorldMap data={[item]} />);
-
-    // maxValue = €1,000,000 → at USD rate 2.0 the top legend bracket is $2M.
-    // The pre-fix code hardcoded 'EUR' and would render '€1M' regardless.
-    expect(screen.getByText(/\$2M/)).toBeDefined();
+    expect(screen.queryByText(/\$2M/)).toBeNull();
     expect(screen.queryByText(/€1M/)).toBeNull();
+    expect(screen.getByText(/number of opportunities/)).toBeTruthy();
   });
 });

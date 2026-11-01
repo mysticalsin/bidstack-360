@@ -1,8 +1,10 @@
-// Pure due-detection + dedupe helpers for the bid-deadline alert worker.
+// Due-detection + dedupe helpers for the bid-deadline alert worker.
 //
 // Extracted from the worker so the threshold maths and the per-(opp, threshold)
 // dedupe key can be unit-tested without Postgres, Redis, or BullMQ. The worker
 // (bid-deadline-alerts.ts) supplies the org-scoped I/O around these.
+
+import { OpportunityStage, type Prisma } from '@bidstack/db';
 
 /**
  * Alert thresholds, in days-before-due. Order matters: closest deadline first so
@@ -11,6 +13,30 @@
  * alert — never two of the same).
  */
 export const DEADLINE_THRESHOLD_DAYS = [7, 3, 1] as const;
+
+/**
+ * Deals the deadline scan may alert. A live stage marked lost or won is
+ * already decided, even when the stored key still looks open.
+ */
+export function openDeadlineScanWhere(window: {
+  start: Date;
+  end: Date;
+}): Prisma.OpportunityWhereInput {
+  return {
+    deletedAt: null,
+    stage: { notIn: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
+    NOT: {
+      pipelineStage: {
+        is: {
+          deletedAt: null,
+          OR: [{ isLost: true }, { isWon: true }],
+        },
+      },
+    },
+    ownerId: { not: null },
+    dueDate: { gte: window.start, lte: window.end },
+  };
+}
 
 export type DeadlineThresholdDay = (typeof DEADLINE_THRESHOLD_DAYS)[number];
 

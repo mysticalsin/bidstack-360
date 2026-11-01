@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { applyMappings, asInt, asMicros, mapStage, normalizeEntity } from './migration.js';
+import { applyMappings, asInt, asMicros, mapLeadStatus, mapStage, normalizeEntity } from './migration.js';
 
 describe('migration value coercion', () => {
   it('parses currency units into micros (money is stored ×1e6)', () => {
@@ -13,6 +13,7 @@ describe('migration value coercion', () => {
     expect(asMicros('1,200,000.50')).toBe(1_200_000_500_000n);
     expect(asMicros('€2 500')).toBe(2_500_000_000n);
     expect(asMicros('0')).toBe(0n);
+    expect(asMicros('8598204328457.184962')).toBe(8_598_204_328_457_184_962n);
   });
 
   it('returns null for blank/garbage money so writers can skip the field', () => {
@@ -42,10 +43,43 @@ describe('mapStage', () => {
     expect(mapStage('Technical Evaluation')).toBe('s3_technical_iteration');
   });
 
-  it('defaults unknown/blank stages to s1_lead (never crashes the import)', () => {
-    expect(mapStage('Whatever')).toBe('s1_lead');
+  it('does not record an unspecified close as a lead or a loss', () => {
+    // Why: "closed" without won or lost was first a false loss, then a false
+    // lead. The import must keep the row out and name the original label.
+    expect(mapStage('Closed Lost')).toBe('closed_lost');
+    expect(mapStage('Lost')).toBe('closed_lost');
+    expect(() => mapStage('Closed')).toThrow(/Closed.*not imported/);
+    expect(() => mapStage('Successfully Closed')).toThrow(/Successfully Closed/);
+  });
+
+  it('keeps a blank stage as a lead and refuses an unknown label', () => {
+    // WHY: "Whatever" used to become a lead, and "absent" became sent.
     expect(mapStage('')).toBe('s1_lead');
     expect(mapStage(null)).toBe('s1_lead');
+    expect(mapStage('Prospect')).toBe('s1_lead');
+    expect(() => mapStage('Whatever')).toThrow(/Whatever.*not imported/);
+    expect(() => mapStage('absent')).toThrow(/absent.*not imported/);
+  });
+});
+
+describe('mapLeadStatus', () => {
+  it('keeps a blank status as new and maps a known status through', () => {
+    expect(mapLeadStatus('')).toBe('new');
+    expect(mapLeadStatus(null)).toBe('new');
+    expect(mapLeadStatus('qualified')).toBe('qualified');
+    expect(mapLeadStatus('Nurture')).toBe('nurture');
+  });
+
+  it('maps an unqualified label to disqualified, not qualified', () => {
+    // WHY: "unqualified" contains "qualif". Checking that alias first
+    // keeps a rejected lead from landing in the qualified bucket.
+    expect(mapLeadStatus('Disqualified')).toBe('disqualified');
+    expect(mapLeadStatus('unqualified')).toBe('disqualified');
+    expect(mapLeadStatus('junk')).toBe('disqualified');
+  });
+
+  it('refuses an unknown label instead of storing it as new', () => {
+    expect(() => mapLeadStatus('parking')).toThrow(/parking.*not imported/);
   });
 });
 

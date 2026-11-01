@@ -27,11 +27,16 @@ import { Icon } from '@/components/ui/Icon';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
-import { formatMoney } from '@/lib/format';
 import { springSnap, springSoft } from '@/lib/motion';
-import { useCurrencyStore } from '@/stores/currency';
+import {
+  formatUnspecifiedAmount,
+  microsSharePercent,
+  recordedMicros,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '../unspecified-currency';
 
-import type { Opportunity } from '@bidstack/shared';
+import { closedOutcome } from '@/lib/pipeline-stages';
+import { formatMicrosAmount, unitsToMicros, type Opportunity } from '@bidstack/shared';
 
 // Must match ClosingThisWeekCard's filter exactly so React Query serves both
 // widgets from a single fetch (object keys are hashed order-independently).
@@ -54,20 +59,28 @@ interface HeroSignal {
 // dueDate inside the window is already decided — counting it as "closing"
 // would read as a bug.
 function isOpenOpp(o: Opportunity): boolean {
-  if (o.pipelineStage) return !o.pipelineStage.isWon && !o.pipelineStage.isLost;
-  return o.stage !== 'closed_won' && o.stage !== 'closed_lost';
+  return closedOutcome(o) === null;
+}
+
+function closingStakeMicros(items: Opportunity[]): bigint {
+  return items.reduce((sum, opp) => {
+    if (opp.valueMicros && /^\d+$/.test(opp.valueMicros)) return sum + BigInt(opp.valueMicros);
+    return sum + (unitsToMicros(opp.value ?? 0) ?? 0n);
+  }, 0n);
 }
 
 export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
-  const { currency, convert } = useCurrencyStore();
   const report = usePipelineReport();
-  const closing = useOpportunities({ dueWithinDays: CLOSING_WINDOW_DAYS, limit: CLOSING_FETCH_LIMIT });
+  const closing = useOpportunities({
+    dueWithinDays: CLOSING_WINDOW_DAYS,
+    excludeClosed: true,
+    limit: CLOSING_FETCH_LIMIT,
+  });
 
-  const money = (value: number) => formatMoney(convert(value, 'EUR'), currency);
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);
-  const closingValue = closingItems.reduce((acc, opp) => acc + (opp.value ?? 0), 0);
+  const closingValue = closingStakeMicros(closingItems);
   const winRate = deriveWinRate(report.data);
 
   const signals = buildSignals({
@@ -79,13 +92,12 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
     closingValue,
     closingPending: closing.isLoading,
     closingFailed: closing.isError,
-    money,
     t,
   });
 
   return (
     <motion.section
-      className="command-center"
+      className="command-center command-center-quiet"
       role="region"
       aria-label={t('orgHero.region.ariaLabel', 'Workspace command center')}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
@@ -94,8 +106,13 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
     >
       <HeroPanel
         summary={summary}
-        heroValue={convert(summary.pipelineValue ?? 0, 'EUR')}
-        formatValue={(n) => formatMoney(n, currency)}
+        heroValue={summary.pipelineValue ?? 0}
+        heroLabel={
+          summary.pipelineValueMicros
+            ? formatMicrosAmount(BigInt(summary.pipelineValueMicros))
+            : undefined
+        }
+        formatValue={(n) => formatUnspecifiedAmount(n)}
         winRate={winRate}
         closingCount={closingItems.length}
         t={t}
@@ -118,27 +135,38 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
 interface HeroPanelProps {
   summary: OrgSummary;
   heroValue: number;
+  heroLabel?: string;
   formatValue: (n: number) => string;
   winRate: number | null;
   closingCount: number;
   t: TFunction;
 }
 
-function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }: HeroPanelProps) {
+function HeroPanel({
+  summary,
+  heroValue,
+  heroLabel,
+  formatValue,
+  winRate,
+  closingCount,
+  t,
+}: HeroPanelProps) {
   return (
     <div className="command-center-hero">
-      <div className="command-center-orbit" aria-hidden>
-        <span />
-        <span />
-        <span />
-      </div>
       <div className="command-center-kicker">
         <Icon name="target" size={14} />
         <span>{t('orgHero.kicker', 'Open pipeline, portfolio-wide')}</span>
       </div>
       <h2>
-        <AnimatedNumber value={heroValue} format={formatValue} />
+        {heroLabel ? (
+          <AnimatedMetric value={heroLabel} />
+        ) : (
+          <AnimatedNumber value={heroValue} format={formatValue} />
+        )}
       </h2>
+      <p className="text-xs text-[var(--fg-tertiary)]">
+        {t('orgHero.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
+      </p>
       <p>{deriveFocusLine(summary, closingCount, t)}</p>
       <div
         className="command-center-actions"
@@ -169,19 +197,33 @@ function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }
 // dashboard copy — so the first screen tells the bid lead where to act.
 function deriveFocusLine(summary: OrgSummary, closingCount: number, t: TFunction): string {
   if (summary.overdueTasks > 0) {
-    return t('orgHero.focus.overdue', 'Clear {{count}} overdue follow-ups before new bids go out.', {
-      count: summary.overdueTasks,
-    });
+    return t(
+      'orgHero.focus.overdue',
+      'Clear {{count}} overdue follow-ups before new bids go out.',
+      {
+        count: summary.overdueTasks,
+      },
+    );
   }
   if (closingCount > 0) {
-    return t('orgHero.focus.closing', '{{count}} bids close within 7 days — run those reviews first.', {
-      count: closingCount,
-    });
+    return t(
+      'orgHero.focus.closing',
+      '{{count}} bids close within 7 days — run those reviews first.',
+      {
+        count: closingCount,
+      },
+    );
   }
   if (summary.openOpportunities === 0) {
-    return t('orgHero.focus.noOpen', 'No open bids yet. Qualify the next lead to start the pipeline.');
+    return t(
+      'orgHero.focus.noOpen',
+      'No open bids yet. Qualify the next lead to start the pipeline.',
+    );
   }
-  return t('orgHero.focus.clear', 'Nothing due this week — runway is clear to advance mid-stage bids.');
+  return t(
+    'orgHero.focus.clear',
+    'Nothing due this week — runway is clear to advance mid-stage bids.',
+  );
 }
 
 function winRateTone(rate: number | null): BadgeTone {
@@ -207,10 +249,9 @@ interface SignalInputs {
   reportPending: boolean;
   winRate: number | null;
   closingCount: number;
-  closingValue: number;
+  closingValue: bigint;
   closingPending: boolean;
   closingFailed: boolean;
-  money: (value: number) => string;
   t: TFunction;
 }
 
@@ -262,7 +303,7 @@ function winRateSignal({ report, reportPending, winRate, t }: SignalInputs): Her
 }
 
 function closingSignal(inputs: SignalInputs): HeroSignal {
-  const { summary, closingCount, closingValue, closingPending, closingFailed, money, t } = inputs;
+  const { summary, closingCount, closingValue, closingPending, closingFailed, t } = inputs;
   const open = Math.max(1, summary.openOpportunities);
   return {
     key: 'closing',
@@ -271,7 +312,9 @@ function closingSignal(inputs: SignalInputs): HeroSignal {
     detail: closingFailed
       ? t('orgHero.signal.closing.failed', 'due list unavailable')
       : closingCount > 0
-        ? t('orgHero.signal.closing.detail', '{{value}} at stake', { value: money(closingValue) })
+        ? t('orgHero.signal.closing.detail', '{{value}} at stake', {
+            value: formatMicrosAmount(closingValue),
+          })
         : t('orgHero.signal.closing.empty', 'runway clear'),
     tone: closingFailed ? 'gray' : closingCount > 0 ? 'amber' : 'jade',
     progress:
@@ -280,15 +323,24 @@ function closingSignal(inputs: SignalInputs): HeroSignal {
   };
 }
 
-function weightedSignal({ report, reportPending, money, t }: SignalInputs): HeroSignal {
-  const coverage =
-    report && report.totalValueOpen > 0
-      ? Math.round((report.weightedPipeline / report.totalValueOpen) * 100)
-      : 0;
+function weightedAmount(micros: bigint): string {
+  const value = micros > 0n ? micros : 0n;
+  // The cent is on the integer. A unit number rounds 200,000.50 to 200,001.
+  return `${formatMicrosAmount(value)} unspecified`;
+}
+
+function weightedSignal({ report, reportPending, t }: SignalInputs): HeroSignal {
+  const openMicros = report
+    ? recordedMicros(report.totalValueOpen, report.totalValueOpenMicros)
+    : 0n;
+  const weightedMicros = report
+    ? recordedMicros(report.weightedPipeline, report.weightedPipelineMicros)
+    : 0n;
+  const coverage = openMicros > 0n ? Math.round(microsSharePercent(weightedMicros, openMicros)) : 0;
   return {
     key: 'weighted',
     label: t('orgHero.signal.weighted.label', 'Weighted pipeline'),
-    display: report ? money(report.weightedPipeline) : '—',
+    display: report ? weightedAmount(weightedMicros) : '—',
     detail: report
       ? t('orgHero.signal.weighted.detail', '{{pct}}% of gross open value', { pct: coverage })
       : t('orgHero.signal.unavailable', 'report unavailable'),
@@ -304,7 +356,10 @@ function SignalCell({ signal, reduced }: { signal: HeroSignal; reduced: boolean 
     // so the cell loads "in place" per the PageSkeletons doctrine.
     return (
       <StaggerItem className="command-signal" aria-hidden>
-        <div data-testid="signal-skeleton" className="h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
+        <div
+          data-testid="signal-skeleton"
+          className="h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]"
+        />
         <div className="mt-4 h-8 w-20 animate-pulse rounded bg-[var(--surface-sunken)]" />
         <div className="mt-4 h-[7px] animate-pulse rounded-full bg-[var(--surface-sunken)]" />
       </StaggerItem>
@@ -344,11 +399,11 @@ function HeroFooter({ summary, report, t }: HeroFooterProps) {
       <div>
         <span>{t('orgHero.footer.velocity.label', 'Avg days a bid stays open')}</span>
         <strong>
-          {report
-            ? t('orgHero.footer.velocity.value', '{{count}} days', {
+          {report?.velocity.avgDaysOpen == null
+            ? t('orgHero.footer.velocity.empty', '—')
+            : t('orgHero.footer.velocity.value', '{{count}} days', {
                 count: Math.round(report.velocity.avgDaysOpen),
-              })
-            : '—'}
+              })}
         </strong>
       </div>
       <div>

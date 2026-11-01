@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { fetchCompanyNewsSignals } from './company-news-signal.js';
+import { fetchCompanyNewsSignals, publicNewsAttribution } from './company-news-signal.js';
 
 const SAMPLE_RSS = `<?xml version="1.0"?><rss><channel>
   <title>"Acme" - Google News</title>
@@ -49,5 +49,14 @@ describe('fetchCompanyNewsSignals', () => {
       throw new Error('network');
     }) as unknown as typeof fetch;
     expect(await fetchCompanyNewsSignals('Acme', throwing)).toEqual([]);
+  });
+});
+
+describe('publicNewsAttribution', () => {
+  it('does not invent a confidence score for a public news search', () => {
+    const attribution = publicNewsAttribution('2026-06-17T12:00:00.000Z', 'DNB Bank');
+    expect(attribution.confidence).toBeNull();
+    expect(attribution.providerMetadata.confidenceBasis).toBe('not_scored');
+    expect(attribution.label).toBe('Google News');
   });
 });

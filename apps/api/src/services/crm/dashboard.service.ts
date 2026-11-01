@@ -16,7 +16,7 @@
 import { type z } from 'zod';
 
 import { type PrismaClient } from '@bidstack/db';
-import type { AiInsight, CrmDashboardSnapshot } from '@bidstack/shared';
+import type { CrmDashboardSnapshot } from '@bidstack/shared';
 
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
@@ -29,31 +29,35 @@ import {
   fallbackCompany,
   findSelectedCompany,
 } from './company-enrichment.service.js';
+import { refreshPublicCompanyFacts } from './enrichment.service.js';
 import {
   buildActivities,
   buildCockpit,
-  buildDefaultInsights,
+  mapStoredInsights,
   serializeBidOpportunity,
 } from './dashboard.cockpit.js';
 import {
   DEFAULT_WIDGETS,
-  defaultBidOpportunities,
-  defaultQueueHealth,
   defaultReleaseScore,
 } from './dashboard.defaults.js';
 import {
   fetchAccountPerformance,
+  fetchBuyingRoleFacts,
   serializeDeal,
   serializeProviderHealth,
   serializeQueueHealth,
   serializeReleaseScore,
   serializeWidget,
 } from './dashboard.queries.js';
-import { normalizeName, parseAttribution } from './dashboard.utils.js';
+import { normalizeName } from './dashboard.utils.js';
 
 // ─── Logger type ───────────────────────────────────────────────────────────────
 
 const DASHBOARD_ACTIVITY_LIMIT = 12;
+
+function isCompanyUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
 
 export type LoggerLike = {
   warn: (obj: unknown, msg?: string) => void;
@@ -65,7 +69,7 @@ export async function buildDashboardSnapshot(
   orgId: string,
   accountId: string | undefined,
   prisma: PrismaClient,
-  _logger: LoggerLike,
+  logger: LoggerLike,
   scope?: AccessScope,
 ): Promise<z.infer<typeof CrmDashboardSnapshot>> {
   const opportunityWhere = scope
@@ -78,14 +82,11 @@ export async function buildDashboardSnapshot(
 
   const [
     opportunities,
-    contacts,
     tasks,
     enrichments,
     persistedInsights,
     widgets,
     bidRows,
-    riskRows,
-    complianceRows,
     providerRows,
     queueRows,
     releaseScoreRow,
@@ -97,6 +98,7 @@ export async function buildDashboardSnapshot(
         id: true,
         code: true,
         customer: true,
+        companyId: true,
         name: true,
         stage: true,
         pipelineStageId: true,
@@ -117,26 +119,12 @@ export async function buildDashboardSnapshot(
             color: true,
             isWon: true,
             isLost: true,
+            deletedAt: true,
           },
         },
       },
       orderBy: { updatedAt: 'desc' },
       take: 100,
-    }),
-    prisma.contact.findMany({
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        customer: true,
-        name: true,
-        role: true,
-        email: true,
-        phone: true,
-        influence: true,
-        createdAt: true,
-      },
-      orderBy: { name: 'asc' },
-      take: 200,
     }),
     prisma.task.findMany({
       where: taskWhere,
@@ -145,7 +133,7 @@ export async function buildDashboardSnapshot(
         title: true,
         status: true,
         createdAt: true,
-        opportunity: { select: { id: true, customer: true, name: true } },
+        opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
         assignee: { select: { name: true, email: true } },
         dueDate: true,
       },
@@ -230,33 +218,6 @@ export async function buildDashboardSnapshot(
       orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
       take: 50,
     }),
-    prisma.riskRegisterItem.findMany({
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        title: true,
-        severity: true,
-        owner: true,
-        mitigation: true,
-        dueDate: true,
-        status: true,
-        companyName: true,
-      },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.complianceCheck.findMany({
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        label: true,
-        status: true,
-        owner: true,
-        sourceAttribution: true,
-      },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
     prisma.providerHealth.findMany({
       where: { orgId, deletedAt: null },
       select: {
@@ -297,7 +258,7 @@ export async function buildDashboardSnapshot(
     // derived companies so manual edits win and the cockpit resolves by real id.
     prisma.company.findMany({
       where: { orgId, deletedAt: null },
-      select: { id: true, name: true, domain: true, logoUrl: true },
+      select: { id: true, name: true, domain: true, logoUrl: true, legalName: true },
       take: 500,
     }),
   ]);
@@ -315,35 +276,61 @@ export async function buildDashboardSnapshot(
   );
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
-  const visibleInsights = visibleCompanyKeys
+  const visibleInsights = visibleOpportunityIds
     ? persistedInsights.filter(
         (insight) =>
-          (insight.companyName && visibleCompanyKeys.has(normalizeName(insight.companyName))) ||
-          (insight.opportunityId && visibleOpportunityIds?.has(insight.opportunityId)),
+          insight.opportunityId != null && visibleOpportunityIds.has(insight.opportunityId),
       )
     : persistedInsights;
-  const insights = visibleInsights.length
-    ? visibleInsights.map((insight) => ({
-        id: insight.id,
-        kind: insight.kind as z.infer<typeof AiInsight>['kind'],
-        title: insight.title,
-        summary: insight.summary,
-        confidence: insight.confidenceBps / 10_000,
-        companyId: insight.companyName ? normalizeName(insight.companyName) : null,
-        companyName: insight.companyName,
-        dealId: insight.opportunityId,
-        sourceAttribution: parseAttribution(insight.sourceAttribution),
-        createdAt: insight.createdAt.toISOString(),
-      }))
-    : buildDefaultInsights(opportunities);
+  const insightOpportunityIds = [
+    ...new Set(
+      visibleInsights
+        .map((insight) => insight.opportunityId)
+        .filter((id): id is string => id != null),
+    ),
+  ];
+  const insightOpportunities =
+    insightOpportunityIds.length === 0
+      ? []
+      : await prisma.opportunity.findMany({
+          where: { orgId, id: { in: insightOpportunityIds }, deletedAt: null },
+          select: { id: true, companyId: true },
+          take: insightOpportunityIds.length,
+        });
+  const insights = mapStoredInsights(
+    visibleInsights,
+    new Map(insightOpportunities.map((row) => [row.id, row.companyId])),
+  );
   const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
-  const selectedCompany =
+  let selectedCompany =
     findSelectedCompany(companies, accountId) ??
     companies.find((company) => company.name === 'CI Financial') ??
     companies.find((company) => company.name === 'Mantu') ??
     companies[0] ??
     fallbackCompany('Mantu');
-  const [fieldOverrides, performance] = await Promise.all([
+  if (accountId) {
+    const refreshed = await refreshPublicCompanyFacts({
+      orgId,
+      company: selectedCompany,
+      prisma,
+      log: logger,
+    });
+    if (refreshed) {
+      const index = companies.findIndex((company) => company.id === selectedCompany.id);
+      selectedCompany = refreshed;
+      if (index >= 0) companies[index] = refreshed;
+    }
+  }
+  const accountOpportunityWhere = isCompanyUuid(selectedCompany.id)
+    ? scope
+      ? applyOpportunityScope(
+          { orgId, companyId: selectedCompany.id, deletedAt: null },
+          scope,
+        )
+      : { orgId, companyId: selectedCompany.id, deletedAt: null }
+    : null;
+  const [fieldOverrides, performance, contacts, accountOpportunities, accountTasks] =
+    await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },
       select: { fieldKey: true, value: true },
@@ -351,35 +338,153 @@ export async function buildDashboardSnapshot(
     }),
     // Account-scoped aggregate — the org-wide `opportunities` array above is
     // a 100-row sample and must NOT back the selected account's win/loss.
-    fetchAccountPerformance(orgId, selectedCompany.name, prisma, scope),
+    fetchAccountPerformance(orgId, selectedCompany.id, prisma, scope),
+    // People for this account only. A 200-row org sample ordered by name
+    // dropped linked contacts, and a matching customer string is not a link.
+    isCompanyUuid(selectedCompany.id)
+      ? prisma.contact.findMany({
+          where: { orgId, companyId: selectedCompany.id, deletedAt: null },
+          select: {
+            id: true,
+            customer: true,
+            companyId: true,
+            name: true,
+            role: true,
+            email: true,
+            phone: true,
+            influence: true,
+            createdAt: true,
+          },
+          orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
+          take: 20,
+        })
+      : Promise.resolve([]),
+    accountOpportunityWhere
+      ? prisma.opportunity.findMany({
+          where: accountOpportunityWhere,
+          select: {
+            id: true,
+            customer: true,
+            companyId: true,
+            name: true,
+            stage: true,
+            valueMicros: true,
+            probability: true,
+            dueDate: true,
+            ownerId: true,
+            updatedAt: true,
+            owner: { select: { name: true, email: true } },
+            pipelineStage: {
+              select: {
+                key: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+                deletedAt: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+        })
+      : Promise.resolve([]),
+    isCompanyUuid(selectedCompany.id) || accountOpportunityWhere
+      ? prisma.task.findMany({
+          where: {
+            orgId,
+            deletedAt: null,
+            OR: [
+              ...(isCompanyUuid(selectedCompany.id) ? [{ accountId: selectedCompany.id }] : []),
+              ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            dueDate: true,
+            accountId: true,
+            opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
+            assignee: { select: { name: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        })
+      : Promise.resolve([]),
   ]);
+  const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
+  const contactIds = contacts.map((contact) => contact.id);
+  const [riskRows, complianceRows, buyingRoleFacts] = await Promise.all([
+    accountOpportunityIds.length === 0
+      ? []
+      : prisma.riskRegisterItem.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            title: true,
+            severity: true,
+            owner: true,
+            mitigation: true,
+            dueDate: true,
+            status: true,
+            companyName: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    accountOpportunityIds.length === 0
+      ? []
+      : prisma.complianceCheck.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            label: true,
+            status: true,
+            owner: true,
+            sourceAttribution: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    fetchBuyingRoleFacts(orgId, contactIds, prisma),
+  ]);
+
+  const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
+  const snapshotDeals = [
+    ...deals.filter((deal) => deal.companyId !== selectedCompany.id),
+    ...accountDeals,
+  ];
 
   return {
     generatedAt: new Date().toISOString(),
     cockpit: buildCockpit({
       company: selectedCompany,
       companies,
-      opportunities,
+      opportunities: accountOpportunities,
       contacts,
-      tasks,
+      tasks: accountTasks,
       risks: riskRows,
       compliance: complianceRows,
+      buyingRoleFacts,
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
       performance,
     }),
     companies,
-    deals,
+    deals: snapshotDeals,
     activities,
     insights,
     widgets: dashboardWidgets,
-    bidOpportunities: bidRows.length
-      ? bidRows.map(serializeBidOpportunity)
-      : defaultBidOpportunities(),
+    bidOpportunities: bidRows.map(serializeBidOpportunity),
     providerHealth: providerRows.length
       ? mergeProviderHealth(providerRows.map(serializeProviderHealth))
       : defaultProviderHealth(),
-    queueHealth: queueRows.length ? queueRows.map(serializeQueueHealth) : defaultQueueHealth(),
+    queueHealth: queueRows.map(serializeQueueHealth),
     releaseScore: releaseScoreRow ? serializeReleaseScore(releaseScoreRow) : defaultReleaseScore(),
   };
 }

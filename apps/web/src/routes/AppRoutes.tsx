@@ -37,6 +37,7 @@ import {
   CrossSellPage,
   KamAccountPage,
   WorkspacePage,
+  WorkspaceInsightsPage,
   LeadDetailPage,
   LeadsPage,
   LoginPage,
@@ -195,6 +196,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <KamAccountPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/workspace/insights"
+            element={
+              <RequireAuth>
+                <WorkspaceInsightsPage />
               </RequireAuth>
             }
           />

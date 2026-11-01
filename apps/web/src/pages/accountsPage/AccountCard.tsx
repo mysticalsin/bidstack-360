@@ -11,8 +11,9 @@ import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout, springSnap } from '@/lib/motion';
+import { formatExactUnspecified } from '@/components/dashboard/unspecified-currency';
+import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 
 import {
   healthLabel,
@@ -31,7 +32,6 @@ export const AccountCard = memo(function AccountCard({
   index: number;
 }) {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
@@ -119,9 +119,9 @@ export const AccountCard = memo(function AccountCard({
               </dd>
             </div>
             <div>
-              <dt>{t('account.pipeline', 'Pipeline')}</dt>
+              <dt>{t('account.pipeline', 'Weighted pipeline')}</dt>
               <dd>
-                <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
+                <AnimatedMetric value={formatExactUnspecified(pipelineMicros)} />
               </dd>
             </div>
             <div>
@@ -135,12 +135,25 @@ export const AccountCard = memo(function AccountCard({
               <dd>{company.employeeCount ? company.employeeCount.toLocaleString() : '—'}</dd>
             </div>
           </dl>
+          {row.openDealsMissingProbability > 0 ? (
+            <p className="px-4 pb-2 text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'account.pipelineMissingProbability',
+                '{{count}} open deals have no recorded probability and are not in the weighted pipeline.',
+                { count: row.openDealsMissingProbability },
+              )}
+            </p>
+          ) : null}
 
           <div className="account-card-signal-grid">
             <div className="account-card-confidence">
               <span>{t('account.confidence', 'Confidence')}</span>
               <strong>
-                <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
+                {recordedConfidencePercent(company.confidence) === null ? (
+                  t('account.confidenceNotScored', 'Not scored')
+                ) : (
+                  <AnimatedMetric value={`${recordedConfidencePercent(company.confidence)}%`} />
+                )}
               </strong>
             </div>
             <div className="account-card-coverage">

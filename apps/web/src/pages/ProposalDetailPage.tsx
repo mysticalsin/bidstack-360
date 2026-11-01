@@ -12,10 +12,10 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import {
   ProposalStatusChip,
   proposalStatusLabel,
-  PROPOSAL_STATUS_LABELS,
   type ProposalStatus,
 } from '@/components/rfp/shared/ProposalStatusChip';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
+import { ProposalApprovalActions } from '@/components/rfp/ProposalApprovalActions';
 
 interface ProposalSection {
   id: string;
@@ -52,6 +52,9 @@ export function ProposalDetailPage() {
   const qc = useQueryClient();
   const { t } = useTranslation('rfp');
   const canWrite = useHasPermission('proposals:write');
+  const capabilities = useCapabilities();
+  // Admin does not imply approver. Match the server grant, not isAdmin.
+  const canApprove = Boolean(capabilities.data?.permissions.includes('proposals:approve'));
   useDocumentTitle();
 
   const {
@@ -121,6 +124,42 @@ export function ProposalDetailPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['proposals'] });
       navigate('/proposals');
+    },
+  });
+
+  const approve = useMutation({
+    mutationFn: async (attestation: string) => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}/approve`, {
+        method: 'POST',
+        body: { attestation },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal & { delivery: string }>(`/api/v1/proposals/${id}/submit`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal', id] });
+    },
+  });
+
+  const revise = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('No proposal ID');
+      return api<Proposal>(`/api/v1/proposals/${id}/revise`, { method: 'POST' });
+    },
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: ['proposals'] });
+      navigate(`/proposals/${created.id}`);
     },
   });
 
@@ -211,6 +250,12 @@ export function ProposalDetailPage() {
     );
   };
 
+  const locked =
+    proposal.status === 'approved' ||
+    proposal.status === 'submitted' ||
+    proposal.status === 'won' ||
+    proposal.status === 'lost';
+
   const handleStatusChange = (next: ProposalStatus) => {
     if (!proposal || next === proposal.status) return;
     // Confirm terminal outcomes — they crystallize win/loss in MemOS + notify
@@ -256,7 +301,7 @@ export function ProposalDetailPage() {
               <Icon name="arrow" size={16} className="rotate-180" />
             </button>
             <h1 className="page-title">{proposal.name}</h1>
-            {canWrite ? (
+            {canWrite && !locked ? (
               <>
                 <label htmlFor="proposal-status" className="sr-only">
                   {t('proposalDetail.statusLabel', 'Proposal status')}
@@ -268,7 +313,7 @@ export function ProposalDetailPage() {
                   onChange={(e) => handleStatusChange(e.target.value as ProposalStatus)}
                   className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-medium disabled:opacity-60"
                 >
-                  {(Object.keys(PROPOSAL_STATUS_LABELS) as ProposalStatus[]).map((s) => (
+                  {(['draft', 'review'] as ProposalStatus[]).map((s) => (
                     <option key={s} value={s}>
                       {proposalStatusLabel(s)}
                     </option>
@@ -278,7 +323,19 @@ export function ProposalDetailPage() {
             ) : (
               <ProposalStatusChip status={proposal.status} />
             )}
-            {canWrite && (
+            {canWrite && locked ? (
+              <button
+                type="button"
+                className="rounded border border-[var(--border)] px-2 py-1 text-xs font-medium"
+                disabled={revise.isPending}
+                onClick={() => revise.mutate()}
+              >
+                {revise.isPending
+                  ? t('proposalDetail.revising', 'Creating draft…')
+                  : t('proposalDetail.revise', 'New draft')}
+              </button>
+            ) : null}
+            {canWrite && !locked && (
               <label className="flex items-center gap-1">
                 <span className="sr-only">{t('proposalDetail.dueDateLabel', 'Due date')}</span>
                 <input
@@ -311,6 +368,22 @@ export function ProposalDetailPage() {
                   : t('proposalDetail.deleteButton', 'Delete')}
               </button>
             )}
+          </div>
+          <div className="mt-3">
+            <ProposalApprovalActions
+              status={proposal.status}
+              canApprove={canApprove}
+              pending={approve.isPending || submit.isPending}
+              error={
+                approve.isError
+                  ? t('proposalApproval.approveError', 'Could not approve this proposal.')
+                  : submit.isError
+                    ? t('proposalApproval.submitError', 'Could not submit this proposal.')
+                    : null
+              }
+              onApprove={(attestation) => approve.mutate(attestation)}
+              onSubmit={() => submit.mutate()}
+            />
           </div>
           <p className="page-sub">
             {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}
@@ -360,7 +433,7 @@ export function ProposalDetailPage() {
                 <span className="text-[10px] text-fg-muted">
                   {t('proposalDetail.wordCount', '{{count}} words', { count: section.wordCount })}
                 </span>
-                {editingSection !== section.id && (
+                {editingSection !== section.id && !locked && (
                   <>
                     <Button
                       variant="secondary"

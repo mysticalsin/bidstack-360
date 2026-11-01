@@ -11,7 +11,8 @@ import {
   type AccountIntelFieldProvenanceSource,
 } from '@bidstack/shared';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
-import { fetchCompanyNewsSignals } from '../providers/company-news-signal.js';
+import { handoffValueFields } from './kam-handoff-value.js';
+import { fetchCompanyNewsSignals, publicNewsAttribution } from '../providers/company-news-signal.js';
 import { canReadAccount } from '../lib/account-access.js';
 
 const SOLUTION_FIELD_KEYS = ['name', 'description', 'category', 'status'] as const;
@@ -250,13 +251,19 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           createdAt: s.createdAt.toISOString(),
           updatedAt: s.updatedAt.toISOString(),
         })),
-        products: products.map((p) => ({
+        products: products.map((p) => {
+          const price =
+            p.priceRangeMicros && p.priceRangeMicros > 0n
+              ? handoffValueFields(p.priceRangeMicros)
+              : null;
+          return {
           id: p.id,
           accountId: p.accountId,
           name: p.name,
           description: p.description,
           category: p.category,
-          priceRangeMicros: p.priceRangeMicros ? Number(p.priceRangeMicros) : null,
+          priceRangeMicros: price?.valueMicros ?? null,
+          priceRangeMicrosText: price?.valueMicrosText ?? null,
           currency: p.currency,
           status: p.status,
           extractedFromDocumentId: p.extractedFromDocumentId,
@@ -269,7 +276,8 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           confidenceBps: p.confidenceBps,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
-        })),
+        };
+        }),
         extractions: extractions.map((e) => ({
           id: e.id,
           documentId: e.documentId,
@@ -297,7 +305,9 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           200: z.object({
             source: z.literal('google-news'),
             fetchedAt: z.string().datetime(),
-            sourceAttribution: SourceAttribution,
+            sourceAttribution: SourceAttribution.extend({
+              confidence: z.number().min(0).max(1).nullable(),
+            }),
             items: z.array(
               z.object({
                 title: z.string(),
@@ -321,17 +331,7 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
       return {
         source: 'google-news' as const,
         fetchedAt,
-        sourceAttribution: {
-          source: 'google_news_open_web',
-          label: 'Google News',
-          sourceUrl: 'https://news.google.com/',
-          fetchedAt,
-          confidence: 0.62,
-          providerMetadata: {
-            signalType: 'public_news',
-            accountQuery: req.params.accountId,
-          },
-        },
+        sourceAttribution: publicNewsAttribution(fetchedAt, req.params.accountId),
         items,
       };
     },

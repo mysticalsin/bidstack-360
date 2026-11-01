@@ -30,6 +30,22 @@ export function isLegacyOpportunityStage(value: string): value is OpportunitySta
   return LEGACY_BY_ID.has(value);
 }
 
+/** Won or lost from either a live stage row or the stored stage key. A missing or deleted stage row is not a close. */
+export function closedOutcome(opp: {
+  stage?: string | null;
+  pipelineStage?: { isWon?: boolean; isLost?: boolean; deletedAt?: string | Date | null } | null;
+}): 'won' | 'lost' | null {
+  const stage = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
+  if (stage?.isLost || opp.stage === 'closed_lost') return 'lost';
+  if (stage?.isWon || opp.stage === 'closed_won') return 'won';
+  return null;
+}
+
+/** Confetti is for a won move. A stage marked lost as well is a loss. */
+export function celebratesWonMove(stage: { isWon?: boolean; isLost?: boolean } | null | undefined): boolean {
+  return Boolean(stage?.isWon) && !stage?.isLost;
+}
+
 export function resolvePipelineStage(opp: Opportunity): PipelineStage {
   if (opp.pipelineStage) return opp.pipelineStage;
 

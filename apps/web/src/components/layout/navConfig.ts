@@ -15,6 +15,14 @@ import type { IconName } from '@/components/ui/Icon';
 
 export type NavBadgeKey = 'openBids' | 'overdueTasks';
 
+/** The badge number is not the list total. Open bids and overdue tasks need that said. */
+export function navBadgeCopy(badgeKey: NavBadgeKey): { key: string; fallback: string } {
+  if (badgeKey === 'openBids') {
+    return { key: 'nav.badgeOpenBids', fallback: '{{count}} open' };
+  }
+  return { key: 'nav.badgeOverdueTasks', fallback: '{{count}} overdue' };
+}
+
 /** Admin-toggled module a nav item belongs to (hidden until enabled in Settings). */
 export type NavFeatureKey = 'agentStudio' | 'appflowy' | 'serum';
 
@@ -42,6 +50,14 @@ export interface NavSection {
   titleKey: string;
   icon: IconName;
   items: NavItem[];
+}
+
+/** Quick Start stays out of the nav until this person turns it on. */
+export function visibleNavSections(quickStartVisible: boolean): NavSection[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.to !== '/quick-start' || quickStartVisible),
+  })).filter((section) => section.items.length > 0);
 }
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -141,6 +157,12 @@ export const NAV_SECTIONS: NavSection[] = [
       // page hosts the dashboard switcher, "Manage dashboards", and links to
       // saved Reports + the report builder. No separate Reports rail door.
       { to: '/analytics', label: 'Analytics & Reports', labelKey: 'nav.analyticsReports', icon: 'dashboard' },
+      {
+        to: '/workspace/insights',
+        label: 'CRM Insights',
+        labelKey: 'nav.workspaceInsights',
+        icon: 'growth',
+      },
       // Collaborative workspace (AppFlowy embed) — hidden until an admin enables
       // it + sets the URL in Settings → Modules.
       { to: '/workspace', label: 'Collaborate', labelKey: 'nav.collaborate', icon: 'note', featureKey: 'appflowy' },

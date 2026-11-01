@@ -45,7 +45,7 @@ function normalizeStackItem(item: TechnicalStackItemType): TechnicalStackItemTyp
   return {
     name,
     source: item.source.trim() || 'manual',
-    confidence: Math.min(1, Math.max(0, item.confidence)),
+    confidence: item.confidence == null ? null : Math.min(1, Math.max(0, item.confidence)),
   };
 }
 
@@ -66,7 +66,10 @@ export function normalizeTechnicalStack(
       if (!item) continue;
       const itemKey = slug(item.name);
       const existing = items.get(itemKey);
-      items.set(itemKey, existing && existing.confidence > item.confidence ? existing : item);
+      items.set(
+        itemKey,
+        existing && (existing.confidence ?? -1) > (item.confidence ?? -1) ? existing : item,
+      );
     }
 
     byLabel.set(labelKey, items);

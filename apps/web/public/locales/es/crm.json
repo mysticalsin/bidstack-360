@@ -324,6 +324,7 @@
       "exportFailed": "La exportación falló",
       "exportFailedDescription": "Vuelve a intentarlo en un momento."
     },
+    "probabilityUnrecorded": "No registrada",
     "confirmDelete": {
       "titleOne": "¿Eliminar {{count}} oportunidad?",
       "titleMany": "¿Eliminar {{count}} oportunidades?",
@@ -354,7 +355,7 @@
   },
   "contacts": {
     "title": "Contactos",
-    "subtitle": "{{count}} personas en la unidad de decisión.",
+    "subtitle": "{{count}} contactos en esta página.",
     "actions": {
       "importCsv": {
         "label": "Importar CSV",
@@ -422,6 +423,8 @@
       "deleted": "Se eliminó a {{name}}"
     },
     "linkedTitle": "Contactos vinculados",
+    "countCaption_one": "{{count}} contacto",
+    "countCaption_other": "{{count}} contactos",
     "countCaption": "{{count}} contactos",
     "linkAction": "+ Vincular contacto",
     "selectPlaceholder": "Selecciona un contacto…",
@@ -450,6 +453,8 @@
     "summary": {
       "companyCount_one": "{{count}} empresa",
       "companyCount_other": "{{count}} empresas",
+      "openDeals_one": "{{count}} oportunidad abierta",
+      "openDeals_other": "{{count}} oportunidades abiertas",
       "openDeals": "{{count}} oportunidades abiertas",
       "weightedPipeline": "{{amount}} de pipeline ponderado"
     },
@@ -711,6 +716,8 @@
     "toastExtractApplied": "Campos extraídos aplicados — revisa antes de guardar",
     "toastMissingReferenceTitle": "Falta la referencia",
     "toastMissingReferenceDesc": "Se requiere una referencia de contrato.",
+    "toastMissingCurrencyTitle": "Moneda obligatoria",
+    "toastMissingCurrencyDesc": "Introduce el código de 3 letras impreso en el acuerdo.",
     "toastAgreementRecorded": "Acuerdo registrado",
     "toastCouldNotSave": "No se pudo guardar",
     "addAgreement": "Añadir acuerdo",
@@ -727,7 +734,7 @@
     "scheduleQuarterly": "Revisión trimestral de tarifas",
     "scheduleAdhoc": "Revisión de tarifas ad hoc",
     "fieldExpiryDate": "Fecha de vencimiento",
-    "placeholderCurrency": "Moneda (EUR)",
+    "placeholderCurrency": "Código de moneda de 3 letras",
     "fieldCurrency": "Moneda",
     "sourceDocument": "Documento fuente",
     "removeAttachedDocument": "Quitar documento adjunto",
@@ -983,8 +990,10 @@
     "errorMessage": "Inténtalo de nuevo.",
     "retry": "Reintentar",
     "decisionUnitEmptyTitle": "Aún no hay miembros de la unidad de decisión",
-    "decisionUnitEmptyMessage": "Agrega un contacto desde la página de Contactos o sincroniza desde Dust.",
+    "decisionUnitEmptyMessage": "Vincula un contacto a esta oportunidad. Un cargo no es un rol de compra.",
     "decisionUnitTitle": "Unidad de decisión",
+    "stakeholdersCount_one": "{{count}} interesado",
+    "stakeholdersCount_other": "{{count}} interesados",
     "stakeholdersCount": "{{count}} interesados",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influencia {{value}} de 5",
@@ -1128,7 +1137,7 @@
     "labelSource": "Fuente",
     "bantHeading": "Cualificación BANT",
     "labelBudget": "Presupuesto",
-    "placeholderBudget": "p. ej. 500 000 €",
+    "placeholderBudget": "Importe y moneda, si se conocen",
     "labelAuthority": "Autoridad",
     "placeholderAuthority": "Responsable de la decisión",
     "labelNeed": "Necesidad",
@@ -1658,7 +1667,7 @@
     "scheduleReviewButton": "Programar revisión",
     "askDustButton": "Preguntar a Dust",
     "changeStageLabel": "Cambiar etapa",
-    "editValueLabel": "Editar valor del trato (EUR)",
+    "editValueLabel": "Editar valor del trato (moneda no registrada)",
     "editProbabilityLabel": "Editar probabilidad",
     "likely": "probable",
     "editDueDateLabel": "Editar fecha de vencimiento",
@@ -1802,14 +1811,15 @@
   "createOpportunity": {
     "triggerButton": "+ Nueva oportunidad",
     "dialogTitle": "Nueva oportunidad",
-    "dialogDescription": "Añade una licitación a tu pipeline. Puedes refinar la información tras la verificación de datos de Dust.",
+    "dialogDescription": "Añade una licitación a tu pipeline. El importe no guarda una moneda.",
     "customerLabel": "Cliente",
     "customerPlaceholder": "Buscar empresas…",
     "nameLabel": "Nombre de la oportunidad",
     "namePlaceholder": "Acme — Modernización de TI",
     "stageLabel": "Etapa",
     "industryLabel": "Sector",
-    "valueLabel": "Valor (EUR)",
+    "valueLabel": "Valor",
+    "valueHint": "Moneda no registrada",
     "probabilityLabel": "Probabilidad %",
     "dueDateLabel": "Fecha límite",
     "countryLabel": "País",
@@ -1833,6 +1843,8 @@
       "domain": "Dominio"
     },
     "meta": {
+      "employees_one": "{{count}} empleado",
+      "employees_other": "{{count}} empleados",
       "employees": "{{count}} empleados",
       "taxId": "NIF: {{taxId}}",
       "parent": "Matriz:"
@@ -1873,7 +1885,7 @@
     "editTitle": "Editar {{name}}",
     "newTitle": "Nuevo contacto",
     "editDescription": "La actualización modifica el registro y crea una entrada de auditoría.",
-    "newDescription": "Agrega una persona a la unidad de decisión.",
+    "newDescription": "Agrega un contacto. Un cargo no es un rol de compra.",
     "errorRequired": "El cliente y el nombre son obligatorios",
     "errorSaveFailed": "Error al guardar",
     "fieldCustomer": "Cliente / cuenta",
@@ -1922,6 +1934,8 @@
     "allIndustries": "Todos los sectores",
     "filterTagAriaLabel": "Filtrar por etiqueta",
     "allTags": "Todas las etiquetas",
+    "resultCount_one": "{{count}} referencia",
+    "resultCount_other": "{{count}} referencias",
     "resultCount": "{{count}} referencias",
     "errorTitle": "No se pudieron cargar las referencias",
     "errorMessage": "Vuelve a intentarlo en un momento.",
@@ -1988,7 +2002,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "Cargando modelos...",
-    "modelTableEmpty": "Aún no se han entrenado modelos de {{entityType}}. Haz clic en \"Reentrenar ahora\" para entrenar el primer modelo.",
+    "modelTableEmpty": "No hay un modelo de {{entityType}} guardado. El entrenamiento necesita al menos 50 registros cerrados de esta organización.",
     "modelTableCaption": "Historial del modelo predictivo de {{entityType}}",
     "colVersion": "Versión",
     "colAccuracyMetrics": "Métricas de precisión",
@@ -2042,7 +2056,10 @@
     "tableHeaderContribution": "Contribución",
     "title": "Análisis de puntuación de ML",
     "chartAria": "Los {{count}} principales factores que influyen en {{label}}",
-    "footer": "Modelo v{{modelVersion}} · Regresión logística · Actualizado cada hora",
+    "footer": "Modelo {{modelVersion}} · regresión logística · en caché durante una hora",
+    "footerBoosted": "Modelo {{modelVersion}} · gradient boosting · en caché durante una hora",
+    "footerUnscored": "No hay un modelo entrenado. Esto no es un pronóstico.",
+    "titleUnscored": "Puntuación",
     "labelLeadScore": "Puntuación del prospecto",
     "labelWinProbability": "Probabilidad de ganar"
   },
@@ -2142,7 +2159,9 @@
   "oppToolbar": {
     "kpiOpportunities": "Oportunidades",
     "kpiRevenue": "Ingresos",
-    "kpiWeightedRevenue": "IP",
+    "kpiWeightedRevenue": "Ponderado",
+    "kpiWeightedRevenuePage": "Ponderado (página)",
+    "kpiWeightedRevenueDetail": "Filas abiertas de esta página × probabilidad de etapa guardada. {{basis}}",
     "kpiOpen": "Abiertas",
     "kpiRegionLabel": "Resumen de KPI de oportunidades",
     "title": "Oportunidades",
@@ -2150,7 +2169,7 @@
     "clear": "borrar",
     "stageOpportunities": "oportunidades {{stage}}",
     "clearFilter": "borrar filtro",
-    "bidsInFlight": "{{count}} ofertas en curso · haz clic en cualquier celda para editar en línea.",
+    "bidsInFlight": "{{count}} en esta página · haz clic en cualquier celda para editar en línea.",
     "exportingLabel": "Exportando oportunidades…",
     "exportLabel": "Exportar las oportunidades visibles como CSV",
     "exporting": "Exportando…",
@@ -2209,6 +2228,8 @@
     "allIndustries": "Todos los sectores",
     "industryLoadError": "No se pudieron cargar los filtros de sector.",
     "retry": "Reintentar",
+    "resultCount_one": "{{count}} cuenta",
+    "resultCount_other": "{{count}} cuentas",
     "resultCount": "{{count}} cuenta",
     "errorTitle": "No se pudieron cargar las cuentas principales",
     "errorMessage": "No se pudieron cargar las cuentas principales.",
@@ -2216,7 +2237,11 @@
     "emptyMessage": "Añade oportunidades con valores para ver las cuentas principales clasificadas por pipeline.",
     "totalPipeline": "pipeline total",
     "won": "ganado",
+    "openDeals_one": "{{count}} negocio abierto",
+    "openDeals_other": "{{count}} negocios abiertos",
     "openDeals": "{{count}} negocios abiertos",
+    "contacts_one": "{{count}} contacto",
+    "contacts_other": "{{count}} contactos",
     "contacts": "{{count}} contactos",
     "sourceCurated": "Top 10 seleccionado",
     "sourceAuto": "Clasificación automática",
@@ -2263,7 +2288,7 @@
       "ariaLabel": "Señales de decisión de la cuenta"
     },
     "badge": {
-      "ready": "{{count}}% listo",
+      "ready": "estimación {{count}}%",
       "stackSignals": "{{count}} señales de stack"
     },
     "signal": {
@@ -2296,8 +2321,14 @@
       "advance": "Avanza el siguiente paso de la propuesta con el contexto de la cuenta disponible y la alineación del responsable."
     },
     "committee": {
+      "champions_one": "{{count}} impulsor mapeado",
+      "champions_other": "{{count}} impulsores mapeados",
       "champions": "{{count}} impulsor mapeado",
+      "buyers_one": "{{count}} comprador mapeado",
+      "buyers_other": "{{count}} compradores mapeados",
       "buyers": "{{count}} comprador mapeado",
+      "stakeholders_one": "{{count}} parte interesada mapeada",
+      "stakeholders_other": "{{count}} partes interesadas mapeadas",
       "stakeholders": "{{count}} parte interesada mapeada",
       "empty": "mapear comprador e impulsor"
     },
@@ -2307,7 +2338,7 @@
         "pending": "Pipeline pendiente"
       },
       "weightedValue": {
-        "label": "Valor ponderado de la cuenta",
+        "label": "Ingresos anuales declarados",
         "notVerified": "No verificado"
       },
       "ownerMap": {
@@ -3001,7 +3032,8 @@
     "caption": "Por qué se cierran los acuerdos — y el patrón en toda la organización",
     "errorTitle": "No se pudieron cargar los patrones de ganancia/pérdida",
     "errorMessage": "Inténtalo de nuevo en breve.",
-    "recordedCount": "{{won}} ganados · {{lost}} perdidos registrados",
+    "recordedCount": "{{won}} motivos de ganancia y {{lost}} motivos de pérdida en toda la organización",
+    "accountClosed": "Esta cuenta tiene {{count}} negocios cerrados. Una etapa cerrada no es un motivo.",
     "patternBadge": "Patrón",
     "mostLossesCitePrefix": "La mayoría de las pérdidas citan ",
     "noReasonsYet": "Aún no hay motivos de pérdida registrados — captura algunos para revelar patrones.",
@@ -3113,7 +3145,7 @@
     "coverage": "Cobertura",
     "strongestBand": "Banda de cobertura más fuerte",
     "noSignal": "Sin señal",
-    "healthBands": "Bandas de salud",
+    "healthBands": "Bandas de cobertura",
     "whatDrivesScore": "Qué determina esta puntuación",
     "scoreFactors": "Factores de la puntuación",
     "nextLabel": "Siguiente: ",
@@ -3224,7 +3256,11 @@
     "emptyFilteredTitle": "No hay cursos etiquetados como \"{{sector}}\"",
     "emptyTitle": "Aún no hay cursos publicados",
     "emptyMessage": "Los cursos aparecen aquí en cuanto Mantu Academy los publica con etiquetas de sector.",
+    "resultCount_one": "{{count}} curso",
+    "resultCount_other": "{{count}} cursos",
     "resultCount": "{{count}} curso",
+    "resultCountInSector_one": "{{count}} curso en {{sector}}",
+    "resultCountInSector_other": "{{count}} cursos en {{sector}}",
     "resultCountInSector": "{{count}} curso en {{sector}}",
     "filterGroupLabel": "Filtrar por sector",
     "allSectors": "Todos los sectores",
@@ -3382,7 +3418,8 @@
     "unknownIndustry": "Sector desconocido",
     "dataSourcesAria": "Fuentes de datos de {{name}}",
     "openDeals": "Oportunidades abiertas",
-    "pipeline": "Pipeline",
+    "pipeline": "Pipeline ponderado",
+    "pipelineMissingProbability": "{{count}} oportunidades abiertas no tienen probabilidad registrada y no entran en el pipeline ponderado.",
     "totalDeals": "Total de oportunidades",
     "employees": "Empleados",
     "confidence": "Confianza",
@@ -3391,15 +3428,19 @@
   "openIssues": {
     "regionLabel": "Problemas abiertos por gravedad",
     "title": "Problemas abiertos",
-    "captionAllClear": "Todo en orden",
-    "captionItemsToAction": "{{count}} elemento{{plural}} por gestionar",
+    "captionAllClear": "Ningún elemento abierto en el registro",
+    "captionNoneRecorded": "No hay riesgos ni controles de cumplimiento registrados en esta cuenta",
+    "captionNoneOpen": "Ningún elemento abierto en el registro",
+    "captionItemsToAction": "{{count}} elemento{{plural}} abierto{{plural}}",
     "bucketsLabel": "Grupos de gravedad",
     "severityCritical": "Crítico",
     "severityHigh": "Alto",
     "severityMedium": "Medio",
     "severityLow": "Bajo",
-    "emptyTitle": "No hay problemas abiertos",
-    "emptyMessage": "Aquí todo está en verde.",
+    "emptyTitle": "Nada registrado",
+    "emptyMessage": "Esta cuenta no tiene filas de riesgo ni de cumplimiento. Eso no es un visto bueno.",
+    "noneOpenTitle": "Ningún elemento abierto",
+    "noneOpenMessage": "El registro no tiene riesgos ni controles de cumplimiento abiertos.",
     "unassigned": "Sin asignar",
     "dueSuffix": " - vence {{dueDate}}",
     "noOwner": "Sin responsable"
@@ -3422,6 +3463,8 @@
   "activityTimeline": {
     "regionLabel": "Actividad reciente",
     "title": "Actividad reciente",
+    "itemCount_one": "Último {{count}} elemento",
+    "itemCount_other": "Últimos {{count}} elementos",
     "itemCount": "Últimos {{count}} elementos",
     "emptyTitle": "Nada todavía",
     "emptyMessage": "Las tareas, los correos y las ejecuciones de Dust de esta cuenta aparecerán aquí."
@@ -3472,6 +3515,8 @@
     "qualityWarningDetail": "{{classified}} de {{total}} cuentas tienen una clasificación de sector ABC; trate estas divisiones como orientativas hasta que mejore la cobertura de ABC.",
     "accountCountOne": "{{count}} cuenta",
     "accountCountOther": "{{count}} cuentas",
+    "geoIndustryMeta_one": "{{count}} oport. · {{value}}",
+    "geoIndustryMeta_other": "{{count}} oport. · {{value}}",
     "fteValue": "{{value}} FTE",
     "fteUnknown": "FTE desconocido",
     "fteUnknownTooltip": "Ninguna cuenta de este sector tiene una plantilla conocida",
@@ -3489,7 +3534,8 @@
     "columnTerritory": "Territorio",
     "columnStage": "Etapa",
     "columnValue": "Valor",
-    "columnProbability": "Probabilidad",
+    "columnProbability": "Probabilidad registrada",
+    "columnProbabilityTitle": "Guardada en el negocio. Un valor en blanco se guarda como 0 y no es una probabilidad de cierre medida.",
     "columnDue": "Vencimiento"
   },
   "territorySegmentBreakdown": {
@@ -3516,7 +3562,8 @@
     "opportunityNameLabel": "Nombre de la oportunidad",
     "opportunityNamePlaceholderWithCompany": "{{companyName}} — Oportunidad",
     "opportunityNamePlaceholder": "Nombre de la oportunidad",
-    "valueLabel": "Valor (EUR)",
+    "valueLabel": "Valor",
+    "valueHint": "Moneda no registrada",
     "stageLabel": "Etapa",
     "stageDiscovery": "Descubrimiento",
     "stageQualified": "Cualificado",
@@ -3755,7 +3802,7 @@
   },
   "businessSnapshot": {
     "title": "Resumen del negocio",
-    "caption": "Salud: {{band}} - puntuación {{score}}/100",
+    "caption": "Cobertura de señales: {{band}} · {{score}}/100. No es salud de relación medida.",
     "region": {
       "ariaLabel": "Resumen del negocio"
     },
@@ -3868,12 +3915,18 @@
     "noTitleOrEmail": "n/d"
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} negocio",
+    "dealCount_other": "{{count}} negocios",
+    "openCaption": "Solo etapas abiertas. Las ganadas y perdidas quedan en la tasa de éxito.",
+    "emptyOpen": "No hay pipeline abierto.",
     "heading": "Pipeline por etapa"
   },
   "microsoftSignInButton": {
     "label": "Iniciar sesión con Microsoft"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} registro",
+    "recordCountLabel_other": "{{count}} registros",
     "recordCountLabel": "{{count}} registros"
   },
   "alert": {
@@ -3891,12 +3944,14 @@
   },
   "oppIndustryBreakdown": {
     "title": "Cartera por sector",
+    "sectorCount_one": "{{count}} sector",
+    "sectorCount_other": "{{count}} sectores",
     "sectorCount": "{{count}} sector"
   },
   "revenueEvolution": {
     "regionLabel": "Evolución de ingresos",
     "title": "Evolución de ingresos",
-    "caption": "Ingresos de acuerdos ganados con este cliente por mes",
+    "caption": "Importes ganados por mes. Moneda no registrada; no es una previsión en euros.",
     "srSummary": "{{count}} meses de ingresos de acuerdos ganados. Máximo {{period}}.",
     "barsListLabel": "Ingresos de acuerdos ganados por mes",
     "barLabel": "{{period}}: {{amount}}"
@@ -3904,7 +3959,7 @@
   "winLoss": {
     "regionLabel": "Ganados / perdidos",
     "title": "Ganados / perdidos",
-    "caption": "Negocios decididos en esta cuenta",
+    "caption": "Negocios decididos en esta cuenta. Moneda no registrada; no es una previsión en euros.",
     "winRateLabel": "tasa de éxito",
     "wonCount": "{{count}} ganados",
     "lostCount": "{{count}} perdidos",

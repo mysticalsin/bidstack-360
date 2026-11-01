@@ -24,6 +24,7 @@ function confidencePct(confidenceBps: number): number {
 }
 
 function confidenceState(confidenceBps: number): CockpitSourceState {
+  if (confidenceBps <= 0) return 'crm';
   if (confidenceBps >= 7000) return 'verified';
   if (confidenceBps >= 5000) return 'crm';
   return 'missing';
@@ -100,10 +101,15 @@ function IntelSourceBadges({
 }) {
   const { t } = useTranslation('crm');
   const source = sourceLabel(documentId, files);
+  const unscored = confidenceBps <= 0 && fieldSource?.confidence == null;
   const pct = confidencePct(
     fieldSource?.confidence == null ? confidenceBps : fieldSource.confidence * 10_000,
   );
-  const sourceHint = fieldSource?.hint ?? (source
+  const sourceHint = fieldSource?.hint ?? (unscored
+    ? source
+      ? t('intelTabs.sourceDocumentUnscored', 'Extracted from {{source}}. Not scored.', { source })
+      : t('intelTabs.sourceManualUnscored', 'Stored account intelligence record. Not scored.')
+    : source
     ? t('intelTabs.sourceDocumentHint', 'Extracted from {{source}} with {{pct}}% confidence.', {
         source,
         pct,
@@ -121,9 +127,17 @@ function IntelSourceBadges({
         data-testid={`${testIdBase}-source`}
       />
       <SourceBadge
-        label={t('intelTabs.confidenceBadge', '{{pct}}% confidence', { pct })}
+        label={
+          unscored
+            ? t('intelTabs.confidenceNotScored', 'Not scored')
+            : t('intelTabs.confidenceBadge', '{{pct}}% confidence', { pct })
+        }
         state={confidenceState(confidenceBps)}
-        hint={t('intelTabs.confidenceHint', 'Extraction confidence: {{pct}}%.', { pct })}
+        hint={
+          unscored
+            ? t('intelTabs.confidenceUnscoredHint', 'This extract was not given a confidence score.')
+            : t('intelTabs.confidenceHint', 'Extraction confidence: {{pct}}%.', { pct })
+        }
         data-testid={`${testIdBase}-confidence`}
       />
     </div>
@@ -173,13 +187,14 @@ export function SolutionsTab({
   const { t } = useTranslation('crm');
   if (solutions.length === 0) {
     return (
-      <EmptyState
-        title={t('intelTabs.solutionsEmptyTitle', 'No solutions yet')}
-        message={t(
+      <p className="px-4 py-8 text-sm text-[var(--fg-secondary)]">
+        {t('intelTabs.solutionsEmptyTitle', 'No solutions yet')}
+        {'. '}
+        {t(
           'intelTabs.solutionsEmptyMessage',
           'Upload documents and run extraction to review suggested solutions.',
         )}
-      />
+      </p>
     );
   }
   return (
@@ -244,6 +259,7 @@ export function ProductsTab({
     description: string | null;
     category: string;
     priceRangeMicros: number | null;
+    priceRangeMicrosText?: string | null;
     currency: string;
     status: string;
     confidenceBps: number;
@@ -279,9 +295,9 @@ export function ProductsTab({
                 <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-wider">
                   {p.category}
                 </span>
-                {p.priceRangeMicros ? (
+                {p.priceRangeMicrosText || p.priceRangeMicros ? (
                   <span className="rounded-full bg-tag-blue-bg px-2 py-0.5 text-[10px] font-medium text-tag-blue-fg">
-                    {formatMoneyMicros(p.priceRangeMicros, p.currency)}
+                    {formatMoneyMicros(p.priceRangeMicrosText ?? p.priceRangeMicros ?? 0, p.currency)}
                   </span>
                 ) : null}
               </div>

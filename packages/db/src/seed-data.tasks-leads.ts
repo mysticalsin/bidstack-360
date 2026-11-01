@@ -74,94 +74,13 @@ export const fixtureTasks: FixtureTask[] = [
   },
 ];
 
-// Returns an intel JSONB payload for a given opportunity code.
-// Models the prototype's intel-data.js shape (financials, triggers, decision
-// unit, competitors, news, hiring, win prediction). For fixtures, all opps
-// get a representative payload; Dust enrichment will replace it in production.
-export function intelFor(code: string): Record<string, unknown> {
-  const refreshedAt = new Date('2026-05-10T08:00:00Z').toISOString();
-  return {
-    refreshedAt,
-    financial: {
-      ticker: code === 'OP-2041' ? 'CIX.TO' : null,
-      marketCap: code === 'OP-2041' ? 4_800_000_000 : null,
-      revenueAnnual: code === 'OP-2041' ? 1_200_000_000 : null,
-      revenueGrowth: 0.06,
-      ebitdaMargin: 0.32,
-      creditRating: code === 'OP-2041' ? 'A-' : null,
-      headcount: 2500,
-      headcountTrend: [
-        { date: '2025-Q3', n: 2400 },
-        { date: '2025-Q4', n: 2440 },
-        { date: '2026-Q1', n: 2500 },
-      ],
-      pricePoints: Array.from({ length: 30 }, (_, i) => 100 + Math.sin(i / 3) * 6),
-    },
-    triggers: [
-      {
-        id: `${code}-t1`,
-        kind: 'funding',
-        label: 'Closed Series D — $80M',
-        weight: 8,
-        observedAt: '2026-04-15T00:00:00Z',
-        source: 'Crunchbase',
-      },
-      {
-        id: `${code}-t2`,
-        kind: 'executive_move',
-        label: 'New CTO appointed',
-        weight: 7,
-        observedAt: '2026-03-20T00:00:00Z',
-        source: 'LinkedIn',
-      },
-      {
-        id: `${code}-t3`,
-        kind: 'regulatory',
-        label: 'NIS2 deadline approaching',
-        weight: 6,
-        observedAt: '2026-05-01T00:00:00Z',
-        source: 'EU register',
-      },
-    ],
-    decisionUnit: [],
-    competitors: [
-      { vendor: 'Accenture', score: 72, strengths: ['Scale', 'Brand'], weaknesses: ['Cost'] },
-      { vendor: 'DXC', score: 64, strengths: ['Local presence'], weaknesses: ['Tech depth'] },
-    ],
-    news: [
-      {
-        id: `${code}-n1`,
-        headline: 'Customer announces digital transformation roadmap',
-        source: 'Press release',
-        publishedAt: '2026-04-22T00:00:00Z',
-        sentiment: 'positive',
-        url: null,
-      },
-    ],
-    hiring: {
-      openings: [
-        {
-          title: 'VP Cloud Engineering',
-          department: 'IT',
-          urgency: 'high',
-          postedAt: '2026-05-01T00:00:00Z',
-        },
-      ],
-      velocity: 1.2,
-      trendDirection: 'up',
-    },
-    winPrediction: {
-      probability: 65,
-      modelVersion: 'wp-baseline-0.1',
-      drivers: [
-        { label: 'Champion strength', contribution: 18 },
-        { label: 'Pricing competitiveness', contribution: 15 },
-        { label: 'Recent funding', contribution: 9 },
-        { label: 'Incumbent risk', contribution: -12 },
-        { label: 'Long deal cycle', contribution: -8 },
-      ],
-    },
-  };
+// Opportunity intel stays empty until a real source writes it.
+// A shared dossier (65% win prediction, a Series D trigger, Accenture/DXC
+// scores, and a copied press headline) used to land on every opportunity.
+// That was not a measurement. presentOpportunityIntel still drops any row
+// that still carries that dossier.
+export function intelFor(_code: string): Record<string, unknown> {
+  return {};
 }
 
 export interface FixtureLead {
