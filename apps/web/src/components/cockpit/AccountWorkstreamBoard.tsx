@@ -10,6 +10,7 @@ import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/componen
 import {
   buyingRoleSlots,
   groupWorkstreams,
+  peopleWithoutDecisionRole,
   type BuyingRole,
   type BuyingRolePerson,
   type LiveWorkstream,
@@ -37,6 +38,7 @@ export function AccountWorkstreamBoard({
   const reducedMotion = useReducedMotion();
   const grouped = groupWorkstreams(deals);
   const roles = buyingRoleSlots(people);
+  const unassigned = peopleWithoutDecisionRole(people);
   const diagramDeal = grouped.pursuit[0] ?? grouped.delivery[0] ?? grouped.renewal[0] ?? grouped.expansion[0];
 
   const laneTotals = LANES.map((lane) => ({
@@ -143,7 +145,7 @@ export function AccountWorkstreamBoard({
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {t(
             'accountWorkstreams.rolesCaption',
-            'Empty means unknown. A title does not fill a role.',
+            'An empty station has no one in that role. A title does not fill it. People without an accepted decision role stay listed.',
           )}
         </p>
         <ol className="role-route">
@@ -161,13 +163,23 @@ export function AccountWorkstreamBoard({
                   </span>
                 ) : (
                   <span className="role-unknown">
-                    {t('accountWorkstreams.roleUnknown', 'Unknown')}
+                    {t('accountWorkstreams.roleEmpty', 'No one recorded')}
                   </span>
                 )}
               </li>
             );
           })}
         </ol>
+        {unassigned.length > 0 ? (
+          <div className="role-unassigned">
+            <h3>{t('accountWorkstreams.unassignedTitle', 'Decision role not recorded')}</h3>
+            <ul>
+              {unassigned.map((person) => (
+                <li key={person.id}>{person.name}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {diagramDeal ? (
           <Link
             to={`/opportunities/${diagramDeal.id}`}

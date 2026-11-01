@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AccountWorkstreamBoard } from './AccountWorkstreamBoard';
 
@@ -14,6 +14,8 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('AccountWorkstreamBoard', () => {
+  afterEach(cleanup);
+
   it('draws lane length from recorded value and leaves an empty role off the route', () => {
     render(
       <MemoryRouter>
@@ -37,7 +39,25 @@ describe('AccountWorkstreamBoard', () => {
     expect(chart.textContent).toMatch(/Not recorded/);
     const dealLink = screen.getByRole('link', { name: /Pursuit · screening/ });
     expect(dealLink.getAttribute('href')).toBe('/opportunities/deal-1');
-    expect(screen.getAllByText('Unknown')).toHaveLength(5);
-    expect(screen.queryByText('Ada')).toBeNull();
+    expect(screen.getAllByText('No one recorded')).toHaveLength(5);
+    // WHY: Ada is linked. Hiding her would read as an empty account.
+    // She is not placed in a role, because a missing decision role is not Buyer.
+    expect(screen.getByRole('heading', { name: 'Decision role not recorded' })).toBeTruthy();
+    expect(screen.getByText('Ada')).toBeTruthy();
+  });
+
+  it('places a recorded buyer on that station and leaves them off the unassigned list', () => {
+    render(
+      <MemoryRouter>
+        <AccountWorkstreamBoard
+          deals={[]}
+          people={[{ id: 'p1', name: 'Ada', roleInDecision: 'buyer' }]}
+        />
+      </MemoryRouter>,
+    );
+
+    const buyer = screen.getByText('Buyer').closest('li');
+    expect(buyer?.textContent).toContain('Ada');
+    expect(screen.queryByRole('heading', { name: 'Decision role not recorded' })).toBeNull();
   });
 });

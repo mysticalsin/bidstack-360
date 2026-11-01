@@ -3419,6 +3419,29 @@
   color: var(--fg-tertiary);
   font-size: 12px;
 }
+.role-unassigned {
+  margin-top: 16px;
+}
+.role-unassigned h3 {
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.role-unassigned ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.role-unassigned li {
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--fg-primary);
+  font-size: 12px;
+  padding: 6px 10px;
+}
 @media (max-width: 720px) {
   .deal-chart {
     grid-template-columns: minmax(0, 1fr);

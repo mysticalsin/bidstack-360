@@ -57,3 +57,13 @@ export function buyingRoleSlots(
     people: people.filter((person) => person.roleInDecision === role),
   }));
 }
+
+/** Linked people with no accepted decision role. A title does not place them. */
+export function peopleWithoutDecisionRole(
+  people: readonly BuyingRolePerson[],
+): BuyingRolePerson[] {
+  const placed = new Set(
+    buyingRoleSlots(people).flatMap((slot) => slot.people.map((person) => person.id)),
+  );
+  return people.filter((person) => !placed.has(person.id));
+}

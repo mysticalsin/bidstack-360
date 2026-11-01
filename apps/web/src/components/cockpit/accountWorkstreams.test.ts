@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buyingRoleSlots, classifyWorkstream, groupWorkstreams, type WorkDeal } from './accountWorkstreams';
+import {
+  buyingRoleSlots,
+  classifyWorkstream,
+  groupWorkstreams,
+  peopleWithoutDecisionRole,
+  type WorkDeal,
+} from './accountWorkstreams';
 
 function deal(overrides: Partial<WorkDeal> & Pick<WorkDeal, 'id' | 'name'>): WorkDeal {
   return {
@@ -51,5 +57,11 @@ describe('account workstreams stay independent', () => {
     expect(slots.find((slot) => slot.role === 'champion')?.people.some((person) => person.name === 'No role')).toBe(
       false,
     );
+    // WHY: hiding the person makes the account look like it has no one.
+    // They stay visible, and they stay out of every role slot.
+    expect(peopleWithoutDecisionRole([
+      { id: 'p1', name: 'Ada', roleInDecision: 'buyer' },
+      { id: 'p2', name: 'No role', roleInDecision: null },
+    ]).map((person) => person.name)).toEqual(['No role']);
   });
 });
