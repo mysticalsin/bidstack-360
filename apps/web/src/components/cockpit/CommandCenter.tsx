@@ -27,11 +27,9 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit, t);
   const committee = deriveCommittee(cockpit, t);
-  const recordedRisks = cockpit.risks.length;
-  const openRisks = cockpit.risks.filter((risk) => risk.status !== 'mitigated').length;
-  const criticalRisks = cockpit.risks.filter(
-    (risk) => risk.severity === 'critical' || risk.severity === 'high',
-  ).length;
+  const riskLoad = openRiskFigures(cockpit);
+  const openRisks = riskLoad.openCount;
+  const criticalRisks = riskLoad.criticalOnPage;
   const attributionCount = cockpit.company.sourceAttribution.length;
   const hasLogo = Boolean(cockpit.company.logo);
   const proofCount = sourceReceiptTotal(attributionCount, hasLogo);
@@ -42,7 +40,9 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
       value: `${readiness}%`,
       detail: t(
         'commandCenter.signal.readiness.detail',
-        'weighted mix of recorded signals on this account, not a measured score',
+        riskLoad.unseenOpen
+          ? 'weighted mix from the latest 50 register rows, not the whole account'
+          : 'weighted mix of recorded signals on this account, not a measured score',
       ),
       progress: readiness,
       tone: readiness >= 85 ? 'jade' : readiness >= 68 ? 'blue' : 'amber',
@@ -75,20 +75,24 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     },
     {
       label: t('commandCenter.signal.risk.label', 'Open risk load'),
-      value: recordedRisks === 0
+      value: riskLoad.noneRecorded
         ? t('commandCenter.signal.risk.valueNone', 'None recorded')
-        : criticalRisks
-          ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
-          : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
-      detail: recordedRisks === 0
+        : riskLoad.unseenOpen
+          ? t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks })
+          : criticalRisks
+            ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
+            : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
+      detail: riskLoad.noneRecorded
         ? t('commandCenter.signal.risk.detailNone', 'no risk rows on this account')
-        : criticalRisks
-          ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
-          : openRisks
-            ? t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up')
-            : t('commandCenter.signal.risk.detailNoneOpen', 'recorded register has no open risks'),
-      progress: recordedRisks === 0 ? null : riskLoadProgress(openRisks, criticalRisks),
-      tone: recordedRisks === 0 ? 'amber' : criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
+        : riskLoad.unseenOpen
+          ? t('commandCenter.signal.risk.detailPage', 'latest 50 open risks')
+          : criticalRisks
+            ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+            : openRisks
+              ? t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up')
+              : t('commandCenter.signal.risk.detailNoneOpen', 'recorded register has no open risks'),
+      progress: riskLoad.noneRecorded ? null : riskLoadProgress(openRisks, riskLoad.unseenOpen ? 0 : criticalRisks),
+      tone: riskLoad.noneRecorded ? 'amber' : riskLoad.unseenOpen || criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
     },
   ];
 
@@ -182,6 +186,13 @@ export function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): s
         );
   }
 
+  if (openRiskFigures(cockpit).unseenOpen) {
+    return t(
+      'commandCenter.nextMove.reviewRegister',
+      'Review open risks past the latest 50 before proposal approval.',
+    );
+  }
+
   const champion = cockpit.keyContacts.find((person) => person.roleInDecision === 'champion');
   if (champion)
     return t(
@@ -242,6 +253,30 @@ export function influenceProxyScore(
   const total = people.reduce((acc, person) => acc + (person.influence ?? 0), 0);
   if (people.length === 0 || total === 0) return 0;
   return Math.min(5, Math.round(total / 2));
+}
+
+/** Open-risk tile figures. A full page is not "none recorded". */
+export function openRiskFigures(cockpit: {
+  risks: readonly RiskItem[];
+  openRiskCount?: number;
+  risksCapped?: boolean;
+}): { noneRecorded: boolean; openCount: number; criticalOnPage: number; unseenOpen: boolean } {
+  const shownOpen = cockpit.risks.filter(
+    (risk) => risk.status === 'open' || risk.status === 'in_progress',
+  ).length;
+  const openCount = cockpit.openRiskCount ?? shownOpen;
+  const criticalOnPage = cockpit.risks.filter(
+    (risk) => risk.severity === 'critical' || risk.severity === 'high',
+  ).length;
+  const unseenOpen = Boolean(
+    cockpit.risksCapped && cockpit.openRiskCount != null && cockpit.openRiskCount > shownOpen,
+  );
+  return {
+    noneRecorded: cockpit.risks.length === 0 && openCount === 0 && !cockpit.risksCapped,
+    openCount,
+    criticalOnPage,
+    unseenOpen,
+  };
 }
 
 /** Bar fill follows open load. Zero open risks is an empty bar. */
