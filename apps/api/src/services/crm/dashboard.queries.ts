@@ -29,6 +29,7 @@ import {
   REGISTER_DEAL_PAGE,
   ROLE_HOLDER_PROBE,
   microsText,
+  recordedComplianceWhere,
   registerDealsAreCapped,
   roleHolderProbeIds,
   roleHoldersAreCapped,
@@ -434,7 +435,7 @@ export async function loadAccountCompliance(
       COMPLIANCE_OPEN,
     ),
     prismaClient.complianceCheck.count({ where: { ...where, status: 'compliant' } }),
-    prismaClient.complianceCheck.count({ where }),
+    prismaClient.complianceCheck.count({ where: recordedComplianceWhere(where) }),
     prismaClient.complianceCheck.count({ where: { ...where, status: 'blocked' } }),
   ]);
   return { ...page, compliantCount, complianceTotal, blockedCount };
