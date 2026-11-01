@@ -313,6 +313,34 @@ describe('analytics workload route', () => {
     });
   });
 
+  skipIfNoSeed('a large weighted amount stays on the exact micros', async (app) => {
+    // WHY: value_micros * probability / 100.0 promoted the product to float.
+    // This amount then came back one cent high once the web divided it.
+    const micros = 8_598_204_328_457_184_962n;
+    const before = (await fetchOwners(app)).find((row) => row.ownerId === aliceId);
+    const deal = await prisma.opportunity.create({
+      data: {
+        orgId: orgId!,
+        ownerId: aliceId,
+        code: `OP-WL-${Date.now()}`,
+        customer: 'Wide desk',
+        name: 'Large open',
+        stage: 's1_lead',
+        valueMicros: micros,
+        probability: 100,
+        intel: {},
+      },
+    });
+    try {
+      const after = (await fetchOwners(app)).find((row) => row.ownerId === aliceId);
+      expect(after).toBeDefined();
+      expect(BigInt(after!.weightedValueMicros) - BigInt(before!.weightedValueMicros)).toBe(micros);
+      expect(after!.weightedValueMicros.includes('.')).toBe(false);
+    } finally {
+      await prisma.opportunity.delete({ where: { id: deal.id } });
+    }
+  });
+
   skipIfNoSeed('a task due today is open but not overdue until the day ends', async (app) => {
     // Overdue keys off the start-of-day UTC boundary, not a live timestamp. Under
     // the previous `dueDate < now` logic Bob's today-due task read as overdue for
