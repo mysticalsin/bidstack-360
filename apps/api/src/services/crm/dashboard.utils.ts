@@ -76,7 +76,7 @@ export function asRiskStatus(
     value === 'mitigated' ||
     value === 'accepted'
     ? value
-    : 'open';
+    : 'unspecified';
 }
 
 export function asComplianceStatus(

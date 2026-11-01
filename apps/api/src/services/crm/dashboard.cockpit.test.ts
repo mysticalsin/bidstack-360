@@ -817,6 +817,47 @@ describe('buildCockpit recorded facts only', () => {
     expect(older.compliance.map((check) => check.id)).toEqual(['older-check']);
   });
 
+  it('does not turn an unrecognized risk status into open', () => {
+    // WHY: a stored word such as closed used to become open, so the card
+    // escalated a risk the register does not count as open.
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [
+        {
+          id: 'deal-1',
+          customer: 'Acme',
+          companyId: 'mantu',
+          name: 'Platform',
+          stage: 'proposal',
+          pipelineStage: null,
+          valueMicros: 0,
+          probability: 0,
+          dueDate: null,
+          owner: null,
+        },
+      ],
+      contacts: [],
+      tasks: [],
+      risks: [
+        {
+          id: 'r-closed',
+          opportunityId: 'deal-1',
+          title: 'Old plant',
+          severity: 'critical',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'closed',
+          companyName: null,
+        },
+      ],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(cockpit.risks[0]?.status).toBe('unspecified');
+  });
+
   it('keeps a follow-up stored on the account when it has no deal', () => {
     // WHY: a meeting import links the task by company id. The cockpit used
     // to keep only tasks hanging off a deal, so that follow-up disappeared.

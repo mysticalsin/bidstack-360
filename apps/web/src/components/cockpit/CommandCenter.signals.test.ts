@@ -179,5 +179,19 @@ describe('command center counts', () => {
       ),
     ).toBe('Escalate Plant before proposal approval.');
     expect(openRiskFigures({ risks: [accepted] }).criticalOnPage).toBe(0);
+    expect(
+      riskPenaltyFromRegister({
+        risks: [{ ...accepted, status: 'unspecified', severity: 'critical' }],
+      }),
+    ).toBe(0);
+    expect(
+      deriveNextMove(
+        nextMoveCockpit({
+          keyContacts: [{ id: 'c1', name: 'Ada', roleInDecision: 'champion' } as never],
+          risks: [{ ...accepted, status: 'unspecified' }],
+        }),
+        t,
+      ),
+    ).toBe('Use Ada as champion for the next presales milestone.');
   });
 });

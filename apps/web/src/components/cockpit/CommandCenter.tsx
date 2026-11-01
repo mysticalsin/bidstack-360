@@ -376,7 +376,7 @@ export function riskLoadProgress(openRisks: number, criticalRisks: number): numb
 }
 
 function riskPenaltyFor(risk: RiskItem): number {
-  if (risk.status === 'mitigated' || risk.status === 'accepted') return 0;
+  if (!isOpenRisk(risk.status)) return 0;
   if (risk.severity == null) return 0;
   return SEVERITY_PENALTY[risk.severity];
 }
