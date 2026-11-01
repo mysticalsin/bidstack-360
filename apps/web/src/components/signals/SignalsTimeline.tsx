@@ -89,6 +89,7 @@ export function TimelineView({
   meetingsCapped,
   newsCapped,
   bidsCapped,
+  bidsSearchCapped,
   marksCapped,
 }: {
   items: TimelineItem[];
@@ -98,6 +99,7 @@ export function TimelineView({
   meetingsCapped?: boolean;
   newsCapped?: boolean;
   bidsCapped?: boolean;
+  bidsSearchCapped?: boolean;
   marksCapped?: boolean;
 }) {
   const narrow = useNarrow();
@@ -140,6 +142,7 @@ export function TimelineView({
     meetingsCapped ? 'Latest 200 meetings' : '',
     newsCapped ? 'Latest 300 news items' : '',
     bidsCapped ? 'Latest 100 bids' : '',
+    bidsSearchCapped ? 'Bid name search stopped at 1,000' : '',
     marksCapped ? 'Latest 300 marks' : '',
   ].filter(Boolean);
   const dealPage = pageNotes.length ? <p className="sg-meta">{pageNotes.join(' · ')}</p> : null;
@@ -309,6 +312,7 @@ export function SignalsTimeline({ companyId }: { companyId: string }) {
           meetingsCapped={q.data.meetingsCapped}
           newsCapped={q.data.newsCapped}
           bidsCapped={q.data.bidsCapped}
+          bidsSearchCapped={q.data.bidsSearchCapped}
           marksCapped={q.data.marksCapped}
         />
       )}

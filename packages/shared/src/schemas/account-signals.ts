@@ -872,8 +872,10 @@ export const AccountTimeline = z.object({
   meetingsCapped: z.boolean().optional(),
   /** True when news on the timeline is the latest 300 in the window. */
   newsCapped: z.boolean().optional(),
-  /** True when bids on the timeline are the latest 100 in the window. */
+  /** True when bids on the timeline are the latest 100 name matches. */
   bidsCapped: z.boolean().optional(),
+  /** True when the buyer-name scan stopped at 1,000 rows. */
+  bidsSearchCapped: z.boolean().optional(),
   /** True when the drawn list stopped at 300 marks. */
   marksCapped: z.boolean().optional(),
 });
