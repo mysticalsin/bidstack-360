@@ -658,4 +658,35 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     expect(cockpit.winLoss?.winRate).toBeNull();
     expect(cockpit.winLoss?.wonCount).toBe(0);
   });
+
+  it('counts a deal once when it is both won and lost, and lost wins', () => {
+    // WHY: the fallback counted the same deal in won and in lost, so the
+    // win rate and the revenue month both included a loss.
+    const cockpit = buildCockpit(
+      baseArgs([
+        opp({
+          stage: 'closed_won',
+          pipelineStage: { isWon: true, isLost: true },
+          valueMicros: 400_000_000_000n,
+          dueDate: new Date('2026-03-01'),
+        }),
+        opp({
+          stage: 's2_sent',
+          pipelineStage: { isWon: true, isLost: false },
+          valueMicros: 100_000_000_000n,
+          dueDate: new Date('2026-03-15'),
+        }),
+      ]),
+    );
+    expect(cockpit.winLoss).toEqual({
+      wonCount: 1,
+      lostCount: 1,
+      wonValueMicros: 100_000_000_000,
+      lostValueMicros: 400_000_000_000,
+      winRate: 50,
+    });
+    expect(cockpit.revenueEvolution).toEqual([
+      { period: '2026-03', revenueMicros: 100_000_000_000 },
+    ]);
+  });
 });

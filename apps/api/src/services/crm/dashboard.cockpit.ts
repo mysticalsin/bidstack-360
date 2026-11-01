@@ -257,8 +257,16 @@ export function deriveAccountPerformance(
 ): AccountPerformance {
   const toMicros = (v: bigint | number | unknown): number =>
     typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
-  const wonOpps = opps.filter((o) => o.pipelineStage?.isWon || o.stage === 'closed_won');
-  const lostOpps = opps.filter((o) => o.pipelineStage?.isLost || o.stage === 'closed_lost');
+  const lostOpps = opps.filter(
+    (o) => o.pipelineStage?.isLost === true || o.stage === 'closed_lost',
+  );
+  // Lost wins when the enum and a won flag disagree, and when both flags are set.
+  const wonOpps = opps.filter(
+    (o) =>
+      o.pipelineStage?.isLost !== true &&
+      o.stage !== 'closed_lost' &&
+      (o.pipelineStage?.isWon === true || o.stage === 'closed_won'),
+  );
   const decided = wonOpps.length + lostOpps.length;
 
   const revenueByMonth = new Map<string, number>();
