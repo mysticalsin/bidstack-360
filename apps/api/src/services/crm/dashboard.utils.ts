@@ -181,6 +181,20 @@ export function normalizeName(value: string) {
 export const OPPORTUNITY_CUSTOMER_KEY_SQL =
   "trim(both '-' from regexp_replace(lower(btrim(customer)), '[^a-z0-9]+', '-', 'g'))";
 
+/** A Company row id. Customer-only accounts use normalizeName(customer) instead. */
+export function isCompanyUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+/**
+ * OPPORTUNITY_CUSTOMER_KEY_SQL for a specific column. Slug-book queries alias
+ * opportunities as `o`, so the joined expression has to read `o.customer`.
+ */
+export function opportunityCustomerKeySql(column: 'customer' | 'o.customer' = 'customer'): string {
+  if (column === 'customer') return OPPORTUNITY_CUSTOMER_KEY_SQL;
+  return OPPORTUNITY_CUSTOMER_KEY_SQL.replace('btrim(customer)', 'btrim(o.customer)');
+}
+
 export function normalizeCountry(country: string | null | undefined) {
   if (!country) return null;
   const normalized = country.trim().toUpperCase();

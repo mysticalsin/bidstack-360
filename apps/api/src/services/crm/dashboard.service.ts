@@ -44,6 +44,8 @@ import {
 } from './dashboard.defaults.js';
 import {
   fetchAccountPerformance,
+  findCustomerKeyOpportunities,
+  findCustomerKeyTasks,
   fetchBuyingRoleFacts,
   serializeDeal,
   serializeProviderHealth,
@@ -51,15 +53,11 @@ import {
   serializeReleaseScore,
   serializeWidget,
 } from './dashboard.queries.js';
-import { normalizeName } from './dashboard.utils.js';
+import { isCompanyUuid, normalizeName } from './dashboard.utils.js';
 
 // ─── Logger type ───────────────────────────────────────────────────────────────
 
 const DASHBOARD_ACTIVITY_LIMIT = 12;
-
-function isCompanyUuid(id: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-}
 
 export type LoggerLike = {
   warn: (obj: unknown, msg?: string) => void;
@@ -346,7 +344,10 @@ export async function buildDashboardSnapshot(
       if (index >= 0) companies[index] = refreshed;
     }
   }
-  const accountOpportunityWhere = isCompanyUuid(selectedCompany.id)
+  const accountIsUuid = isCompanyUuid(selectedCompany.id);
+  // UUID accounts filter on company_id. A slug is the customer key; putting it
+  // in companyId throws (that column is a UUID) and used to skip the book.
+  const accountOpportunityWhere = accountIsUuid
     ? scope
       ? applyOpportunityScope(
           { orgId, companyId: selectedCompany.id, deletedAt: null },
@@ -366,7 +367,7 @@ export async function buildDashboardSnapshot(
     fetchAccountPerformance(orgId, selectedCompany.id, prisma, scope),
     // People for this account only. A 200-row org sample ordered by name
     // dropped linked contacts, and a matching customer string is not a link.
-    isCompanyUuid(selectedCompany.id)
+    accountIsUuid
       ? prisma.contact.findMany({
           where: { orgId, companyId: selectedCompany.id, deletedAt: null },
           select: {
@@ -414,15 +415,15 @@ export async function buildDashboardSnapshot(
           orderBy: { updatedAt: 'desc' },
           take: 100,
         })
-      : Promise.resolve([]),
-    isCompanyUuid(selectedCompany.id) || accountOpportunityWhere
+      : findCustomerKeyOpportunities(orgId, selectedCompany.id, prisma, scope),
+    accountIsUuid
       ? prisma.task.findMany({
           where: {
             orgId,
             deletedAt: null,
             OR: [
-              ...(isCompanyUuid(selectedCompany.id) ? [{ accountId: selectedCompany.id }] : []),
-              ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
+              { accountId: selectedCompany.id },
+              { opportunity: accountOpportunityWhere! },
             ],
           },
           select: {
@@ -438,7 +439,7 @@ export async function buildDashboardSnapshot(
           orderBy: { createdAt: 'desc' },
           take: 50,
         })
-      : Promise.resolve([]),
+      : findCustomerKeyTasks(orgId, selectedCompany.id, prisma, scope),
   ]);
   const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
   const contactIds = contacts.map((contact) => contact.id);
