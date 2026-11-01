@@ -127,9 +127,9 @@ function buildFieldSources(
       hint: `Human-reviewed ${isLlm ? 'AI' : 'rules'} extraction from ${sourceFileName ?? 'the source document'}. Saved ${row.updatedAt.toISOString().slice(0, 10)}.`,
       confidence:
         extractedDraft.confidenceBps == null ? null : extractedDraft.confidenceBps / 10_000,
-      sourceFileId: row.sourceFileId,
+      sourceFileId: uuidOrNull(row.sourceFileId),
       sourceFileName,
-      sourceExtractionId: row.sourceExtractionId,
+      sourceExtractionId: uuidOrNull(row.sourceExtractionId),
       updatedAt: row.updatedAt.toISOString(),
     };
   } else if (row.sourceFileId) {
@@ -138,9 +138,9 @@ function buildFieldSources(
       label: 'Document',
       hint: `Linked to source document ${sourceFileName ?? row.sourceFileId}. Saved ${row.updatedAt.toISOString().slice(0, 10)}.`,
       confidence: null,
-      sourceFileId: row.sourceFileId,
+      sourceFileId: uuidOrNull(row.sourceFileId),
       sourceFileName,
-      sourceExtractionId: row.sourceExtractionId,
+      sourceExtractionId: uuidOrNull(row.sourceExtractionId),
       updatedAt: row.updatedAt.toISOString(),
     };
   } else {
@@ -162,35 +162,68 @@ function buildFieldSources(
   >;
 }
 
+const CONTRACT_KINDS = new Set(['msa', 'framework', 'sow', 'nda', 'other']);
+const CONTRACT_STATUSES = new Set(['active', 'pending', 'expired', 'terminated']);
+const RATE_SCHEDULES = new Set(['annual', 'biannual', 'quarterly', 'adhoc']);
+
+function enumOr<T extends string>(value: string, allowed: Set<string>, fallback: T): T {
+  return allowed.has(value) ? (value as T) : fallback;
+}
+
+function isoOrNull(value: Date | null): string | null {
+  if (!value || Number.isNaN(value.getTime())) return null;
+  const iso = value.toISOString();
+  return z.string().datetime().safeParse(iso).success ? iso : null;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function uuidOrNull(value: string | null): string | null {
+  return value && UUID_RE.test(value) ? value : null;
+}
+
+function countryCodes(values: readonly string[]): string[] {
+  return values
+    .map((code) => code.trim().toUpperCase())
+    .filter((code) => /^[A-Z]{2}$/.test(code))
+    .slice(0, 100);
+}
+
 function serialize(
   row: DbRow,
   extraction?: ExtractionSourceRow | null,
 ): z.infer<typeof ContractAgreement> {
+  const reference = row.reference.trim().slice(0, 255);
+  const currency = /^[A-Za-z]{3}$/.test(row.currency) ? row.currency.toUpperCase() : 'XXX';
+  const rebate = row.globalRebateBps;
   return {
     id: row.id,
     accountKey: row.accountKey,
-    kind: row.kind as z.infer<typeof ContractAgreement>['kind'],
-    reference: row.reference,
-    countries: row.countries,
-    globalRebateBps: row.globalRebateBps,
-    currency: row.currency,
+    kind: enumOr(row.kind, CONTRACT_KINDS, 'other'),
+    reference: reference.length > 0 ? reference : 'Recorded agreement',
+    // A full country name is not an ISO code. Dropping it keeps the list readable.
+    countries: countryCodes(row.countries),
+    globalRebateBps:
+      typeof rebate === 'number' && Number.isInteger(rebate) && rebate >= 0 && rebate <= 100_000
+        ? rebate
+        : null,
+    currency,
     // The Json column is validated back into RateCardLine[]; a malformed legacy
     // value degrades to an empty card rather than failing the read.
-    rateCard: z.array(RateCardLine).safeParse(row.rateCard).data ?? [],
-    effectiveDate: row.effectiveDate?.toISOString() ?? null,
-    expiryDate: row.expiryDate?.toISOString() ?? null,
-    rateReviewSchedule: row.rateReviewSchedule as z.infer<
-      typeof ContractAgreement
-    >['rateReviewSchedule'],
-    nextRateReviewAt: row.nextRateReviewAt?.toISOString() ?? null,
-    status: row.status as z.infer<typeof ContractAgreement>['status'],
-    notes: row.notes,
-    sourceFileId: row.sourceFileId,
+    rateCard: (z.array(RateCardLine).safeParse(row.rateCard).data ?? []).slice(0, 200),
+    effectiveDate: isoOrNull(row.effectiveDate),
+    expiryDate: isoOrNull(row.expiryDate),
+    rateReviewSchedule: enumOr(row.rateReviewSchedule, RATE_SCHEDULES, 'adhoc'),
+    nextRateReviewAt: isoOrNull(row.nextRateReviewAt),
+    status: enumOr(row.status, CONTRACT_STATUSES, 'pending'),
+    notes: row.notes == null ? null : row.notes.slice(0, 4000),
+    sourceFileId: uuidOrNull(row.sourceFileId),
     sourceFileName: row.sourceFile?.name ?? null,
-    sourceExtractionId: row.sourceExtractionId,
+    sourceExtractionId: uuidOrNull(row.sourceExtractionId),
     fieldSources: buildFieldSources(row, extraction),
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    createdAt: isoOrNull(row.createdAt) ?? new Date(0).toISOString(),
+    updatedAt: isoOrNull(row.updatedAt) ?? new Date(0).toISOString(),
   };
 }
 
