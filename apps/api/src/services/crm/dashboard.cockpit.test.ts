@@ -98,9 +98,12 @@ describe('computeSignalCoverage', () => {
       },
       { dealsCapped: true, openDealCount: 40 },
     );
-    const action = health.factors?.find((factor) => factor.key === 'pipeline')?.recommendedAction;
-    expect(action).toContain('1 open deal');
-    expect(action).toContain('40 open deals are on the account.');
+    const pipeline = health.factors?.find((factor) => factor.key === 'pipeline');
+    expect(pipeline?.recommendedAction).toContain('1 open deal');
+    expect(pipeline?.recommendedAction).toContain('40 open deals are on the account.');
+    // WHY: one complete deal on the page would otherwise score the account pipeline at 100.
+    expect(pipeline?.scored).toBe(false);
+    expect(pipeline?.whatItMeasures).toContain('Not scored');
   });
 
   it('rewards a fully covered account with a strong composite', () => {
