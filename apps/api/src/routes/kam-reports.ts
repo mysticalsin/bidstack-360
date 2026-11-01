@@ -18,9 +18,17 @@ import {
 
 import { accessibleCompanyIds, assertCompanyVisible } from './kam-access.js';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const DAY_MS = 86_400_000;
+
+/** Exclusive end of the stale window. An activity this many UTC days old is included. */
+export function staleCutoff(days: number, now = Date.now()): Date {
+  const at = new Date(now);
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return new Date(today - (days - 1) * DAY_MS);
+}
+
 function staleThreshold(days: number): Date {
-  return new Date(Date.now() - days * DAY_MS);
+  return staleCutoff(days);
 }
 
 /** Whole UTC days since the last activity. Floor of the clock is a day short after noon. */
