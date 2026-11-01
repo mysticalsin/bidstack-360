@@ -312,21 +312,54 @@ function deriveCommittee(
 } {
   const contacts = cockpit.keyContacts.length;
   const influence = influenceProxyScore(cockpit.keyContacts);
-  const champions = cockpit.keyContacts.filter(
-    (person) => person.roleInDecision === 'champion',
-  ).length;
-  const buyers = cockpit.keyContacts.filter((person) => person.roleInDecision === 'buyer').length;
-  const summary =
-    champions > 0
-      ? t('commandCenter.committee.champions', '{{count}} champion mapped', { count: champions })
-      : buyers > 0
-        ? t('commandCenter.committee.buyers', '{{count}} buyer mapped', { count: buyers })
-        : contacts > 0
-          ? t('commandCenter.committee.stakeholders', '{{count}} stakeholder mapped', {
-              count: contacts,
-            })
-          : t('commandCenter.committee.empty', 'map buyer and champion');
+  const committee = committeeSummary(cockpit);
+  const summary = t(committee.key, committee.text, { count: committee.count });
   return { contacts, influence, summary };
+}
+
+/** Role counts from the loaded contacts. The five seats are the fallback. */
+export function committeeSummary(input: {
+  keyContacts: readonly { roleInDecision?: string | null }[];
+  championCount?: number;
+  buyerCount?: number;
+  contactsCapped?: boolean;
+}): { key: string; text: string; count: number } {
+  const champions =
+    input.championCount ??
+    input.keyContacts.filter((person) => person.roleInDecision === 'champion').length;
+  const buyers =
+    input.buyerCount ??
+    input.keyContacts.filter((person) => person.roleInDecision === 'buyer').length;
+  if (champions > 0) {
+    return {
+      count: champions,
+      key: input.contactsCapped
+        ? 'commandCenter.committee.championsPage'
+        : 'commandCenter.committee.champions',
+      text: input.contactsCapped
+        ? `${champions} champion on the loaded contacts`
+        : `${champions} champion mapped`,
+    };
+  }
+  if (buyers > 0) {
+    return {
+      count: buyers,
+      key: input.contactsCapped
+        ? 'commandCenter.committee.buyersPage'
+        : 'commandCenter.committee.buyers',
+      text: input.contactsCapped
+        ? `${buyers} buyer on the loaded contacts`
+        : `${buyers} buyer mapped`,
+    };
+  }
+  if (input.keyContacts.length > 0) {
+    return {
+      count: input.keyContacts.length,
+      key: 'commandCenter.committee.stakeholders',
+      text: `${input.keyContacts.length} stakeholder mapped`,
+    };
+  }
+  return { count: 0, key: 'commandCenter.committee.empty', text: 'map buyer and champion' };
 }
 
 /** A stored logo is one receipt. The number matches the sentence under it. */
