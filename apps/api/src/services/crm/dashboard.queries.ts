@@ -26,7 +26,9 @@ import {
   COCKPIT_CONTACT_PAGE,
   COCKPIT_OPP_PAGE,
   COCKPIT_TASK_PAGE,
+  REGISTER_DEAL_PAGE,
   microsText,
+  registerDealsAreCapped,
   type AccountPerformance,
 } from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
@@ -318,19 +320,23 @@ export async function resolveCockpitCompany(
   return buildCompanies(opportunities, []).find((c) => c.id === companyId) ?? null;
 }
 
-// ─── Per-company cockpit query ────────────────────────────────────────────────
+/** Latest deal ids for register counts. The 100-deal card is not this list. */
+export async function loadRegisterDealIds(
+  prismaClient: PrismaClient,
+  where: Prisma.OpportunityWhereInput,
+): Promise<{ ids: string[]; capped: boolean }> {
+  const rows = await prismaClient.opportunity.findMany({
+    where,
+    select: { id: true },
+    orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+    take: REGISTER_DEAL_PAGE,
+  });
+  const ids = rows.map((row) => row.id);
+  if (rows.length < REGISTER_DEAL_PAGE) return { ids, capped: false };
+  const total = await prismaClient.opportunity.count({ where });
+  return { ids, capped: registerDealsAreCapped(rows.length, total) };
+}
 
-/**
- * Lean per-company cockpit builder for GET /crm/companies/:id.
- *
- * WHY: The original handler called buildDashboardSnapshot (12 parallel queries,
- * ~1 000 rows) just to look up one company. This builds the same
- * AccountCockpitSnapshot using 7 targeted queries — it skips widgets,
- * bidOpportunities, insights, providers, queues, and releaseScore entirely,
- * and scopes opportunities, contacts, and tasks to the requested company.
- *
- * Returns null when the company cannot be found (caller should throw 404).
- */
 export const ISSUE_PAGE = 50;
 const RISK_OPEN = ['open', 'in_progress'] as const;
 const COMPLIANCE_OPEN = ['blocked', 'in_progress', 'not_started'] as const;
@@ -431,6 +437,10 @@ export async function loadAccountCompliance(
   return { ...page, compliantCount, complianceTotal, blockedCount };
 }
 
+/**
+ * Lean per-company cockpit for GET /crm/companies/:id.
+ * Returns null when the company cannot be found (caller should throw 404).
+ */
 export async function buildCompanyCockpit(
   orgId: string,
   companyId: string,
@@ -540,7 +550,8 @@ export async function buildCompanyCockpit(
     deletedAt: null,
     OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
   };
-  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders] = await Promise.all([
+  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders, registerDeals] =
+    await Promise.all([
     opportunities.length < COCKPIT_OPP_PAGE
       ? Promise.resolve(false)
       : prismaClient.opportunity.count({ where: opportunityWhere }).then((total) => total > COCKPIT_OPP_PAGE),
@@ -565,14 +576,14 @@ export async function buildCompanyCockpit(
           });
         })(),
     includeBuyingRoleContacts(orgId, company.id, contacts, prismaClient),
+    loadRegisterDealIds(prismaClient, opportunityWhere),
   ]);
   const cockpitContacts = [...contacts, ...roleHolders.extra];
 
-  const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
   const contactIds = cockpitContacts.map((contact) => contact.id);
-  const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
+  const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: registerDeals.ids } };
   const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
-    accountOpportunityIds.length === 0
+    registerDeals.ids.length === 0
       ? {
           rows: [],
           openCount: 0,
@@ -580,7 +591,7 @@ export async function buildCompanyCockpit(
           openBySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
         }
       : loadAccountRisks(prismaClient, registerWhere),
-    accountOpportunityIds.length === 0
+    registerDeals.ids.length === 0
       ? {
           rows: [],
           openCount: 0,
@@ -609,6 +620,7 @@ export async function buildCompanyCockpit(
     compliantCount: compliancePage.compliantCount,
     complianceTotal: compliancePage.complianceTotal,
     blockedCount: compliancePage.blockedCount,
+    registerDealsCapped: registerDeals.capped,
     risksCapped: riskPage.capped,
     complianceCapped: compliancePage.capped,
     buyingRoleFacts: buyingRoleFacts.rows,

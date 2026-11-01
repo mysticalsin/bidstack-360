@@ -161,6 +161,13 @@ function factor(
 export const COCKPIT_OPP_PAGE = 100;
 export const COCKPIT_CONTACT_PAGE = 20;
 export const COCKPIT_TASK_PAGE = 50;
+/** Deal ids the register may count. The cockpit card stays at COCKPIT_OPP_PAGE. */
+export const REGISTER_DEAL_PAGE = 1000;
+
+/** Older deals stay out of the register only after this page is full. */
+export function registerDealsAreCapped(loaded: number, total: number): boolean {
+  return loaded >= REGISTER_DEAL_PAGE && total > REGISTER_DEAL_PAGE;
+}
 
 export function computeSignalCoverage(
   input: {
@@ -632,6 +639,7 @@ export function buildCockpit({
   compliantCount,
   complianceTotal,
   blockedCount,
+  registerDealsCapped = false,
   risksCapped,
   complianceCapped,
   buyingRolesCapped = false,
@@ -727,6 +735,8 @@ export function buildCockpit({
   compliantCount?: number;
   complianceTotal?: number;
   blockedCount?: number;
+  /** Register counts stopped at REGISTER_DEAL_PAGE deal ids. */
+  registerDealsCapped?: boolean;
   risksCapped?: boolean;
   complianceCapped?: boolean;
   /** Accepted buying-role facts filled their page, so one role is not the whole set. */
@@ -967,7 +977,7 @@ export function buildCockpit({
     compliantCount,
     complianceTotal,
     blockedCount,
-    registerDealsCapped: coveragePages?.dealsCapped,
+    registerDealsCapped,
     risksCapped,
     complianceCapped,
     buyingRolesCapped,
