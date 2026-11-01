@@ -18,7 +18,7 @@ import {
   rewriteResponseHeaders,
 } from './protocol.js';
 
-const PREVIEW_INSTANCE = 'polo-v5';
+const PREVIEW_INSTANCE = 'polo-v6';
 
 const TEAM = 'https://tony-walteur.cloudflareaccess.com';
 let jwksCache = null;

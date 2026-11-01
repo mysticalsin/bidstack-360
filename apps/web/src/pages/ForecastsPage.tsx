@@ -315,6 +315,8 @@ export function ForecastsPage() {
           onNewForecast={() => setDialogOpen(true)}
           onSaveCell={handleSaveCell}
           onDeleteRow={(row) => void handleDeleteRow(row)}
+          canWrite={canWrite}
+          readOnlyHint={readOnlyHint}
         />
       </motion.div>
     </motion.div>

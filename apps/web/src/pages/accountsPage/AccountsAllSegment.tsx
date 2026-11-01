@@ -237,6 +237,9 @@ export function AccountsAllSegment() {
   }
 
   const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
+  const providers = dashboard.data.providerHealth;
+  const providerCount = providers.length;
+  const healthyProviders = providers.filter((provider) => provider.status === 'healthy').length;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;

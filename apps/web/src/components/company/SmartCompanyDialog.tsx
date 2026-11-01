@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { api } from '@/lib/api';
+import { api, buildApiUrl } from '@/lib/api';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { CompanyLookupResponse, CrmCompany } from '@bidstack/shared';
@@ -113,6 +113,14 @@ export function SmartCompanyDialog({ trigger }: Props) {
     preview: company ? null : publicPreview,
   });
   const confidencePercent = recordedConfidencePercent(company?.confidence);
+  const previewName = draft.name;
+  const resolving = lookup.isFetching || domainHit.isFetching;
+  const facts = [
+    publicPreview?.headquarters,
+    publicPreview?.industry,
+    publicPreview?.revenueLabel,
+    publicPreview?.employeeCount != null ? publicPreview.employeeCount.toLocaleString() : null,
+  ].filter((fact): fact is string => Boolean(fact));
   const proxiedLogo = logoProxyPath(draft.domain);
   const logoUrl = proxiedLogo ? buildApiUrl(proxiedLogo) : displayableLogoUrl(company?.logo?.url);
   const showLogo = Boolean(logoUrl) && brokenLogo !== logoUrl;
