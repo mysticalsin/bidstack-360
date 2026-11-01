@@ -177,6 +177,13 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
           </span>
         ))}
       </p>
+      {pulse.sources
+        .filter((s) => s.hint)
+        .map((s) => (
+          <p key={`hint-${s.id}`} className="sg-source-hint">
+            {s.hint}
+          </p>
+        ))}
     </section>
   );
 }

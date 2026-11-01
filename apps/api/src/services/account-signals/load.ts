@@ -13,6 +13,7 @@ import {
 } from '@bidstack/shared';
 
 import type { AccessScope } from '../../lib/access-scope.js';
+import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from './live-signals.js';
 import { scopedMeetingWhere } from '../../meeting-intel/access.js';
 
 const DAY = 86_400_000;
@@ -76,6 +77,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   const owner = new Map<string, string>();
   for (const [root, ids] of groups) for (const id of ids) owner.set(id, root);
   const all = [...owner.keys()];
+  const live = await companiesWithLiveSignals(orgId, all);
   const since = new Date(now.getTime() - 400 * DAY);
   const [opps, meetings, postings, events, firmo] = await Promise.all([
     prisma.opportunity.findMany({ where: { orgId, companyId: { in: all }, deletedAt: null }, select: OPP_SELECT, orderBy: { updatedAt: 'desc' }, take: TAKE }),
@@ -92,7 +94,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
       take: TAKE,
     }),
     prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: all }, status: { not: 'DISMISSED' }, occurredAt: { gte: since, lte: now } },
+      where: { orgId, companyId: { in: all }, status: { not: 'DISMISSED' }, occurredAt: { gte: since, lte: now }, ...hideSampleWhere(live) },
       select: { companyId: true, occurredAt: true, importance: true, severity: true, sentiment: true, implication: true, kind: true, sample: true },
       orderBy: { occurredAt: 'desc' },
       take: TAKE,
@@ -136,18 +138,20 @@ export function momentumFor(loaded: LoadedSignals | undefined, now: Date): Momen
 
 /** Watchdog sources and whether each one is feeding this account now. */
 export async function sourceStatus(orgId: string, companyId: string, env: Record<string, string | undefined> = process.env) {
-  const [subject, firmo, meetings] = await Promise.all([
-    prisma.accountWatchSubject.findFirst({ where: { orgId, companyId }, select: { enabled: true, secCik: true, companiesHouseNumber: true, irFeedUrl: true, identifiersConfirmedAt: true } }),
+  const [subject, firmo, meetings, company] = await Promise.all([
+    prisma.accountWatchSubject.findFirst({ where: { orgId, companyId }, select: { enabled: true, secCik: true, companiesHouseNumber: true, irFeedUrl: true, identifiersConfirmedAt: true, ticker: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { status: true, fetchedAt: true } }),
     prisma.meetingIntel.count({ where: { orgId, companyId, deletedAt: null } }),
+    prisma.company.findFirst({ where: { orgId, id: companyId }, select: { domain: true } }),
   ]);
+  const ids = newsIdentifiers(company?.domain, subject);
   const news = (env.WATCHDOG_NEWS_SOURCES ?? '').split(',').map((s) => s.trim());
   const confirmed = Boolean(subject?.enabled && subject.identifiersConfirmedAt);
   return [
     { id: 'crm', label: 'Deals and bids', active: true },
     { id: 'meetings', label: 'Meeting intel', active: meetings > 0 },
     { id: 'enrichment', label: 'Hiring and firmographics', active: Boolean(firmo?.fetchedAt) },
-    { id: 'news', label: 'News (GDELT, Google News)', active: news.includes('gdelt') || news.includes('google_news') },
+    { id: 'news', label: 'News (GDELT, Google News)', active: (news.includes('gdelt') || news.includes('google_news')) && !ids.hint, hint: ids.hint },
     { id: 'press', label: 'Company press feed', active: news.includes('company_rss') && Boolean(subject?.irFeedUrl) },
     { id: 'filings', label: 'Public filings', active: confirmed && Boolean(subject?.secCik || subject?.companiesHouseNumber) },
     { id: 'linkedin', label: 'LinkedIn updates (provider)', active: env.WATCHDOG_APIFY_LINKEDIN_ENABLED === 'true' && Boolean(env.APIFY_TOKEN) },

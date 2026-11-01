@@ -40,6 +40,16 @@ describe('AccountWatchdogSection', () => {
     expect(screen.getByText('No results dates announced')).toBeTruthy();
   });
 
+  it('says what to add when the account has no website or ticker for news (v22)', () => {
+    state.data = { ...base, news: { domain: null, ticker: null, hint: 'Add a website or stock ticker to this account to get news.' } };
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByTestId('wd-news-hint').textContent).toBe('Add a website or stock ticker to this account to get news.');
+    cleanup();
+    state.data = { ...base, news: { domain: 'acme.com', ticker: null, hint: null } };
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.queryByTestId('wd-news-hint')).toBeNull();
+  });
+
   const ev = (n: number, implication: 'RISK' | 'OPPORTUNITY' | 'NEUTRAL' = 'RISK') => ({
     id: `e${n}`, source: 'sec_edgar', kind: 'RESTRUCTURING', title: `8-K Item 2.05 exit costs ${n}`,
     summary: `Restructuring announced ${n}.`, sourceUrl: `https://www.sec.gov/${n}`, occurredAt: '2026-10-20T00:00:00Z',

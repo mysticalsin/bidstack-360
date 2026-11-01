@@ -162,10 +162,16 @@ function Signals({ data }: { data: AccountWatchdog }) {
   ) : setStatus.isError ? (
     <p className="wd-row-meta" role="alert">Couldn&apos;t update the signal. Try again.</p>
   ) : null;
+  const newsHint = data.news?.hint ? (
+    <p className="wd-news-hint" data-testid="wd-news-hint">
+      {data.news.hint}
+    </p>
+  ) : null;
   if (data.events.length === 0) {
     return (
       <>
       {undoBar}
+      {newsHint}
       <p className="wd-empty">
         <span>Nothing new in public filings</span>
         {data.monitoring.identifiers.length > 0
@@ -201,6 +207,7 @@ function Signals({ data }: { data: AccountWatchdog }) {
       </ul>
       <ShowMore total={data.events.length} shown={TOP_SIGNALS} open={all} onToggle={() => setAll((v) => !v)} noun="signals" controls={listId} />
       {undoBar}
+      {newsHint}
     </>
   );
 }

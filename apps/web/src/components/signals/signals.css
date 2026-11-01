@@ -96,6 +96,7 @@
 @keyframes sg-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .sg-contrib-bar { animation: none; } }
 .sg-sources { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 12px; color: var(--sg-muted); }
+.sg-source-hint { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--sg-ink, inherit); }
 .sg-source { display: inline-flex; align-items: center; gap: 6px; }
 .sg-source i { width: 6px; height: 6px; border-radius: 50%; background: var(--sg-line); box-shadow: inset 0 0 0 1px var(--sg-muted); }
 .sg-source[data-on='true'] i { background: var(--sg-pos); box-shadow: none; }

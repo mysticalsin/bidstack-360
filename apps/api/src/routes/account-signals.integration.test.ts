@@ -62,7 +62,7 @@ beforeAll(async () => {
       data: { orgId: o, companyId: c.acme!, source: 'gdelt', externalId: `${TAG}-${externalId}`, kind: kind as never, occurredAt: ago(days), title, sourceUrl: `https://news.example/${externalId}`, summary: title, implication: 'OPPORTUNITY', severity: 3, ...extra },
     });
   await ev('fund', 'FUNDING_ROUND', `${TAG} Acme raises $40M to scale its data platform`, 10, { importance: 85, sentiment: 0.8 });
-  await ev('launch', 'PRODUCT_LAUNCH', 'Sample: Acme launches a new customer app', 20, { importance: 55, sentiment: 0.5, sample: true, source: 'sample', sourceUrl: '' });
+  await ev('launch', 'PRODUCT_LAUNCH', 'Sample: Acme launches a new customer app', 20, { importance: 55, sentiment: 0.5, sample: true, source: 'sample', sourceUrl: '', companyId: c.child! });
   await ev('gone', 'NEWS_SIGNAL', 'Dismissed story', 5, { status: 'DISMISSED', importance: 90 });
   server = await buildServer();
   await server.ready();
@@ -161,5 +161,45 @@ describe('GET /portfolio/momentum', () => {
     expect(body.counts.gaining + body.counts.steady + body.counts.declining).toBe(body.accounts.length);
     expect(body.alerts[0].title).toBe(`${TAG} Acme raises $40M to scale its data platform`);
     expect(body.alerts.some((a: { title: string }) => a.title === 'Dismissed story')).toBe(false);
+  });
+});
+
+describe('v22 sample rows and news identifiers', () => {
+  it('hides sample rows once an account has a real one, and says what news needs', async () => {
+    const o = orgA.orgId;
+    const mk = (externalId: string, source: string, sample: boolean, days: number) =>
+      prisma.accountWatchEvent.create({
+        data: { orgId: o, companyId: c.quiet!, source, externalId: `${TAG}-${externalId}`, kind: 'NEWS_SIGNAL', occurredAt: ago(days), title: `${TAG} ${externalId}`, sourceUrl: '', summary: '', implication: 'NEUTRAL', severity: 2, importance: 50, sample },
+      });
+    await mk('q-sample', 'sample', true, 6);
+    let t = (await get(`/accounts/${c.quiet}/timeline`)).json();
+    expect(t.items.some((i: { title: string }) => i.title === `${TAG} q-sample`)).toBe(true);
+    const pulse = (await get(`/accounts/${c.quiet}/pulse`)).json();
+    const news = pulse.sources.find((s: { id: string }) => s.id === 'news');
+    expect(news.active).toBe(false);
+    expect(news.hint).toBe('Add a website or stock ticker to this account to get news.');
+
+    await mk('q-live', 'google_news', false, 3);
+    t = (await get(`/accounts/${c.quiet}/timeline`)).json();
+    expect(t.items.some((i: { title: string }) => i.title === `${TAG} q-sample`)).toBe(false);
+    expect(t.items.some((i: { title: string }) => i.title === `${TAG} q-live`)).toBe(true);
+    // Another account keeps its sample rows.
+    const acme = (await get(`/accounts/${c.acme}/timeline`)).json();
+    expect(acme.items.some((i: { sample: boolean }) => i.sample)).toBe(true);
+  });
+
+  it('turns news on once the account has a real website', async () => {
+    await prisma.company.update({ where: { id: c.quiet! }, data: { domain: 'quiet-co.com' } });
+    const prev = process.env.WATCHDOG_NEWS_SOURCES;
+    process.env.WATCHDOG_NEWS_SOURCES = 'google_news';
+    try {
+      const pulse = (await get(`/accounts/${c.quiet}/pulse`)).json();
+      const news = pulse.sources.find((s: { id: string }) => s.id === 'news');
+      expect(news.active).toBe(true);
+      expect(news.hint).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.WATCHDOG_NEWS_SOURCES;
+      else process.env.WATCHDOG_NEWS_SOURCES = prev;
+    }
   });
 });

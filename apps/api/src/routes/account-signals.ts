@@ -27,6 +27,7 @@ import { canReadAccount } from '../lib/account-access.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import { closedAtOf, groupMap, loadMomentumInputs, momentumFor, OPP_SELECT, sourceStatus } from '../services/account-signals/load.js';
+import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
 
 const DAY = 86_400_000;
 const params = z.object({ companyId: z.string().uuid() });
@@ -93,6 +94,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const from = new Date(now.getTime() - req.query.days * DAY);
       const to = new Date(now.getTime() + 90 * DAY);
       const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
+      const live = await companiesWithLiveSignals(orgId, ids);
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
@@ -110,7 +112,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 100,
         }),
         prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to } },
+          where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
           orderBy: { occurredAt: 'desc' },
           take: 300,
         }),
@@ -195,6 +197,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const scope = await getAccessScope(orgId, userId);
       const now = new Date();
       const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
+      const live = await companiesWithLiveSignals(orgId, ids);
       const [firmo, events, solutions, meetings] = await Promise.all([
         prisma.companyFirmographics.findFirst({ where: { orgId, companyId: company.id }, select: { projects: true } }),
         prisma.accountWatchEvent.findMany({
@@ -203,6 +206,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
             companyId: { in: ids },
             status: { not: 'DISMISSED' },
             occurredAt: { gte: new Date(now.getTime() - 365 * DAY) },
+            ...hideSampleWhere(live),
             kind: { in: ['STRATEGIC_INITIATIVE', 'PRODUCT_LAUNCH', 'FUNDING_ROUND', 'PARTNERSHIP', 'M_AND_A', 'LAYOFFS', 'RESTRUCTURING', 'HIRING_SPIKE'] },
           },
           orderBy: { occurredAt: 'desc' },
@@ -357,6 +361,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const groups = await groupMap(orgId, ids);
       const owner = new Map<string, string>();
       for (const [root, members] of groups) for (const m of members) owner.set(m, root);
+      const live = await companiesWithLiveSignals(orgId, [...owner.keys()]);
       const rows = owner.size
         ? await prisma.accountWatchEvent.findMany({
             where: {
@@ -364,6 +369,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
               companyId: { in: [...owner.keys()] },
               status: 'NEW',
               occurredAt: { gte: new Date(now.getTime() - 45 * DAY), lte: now },
+              ...hideSampleWhere(live),
               OR: [{ importance: { gte: 60 } }, { importance: 0, severity: { gte: 3 } }],
             },
             orderBy: [{ importance: 'desc' }, { occurredAt: 'desc' }],

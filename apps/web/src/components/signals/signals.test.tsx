@@ -31,7 +31,7 @@ const pulse: AccountPulse = {
   sample: true,
   sources: [
     { id: 'crm', label: 'Deals and bids', active: true },
-    { id: 'news', label: 'News (GDELT, Google News)', active: false },
+    { id: 'news', label: 'News (GDELT, Google News)', active: false, hint: 'Add a website or stock ticker to this account to get news.' },
   ],
   computedAt: '2026-10-31T00:00:00Z',
 };
@@ -48,6 +48,7 @@ describe('PulseView', () => {
     expect(screen.getByRole('img', { name: /Momentum over 13 weeks: from 60 to 72/ })).toBeTruthy();
     expect(screen.getByText('Sample')).toBeTruthy();
     expect(screen.getByText(/\(off\)/)).toBeTruthy();
+    expect(screen.getByText('Add a website or stock ticker to this account to get news.')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
   });
 
@@ -132,7 +133,7 @@ const port: PortfolioMomentum = {
   accounts: [
     { companyId: 'a', companyName: 'CI Financial', score: 88, delta: 15, trend: 'gaining', verdict: 'Gaining traction', topDriver: 'pipeline', openPipelineMicros: '0', series: [70, 80, 88], sample: true, coverage: 1 },
     { companyId: 'b', companyName: 'Mantu', score: 55, delta: 1, trend: 'steady', verdict: 'Holding steady', topDriver: null, openPipelineMicros: '0', series: [55, 55], sample: false, coverage: 1 },
-    { companyId: 'c', companyName: 'Example Corp', score: 40, delta: -12, trend: 'declining', verdict: 'Losing momentum \u2014 news', topDriver: 'news', openPipelineMicros: '0', series: [52, 40], sample: true, coverage: 1 },
+    { companyId: 'c', companyName: 'Example Corp', score: 40, delta: -12, trend: 'declining', verdict: 'High level, but down over 4 weeks \u2014 news', topDriver: 'news', openPipelineMicros: '0', series: [52, 40], sample: true, coverage: 1 },
   ],
   counts: { gaining: 1, steady: 1, declining: 1 },
   alerts: [
@@ -148,7 +149,7 @@ describe('Portfolio momentum', () => {
     // Biggest movers first in either direction: the decline is not buried.
     expect(within(list).getAllByRole('link').map((l) => l.textContent)).toEqual(['CI Financial', 'Example Corp', 'Mantu']);
     expect(screen.getByLabelText('+15 in 4 weeks')).toBeTruthy();
-    expect(screen.getByText('Losing momentum, news')).toBeTruthy();
+    expect(screen.getByText('High level, but down over 4 weeks, news')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /^Declining 1/ }));
     expect(within(screen.getByRole('list', { name: /ranked/ })).getAllByRole('link').map((l) => l.textContent)).toEqual(['Example Corp']);
     expect(screen.getByRole('link', { name: 'Example Corp' }).getAttribute('href')).toBe('/accounts/c');

@@ -6,6 +6,8 @@ export type WatchImplication = 'OPPORTUNITY' | 'RISK' | 'NEUTRAL';
 
 export interface AccountWatchdog {
   companyId: string;
+  /** v22: news runs only with a real website or confirmed ticker. */
+  news?: { domain: string | null; ticker: string | null; hint: string | null };
   monitoring: {
     enabled: boolean;
     identifiers: string[];

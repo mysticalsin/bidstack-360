@@ -60,6 +60,19 @@ const ev = (o: string, c: string, externalId: string, occurredAt: string, extra:
 });
 
 describe('GET /accounts/:companyId/watchdog', () => {
+  skipIfNoDb('v22: hides sample rows once a real row exists and ignores reserved domains', async () => {
+    const company = await prisma.company.create({ data: { orgId: orgId!, name: `Sample Co ${Date.now()}`, domain: 'example.org' } });
+    await prisma.accountWatchEvent.create({ data: ev(orgId!, company.id, `S-${company.id}`, '2026-10-20T00:00:00Z', { source: 'sample', sample: true, title: 'Sample: thing' }) });
+    let body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${company.id}/watchdog` })).json();
+    expect(body.news.hint).toBe('Add a website or stock ticker to this account to get news.');
+    expect(body.events.map((e: { sample: boolean }) => e.sample)).toEqual([true]);
+    await prisma.company.update({ where: { id: company.id }, data: { domain: 'https://www.sample-co.com/about' } });
+    await prisma.accountWatchEvent.create({ data: ev(orgId!, company.id, `L-${company.id}`, '2026-10-21T00:00:00Z', { source: 'google_news', title: 'Real story' }) });
+    body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${company.id}/watchdog` })).json();
+    expect(body.news).toEqual({ domain: 'sample-co.com', ticker: null, hint: null });
+    expect(body.events.map((e: { title: string }) => e.title)).toEqual(['Real story']);
+  });
+
   skipIfNoDb('reports honest monitoring status, newest-first events, future earnings and the merged history', async () => {
     const company = await prisma.company.create({ data: { orgId: orgId!, name: `Watch Co ${Date.now()}` } });
     // Unconfirmed identifiers: not reported as monitoring.
@@ -74,6 +87,8 @@ describe('GET /accounts/:companyId/watchdog', () => {
       lastCheckedAt: null,
       lastError: null,
     });
+    // v22: unconfirmed ticker and no website means no news, with a hint.
+    expect(res.json().news).toEqual({ domain: null, ticker: null, hint: 'Add a website or stock ticker to this account to get news.' });
 
     const checked = new Date('2026-10-31T09:00:00.000Z');
     await prisma.accountWatchSubject.update({
@@ -103,6 +118,7 @@ describe('GET /accounts/:companyId/watchdog', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.monitoring).toMatchObject({ enabled: true, lastCheckedAt: checked.toISOString(), lastError: 'Companies House rate limited (429)' });
+    expect(body.news).toEqual({ domain: null, ticker: 'WTC', hint: null });
     expect(body.events.map((e: { title: string }) => e.title)).toEqual(['Filing NEWEST', 'Filing MID', 'Filing OLD']);
     expect(body.events[0]).toMatchObject({ implication: 'RISK', severity: 5, implicationRationale: 'Insolvency filing.', status: 'NEW' });
     expect(body.earnings.map((d: { fiscalPeriod: string }) => d.fiscalPeriod)).toEqual(['FY2026-Q4']);

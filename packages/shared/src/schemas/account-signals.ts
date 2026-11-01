@@ -658,7 +658,8 @@ export const AccountPulse = z.object({
   /** True when any input is demo data. */
   sample: z.boolean(),
   /** What the watchdog is listening to right now. */
-  sources: z.array(z.object({ id: z.string(), label: z.string(), active: z.boolean() })),
+  // v22: hint says what to add when a source cannot run (news needs a website or ticker).
+  sources: z.array(z.object({ id: z.string(), label: z.string(), active: z.boolean(), hint: z.string().nullable().optional() })),
   computedAt: Iso,
 });
 export type AccountPulse = z.infer<typeof AccountPulse>;

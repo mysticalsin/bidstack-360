@@ -9,6 +9,7 @@ import { prisma, type Prisma } from '@bidstack/db';
 import { categoryForKind, enrichmentWatchRows, importanceScore, stripSamplePrefix } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from '../services/account-signals/live-signals.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 
 const Implication = z.enum(['OPPORTUNITY', 'RISK', 'NEUTRAL']);
@@ -61,6 +62,8 @@ const HistoryItem = z.object({
 
 export const AccountWatchdogResponse = z.object({
   companyId: z.string(),
+  // v22: news runs only with a real website or a confirmed ticker; hint says what to add.
+  news: z.object({ domain: z.string().nullable(), ticker: z.string().nullable(), hint: z.string().nullable() }),
   monitoring: z.object({
     enabled: z.boolean(),
     identifiers: z.array(z.string()),
@@ -172,6 +175,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const names = new Map(companies.map((c) => [c.id, c.name]));
       const ids = [...names.keys()];
+      const hide = hideSampleWhere(await companiesWithLiveSignals(orgId, ids));
       const now = new Date();
       const until = new Date(now.getTime() + days * 86_400_000);
       const heatFrom = new Date(now.getTime() - HEAT_WEEKS * WEEK_MS);
@@ -182,13 +186,13 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 12,
         }),
         prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId: { in: ids }, status: 'NEW' },
+          where: { orgId, companyId: { in: ids }, status: 'NEW', ...hide },
           orderBy: [{ importance: 'desc' }, { severity: 'desc' }, { occurredAt: 'desc' }],
           take: 5,
         }),
-        prisma.accountWatchEvent.count({ where: { orgId, companyId: { in: ids }, status: 'NEW' } }),
+        prisma.accountWatchEvent.count({ where: { orgId, companyId: { in: ids }, status: 'NEW', ...hide } }),
         prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId: { in: ids }, occurredAt: { gte: heatFrom, lte: now } },
+          where: { orgId, companyId: { in: ids }, occurredAt: { gte: heatFrom, lte: now }, ...hide },
           select: { companyId: true, occurredAt: true, implication: true },
           take: 1000,
         }),
@@ -256,7 +260,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
       const { companyId } = req.params;
       const company = await prisma.company.findFirst({
         where: { id: companyId, orgId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, domain: true },
       });
       if (!company) throw server.httpErrors.notFound('Account not found');
       const access = await canReadAccount({ orgId, userId, companyId, accountName: company.name });
@@ -270,7 +274,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
       const [subject, events, earnings, closed] = await Promise.all([
         prisma.accountWatchSubject.findFirst({ where: { orgId, companyId } }),
         prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId, status: { not: 'DISMISSED' } },
+          where: { orgId, companyId, status: { not: 'DISMISSED' }, ...hideSampleWhere(await companiesWithLiveSignals(orgId, [companyId])) },
           orderBy: { occurredAt: 'desc' },
           take: 50,
         }),
@@ -325,6 +329,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
 
       return {
         companyId,
+        news: newsIdentifiers(company.domain, subject),
         monitoring: {
           enabled: Boolean(subject?.enabled && subject.identifiersConfirmedAt),
           identifiers,
