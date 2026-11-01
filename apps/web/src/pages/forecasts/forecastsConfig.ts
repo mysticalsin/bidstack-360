@@ -105,6 +105,8 @@ export function matchesPeriodFilter(period: string, filter: PeriodFilter): boole
 
 export type ChartDatum = {
   period: string;
+  /** XXX is the unspecified book. A recorded currency is its own series. */
+  currency: string;
   pipeline: string;
   bestCase: string;
   commit: string;
@@ -115,29 +117,46 @@ function addMicros(left: string, right: string): string {
   return (BigInt(left) + BigInt(right)).toString();
 }
 
-/** Aggregate ForecastRows into per-period totals for the bar chart. */
+const CHART_FIELD: Record<Forecast['category'], keyof Pick<ChartDatum, 'pipeline' | 'bestCase' | 'commit' | 'closed'>> =
+  {
+    pipeline: 'pipeline',
+    best_case: 'bestCase',
+    commit: 'commit',
+    closed: 'closed',
+  };
+
+function chartCurrency(currency: string | undefined): string {
+  if (isUnspecifiedForecastCurrency(currency)) return 'XXX';
+  return (currency ?? 'XXX').trim().toUpperCase();
+}
+
+/** One stacked bar per period and currency. A dollar commit is not drawn as unspecified. */
 export function buildChartData(rows: ForecastRow[]): ChartDatum[] {
-  const byPeriod = new Map<string, ChartDatum>();
+  const byKey = new Map<string, ChartDatum>();
   for (const row of rows) {
-    const existing = byPeriod.get(row.period);
-    const chartAmount = (category: Forecast['category'], amount: string) =>
-      row.ids[category] && !isUnspecifiedForecastCurrency(row.currencies[category]) ? '0' : amount;
-    if (existing) {
-      existing.pipeline = addMicros(existing.pipeline, chartAmount('pipeline', row.pipeline));
-      existing.bestCase = addMicros(existing.bestCase, chartAmount('best_case', row.bestCase));
-      existing.commit = addMicros(existing.commit, chartAmount('commit', row.commit));
-      existing.closed = addMicros(existing.closed, chartAmount('closed', row.closed));
-    } else {
-      byPeriod.set(row.period, {
-        period: row.period,
-        pipeline: chartAmount('pipeline', row.pipeline),
-        bestCase: chartAmount('best_case', row.bestCase),
-        commit: chartAmount('commit', row.commit),
-        closed: chartAmount('closed', row.closed),
-      });
+    for (const category of CATEGORIES) {
+      if (!row.ids[category]) continue;
+      const code = chartCurrency(row.currencies[category]);
+      const key = `${row.period}|${code}`;
+      let datum = byKey.get(key);
+      if (!datum) {
+        datum = {
+          period: row.period,
+          currency: code,
+          pipeline: '0',
+          bestCase: '0',
+          commit: '0',
+          closed: '0',
+        };
+        byKey.set(key, datum);
+      }
+      const field = CHART_FIELD[category];
+      datum[field] = addMicros(datum[field], row[field]);
     }
   }
-  return Array.from(byPeriod.values()).sort((a, b) => a.period.localeCompare(b.period));
+  return Array.from(byKey.values()).sort(
+    (a, b) => a.period.localeCompare(b.period) || a.currency.localeCompare(b.currency),
+  );
 }
 
 export function sumForecastMicros(...amounts: string[]): bigint {

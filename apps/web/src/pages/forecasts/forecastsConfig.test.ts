@@ -55,8 +55,10 @@ describe('forecast grouping', () => {
     ]);
     expect(rows[0]?.currencies.commit).toBe('USD');
     expect(forecastRowTotalCurrency(rows[0]!)).toBe('mixed');
-    expect(buildChartData(rows)[0]?.commit).toBe('0');
-    expect(buildChartData(rows)[0]?.pipeline).toBe('1000000');
+    const series = buildChartData(rows);
+    expect(series.find((datum) => datum.currency === 'USD')?.commit).toBe(micros);
+    expect(series.find((datum) => datum.currency === 'XXX')?.pipeline).toBe('1000000');
+    expect(series.find((datum) => datum.currency === 'XXX')?.commit).toBe('0');
     const label = formatForecastAmount(micros, 'usd');
     expect(label).toContain('9,007,199,254,740,993');
     expect(label).toContain('$');

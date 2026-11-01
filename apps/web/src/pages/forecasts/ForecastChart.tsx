@@ -12,20 +12,32 @@ import {
   CATEGORIES,
   CATEGORY_COLOR,
   CATEGORY_LABELS,
+  formatForecastAmount,
   sumForecastMicros,
   type ChartDatum,
 } from './forecastsConfig';
 
 interface ForecastChartProps {
   chartData: ChartDatum[];
-  maxTotal: string;
-  formatMoneyMicros: (micros: string) => string;
 }
 
-export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: ForecastChartProps) {
+function seriesMax(series: ChartDatum[]): string {
+  return series.reduce((max, datum) => {
+    const total = sumForecastMicros(datum.pipeline, datum.bestCase, datum.commit, datum.closed).toString();
+    return compareMicros(total, max) > 0 ? total : max;
+  }, '0');
+}
+
+export function ForecastChart({ chartData }: ForecastChartProps) {
   const { t } = useTranslation('crm');
 
   if (chartData.length === 0) return null;
+
+  const currencies = [...new Set(chartData.map((datum) => datum.currency))].sort((a, b) => {
+    if (a === 'XXX') return -1;
+    if (b === 'XXX') return 1;
+    return a.localeCompare(b);
+  });
 
   return (
     <div className="hidden md:block">
@@ -34,45 +46,64 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
           title={t('forecastChart.title', 'Forecast Breakdown')}
           caption={t('forecastChart.caption', 'Stacked by category across periods')}
         />
-        <div className="px-5 pb-5 pt-2">
-          <div className="flex items-end gap-4" style={{ height: 220 }}>
-            {chartData.map((d) => {
-              const total = sumForecastMicros(d.pipeline, d.bestCase, d.commit, d.closed).toString();
-              const heightPct = microsSharePercent(total, maxTotal);
-              return (
-                <div key={d.period} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="flex w-full flex-1 items-end justify-center">
-                    <div
-                      className="flex w-12 flex-col-reverse overflow-hidden rounded-md"
-                      style={{ height: `${Math.max(heightPct, 0)}%` }}
-                      role="img"
-                      aria-label={`${d.period}: ${formatMoneyMicros(total)}`}
-                    >
-                      {CATEGORIES.map((cat) => {
-                        const val = d[cat === 'best_case' ? 'bestCase' : cat];
-                        const catPct = microsSharePercent(val, total);
-                        return (
+        <div className="space-y-6 px-5 pb-5 pt-2">
+          {currencies.map((code) => {
+            const series = chartData.filter((datum) => datum.currency === code);
+            const maxTotal = seriesMax(series);
+            const showHeading = code !== 'XXX' || currencies.length > 1;
+            const heading =
+              code === 'XXX' ? t('forecastChart.unspecified', 'Unspecified') : code;
+            return (
+              <div key={code} aria-label={heading}>
+                {showHeading ? (
+                  <p className="mb-2 text-xs font-medium text-[var(--fg-secondary)]">{heading}</p>
+                ) : null}
+                <div className="flex items-end gap-4" style={{ height: 220 }}>
+                  {series.map((datum) => {
+                    const total = sumForecastMicros(
+                      datum.pipeline,
+                      datum.bestCase,
+                      datum.commit,
+                      datum.closed,
+                    ).toString();
+                    const heightPct = microsSharePercent(total, maxTotal);
+                    return (
+                      <div key={datum.period} className="flex flex-1 flex-col items-center gap-2">
+                        <div className="flex w-full flex-1 items-end justify-center">
                           <div
-                            key={cat}
-                            style={{
-                              height: `${Math.max(catPct, 0)}%`,
-                              backgroundColor: CATEGORY_COLOR[cat],
-                              minHeight: compareMicros(val, 0) > 0 ? 2 : 0,
-                            }}
-                            title={`${CATEGORY_LABELS[cat]}: ${formatMoneyMicros(val)}`}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-medium text-[var(--fg-tertiary)]">
-                    {d.period}
-                  </span>
+                            className="flex w-12 flex-col-reverse overflow-hidden rounded-md"
+                            style={{ height: `${Math.max(heightPct, 0)}%` }}
+                            role="img"
+                            aria-label={`${datum.period}: ${formatForecastAmount(total, code)}`}
+                          >
+                            {CATEGORIES.map((cat) => {
+                              const val = datum[cat === 'best_case' ? 'bestCase' : cat];
+                              const catPct = microsSharePercent(val, total);
+                              return (
+                                <div
+                                  key={cat}
+                                  style={{
+                                    height: `${Math.max(catPct, 0)}%`,
+                                    backgroundColor: CATEGORY_COLOR[cat],
+                                    minHeight: compareMicros(val, 0) > 0 ? 2 : 0,
+                                  }}
+                                  title={`${CATEGORY_LABELS[cat]}: ${formatForecastAmount(val, code)}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-medium text-[var(--fg-tertiary)]">
+                          {datum.period}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+              </div>
+            );
+          })}
+          <div className="flex flex-wrap items-center justify-center gap-4">
             {CATEGORIES.map((cat) => (
               <div key={cat} className="flex items-center gap-1.5">
                 <span

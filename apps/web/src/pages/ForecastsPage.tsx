@@ -55,17 +55,6 @@ export function ForecastsPage() {
 
   const rows = useMemo(() => groupForecasts(filteredItems), [filteredItems]);
   const chartData = useMemo(() => buildChartData(rows), [rows]);
-  const maxTotal = useMemo(() => {
-    return chartData.reduce((max, datum) => {
-      const total = (
-        BigInt(datum.pipeline) +
-        BigInt(datum.bestCase) +
-        BigInt(datum.commit) +
-        BigInt(datum.closed)
-      ).toString();
-      return BigInt(total) > BigInt(max) ? total : max;
-    }, '0');
-  }, [chartData]);
 
   // Headline totals for the selected period — so the page answers "what's the
   // number?" in one glance, led by Commit (the figure the bid team is held to).
@@ -302,11 +291,7 @@ export function ForecastsPage() {
 
       {/* ── Chart (desktop only; returns null when empty) ── */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
-        <ForecastChart
-          chartData={chartData}
-          maxTotal={maxTotal}
-          formatMoneyMicros={formatMoneyMicros}
-        />
+        <ForecastChart chartData={chartData} />
       </motion.div>
 
       {/* ── List ── */}
