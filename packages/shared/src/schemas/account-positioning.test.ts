@@ -220,6 +220,24 @@ describe('composeBrief', () => {
     };
     expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 100 news items and meetings');
   });
+
+  it('says when the already-sold check is a page of solutions', () => {
+    // WHY: a solution past the first 100 left the theme looking unsold.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 0, openMicros: '0', won24m: 0, lost24m: 0 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+      solutionsCapped: true,
+    };
+    expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 100 solutions');
+  });
 });
 
 describe('labels', () => {
