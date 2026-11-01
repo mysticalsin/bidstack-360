@@ -28,10 +28,15 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { springSnap, springSoft } from '@/lib/motion';
-import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecified-currency';
+import {
+  formatUnspecifiedAmount,
+  microsSharePercent,
+  recordedMicros,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '../unspecified-currency';
 
 import { closedOutcome } from '@/lib/pipeline-stages';
-import { formatMicrosAmount, unitsToMicros, type Opportunity } from '@bidstack/shared';
+import { formatMicrosAmount, microsToUnits, unitsToMicros, type Opportunity } from '@bidstack/shared';
 
 // Must match ClosingThisWeekCard's filter exactly so React Query serves both
 // widgets from a single fetch (object keys are hashed order-independently).
@@ -74,7 +79,6 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
     limit: CLOSING_FETCH_LIMIT,
   });
 
-  const money = (value: number) => formatUnspecifiedAmount(value);
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);
   const closingValue = closingStakeMicros(closingItems);
   const winRate = deriveWinRate(report.data);
@@ -88,7 +92,6 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
     closingValue,
     closingPending: closing.isLoading,
     closingFailed: closing.isError,
-    money,
     t,
   });
 
@@ -249,7 +252,6 @@ interface SignalInputs {
   closingValue: bigint;
   closingPending: boolean;
   closingFailed: boolean;
-  money: (value: number) => string;
   t: TFunction;
 }
 
@@ -321,15 +323,24 @@ function closingSignal(inputs: SignalInputs): HeroSignal {
   };
 }
 
-function weightedSignal({ report, reportPending, money, t }: SignalInputs): HeroSignal {
-  const coverage =
-    report && report.totalValueOpen > 0
-      ? Math.round((report.weightedPipeline / report.totalValueOpen) * 100)
-      : 0;
+function weightedAmount(micros: bigint): string {
+  const value = micros > 0n ? micros : 0n;
+  if (value / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) return formatMicrosAmount(value);
+  return formatUnspecifiedAmount(microsToUnits(value));
+}
+
+function weightedSignal({ report, reportPending, t }: SignalInputs): HeroSignal {
+  const openMicros = report
+    ? recordedMicros(report.totalValueOpen, report.totalValueOpenMicros)
+    : 0n;
+  const weightedMicros = report
+    ? recordedMicros(report.weightedPipeline, report.weightedPipelineMicros)
+    : 0n;
+  const coverage = openMicros > 0n ? Math.round(microsSharePercent(weightedMicros, openMicros)) : 0;
   return {
     key: 'weighted',
     label: t('orgHero.signal.weighted.label', 'Weighted pipeline'),
-    display: report ? money(report.weightedPipeline) : '—',
+    display: report ? weightedAmount(weightedMicros) : '—',
     detail: report
       ? t('orgHero.signal.weighted.detail', '{{pct}}% of gross open value', { pct: coverage })
       : t('orgHero.signal.unavailable', 'report unavailable'),

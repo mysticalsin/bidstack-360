@@ -5,7 +5,9 @@ export interface PipelineReport {
   byStage: { stage: string; count: number; valueSum: number; valueSumMicros?: string }[];
   totalOpen: number;
   totalValueOpen: number;
+  totalValueOpenMicros?: string;
   weightedPipeline: number;
+  weightedPipelineMicros?: string;
   velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
 }
 

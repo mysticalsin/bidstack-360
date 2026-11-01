@@ -19,7 +19,9 @@ const PipelineKpis = z.object({
   ),
   totalOpen: z.number().int(),
   totalValueOpen: z.number(),
+  totalValueOpenMicros: z.string(),
   weightedPipeline: z.number(),
+  weightedPipelineMicros: z.string(),
   velocity: z.object({
     avgDaysOpen: z.number().nullable(),
     closedThisQuarter: z.number().int(),

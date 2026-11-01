@@ -7,7 +7,9 @@ export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number; valueSumMicros: string }>;
   totalOpen: number;
   totalValueOpen: number;
+  totalValueOpenMicros: string;
   weightedPipeline: number;
+  weightedPipelineMicros: string;
   velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
 }
 
@@ -18,13 +20,12 @@ function weightedMicrosFromText(value: string | null | undefined): bigint {
   return BigInt(whole);
 }
 
-/** Round to the cent in integer micros, then convert. Float rounding moves this amount by one cent. */
-function unitsRoundedToCents(micros: bigint): number {
+/** Round to the cent in integer micros. Float rounding moves this amount by one cent. */
+function roundToCentMicros(micros: bigint): bigint {
   const negative = micros < 0n;
   const abs = negative ? -micros : micros;
-  const cents = (abs + 5_000n) / 10_000n;
-  const rounded = cents * 10_000n;
-  return microsToUnits(negative ? -rounded : rounded);
+  const rounded = ((abs + 5_000n) / 10_000n) * 10_000n;
+  return negative ? -rounded : rounded;
 }
 
 function asMicros(value: bigint | number | null | undefined): bigint {
@@ -144,15 +145,22 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
           AND (ps.is_lost OR ps.is_won)
       )
   `);
-  const weighted = unitsRoundedToCents(weightedMicrosFromText(agg?.weightedMicros));
+  const weightedMicros = roundToCentMicros(weightedMicrosFromText(agg?.weightedMicros));
+  const weighted = microsToUnits(weightedMicros);
+  const openMicros = [...sums.entries()].reduce((sum, [stage, row]) => {
+    if (row.count <= 0 || stage === 'closed_won' || stage === 'closed_lost') return sum;
+    return sum + (row.micros > 0n ? row.micros : 0n);
+  }, 0n);
   const avgDaysOpen =
     agg && agg.openCount > 0 && agg.avgDaysOpen != null ? Math.round(agg.avgDaysOpen) : null;
 
   return {
     byStage,
     totalOpen: open.reduce((acc, s) => acc + s.count, 0),
-    totalValueOpen: open.reduce((acc, s) => acc + s.valueSum, 0),
+    totalValueOpen: microsToUnits(openMicros),
+    totalValueOpenMicros: openMicros.toString(),
     weightedPipeline: weighted,
+    weightedPipelineMicros: weightedMicros.toString(),
     velocity: { avgDaysOpen, closedThisQuarter },
   };
 }

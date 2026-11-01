@@ -128,6 +128,7 @@ describe('OrgCommandHero', () => {
     expect(screen.getByText(/50,000 at stake/)).toBeDefined();
     // Weighted coverage = 200k / 500k = 40% of the gross open value.
     expect(screen.getByText('40% of gross open value')).toBeDefined();
+    expect(screen.getByText('200,000')).toBeDefined();
     // Velocity footer surfaces the report's real numbers, rounded.
     expect(screen.getByText('21 days')).toBeDefined();
     expect(screen.getByText('2 of 12 tasks')).toBeDefined();
@@ -157,6 +158,29 @@ describe('OrgCommandHero', () => {
     render(<OrgCommandHero summary={summary} />);
     expect(screen.getByText(/8,598,204,328,457\.18 at stake/)).toBeDefined();
     expect(screen.queryByText(/457\.19 at stake/)).toBeNull();
+  });
+
+  it('prints a weighted total from micros when the unit number collapses', () => {
+    // WHY: format of the unit number showed 9,007,199,254,740,992. The stored
+    // weighted total is one unit higher.
+    const units = 9007199254740993n;
+    const micros = (units * 1_000_000n).toString();
+    mockQueries({
+      reportState: {
+        data: {
+          ...report,
+          totalValueOpen: Number(units),
+          totalValueOpenMicros: micros,
+          weightedPipeline: Number(units),
+          weightedPipelineMicros: micros,
+        },
+        isLoading: false,
+        isError: false,
+      },
+    });
+    render(<OrgCommandHero summary={summary} />);
+    expect(screen.getByText('9,007,199,254,740,993')).toBeDefined();
+    expect(screen.queryByText('9,007,199,254,740,992')).toBeNull();
   });
 
   it('skeletons the report-backed signals while the pipeline report loads', () => {

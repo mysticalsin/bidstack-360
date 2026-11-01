@@ -51,6 +51,7 @@ describe('getPipelineKpis money precision', () => {
     expect(result.byStage[0]!.valueSumMicros).toBe(bigSumMicros.toString());
     // `proposal` is an open stage, so the rollup must be exact too.
     expect(result.totalValueOpen).toBe(600_000_000_001);
+    expect(result.totalValueOpenMicros).toBe(bigSumMicros.toString());
     expect(result.velocity.avgDaysOpen).toBeNull();
     // Sanity: the naive Number(bigint)/1e6 path would have produced a value that
     // is strictly not equal to the exact result — guards the test's own premise.
@@ -85,6 +86,24 @@ describe('getPipelineKpis money precision', () => {
     });
     expect(result.totalOpen).toBe(1);
     expect(result.totalValueOpen).toBe(1);
+    expect(result.totalValueOpenMicros).toBe('1000000');
+  });
+
+  it('sums open stages as integer micros when their unit numbers collapse', async () => {
+    // WHY: adding the converted unit numbers made this open book one unit low.
+    const smaller = 9007199254740992n * 1_000_000n;
+    const larger = 9007199254740993n * 1_000_000n;
+    opportunityGroupBy
+      .mockResolvedValueOnce([
+        { stage: 'proposal', _count: { _all: 1 }, _sum: { valueMicros: smaller } },
+        { stage: 'negotiation', _count: { _all: 1 }, _sum: { valueMicros: larger } },
+      ])
+      .mockResolvedValue([]);
+
+    const result = await getPipelineKpis('org-1');
+
+    expect(result.totalValueOpenMicros).toBe((smaller + larger).toString());
+    expect(Number(9007199254740993n) + Number(9007199254740993n)).toBe(18_014_398_509_481_984);
   });
 
   it('scopes the groupBy query to the caller org and excludes soft-deleted rows', async () => {
