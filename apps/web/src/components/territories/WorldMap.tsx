@@ -234,8 +234,6 @@ interface WorldMapProps {
   className?: string;
   onCountryClick?: (item: TerritoryAnalyticsItem) => void;
   selectedCountryCode?: string | null;
-  /** Opportunities do not store a currency. Only pass true when the micros are known EUR. */
-  currencyKnown?: boolean;
 }
 
 export const WorldMap = memo(function WorldMap({
