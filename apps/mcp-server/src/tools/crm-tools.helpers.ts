@@ -5,7 +5,7 @@
  * Import via crm-tools.ts (consumed internally, not re-exported to callers).
  */
 import { prisma, type Prisma } from '@bidstack/db';
-import { microsToUnits, unitsTextToMicros } from '@bidstack/shared';
+import { microsToUnits, unitsTextToMicros, unitsToMicros } from '@bidstack/shared';
 
 export async function mintNextCode(orgId: string): Promise<string> {
   const last = await prisma.opportunity.findFirst({
@@ -57,10 +57,7 @@ export async function pipelineStageIdForStageChange(
 export function outcomeWhere(outcome: 'open' | 'won' | 'lost'): Prisma.OpportunityWhereInput {
   if (outcome === 'lost') {
     return {
-      OR: [
-        { stage: 'closed_lost' },
-        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
-      ],
+      OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
     };
   }
   if (outcome === 'won') {
@@ -100,11 +97,12 @@ export function dealOutcome(deal: {
 
 /** Integer micros to units. A float division moves a large amount by one cent. */
 export function dealValueUnits(valueMicros: bigint | number | unknown): number {
-  if (typeof valueMicros === 'bigint' || typeof valueMicros === 'number') return microsToUnits(valueMicros);
+  if (typeof valueMicros === 'bigint' || typeof valueMicros === 'number')
+    return microsToUnits(valueMicros);
   return 0;
 }
 
-/** Unit amount to stored micros. A string keeps a large remainder; a number still rounds. */
+/** Unit amount to stored micros. A string keeps a large remainder. A JSON number is exact only while it is a safe integer of units. */
 export function valueToMicros(value: number | string): bigint {
   if (typeof value === 'string') {
     const parsed = unitsTextToMicros(value);
@@ -113,7 +111,10 @@ export function valueToMicros(value: number | string): bigint {
     }
     return parsed;
   }
-  return BigInt(Math.round(value * 1_000_000));
+  const micros = unitsToMicros(value);
+  if (micros == null)
+    throw new Error('value is too large to store as a JSON number; send the amount as text');
+  return micros;
 }
 
 /** Integer micros for Dust. The unit number cannot keep a large cent. */
@@ -178,9 +179,10 @@ export function isCompanyUuid(value: string): boolean {
 }
 
 /** One company, or a refusal. A name that matches none or several is not a link. */
-export function uniqueCompanyLink(
-  matches: readonly { id: string; name: string }[],
-): { id: string; name: string } {
+export function uniqueCompanyLink(matches: readonly { id: string; name: string }[]): {
+  id: string;
+  name: string;
+} {
   if (matches.length === 1 && matches[0]) return matches[0];
   throw new Error('Pass a company id. A name is not a company link unless it matches one company.');
 }

@@ -7,7 +7,9 @@ describe('valueToMicros', () => {
     // WHY: a JSON number cannot carry this remainder into the create call.
     expect(valueToMicros('8598204328457.184962')).toBe(8_598_204_328_457_184_962n);
     expect(valueToMicros(2)).toBe(2_000_000n);
+    expect(valueToMicros(54_857_000_000)).toBe(54_857_000_000_000_000n);
     expect(() => valueToMicros('nope')).toThrow(/6 decimal places/);
+    expect(() => valueToMicros(Number.MAX_SAFE_INTEGER + 2)).toThrow(/JSON number/);
   });
 });
 

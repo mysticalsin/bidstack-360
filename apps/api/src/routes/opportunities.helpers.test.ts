@@ -8,6 +8,7 @@ describe('patchedValueMicros', () => {
     const micros = '8598204328457184962';
     expect(patchedValueMicros({ value: 1, valueMicros: micros })).toBe(BigInt(micros));
     expect(patchedValueMicros({ value: 2 })).toBe(2_000_000n);
+    expect(patchedValueMicros({ value: 54_857_000_000 })).toBe(54_857_000_000_000_000n);
     expect(patchedValueMicros({})).toBeUndefined();
   });
 });

@@ -5,7 +5,7 @@
  * and are used from create, import, and lead conversion handlers.
  */
 import { Prisma } from '@bidstack/db';
-import { normalizeName } from '@bidstack/shared';
+import { normalizeName, unitsToMicros } from '@bidstack/shared';
 
 type MaxOpportunityCodeRow = {
   maxCode: number | bigint | null;
@@ -82,10 +82,7 @@ export function excludeClosedOutcome(): Prisma.OpportunityWhereInput {
 export function wonOutcomeWhere(): Prisma.OpportunityWhereInput {
   return {
     NOT: {
-      OR: [
-        { stage: 'closed_lost' },
-        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
-      ],
+      OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
     },
     OR: [
       { stage: 'closed_won' },
@@ -174,7 +171,11 @@ export function patchedValueMicros(body: {
   valueMicros?: string;
 }): bigint | undefined {
   if (body.valueMicros !== undefined) return BigInt(body.valueMicros);
-  if (body.value !== undefined) return BigInt(Math.round(body.value * 1_000_000));
+  if (body.value !== undefined) {
+    const micros = unitsToMicros(body.value);
+    if (micros == null) throw new Error('value is too large to store as a JSON number');
+    return micros;
+  }
   return undefined;
 }
 

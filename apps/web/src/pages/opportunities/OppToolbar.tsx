@@ -25,7 +25,12 @@ import { formatStage } from '@/lib/format';
 import { closedOutcome } from '@/lib/pipeline-stages';
 import { useTranslation } from 'react-i18next';
 
-import { formatMicrosAmount, type Opportunity, type PipelineStage } from '@bidstack/shared';
+import {
+  formatMicrosAmount,
+  unitsToMicros,
+  type Opportunity,
+  type PipelineStage,
+} from '@bidstack/shared';
 
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
@@ -39,7 +44,7 @@ import { formatMicrosAmount, type Opportunity, type PipelineStage } from '@bidst
  */
 function dealMicros(opp: Opportunity): bigint {
   if (opp.valueMicros != null && /^\d+$/.test(opp.valueMicros)) return BigInt(opp.valueMicros);
-  return BigInt(Math.round(opp.value * 1_000_000));
+  return unitsToMicros(opp.value) ?? 0n;
 }
 
 function sumDealMicros(rows: Opportunity[], weight: boolean): bigint {
@@ -130,7 +135,9 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
             {kpi.value}
           </div>
           {kpi.detail ? (
-            <div className="mt-0.5 text-[11px] leading-snug text-[var(--fg-tertiary)]">{kpi.detail}</div>
+            <div className="mt-0.5 text-[11px] leading-snug text-[var(--fg-tertiary)]">
+              {kpi.detail}
+            </div>
           ) : null}
         </div>
       ))}
@@ -199,9 +206,13 @@ export function OppPageHeader({
             </>
           ) : (
             <>
-              {t('oppToolbar.bidsInFlight', '{{count}} on this page · click any cell to edit inline.', {
-                count: itemCount,
-              })}
+              {t(
+                'oppToolbar.bidsInFlight',
+                '{{count}} on this page · click any cell to edit inline.',
+                {
+                  count: itemCount,
+                },
+              )}
             </>
           )}
         </p>
