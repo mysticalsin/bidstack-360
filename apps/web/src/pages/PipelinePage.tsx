@@ -340,24 +340,9 @@ export function PipelinePage() {
           }
         >
           {visibleStages.map((stage) => {
-            const stageIdx = stages.findIndex((s) => s.id === stage.id);
             const items = byStage.get(stage.id) ?? [];
             const total = items.reduce((acc, o) => acc + o.value, 0);
             const isHover = hoverStageId === stage.id;
-            // Funnel ratio: how many opps advanced past this stage into any
-            // later one. We exclude closed_lost from the "advanced" pool so
-            // it isn't counted as forward progress — losses are terminal.
-            // The closed_* stages themselves get no chip (no "next" stage).
-            const nextStages = stages.slice(stageIdx + 1).filter((s) => s.name !== 'Closed Lost');
-            const advanced = nextStages.reduce(
-              (acc, s) => acc + (byStage.get(s.id)?.length ?? 0),
-              0,
-            );
-            const totalReached = items.length + advanced;
-            const conversion =
-              stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0
-                ? null
-                : Math.round((advanced / totalReached) * 100);
             return (
               <StageColumn
                 key={stage.id}
@@ -366,7 +351,6 @@ export function PipelinePage() {
                 stageColor={stage.color}
                 items={items}
                 total={total}
-                conversion={conversion}
                 isHoverTarget={isHover}
                 draggingId={draggingId}
                 focusedId={focusedId}
