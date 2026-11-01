@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrmCompany } from '@bidstack/shared';
 
-import { applyFieldOverrides, buildCockpit, computeSignalCoverage } from './dashboard.cockpit.js';
+import {
+  applyFieldOverrides,
+  buildCockpit,
+  computeSignalCoverage,
+  registerDealsAreCapped,
+} from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
   return {
@@ -805,13 +810,33 @@ describe('buildCockpit recorded facts only', () => {
       compliantCount: 40,
       complianceTotal: 46,
       blockedCount: 3,
-      coveragePages: { dealsCapped: true },
+      registerDealsCapped: true,
     });
     expect(cockpit.openRiskSeverity).toEqual({ critical: 10, high: 0, medium: 0, low: 1 });
     expect(cockpit.compliantCount).toBe(40);
     expect(cockpit.complianceTotal).toBe(46);
     expect(cockpit.blockedCount).toBe(3);
     expect(cockpit.registerDealsCapped).toBe(true);
+  });
+
+  it('does not treat the 100-deal card as a partial register', () => {
+    // WHY: the card shows 100 deals. A risk on deal 101 still belongs in the
+    // register until the deal-id page of 1,000 is full.
+    expect(registerDealsAreCapped(100, 150)).toBe(false);
+    expect(registerDealsAreCapped(1000, 1000)).toBe(false);
+    expect(registerDealsAreCapped(1000, 1001)).toBe(true);
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      coveragePages: { dealsCapped: true },
+    });
+    expect(cockpit.registerDealsCapped).toBe(false);
   });
 });
 

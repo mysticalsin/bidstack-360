@@ -52,6 +52,7 @@ import {
   includeBuyingRoleContacts,
   loadAccountCompliance,
   loadAccountRisks,
+  loadRegisterDealIds,
   serializeDeal,
   serializeProviderHealth,
   serializeQueueHealth,
@@ -455,7 +456,8 @@ export async function buildDashboardSnapshot(
       ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
     ],
   };
-  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders] = await Promise.all([
+  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders, registerDeals] =
+    await Promise.all([
     !accountOpportunityWhere || accountOpportunities.length < COCKPIT_OPP_PAGE
       ? Promise.resolve(false)
       : prisma.opportunity.count({ where: accountOpportunityWhere }).then((total) => total > COCKPIT_OPP_PAGE),
@@ -484,13 +486,15 @@ export async function buildDashboardSnapshot(
     isCompanyUuid(selectedCompany.id)
       ? includeBuyingRoleContacts(orgId, selectedCompany.id, contacts, prisma)
       : Promise.resolve({ extra: [], roleHoldersCapped: false }),
+    accountOpportunityWhere
+      ? loadRegisterDealIds(prisma, accountOpportunityWhere)
+      : Promise.resolve({ ids: [] as string[], capped: false }),
   ]);
   const cockpitContacts = [...contacts, ...roleHolders.extra];
-  const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
   const contactIds = cockpitContacts.map((contact) => contact.id);
-  const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
+  const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: registerDeals.ids } };
   const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
-    accountOpportunityIds.length === 0
+    registerDeals.ids.length === 0
       ? {
           rows: [],
           openCount: 0,
@@ -498,7 +502,7 @@ export async function buildDashboardSnapshot(
           openBySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
         }
       : loadAccountRisks(prisma, registerWhere),
-    accountOpportunityIds.length === 0
+    registerDeals.ids.length === 0
       ? {
           rows: [],
           openCount: 0,
@@ -533,6 +537,7 @@ export async function buildDashboardSnapshot(
       compliantCount: compliancePage.compliantCount,
       complianceTotal: compliancePage.complianceTotal,
       blockedCount: compliancePage.blockedCount,
+      registerDealsCapped: registerDeals.capped,
       risksCapped: riskPage.capped,
       complianceCapped: compliancePage.capped,
       buyingRoleFacts: buyingRoleFacts.rows,

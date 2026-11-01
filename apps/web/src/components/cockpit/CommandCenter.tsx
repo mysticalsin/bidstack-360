@@ -220,7 +220,7 @@ export function unseenHighSeverityCount(input: {
 /** A full opportunity page means the register counts skip older deals. */
 export function readinessDetailFallback(registerDealsCapped?: boolean): string {
   return registerDealsCapped
-    ? 'weighted mix of checks on the latest 100 opportunities, not the whole account'
+    ? 'weighted mix of checks on the latest 1,000 opportunities, not the whole account'
     : 'weighted mix of recorded signals on this account, not a measured score';
 }
 

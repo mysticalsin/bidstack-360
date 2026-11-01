@@ -101,7 +101,7 @@ describe('command center counts', () => {
   it('names the opportunity page when register counts skip older deals', () => {
     // WHY: checks on deals past the latest 100 are not in the readiness mix.
     expect(readinessDetailFallback(true)).toBe(
-      'weighted mix of checks on the latest 100 opportunities, not the whole account',
+      'weighted mix of checks on the latest 1,000 opportunities, not the whole account',
     );
     expect(readinessDetailFallback(false)).toBe(
       'weighted mix of recorded signals on this account, not a measured score',
