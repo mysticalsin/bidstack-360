@@ -21,7 +21,7 @@ import {
   proposalApprovalRoutes,
   proposalIsImmutable,
 } from './proposals.approval.js';
-import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
+import { DEFAULT_SECTIONS, opportunityDraftLines, serializeProposal } from './proposals.helpers.js';
 
 // DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
 
@@ -395,7 +395,16 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           // RFP visibility: a non-admin may only access proposals they own.
           ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
         },
-        include: { sections: true, opportunity: { include: { company: true, territory: true } } },
+        include: {
+          sections: true,
+          opportunity: {
+            include: {
+              company: true,
+              territory: true,
+              pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+            },
+          },
+        },
       });
       if (!proposal) return reply.notFound('Proposal not found');
       if (proposalIsImmutable(proposal.status)) {
@@ -410,10 +419,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Build opportunity context
       const opportunityContext = [
-        opp ? `Opportunity: ${opp.name}` : '',
-        opp ? `Stage: ${opp.stage}, Probability: ${opp.probability}%` : '',
-        opp?.valueMicros ? `Value: €${(Number(opp.valueMicros) / 1e6).toLocaleString()}` : '',
-        opp?.territory?.name ? `Territory: ${opp.territory.name}` : '',
+        opportunityDraftLines(opp),
         req.body.context ? `User context: ${req.body.context}` : '',
       ]
         .filter(Boolean)

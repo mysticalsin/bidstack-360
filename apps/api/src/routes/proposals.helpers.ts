@@ -37,6 +37,45 @@ export type ProposalRow = {
  * Convert a Prisma proposal row to the Zod-validated wire shape.
  * Dates → ISO strings; dueDate → date-only (YYYY-MM-DD).
  */
+type DraftStage = {
+  isWon: boolean;
+  isLost: boolean;
+  deletedAt: Date | null;
+};
+
+/** Prompt lines for a proposal section. Amounts have no currency. A stored 0 is not a measured chance. */
+export function opportunityDraftLines(
+  opp: {
+    name: string;
+    stage: string;
+    probability: number;
+    valueMicros: bigint | number | null;
+    territory?: { name: string } | null;
+    pipelineStage?: DraftStage | null;
+  } | null,
+): string {
+  if (!opp) return '';
+  const live =
+    opp.pipelineStage && opp.pipelineStage.deletedAt == null ? opp.pipelineStage : null;
+  const outcome =
+    opp.stage === 'closed_lost' || live?.isLost === true
+      ? 'lost'
+      : opp.stage === 'closed_won' || live?.isWon === true
+        ? 'won'
+        : 'open';
+  const lines = [
+    `Opportunity: ${opp.name}`,
+    `Stage: ${opp.stage}, Probability: ${opp.probability === 0 ? 'not recorded' : `${opp.probability}%`}`,
+  ];
+  if (outcome !== 'open') lines.push(`Outcome: ${outcome}`);
+  if (opp.valueMicros) {
+    const amount = (Number(opp.valueMicros) / 1_000_000).toLocaleString('en-US');
+    lines.push(`Value: ${amount} (currency not recorded)`);
+  }
+  if (opp.territory?.name) lines.push(`Territory: ${opp.territory.name}`);
+  return lines.join('\n');
+}
+
 export function serializeProposal(row: ProposalRow): z.infer<typeof Proposal> {
   return {
     id: row.id,

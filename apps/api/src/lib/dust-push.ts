@@ -74,7 +74,7 @@ function serializeOpportunityToMarkdown(opp: {
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
     `- **Value (currency not recorded):** ${value}`,
-    `- **Stored probability:** ${opp.probability}%`,
+    `- **Stored probability:** ${opp.probability === 0 ? 'not recorded' : `${opp.probability}%`}`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
     ``,

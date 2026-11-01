@@ -4,7 +4,7 @@
 
 import { type z } from 'zod';
 
-import { prisma, type Opportunity } from '@bidstack/db';
+import { prisma } from '@bidstack/db';
 
 import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.js';
 
@@ -362,7 +362,17 @@ export function buildIntegrationSetupGuide() {
 
 // Opportunity serialization
 
-export function serializeOpportunityToMarkdown(opp: Opportunity): string {
+export function serializeOpportunityToMarkdown(opp: {
+  name: string;
+  code: string;
+  customer: string;
+  stage: string;
+  valueMicros: bigint | number | unknown;
+  probability: number;
+  dueDate: Date | null;
+  industry: string | null;
+  intel: unknown;
+}): string {
   const value =
     typeof opp.valueMicros === 'bigint'
       ? (Number(opp.valueMicros) / 1_000_000).toString()
@@ -377,7 +387,7 @@ export function serializeOpportunityToMarkdown(opp: Opportunity): string {
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
     `- **Value (currency not recorded):** ${value}`,
-    `- **Stored probability:** ${opp.probability}%`,
+    `- **Stored probability:** ${opp.probability === 0 ? 'not recorded' : `${opp.probability}%`}`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
     ``,

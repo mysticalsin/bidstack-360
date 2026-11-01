@@ -130,4 +130,100 @@ describe('proposal.draft grounded builder', () => {
       ]),
     );
   });
+
+  it('does not treat a stored zero as a measured chance below 40', () => {
+    const result = buildGroundedProposalDraft({
+      opportunity: {
+        id: 'opp-3',
+        code: 'OP-2044',
+        customer: 'Northwind',
+        name: 'Ledger Refresh',
+        stage: 's1_lead',
+        valueMicros: 2_000_000n,
+        probability: 0,
+        dueDate: new Date('2026-08-01T00:00:00.000Z'),
+        industry: null,
+        updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+      },
+      section: 'risks',
+      sectionTitle: 'Risks',
+      tone: 'concise',
+      references: [],
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect(result.markdown).toContain('No probability is recorded. Do not treat that as a measured chance below 40%');
+    expect(result.markdown).not.toContain('Stored probability is below 40%');
+    expect(result.markdown).not.toMatch(/0% probability|stored probability is 0%/i);
+    expect(result.markdown).toContain('probability not recorded');
+  });
+
+  it('names a both-flagged live stage as lost', () => {
+    const result = buildGroundedProposalDraft({
+      opportunity: {
+        id: 'opp-4',
+        code: 'OP-2045',
+        customer: 'Contoso',
+        name: 'Cloud Exit',
+        stage: 'Won and lost',
+        stageKey: 'closed_won',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+        valueMicros: 9_000_000n,
+        probability: 80,
+        dueDate: new Date('2026-09-01T00:00:00.000Z'),
+        industry: null,
+        updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+      },
+      section: 'executive_summary',
+      sectionTitle: 'Executive Summary',
+      tone: 'executive',
+      references: [],
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect(result.markdown).toContain('recorded "Cloud Exit" as lost');
+    expect(result.markdown).not.toContain('is evaluating');
+    expect(result.markdown).not.toContain('recorded "Cloud Exit" as won');
+    expect(result.markdown).toContain('stored probability is 80%');
+  });
+
+  it('ignores win and loss flags on a deleted stage', () => {
+    const result = buildGroundedProposalDraft({
+      opportunity: {
+        id: 'opp-5',
+        code: 'OP-2046',
+        customer: 'Fabrikam',
+        name: 'Data Platform',
+        stage: 'Archived Lost',
+        stageKey: 's2_sent',
+        pipelineStage: {
+          isWon: true,
+          isLost: true,
+          deletedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+        valueMicros: 1_000_000n,
+        probability: 50,
+        dueDate: new Date('2026-09-01T00:00:00.000Z'),
+        industry: null,
+        updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+      },
+      section: 'executive_summary',
+      sectionTitle: 'Executive Summary',
+      tone: 'consultative',
+      references: [],
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect(result.markdown).toContain('is evaluating');
+    expect(result.markdown).toContain('S2 Sent');
+    expect(result.markdown).not.toContain('Archived Lost');
+    expect(result.markdown).not.toContain('as lost');
+    expect(result.markdown).not.toContain('as won');
+  });
 });

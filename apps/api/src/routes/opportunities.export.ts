@@ -54,7 +54,7 @@ const CSV_HEADERS = [
   'Customer',
   'Stage',
   'Value (currency not recorded)',
-  'Stored probability (stage proxy)',
+  'Stored probability',
   'Due date',
   'Owner',
   'Territory',
@@ -125,7 +125,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           const batch = await prisma.opportunity.findMany({
             where,
             include: {
-              pipelineStage: { select: { name: true } },
+              pipelineStage: { select: { name: true, deletedAt: true } },
               owner: { select: { name: true, email: true } },
               territory: { select: { name: true } },
             },
@@ -143,7 +143,10 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           if (batch.length === 0) break;
 
           for (const opp of batch) {
-            const stageName = opp.pipelineStage?.name ?? opp.stage ?? '';
+            const stageName =
+              opp.pipelineStage && opp.pipelineStage.deletedAt == null
+                ? opp.pipelineStage.name
+                : (opp.stage ?? '');
             const ownerLabel = opp.owner?.name ?? opp.owner?.email ?? '';
             const territory = opp.territory?.name ?? '';
             stream.write(
@@ -153,7 +156,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
                 opp.customer,
                 stageName,
                 formatMicros(opp.valueMicros),
-                `${opp.probability}%`,
+                opp.probability === 0 ? 'not recorded' : `${opp.probability}%`,
                 opp.dueDate?.toISOString().slice(0, 10) ?? '',
                 ownerLabel,
                 territory,
