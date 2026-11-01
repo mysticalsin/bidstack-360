@@ -124,7 +124,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetingPage, oppPage, bidPage, eventPage, earnings, postingPage] = await Promise.all([
+      const [meetingPage, oppPage, bidPage, eventPage, earningsPage, postingPage] = await Promise.all([
         (async () => {
           const where = { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] };
           const rows = await prisma.meetingIntel.findMany({
@@ -169,7 +169,16 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           const capped = rows.length === 300 && pageIsCapped(rows.length, await prisma.accountWatchEvent.count({ where }), 300);
           return { rows, capped };
         })(),
-        prisma.accountEarningsDate.findMany({ where: { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } }, take: 20 }),
+        (async () => {
+          const where = { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } };
+          const rows = await prisma.accountEarningsDate.findMany({
+            where,
+            orderBy: { expectedAt: 'desc' },
+            take: 20,
+          });
+          const capped = rows.length === 20 && pageIsCapped(rows.length, await prisma.accountEarningsDate.count({ where }), 20);
+          return { rows, capped };
+        })(),
         (async () => {
           const where = { orgId, companyId: { in: ids }, postedAt: { gte: from } };
           const rows = await prisma.companyJobPosting.findMany({
@@ -233,7 +242,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           sample: e.sample,
         });
       }
-      for (const d of earnings) {
+      for (const d of earningsPage.rows) {
         push({ id: `er:${d.id}`, at: d.expectedAt.toISOString(), lane: 'theirs', category: 'earnings', title: `Results ${d.fiscalPeriod}${d.confirmed ? '' : ' (expected)'}`, summary: d.confirmed ? 'Confirmed date' : 'Estimated date', source: d.source, sourceUrl: d.sourceUrl || null, href: null, importance: 45, implication: 'NEUTRAL', sample: d.source === 'sample' });
       }
       // Hiring spikes: weeks with at least 5 postings and twice the median week.
@@ -279,6 +288,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         bidsSearchCapped: bidPage.searchCapped,
         marksCapped: pool.length > shown.length,
         postingsCapped: postingPage.capped,
+        earningsCapped: earningsPage.capped,
       };
     },
   );
