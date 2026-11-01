@@ -39,6 +39,7 @@ import {
 } from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
 import { buyerNamesAccount } from '../services/account-signals/bid-name.js';
+import { hiringSpikeWeeks } from '../services/account-signals/hiring-spike.js';
 import { loadInitiatives } from '../services/account-signals/initiatives.js';
 import { loadKeyNumbers, loadPositioning } from '../services/account-positioning/load.js';
 
@@ -236,17 +237,12 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         push({ id: `er:${d.id}`, at: d.expectedAt.toISOString(), lane: 'theirs', category: 'earnings', title: `Results ${d.fiscalPeriod}${d.confirmed ? '' : ' (expected)'}`, summary: d.confirmed ? 'Confirmed date' : 'Estimated date', source: d.source, sourceUrl: d.sourceUrl || null, href: null, importance: 45, implication: 'NEUTRAL', sample: d.source === 'sample' });
       }
       // Hiring spikes: weeks with at least 5 postings and twice the median week.
+      // A capped page does not invent 0 for weeks it never read.
       const weeks = new Map<number, number>();
       const postings = postingPage.rows;
       for (const p of postings) if (p.postedAt) weeks.set(Math.floor(p.postedAt.getTime() / (7 * DAY)), (weeks.get(Math.floor(p.postedAt.getTime() / (7 * DAY))) ?? 0) + 1);
-      // Median over every week in the window, quiet weeks (0 postings) included.
-      const totalWeeks = Math.max(weeks.size, Math.ceil(req.query.days / 7));
-      const counts = [...weeks.values(), ...Array<number>(totalWeeks - weeks.size).fill(0)].sort((a, b) => a - b);
-      const median = counts[Math.floor(counts.length / 2)] ?? 0;
-      for (const [w, n] of weeks) {
-        if (n >= 5 && n >= median * 2) {
-          push({ id: `hire:${w}`, at: new Date(w * 7 * DAY + 3 * DAY).toISOString(), lane: 'theirs', category: 'hiring', title: `Hiring spike: ${n} roles posted in one week`, summary: postingPage.capped ? `Typical week in the latest 1,000 posts: ${median}` : `Typical week: ${median}`, source: 'Job postings', sourceUrl: null, href: null, importance: 55, implication: 'OPPORTUNITY', sample: false });
-        }
+      for (const spike of hiringSpikeWeeks(weeks, req.query.days, postingPage.capped)) {
+        push({ id: `hire:${spike.week}`, at: new Date(spike.week * 7 * DAY + 3 * DAY).toISOString(), lane: 'theirs', category: 'hiring', title: `Hiring spike: ${spike.count} roles posted in one week`, summary: postingPage.capped ? `Typical week in the latest 1,000 posts: ${spike.median}` : `Typical week: ${spike.median}`, source: 'Job postings', sourceUrl: null, href: null, importance: 55, implication: 'OPPORTUNITY', sample: false });
       }
       // v22.1: several analyst notes in a week read as one row.
       const grouped = collapseMarketNotes(
