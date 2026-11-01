@@ -25,6 +25,7 @@ import {
   pipelineStageIdForStageChange,
   solePipelineStage,
   source,
+  valueToMicros,
 } from './crm-tools.helpers.js';
 
 export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
@@ -113,7 +114,7 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
 
 export const crmCreateDeal: Tool<typeof DealCreateInput> = {
   description:
-    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. The stage key links the one live pipeline stage with that key. Two matches are refused. Omit probability when it is unknown. The row stores 0, the response returns null, and that blank adds nothing to weighted pipeline.',
+    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. The stage key links the one live pipeline stage with that key. Two matches are refused. Omit probability when it is unknown. The row stores 0, the response returns null, and that blank adds nothing to weighted pipeline. Pass value as text when the amount is large or has a fractional unit, so the stored micros are not rounded.',
   input: DealCreateInput,
   inputJsonSchema: {
     type: 'object',
@@ -122,7 +123,17 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
       customer: { type: 'string', minLength: 1 },
       name: { type: 'string', minLength: 1 },
       stage: { type: 'string', enum: Stage.options, default: 's1_lead' },
-      value: { type: 'number', minimum: 0, default: 0 },
+      value: {
+        anyOf: [
+          { type: 'number', minimum: 0 },
+          {
+            type: 'string',
+            minLength: 1,
+            description: 'Unit amount as text, up to 6 decimal places. Use this when the amount is large.',
+          },
+        ],
+        default: 0,
+      },
       probability: { type: 'integer', minimum: 0, maximum: 100 },
       companyId: { type: 'string', format: 'uuid' },
       dueDate: { type: ['string', 'null'], format: 'date' },
@@ -146,7 +157,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
         name: args.name,
         stage: args.stage as PrismaStage,
         ...(stageRow ? { pipelineStageId: stageRow.id } : {}),
-        valueMicros: BigInt(Math.round(args.value * 1_000_000)),
+        valueMicros: valueToMicros(args.value),
         probability: args.probability ?? 0,
         dueDate: args.dueDate ? new Date(args.dueDate) : null,
         industry: args.industry ?? null,
@@ -207,9 +218,7 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
         ...(args.patch.stage !== undefined ? { stage: args.patch.stage as PrismaStage } : {}),
         ...(pipelineStageId !== undefined ? { pipelineStageId } : {}),
         ...(args.patch.probability !== undefined ? { probability: args.patch.probability } : {}),
-        ...(args.patch.value !== undefined
-          ? { valueMicros: BigInt(Math.round(args.patch.value * 1_000_000)) }
-          : {}),
+        ...(args.patch.value !== undefined ? { valueMicros: valueToMicros(args.patch.value) } : {}),
         ...(args.patch.dueDate !== undefined
           ? { dueDate: args.patch.dueDate ? new Date(args.patch.dueDate) : null }
           : {}),

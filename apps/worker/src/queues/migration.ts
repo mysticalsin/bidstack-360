@@ -28,7 +28,7 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma, Prisma } from '@bidstack/db';
-import { MIGRATION, MigrationJobPayload, type MigrationJobError } from '@bidstack/shared';
+import { MIGRATION, MigrationJobPayload, unitsTextToMicros, type MigrationJobError } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
 import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
@@ -75,11 +75,13 @@ export function asInt(v: unknown): number | null {
 export function asMicros(v: unknown): bigint | null {
   const s = asTrimmed(v);
   // Require a digit so a non-numeric cell ("n/a", "TBD") is SKIPPED, not
-  // silently coerced to €0 (Number('') === 0 would otherwise do that).
+  // silently coerced to 0.
   if (!s || !/\d/.test(s)) return null;
-  const n = Number(s.replace(/[^0-9.-]/g, ''));
-  if (!Number.isFinite(n)) return null;
-  return BigInt(Math.round(n * 1_000_000));
+  const cleaned = s.replace(/[^0-9.-]/g, '');
+  const negative = cleaned.startsWith('-');
+  const parsed = unitsTextToMicros(negative ? cleaned.slice(1) : cleaned);
+  if (parsed == null) return null;
+  return negative ? -parsed : parsed;
 }
 
 function asDate(v: unknown): Date | null {

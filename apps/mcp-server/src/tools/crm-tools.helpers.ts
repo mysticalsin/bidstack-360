@@ -5,7 +5,7 @@
  * Import via crm-tools.ts (consumed internally, not re-exported to callers).
  */
 import { prisma, type Prisma } from '@bidstack/db';
-import { microsToUnits } from '@bidstack/shared';
+import { microsToUnits, unitsTextToMicros } from '@bidstack/shared';
 
 export async function mintNextCode(orgId: string): Promise<string> {
   const last = await prisma.opportunity.findFirst({
@@ -102,6 +102,18 @@ export function dealOutcome(deal: {
 export function dealValueUnits(valueMicros: bigint | number | unknown): number {
   if (typeof valueMicros === 'bigint' || typeof valueMicros === 'number') return microsToUnits(valueMicros);
   return 0;
+}
+
+/** Unit amount to stored micros. A string keeps a large remainder; a number still rounds. */
+export function valueToMicros(value: number | string): bigint {
+  if (typeof value === 'string') {
+    const parsed = unitsTextToMicros(value);
+    if (parsed == null) {
+      throw new Error('value is not an amount with up to 6 decimal places');
+    }
+    return parsed;
+  }
+  return BigInt(Math.round(value * 1_000_000));
 }
 
 /** Integer micros for Dust. The unit number cannot keep a large cent. */

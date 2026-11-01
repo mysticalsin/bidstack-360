@@ -11,6 +11,7 @@ import {
   pipelineStageIdForStageChange,
   recordedProbability,
   recordOpportunityStageMove,
+  valueToMicros,
 } from './crm-tools.helpers.js';
 
 const Stage = z.enum([
@@ -27,7 +28,7 @@ const STAGE_OPTIONS = [...Stage.options];
 const Patch = z.object({
   stage: Stage.optional(),
   probability: z.number().int().min(0).max(100).optional(),
-  value: z.number().nonnegative().optional(),
+  value: z.union([z.number().nonnegative(), z.string().min(1)]).optional(),
   dueDate: z.string().date().nullable().optional(),
   customer: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
@@ -56,7 +57,16 @@ export const opportunityUpdate: Tool<typeof Input> = {
             enum: STAGE_OPTIONS,
           },
           probability: { type: 'integer', minimum: 0, maximum: 100 },
-          value: { type: 'number', minimum: 0 },
+          value: {
+            anyOf: [
+              { type: 'number', minimum: 0 },
+              {
+                type: 'string',
+                minLength: 1,
+                description: 'Unit amount as text, up to 6 decimal places. Use this when the amount is large.',
+              },
+            ],
+          },
           dueDate: { type: ['string', 'null'], format: 'date' },
           customer: { type: 'string', minLength: 1 },
           name: { type: 'string', minLength: 1 },
@@ -84,9 +94,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
         ...(patch.stage ? { stage: patch.stage as PrismaStage } : {}),
         ...(pipelineStageId !== undefined ? { pipelineStageId } : {}),
         ...(patch.probability !== undefined ? { probability: patch.probability } : {}),
-        ...(patch.value !== undefined
-          ? { valueMicros: BigInt(Math.round(patch.value * 1_000_000)) }
-          : {}),
+        ...(patch.value !== undefined ? { valueMicros: valueToMicros(patch.value) } : {}),
         ...(patch.dueDate !== undefined
           ? { dueDate: patch.dueDate ? new Date(patch.dueDate) : null }
           : {}),

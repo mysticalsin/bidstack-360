@@ -13,6 +13,7 @@ describe('migration value coercion', () => {
     expect(asMicros('1,200,000.50')).toBe(1_200_000_500_000n);
     expect(asMicros('€2 500')).toBe(2_500_000_000n);
     expect(asMicros('0')).toBe(0n);
+    expect(asMicros('8598204328457.184962')).toBe(8_598_204_328_457_184_962n);
   });
 
   it('returns null for blank/garbage money so writers can skip the field', () => {
