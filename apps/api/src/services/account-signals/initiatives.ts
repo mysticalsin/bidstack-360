@@ -18,7 +18,25 @@ import { companiesWithLiveSignals, hideSampleWhere } from './live-signals.js';
 
 const DAY = 86_400_000;
 const EVIDENCE_PAGE = 100;
-const SOLUTION_PAGE = 100;
+const SOLUTION_PAGE = 1000;
+const SOLUTION_LIMIT = 5000;
+
+/** Read bounded pages until a short page, or stop and say the list is capped. */
+export async function readBoundedPages<T extends { id: string }>(
+  load: (cursor: string | undefined) => Promise<T[]>,
+  pageSize: number,
+  maxRows: number,
+): Promise<{ rows: T[]; capped: boolean }> {
+  const rows: T[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await load(cursor);
+    rows.push(...page);
+    if (page.length < pageSize) return { rows, capped: false };
+    if (rows.length >= maxRows) return { rows, capped: true };
+    cursor = page[page.length - 1]!.id;
+  }
+}
 
 /** True when the latest news page or the latest meeting page is not the whole year. */
 export function evidencePageCapped(
@@ -78,11 +96,17 @@ export async function loadInitiatives(
       orderBy: { occurredAt: 'desc' },
       take: EVIDENCE_PAGE,
     }),
-    prisma.accountSolution.findMany({
-      where: solutionWhere,
-      select: { name: true, category: true },
-      take: SOLUTION_PAGE,
-    }),
+    readBoundedPages(
+      (cursor) => prisma.accountSolution.findMany({
+        where: solutionWhere,
+        select: { id: true, name: true, category: true },
+        orderBy: { id: 'asc' },
+        take: SOLUTION_PAGE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      }),
+      SOLUTION_PAGE,
+      SOLUTION_LIMIT,
+    ),
     prisma.meetingIntel.findMany({
       where: meetingWhere,
       select: { id: true, title: true, heldAt: true, opportunities: true, challenges: true },
@@ -95,11 +119,9 @@ export async function loadInitiatives(
     meetings.length,
     meetings.length < EVIDENCE_PAGE ? meetings.length : await prisma.meetingIntel.count({ where: meetingWhere }),
   );
-  const solutionsCapped =
-    solutions.length === SOLUTION_PAGE &&
-    pageIsCapped(solutions.length, await prisma.accountSolution.count({ where: solutionWhere }), SOLUTION_PAGE);
+  const solutionsCapped = solutions.capped;
   const soldThemes = new Set<InitiativeTheme>(
-    solutions.map((s) => themeForText(`${s.category} ${s.name}`)),
+    solutions.rows.map((s) => themeForText(`${s.category} ${s.name}`)),
   );
   const byTheme = new Map<InitiativeTheme, Initiative>();
   const confScore = { high: 0.85, medium: 0.6, low: 0.35 } as const;

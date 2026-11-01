@@ -221,8 +221,8 @@ describe('composeBrief', () => {
     expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 100 news items and meetings');
   });
 
-  it('says when the already-sold check is a page of solutions', () => {
-    // WHY: a solution past the first 100 left the theme looking unsold.
+  it('says when the already-sold check stopped at 5000 solutions', () => {
+    // WHY: a solution past the read limit left the theme looking unsold.
     const f: BriefFacts = {
       name: 'NOS',
       tierLabel: 'Strategic',
@@ -236,7 +236,7 @@ describe('composeBrief', () => {
       topSignal: null,
       solutionsCapped: true,
     };
-    expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 100 solutions');
+    expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 5,000 solutions');
   });
 });
 

@@ -106,7 +106,7 @@ export const BriefFacts = z.object({
   subsidiariesCapped: z.boolean().optional(),
   /** True when initiative news or meetings stopped at the latest 100. */
   evidenceCapped: z.boolean().optional(),
-  /** True when the already-sold check used the latest 100 solutions. */
+  /** True when the already-sold check used the latest 5,000 solutions. */
   solutionsCapped: z.boolean().optional(),
 });
 export type BriefFacts = z.infer<typeof BriefFacts>;
@@ -502,7 +502,7 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   if (f.topSignal) s.push(`Latest notable signal: ${f.topSignal.title}${f.topSignal.at ? ` (${monthYear(f.topSignal.at)}, ${f.topSignal.source})` : ''}${f.topSignal.sample ? ' [sample]' : ''}.`);
   if (f.subsidiariesCapped) s.push('Subsidiary figures use the latest 1,000 direct subsidiaries.');
   if (f.evidenceCapped) s.push('Initiative evidence is the latest 100 news items and meetings.');
-  if (f.solutionsCapped) s.push('Already-sold check used the latest 100 solutions.');
+  if (f.solutionsCapped) s.push('Already-sold check used the latest 5,000 solutions.');
   return s.join(' ');
 }
 
