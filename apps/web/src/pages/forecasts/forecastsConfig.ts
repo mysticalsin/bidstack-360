@@ -4,6 +4,9 @@
  */
 import type { Forecast } from '@bidstack/shared';
 
+import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
+import { formatMoneyMicros } from '@/lib/format';
+
 export const CATEGORIES: Forecast['category'][] = ['pipeline', 'best_case', 'commit', 'closed'];
 
 export const CATEGORY_LABELS: Record<Forecast['category'], string> = {
@@ -29,6 +32,26 @@ export interface ForecastRow {
   commit: string;
   closed: string;
   ids: Record<Forecast['category'], string | undefined>;
+  /** Recorded currency for a filled cell. Absent until that category is stored. */
+  currencies: Record<Forecast['category'], string | undefined>;
+}
+
+/** EUR is the old form default, not a chosen euro amount. Same rule as the API. */
+export function isUnspecifiedForecastCurrency(currency: string | null | undefined): boolean {
+  const code = (currency ?? '').trim().toUpperCase();
+  return code === '' || code === 'XXX' || code === 'EUR';
+}
+
+/** A recorded currency prints in that currency. XXX and legacy EUR stay unspecified. */
+export function formatForecastAmount(micros: string | bigint, currency?: string | null): string {
+  if (isUnspecifiedForecastCurrency(currency)) return unspecifiedMicrosLabel(micros);
+  const code = currency!.trim().toUpperCase();
+  const value = typeof micros === 'bigint' ? micros : BigInt(micros);
+  const units = (value < 0n ? -value : value) / 1_000_000n;
+  if (units > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return formatMoneyMicros(value, code, { compact: false });
+  }
+  return formatMoneyMicros(value, code);
 }
 
 export type PeriodFilter = 'monthly' | 'quarterly' | 'yearly';
@@ -48,12 +71,18 @@ export function groupForecasts(items: Forecast[]): ForecastRow[] {
         commit: '0',
         closed: '0',
         ids: { pipeline: undefined, best_case: undefined, commit: undefined, closed: undefined },
+        currencies: {
+          pipeline: undefined,
+          best_case: undefined,
+          commit: undefined,
+          closed: undefined,
+        },
       };
       map.set(key, row);
     }
     const fieldMap: Record<
       Forecast['category'],
-      keyof Omit<ForecastRow, 'ownerId' | 'ownerName' | 'period' | 'ids'>
+      keyof Pick<ForecastRow, 'pipeline' | 'bestCase' | 'commit' | 'closed'>
     > = {
       pipeline: 'pipeline',
       best_case: 'bestCase',
@@ -62,6 +91,7 @@ export function groupForecasts(items: Forecast[]): ForecastRow[] {
     };
     (row as unknown as Record<string, unknown>)[fieldMap[item.category]] = item.amountMicros;
     row.ids[item.category] = item.id;
+    row.currencies[item.category] = item.currency;
   }
   return Array.from(map.values()).sort((a, b) => b.period.localeCompare(a.period));
 }
@@ -90,18 +120,20 @@ export function buildChartData(rows: ForecastRow[]): ChartDatum[] {
   const byPeriod = new Map<string, ChartDatum>();
   for (const row of rows) {
     const existing = byPeriod.get(row.period);
+    const chartAmount = (category: Forecast['category'], amount: string) =>
+      row.ids[category] && !isUnspecifiedForecastCurrency(row.currencies[category]) ? '0' : amount;
     if (existing) {
-      existing.pipeline = addMicros(existing.pipeline, row.pipeline);
-      existing.bestCase = addMicros(existing.bestCase, row.bestCase);
-      existing.commit = addMicros(existing.commit, row.commit);
-      existing.closed = addMicros(existing.closed, row.closed);
+      existing.pipeline = addMicros(existing.pipeline, chartAmount('pipeline', row.pipeline));
+      existing.bestCase = addMicros(existing.bestCase, chartAmount('best_case', row.bestCase));
+      existing.commit = addMicros(existing.commit, chartAmount('commit', row.commit));
+      existing.closed = addMicros(existing.closed, chartAmount('closed', row.closed));
     } else {
       byPeriod.set(row.period, {
         period: row.period,
-        pipeline: row.pipeline,
-        bestCase: row.bestCase,
-        commit: row.commit,
-        closed: row.closed,
+        pipeline: chartAmount('pipeline', row.pipeline),
+        bestCase: chartAmount('best_case', row.bestCase),
+        commit: chartAmount('commit', row.commit),
+        closed: chartAmount('closed', row.closed),
       });
     }
   }
@@ -110,4 +142,14 @@ export function buildChartData(rows: ForecastRow[]): ChartDatum[] {
 
 export function sumForecastMicros(...amounts: string[]): bigint {
   return amounts.reduce((total, amount) => total + BigInt(amount), 0n);
+}
+
+/** One currency for a row total. Mixed recorded currencies are not added together. */
+export function forecastRowTotalCurrency(row: ForecastRow): string | 'mixed' {
+  const recorded = CATEGORIES.filter((category) => row.ids[category]);
+  const codes = recorded.map((category) => (row.currencies[category] ?? '').trim().toUpperCase());
+  const real = codes.filter((code) => !isUnspecifiedForecastCurrency(code));
+  if (real.length === 0) return 'XXX';
+  if (real.length === codes.length && new Set(real).size === 1) return real[0]!;
+  return 'mixed';
 }

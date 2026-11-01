@@ -23,7 +23,14 @@ import {
 } from '@/components/ui/Table';
 import { microsToUnitsText, unitsTextToMicros, type Forecast } from '@bidstack/shared';
 
-import { CATEGORIES, CATEGORY_LABELS, sumForecastMicros, type ForecastRow } from './forecastsConfig';
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  forecastRowTotalCurrency,
+  formatForecastAmount,
+  sumForecastMicros,
+  type ForecastRow,
+} from './forecastsConfig';
 
 interface EditingCell {
   ownerId: string;
@@ -44,9 +51,9 @@ interface ForecastListProps {
     period: string,
     category: Forecast['category'],
     micros: string,
+    currency: string,
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
-  formatMoneyMicros: (micros: string) => string;
 }
 
 export function ForecastList({
@@ -58,7 +65,6 @@ export function ForecastList({
   onNewForecast,
   onSaveCell,
   onDeleteRow,
-  formatMoneyMicros,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
@@ -75,7 +81,7 @@ export function ForecastList({
   ) => {
     const micros = unitsTextToMicros(e.target.value);
     if (micros != null) {
-      onSaveCell(row.ownerId, row.period, cat, micros.toString());
+      onSaveCell(row.ownerId, row.period, cat, micros.toString(), row.currencies[cat] ?? 'XXX');
     }
     setEditingCell(null);
   };
@@ -83,6 +89,13 @@ export function ForecastList({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
     if (e.key === 'Escape') setEditingCell(null);
+  };
+
+  const formatForecastRowTotal = (row: ForecastRow): string => {
+    const currency = forecastRowTotalCurrency(row);
+    const total = sumForecastMicros(row.pipeline, row.bestCase, row.commit, row.closed).toString();
+    if (currency === 'mixed') return t('forecastList.mixedCurrencies', 'Mixed currencies');
+    return formatForecastAmount(total, currency);
   };
 
   const rowVal = (row: ForecastRow, cat: Forecast['category']): string => {
@@ -199,7 +212,7 @@ export function ForecastList({
                                   { category: CATEGORY_LABELS[cat], period: row.period },
                                 )}
                               >
-                                {formatMoneyMicros(val)}
+                                {formatForecastAmount(val, row.currencies[cat])}
                               </button>
                             )}
                           </TableCell>
@@ -207,9 +220,7 @@ export function ForecastList({
                       })}
                       <TableCell className="text-right">
                         <span className="text-sm font-semibold tabular-nums text-[var(--fg-primary)]">
-                          {formatMoneyMicros(
-                            sumForecastMicros(row.pipeline, row.bestCase, row.commit, row.closed).toString(),
-                          )}
+                          {formatForecastRowTotal(row)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -284,7 +295,7 @@ export function ForecastList({
                               { category: CATEGORY_LABELS[cat], period: row.period },
                             )}
                           >
-                            {formatMoneyMicros(val)}
+                            {formatForecastAmount(val, row.currencies[cat])}
                           </button>
                         )}
                       </div>
@@ -294,9 +305,7 @@ export function ForecastList({
                 <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                   <span className="text-xs font-semibold text-[var(--fg-primary)]">
                     {t('forecastList.totalLabel', 'Total:')}{' '}
-                    {formatMoneyMicros(
-                      sumForecastMicros(row.pipeline, row.bestCase, row.commit, row.closed).toString(),
-                    )}
+                    {formatForecastRowTotal(row)}
                   </span>
                   <button
                     type="button"

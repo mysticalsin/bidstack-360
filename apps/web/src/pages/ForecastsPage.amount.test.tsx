@@ -27,7 +27,7 @@ vi.mock('@/hooks/useUsers', () => ({
   useUsers: () => ({ data: [], isLoading: false }),
 }));
 
-function forecast(amountMicros: string): Forecast {
+function forecast(amountMicros: string, currency = 'XXX'): Forecast {
   return {
     id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5b',
     orgId: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5c',
@@ -36,7 +36,7 @@ function forecast(amountMicros: string): Forecast {
     period: '2026-07',
     category: 'commit',
     amountMicros,
-    currency: 'XXX',
+    currency,
     note: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -58,5 +58,15 @@ describe('ForecastsPage amounts', () => {
     expect(screen.getAllByText('9,007,199,254,740,993 unspecified').length).toBeGreaterThan(0);
     expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
     expect(screen.queryByText('$')).toBeNull();
+  });
+
+  it('prints a USD commit in dollars and leaves it out of the unspecified headline', () => {
+    // WHY: the grid labeled every cell unspecified, so a stored dollar amount disappeared into that word.
+    forecasts.data = {
+      items: [forecast('1500000000000', 'USD')],
+    };
+    render(<ForecastsPage />);
+    expect(screen.getAllByText('$1.5M').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 unspecified').length).toBeGreaterThan(0);
   });
 });

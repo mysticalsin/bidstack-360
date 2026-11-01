@@ -26,6 +26,7 @@ import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
 import {
   buildChartData,
   groupForecasts,
+  isUnspecifiedForecastCurrency,
   matchesPeriodFilter,
   type ForecastRow,
   type PeriodFilter,
@@ -68,7 +69,10 @@ export function ForecastsPage() {
   // number?" in one glance, led by Commit (the figure the bid team is held to).
   const totals = useMemo(() => {
     const t = { pipeline: 0n, best_case: 0n, commit: 0n, closed: 0n };
-    for (const item of filteredItems) t[item.category] += BigInt(item.amountMicros);
+    for (const item of filteredItems) {
+      if (!isUnspecifiedForecastCurrency(item.currency)) continue;
+      t[item.category] += BigInt(item.amountMicros);
+    }
     return t;
   }, [filteredItems]);
 
@@ -76,14 +80,20 @@ export function ForecastsPage() {
   // forecasts, so the write MUST carry it through or it silently overwrites the
   // signed-in user's own row instead.
   const handleSaveCell = useCallback(
-    async (ownerId: string, period: string, category: Forecast['category'], micros: string) => {
+    async (
+      ownerId: string,
+      period: string,
+      category: Forecast['category'],
+      micros: string,
+      currency: string,
+    ) => {
       try {
         await createForecast.mutateAsync({
           ownerId,
           period,
           category,
           amountMicros: micros,
-          currency: 'XXX',
+          currency: isUnspecifiedForecastCurrency(currency) ? 'XXX' : currency,
         });
         toast.success(t('forecasts.toastUpdated', 'Forecast updated'));
       } catch (err) {
@@ -273,7 +283,6 @@ export function ForecastsPage() {
           onNewForecast={() => setDialogOpen(true)}
           onSaveCell={handleSaveCell}
           onDeleteRow={(row) => void handleDeleteRow(row)}
-          formatMoneyMicros={formatMoneyMicros}
         />
       </motion.div>
     </motion.div>
