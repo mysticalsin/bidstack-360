@@ -20,9 +20,26 @@ export interface MarsPage {
   hasMore: boolean;
 }
 
+export type MarsSourceKind = 'api' | 'powerbi' | 'file_export' | 'mock' | 'none';
+
+export interface MarsListArgs {
+  cursor: string | null;
+  updatedSince: Date | null;
+  limit: number;
+  /**
+   * Account values to keep (exact, case-insensitive, never substring). Account
+   * scoped sources get ONE account's keys per call; org scoped tabular sources
+   * get every mapped key and drop all other rows. The REST source ignores it.
+   */
+  accountKeys?: readonly string[];
+}
+
 export interface MarsClient {
   readonly configured: boolean;
-  listEntries(args: { cursor: string | null; updatedSince: Date | null; limit: number }): Promise<MarsPage>;
+  readonly kind?: MarsSourceKind;
+  /** 'account': sync calls listEntries once per mapped account, with that account's own cursor. Default 'org'. */
+  readonly scope?: 'org' | 'account';
+  listEntries(args: MarsListArgs): Promise<MarsPage>;
 }
 
 export class MarsNotConfiguredError extends Error {
@@ -48,6 +65,7 @@ export class MarsHttpError extends Error {
 
 export const notConfiguredMarsClient: MarsClient = {
   configured: false,
+  kind: 'none',
   async listEntries() {
     throw new MarsNotConfiguredError();
   },
@@ -59,14 +77,14 @@ export interface MarsHttpConfig {
   timeoutMs?: number;
 }
 
-type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{
+export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{
   ok: boolean;
   status: number;
   headers: { get(name: string): string | null };
   json(): Promise<unknown>;
 }>;
 
-function retryAfterMs(h: string | null): number {
+export function retryAfterMs(h: string | null): number {
   if (!h) return 60_000;
   const s = Number(h);
   if (Number.isFinite(s)) return Math.min(15 * 60_000, Math.max(1_000, s * 1000));
@@ -105,6 +123,8 @@ export function httpMarsClient(cfg: MarsHttpConfig, fetchImpl: FetchLike = fetch
 
   return {
     configured: true,
+    kind: 'api',
+    scope: 'org',
     async listEntries({ cursor, updatedSince, limit }) {
       const q = new URLSearchParams({ limit: String(limit) });
       if (cursor) q.set('cursor', cursor);

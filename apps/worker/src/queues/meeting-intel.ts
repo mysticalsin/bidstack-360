@@ -13,7 +13,7 @@ import type pino from 'pino';
 import { prisma } from '@bidstack/db';
 import { isMarsEnabled, MEETING_INTEL, type MeetingIntelJob } from '@bidstack/shared';
 
-import { marsClientFromEnv } from '../mars/client.js';
+import { marsSourceFromEnv } from '../mars/source.js';
 import { marsOrgsToSync, marsSyncDepsFromEnv, runMarsSync } from '../mars/sync.js';
 import { defaultPipelineDeps, type PipelineDeps, processIngestItem, raiseCrossRegionFlags, syncConnection } from '../meeting-intel/pipeline.js';
 
@@ -49,7 +49,7 @@ export async function startMeetingIntel(
     await queue.add(`meeting-intel.${job.kind}`, job, { jobId: id });
   };
   const deps = defaultPipelineDeps(enqueue);
-  const marsDeps = marsSyncDepsFromEnv(marsClientFromEnv(), enqueue);
+  const marsDeps = marsSyncDepsFromEnv(marsSourceFromEnv(), enqueue);
   const worker = new Worker<MeetingIntelJob | Record<string, never>>(
     MEETING_INTEL.name,
     async (job: Job<MeetingIntelJob | Record<string, never>>) => {

@@ -4,6 +4,8 @@
 //   GET  /mars/status                  meetings:read   connection status and counts
 //   POST /mars/sync                    meetings:write + Admin   create the org connection if missing, enqueue a pull
 //   POST /mars/webhook                 public, HMAC    MARS nudges Polo; Polo then pulls (no payload trusted)
+//   GET  /mars/account-keys            meetings:read   admin-confirmed Polo account to MARS / Power BI account values
+//   PUT  /mars/account-keys            meetings:write + Admin   replace that map (strict, whole values, no clashes)
 //   GET  /mars/tools                   meetings:read   MCP style tools/list (read-only tools)
 //   POST /mars/tools/:name             meetings:read   MCP style tools/call {arguments}
 //
@@ -16,7 +18,7 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { type Prisma, prisma } from '@bidstack/db';
-import { isMarsEnabled, MarsWebhookEvent } from '@bidstack/shared';
+import { isMarsEnabled, MarsAccountKeyMap, marsAccountKeyConflicts, MarsWebhookEvent, normalizeMarsAccountKey, parseMarsSettings } from '@bidstack/shared';
 
 import { userHasAnyRole } from '../lib/rbac-decision-cache.js';
 import { callMarsTool, listMarsTools, MarsToolError } from '../mars/tools.js';
@@ -75,6 +77,8 @@ export const marsRoutes: FastifyPluginAsyncZod = async (server) => {
       lastSyncAt: conn?.lastSyncAt?.toISOString() ?? null,
       lastError: conn?.lastError ?? null,
       itemsReceived: conn?.itemsReceived ?? 0,
+      sourceKind: (process.env.MARS_SOURCE ?? 'auto').trim().toLowerCase(),
+      mappedAccounts: Object.keys(parseMarsSettings(conn?.settings).accountKeys).length,
       pending,
       unmatched,
       webhook: !!process.env.MARS_WEBHOOK_SECRET,
@@ -118,6 +122,52 @@ export const marsRoutes: FastifyPluginAsyncZod = async (server) => {
       const queued = (await enqueueMeetingIntel({ kind: 'mars-sync', orgId, reason: 'webhook' })) !== null;
       await audit(req, 'meeting_intel.source.webhook', conn.id, { source: 'mars', type: evt.data.type, queued }, { orgId, userId: null });
       return reply.code(202).send({ queued });
+    },
+  );
+
+  server.get('/mars/account-keys', { config: { permission: 'meetings:read' } }, async (req) => {
+    const orgId = req.auth.orgId;
+    const conn = await prisma.meetingSourceConnection.findFirst({ where: { orgId, source: 'mars' }, orderBy: { createdAt: 'asc' }, select: { settings: true } });
+    const map = parseMarsSettings(conn?.settings).accountKeys;
+    const ids = Object.keys(map);
+    const companies = ids.length
+      ? await prisma.company.findMany({ where: { orgId, id: { in: ids }, deletedAt: null }, select: { id: true, name: true }, take: 1000 })
+      : [];
+    return { accounts: companies.map((c) => ({ companyId: c.id, name: c.name, keys: map[c.id] ?? [] })) };
+  });
+
+  server.put(
+    '/mars/account-keys',
+    { config: { permission: 'meetings:write' }, schema: { body: z.object({ accountKeys: MarsAccountKeyMap }) } },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      if (!(await userHasAnyRole(orgId, userId, ['Admin']))) throw server.httpErrors.forbidden('Admin only');
+      const next = Object.fromEntries(
+        // Same value twice (case or spacing) keeps the first spelling.
+        Object.entries(req.body.accountKeys).map(([id, keys]) => [id, keys.filter((k, i) => keys.findIndex((x) => normalizeMarsAccountKey(x) === normalizeMarsAccountKey(k)) === i).map((k) => k.trim())]),
+      );
+      const clashes = marsAccountKeyConflicts(next);
+      if (clashes.length) throw server.httpErrors.unprocessableEntity(`Account values mapped to more than one account: ${clashes.slice(0, 10).join(', ')}`);
+      const ids = Object.keys(next);
+      if (ids.length) {
+        const found = await prisma.company.count({ where: { orgId, id: { in: ids }, deletedAt: null } });
+        if (found !== ids.length) throw server.httpErrors.badRequest('Unknown account in the map');
+      }
+      const conn =
+        (await prisma.meetingSourceConnection.findFirst({ where: { orgId, source: 'mars' }, orderBy: { createdAt: 'asc' } })) ??
+        (await prisma.meetingSourceConnection.create({ data: { orgId, userId, source: 'mars', consentedAt: new Date() } }));
+      const prev = parseMarsSettings(conn.settings);
+      const same = (a: readonly string[] = [], b: readonly string[] = []) => {
+        const x = new Set(a.map(normalizeMarsAccountKey));
+        const y = new Set(b.map(normalizeMarsAccountKey));
+        return x.size === y.size && [...x].every((k) => y.has(k));
+      };
+      // A changed key set restarts that account's watermark, so its history is backfilled.
+      const cursors = Object.fromEntries(Object.entries(prev.cursors).filter(([id]) => same(prev.accountKeys[id], next[id])));
+      await prisma.meetingSourceConnection.update({ where: { id: conn.id }, data: { settings: { ...prev, accountKeys: next, cursors } as Prisma.InputJsonValue } });
+      const changed = [...new Set([...Object.keys(prev.accountKeys), ...ids])].filter((id) => !same(prev.accountKeys[id], next[id]));
+      await audit(req, 'meeting_intel.source.account_keys', conn.id, { source: 'mars', accounts: ids.length, changed: changed.slice(0, 200) });
+      return { accounts: ids.length, changed: changed.length };
     },
   );
 

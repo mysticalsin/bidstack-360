@@ -31,6 +31,7 @@ const deps = (over: Partial<MarsSyncDeps> = {}): MarsSyncDeps => ({
   enabled: true,
   pageSize: 3,
   maxPages: 20,
+  maxQueries: 100,
   webBaseUrl: 'https://mars.example',
   ...over,
 });

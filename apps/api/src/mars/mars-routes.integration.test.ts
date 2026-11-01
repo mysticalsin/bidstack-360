@@ -30,7 +30,7 @@ let nw = '';
 const queued: MeetingIntelJob[] = [];
 const SECRET = 'test-webhook-secret';
 
-type Inj = { method: 'GET' | 'POST'; url: string; payload?: unknown; role?: string; headers?: Record<string, string> };
+type Inj = { method: 'GET' | 'POST' | 'PUT'; url: string; payload?: unknown; role?: string; headers?: Record<string, string> };
 const call = ({ method, url, payload, role, headers }: Inj) =>
   server.inject({
     method,
@@ -129,6 +129,7 @@ describe('feature flag', () => {
   it('every MARS route is 404 while the flag is off', async () => {
     expect((await call({ method: 'GET', url: '/mars/status' })).statusCode).toBe(404);
     expect((await call({ method: 'GET', url: '/mars/tools' })).statusCode).toBe(404);
+    expect((await call({ method: 'GET', url: '/mars/account-keys' })).statusCode).toBe(404);
     expect((await call({ method: 'POST', url: '/mars/webhook', payload: {} })).statusCode).toBe(404);
     expect((await tool('list_meetings', { accountId: nw })).statusCode).toBe(404);
   });
@@ -250,5 +251,29 @@ describe('with the flag on', () => {
     const audits = await prisma.auditLog.findMany({ where: { orgId: org.orgId, action: { startsWith: 'meeting_intel.tool.' } }, take: 50 });
     expect(new Set(audits.map((a) => a.action))).toEqual(new Set(['meeting_intel.tool.list_meetings', 'meeting_intel.tool.list_contacts', 'meeting_intel.tool.suggest_org_chart']));
     expect(audits.every((a) => a.targetId === nw)).toBe(true);
+  });
+  it('account keys: admin only, strict, no clashes, a changed key set restarts that account watermark', async () => {
+    const ct = (await prisma.company.create({ data: { orgId: org.orgId, name: `${TAG} Contoso` } })).id;
+    const put = (accountKeys: unknown, role?: string) => call({ method: 'PUT', url: '/mars/account-keys', payload: { accountKeys }, ...(role ? { role } : {}) });
+    expect((await put({ [nw]: ['Northwind Energy'] }, 'account-executive')).statusCode).toBe(403);
+    expect((await put({ [nw]: ['Northwind Energy'], [ct]: [' northwind  energy '] })).statusCode).toBe(422);
+    expect((await put({ '00000000-0000-4000-8000-000000000000': ['Ghost'] })).statusCode).toBe(400);
+    expect((await put({ [nw]: [''] })).statusCode).toBe(400);
+
+    expect((await put({ [nw]: ['Northwind Energy', 'NORTHWIND ENERGY', 'NWE-UK'], [ct]: ['Contoso'] })).json()).toEqual({ accounts: 2, changed: 2 });
+    const conn = await prisma.meetingSourceConnection.findFirstOrThrow({ where: { orgId: org.orgId, source: 'mars' } });
+    await prisma.meetingSourceConnection.update({
+      where: { id: conn.id },
+      data: { settings: { ...(conn.settings as object), cursors: { [nw]: 'pbi1:w:2026-10-01T00:00:00.000Z', [ct]: 'pbi1:w:2026-10-02T00:00:00.000Z' } } },
+    });
+    const keys = (await call({ method: 'GET', url: '/mars/account-keys' })).json().accounts as Array<{ companyId: string; keys: string[] }>;
+    expect(keys.find((a) => a.companyId === nw)?.keys).toEqual(['Northwind Energy', 'NWE-UK']);
+
+    expect((await put({ [nw]: ['nwe-uk', 'Northwind Energy'], [ct]: ['Contoso SA'] })).json()).toEqual({ accounts: 2, changed: 1 });
+    const after = await prisma.meetingSourceConnection.findFirstOrThrow({ where: { id: conn.id } });
+    expect((after.settings as { cursors: Record<string, string> }).cursors).toEqual({ [nw]: 'pbi1:w:2026-10-01T00:00:00.000Z' });
+    const status = (await call({ method: 'GET', url: '/mars/status' })).json();
+    expect(status).toMatchObject({ mappedAccounts: 2, sourceKind: 'auto' });
+    expect(await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'meeting_intel.source.account_keys' } })).toBe(2);
   });
 });

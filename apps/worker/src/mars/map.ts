@@ -21,7 +21,13 @@ const TYPE_LABEL: Record<MarsEntry['meetingType'], string> = {
 
 export function mapMarsEntry(e: MarsEntry, companyId: string, opts: { webBaseUrl?: string | null } = {}): NormalizedMeeting {
   const title = clip(e.topic, 300) || `${TYPE_LABEL[e.meetingType]} with ${e.client.name}`.slice(0, 300);
-  const internal = [{ name: e.loggedBy.name, email: e.loggedBy.email, ...(e.loggedBy.region ? { region: e.loggedBy.region.slice(0, 100) } : {}) }, ...e.internalAttendees.map((a) => ({ name: a.name, email: a.email }))];
+  // Internal people need an email: the pipeline tells internal from client
+  // people by user email or our own domains, so a name-only colleague would be
+  // filed as a client contact. Sync resolves names to users first; leftovers drop.
+  const internal = [
+    ...(e.loggedBy.email ? [{ name: e.loggedBy.name, email: e.loggedBy.email, ...(e.loggedBy.region ? { region: e.loggedBy.region.slice(0, 100) } : {}) }] : []),
+    ...e.internalAttendees.flatMap((a) => (a.email ? [{ name: a.name, email: a.email }] : [])),
+  ];
   const seen = new Set<string>();
   const attendees = [
     ...internal,
