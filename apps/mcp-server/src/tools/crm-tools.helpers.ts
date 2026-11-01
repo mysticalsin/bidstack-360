@@ -4,7 +4,7 @@
  * Extracted from crm-tools.ts (BS-R1 file-size refactor).
  * Import via crm-tools.ts (consumed internally, not re-exported to callers).
  */
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 
 export async function mintNextCode(orgId: string): Promise<string> {
   const last = await prisma.opportunity.findFirst({
@@ -50,6 +50,40 @@ export async function pipelineStageIdForStageChange(
   if (!nextStage || nextStage === beforeStage) return undefined;
   const row = await solePipelineStage(orgId, nextStage);
   return row?.id ?? null;
+}
+
+/** Open, won, or lost. A deleted stage does not close the deal. Lost wins when both flags are set. */
+export function outcomeWhere(outcome: 'open' | 'won' | 'lost'): Prisma.OpportunityWhereInput {
+  if (outcome === 'lost') {
+    return {
+      OR: [
+        { stage: 'closed_lost' },
+        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+      ],
+    };
+  }
+  if (outcome === 'won') {
+    return {
+      NOT: {
+        OR: [
+          { stage: 'closed_lost' },
+          { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+        ],
+      },
+      OR: [
+        { stage: 'closed_won' },
+        { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+      ],
+    };
+  }
+  return {
+    stage: { notIn: ['closed_won', 'closed_lost'] },
+    NOT: {
+      pipelineStage: {
+        is: { deletedAt: null, OR: [{ isLost: true }, { isWon: true }] },
+      },
+    },
+  };
 }
 
 /** Lost wins when the enum and a live stage flag disagree, or both are set. */

@@ -280,6 +280,68 @@ describeDb('MCP tools', () => {
     expect(renamed.outcome).toBe('lost');
   });
 
+  it('opportunities.list can keep a lost flag out of the open stage', async () => {
+    // WHY: filtering by the stored key returned a lost deal as if it were still
+    // open. Dust asking for open deals in that stage must not see it. Deleting
+    // the stage puts the deal back in the open list.
+    const token = randomBytes(4).toString('hex');
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Open filter ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    const open = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OF1-${token}`,
+        customer: 'Filter Co',
+        name: `Still open ${token}`,
+        stage: 's2_sent',
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    const flagged = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-OF2-${token}`,
+        customer: 'Filter Co',
+        name: `Flagged lost ${token}`,
+        stage: 's2_sent',
+        pipelineStageId: lost.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+    try {
+      const openRows = (await tools['opportunities.list'].handler(
+        { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
+        ctx,
+      )) as Array<{ id: string }>;
+      expect(openRows.map((row) => row.id)).toEqual([open.id]);
+
+      const lostRows = (await tools['opportunities.list'].handler(
+        { outcome: 'lost', search: token, limit: 20 },
+        ctx,
+      )) as Array<{ id: string }>;
+      expect(lostRows.map((row) => row.id)).toEqual([flagged.id]);
+
+      await prisma.pipelineStage.update({ where: { id: lost.id }, data: { deletedAt: new Date() } });
+      const afterDelete = (await tools['opportunities.list'].handler(
+        { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
+        ctx,
+      )) as Array<{ id: string }>;
+      expect(afterDelete.map((row) => row.id).sort()).toEqual([flagged.id, open.id].sort());
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { id: { in: [open.id, flagged.id] } } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
+      await prisma.pipeline.delete({ where: { id: pipeline.id } });
+    }
+  });
+
   it('crm_create_deal links the one live stage with that key', async () => {
     // WHY: create stored the enum and reported open. A stage key whose only
     // live row is lost must come back lost. Two rows with that key are refused
