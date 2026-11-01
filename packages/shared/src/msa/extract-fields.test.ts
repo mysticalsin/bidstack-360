@@ -50,19 +50,21 @@ describe('extractMsaFields', () => {
     expect(contractMicros('1234,567')).toBe(1_234_567_000);
     expect(contractMicros('250,50')).toBe(250_500_000);
     expect(contractMicros('1.250,50')).toBe(1_250_500_000);
-    expect(contractMicros('1.015')).toBe(1_015_000);
+    expect(contractMicros('1.50')).toBe(1_500_000);
+    expect(contractMicros('1.100')).toBe(1_100_000_000);
+    expect(contractMicros('1.100.000')).toBe(1_100_000_000_000);
     expect(contractMicros('99999999999.99')).toBeNull();
     const fields = extractMsaFields(
       [
         "Supplier's aggregate liability under this Agreement is capped at 250,000.50 EUR.",
-        'Specialist: 1.015 EUR per hour',
+        'Specialist: 1.50 EUR per hour',
       ].join('\n'),
     );
     expect(fields.liabilityCap.value).toEqual({ amountMicros: 250_000_500_000, currency: 'EUR' });
     const rates = fields.rateCard.value as Array<{ role: string; rateMicros: number; unit: string }>;
     expect(rates.find((row) => row.role === 'Specialist')).toEqual({
       role: 'Specialist',
-      rateMicros: 1_015_000,
+      rateMicros: 1_500_000,
       unit: 'hour',
     });
     const european = extractMsaFields(
