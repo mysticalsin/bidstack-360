@@ -765,6 +765,8 @@ export const AccountInitiatives = z.object({
   subsidiariesCapped: z.boolean().optional(),
   /** True when news or meetings stopped at the latest 100. */
   evidenceCapped: z.boolean().optional(),
+  /** True when the already-sold check used the latest 100 solutions. */
+  solutionsCapped: z.boolean().optional(),
 });
 export type AccountInitiatives = z.infer<typeof AccountInitiatives>;
 

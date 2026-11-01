@@ -96,10 +96,12 @@ export function InitiativesView({
   items,
   subsidiariesCapped,
   evidenceCapped,
+  solutionsCapped,
 }: {
   items: Initiative[];
   subsidiariesCapped?: boolean;
   evidenceCapped?: boolean;
+  solutionsCapped?: boolean;
 }) {
   const [all, setAll] = useState(false);
   const listId = useId();
@@ -107,6 +109,7 @@ export function InitiativesView({
     <>
       {subsidiariesCapped ? <p className="sg-meta">Latest 1,000 subsidiaries</p> : null}
       {evidenceCapped ? <p className="sg-meta">Latest 100 news and meetings</p> : null}
+      {solutionsCapped ? <p className="sg-meta">Already-sold check used the latest 100 solutions.</p> : null}
     </>
   );
   if (!items.length) {
@@ -152,7 +155,12 @@ export function InitiativesBoard({ companyId }: { companyId: string }) {
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
       ) : (
-        <InitiativesView items={q.data.items} subsidiariesCapped={q.data.subsidiariesCapped} evidenceCapped={q.data.evidenceCapped} />
+        <InitiativesView
+          items={q.data.items}
+          subsidiariesCapped={q.data.subsidiariesCapped}
+          evidenceCapped={q.data.evidenceCapped}
+          solutionsCapped={q.data.solutionsCapped}
+        />
       )}
     </section>
   );

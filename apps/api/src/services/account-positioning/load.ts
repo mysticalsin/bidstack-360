@@ -250,6 +250,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     topSignal: top ? { title: cleanText(stripSamplePrefix(top.title)), at: top.occurredAt.toISOString(), source: sourceLabel(top.source), sample: top.sample } : null,
     subsidiariesCapped: childrenCapped,
     evidenceCapped: initiativeLoad.evidenceCapped,
+    solutionsCapped: initiativeLoad.solutionsCapped,
   };
   const gaps = buildGaps({
     people,

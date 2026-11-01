@@ -231,6 +231,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         items: loaded.items,
         subsidiariesCapped: rollup.cappedRoots.has(company.id),
         evidenceCapped: loaded.evidenceCapped,
+        solutionsCapped: loaded.solutionsCapped,
       };
     },
   );

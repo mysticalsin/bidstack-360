@@ -18,6 +18,7 @@ import { companiesWithLiveSignals, hideSampleWhere } from './live-signals.js';
 
 const DAY = 86_400_000;
 const EVIDENCE_PAGE = 100;
+const SOLUTION_PAGE = 100;
 
 /** True when the latest news page or the latest meeting page is not the whole year. */
 export function evidencePageCapped(
@@ -38,7 +39,7 @@ export async function loadInitiatives(
   company: { id: string },
   now: Date,
   companyIds?: string[],
-): Promise<{ items: Initiative[]; evidenceCapped: boolean }> {
+): Promise<{ items: Initiative[]; evidenceCapped: boolean; solutionsCapped: boolean }> {
   const ids = companyIds ?? (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
   const live = await companiesWithLiveSignals(orgId, ids);
   const eventWhere = {
@@ -60,6 +61,7 @@ export async function loadInitiatives(
       ] as const,
     },
   };
+  const solutionWhere = { orgId, companyId: company.id, deletedAt: null };
   const meetingWhere = {
     AND: [
       visibleMeetingWhere(orgId, scope),
@@ -77,9 +79,9 @@ export async function loadInitiatives(
       take: EVIDENCE_PAGE,
     }),
     prisma.accountSolution.findMany({
-      where: { orgId, companyId: company.id, deletedAt: null },
+      where: solutionWhere,
       select: { name: true, category: true },
-      take: 100,
+      take: SOLUTION_PAGE,
     }),
     prisma.meetingIntel.findMany({
       where: meetingWhere,
@@ -93,6 +95,9 @@ export async function loadInitiatives(
     meetings.length,
     meetings.length < EVIDENCE_PAGE ? meetings.length : await prisma.meetingIntel.count({ where: meetingWhere }),
   );
+  const solutionsCapped =
+    solutions.length === SOLUTION_PAGE &&
+    pageIsCapped(solutions.length, await prisma.accountSolution.count({ where: solutionWhere }), SOLUTION_PAGE);
   const soldThemes = new Set<InitiativeTheme>(
     solutions.map((s) => themeForText(`${s.category} ${s.name}`)),
   );
@@ -243,5 +248,5 @@ export async function loadInitiatives(
       (a, b) =>
         b.confidenceScore - a.confidenceScore || (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''),
     );
-  return { items, evidenceCapped };
+  return { items, evidenceCapped, solutionsCapped };
 }
