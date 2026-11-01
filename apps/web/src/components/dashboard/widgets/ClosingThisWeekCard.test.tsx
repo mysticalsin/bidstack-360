@@ -163,6 +163,12 @@ describe('ClosingThisWeekCard', () => {
           name: 'Already won',
           pipelineStage: { ...OPEN_STAGE, isWon: true },
         }),
+        makeOpp({
+          id: 'lost-key',
+          name: 'Already lost',
+          stage: 'closed_lost',
+          pipelineStage: OPEN_STAGE,
+        }),
         makeOpp({ id: 'open', name: 'Still open' }),
       ],
     };
@@ -170,6 +176,7 @@ describe('ClosingThisWeekCard', () => {
     renderCard();
 
     expect(screen.queryByText('Already won')).toBeNull();
+    expect(screen.queryByText('Already lost')).toBeNull();
     expect(screen.getByText('Still open')).toBeDefined();
   });
 });

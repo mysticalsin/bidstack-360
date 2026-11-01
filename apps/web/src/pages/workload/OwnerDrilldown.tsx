@@ -12,6 +12,7 @@ import {
 import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { useOpportunities } from '@/hooks/useOpportunities';
+import { closedOutcome } from '@/lib/pipeline-stages';
 import type { Opportunity } from '@bidstack/shared';
 
 interface Props {
@@ -21,8 +22,7 @@ interface Props {
 }
 
 function isOpen(o: Opportunity): boolean {
-  if (o.pipelineStage) return !o.pipelineStage.isWon && !o.pipelineStage.isLost;
-  return o.stage !== 'closed_won' && o.stage !== 'closed_lost';
+  return closedOutcome(o) === null;
 }
 
 export function OwnerDrilldown({ email, ownerLabel }: Props) {

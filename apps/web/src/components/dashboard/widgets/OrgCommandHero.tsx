@@ -33,6 +33,7 @@ import {
   UNSPECIFIED_CURRENCY_BASIS,
 } from '../unspecified-currency';
 
+import { closedOutcome } from '@/lib/pipeline-stages';
 import type { Opportunity } from '@bidstack/shared';
 
 // Must match ClosingThisWeekCard's filter exactly so React Query serves both
@@ -56,8 +57,7 @@ interface HeroSignal {
 // dueDate inside the window is already decided — counting it as "closing"
 // would read as a bug.
 function isOpenOpp(o: Opportunity): boolean {
-  if (o.pipelineStage) return !o.pipelineStage.isWon && !o.pipelineStage.isLost;
-  return o.stage !== 'closed_won' && o.stage !== 'closed_lost';
+  return closedOutcome(o) === null;
 }
 
 export function OrgCommandHero({ summary }: { summary: OrgSummary }) {

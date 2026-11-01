@@ -22,14 +22,15 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { springSoft } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
 
+import { closedOutcome } from '@/lib/pipeline-stages';
+
 import { formatUnspecifiedAmount } from '../unspecified-currency';
 
 const CLOSING_WINDOW_DAYS = 7;
 const DISPLAY_LIMIT = 6;
 
 function isOpenOpp(o: Opportunity): boolean {
-  if (o.pipelineStage) return !o.pipelineStage.isWon && !o.pipelineStage.isLost;
-  return o.stage !== 'closed_won' && o.stage !== 'closed_lost';
+  return closedOutcome(o) === null;
 }
 
 export function ClosingThisWeekCard() {
