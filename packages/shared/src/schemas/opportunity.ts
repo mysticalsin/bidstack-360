@@ -110,6 +110,7 @@ export const OpportunityPatch = Opportunity.partial().omit({
   pipelineStage: true,
   valueMicros: true,
 }).extend({
+  valueMicros: z.string().regex(/^\d+$/).optional(),
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and
   // the API 409s when the row changed since — without it, concurrent

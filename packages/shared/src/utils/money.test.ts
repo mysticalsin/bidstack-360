@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatMicrosAmount, microsToUnits, sumMicros } from './money.js';
+import { formatMicrosAmount, microsToUnits, microsToUnitsText, sumMicros, unitsTextToMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -35,6 +35,17 @@ describe('microsToUnits', () => {
     expect(formatMicrosAmount(8_598_204_328_457_184_962n)).toBe('8,598,204,328,457.18');
     expect(formatMicrosAmount(2_500_000_000_000n)).toBe('2,500,000');
     expect(formatMicrosAmount(0n)).toBe('0');
+  });
+
+  it('round-trips a large amount through unit text without a float', () => {
+    // WHY: the deal editor used to save Number(text) * 1e6 and drop this remainder.
+    const micros = 8_598_204_328_457_184_962n;
+    const text = microsToUnitsText(micros);
+    expect(text).toBe('8598204328457.184962');
+    expect(unitsTextToMicros(text)).toBe(micros);
+    expect(unitsTextToMicros('8598204328457.18')).toBe(8_598_204_328_457_180_000n);
+    expect(unitsTextToMicros('8,598,204,328,457.184962')).toBe(micros);
+    expect(unitsTextToMicros('nope')).toBeNull();
   });
 
   it('reconstructs negative amounts exactly, including the fractional remainder', () => {

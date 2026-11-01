@@ -165,6 +165,19 @@ export function livePipelineStageFilter(
  * duplicates). Keeps `opportunity.companyId` consistent with `customer` so the
  * /accounts and cockpit rollups (which group by companyId) stay correct.
  */
+/**
+ * Stored micros for a value edit. An explicit micros string wins so a large
+ * amount is not rounded through `value * 1e6`.
+ */
+export function patchedValueMicros(body: {
+  value?: number;
+  valueMicros?: string;
+}): bigint | undefined {
+  if (body.valueMicros !== undefined) return BigInt(body.valueMicros);
+  if (body.value !== undefined) return BigInt(Math.round(body.value * 1_000_000));
+  return undefined;
+}
+
 /** A stage move that did not happen is not an event. Lost and won both count. */
 export function stageMoveDiff(
   before: { stage: string; pipelineStageId: string | null },

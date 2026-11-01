@@ -30,6 +30,7 @@ import { serializeOpportunity, serializeOpportunityFull } from '../serializers/o
 import {
   excludeClosedOutcome,
   livePipelineStageFilter,
+  patchedValueMicros,
   resolveCompanyIdByName,
   stageMoveDiff,
 } from './opportunities.helpers.js';
@@ -425,6 +426,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         { stage: stageUpdate ?? before.stage, pipelineStageId: nextPipelineStageId },
       );
 
+      const nextValueMicros = patchedValueMicros(req.body);
       const dataPatch = {
         ...(req.body.customer ? { customer: req.body.customer } : {}),
         ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
@@ -433,9 +435,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(req.body.pipelineStageId !== undefined
           ? { pipelineStageId: req.body.pipelineStageId }
           : {}),
-        ...(req.body.value !== undefined
-          ? { valueMicros: BigInt(Math.round(req.body.value * 1_000_000)) }
-          : {}),
+        ...(nextValueMicros !== undefined ? { valueMicros: nextValueMicros } : {}),
         ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
         ...(req.body.dueDate !== undefined
           ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }

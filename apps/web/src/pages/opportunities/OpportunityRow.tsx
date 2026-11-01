@@ -215,6 +215,24 @@ export const Row = memo(function Row({
               ? `${formatMicrosAmount(BigInt(opp.valueMicros))} unspecified`
               : `${formatUnspecifiedAmount(v)} unspecified`
           }
+          exactMicros={opp.valueMicros}
+          onSaveMicros={(micros) => {
+            startSave('value');
+            patch.mutate(
+              { id: opp.id, patch: { valueMicros: micros } },
+              {
+                onSuccess: () => {
+                  endSave('value');
+                  savedToast('Value');
+                  flash('value');
+                },
+                onError: (err) => {
+                  endSave('value');
+                  errorToast(err);
+                },
+              },
+            );
+          }}
           onSave={(next) => {
             startSave('value');
             patch.mutate(

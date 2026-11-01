@@ -35,7 +35,13 @@ import {
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatStage } from '@/lib/format';
-import { presentOpportunityIntel, type OpportunityStage, type IntelPayload, type Task } from '@bidstack/shared';
+import {
+  formatMicrosAmount,
+  presentOpportunityIntel,
+  type OpportunityStage,
+  type IntelPayload,
+  type Task,
+} from '@bidstack/shared';
 
 import {
   DataFreshnessRibbon,
@@ -223,6 +229,10 @@ export function OpportunityDetailPage() {
                 <dd className="mt-1 text-2xl font-medium tabular-nums text-[var(--fg-primary)]">
                   <InlineEditNumber
                     value={data.value}
+                    exactMicros={data.valueMicros}
+                    onSaveMicros={(micros) =>
+                      patch.mutateAsync({ id: id!, patch: { valueMicros: micros } })
+                    }
                     onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
                     label={t(
                       'opportunityDetail.editValueLabel',
@@ -230,7 +240,11 @@ export function OpportunityDetailPage() {
                     )}
                     min={0}
                     step={1000}
-                    display={(v) => formatUnspecifiedAmount(v)}
+                    display={(v) =>
+                      data.valueMicros
+                        ? formatMicrosAmount(BigInt(data.valueMicros))
+                        : formatUnspecifiedAmount(v)
+                    }
                   />
                 </dd>
                 <p className="mt-1 max-w-[16rem] text-xs text-[var(--fg-secondary)]">

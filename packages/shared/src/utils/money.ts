@@ -45,6 +45,24 @@ export function formatMicrosAmount(micros: bigint | number): string {
   return negative ? `-${text}` : text;
 }
 
+/** Unit text with up to 6 decimal places. No rounding. */
+export function microsToUnitsText(micros: bigint | number | string): string {
+  const value = typeof micros === 'bigint' ? micros : BigInt(micros);
+  const whole = value / MICROS_PER_UNIT;
+  const frac = value % MICROS_PER_UNIT;
+  if (frac === 0n) return whole.toString();
+  return `${whole}.${frac.toString().padStart(6, '0').replace(/0+$/, '')}`;
+}
+
+/** Parse a unit amount into integer micros. Rejects more than 6 decimal places. */
+export function unitsTextToMicros(text: string): bigint | null {
+  const trimmed = text.trim().replace(/,/g, '');
+  if (!/^\d+(\.\d{1,6})?$/.test(trimmed)) return null;
+  const [whole = '0', frac = ''] = trimmed.split('.');
+  const padded = (frac + '000000').slice(0, 6);
+  return BigInt(whole) * MICROS_PER_UNIT + BigInt(padded);
+}
+
 export function microsToUnits(micros: bigint | number): number {
   const value = toBigIntMicros(micros);
   const whole = value / MICROS_PER_UNIT;

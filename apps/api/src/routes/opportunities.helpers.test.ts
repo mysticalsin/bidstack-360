@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { rememberCompanyName, stageMoveDiff } from './opportunities.helpers';
+import { patchedValueMicros, rememberCompanyName, stageMoveDiff } from './opportunities.helpers';
+
+describe('patchedValueMicros', () => {
+  it('keeps an explicit micros string instead of rounding the unit number', () => {
+    // WHY: Math.round(value * 1e6) cannot store this amount.
+    const micros = '8598204328457184962';
+    expect(patchedValueMicros({ value: 1, valueMicros: micros })).toBe(BigInt(micros));
+    expect(patchedValueMicros({ value: 2 })).toBe(2_000_000n);
+    expect(patchedValueMicros({})).toBeUndefined();
+  });
+});
 
 describe('stageMoveDiff', () => {
   it('records a lost move so a patch cannot drop the stage event', () => {
