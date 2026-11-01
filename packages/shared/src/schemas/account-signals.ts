@@ -380,6 +380,12 @@ export interface MomentumData {
   headcountGrowth12m: number | null;
   /** The post list is the latest page, so the 30-day ratio is not the book. */
   postingsArePage?: boolean;
+  /** Deals are the latest page, so the 90-day change is not the book. */
+  dealsArePage?: boolean;
+  /** Meetings are the latest page, so the prior 60 days are not the book. */
+  meetingsArePage?: boolean;
+  /** News is the latest page, so the 90-day tone is not the book. */
+  newsArePage?: boolean;
 }
 
 export interface MomentumDriver {
@@ -494,15 +500,24 @@ function components(d: MomentumData, asOf: number): Component[] {
   const nowV = openValueAt(d.opps, asOf);
   const prevV = openValueAt(d.opps, asOf - 90 * DAY);
   if (nowV > 0n || prevV > 0n) {
-    const s = clamp(ratioChangeMicros(nowV, prevV) * 1.25);
-    const pct = prevV > 0n ? roundedPercent(nowV - prevV, prevV) : null;
-    const detail =
-      pct === null
-        ? `${compactMoney(nowV)} open pipeline, all opened in the last 90 days`
-        : pct === 0
-          ? `${compactMoney(nowV)} open pipeline, flat over 90 days`
-          : `Open pipeline ${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)}% in 90 days (${compactMoney(nowV)})`;
-    out.push({ key: 'pipeline', signal: s, detail });
+    if (d.dealsArePage) {
+      out.push({
+        key: 'pipeline',
+        signal: 0,
+        detail: `${compactMoney(nowV)} open pipeline on the latest page`,
+        scored: false,
+      });
+    } else {
+      const s = clamp(ratioChangeMicros(nowV, prevV) * 1.25);
+      const pct = prevV > 0n ? roundedPercent(nowV - prevV, prevV) : null;
+      const detail =
+        pct === null
+          ? `${compactMoney(nowV)} open pipeline, all opened in the last 90 days`
+          : pct === 0
+            ? `${compactMoney(nowV)} open pipeline, flat over 90 days`
+            : `Open pipeline ${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)}% in 90 days (${compactMoney(nowV)})`;
+      out.push({ key: 'pipeline', signal: s, detail });
+    }
   }
   // Win/loss: last 180 days.
   let won = 0;
@@ -515,8 +530,9 @@ function components(d: MomentumData, asOf: number): Component[] {
   if (won + lost > 0) {
     out.push({
       key: 'winloss',
-      signal: clamp((won - lost) / (won + lost)),
+      signal: d.dealsArePage ? 0 : clamp((won - lost) / (won + lost)),
       detail: `${won} won, ${lost} lost in the last 6 months`,
+      scored: !d.dealsArePage,
     });
   }
   // Meetings: frequency (60 vs prior 60 days) and recency.
@@ -529,11 +545,20 @@ function components(d: MomentumData, asOf: number): Component[] {
     const recency = days <= 14 ? 1 : days <= 30 ? 0.5 : days <= 60 ? 0 : days <= 90 ? -0.5 : -1;
     const freq = a + b === 0 ? -0.5 : ratioChange(a, b);
     const when = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
-    out.push({
-      key: 'meetings',
-      signal: clamp(freq * 0.6 + recency * 0.4),
-      detail: `${a} meeting${a === 1 ? '' : 's'} in 60 days (${b} before), last ${when}`,
-    });
+    const count = `${a} meeting${a === 1 ? '' : 's'}`;
+    out.push(
+      d.meetingsArePage
+        ? {
+            key: 'meetings',
+            signal: recency,
+            detail: `${count} in 60 days on this page, last ${when}`,
+          }
+        : {
+            key: 'meetings',
+            signal: clamp(freq * 0.6 + recency * 0.4),
+            detail: `${count} in 60 days (${b} before), last ${when}`,
+          },
+    );
   }
   // Hiring: postings 30 vs prior 30 days, blended with 12-month headcount.
   const pa = d.postings.filter((p) => inWindow(p, asOf - 30 * DAY, asOf)).length;
@@ -576,8 +601,9 @@ function components(d: MomentumData, asOf: number): Component[] {
     const tone = avg > 0.15 ? 'mostly positive' : avg < -0.15 ? 'mostly negative' : 'mixed';
     out.push({
       key: 'news',
-      signal: clamp(avg * 1.4),
+      signal: d.newsArePage ? 0 : clamp(avg * 1.4),
       detail: `News ${tone}: ${pos} positive, ${neg} negative in 90 days`,
+      scored: !d.newsArePage,
     });
   }
   return out;
