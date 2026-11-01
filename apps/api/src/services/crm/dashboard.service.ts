@@ -49,6 +49,8 @@ import {
 import {
   fetchAccountPerformance,
   fetchBuyingRoleFacts,
+  loadAccountCompliance,
+  loadAccountRisks,
   serializeDeal,
   serializeProviderHealth,
   serializeQueueHealth,
@@ -481,40 +483,14 @@ export async function buildDashboardSnapshot(
   ]);
   const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
   const contactIds = contacts.map((contact) => contact.id);
-  const [riskRows, complianceRows, buyingRoleFacts] = await Promise.all([
+  const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
+  const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
-      ? []
-      : prisma.riskRegisterItem.findMany({
-          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-          select: {
-            id: true,
-            opportunityId: true,
-            title: true,
-            severity: true,
-            owner: true,
-            mitigation: true,
-            dueDate: true,
-            status: true,
-            companyName: true,
-          },
-          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-          take: 50,
-        }),
+      ? { rows: [], openCount: 0, capped: false }
+      : loadAccountRisks(prisma, registerWhere),
     accountOpportunityIds.length === 0
-      ? []
-      : prisma.complianceCheck.findMany({
-          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-          select: {
-            id: true,
-            opportunityId: true,
-            label: true,
-            status: true,
-            owner: true,
-            sourceAttribution: true,
-          },
-          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-          take: 50,
-        }),
+      ? { rows: [], openCount: 0, capped: false }
+      : loadAccountCompliance(prisma, registerWhere),
     fetchBuyingRoleFacts(orgId, contactIds, prisma),
   ]);
 
@@ -532,8 +508,12 @@ export async function buildDashboardSnapshot(
       opportunities: accountOpportunities,
       contacts,
       tasks: accountTasks,
-      risks: riskRows,
-      compliance: complianceRows,
+      risks: riskPage.rows,
+      compliance: compliancePage.rows,
+      openRiskCount: riskPage.openCount,
+      openComplianceCount: compliancePage.openCount,
+      risksCapped: riskPage.capped,
+      complianceCapped: compliancePage.capped,
       buyingRoleFacts,
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',

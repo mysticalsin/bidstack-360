@@ -15,19 +15,31 @@ import { severityBg, severityShort, severityTone } from './_tokens';
 interface Props {
   risks: RiskItem[];
   compliance: ComplianceCheck[];
+  openRiskCount?: number;
+  openComplianceCount?: number;
+  risksCapped?: boolean;
+  complianceCapped?: boolean;
 }
 
 // Memoized — render is pure on risks+compliance arrays, both stable per
 // snapshot fetch. Avoids re-render when sibling cards refetch.
-export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }: Props) {
+export const OpenIssuesCard = memo(function OpenIssuesCard({
+  risks,
+  compliance,
+  openRiskCount,
+  openComplianceCount,
+  risksCapped,
+  complianceCapped,
+}: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
   const openRisks = risks.filter((r) => r.status === 'open' || r.status === 'in_progress');
   const openCompliance = compliance.filter(
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
   );
-  const total = openRisks.length + openCompliance.length;
+  const total = (openRiskCount ?? openRisks.length) + (openComplianceCount ?? openCompliance.length);
   const recorded = risks.length + compliance.length;
+  const pageCapped = Boolean(risksCapped || complianceCapped);
   // Severity buckets are computed against the full risk list (not just open)
   // so the bar reflects the registry total rather than "what's left today".
   const buckets = [
@@ -62,17 +74,28 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
       <SectionHeader
         title={t('openIssues.title', 'Open issues')}
         caption={
-          recorded === 0
+          recorded === 0 && total === 0
             ? t(
                 'openIssues.captionNoneRecorded',
                 'No risks or compliance checks recorded on this account',
               )
             : total === 0
-              ? t('openIssues.captionNoneOpen', 'No open items in the recorded register')
-              : t('openIssues.captionItemsToAction', '{{count}} open item{{plural}}', {
-                  count: total,
-                  plural: total === 1 ? '' : 's',
-                })
+              ? t(
+                  'openIssues.captionNoneOpen',
+                  pageCapped
+                    ? 'No open items in the latest 50 rows. Older rows are outside this page.'
+                    : 'No open items in the recorded register',
+                )
+              : t(
+                  'openIssues.captionItemsToAction',
+                  pageCapped
+                    ? `Latest 50 rows. ${total} open items on the account.`
+                    : '{{count}} open item{{plural}}',
+                  {
+                    count: total,
+                    plural: total === 1 ? '' : 's',
+                  },
+                )
         }
       />
       <div style={{ padding: '8px 18px 14px' }}>

@@ -608,6 +608,10 @@ export function buildCockpit({
   now = new Date(),
   coveragePages,
   openDealCount,
+  openRiskCount,
+  openComplianceCount,
+  risksCapped,
+  complianceCapped,
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
@@ -694,6 +698,10 @@ export function buildCockpit({
   coveragePages?: { contactsCapped?: boolean; dealsCapped?: boolean; tasksCapped?: boolean };
   /** Exact open-deal count when the opportunity page is not the whole book. */
   openDealCount?: number;
+  openRiskCount?: number;
+  openComplianceCount?: number;
+  risksCapped?: boolean;
+  complianceCapped?: boolean;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
   const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
@@ -915,6 +923,10 @@ export function buildCockpit({
     recentActivity: buildActivities(accountTasks).slice(0, 5),
     risks: visibleRisks.map(serializeRisk),
     compliance: visibleCompliance.map(serializeCompliance),
+    openRiskCount,
+    openComplianceCount,
+    risksCapped,
+    complianceCapped,
     roadmap: [],
   };
 }
