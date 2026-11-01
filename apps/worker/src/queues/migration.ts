@@ -156,6 +156,21 @@ interface WriteCtx {
   dedupStrategy: 'skip' | 'update' | 'duplicate';
 }
 
+/** One insensitive name match may be used. Two matches must not pick a winner. */
+export function soleCompanyId(ids: readonly string[]): { id: string | null; ambiguous: boolean } {
+  if (ids.length > 1) return { id: null, ambiguous: true };
+  return { id: ids[0] ?? null, ambiguous: false };
+}
+
+async function companiesNamed(orgId: string, name: string): Promise<string[]> {
+  const rows = await prisma.company.findMany({
+    where: { orgId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
+    select: { id: true },
+    take: 2,
+  });
+  return rows.map((row) => row.id);
+}
+
 async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
   const name = asTrimmed(t['company.name']);
   if (!name) throw new Error('company.name is required');
@@ -168,13 +183,13 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     countryCode: asTrimmed(t['company.countryCode'])?.slice(0, 2).toUpperCase() ?? null,
   };
   if (ctx.dedupStrategy !== 'duplicate') {
-    const existing = await prisma.company.findFirst({
-      where: { orgId: ctx.orgId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
-      select: { id: true },
-    });
-    if (existing) {
+    const match = soleCompanyId(await companiesNamed(ctx.orgId, name));
+    if (match.ambiguous) {
+      throw new Error(`company.name matches more than one company: ${name}`);
+    }
+    if (match.id) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.company.update({ where: { id: existing.id }, data });
+      await prisma.company.update({ where: { id: match.id }, data });
       return null; // updated, not created — undo must not delete pre-existing rows
     }
   }
@@ -192,20 +207,11 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
   if (!name) throw new Error('contact first/last name is required');
   const customer = asTrimmed(t['contact.companyName']) ?? '';
   const email = asTrimmed(t['contact.email']);
-  const company = customer
-    ? await prisma.company.findFirst({
-        where: {
-          orgId: ctx.orgId,
-          name: { equals: customer, mode: 'insensitive' },
-          deletedAt: null,
-        },
-        select: { id: true },
-      })
-    : null;
+  const company = customer ? soleCompanyId(await companiesNamed(ctx.orgId, customer)) : null;
   const data = {
     name,
     customer,
-    companyId: company?.id ?? null,
+    companyId: company?.ambiguous ? null : (company?.id ?? null),
     email,
     phone: asTrimmed(t['contact.phone']) ?? asTrimmed(t['contact.mobile']),
     role: asTrimmed(t['contact.title']),
