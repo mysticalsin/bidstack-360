@@ -110,6 +110,36 @@ describe('computeMomentum', () => {
     headcountGrowth12m: 0.08,
   };
 
+  it('prints an open pipeline amount the one-digit compact label would move', () => {
+    // WHY: toFixed(1) turned 7.86 million into 7.9M on the pulse.
+    const moved = computeMomentum(
+      {
+        opps: [{ createdAt: daysAgo(10), closedAt: null, outcome: 'open', valueMicros: 7_860_000_000_000n }],
+        meetings: [],
+        postings: [],
+        events: [],
+        headcountGrowth12m: null,
+      },
+      NOW,
+    );
+    const movedDetail = moved.drivers.find((driver) => driver.key === 'pipeline')?.detail ?? '';
+    expect(movedDetail).toContain('7.86M');
+    expect(movedDetail).not.toContain('7.9');
+    const kept = computeMomentum(
+      {
+        opps: [{ createdAt: daysAgo(10), closedAt: null, outcome: 'open', valueMicros: 12_015_000_000_000n }],
+        meetings: [],
+        postings: [],
+        events: [],
+        headcountGrowth12m: null,
+      },
+      NOW,
+    );
+    const keptDetail = kept.drivers.find((driver) => driver.key === 'pipeline')?.detail ?? '';
+    expect(keptDetail).toContain('12,015,000');
+    expect(keptDetail).not.toMatch(/12\.0/);
+  });
+
   it('reads a growing account as gaining with plain-English drivers', () => {
     const m = computeMomentum(growing, NOW);
     expect(m.score).toBeGreaterThan(65);
