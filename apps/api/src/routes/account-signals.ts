@@ -38,6 +38,7 @@ import {
   sourceStatus,
 } from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
+import { buyerNamesAccount } from '../services/account-signals/bid-name.js';
 import { loadInitiatives } from '../services/account-signals/initiatives.js';
 import { loadKeyNumbers, loadPositioning } from '../services/account-positioning/load.js';
 
@@ -149,12 +150,13 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           const where = { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' as const }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] };
           const rows = await prisma.bidOpportunity.findMany({
             where,
-            select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
+            select: { id: true, title: true, buyer: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
             orderBy: { importedAt: 'desc' },
-            take: 100,
+            take: 1000,
           });
-          const capped = rows.length === 100 && pageIsCapped(rows.length, await prisma.bidOpportunity.count({ where }), 100);
-          return { rows, capped };
+          const named = rows.filter((row) => buyerNamesAccount(row.buyer, company.name));
+          const searchCapped = rows.length === 1000 && pageIsCapped(rows.length, await prisma.bidOpportunity.count({ where }), 1000);
+          return { rows: named.slice(0, 100), capped: named.length > 100, searchCapped };
         })(),
         (async () => {
           const where = { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' as const }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) };
@@ -267,6 +269,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         meetingsCapped: meetingPage.capped,
         newsCapped: eventPage.capped,
         bidsCapped: bidPage.capped,
+        bidsSearchCapped: bidPage.searchCapped,
         marksCapped: pool.length > shown.length,
       };
     },
