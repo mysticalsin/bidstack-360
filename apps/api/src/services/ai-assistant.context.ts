@@ -12,6 +12,7 @@
 import { z } from 'zod';
 
 import { Prisma, prisma } from '@bidstack/db';
+import { formatMicrosAmount } from '@bidstack/shared';
 
 import { excludeClosedOutcome } from '../routes/opportunities.helpers.js';
 
@@ -45,8 +46,9 @@ export function countRecordedDealOutcomes(deals: readonly PromptDeal[]): {
 
 /** Deal line for a model prompt. Amounts have no currency. Outcome follows a live stage flag. */
 export function formatDealForPrompt(deal: PromptDeal): string {
-  const micros = deal.valueMicros == null ? 0 : Number(deal.valueMicros);
-  const amount = micros === 0 ? '' : `, value ${micros / 1_000_000} (currency not recorded)`;
+  const micros = deal.valueMicros == null ? 0n : BigInt(deal.valueMicros);
+  const amount =
+    micros === 0n ? '' : `, value ${formatMicrosAmount(micros)} (currency not recorded)`;
   return `"${deal.name}" (stage ${deal.stage}, outcome ${dealOutcomeForPrompt(deal)}${amount})`;
 }
 

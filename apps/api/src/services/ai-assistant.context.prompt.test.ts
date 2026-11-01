@@ -18,6 +18,18 @@ describe('formatDealForPrompt', () => {
     expect(line).not.toContain('$');
   });
 
+  it('prints a large amount from integer micros', () => {
+    // WHY: Number(micros) / 1e6 moved this amount to the next cent in the brief.
+    const line = formatDealForPrompt({
+      name: 'Large book',
+      stage: 's4_negotiation',
+      valueMicros: 8_598_204_328_457_184_962n,
+      pipelineStage: null,
+    });
+    expect(line).toContain('value 8,598,204,328,457.18 (currency not recorded)');
+    expect(line).not.toContain('457.19');
+  });
+
   it('treats a deleted stage as open and omits a zero amount', () => {
     const line = formatDealForPrompt({
       name: 'Back in play',
