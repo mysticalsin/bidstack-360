@@ -95,6 +95,63 @@ export async function seedPublicIdentifiers(prisma: PrismaClient, now: Date = ne
   return { domains, tickers };
 }
 
+/**
+ * v23: filer identifiers for the financials pull (LEI for ESEF, CIK for SEC
+ * EDGAR), checked against the filer name on filings.xbrl.org and EDGAR. Pulls
+ * only ever use these ids, never a name search, so namesakes (MAPFRE MALTA,
+ * RUSH ENTERPRISES) cannot leak in. Fills empty fields only.
+ * Aritzia has no XBRL filings (its ADR CIK only files F-6), Rush is a private
+ * health system, MAHLE, Logistec and Mantu do not file XBRL.
+ */
+export const FILER_IDENTIFIERS: Record<string, { lei?: string; secCik?: string }> = {
+  'DNB Bank': { lei: '549300GKFG0RYRRQ1414' },
+  MAPFRE: { lei: '95980020140005693107' },
+  NOS: { lei: '5493004DM8FGIY6QKF37' },
+  'CI Financial': { secCik: '0001829948' },
+};
+
+/**
+ * v23 demo tiers: the financials pull runs for Strategic (key) and Top
+ * accounts. Applied only while the account has no financials profile yet, so a
+ * re-seed never undoes an Admin's tier edit.
+ */
+export const DEMO_TIERS: Record<string, 'key' | 'top'> = {
+  Aritzia: 'top',
+  MAPFRE: 'top',
+  NOS: 'top',
+};
+
+export async function seedFinancialsSetup(prisma: PrismaClient, now: Date = new Date()): Promise<{ identifiers: number; tiers: number }> {
+  let identifiers = 0;
+  let tiers = 0;
+  for (const [name, ids] of Object.entries(FILER_IDENTIFIERS)) {
+    const companies = await prisma.company.findMany({ where: { name, deletedAt: null }, select: { id: true, orgId: true } });
+    for (const c of companies) {
+      const sub = await prisma.accountWatchSubject.findUnique({ where: { orgId_companyId: { orgId: c.orgId, companyId: c.id } } });
+      if (!sub) {
+        await prisma.accountWatchSubject.create({ data: { orgId: c.orgId, companyId: c.id, lei: ids.lei ?? null, secCik: ids.secCik ?? null, identifiersConfirmedAt: now } });
+        identifiers++;
+        continue;
+      }
+      const data: { lei?: string; secCik?: string } = {};
+      if (ids.lei && !sub.lei) data.lei = ids.lei;
+      if (ids.secCik && !sub.secCik) data.secCik = ids.secCik;
+      if (Object.keys(data).length) {
+        await prisma.accountWatchSubject.update({ where: { id: sub.id }, data });
+        identifiers++;
+      }
+    }
+  }
+  for (const [name, tier] of Object.entries(DEMO_TIERS)) {
+    const companies = await prisma.company.findMany({ where: { name, deletedAt: null, financialProfile: null, tier: 'standard' }, select: { id: true } });
+    for (const c of companies) {
+      await prisma.company.update({ where: { id: c.id }, data: { tier } });
+      tiers++;
+    }
+  }
+  return { identifiers, tiers };
+}
+
 export async function seedSampleSignals(prisma: PrismaClient, opts: { now?: Date; remove?: boolean } = {}): Promise<{ upserted: number; removed: number }> {
   const now = opts.now ?? new Date();
   if (opts.remove) {
@@ -146,6 +203,8 @@ if (isMain) {
       if (!remove) {
         const ids = await seedPublicIdentifiers(prisma);
         process.stdout.write(`public identifiers: ${ids.domains} domains, ${ids.tickers} tickers set\n`);
+        const fin = await seedFinancialsSetup(prisma);
+        process.stdout.write(`financials: ${fin.identifiers} filer ids set, ${fin.tiers} demo tiers set\n`);
       }
     })
     .catch((err: unknown) => {
