@@ -23,11 +23,8 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import {
-  formatUnspecifiedCompact,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
-import { pipelineHeadline } from '@/components/dashboard/widgets/pipeline-headline';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { PipelineMetricStrip } from '@/components/dashboard/widgets/PipelineMetricStrip';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -235,49 +232,9 @@ export function PipelinePage() {
           : ''}
       </p>
 
-      {/* KPI summary bar */}
-      {!isLoading && data && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
-          {(() => {
-            const headline = pipelineHeadline(report.data?.byStage ?? []);
-            const winRate =
-              headline.winRate === null
-                ? t('pipeline.winRateNoClosedBids', 'No closed bids')
-                : `${Math.round(headline.winRate * 100)}%`;
-            const loading = report.isLoading;
-            return [
-              {
-                label: t('pipeline.kpiOpenValue', 'Open pipeline'),
-                value: loading ? '…' : formatUnspecifiedCompact(headline.openValue),
-              },
-              {
-                label: t('pipeline.kpiWonValue', 'Won'),
-                value: loading ? '…' : formatUnspecifiedCompact(headline.wonValue),
-              },
-              {
-                label: t('pipeline.kpiLostValue', 'Lost'),
-                value: loading ? '…' : formatUnspecifiedCompact(headline.lostValue),
-              },
-              {
-                label: t('pipeline.kpiWinRate', 'Win rate'),
-                value: loading ? '…' : winRate,
-              },
-            ];
-          })().map((kpi) => (
-            <div
-              key={kpi.label}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
-            >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                {kpi.label}
-              </div>
-              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
-                {kpi.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {!isLoading && data ? (
+        <PipelineMetricStrip stages={report.data?.byStage} loading={report.isLoading} />
+      ) : null}
       {!isLoading && data ? (
         <p className="text-xs text-[var(--fg-tertiary)]">
           {t(

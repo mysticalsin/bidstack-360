@@ -9,9 +9,9 @@ import { ErrorState } from '@/components/ui/StateMessages';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { useOrgSummary, type OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
-import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
 import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { PipelineByStageMini } from './widgets/PipelineByStageMini';
+import { PipelineMetricStrip } from './widgets/PipelineMetricStrip';
 import { AlertCard } from './widgets/AlertCard';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
 import { TopAccountsCard } from './widgets/TopAccountsCard';
@@ -73,15 +73,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
       </header>
 
-      <section aria-label={t('orgDashboard.pipelineTotalLabel', 'Open pipeline')}>
-        <p className="text-sm text-[var(--fg-secondary)]">
-          {t('orgDashboard.pipelineTotalLabel', 'Open pipeline')}
-        </p>
-        <p className="mt-2 text-[32px] font-medium tabular-nums leading-none text-[var(--fg-primary)]">
-          {formatUnspecifiedAmount(s.pipelineValue ?? 0)}
-        </p>
-        <p className="mt-2 text-sm text-[var(--fg-secondary)]">{UNSPECIFIED_CURRENCY_BASIS}</p>
-      </section>
+      <PipelineMetricStrip stages={pipelineReport.data?.byStage} loading={pipelineReport.isLoading} />
 
       <PipelineByStageMini report={pipelineReport.data} />
 
