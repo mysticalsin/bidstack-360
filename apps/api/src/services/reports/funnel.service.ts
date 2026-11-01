@@ -93,11 +93,15 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
 
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');
 
+  // Close date is the due date. A later edit must not move last quarter's win
+  // into this quarter, and a win with no close date is not counted.
+  const quarterBegin = quarterStart();
+  const quarterEnd = new Date(Date.UTC(quarterBegin.getUTCFullYear(), quarterBegin.getUTCMonth() + 3, 1));
   const closedThisQuarter = await prisma.opportunity.count({
     where: {
       orgId,
       deletedAt: null,
-      updatedAt: { gte: quarterStart() },
+      dueDate: { gte: quarterBegin, lt: quarterEnd },
       ...wonOutcomeWhere(),
     },
   });

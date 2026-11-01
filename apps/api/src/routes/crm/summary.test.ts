@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import { quarterStart } from '@bidstack/shared';
 
 import { getPipelineKpis } from '../../services/reports/funnel.service.js';
 import { buildServer } from '../../server.js';
@@ -116,9 +117,13 @@ describe('crm summary routes', () => {
   });
 
   failIfNoDb('a won stage flag counts as closed this quarter', async () => {
-    // WHY: the quarter close count used the closed_won enum only. A live won
-    // flag was still an open stage, and a lost flag on a won enum still counted.
+    // WHY: the quarter close count used the closed_won enum only, then any
+    // update this quarter. A live won flag with a close date in this quarter
+    // counts. Lost still wins. A win dated last year does not, even if edited now.
     const before = await getPipelineKpis(orgId);
+    const quarterBegin = quarterStart();
+    const thisQuarter = new Date(Date.UTC(quarterBegin.getUTCFullYear(), quarterBegin.getUTCMonth(), 15));
+    const lastYear = new Date(Date.UTC(quarterBegin.getUTCFullYear() - 1, quarterBegin.getUTCMonth(), 15));
     const pipeline = await prisma.pipeline.create({
       data: { orgId, name: `Quarter flags ${Date.now()}` },
     });
@@ -147,6 +152,7 @@ describe('crm summary routes', () => {
           pipelineStageId: won.id,
           valueMicros: 1_000_000n,
           probability: 80,
+          dueDate: thisQuarter,
           intel: {},
         },
         {
@@ -158,6 +164,18 @@ describe('crm summary routes', () => {
           pipelineStageId: lost.id,
           valueMicros: 4_000_000n,
           probability: 100,
+          dueDate: thisQuarter,
+          intel: {},
+        },
+        {
+          orgId,
+          code: `OP-WQ3-${stamp}`,
+          customer: 'Quarter Co',
+          name: 'Won last year, edited now',
+          stage: 'closed_won',
+          valueMicros: 3_000_000n,
+          probability: 100,
+          dueDate: lastYear,
           intel: {},
         },
       ],
