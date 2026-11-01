@@ -312,15 +312,52 @@ describeDb('MCP tools', () => {
         score: 0,
       },
       ctx,
-    )) as { id: string; firstName: string; status: string };
+    )) as { id: string; firstName: string; status: string; companyId: string | null };
     expect(out.firstName).toBe('Alice');
     expect(out.status).toBe('new');
+    expect(out.companyId).toBeNull();
 
     const audit = await prisma.auditLog.findFirst({
       where: { orgId, targetType: 'lead', action: 'lead.create.mcp' },
       orderBy: { at: 'desc' },
     });
     expect(audit).toBeTruthy();
+  });
+
+  it('leads.create stores a company id only when the name is one company', async () => {
+    // WHY: a new prospect often has no company row. The name stays a label.
+    // One match becomes the link. Two casings must not pick a company.
+    const name = `Linked Lead ${randomBytes(4).toString('hex')}`;
+    const company = await prisma.company.create({ data: { orgId, name } });
+    const linked = (await tools['leads.create'].handler(
+      {
+        firstName: 'Lia',
+        lastName: 'Link',
+        companyName: name,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { companyId: string | null };
+    expect(linked.companyId).toBe(company.id);
+
+    const token = randomBytes(4).toString('hex');
+    await prisma.company.create({ data: { orgId, name: `Twin Lead ${token}` } });
+    await prisma.company.create({ data: { orgId, name: `twin lead ${token}` } });
+    await expect(
+      tools['leads.create'].handler(
+        {
+          firstName: 'Amy',
+          lastName: 'Big',
+          companyName: `Twin Lead ${token}`,
+          source: 'website',
+          priority: 'medium',
+          score: 0,
+        },
+        ctx,
+      ),
+    ).rejects.toThrow(/company id/);
   });
 
   it('leads.list returns leads for the org', async () => {
