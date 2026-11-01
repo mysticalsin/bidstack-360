@@ -499,7 +499,14 @@ export async function buildDashboardSnapshot(
         }
       : loadAccountRisks(prisma, registerWhere),
     accountOpportunityIds.length === 0
-      ? { rows: [], openCount: 0, capped: false, compliantCount: 0, complianceTotal: 0 }
+      ? {
+          rows: [],
+          openCount: 0,
+          capped: false,
+          compliantCount: 0,
+          complianceTotal: 0,
+          blockedCount: 0,
+        }
       : loadAccountCompliance(prisma, registerWhere),
     fetchBuyingRoleFacts(orgId, contactIds, prisma, selectedCompany.id),
   ]);
@@ -525,6 +532,7 @@ export async function buildDashboardSnapshot(
       openRiskSeverity: riskPage.openBySeverity,
       compliantCount: compliancePage.compliantCount,
       complianceTotal: compliancePage.complianceTotal,
+      blockedCount: compliancePage.blockedCount,
       risksCapped: riskPage.capped,
       complianceCapped: compliancePage.capped,
       buyingRoleFacts: buyingRoleFacts.rows,
