@@ -661,6 +661,7 @@ const EMPTY_ACCOUNT_PERFORMANCE: AccountPerformance = {
     winRate: null,
   },
   revenueEvolution: [],
+  book: { projectCount: 0, openCount: 0 },
 };
 
 export async function fetchAccountPerformance(
@@ -692,9 +693,16 @@ export async function fetchAccountPerformance(
       { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
     ],
   };
+  const openWhere: Prisma.OpportunityWhereInput = {
+    ...base,
+    stage: { notIn: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
+    NOT: {
+      pipelineStage: { is: { deletedAt: null, OR: [{ isWon: true }, { isLost: true }] } },
+    },
+  };
   const scoped = (where: Prisma.OpportunityWhereInput) =>
     scope ? applyOpportunityScope(where, scope) : where;
-  const [won, lost, revenueRows] = await Promise.all([
+  const [won, lost, projects, open, revenueRows] = await Promise.all([
     prismaClient.opportunity.aggregate({
       where: scoped(wonWhere),
       _sum: { valueMicros: true },
@@ -705,6 +713,8 @@ export async function fetchAccountPerformance(
       _sum: { valueMicros: true },
       _count: { _all: true },
     }),
+    prismaClient.opportunity.count({ where: scoped(base) }),
+    prismaClient.opportunity.count({ where: scoped(openWhere) }),
     fetchRevenueRows(orgId, companyId, prismaClient, scope),
   ]);
 
@@ -720,6 +730,7 @@ export async function fetchAccountPerformance(
       lostValueMicros: microsText(lost._sum.valueMicros),
       winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
     },
+    book: { projectCount: projects, openCount: open },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
     // oldest-first.
     revenueEvolution: revenueRows

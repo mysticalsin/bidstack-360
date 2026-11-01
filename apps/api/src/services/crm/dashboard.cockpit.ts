@@ -248,6 +248,11 @@ export interface AccountPerformance {
     winRate: number | null;
   };
   revenueEvolution: Array<{ period: string; revenueMicros: string }>;
+  /** Exact account totals. The opportunity array on the cockpit is only a page. */
+  book?: {
+    projectCount: number;
+    openCount: number;
+  };
 }
 
 /** Integer micros text. Number() moves a sum past 2^53 off the cent. */
@@ -777,6 +782,8 @@ export function buildCockpit({
   const { winLoss, revenueEvolution } = performance ?? deriveAccountPerformance(companyOpps);
   const wonDeals = winLoss.wonCount;
   const lostDeals = winLoss.lostCount;
+  const projectCount = performance?.book?.projectCount ?? companyOpps.length;
+  const openCount = performance?.book?.openCount ?? openDeals.length;
 
   return {
     company,
@@ -830,7 +837,7 @@ export function buildCockpit({
       },
       {
         label: 'Projects',
-        value: companyOpps.length.toString(),
+        value: projectCount.toString(),
         detail: 'count of opportunities matched to this account',
         tone: 'blue',
         ...internalSource,
@@ -838,7 +845,7 @@ export function buildCockpit({
       },
       {
         label: 'Open deals',
-        value: openDeals.length.toString(),
+        value: openCount.toString(),
         detail: 'count of open opportunities on this account',
         tone: 'amber',
         ...internalSource,

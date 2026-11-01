@@ -743,4 +743,24 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     expect(cockpit.winLoss?.lostCount).toBe(0);
     expect(cockpit.winLoss?.wonCount).toBe(0);
   });
+
+  it('uses the account total when the loaded deals are only a page', () => {
+    // WHY: the tiles counted the 100-row page, so a larger book showed the page size.
+    const cockpit = buildCockpit({
+      ...baseArgs([opp({ stage: 's2_sent' })]),
+      performance: {
+        winLoss: {
+          wonCount: 0,
+          lostCount: 0,
+          wonValueMicros: '0',
+          lostValueMicros: '0',
+          winRate: null,
+        },
+        revenueEvolution: [],
+        book: { projectCount: 140, openCount: 120 },
+      },
+    });
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('120');
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('140');
+  });
 });
