@@ -56,15 +56,25 @@ function sumDealMicros(rows: Opportunity[], weight: boolean): bigint {
   }, 0n);
 }
 
+export type OpportunityMatchTotals = {
+  count: number;
+  wonMicros: string;
+  openMicros: string;
+  weightedMicros: string;
+};
+
 export function OppKpiBar({
   opps,
   summary,
   partial = false,
+  match,
 }: {
   opps: Opportunity[];
   summary?: OrgSummary;
   /** True when this cursor page is not the whole filtered result. */
   partial?: boolean;
+  /** Server totals for the active filter. Present only after that request resolves. */
+  match?: OpportunityMatchTotals;
 }) {
   const { t } = useTranslation('crm');
   const openOpps = opps.filter((o) => closedOutcome(o) === null);
@@ -75,13 +85,44 @@ export function OppKpiBar({
   const weightedMicros = sumDealMicros(openOpps, true);
   const openMicros = sumDealMicros(openOpps, false);
   const currencyDetail = t('oppToolbar.kpiCurrencyBasis', UNSPECIFIED_CURRENCY_BASIS);
+  const matchDetail = t(
+    'oppToolbar.kpiMatchDetail',
+    'Every row matching this filter. {{basis}}',
+    { basis: UNSPECIFIED_CURRENCY_BASIS },
+  );
   const weightedDetail = t(
     'oppToolbar.kpiWeightedRevenueDetail',
     'Open rows on this page × stored probability. {{basis}}',
     { basis: UNSPECIFIED_CURRENCY_BASIS },
   );
-  const kpis: Array<{ label: string; value: string; detail?: string }> = summary
+  const kpis: Array<{ label: string; value: string; detail?: string }> = match
     ? [
+        {
+          label: t('oppToolbar.kpiMatchCount', 'Matching'),
+          value: match.count.toLocaleString(),
+        },
+        {
+          label: t('oppToolbar.kpiMatchWon', 'Won'),
+          value: formatMicrosAmount(BigInt(match.wonMicros)),
+          detail: matchDetail,
+        },
+        {
+          label: t('oppToolbar.kpiMatchWeighted', 'Weighted'),
+          value: formatMicrosAmount(BigInt(match.weightedMicros)),
+          detail: t(
+            'oppToolbar.kpiMatchWeightedDetail',
+            'Every open row matching this filter × stored probability. {{basis}}',
+            { basis: UNSPECIFIED_CURRENCY_BASIS },
+          ),
+        },
+        {
+          label: t('oppToolbar.kpiMatchOpen', 'Open'),
+          value: formatMicrosAmount(BigInt(match.openMicros)),
+          detail: matchDetail,
+        },
+      ]
+    : summary
+      ? [
         {
           label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
           value: summary.opportunities.toLocaleString(),
@@ -132,7 +173,7 @@ export function OppKpiBar({
       aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"
     >
-      {!summary && partial ? (
+      {!summary && !match && partial ? (
         <p className="col-span-2 text-sm text-[var(--fg-secondary)] sm:col-span-4">
           {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
         </p>

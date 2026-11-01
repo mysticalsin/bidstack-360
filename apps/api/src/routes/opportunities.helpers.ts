@@ -78,6 +78,48 @@ export function excludeClosedOutcome(): Prisma.OpportunityWhereInput {
   };
 }
 
+/** Value × stored probability for open rows. A non-positive probability adds nothing. */
+export function weightedOpenMicros(
+  rows: ReadonlyArray<{ valueMicros: bigint; probability: number }>,
+): bigint {
+  return rows.reduce((sum, row) => {
+    if (row.probability <= 0) return sum;
+    return sum + (row.valueMicros * BigInt(row.probability)) / 100n;
+  }, 0n);
+}
+
+/** The list predicate, without access scope or pagination. Summary uses the same object. */
+export function opportunityListWhere(input: {
+  orgId: string;
+  pipelineStageId?: string;
+  stage?: Prisma.OpportunityWhereInput['stage'];
+  industry?: string;
+  ownerEmail?: string;
+  search?: string;
+  dueDate?: Prisma.OpportunityWhereInput['dueDate'];
+  excludeClosed?: boolean;
+}): Prisma.OpportunityWhereInput {
+  return {
+    orgId: input.orgId,
+    deletedAt: null,
+    ...livePipelineStageFilter(input.pipelineStageId),
+    ...(input.stage ? { stage: input.stage } : {}),
+    ...(input.industry ? { industry: input.industry } : {}),
+    ...(input.ownerEmail ? { owner: { email: input.ownerEmail } } : {}),
+    ...(input.dueDate ? { dueDate: input.dueDate } : {}),
+    ...(input.excludeClosed ? excludeClosedOutcome() : {}),
+    ...(input.search
+      ? {
+          OR: [
+            { customer: { contains: input.search, mode: 'insensitive' as const } },
+            { name: { contains: input.search, mode: 'insensitive' as const } },
+            { code: { contains: input.search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
+}
+
 /** Won book. Lost wins when the enum or the live stage flag says lost. */
 export function wonOutcomeWhere(): Prisma.OpportunityWhereInput {
   return {
