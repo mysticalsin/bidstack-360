@@ -13,7 +13,7 @@ import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { opportunityVizIsPartial, useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
 import {
@@ -48,6 +48,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const projection = useForecastProjection();
   const feed = useWatchdogFeed(30);
   const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
+  const rowsCapped = opportunityVizIsPartial(opps.data);
   // Progressive disclosure (Tony 15:21): five visuals up top, every number,
   // stage, status and account opens this one drill-down sheet.
   const [drill, setDrill] = useState<OppDrillFilter | null>(null);
@@ -260,6 +261,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
         <div className="viz-grid-3">
           <DashboardHero
             rows={oppRows}
+            rowsCapped={rowsCapped}
             openValue={pipelineReport.data?.totalValueOpen ?? s?.pipelineValue ?? 0}
             openMicros={pipelineReport.data?.totalValueOpenMicros ?? s?.pipelineValueMicros}
             weighted={pipelineReport.data?.weightedPipeline ?? 0}
@@ -281,8 +283,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <PortfolioMomentum />
         </Suspense>
         <HemaLeverageTile />
-        <PipelineCard rows={oppRows} onDrill={setDrill} />
-        <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
+        <PipelineCard rows={oppRows} onDrill={setDrill} rowsCapped={rowsCapped} />
+        <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} rowsCapped={rowsCapped} />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 
         <details className="dash-more">

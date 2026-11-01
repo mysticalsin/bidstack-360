@@ -37,6 +37,7 @@ export function DashboardHero({
   onDrill,
   openMicros,
   weightedMicros,
+  rowsCapped = false,
 }: {
   rows: OppRow[];
   openValue: number;
@@ -46,6 +47,8 @@ export function DashboardHero({
   onDrill?: OnDrill;
   openMicros?: string | null;
   weightedMicros?: string | null;
+  /** The won chart uses the latest 100 updated bids when another page exists. */
+  rowsCapped?: boolean;
 }) {
   const fresh = feed?.newAlertCount ?? 0;
   const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
@@ -64,7 +67,7 @@ export function DashboardHero({
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${openLabel}, weighted ${weightedLabel}. Won so far this year ${wonLabel}.`}
+      summary={`Open pipeline ${openLabel}, weighted ${weightedLabel}. ${rowsCapped ? `Won this year in the latest 100 updated bids ${wonLabel}.` : `Won so far this year ${wonLabel}.`}`}
       table={{
         columns: ['Month', 'Won to date'],
         rows: trend.map((p) => [p.x, recordedPipelineCompact(p.yMicros, p.y)]),
@@ -77,9 +80,9 @@ export function DashboardHero({
           <span className="dash-hero-num">{openLabel}</span>
           <div className="viz-meta">Weighted {weightedLabel}</div>
         </HeroFig>
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${wonLabel}: show the won bids`}>
+        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={rowsCapped ? `Won this year in the latest 100 updated bids ${wonLabel}: show those bids` : `Won this year ${wonLabel}: show the won bids`}>
           <span className="dash-hero-num dash-hero-num--won">{wonLabel}</span>
-          <div className="viz-meta">Won this year</div>
+          <div className="viz-meta">{rowsCapped ? 'Won this year · latest 100 bids' : 'Won this year'}</div>
         </HeroFig>
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
@@ -96,7 +99,7 @@ export function DashboardHero({
         }))}
         format={fmtCompact}
       />
-      <div className="viz-caption">Won value to date, by close month. Select a number to see the bids behind it.</div>
+      <div className="viz-caption">{rowsCapped ? 'Won value in the latest 100 updated bids, by close month. Older bids are outside this chart. Select a number to see the bids behind it.' : 'Won value to date, by close month. Select a number to see the bids behind it.'}</div>
     </ChartCard>
   );
 }
@@ -159,11 +162,11 @@ export function NeedsYou({ overdueTasks, feed }: { overdueTasks: number; feed?: 
 
 /** Pipeline by stage and bids by status, merged (both answered "where are my
  *  bids?"). Each funnel column and each status chip opens the bid drill. */
-export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDrill }) {
+export function PipelineCard({ rows, onDrill, rowsCapped = false }: { rows: OppRow[]; onDrill: OnDrill; rowsCapped?: boolean }) {
   const data = stageFunnel(rows);
   const m = statusMix(rows);
   return (
-    <ChartCard title="Pipeline" meta={`${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
+    <ChartCard title="Pipeline" meta={`${rowsCapped ? 'Latest 100 updated bids · ' : ''}${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
       summary={data.map((d) => `${d.label}: ${d.amount} across ${d.count}`).join('; ') || 'No open bids'}
       table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, d.amount]) }}>
       {data.length ? (
@@ -177,7 +180,7 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
           </div>
         </div>
       ) : <p className="viz-empty">No open bids.</p>}
-      <div className="viz-caption">Where your open bids sit today. Select a stage or a status to see the bids.</div>
+      <div className="viz-caption">{rowsCapped ? 'Where the latest 100 updated bids sit. Select a stage or a status to see the bids.' : 'Where your open bids sit today. Select a stage or a status to see the bids.'}</div>
       <div className="dash-chips" role="group" aria-label="Bids by status">
         {([['open', 'Open', m.open], ['won', 'Won', m.won], ['lost', 'Lost', m.lost]] as const).map(([k, label, n]) => (
           <button key={k} type="button" className="dash-chip" onClick={() => onDrill({ status: k })}>
@@ -189,9 +192,10 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
   );
 }
 
-export function ForecastCard({ rows, projection, headingLevel }: {
+export function ForecastCard({ rows, projection, headingLevel, rowsCapped = false }: {
   rows: OppRow[];
   headingLevel?: 2 | 3;
+  rowsCapped?: boolean;
   projection?: { periods: Array<{ label: string; weightedMicros: string | number; wonMicros: string | number; openMicros: string | number; manualCommitMicros: string | number | null }> };
 }) {
   const actuals = wonByQuarter(rows).map((q) =>
@@ -207,7 +211,7 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
   const target = (projection?.periods ?? []).map((p) => forecastCommitLabel(p.manualCommitMicros)).find((label) => label != null) ?? null;
   return (
-    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${target} per quarter` : 'No target set yet · add a commit forecast to compare'}
+    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={`${rowsCapped ? 'Won bars from the latest 100 updated bids · ' : ''}${target ? `Commit target ${target} per quarter` : 'No target set yet · add a commit forecast to compare'}`}
       summary={data.map((d) => `${d.label}: won ${d.wonLabel}${d.weighted ? `, weighted ${d.weightedLabel}` : ''}`).join('; ')}
       table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, d.wonLabel, d.weightedLabel, d.openLabel]) }}>
       <QuarterBars data={data} format={fmtCompact} />
@@ -219,10 +223,10 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   );
 }
 
-export function WinRateTrendCard({ rows, headingLevel }: { rows: OppRow[]; headingLevel?: 2 | 3 }) {
+export function WinRateTrendCard({ rows, headingLevel, rowsCapped = false }: { rows: OppRow[]; headingLevel?: 2 | 3; rowsCapped?: boolean }) {
   const data = winRateByQuarter(rows);
   return (
-    <ChartCard headingLevel={headingLevel} title="Win rate over time" meta="Share of closed bids won, by close quarter"
+    <ChartCard headingLevel={headingLevel} title="Win rate over time" meta={rowsCapped ? 'Share of closed bids won in the latest 100 updated bids' : 'Share of closed bids won, by close quarter'}
       summary={data.map((d) => `${d.x}: ${d.rate}% (${d.won} of ${d.won + d.lost})`).join('; ') || 'No closed bids'}
       table={{ columns: ['Quarter', 'Won', 'Lost', 'Win rate'], rows: data.map((d) => [d.x, d.won, d.lost, `${d.rate}%`]) }}>
       {data.length > 1 ? <WinRateLine data={data} /> : <p className="viz-empty">Needs closed bids in two quarters.</p>}
@@ -230,10 +234,10 @@ export function WinRateTrendCard({ rows, headingLevel }: { rows: OppRow[]; headi
   );
 }
 
-export function TopAccountsBarCard({ rows, headingLevel, onDrill }: { rows: OppRow[]; headingLevel?: 2 | 3; onDrill?: OnDrill }) {
+export function TopAccountsBarCard({ rows, headingLevel, onDrill, rowsCapped = false }: { rows: OppRow[]; headingLevel?: 2 | 3; onDrill?: OnDrill; rowsCapped?: boolean }) {
   const data = accountBars(rows);
   return (
-    <ChartCard headingLevel={headingLevel} title="Top accounts" meta="Won plus open value"
+    <ChartCard headingLevel={headingLevel} title="Top accounts" meta={rowsCapped ? 'Won plus open value in the latest 100 updated bids' : 'Won plus open value'}
       summary={data.map((d) => `${d.label}: won ${d.wonLabel}, open ${d.openLabel}`).join('; ')}
       table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, d.wonLabel, d.openLabel]) }}>
       <HBars data={data} format={fmtCompact} onSelect={onDrill ? (label) => onDrill({ status: 'all', account: label }) : undefined} />
@@ -293,10 +297,11 @@ export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
 /** Revenue, win rate and top accounts in one card with kokonutui SmoothTab
  *  (MIT): one surface instead of three, each view keeps its own summary and
  *  table toggle. */
-export function PerformanceCard({ rows, projection, onDrill }: {
+export function PerformanceCard({ rows, projection, onDrill, rowsCapped = false }: {
   rows: OppRow[];
   projection?: Parameters<typeof ForecastCard>[0]['projection'];
   onDrill?: OnDrill;
+  rowsCapped?: boolean;
 }) {
   const [tab, setTab] = useState('revenue');
   const headId = useId();
@@ -305,7 +310,7 @@ export function PerformanceCard({ rows, projection, onDrill }: {
       <header className="viz-head">
         <div style={{ minWidth: 0 }}>
           <h2 id={headId} className="viz-title">Performance</h2>
-          <div className="viz-meta">Revenue, win rate and top accounts from your bids</div>
+          <div className="viz-meta">{rowsCapped ? 'Revenue, win rate and top accounts from the latest 100 updated bids' : 'Revenue, win rate and top accounts from your bids'}</div>
         </div>
         {onDrill ? (
           <button type="button" className="drill-more" onClick={() => onDrill({ status: tab === 'revenue' ? 'won' : 'all' })}>
@@ -318,9 +323,9 @@ export function PerformanceCard({ rows, projection, onDrill }: {
         value={tab}
         onChange={setTab}
         items={[
-          { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} /> },
-          { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} /> },
-          { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} /> },
+          { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} rowsCapped={rowsCapped} /> },
+          { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} rowsCapped={rowsCapped} /> },
+          { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} rowsCapped={rowsCapped} /> },
         ]}
       />
     </section>
