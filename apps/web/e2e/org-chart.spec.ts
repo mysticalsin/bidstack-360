@@ -68,8 +68,18 @@ test.describe('org chart contacts and recency', () => {
     await expect(node(page, 'Gabriela Lima').getByTestId('orgchart-node')).toHaveAttribute('data-gap', 'true', { timeout: 15_000 });
     await expect(node(page, 'Hana Park').getByTestId('orgchart-node')).not.toHaveAttribute('data-gap', 'true');
     const cov = (await (await request.get(`${API_URL}/api/v1/companies/${EX}/org-chart/coverage`, { headers: H })).json()) as { unmetSenior: string[] };
-    // The account card counts this same list (unit-tested with the page and the Sample).
     await expect(page.locator('[data-testid="orgchart-node"][data-gap="true"]')).toHaveCount(cov.unmetSenior.length);
+  });
+
+  test('the account page renders the cockpit for this sparse account and its card counts the same gaps', async ({ page, request }) => {
+    const cov = (await (await request.get(`${API_URL}/api/v1/companies/${EX}/org-chart/coverage`, { headers: H })).json()) as { unmetSenior: string[] };
+    const n = cov.unmetSenior.length;
+    await page.goto(`/accounts/${EX}`);
+    const card = page.getByTestId('account-orgchart-card');
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Couldn't load the account cockpit")).toHaveCount(0);
+    await expect(card).toContainText(new RegExp(`(?<!\\d)${n} senior gap${n === 1 ? '' : 's'}(?!s)`));
+    await expect(card.getByTestId('account-orgchart-open')).toHaveAttribute('href', `/accounts/${EX}/org-chart`);
   });
 
   test('side panel lists contacts, last meeting and profile', async ({ page }) => {
