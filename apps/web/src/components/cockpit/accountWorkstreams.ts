@@ -5,6 +5,7 @@
  */
 
 import { compareMicros, microsSharePercent } from '@/components/dashboard/unspecified-currency';
+import { unitsToMicros } from '@bidstack/shared';
 
 export const BUYING_ROLES = ['buyer', 'champion', 'influencer', 'user', 'blocker'] as const;
 export type BuyingRole = (typeof BUYING_ROLES)[number];
@@ -23,6 +24,14 @@ export interface WorkDeal {
   /** Integer micros. The bar length uses this when every lane has it. */
   valueMicros?: string;
   owner: string | null;
+}
+
+/** Lane total. A micros string wins; otherwise the unit number is converted. */
+export function laneRecordedMicros(deals: readonly WorkDeal[]): bigint {
+  return deals.reduce((sum, deal) => {
+    if (deal.valueMicros && /^\d+$/.test(deal.valueMicros)) return sum + BigInt(deal.valueMicros);
+    return sum + (unitsToMicros(deal.value) ?? 0n);
+  }, 0n);
 }
 
 export interface BuyingRolePerson {
@@ -86,9 +95,7 @@ export function buyingRoleSlots(
 }
 
 /** Linked people with no accepted decision role. A title does not place them. */
-export function peopleWithoutDecisionRole(
-  people: readonly BuyingRolePerson[],
-): BuyingRolePerson[] {
+export function peopleWithoutDecisionRole(people: readonly BuyingRolePerson[]): BuyingRolePerson[] {
   const placed = new Set(
     buyingRoleSlots(people).flatMap((slot) => slot.people.map((person) => person.id)),
   );

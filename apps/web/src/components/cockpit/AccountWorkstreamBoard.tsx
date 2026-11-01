@@ -5,13 +5,17 @@ import { useTranslation } from 'react-i18next';
 import { Bar } from '@/components/charts/bar';
 import { BarChart } from '@/components/charts/bar-chart';
 import { BarYAxis } from '@/components/charts/bar-y-axis';
-import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { formatMicrosAmount } from '@bidstack/shared';
 
 import {
   buyingRoleSlots,
   groupWorkstreams,
   peopleWithoutDecisionRole,
+  laneRecordedMicros,
   workstreamBarValues,
   type BuyingRole,
   type BuyingRolePerson,
@@ -41,18 +45,17 @@ export function AccountWorkstreamBoard({
   const grouped = groupWorkstreams(deals);
   const roles = buyingRoleSlots(people);
   const unassigned = peopleWithoutDecisionRole(people);
-  const diagramDeal = grouped.pursuit[0] ?? grouped.delivery[0] ?? grouped.renewal[0] ?? grouped.expansion[0];
+  const diagramDeal =
+    grouped.pursuit[0] ?? grouped.delivery[0] ?? grouped.renewal[0] ?? grouped.expansion[0];
 
   const laneTotals = LANES.map((lane) => {
     const deals = grouped[lane];
-    const micros = deals.every((deal) => deal.valueMicros != null)
-      ? deals.reduce((sum, deal) => sum + BigInt(deal.valueMicros ?? 0), 0n)
-      : null;
+    const micros = laneRecordedMicros(deals);
     return {
       lane,
       deals,
       value: deals.reduce((sum, deal) => sum + deal.value, 0),
-      valueMicros: micros?.toString() ?? null,
+      valueMicros: micros.toString(),
     };
   });
   const barValues = workstreamBarValues(laneTotals);
@@ -95,7 +98,9 @@ export function AccountWorkstreamBoard({
           orientation="horizontal"
           aspectRatio="4 / 1"
           animationDuration={reducedMotion ? 0 : 450}
-          enterTransition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.2, 0, 0, 1] }}
+          enterTransition={
+            reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.2, 0, 0, 1] }
+          }
           margin={{ top: 8, right: 8, bottom: 8, left: 96 }}
           barGap={0.55}
         >
@@ -124,15 +129,14 @@ export function AccountWorkstreamBoard({
         {laneTotals.flatMap((row) =>
           row.deals.map((deal) => (
             <li key={deal.id}>
-              <Link
-                to={`/opportunities/${deal.id}`}
-                className="deal-chart-deal"
-              >
+              <Link to={`/opportunities/${deal.id}`} className="deal-chart-deal">
                 <span className="truncate font-medium">{deal.name}</span>
                 <span className="deal-chart-deal-meta">
                   {t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane))}
                   {' · '}
-                  {deal.stageName || deal.stage || t('accountWorkstreams.stageUnknown', 'Stage unknown')}
+                  {deal.stageName ||
+                    deal.stage ||
+                    t('accountWorkstreams.stageUnknown', 'Stage unknown')}
                   {' · '}
                   {deal.valueMicros != null
                     ? `${formatMicrosAmount(BigInt(deal.valueMicros))} unspecified`
