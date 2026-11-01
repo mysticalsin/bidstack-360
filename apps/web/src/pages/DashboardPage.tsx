@@ -422,7 +422,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           <OrgChartCard companyId={cockpit.company.id} />
           <AgreementsSummaryCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
           <OppDrill
-            rows={(oppRows.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === cockpit.company.name.toLowerCase())}
+            rows={(oppRows.data?.items ?? []).filter((o) => o.companyId === cockpit.company.id)}
             filter={drill}
             onFilterChange={setDrill}
             onClose={() => setDrill(null)}

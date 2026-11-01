@@ -72,7 +72,7 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
   const opps = useOpportunityRows();
   const people = usePeopleMap({ companyId });
   const rowsCapped = opportunityVizIsPartial(opps.data);
-  const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase());
+  const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => o.companyId === companyId);
   const stages = stageFunnel(rows);
   const mix = statusMix(rows);
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));

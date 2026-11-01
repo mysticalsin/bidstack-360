@@ -32,6 +32,26 @@ import { deriveNextMove } from './CommandCenter';
 import { openRiskHeadline, openRiskSparkLabel } from './open-risk-headline';
 import { labelForBand } from './_tokens';
 
+const ACCOUNT_HEAD_OPP_LIMIT = 50;
+
+/** A customer string is not a company link. Only the stored company id is. */
+export function opportunityBelongsToCompany(
+  opportunity: { companyId?: string | null },
+  companyId: string,
+): boolean {
+  return opportunity.companyId === companyId;
+}
+
+/** Open-deal count on the account header. A continuing page is not the account total. */
+export function openDealCountLabel(count: number, pageContinues: boolean): string {
+  if (pageContinues) {
+    return count === 1
+      ? `1 open deal in the latest ${ACCOUNT_HEAD_OPP_LIMIT} bids`
+      : `${count} open deals in the latest ${ACCOUNT_HEAD_OPP_LIMIT} bids`;
+  }
+  return count === 1 ? '1 open deal' : `${count} open deals`;
+}
+
 interface Props {
   cockpit: AccountCockpitSnapshot;
   accountView: boolean;
@@ -47,9 +67,9 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   // We use the most recent opportunity for this customer as the brief target.
   // Briefs are scoped to a deal (the API endpoint is /opportunities/:id/brief)
   // — if no deal exists yet, the button stays disabled with a helpful tooltip.
-  const opps = useOpportunities({ limit: 50 });
-  const linkedOpp = opps.data?.items.find(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+  const opps = useOpportunities({ limit: ACCOUNT_HEAD_OPP_LIMIT });
+  const linkedOpp = opps.data?.items.find((o) =>
+    opportunityBelongsToCompany(o, cockpit.company.id),
   );
 
   // Pulse a "Saved" chip whenever data verification finishes. Tracking a counter
@@ -83,9 +103,10 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
     company: cockpit.company.name,
   });
   const { formatMoneyMicros } = useFormatMoney();
-  const accountOpps = (opps.data?.items ?? []).filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+  const accountOpps = (opps.data?.items ?? []).filter((o) =>
+    opportunityBelongsToCompany(o, cockpit.company.id),
   );
+  const oppPageContinues = Boolean(opps.data?.nextCursor);
   const openOpps = accountOpps.filter((o) => closedOutcome(o) === null);
   const openMicros = openOpps.reduce((sum, o) => sum + recordedMicros(o.value, o.valueMicros), 0n);
   const riskHeadline = openRiskHeadline(cockpit);
@@ -228,9 +249,17 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             <span className="acct-key-value">{formatMoneyMicros(openMicros)}</span>
             <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
-              {openOpps.length === 1
-                ? t('pageHead.keyOpenDeal', '1 open deal')
-                : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
+              {t(
+                oppPageContinues
+                  ? openOpps.length === 1
+                    ? 'pageHead.keyOpenDealPage'
+                    : 'pageHead.keyOpenDealsPage'
+                  : openOpps.length === 1
+                    ? 'pageHead.keyOpenDeal'
+                    : 'pageHead.keyOpenDeals',
+                openDealCountLabel(openOpps.length, oppPageContinues),
+                { count: openOpps.length },
+              )}
             </span>
             {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
           </div>
