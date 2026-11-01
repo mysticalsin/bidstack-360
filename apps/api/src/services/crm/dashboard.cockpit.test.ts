@@ -11,6 +11,7 @@ import {
   buildCockpit,
   computeSignalCoverage,
   registerDealsAreCapped,
+  roleHolderProbeIds,
   roleHoldersAreCapped,
 } from './dashboard.cockpit.js';
 
@@ -999,6 +1000,28 @@ describe('buildCockpit recorded facts only', () => {
     expect(roleHoldersAreCapped(20, true)).toBe(false);
     expect(roleHoldersAreCapped(1000, false)).toBe(false);
     expect(roleHoldersAreCapped(1000, true)).toBe(true);
+    // WHY: id order used to keep an older holder and drop a newer champion
+    // once the probe filled. The newest fact takes the seat.
+    const probe = roleHolderProbeIds(
+      [
+        { contactId: 'older', observedAt: '2026-01-01T00:00:00.000Z' },
+        { contactId: 'newer', observedAt: '2026-10-01T00:00:00.000Z' },
+        { contactId: 'undated', observedAt: null },
+        { contactId: 'newer', observedAt: '2026-06-01T00:00:00.000Z' },
+      ],
+      1,
+    );
+    expect(probe.ids).toEqual(['newer']);
+    expect(probe.capped).toBe(true);
+    expect(
+      roleHolderProbeIds(
+        [
+          { contactId: 'b', observedAt: '2026-06-01T00:00:00.000Z' },
+          { contactId: 'a', observedAt: '2026-06-01T00:00:00.000Z' },
+        ],
+        2,
+      ).ids,
+    ).toEqual(['a', 'b']);
     const cockpit = buildCockpit({
       company: company(),
       companies: [],

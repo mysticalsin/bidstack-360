@@ -177,6 +177,38 @@ export function roleHoldersAreCapped(loaded: number, anotherExists: boolean): bo
   return loaded >= ROLE_HOLDER_PROBE && anotherExists;
 }
 
+function observedAtRank(value: string | null): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
+}
+
+/**
+ * Newest accepted fact first. An undated fact loses to a dated one. The same
+ * instant keeps the lower contact id so the page does not flicker.
+ */
+export function roleHolderProbeIds(
+  facts: readonly { contactId: string; observedAt: string | null }[],
+  limit = ROLE_HOLDER_PROBE,
+): { ids: string[]; capped: boolean } {
+  const newest = new Map<string, string | null>();
+  for (const fact of facts) {
+    const previous = newest.get(fact.contactId);
+    if (previous === undefined || observedAtRank(fact.observedAt) > observedAtRank(previous)) {
+      newest.set(fact.contactId, fact.observedAt);
+    }
+  }
+  const ranked = [...newest.entries()].sort((a, b) => {
+    const delta = observedAtRank(b[1]) - observedAtRank(a[1]);
+    if (delta !== 0) return delta;
+    return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+  });
+  return {
+    ids: ranked.slice(0, limit).map(([id]) => id),
+    capped: ranked.length > limit,
+  };
+}
+
 export function computeSignalCoverage(
   input: {
     company: z.infer<typeof CrmCompany>;

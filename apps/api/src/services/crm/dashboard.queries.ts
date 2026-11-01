@@ -30,6 +30,7 @@ import {
   ROLE_HOLDER_PROBE,
   microsText,
   registerDealsAreCapped,
+  roleHolderProbeIds,
   roleHoldersAreCapped,
   type AccountPerformance,
 } from './dashboard.cockpit.js';
@@ -657,8 +658,8 @@ const cockpitContactSelect = {
 
 /**
  * The influence page is 20 people. Accepted role holders outside it still
- * count, up to ROLE_HOLDER_PROBE distinct people. A further holder marks the
- * champion count partial.
+ * count, up to ROLE_HOLDER_PROBE distinct people, newest fact first. A further
+ * holder marks the champion count partial.
  */
 export async function includeBuyingRoleContacts(
   orgId: string,
@@ -679,34 +680,39 @@ export async function includeBuyingRoleContacts(
   }>;
   roleHoldersCapped: boolean;
 }> {
-  const where = {
-    orgId,
-    deletedAt: null,
-    kind: 'buying_role' as const,
-    status: 'accepted' as const,
-    opportunity: { orgId, companyId, deletedAt: null },
-  };
-  const probe = await prismaClient.contactFact.findMany({
-    where,
-    distinct: ['contactId'],
-    select: { contactId: true },
-    orderBy: { contactId: 'asc' },
-    take: ROLE_HOLDER_PROBE,
-  });
+  const probeSql = (limit: number, offset: number) => Prisma.sql`
+    SELECT cf.contact_id AS "contactId", MAX(cf.observed_at) AS "observedAt"
+    FROM contact_facts cf
+    INNER JOIN opportunities o ON o.id = cf.opportunity_id
+    WHERE cf.org_id = ${orgId}::uuid
+      AND cf.deleted_at IS NULL
+      AND cf.kind::text = 'buying_role'
+      AND cf.status::text = 'accepted'
+      AND o.org_id = ${orgId}::uuid
+      AND o.company_id = ${companyId}::uuid
+      AND o.deleted_at IS NULL
+    GROUP BY cf.contact_id
+    ORDER BY MAX(cf.observed_at) DESC NULLS LAST, cf.contact_id ASC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+  const probe = await prismaClient.$queryRaw<Array<{ contactId: string; observedAt: Date | null }>>(
+    probeSql(ROLE_HOLDER_PROBE, 0),
+  );
   const another =
     probe.length < ROLE_HOLDER_PROBE
       ? []
-      : await prismaClient.contactFact.findMany({
-          where,
-          distinct: ['contactId'],
-          select: { contactId: true },
-          orderBy: { contactId: 'asc' },
-          skip: ROLE_HOLDER_PROBE,
-          take: 1,
-        });
+      : await prismaClient.$queryRaw<Array<{ contactId: string }>>(probeSql(1, ROLE_HOLDER_PROBE));
+  const ranked = roleHolderProbeIds(
+    probe.map((row) => ({
+      contactId: row.contactId,
+      observedAt:
+        row.observedAt instanceof Date ? row.observedAt.toISOString() : row.observedAt,
+    })),
+  );
   const roleHoldersCapped = roleHoldersAreCapped(probe.length, another.length > 0);
   const have = new Set(loaded.map((contact) => contact.id));
-  const missing = probe.map((row) => row.contactId).filter((id) => !have.has(id));
+  const missing = ranked.ids.filter((id) => !have.has(id));
   if (missing.length === 0) return { extra: [], roleHoldersCapped };
   const extra = await prismaClient.contact.findMany({
     where: { orgId, companyId, deletedAt: null, id: { in: missing } },
