@@ -122,13 +122,18 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetings, oppPage, bids, events, earnings, postings] = await Promise.all([
-        prisma.meetingIntel.findMany({
-          where: { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] },
-          select: { id: true, title: true, heldAt: true, summary: true, companyId: true, _count: { select: { attendees: true } } },
-          orderBy: { heldAt: 'desc' },
-          take: 200,
-        }),
+      const [meetingPage, oppPage, bids, eventPage, earnings, postings] = await Promise.all([
+        (async () => {
+          const where = { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] };
+          const rows = await prisma.meetingIntel.findMany({
+            where,
+            select: { id: true, title: true, heldAt: true, summary: true, companyId: true, _count: { select: { attendees: true } } },
+            orderBy: { heldAt: 'desc' },
+            take: 200,
+          });
+          const capped = rows.length === 200 && pageIsCapped(rows.length, await prisma.meetingIntel.count({ where }), 200);
+          return { rows, capped };
+        })(),
         (async () => {
           const where = { orgId, companyId: { in: ids }, deletedAt: null };
           const rows = await prisma.opportunity.findMany({
@@ -145,16 +150,22 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
           take: 100,
         }),
-        prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
-          orderBy: { occurredAt: 'desc' },
-          take: 300,
-        }),
+        (async () => {
+          const where = { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' as const }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) };
+          const rows = await prisma.accountWatchEvent.findMany({
+            where,
+            orderBy: { occurredAt: 'desc' },
+            take: 300,
+          });
+          const capped = rows.length === 300 && pageIsCapped(rows.length, await prisma.accountWatchEvent.count({ where }), 300);
+          return { rows, capped };
+        })(),
         prisma.accountEarningsDate.findMany({ where: { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } }, take: 20 }),
         prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: from } }, select: { postedAt: true }, orderBy: { postedAt: 'desc' }, take: 1000 }),
       ]);
       const items: TimelineItem[] = [];
       const push = (i: Omit<TimelineItem, 'upcoming'>) => items.push({ ...i, upcoming: new Date(i.at).getTime() > now.getTime() });
+      const meetings = meetingPage.rows;
       for (const m of meetings) {
         push({
           id: `mt:${m.id}`,
@@ -185,6 +196,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       for (const b of bids) {
         push({ id: `bid:${b.id}`, at: (b.dueDate ?? b.importedAt).toISOString(), lane: 'ours', category: 'bid', title: `Bid: ${b.title}`, summary: b.dueDate ? `Due ${b.dueDate.toISOString().slice(0, 10)}, ${b.status}` : b.status, source: 'Bids', sourceUrl: b.url, href: '/bid-matrix', importance: 50, implication: 'NEUTRAL', sample: false });
       }
+      const events = eventPage.rows;
       for (const e of events) {
         push({
           id: `ev:${e.id}`,
@@ -237,7 +249,16 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const tally: Record<string, number> = {};
       for (const i of grouped) tally[i.category] = (tally[i.category] ?? 0) + 1;
       const shown = (wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped).slice(0, 300);
-      return { companyId: company.id, from: from.toISOString(), to: to.toISOString(), items: shown, counts: tally, dealsCapped: oppPage.capped };
+      return {
+        companyId: company.id,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        items: shown,
+        counts: tally,
+        dealsCapped: oppPage.capped,
+        meetingsCapped: meetingPage.capped,
+        newsCapped: eventPage.capped,
+      };
     },
   );
 
