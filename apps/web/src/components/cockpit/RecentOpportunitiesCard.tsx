@@ -32,7 +32,11 @@ function recentDealAmount(amountMicros: string | number | bigint): string {
   return unspecifiedMicrosLabel(amountMicros);
 }
 
-/** Snapshot deals are micros. The card prints major units, once. */
+function isOpenDealStage(stage: string): boolean {
+  return stage !== 'closed_won' && stage !== 'closed_lost';
+}
+
+/** Snapshot deals are micros. Closed outcomes stay off the open-opportunity list. */
 export function recentItemsFromDeals(
   deals: ReadonlyArray<{
     id: string;
@@ -42,13 +46,15 @@ export function recentItemsFromDeals(
     companyName: string | null;
   }>,
 ): RecentOpportunityItem[] {
-  return deals.map((deal) => ({
-    id: deal.id,
-    name: deal.name,
-    customer: deal.companyName,
-    value: recentDealAmount(deal.amountMicros),
-    stage: deal.stage,
-  }));
+  return deals
+    .filter((deal) => isOpenDealStage(deal.stage))
+    .map((deal) => ({
+      id: deal.id,
+      name: deal.name,
+      customer: deal.companyName,
+      value: recentDealAmount(deal.amountMicros),
+      stage: deal.stage,
+    }));
 }
 
 interface Props {
@@ -118,7 +124,10 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         <EmptyState
           title={
             accountScoped
-              ? t('recentOpportunities.emptyAccountTitle', 'No opportunities for this account yet')
+              ? t(
+                  'recentOpportunities.emptyAccountTitle',
+                  'No open opportunities for this account yet',
+                )
               : t('recentOpportunities.emptyTitle', 'No opportunities yet')
           }
           message={

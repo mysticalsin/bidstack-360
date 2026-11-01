@@ -40,4 +40,33 @@ describe('recentItemsFromDeals', () => {
     expect(items[0]?.value).toBe('Not recorded');
     expect(items[0]?.value).not.toContain('9,007,199,254,740,992');
   });
+
+  it('leaves closed outcomes off the open opportunity list', () => {
+    // WHY: the card says open opportunities. A closed won row made that caption false.
+    const items = recentItemsFromDeals([
+      {
+        id: 'won',
+        name: 'Won bid',
+        stage: 'closed_won',
+        amountMicros: '1350000000000',
+        companyName: 'CI Financial',
+      },
+      {
+        id: 'open',
+        name: 'IT Modernization & MSP',
+        stage: 'proposal',
+        amountMicros: '1240000000000',
+        companyName: 'CI Financial',
+      },
+      {
+        id: 'lost',
+        name: 'Lost bid',
+        stage: 'closed_lost',
+        amountMicros: '300000000000',
+        companyName: 'CI Financial',
+      },
+    ]);
+    expect(items.map((item) => item.name)).toEqual(['IT Modernization & MSP']);
+    expect(items[0]?.value).toBe('1.24M unspecified');
+  });
 });
