@@ -66,7 +66,11 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
         )}
       </div>
       <button type="button" className="sg-link" aria-expanded={open} aria-controls={`${id}-ev`} onClick={() => setOpen((v) => !v)}>
-        {open ? 'Hide evidence' : `See ${it.evidence.length} evidence ${it.evidence.length === 1 ? 'item' : 'items'}`}
+        {open
+          ? 'Hide evidence'
+          : (it.evidenceHidden ?? 0) > 0
+            ? `See ${it.evidence.length} of ${it.evidence.length + (it.evidenceHidden ?? 0)} evidence items`
+            : `See ${it.evidence.length} evidence ${it.evidence.length === 1 ? 'item' : 'items'}`}
         <ChevronDown size={14} strokeWidth={1.5} aria-hidden style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 200ms cubic-bezier(0.22,1,0.36,1)' }} />
       </button>
       <ul id={`${id}-ev`} className="sg-ev" hidden={!open}>
@@ -80,6 +84,9 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
             <span className="sg-meta"> · {e.sample ? 'Sample' : sourceLabel(e.source)}{e.at ? ` · ${dateFmt.format(new Date(e.at))}` : ''}</span>
           </li>
         ))}
+        {(it.evidenceHidden ?? 0) > 0 ? (
+          <li className="sg-meta">{it.evidenceHidden} older {it.evidenceHidden === 1 ? 'item is' : 'items are'} not listed.</li>
+        ) : null}
       </ul>
     </article>
   );
