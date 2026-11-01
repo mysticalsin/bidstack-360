@@ -3,7 +3,7 @@ import '@/components/agreements/agreements.css';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { formatMicrosAmount, LOW_CONFIDENCE_BPS, type MsaExtractedField } from '@bidstack/shared';
+import { formatMicrosAmount, LOW_CONFIDENCE_BPS, rateCardLineText, type MsaExtractedField } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -38,10 +38,7 @@ function display(field: MsaExtractedField): string {
       .map((row) => {
         if (!row || typeof row !== 'object') return JSON.stringify(row);
         const item = row as { name?: string; role?: string; rateMicros?: number; unit?: string };
-        if (item.role && item.rateMicros == null) return `${item.role}: amount not readable`;
-        if (item.role && item.rateMicros != null) {
-          return `${item.role}: ${formatExtractedMicros(item.rateMicros)} / ${item.unit ?? 'day'}`;
-        }
+        if (item.role) return rateCardLineText(item.role, item.rateMicros ?? null, item.unit ?? 'day');
         if (item.name) return item.name;
         return JSON.stringify(row);
       })

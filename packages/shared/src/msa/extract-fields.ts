@@ -3,7 +3,7 @@
  * (PDF text layer or DOCX). Missing values stay blank. Nothing is invented.
  */
 import type { MsaCitation, MsaExtractedField, MsaExtractedFields, MsaParty } from '../schemas/msa-intake.js';
-import { unitsTextToMicros } from '../utils/money.js';
+import { formatMicrosAmount, unitsTextToMicros } from '../utils/money.js';
 
 export const LOW_CONFIDENCE_BPS = 6500;
 const LABELLED = 8500;
@@ -204,6 +204,16 @@ function detectLiability(pages: TextPage[]): { amountMicros: number | null; curr
   };
 }
 
+/** Agreement rate lines stop at 1,000,000 in the contract currency. */
+export const RATE_CARD_MAX_MICROS = 1_000_000_000_000;
+
+/** Review text for one rate. A figure past the record maximum says so. */
+export function rateCardLineText(role: string, micros: number | null, unit = 'day'): string {
+  if (micros == null || !Number.isSafeInteger(micros) || micros < 0) return `${role}: amount not readable`;
+  if (micros > RATE_CARD_MAX_MICROS) return `${role}: ${formatMicrosAmount(micros)} / ${unit}, too large to store`;
+  return `${role}: ${formatMicrosAmount(micros)} / ${unit}`;
+}
+
 /** Rows safe to store on the agreement. An unreadable rate stays on the review and is left off the record. */
 export function storableRateCard(value: unknown): Array<{ role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }> {
   if (!Array.isArray(value)) return [];
@@ -213,7 +223,7 @@ export function storableRateCard(value: unknown): Array<{ role: string; rateMicr
     const item = row as { role?: unknown; rateMicros?: unknown; unit?: unknown };
     if (typeof item.role !== 'string' || !item.role.trim()) continue;
     if (typeof item.rateMicros !== 'number' || !Number.isSafeInteger(item.rateMicros) || item.rateMicros < 0) continue;
-    if (item.rateMicros > 1_000_000_000_000) continue;
+    if (item.rateMicros > RATE_CARD_MAX_MICROS) continue;
     const unit = item.unit === 'hour' || item.unit === 'month' || item.unit === 'year' ? item.unit : 'day';
     out.push({ role: item.role.trim(), rateMicros: item.rateMicros, unit });
   }
