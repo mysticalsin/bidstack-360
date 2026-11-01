@@ -15,7 +15,7 @@ import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { useForecasts, useCreateForecast, useDeleteForecast } from '@/hooks/useForecasts';
 import { useUsers } from '@/hooks/useUsers';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { staggerChild, staggerParent } from '@/lib/motion';
 import type { Forecast } from '@bidstack/shared';
 
@@ -33,7 +33,8 @@ import {
 
 export function ForecastsPage() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
+  const formatMoneyMicros = (micros: string | bigint) =>
+    formatMicrosAmount(typeof micros === 'bigint' ? micros : BigInt(micros));
   const reducedMotion = useReducedMotion();
   const forecasts = useForecasts();
   // Owner picker (NewForecastDialog): no server-side user search exists, so
@@ -52,19 +53,23 @@ export function ForecastsPage() {
 
   const rows = useMemo(() => groupForecasts(filteredItems), [filteredItems]);
   const chartData = useMemo(() => buildChartData(rows), [rows]);
-  const maxTotal = useMemo(
-    () =>
-      chartData.length === 0
-        ? 0
-        : Math.max(...chartData.map((d) => d.pipeline + d.bestCase + d.commit + d.closed)),
-    [chartData],
-  );
+  const maxTotal = useMemo(() => {
+    return chartData.reduce((max, datum) => {
+      const total = (
+        BigInt(datum.pipeline) +
+        BigInt(datum.bestCase) +
+        BigInt(datum.commit) +
+        BigInt(datum.closed)
+      ).toString();
+      return BigInt(total) > BigInt(max) ? total : max;
+    }, '0');
+  }, [chartData]);
 
   // Headline totals for the selected period — so the page answers "what's the
   // number?" in one glance, led by Commit (the figure the bid team is held to).
   const totals = useMemo(() => {
-    const t = { pipeline: 0, best_case: 0, commit: 0, closed: 0 };
-    for (const item of filteredItems) t[item.category] += item.amountMicros;
+    const t = { pipeline: 0n, best_case: 0n, commit: 0n, closed: 0n };
+    for (const item of filteredItems) t[item.category] += BigInt(item.amountMicros);
     return t;
   }, [filteredItems]);
 
@@ -72,7 +77,7 @@ export function ForecastsPage() {
   // forecasts, so the write MUST carry it through or it silently overwrites the
   // signed-in user's own row instead.
   const handleSaveCell = useCallback(
-    async (ownerId: string, period: string, category: Forecast['category'], micros: number) => {
+    async (ownerId: string, period: string, category: Forecast['category'], micros: string) => {
       try {
         await createForecast.mutateAsync({
           ownerId,
@@ -156,10 +161,10 @@ export function ForecastsPage() {
             onClose={() => setDialogOpen(false)}
             onSubmit={async (body) => {
               try {
-                const entries = Object.entries(body.amounts) as [Forecast['category'], number][];
+                const entries = Object.entries(body.amounts) as [Forecast['category'], string][];
                 await Promise.all(
                   entries
-                    .filter(([, amount]) => amount > 0)
+                    .filter(([, amount]) => BigInt(amount) > 0n)
                     .map(([category, amount]) =>
                       createForecast.mutateAsync({
                         ownerId: body.ownerId,

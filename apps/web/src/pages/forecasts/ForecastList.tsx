@@ -21,15 +21,15 @@ import {
   TableCell,
   TableScrollArea,
 } from '@/components/ui/Table';
-import type { Forecast } from '@bidstack/shared';
+import { microsToUnitsText, unitsTextToMicros, type Forecast } from '@bidstack/shared';
 
-import { CATEGORIES, CATEGORY_LABELS, type ForecastRow } from './forecastsConfig';
+import { CATEGORIES, CATEGORY_LABELS, sumForecastMicros, type ForecastRow } from './forecastsConfig';
 
 interface EditingCell {
   ownerId: string;
   period: string;
   category: Forecast['category'];
-  value: number;
+  value: string;
 }
 
 interface ForecastListProps {
@@ -43,10 +43,10 @@ interface ForecastListProps {
     ownerId: string,
     period: string,
     category: Forecast['category'],
-    micros: number,
+    micros: string,
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
-  formatMoneyMicros: (micros: number) => string;
+  formatMoneyMicros: (micros: string) => string;
 }
 
 export function ForecastList({
@@ -73,9 +73,9 @@ export function ForecastList({
     row: ForecastRow,
     cat: Forecast['category'],
   ) => {
-    const num = Number(e.target.value);
-    if (!Number.isNaN(num)) {
-      onSaveCell(row.ownerId, row.period, cat, Math.round(num * 1_000_000));
+    const micros = unitsTextToMicros(e.target.value);
+    if (micros != null) {
+      onSaveCell(row.ownerId, row.period, cat, micros.toString());
     }
     setEditingCell(null);
   };
@@ -85,7 +85,7 @@ export function ForecastList({
     if (e.key === 'Escape') setEditingCell(null);
   };
 
-  const rowVal = (row: ForecastRow, cat: Forecast['category']): number => {
+  const rowVal = (row: ForecastRow, cat: Forecast['category']): string => {
     if (cat === 'best_case') return row.bestCase;
     if (cat === 'pipeline') return row.pipeline;
     if (cat === 'commit') return row.commit;
@@ -167,10 +167,11 @@ export function ForecastList({
                           <TableCell key={cat} className="text-right">
                             {isEditingCell(row, cat) ? (
                               <Input
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 size="sm"
                                 autoFocus
-                                defaultValue={val / 1_000_000}
+                                defaultValue={microsToUnitsText(val)}
                                 className="w-28 text-right"
                                 aria-label={t(
                                   'forecastList.cellLabel',
@@ -206,7 +207,9 @@ export function ForecastList({
                       })}
                       <TableCell className="text-right">
                         <span className="text-sm font-semibold tabular-nums text-[var(--fg-primary)]">
-                          {formatMoneyMicros(row.pipeline + row.bestCase + row.commit + row.closed)}
+                          {formatMoneyMicros(
+                            sumForecastMicros(row.pipeline, row.bestCase, row.commit, row.closed).toString(),
+                          )}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -251,10 +254,11 @@ export function ForecastList({
                         </span>
                         {isEditingCell(row, cat) ? (
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             size="sm"
                             autoFocus
-                            defaultValue={val / 1_000_000}
+                            defaultValue={microsToUnitsText(val)}
                             aria-label={t('forecastList.cellLabel', '{{category}} for {{period}}', {
                               category: CATEGORY_LABELS[cat],
                               period: row.period,
@@ -290,7 +294,9 @@ export function ForecastList({
                 <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                   <span className="text-xs font-semibold text-[var(--fg-primary)]">
                     {t('forecastList.totalLabel', 'Total:')}{' '}
-                    {formatMoneyMicros(row.pipeline + row.bestCase + row.commit + row.closed)}
+                    {formatMoneyMicros(
+                      sumForecastMicros(row.pipeline, row.bestCase, row.commit, row.closed).toString(),
+                    )}
                   </span>
                   <button
                     type="button"

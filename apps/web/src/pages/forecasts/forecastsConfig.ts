@@ -24,10 +24,10 @@ export interface ForecastRow {
   ownerId: string;
   ownerName: string | null;
   period: string;
-  pipeline: number;
-  bestCase: number;
-  commit: number;
-  closed: number;
+  pipeline: string;
+  bestCase: string;
+  commit: string;
+  closed: string;
   ids: Record<Forecast['category'], string | undefined>;
 }
 
@@ -43,10 +43,10 @@ export function groupForecasts(items: Forecast[]): ForecastRow[] {
         ownerId: item.ownerId,
         ownerName: item.ownerName,
         period: item.period,
-        pipeline: 0,
-        bestCase: 0,
-        commit: 0,
-        closed: 0,
+        pipeline: '0',
+        bestCase: '0',
+        commit: '0',
+        closed: '0',
         ids: { pipeline: undefined, best_case: undefined, commit: undefined, closed: undefined },
       };
       map.set(key, row);
@@ -75,11 +75,15 @@ export function matchesPeriodFilter(period: string, filter: PeriodFilter): boole
 
 export type ChartDatum = {
   period: string;
-  pipeline: number;
-  bestCase: number;
-  commit: number;
-  closed: number;
+  pipeline: string;
+  bestCase: string;
+  commit: string;
+  closed: string;
 };
+
+function addMicros(left: string, right: string): string {
+  return (BigInt(left) + BigInt(right)).toString();
+}
 
 /** Aggregate ForecastRows into per-period totals for the bar chart. */
 export function buildChartData(rows: ForecastRow[]): ChartDatum[] {
@@ -87,10 +91,10 @@ export function buildChartData(rows: ForecastRow[]): ChartDatum[] {
   for (const row of rows) {
     const existing = byPeriod.get(row.period);
     if (existing) {
-      existing.pipeline += row.pipeline;
-      existing.bestCase += row.bestCase;
-      existing.commit += row.commit;
-      existing.closed += row.closed;
+      existing.pipeline = addMicros(existing.pipeline, row.pipeline);
+      existing.bestCase = addMicros(existing.bestCase, row.bestCase);
+      existing.commit = addMicros(existing.commit, row.commit);
+      existing.closed = addMicros(existing.closed, row.closed);
     } else {
       byPeriod.set(row.period, {
         period: row.period,
@@ -102,4 +106,8 @@ export function buildChartData(rows: ForecastRow[]): ChartDatum[] {
     }
   }
   return Array.from(byPeriod.values()).sort((a, b) => a.period.localeCompare(b.period));
+}
+
+export function sumForecastMicros(...amounts: string[]): bigint {
+  return amounts.reduce((total, amount) => total + BigInt(amount), 0n);
 }

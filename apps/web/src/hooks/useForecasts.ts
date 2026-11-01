@@ -31,7 +31,7 @@ export function useCreateForecast() {
     mutationFn: (body: {
       period: string;
       category: Forecast['category'];
-      amountMicros: number;
+      amountMicros: string | number;
       currency?: string;
       note?: string;
       // Target a specific owner's row (the grid edits org-wide rows). Omit to

@@ -6,12 +6,20 @@ import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 
-import { CATEGORIES, CATEGORY_COLOR, CATEGORY_LABELS, type ChartDatum } from './forecastsConfig';
+import { compareMicros, microsSharePercent } from '@/components/dashboard/unspecified-currency';
+
+import {
+  CATEGORIES,
+  CATEGORY_COLOR,
+  CATEGORY_LABELS,
+  sumForecastMicros,
+  type ChartDatum,
+} from './forecastsConfig';
 
 interface ForecastChartProps {
   chartData: ChartDatum[];
-  maxTotal: number;
-  formatMoneyMicros: (micros: number) => string;
+  maxTotal: string;
+  formatMoneyMicros: (micros: string) => string;
 }
 
 export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: ForecastChartProps) {
@@ -29,8 +37,8 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
         <div className="px-5 pb-5 pt-2">
           <div className="flex items-end gap-4" style={{ height: 220 }}>
             {chartData.map((d) => {
-              const total = d.pipeline + d.bestCase + d.commit + d.closed;
-              const heightPct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+              const total = sumForecastMicros(d.pipeline, d.bestCase, d.commit, d.closed).toString();
+              const heightPct = microsSharePercent(total, maxTotal);
               return (
                 <div key={d.period} className="flex flex-1 flex-col items-center gap-2">
                   <div className="flex w-full flex-1 items-end justify-center">
@@ -42,14 +50,14 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
                     >
                       {CATEGORIES.map((cat) => {
                         const val = d[cat === 'best_case' ? 'bestCase' : cat];
-                        const catPct = total > 0 ? (val / total) * 100 : 0;
+                        const catPct = microsSharePercent(val, total);
                         return (
                           <div
                             key={cat}
                             style={{
                               height: `${Math.max(catPct, 0)}%`,
                               backgroundColor: CATEGORY_COLOR[cat],
-                              minHeight: val > 0 ? 2 : 0,
+                              minHeight: compareMicros(val, 0) > 0 ? 2 : 0,
                             }}
                             title={`${CATEGORY_LABELS[cat]}: ${formatMoneyMicros(val)}`}
                           />

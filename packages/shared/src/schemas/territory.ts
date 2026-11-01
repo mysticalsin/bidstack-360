@@ -61,7 +61,7 @@ export const Forecast = z.object({
   ownerName: z.string().nullable(),
   period: z.string().min(1),
   category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
-  amountMicros: z.number().int().nonnegative(),
+  amountMicros: z.string().regex(/^\d+$/),
   currency: z.string().length(3),
   note: z.string().nullable(),
   createdAt: z.string().datetime(),
