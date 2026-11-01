@@ -17,6 +17,24 @@ import { excludeClosedOutcome } from '../routes/opportunities.helpers.js';
 
 import { sanitiseContactForPrompt } from './ai-assistant.helpers.js';
 
+/** Deal line for a model prompt. Amounts have no currency. Outcome follows a live stage flag. */
+export function formatDealForPrompt(deal: {
+  name: string;
+  stage: string;
+  valueMicros: bigint | number | null;
+  pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt: Date | null } | null;
+}): string {
+  const stage =
+    deal.pipelineStage && deal.pipelineStage.deletedAt == null ? deal.pipelineStage : null;
+  const lost = deal.stage === 'closed_lost' || stage?.isLost === true;
+  const won = !lost && (deal.stage === 'closed_won' || stage?.isWon === true);
+  const outcome = lost ? 'lost' : won ? 'won' : 'open';
+  const micros = deal.valueMicros == null ? 0 : Number(deal.valueMicros);
+  const amount =
+    micros === 0 ? '' : `, value ${micros / 1_000_000} (currency not recorded)`;
+  return `"${deal.name}" (stage ${deal.stage}, outcome ${outcome}${amount})`;
+}
+
 // ─── Email draft context ──────────────────────────────────────────────────
 
 export async function buildEmailDraftContext(
@@ -42,15 +60,15 @@ export async function buildEmailDraftContext(
   if (dealId) {
     const opp = await prisma.opportunity.findFirst({
       where: { id: dealId, orgId, deletedAt: null },
-      select: { name: true, stage: true, valueMicros: true },
+      select: {
+        name: true,
+        stage: true,
+        valueMicros: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
     });
     if (opp) {
-      const valueStr = opp.valueMicros
-        ? `$${(Number(opp.valueMicros) / 1_000_000).toFixed(0)}`
-        : '';
-      parts.push(
-        `Deal: "${opp.name}" — stage: ${String(opp.stage)}${valueStr ? `, value: ${valueStr}` : ''}`,
-      );
+      parts.push(`Deal: ${formatDealForPrompt(opp)}`);
     }
   }
 
@@ -209,7 +227,13 @@ export async function buildAccountIntelContext(orgId: string, accountId: string)
   const [opps, contacts] = await Promise.all([
     prisma.opportunity.findMany({
       where: { orgId, companyId: accountId, deletedAt: null },
-      select: { id: true, name: true, stage: true, valueMicros: true },
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        valueMicros: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 20,
     }),
@@ -223,7 +247,7 @@ export async function buildAccountIntelContext(orgId: string, accountId: string)
   const oppSummary = opps
     .map(
       (o) =>
-        `"${o.name}" (${String(o.stage)}${o.valueMicros ? `, $${(Number(o.valueMicros) / 1_000_000).toFixed(0)}` : ''})`,
+        formatDealForPrompt(o),
     )
     .join(', ');
 
