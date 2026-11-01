@@ -2097,7 +2097,7 @@ select:focus-visible {
 /* ---------- Cards ---------- */
 .card {
   background: var(--surface-card);
-  border-radius: 14px;
+  border-radius: 18px;
   border: 1px solid var(--border-default);
   overflow: hidden;
   transition:
@@ -2955,11 +2955,11 @@ select:focus-visible {
   gap: 8px;
 }
 .command-center-next {
-  margin: 0;
-  color: var(--fg-primary);
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
+  margin: 2px 4px 0;
+  color: var(--fg-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
 }
 .command-center-graphic .command-center-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3058,10 +3058,19 @@ select:focus-visible {
 .command-signal {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  box-shadow: var(--shadow-xs);
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(5, 7, 26, 0.05);
   min-height: 100px;
-  padding: 14px;
+  padding: 16px 18px;
+}
+.command-signal[data-tone='amber'] .command-progress span {
+  background: var(--warning);
+}
+.command-signal[data-tone='tomato'] .command-progress span {
+  background: var(--danger);
+}
+.command-signal[data-tone='jade'] .command-progress span {
+  background: var(--success);
 }
 .command-signal-head {
   align-items: flex-start;

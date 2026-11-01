@@ -101,7 +101,6 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={springSoft}
     >
-      <p className="command-center-next">{nextMove}</p>
       <div className="command-center-metrics">
         {signals.map((signal, index) => (
           <motion.div
@@ -131,6 +130,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
           </motion.div>
         ))}
       </div>
+      <p className="command-center-next">{nextMove}</p>
     </motion.section>
   );
 });
