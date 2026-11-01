@@ -39,7 +39,8 @@ export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
   let openDealsMissingProbability = 0;
   const pipelineMicros = open.reduce((acc, deal) => {
-    if (deal.probability == null) {
+    // A blank probability is stored as 0. It adds nothing and is not a measured chance.
+    if (deal.probability == null || deal.probability === 0) {
       openDealsMissingProbability += 1;
       return acc;
     }

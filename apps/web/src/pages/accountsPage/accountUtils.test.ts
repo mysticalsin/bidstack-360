@@ -128,6 +128,28 @@ describe('accountUtils', () => {
     expect(row.health).toBe('critical');
   });
 
+  it('counts a stored zero as no recorded probability', () => {
+    // WHY: the column stores a blank as 0. Weighting that deal at 0% still
+    // reads as a measured chance of zero.
+    const row = deriveAccount(company(), [
+      deal({
+        id: 'blank',
+        stage: 'proposal',
+        probability: 0,
+        amountMicros: 1_000_000_000_000,
+      }),
+      deal({
+        id: 'recorded',
+        stage: 'proposal',
+        probability: 40,
+        amountMicros: 1_000_000_000_000,
+      }),
+    ]);
+    expect(row.openDeals).toBe(2);
+    expect(row.openDealsMissingProbability).toBe(1);
+    expect(row.pipelineMicros).toBe(400_000_000_000);
+  });
+
   it('keeps the pipeline band from reading as a measured health score', () => {
     // Why: the list only has weighted pipeline size. Calling that Strong
     // without a proxy mark is the misleading health the safety gate forbids.

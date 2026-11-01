@@ -69,7 +69,8 @@ export function serializeDeal(opportunity: {
     stageName: liveStage?.name ?? null,
     amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
     currencyCode: recorded && recorded.length === 3 ? recorded : null,
-    probability: opportunity.probability,
+    // A blank probability is stored as 0. That is not a measured win chance.
+    probability: opportunity.probability === 0 ? null : opportunity.probability,
     closeDate: opportunity.dueDate ? opportunity.dueDate.toISOString().slice(0, 10) : null,
     ownerId: opportunity.ownerId,
     ownerName: opportunity.owner?.name ?? opportunity.owner?.email ?? null,

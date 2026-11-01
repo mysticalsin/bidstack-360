@@ -167,8 +167,28 @@ describe('deal currency is omitted when the opportunity has none', () => {
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
     expect(deal.currencyCode).toBeNull();
+    expect(deal.probability).toBe(40);
     expect(deal.companyId).toBeNull();
     expect(deal.companyName).toBe('Acme');
+  });
+
+  it('does not present a stored zero as a measured probability', () => {
+    // WHY: a blank probability is stored as 0. The account list must count it
+    // as unrecorded, the same way a null does.
+    const deal = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5b',
+      customer: 'Acme',
+      name: 'Unscored',
+      stage: 's1_lead',
+      pipelineStage: null,
+      valueMicros: 1_000_000,
+      probability: 0,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(deal.probability).toBeNull();
   });
 
   it('keeps the company id only when the opportunity row stores one', () => {
