@@ -1,6 +1,8 @@
 import { Prisma, prisma } from '@bidstack/db';
 import { microsToUnits, quarterStart } from '@bidstack/shared';
 
+import { wonOutcomeWhere } from '../../routes/opportunities.helpers.js';
+
 export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number }>;
   totalOpen: number;
@@ -91,7 +93,12 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');
 
   const closedThisQuarter = await prisma.opportunity.count({
-    where: { orgId, deletedAt: null, stage: 'closed_won', updatedAt: { gte: quarterStart() } },
+    where: {
+      orgId,
+      deletedAt: null,
+      updatedAt: { gte: quarterStart() },
+      ...wonOutcomeWhere(),
+    },
   });
 
   // Weighted pipeline + avg-open-age over the FULL open set, not a take:1000

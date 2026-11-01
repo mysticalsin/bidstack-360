@@ -115,6 +115,58 @@ describe('crm summary routes', () => {
     expect(openOnAccount).toBe(0);
   });
 
+  failIfNoDb('a won stage flag counts as closed this quarter', async () => {
+    // WHY: the quarter close count used the closed_won enum only. A live won
+    // flag was still an open stage, and a lost flag on a won enum still counted.
+    const before = await getPipelineKpis(orgId);
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Quarter flags ${Date.now()}` },
+    });
+    const won = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: 'verbal_won', name: 'Verbal won', isWon: true },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: {
+        orgId,
+        pipelineId: pipeline.id,
+        key: 'both_flags',
+        name: 'Both',
+        isWon: true,
+        isLost: true,
+      },
+    });
+    const stamp = Date.now();
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId,
+          code: `OP-WQ1-${stamp}`,
+          customer: 'Quarter Co',
+          name: 'Flagged won',
+          stage: 's3_technical_iteration',
+          pipelineStageId: won.id,
+          valueMicros: 1_000_000n,
+          probability: 80,
+          intel: {},
+        },
+        {
+          orgId,
+          code: `OP-WQ2-${stamp}`,
+          customer: 'Quarter Co',
+          name: 'Won enum but lost flag',
+          stage: 'closed_won',
+          pipelineStageId: lost.id,
+          valueMicros: 4_000_000n,
+          probability: 100,
+          intel: {},
+        },
+      ],
+    });
+
+    const after = await getPipelineKpis(orgId);
+    expect(after.velocity.closedThisQuarter).toBe(before.velocity.closedThisQuarter + 1);
+  });
+
   failIfNoDb('GET /api/crm/summary rejects invalid limits', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/crm/summary?limit=0' });
     expect(res.statusCode).toBe(400);
