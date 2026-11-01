@@ -141,6 +141,23 @@ describe('computeMomentum', () => {
     expect(keptDetail).not.toMatch(/12\.0/);
   });
 
+  it('does not let a capped job-post page move the score', () => {
+    // WHY: the newest 1,000 posts drop the prior month, so the ratio looked like a hiring spike.
+    const postings = Array.from({ length: 20 }, () => daysAgo(5));
+    const base = { opps: [], meetings: [], events: [], headcountGrowth12m: null as number | null };
+    const spiked = computeMomentum({ ...base, postings }, NOW);
+    const page = computeMomentum({ ...base, postings, postingsArePage: true }, NOW);
+    expect(spiked.drivers.find((driver) => driver.key === 'hiring')?.direction).toBe('up');
+    expect(page.score).toBe(50);
+    expect(page.drivers.find((driver) => driver.key === 'hiring')?.signal).toBe(0);
+    expect(page.drivers.find((driver) => driver.key === 'hiring')?.detail).toContain('20 roles posted');
+    const head = computeMomentum({ ...base, postings: [], headcountGrowth12m: 0.08 }, NOW);
+    const mixed = computeMomentum({ ...base, postings, headcountGrowth12m: 0.08, postingsArePage: true }, NOW);
+    expect(mixed.drivers.find((driver) => driver.key === 'hiring')?.signal).toBe(
+      head.drivers.find((driver) => driver.key === 'hiring')?.signal,
+    );
+  });
+
   it('reads a growing account as gaining with plain-English drivers', () => {
     const m = computeMomentum(growing, NOW);
     expect(m.score).toBeGreaterThan(65);

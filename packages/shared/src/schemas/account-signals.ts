@@ -378,6 +378,8 @@ export interface MomentumData {
   events: MomentumEvent[];
   /** Fraction, e.g. 0.08 for +8% (firmographics, undated snapshot). */
   headcountGrowth12m: number | null;
+  /** The post list is the latest page, so the 30-day ratio is not the book. */
+  postingsArePage?: boolean;
 }
 
 export interface MomentumDriver {
@@ -478,6 +480,12 @@ interface Component {
   key: DriverKey;
   signal: number;
   detail: string;
+  /** False when the line is shown and must not move the score. */
+  scored?: boolean;
+}
+
+function scoredComponents(comps: Component[]): Component[] {
+  return comps.filter((component) => component.scored !== false);
 }
 
 function components(d: MomentumData, asOf: number): Component[] {
@@ -536,16 +544,21 @@ function components(d: MomentumData, asOf: number): Component[] {
     const parts: number[] = [];
     const words: string[] = [];
     if (hasPostings) {
-      parts.push(ratioChange(pa, pb));
+      if (!d.postingsArePage) parts.push(ratioChange(pa, pb));
       words.push(`${pa} roles posted in 30 days (${pb} before)`);
     }
     if (hc !== null) {
       parts.push(clamp(hc / 0.15));
       words.push(`headcount ${hc >= 0 ? '+' : ''}${Math.round(hc * 100)}% in 12 months`);
     }
-    const s = parts.reduce((x, y) => x + y, 0) / parts.length;
+    const s = parts.length === 0 ? 0 : parts.reduce((x, y) => x + y, 0) / parts.length;
     const text = words.join(', ');
-    out.push({ key: 'hiring', signal: clamp(s), detail: text.charAt(0).toUpperCase() + text.slice(1) });
+    out.push({
+      key: 'hiring',
+      signal: clamp(s),
+      detail: text.charAt(0).toUpperCase() + text.slice(1),
+      scored: parts.length > 0,
+    });
   }
   // News: importance-weighted sentiment over 90 days.
   const recent = d.events.filter((e) => inWindow(e.occurredAt, asOf - 90 * DAY, asOf));
@@ -644,10 +657,10 @@ export function computeMomentum(data: MomentumData, now: Date = new Date(), week
   const series: Array<{ at: string; score: number }> = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const at = t - i * 7 * DAY;
-    series.push({ at: new Date(at).toISOString(), score: scoreOf(components(data, at)).score });
+    series.push({ at: new Date(at).toISOString(), score: scoreOf(scoredComponents(components(data, at))).score });
   }
   const comps = components(data, t);
-  const { score, coverage, points } = scoreOf(comps);
+  const { score, coverage, points } = scoreOf(scoredComponents(comps));
   const before = series.length > 4 ? (series[series.length - 5]?.score ?? score) : (series[0]?.score ?? score);
   const delta = score - before;
   const trend = trendFor(delta);
