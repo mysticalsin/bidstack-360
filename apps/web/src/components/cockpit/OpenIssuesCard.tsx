@@ -17,6 +17,35 @@ import {
   type OpenRiskSeverityCounts,
 } from './open-risk-headline';
 
+export const ISSUE_RISK_LIST = 4;
+export const ISSUE_CHECK_LIST = 2;
+
+/** The list is a sample. Say so when the counts are larger. */
+export function issueListNote(input: {
+  shownRisks: number;
+  shownChecks: number;
+  openRisks: number;
+  openChecks: number;
+}): string | null {
+  const parts: string[] = [];
+  if (input.openRisks > input.shownRisks) {
+    parts.push(
+      input.shownRisks === 0
+        ? `none of the ${input.openRisks} open risks`
+        : `${input.shownRisks} of ${input.openRisks} open risks`,
+    );
+  }
+  if (input.openChecks > input.shownChecks) {
+    parts.push(
+      input.shownChecks === 0
+        ? `none of the ${input.openChecks} open checks`
+        : `${input.shownChecks} of ${input.openChecks} open checks`,
+    );
+  }
+  if (parts.length === 0) return null;
+  return `Showing ${parts.join(' and ')}.`;
+}
+
 /** The caption names risks and checks separately so it matches the risk mix. */
 export function openIssuesCaption(input: {
   recorded: number;
@@ -92,6 +121,12 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
     openRisks: riskTotal,
     openChecks: checkTotal,
     pageCapped,
+  });
+  const listNote = issueListNote({
+    shownRisks: Math.min(ISSUE_RISK_LIST, openRisks.length),
+    shownChecks: Math.min(ISSUE_CHECK_LIST, openCompliance.length),
+    openRisks: riskTotal,
+    openChecks: checkTotal,
   });
   // Register counts are open risks on the loaded deals. Without them, the
   // visible rows are the only book.
@@ -187,7 +222,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
           />
         ) : (
           <ul className="open-issues">
-            {openRisks.slice(0, 4).map((r, index) => (
+            {openRisks.slice(0, ISSUE_RISK_LIST).map((r, index) => (
               <motion.li
                 key={r.id}
                 initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
@@ -211,7 +246,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
                 </Badge>
               </motion.li>
             ))}
-            {openCompliance.slice(0, 2).map((c, index) => (
+            {openCompliance.slice(0, ISSUE_CHECK_LIST).map((c, index) => (
               <motion.li
                 key={c.id}
                 initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
@@ -240,6 +275,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
             ))}
           </ul>
         )}
+        {listNote ? <p className="open-issues-sample">{listNote}</p> : null}
       </div>
     </Card>
   );
