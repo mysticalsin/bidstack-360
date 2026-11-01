@@ -515,6 +515,64 @@ describe('opportunities routes', () => {
     }
   });
 
+  skipIfNoDb('GET /api/opportunities?overdue=true&excludeClosed=true leaves a lost flag out', async () => {
+    // WHY: Overdue is missed open work. A stage marked lost, with a past due
+    // date, was still sitting in that list.
+    const suffix = randomUUID().slice(0, 8);
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `Overdue lost ${suffix}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'price_lost',
+        name: 'Price lost',
+        isLost: true,
+      },
+    });
+    const [open, flagged] = await prisma.$transaction([
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-OD1-${suffix}`,
+          customer: 'Overdue Test',
+          name: 'Still open',
+          stage: 's2_sent',
+          probability: 40,
+          dueDate: yesterday,
+        },
+      }),
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-OD2-${suffix}`,
+          customer: 'Overdue Test',
+          name: 'Flagged lost',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          probability: 40,
+          dueDate: yesterday,
+        },
+      }),
+    ]);
+    try {
+      const openOnly = await server.inject({
+        method: 'GET',
+        url: '/api/opportunities?overdue=true&excludeClosed=true&limit=100',
+      });
+      expect(openOnly.statusCode).toBe(200);
+      const openIds = openOnly.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id);
+      expect(openIds).toContain(open.id);
+      expect(openIds).not.toContain(flagged.id);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { id: { in: [open.id, flagged.id] } } });
+      await prisma.pipelineStage.deleteMany({ where: { id: lost.id } });
+      await prisma.pipeline.deleteMany({ where: { id: pipeline.id } });
+    }
+  });
+
   skipIfNoDb('GET /api/opportunities?dueWithinDays=7&excludeClosed=true leaves a lost flag out', async () => {
     // WHY: the closing strip takes 25 rows. A page of lost deals with due
     // dates inside the window hid the open bid that was due later in the week.

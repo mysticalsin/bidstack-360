@@ -90,7 +90,9 @@ export function OpportunitiesPage() {
           : {}
       : {}),
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
-    ...(dueFilter === 'overdue' ? { overdue: true } : {}),
+    // Overdue means an open bid whose date has passed. A lost or won stage
+    // is not missed work. The Due ≤ 7d chip stays a plain date window.
+    ...(dueFilter === 'overdue' ? { overdue: true, excludeClosed: true } : {}),
   });
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.

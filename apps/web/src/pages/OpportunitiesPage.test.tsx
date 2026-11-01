@@ -170,7 +170,10 @@ describe('OpportunitiesPage', () => {
 
     const overdueChip = () => screen.getByRole('button', { name: 'Overdue' });
     fireEvent.click(overdueChip());
-    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({ overdue: true });
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({
+      overdue: true,
+      excludeClosed: true,
+    });
 
     // Toggling the same chip again clears the filter — same UX contract as
     // the existing stage-filter chips.
