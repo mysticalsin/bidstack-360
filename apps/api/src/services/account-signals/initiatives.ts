@@ -23,17 +23,20 @@ const SOLUTION_PAGE = 1000;
 const SOLUTION_LIMIT = 5000;
 /** Retrieval words per theme. A hit counts only when themeForText returns that theme. */
 const THEME_PROBES: Partial<Record<InitiativeTheme, readonly string[]>> = {
-  cloud: ['cloud', 'kubernetes', 'azure'],
-  cyber: ['cyber', 'security'],
-  data_ai: ['analytics', 'databricks', 'machine learning'],
-  erp_finance: ['erp', 'workday'],
-  regulatory: ['compliance', 'gdpr'],
-  m_and_a: ['acquisition', 'merger'],
-  workforce: ['layoff', 'restructuring'],
-  engineering: ['embedded', 'electrification'],
-  digital_cx: ['ecommerce', 'customer journey'],
-  expansion: ['new market', 'series a'],
+  cloud: ['cloud', 'kubernetes', 'azure', 'aws', 'gcp', 'devops', 'migration'],
+  cyber: ['cyber', 'security', 'siem', 'ciso', 'zero trust'],
+  data_ai: ['analytics', 'databricks', 'machine learning', 'snowflake', 'genai'],
+  erp_finance: ['erp', 'workday', 'sap', 'oracle', 'core banking'],
+  regulatory: ['compliance', 'gdpr', 'basel', 'dora', 'aml', 'kyc'],
+  m_and_a: ['acquisition', 'merger', 'takeover', 'carve'],
+  workforce: ['layoff', 'restructuring', 'redundancy', 'job cuts'],
+  engineering: ['embedded', 'electrification', 'manufacturing'],
+  digital_cx: ['ecommerce', 'customer journey', 'e-commerce'],
+  expansion: ['new market', 'series a', 'new office'],
 };
+/** One probe page stays inside the query guard. A full page is not the whole book. */
+export const SOLUTION_PROBE_PAGE = 1000;
+const SOLUTION_PROBE_LIMIT = 5000;
 
 export function soldThemesFromSolutions(rows: readonly { name: string; category: string }[]): Set<InitiativeTheme> {
   return new Set(rows.map((row) => themeForText(`${row.category} ${row.name}`)));
@@ -88,13 +91,25 @@ export function applyMeetingEvidence(
   }
 }
 
-/** Each probe word is its own lookup, so one noisy word cannot hide the next. */
+/**
+ * Each probe word is its own lookup. A full page of noise is not the end of
+ * that word: the next page is read until a real match or the ceiling.
+ */
 export async function confirmThemeFromProbes(
   theme: InitiativeTheme,
-  load: (word: string) => Promise<readonly { name: string; category: string }[]>,
+  load: (word: string, cursor?: string) => Promise<readonly { id?: string; name: string; category: string }[]>,
 ): Promise<boolean> {
   for (const word of THEME_PROBES[theme] ?? []) {
-    if (themeConfirmedByRows(theme, await load(word))) return true;
+    let cursor: string | undefined;
+    let seen = 0;
+    for (;;) {
+      const rows = await load(word, cursor);
+      if (themeConfirmedByRows(theme, rows)) return true;
+      seen += rows.length;
+      const lastId = rows[rows.length - 1]?.id;
+      if (rows.length < SOLUTION_PROBE_PAGE || seen >= SOLUTION_PROBE_LIMIT || !lastId) break;
+      cursor = lastId;
+    }
   }
   return false;
 }
@@ -202,7 +217,7 @@ export async function loadInitiatives(
   if (solutionsCapped) {
     const missing = (Object.keys(THEME_PROBES) as InitiativeTheme[]).filter((theme) => !soldThemes.has(theme));
     await Promise.all(missing.map(async (theme) => {
-      const confirmed = await confirmThemeFromProbes(theme, async (word) => prisma.accountSolution.findMany({
+      const confirmed = await confirmThemeFromProbes(theme, async (word, cursor) => prisma.accountSolution.findMany({
         where: {
           ...solutionWhere,
           OR: [
@@ -210,8 +225,10 @@ export async function loadInitiatives(
             { category: { contains: word, mode: 'insensitive' as const } },
           ],
         },
-        select: { name: true, category: true },
-        take: 5,
+        select: { id: true, name: true, category: true },
+        orderBy: { id: 'asc' },
+        take: SOLUTION_PROBE_PAGE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       }));
       if (confirmed) soldThemes.add(theme);
     }));
