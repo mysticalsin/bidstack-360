@@ -15,6 +15,7 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 import { storedProbabilityLabel } from '@/lib/stored-probability';
+import { contactOpportunityCaption, dealsForContact } from './contact-deals';
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
@@ -22,7 +23,7 @@ export function ContactDetailPage() {
   const contact = useContact(id);
   const allOpps = useOpportunities({ limit: 100 });
   const allTasks = useTasks();
-  const allNotes = useNotes(contact.data?.customer);
+  const allNotes = useNotes(contact.data?.companyId ?? undefined);
 
   if (contact.isLoading) return <DetailPageSkeleton columns={3} cards={3} />;
   if (contact.isError)
@@ -54,10 +55,11 @@ export function ContactDetailPage() {
   }
 
   const c = contact.data;
-  const relatedOpps = allOpps.data?.items.filter((o) => o.customer === c.customer) ?? [];
+  const relatedOpps = dealsForContact(allOpps.data?.items ?? [], c.companyId);
+  const oppPageContinues = Boolean(allOpps.data?.nextCursor);
   const relatedTasks =
     allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
-  const relatedNotes = allNotes.data?.items.filter((n) => n.accountId === c.customer) ?? [];
+  const relatedNotes = c.companyId ? (allNotes.data?.items ?? []) : [];
 
   return (
     <div className="space-y-6">
@@ -86,12 +88,16 @@ export function ContactDetailPage() {
               {c.customer ? (
                 <>
                   {' · '}
-                  <Link
-                    to={`/companies?search=${encodeURIComponent(c.customer)}`}
-                    className="text-[var(--brand-primary)] hover:underline"
-                  >
-                    {c.customer}
-                  </Link>
+                  {c.companyId ? (
+                    <Link
+                      to={`/accounts/${c.companyId}`}
+                      className="text-[var(--brand-primary)] hover:underline"
+                    >
+                      {c.customer}
+                    </Link>
+                  ) : (
+                    <span>{c.customer}</span>
+                  )}
                 </>
               ) : null}
             </p>
@@ -149,15 +155,28 @@ export function ContactDetailPage() {
         <Card>
           <SectionHeader
             title={t('contactDetail.opportunitiesTitle', 'Opportunities')}
-            caption={t('contactDetail.relatedCount', '{{count}} related', {
-              count: relatedOpps.length,
-            })}
+            caption={t(
+              'contactDetail.opportunityCaption',
+              contactOpportunityCaption(relatedOpps.length, Boolean(c.companyId), oppPageContinues),
+              { count: relatedOpps.length },
+            )}
           />
           {relatedOpps.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
-              {t('contactDetail.noOpportunities', 'No opportunities for {{customer}}.', {
-                customer: c.customer,
-              })}
+              {c.companyId
+                ? oppPageContinues
+                  ? t(
+                      'contactDetail.noOpportunitiesPage',
+                      'No opportunities for this company in the latest 100 bids.',
+                    )
+                  : t(
+                      'contactDetail.noLinkedOpportunities',
+                      'No opportunities linked to this company.',
+                    )
+                : t(
+                    'contactDetail.unlinkedOpportunities',
+                    'This contact is not linked to a company, so its opportunities are not listed.',
+                  )}
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
@@ -243,7 +262,12 @@ export function ContactDetailPage() {
           />
           {relatedNotes.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
-              {t('contactDetail.noNotes', 'No notes for this account.')}
+              {c.companyId
+                ? t('contactDetail.noNotes', 'No notes for this account.')
+                : t(
+                    'contactDetail.unlinkedNotes',
+                    'This contact is not linked to a company, so account notes are not listed.',
+                  )}
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
