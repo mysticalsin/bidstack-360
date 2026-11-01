@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { closedAtOf, recordedOutcome, toMomentumOpp, type OppRow } from './load';
+import { closedAtOf, openBookMicros, recordedOutcome, toMomentumOpp, type OppRow } from './load';
 
 const row = (over: Partial<OppRow>): OppRow => ({
   id: 'o1',
@@ -45,5 +45,16 @@ describe('recordedOutcome', () => {
   it('still closes the enum lost and won stages', () => {
     expect(recordedOutcome(row({ stage: 'closed_lost' }))).toBe('lost');
     expect(recordedOutcome(row({ stage: 'closed_won' }))).toBe('won');
+  });
+
+  it('leaves a live lost stage out of the open pipeline total', () => {
+    // WHY: the portfolio tile added every deal whose enum was not closed_*.
+    const lost = row({
+      valueMicros: 2_000_000_000_000n,
+      pipelineStage: { isWon: false, isLost: true, deletedAt: null },
+    });
+    const open = row({ stage: 's2_sent', valueMicros: 1_000_000_000_000n });
+    const won = row({ stage: 'closed_won', valueMicros: 500n });
+    expect(openBookMicros(lost) + openBookMicros(open) + openBookMicros(won)).toBe(1_000_000_000_000n);
   });
 });
