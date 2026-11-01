@@ -107,7 +107,8 @@ export interface ContactEnrichResult {
 
 export interface AccountIntelResult {
   sessionId: string;
-  healthScore: number; // 0–100
+  /** A model score from 0 to 100. Null when no score was returned. */
+  healthScore: number | null;
   summary: string;
   expansionOpportunities: string[];
   churnRisks: string[];

@@ -151,13 +151,21 @@ function AccountIntelView({ data }: { data: AccountIntelResult }) {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline gap-1.5">
-        <AnimatedNumber
-          value={data.healthScore}
-          duration={0.6}
-          className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]"
-        />
+        {data.healthScore == null ? (
+          <span className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('copilot.healthMissing', 'No health score')}
+          </span>
+        ) : (
+          <AnimatedNumber
+            value={data.healthScore}
+            duration={0.6}
+            className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]"
+          />
+        )}
         <span className="text-xs text-[var(--fg-tertiary)]">
-          {t('copilot.healthOutOf', '/ 100 relationship health')}
+          {data.healthScore == null
+            ? t('copilot.healthMissingDetail', 'No model score was returned')
+            : t('copilot.healthOutOf', '/ 100 model score, basis not recorded')}
         </span>
       </div>
       {data.summary ? (

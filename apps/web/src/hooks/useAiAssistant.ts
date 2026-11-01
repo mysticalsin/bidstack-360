@@ -40,8 +40,8 @@ export interface DealSentimentResult {
 
 export interface AccountIntelResult {
   sessionId: string;
-  /** 0–100 relationship health. */
-  healthScore: number;
+  /** 0–100 when a model returned one. Null when no score was produced. */
+  healthScore: number | null;
   summary: string;
   expansionOpportunities: string[];
   churnRisks: string[];

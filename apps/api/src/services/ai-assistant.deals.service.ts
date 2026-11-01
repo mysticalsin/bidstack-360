@@ -123,6 +123,34 @@ export async function analyzeDealSentiment(
 
 // ─── Account intel ────────────────────────────────────────────────────────────
 
+/** Counts from recorded deals. No score, and no suggested plays. */
+export function recordedAccountIntel(input: {
+  opportunityCount: number;
+  wonCount: number;
+  lostCount: number;
+  contactCount: number;
+}): {
+  healthScore: null;
+  summary: string;
+  expansionOpportunities: [];
+  churnRisks: [];
+} {
+  return {
+    healthScore: null,
+    summary: `${input.opportunityCount} opportunities on this account, ${input.wonCount} won, ${input.lostCount} lost, ${input.contactCount} linked contacts. No health score was produced.`,
+    expansionOpportunities: [],
+    churnRisks: [],
+  };
+}
+
+/** Keeps a 0–100 model number. Anything else, including a missing field, is no score. */
+export function parseAccountHealthScore(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) return null;
+  return Math.round(value);
+}
+
+// ─── Account intel runner ─────────────────────────────────────────────────────
+
 export async function summarizeAccountIntel(
   opts: { orgId: string; userId: string; accountId: string },
   log: PinoLogger,
@@ -168,18 +196,13 @@ export async function summarizeAccountIntel(
   if (!responseText) {
     const wonCount = opps.filter((o) => String(o.stage) === 'closed_won').length;
     const lostCount = opps.filter((o) => String(o.stage) === 'closed_lost').length;
-    const healthScore = opps.length
-      ? Math.round(((wonCount + 1) / (wonCount + lostCount + 1)) * 100)
-      : 50;
-    responseText = JSON.stringify({
-      healthScore,
-      summary: `${opps.length} total opportunities, ${wonCount} won, ${lostCount} lost. ${contacts.length} known contacts.`,
-      expansionOpportunities:
-        wonCount > 0
-          ? ['Explore upsell for existing won deals', 'Cross-sell related products']
-          : [],
-      churnRisks: lostCount >= 2 ? ['Multiple lost deals may indicate competitive pressure'] : [],
+    const recorded = recordedAccountIntel({
+      opportunityCount: opps.length,
+      wonCount,
+      lostCount,
+      contactCount: contacts.length,
     });
+    responseText = JSON.stringify(recorded);
   }
 
   const tokenInput = Math.ceil(prompt.length / 4);
@@ -187,7 +210,7 @@ export async function summarizeAccountIntel(
   const costMicros = estimateCost(tokenInput, tokenOutput);
 
   let parsed: {
-    healthScore: number;
+    healthScore: number | null;
     summary: string;
     expansionOpportunities: string[];
     churnRisks: string[];
@@ -196,7 +219,7 @@ export async function summarizeAccountIntel(
     parsed = JSON.parse(responseText) as typeof parsed;
   } catch {
     parsed = {
-      healthScore: 50,
+      healthScore: null,
       summary: responseText.slice(0, 500),
       expansionOpportunities: [],
       churnRisks: [],
@@ -220,7 +243,7 @@ export async function summarizeAccountIntel(
 
   return {
     sessionId,
-    healthScore: parsed.healthScore ?? 50,
+    healthScore: parseAccountHealthScore(parsed.healthScore),
     summary: parsed.summary ?? '',
     expansionOpportunities: Array.isArray(parsed.expansionOpportunities)
       ? parsed.expansionOpportunities
