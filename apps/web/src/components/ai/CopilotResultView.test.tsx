@@ -5,7 +5,10 @@ import { CopilotResultView } from './CopilotResultView';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
+    t: (_key: string, fallback: string, values?: Record<string, unknown>) => {
+      if (!values) return fallback;
+      return fallback.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => String(values[key] ?? ''));
+    },
   }),
 }));
 
@@ -23,7 +26,8 @@ afterEach(() => {
 
 const base = {
   sessionId: 's1',
-  summary: '7 opportunities on this account, 4 won, 2 lost, 3 linked contacts. No health score was produced.',
+  summary:
+    '7 opportunities on this account, 4 won, 2 lost, 3 linked contacts. No health score was produced.',
   expansionOpportunities: [],
   churnRisks: [],
   costMicros: 0,
@@ -52,6 +56,18 @@ describe('deal sentiment result', () => {
     expect(screen.getByText('No model score was returned').textContent).toContain('No model score');
     expect(screen.queryByText('negative')).toBeNull();
     expect(screen.queryByText('neutral')).toBeNull();
+  });
+});
+
+describe('copilot cost', () => {
+  it('prints a sub-cent cost from integer micros', () => {
+    // WHY: four decimal places turned a 5-micro call into $0.0000.
+    render(
+      <CopilotResultView
+        result={{ kind: 'account-intel', data: { ...base, costMicros: 5, healthScore: null } }}
+      />,
+    );
+    expect(screen.getByText('Cost: $0.000005')).toBeTruthy();
   });
 });
 

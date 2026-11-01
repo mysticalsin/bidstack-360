@@ -167,7 +167,7 @@ export async function checkDailyCap(
       return {
         allowed: false,
         retryAfterSeconds: Math.ceil(msUntilMidnight / 1000),
-        reason: `Daily AI cost cap of $${Number(capMicros) / 1_000_000} reached.`,
+        reason: `Daily AI cost cap of $${usdFromMicros(capMicros)} reached.`,
       };
     }
   } catch (err) {
@@ -237,6 +237,12 @@ export function buildDustClient(
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────
+
+function usdFromMicros(micros: bigint): string {
+  const whole = micros / 1_000_000n;
+  const frac = (micros % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  return frac ? `${whole.toString()}.${frac}` : whole.toString();
+}
 
 export function estimateCost(inputTokens: number, outputTokens: number): bigint {
   return (

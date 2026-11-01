@@ -151,6 +151,22 @@ export function formatMoneyMicros(
   }).format(value);
 }
 
+/** USD from integer micros, including sub-cent digits. A 4-decimal float prints a small cost as zero. */
+export function formatUsdMicros(micros: number | bigint | string): string {
+  let value: bigint;
+  try {
+    value = typeof micros === 'bigint' ? micros : BigInt(micros);
+  } catch {
+    return '0';
+  }
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const whole = abs / 1_000_000n;
+  const frac = (abs % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  const text = frac ? `${whole.toString()}.${frac}` : whole.toString();
+  return negative ? `-${text}` : text;
+}
+
 /** Same as formatMoneyMicros but always returns full-precision (e.g. tooltips). */
 export function formatMoneyMicrosFull(
   micros: string | number | bigint,

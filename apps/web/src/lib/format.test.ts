@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatStage, formatMoney, formatMoneyMicros, daysUntil } from './format.js';
+import {
+  formatStage,
+  formatMoney,
+  formatMoneyMicros,
+  formatUsdMicros,
+  daysUntil,
+} from './format.js';
 
 describe('formatStage', () => {
   it('humanizes snake_case enum values for display', () => {
@@ -38,6 +44,14 @@ describe('formatMoneyMicros', () => {
     expect(formatMoneyMicros(1_500_000_000_000n, 'USD', { locale: 'en' })).toBe('$1.5M');
     const units = 9_950_000_000_000_000n;
     expect(formatMoneyMicros(units * 1_000_000n, 'USD', { locale: 'en' })).toBe('$9950T');
+  });
+});
+
+describe('formatUsdMicros', () => {
+  it('keeps a sub-cent AI cost instead of printing zero', () => {
+    // WHY: dividing by 1e6 and keeping 4 decimals turned 5 micros into $0.0000.
+    expect(formatUsdMicros(5)).toBe('0.000005');
+    expect(formatUsdMicros(5_000_000n)).toBe('5');
   });
 });
 

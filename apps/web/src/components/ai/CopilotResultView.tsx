@@ -11,6 +11,7 @@ import { AiFeedback } from '@/components/ai/ai-feedback';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { formatUsdMicros } from '@/lib/format';
 import type {
   AccountIntelResult,
   DealSentimentResult,
@@ -199,7 +200,7 @@ export function CopilotResultView({ result }: { result: CopilotResultData }) {
       <p className="text-[10px] text-[var(--fg-muted)]">
         {t('copilot.cost', 'Cost: ${{amount}}', {
           // Money lives in micros on the wire; format at the edge only.
-          amount: (result.data.costMicros / 1_000_000).toFixed(4),
+          amount: formatUsdMicros(result.data.costMicros),
         })}
       </p>
       <AiFeedback sessionId={result.data.sessionId} />
