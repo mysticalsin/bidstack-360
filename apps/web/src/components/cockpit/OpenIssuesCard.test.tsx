@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { OpenIssuesCard } from './OpenIssuesCard';
+import { OpenIssuesCard, openIssuesCaption } from './OpenIssuesCard';
 import { severityShort } from './_tokens';
 
 vi.mock('react-i18next', () => ({
@@ -49,7 +49,7 @@ describe('OpenIssuesCard', () => {
         risksCapped
       />,
     );
-    expect(screen.getByText('Latest 50 rows. 3 open items on the account.')).toBeTruthy();
+    expect(screen.getByText('Latest 50 rows. 3 open risks on the account.')).toBeTruthy();
     expect(screen.queryByText('Nothing recorded')).toBeNull();
   });
 
@@ -82,9 +82,19 @@ describe('OpenIssuesCard', () => {
         complianceCapped
       />,
     );
-    expect(screen.getByText('Latest 50 rows. 5 open items on the account.')).toBeTruthy();
+    expect(screen.getByText('Latest 50 rows. 5 open checks on the account.')).toBeTruthy();
     expect(screen.queryByText('Unranked')).toBeNull();
     expect(screen.queryByText('Critical')).toBeNull();
+  });
+
+  it('names open risks and open checks separately', () => {
+    // WHY: one combined total did not match the risk buckets under the caption.
+    expect(
+      openIssuesCaption({ recorded: 2, openRisks: 2, openChecks: 5, pageCapped: true }).text,
+    ).toBe('Latest 50 rows. 2 open risks and 5 open checks on the account.');
+    expect(
+      openIssuesCaption({ recorded: 1, openRisks: 1, openChecks: 0, pageCapped: false }).text,
+    ).toBe('1 open risk');
   });
 
   it('does not mark an unranked risk as low', () => {
