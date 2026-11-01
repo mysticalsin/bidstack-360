@@ -11,11 +11,12 @@
  *    accessTokenEncrypted holds JSON: { accountSid, authToken }.
  *  - Webhook signature validated with timingSafeEqual (constant-time).
  *  - STOP keyword matching is case-insensitive per CTIA/TCPA guidance.
- *  - costMicros populated from Twilio's price field (USD string × 1e6).
+ *  - costMicros populated from Twilio's price string as integer micros.
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Prisma, prisma } from '@bidstack/db';
+import { unitsTextToMicros } from '@bidstack/shared';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import {
@@ -301,6 +302,17 @@ export async function testTwilioConnection(
   return { ok: true, accountSidSuffix: accountSid.slice(-6), fromNumber };
 }
 
+/** Twilio sends a signed decimal such as "-0.00750". A float multiply drops a digit. */
+export function twilioPriceToMicros(price: string | null | undefined): bigint | null {
+  if (price == null) return null;
+  const trimmed = price.trim();
+  if (!trimmed) return null;
+  const negative = trimmed.startsWith('-');
+  const micros = unitsTextToMicros(negative ? trimmed.slice(1) : trimmed);
+  if (micros == null) return null;
+  return negative ? -micros : micros;
+}
+
 // ─── Status webhook ────────────────────────────────────────────────────────
 
 /**
@@ -327,14 +339,14 @@ export async function handleStatusCallback(
     return;
   }
 
-  const costMicros = Price ? BigInt(Math.round(parseFloat(Price) * 1_000_000)) : undefined;
+  const costMicros = twilioPriceToMicros(Price);
 
   await prisma.smsMessage.updateMany({
     where: { twilioSid: MessageSid },
     data: {
       status: mapped,
       errorCode: ErrorCode ? parseInt(ErrorCode, 10) : null,
-      costMicros: costMicros ?? null,
+      costMicros,
       segments: NumSegments ? parseInt(NumSegments, 10) : undefined,
       deliveredAt: mapped === 'DELIVERED' ? new Date() : undefined,
     },
