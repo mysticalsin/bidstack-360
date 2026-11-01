@@ -20,6 +20,8 @@
  * inserting) -> insert -> alert at importance >= ALERT_IMPORTANCE.
  * Responses are cached (6 h by default) so restarts do not re-hit sources.
  */
+import { createHash } from 'node:crypto';
+
 import {
   ALERT_IMPORTANCE,
   classifySignalText,
@@ -33,6 +35,19 @@ import {
   type Implication,
   type WatchEventKind,
 } from '@bidstack/shared';
+
+import {
+  hasNewsIdentifiers,
+  hostOnDomain,
+  isQuotePage,
+  mentionsName,
+  usableIdentifiers,
+  verifyArticleBody,
+  verifyText,
+  type AccountIdentifiers,
+  type BodyFetch,
+  type VerifiedVia,
+} from './news-verify.js';
 
 export const NEWS_SOURCES = ['gdelt', 'google_news', 'company_rss', 'apify_linkedin'] as const;
 export type NewsSourceId = (typeof NEWS_SOURCES)[number];
@@ -50,6 +65,8 @@ export interface NewsItem {
   title: string;
   description: string;
   publisher: string | null;
+  /** The publisher's site when the feed names it (Google News <source url>). */
+  publisherUrl?: string | null;
   publishedAt: Date;
 }
 
@@ -58,6 +75,9 @@ export interface NewsSubject {
   companyId: string;
   companyName: string;
   domain: string | null;
+  /** Exchange ticker and venue from the confirmed watch subject (v22). */
+  ticker?: string | null;
+  exchange?: string | null;
   irFeedUrl: string | null;
   linkedinUrl: string | null;
   alertUserIds: string[];
@@ -111,6 +131,9 @@ export interface NewsConfig {
   lookbackDays: number;
   apify: { token: string; actor: string } | null;
   userAgent: string;
+  /** Fetch article pages to look for the domain or ticker (v22). */
+  verifyBody: boolean;
+  maxArticleFetches: number;
 }
 
 /** Flags: WATCHDOG_NEWS_SOURCES=gdelt,google_news,company_rss (default: none). */
@@ -127,12 +150,15 @@ export function newsConfigFromEnv(env: Record<string, string | undefined>): News
   if (apify) sources.push('apify_linkedin');
   const ttl = Number.parseInt(env.WATCHDOG_NEWS_CACHE_TTL_S ?? '', 10);
   const look = Number.parseInt(env.WATCHDOG_NEWS_LOOKBACK_DAYS ?? '', 10);
+  const art = Number.parseInt(env.WATCHDOG_NEWS_MAX_ARTICLE_FETCHES ?? '', 10);
   return {
     sources,
     cacheTtlSeconds: Number.isFinite(ttl) && ttl >= 300 ? ttl : 6 * 3600,
     lookbackDays: Number.isFinite(look) && look >= 1 && look <= 90 ? look : 14,
     apify,
-    userAgent: env.WATCHDOG_USER_AGENT?.trim() || env.SEC_USER_AGENT?.trim() || 'Polo account watchdog',
+    userAgent: env.WATCHDOG_USER_AGENT?.trim() || env.SEC_USER_AGENT?.trim() || 'PoloWatchdog/1.0 (account news check)',
+    verifyBody: env.WATCHDOG_NEWS_VERIFY_BODY !== 'false',
+    maxArticleFetches: Number.isFinite(art) && art >= 0 && art <= 30 ? art : 8,
   };
 }
 
@@ -188,6 +214,7 @@ export function parseFeed(xml: string, source: NewsSourceId): NewsItem[] {
       title,
       description: cleanText(tag(b, 'description') || tag(b, 'summary') || tag(b, 'content')),
       publisher: cleanText(tag(b, 'source')) || null,
+      publisherUrl: /<source[^>]*\burl="(https?:\/\/[^"]+)"/i.exec(b)?.[1] ?? null,
       publishedAt: at,
     });
   }
@@ -216,8 +243,14 @@ export function gdeltUrl(name: string, days: number): string {
   return `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=ArtList&format=json&maxrecords=50&sort=DateDesc&timespan=${days}d`;
 }
 
-export function googleNewsUrl(name: string, days: number): string {
-  const q = encodeURIComponent(`"${name}" when:${days}d`);
+/**
+ * Google News search. With identifiers the query asks for the ticker or the
+ * domain next to the name, so the feed leans to stories that cite them; the
+ * mention is still verified afterwards because the feed only carries titles.
+ */
+export function googleNewsUrl(name: string, days: number, ids?: { ticker?: string | null; domain?: string | null }): string {
+  const extra = [ids?.ticker && `"${ids.ticker}"`, ids?.domain && `"${ids.domain}"`].filter(Boolean);
+  const q = encodeURIComponent(`"${name}"${extra.length ? ` (${extra.join(' OR ')})` : ''} when:${days}d`);
   return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 }
 
@@ -233,6 +266,9 @@ export function apifyInput(linkedinUrl: string, extra: Record<string, unknown> =
 }
 
 // ── Fetching ───────────────────────────────────────────────────────────────
+
+/** Short stable hash so a changed query never reuses an old cached answer. */
+const keyHash = (s: string) => createHash('sha1').update(s).digest('hex').slice(0, 12);
 
 async function cachedText(
   key: string,
@@ -262,19 +298,22 @@ export interface FetchNewsDeps {
 }
 
 /** Pull every configured source for one account. Errors are per source. */
-export async function fetchAccountNews(subject: NewsSubject, deps: FetchNewsDeps): Promise<{ items: NewsItem[]; errors: string[] }> {
+export async function fetchAccountNews(subject: NewsSubject, deps: FetchNewsDeps): Promise<{ items: NewsItem[]; errors: string[]; skipped?: 'no_identifiers' }> {
   const { config } = deps;
   const items: NewsItem[] = [];
   const errors: string[] = [];
+  const ids = identifiersOf(subject);
+  // v22: no website and no ticker means nothing to verify against, so no news.
+  if (!hasNewsIdentifiers(ids)) return { items, errors, skipped: 'no_identifiers' };
   const base = { fetchImpl: deps.fetchImpl, cache: deps.cache, ttl: config.cacheTtlSeconds };
   const ua = { 'User-Agent': config.userAgent };
   for (const source of config.sources) {
     try {
       if (source === 'gdelt') {
-        const body = await cachedText(`gdelt:${subject.companyId}`, gdeltUrl(subject.companyName, config.lookbackDays), { ...base, init: { headers: ua } });
+        const body = await cachedText(`gdelt:${subject.companyId}:${keyHash(searchName(subject.companyName))}`, gdeltUrl(searchName(subject.companyName), config.lookbackDays), { ...base, init: { headers: ua } });
         items.push(...parseGdelt(body));
       } else if (source === 'google_news') {
-        const body = await cachedText(`gnews:${subject.companyId}`, googleNewsUrl(subject.companyName, config.lookbackDays), { ...base, init: { headers: ua } });
+        const body = await cachedText(`gnews:${subject.companyId}:${keyHash(googleNewsUrl(searchName(subject.companyName), config.lookbackDays, ids))}`, googleNewsUrl(searchName(subject.companyName), config.lookbackDays, ids), { ...base, init: { headers: ua } });
         items.push(...parseFeed(body, 'google_news'));
       } else if (source === 'company_rss') {
         if (!subject.irFeedUrl || !/^https:\/\//.test(subject.irFeedUrl)) continue;
@@ -302,6 +341,82 @@ export async function fetchAccountNews(subject: NewsSubject, deps: FetchNewsDeps
     }
   }
   return { items, errors };
+}
+
+// ── Verification (v22) ─────────────────────────────────────────────────────
+
+export const identifiersOf = (s: NewsSubject): AccountIdentifiers =>
+  usableIdentifiers({ domain: s.domain, ticker: s.ticker ?? null, exchange: s.exchange ?? null, companyName: s.companyName });
+
+/** "DNB Bank" -> "DNB", "CI Financial" stays: the search phrase without legal suffixes. */
+export function searchName(name: string): string {
+  const core = name.replace(/\b(inc|ltd|plc|corp|corporation|co|group|sa|ag|nv|llc|asa|sgps)\b\.?/gi, ' ').replace(/\s+/g, ' ').trim();
+  return core.length >= 3 ? core : name;
+}
+
+export interface VerifiedItem extends NewsItem {
+  via: VerifiedVia | 'own_feed';
+}
+
+export interface VerifyDeps {
+  bodyFetch?: BodyFetch;
+  cache: NewsCache;
+  config: NewsConfig;
+  sleep?: (ms: number) => Promise<void>;
+  now: Date;
+}
+
+/**
+ * Keep only items that cite the account's domain or ticker: URL first, then
+ * title and snippet, then (budget permitting) the article body.
+ */
+export async function verifyNewsItems(subject: NewsSubject, items: NewsItem[], deps: VerifyDeps): Promise<{ kept: VerifiedItem[]; dropped: number; bodyChecks: number }> {
+  const ids = identifiersOf(subject);
+  if (!hasNewsIdentifiers(ids)) return { kept: [], dropped: items.length, bodyChecks: 0 };
+  const since = deps.now.getTime() - deps.config.lookbackDays * 86_400_000;
+  const kept: VerifiedItem[] = [];
+  const later: NewsItem[] = [];
+  let dropped = 0;
+  const seen = new Set<string>();
+  for (const it of items) {
+    const t = it.publishedAt.getTime();
+    if (t < since || t > deps.now.getTime() + 86_400_000 || seen.has(it.url) || isQuotePage(it.title)) {
+      dropped++;
+      continue;
+    }
+    seen.add(it.url);
+    if (it.source === 'company_rss' || it.source === 'apify_linkedin') {
+      kept.push({ ...it, via: 'own_feed' });
+      continue;
+    }
+    if (ids.domain && (hostOnDomain(it.url, ids.domain) || (it.publisherUrl && hostOnDomain(it.publisherUrl, ids.domain)))) {
+      kept.push({ ...it, via: 'url' });
+      continue;
+    }
+    const via = verifyText(`${it.title} ${it.description} ${it.url}`, ids);
+    if (via) kept.push({ ...it, via });
+    else later.push(it);
+  }
+  let bodyChecks = 0;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  for (const it of later) {
+    const canFetch =
+      deps.config.verifyBody &&
+      deps.bodyFetch &&
+      bodyChecks < deps.config.maxArticleFetches &&
+      it.source === 'gdelt' &&
+      mentionsName(`${it.title} ${it.description}`, subject.companyName);
+    if (!canFetch) {
+      dropped++;
+      continue;
+    }
+    if (bodyChecks > 0) await sleep(1_000);
+    bodyChecks++;
+    const via = await verifyArticleBody(it.url, ids, { fetchImpl: deps.bodyFetch!, cache: deps.cache, ttl: deps.config.cacheTtlSeconds, userAgent: deps.config.userAgent });
+    if (via) kept.push({ ...it, via });
+    else dropped++;
+  }
+  return { kept, dropped, bodyChecks };
 }
 
 // ── Processing ─────────────────────────────────────────────────────────────
@@ -367,7 +482,7 @@ const RATIONALE: Partial<Record<WatchEventKind, string>> = {
 };
 
 /** Items -> rows: name check, classify, score, dedupe within the batch. */
-export function processNews(subject: NewsSubject, items: NewsItem[], opts: { now: Date; lookbackDays: number }): NewsRow[] {
+export function processNews(subject: NewsSubject, items: Array<NewsItem & { via?: VerifiedItem['via'] }>, opts: { now: Date; lookbackDays: number }): NewsRow[] {
   const since = opts.now.getTime() - opts.lookbackDays * 86_400_000;
   const rows: NewsRow[] = [];
   const sorted = [...items].sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
@@ -375,7 +490,7 @@ export function processNews(subject: NewsSubject, items: NewsItem[], opts: { now
     if (it.publishedAt.getTime() < since || it.publishedAt.getTime() > opts.now.getTime() + 86_400_000) continue;
     const title = stripPublisher(it.title, it.publisher);
     // The company's own feed and the LinkedIn page are about the company by definition.
-    const own = it.source === 'company_rss' || it.source === 'apify_linkedin';
+    const own = it.source === 'company_rss' || it.source === 'apify_linkedin' || Boolean(it.via);
     if (!own && !mentionsCompany(`${title} ${it.description}`, subject.companyName)) continue;
     const c = classifySignalText(title, it.description);
     const key = signalDedupeKey(c.kind, title, subject.companyName);
@@ -408,7 +523,7 @@ export function processNews(subject: NewsSubject, items: NewsItem[], opts: { now
       dedupeKey: key,
       mentions: 1,
       confirmed: it.source === 'company_rss',
-      payload: { publisher: it.publisher, outlets: it.publisher ? [it.publisher] : [], rule: c.rule, category: c.category },
+      payload: { publisher: it.publisher, outlets: it.publisher ? [it.publisher] : [], rule: c.rule, category: c.category, ...(it.via ? { verifiedVia: it.via } : {}) },
     });
   }
   return rows;
@@ -430,16 +545,22 @@ export interface NewsRunResult {
   merged: number;
   alerted: number;
   errors: string[];
+  /** v22: items dropped because they did not cite the domain or ticker. */
+  dropped: number;
+  bodyChecks: number;
+  skipped?: 'no_identifiers';
 }
 
 /** One account: fetch, process, merge with stored stories, insert, alert. */
 export async function runAccountNews(
   subject: NewsSubject,
-  deps: FetchNewsDeps & { store: NewsStore; now?: Date },
+  deps: FetchNewsDeps & { store: NewsStore; now?: Date; bodyFetch?: BodyFetch; sleep?: (ms: number) => Promise<void> },
 ): Promise<NewsRunResult> {
   const now = deps.now ?? new Date();
-  const { items, errors } = await fetchAccountNews(subject, deps);
-  const rows = processNews(subject, items, { now, lookbackDays: deps.config.lookbackDays });
+  const { items, errors, skipped } = await fetchAccountNews(subject, deps);
+  if (skipped) return { fetched: 0, kept: 0, inserted: 0, merged: 0, alerted: 0, errors, dropped: 0, bodyChecks: 0, skipped };
+  const v = await verifyNewsItems(subject, items, { bodyFetch: deps.bodyFetch, cache: deps.cache, config: deps.config, sleep: deps.sleep, now });
+  const rows = processNews(subject, v.kept, { now, lookbackDays: deps.config.lookbackDays });
   const existing = rows.length
     ? await deps.store.findByDedupeKeys(subject.orgId, subject.companyId, rows.map((r) => r.dedupeKey), new Date(now.getTime() - 14 * 86_400_000))
     : [];
@@ -470,5 +591,5 @@ export async function runAccountNews(
       alerted++;
     }
   }
-  return { fetched: items.length, kept: rows.length, inserted: inserted.length, merged, alerted, errors };
+  return { fetched: items.length, kept: rows.length, inserted: inserted.length, merged, alerted, errors, dropped: v.dropped, bodyChecks: v.bodyChecks };
 }

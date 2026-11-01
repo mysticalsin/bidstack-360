@@ -19,6 +19,7 @@ import {
   type NewsStore,
   type NewsSubject,
 } from './news.js';
+import { hasNewsIdentifiers, usableIdentifiers, type BodyFetch } from './news-verify.js';
 
 type Db = Pick<typeof prisma, 'accountWatchEvent' | 'notification' | 'company' | 'companyFirmographics' | 'opportunity' | 'accountWatchSubject'>;
 
@@ -29,6 +30,7 @@ export interface NewsScanDeps {
   cache?: NewsCache;
   now?: Date;
   sleep?: (ms: number) => Promise<void>;
+  bodyFetch?: BodyFetch;
   log?: { info(o: object, m?: string): void; warn(o: object, m?: string): void };
   orgId?: string;
 }
@@ -40,6 +42,10 @@ export interface NewsScanSummary {
   merged: number;
   alerted: number;
   errored: number;
+  /** v22: accounts with no website or ticker (no news, UI shows a hint). */
+  skippedNoIdentifiers: number;
+  dropped: number;
+  perAccount: Array<{ companyId: string; name: string; fetched: number; kept: number; inserted: number; dropped: number; skipped?: string }>;
 }
 
 const PACE_MS = 5_000;
@@ -118,7 +124,7 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
   const db = deps.db ?? prisma;
   const env = deps.env ?? process.env;
   const config = newsConfigFromEnv(env);
-  const summary: NewsScanSummary = { enabled: config.sources.length > 0, accounts: 0, inserted: 0, merged: 0, alerted: 0, errored: 0 };
+  const summary: NewsScanSummary = { enabled: config.sources.length > 0, accounts: 0, inserted: 0, merged: 0, alerted: 0, errored: 0, skippedNoIdentifiers: 0, dropped: 0, perAccount: [] };
   if (!summary.enabled) return summary;
   const now = deps.now ?? new Date();
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -139,7 +145,7 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
       name: true,
       domain: true,
       keyAccountOwnerId: true,
-      accountWatchSubjects: { select: { irFeedUrl: true }, take: 1 },
+      accountWatchSubjects: { select: { irFeedUrl: true, ticker: true, exchange: true, identifiersConfirmedAt: true }, take: 1 },
       firmographics: { select: { providerIds: true } },
     },
     orderBy: { name: 'asc' },
@@ -148,8 +154,21 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
   const store = prismaNewsStore(db);
   const cache = deps.cache ?? memoryNewsCache();
   const fetchImpl = deps.fetchImpl ?? (fetch as unknown as NewsFetch);
-  for (const [i, c] of companies.entries()) {
-    if (i > 0) await sleep(PACE_MS);
+  const bodyFetch = deps.bodyFetch ?? (deps.fetchImpl ? undefined : (fetch as unknown as BodyFetch));
+  let paced = false;
+  let cfg = config;
+  for (const c of companies) {
+    const ws = c.accountWatchSubjects[0];
+    // Tickers count only once a person confirmed them (same rule as filings).
+    const ticker = ws?.identifiersConfirmedAt ? (ws.ticker ?? null) : null;
+    const exchange = ws?.identifiersConfirmedAt ? (ws.exchange ?? null) : null;
+    if (!hasNewsIdentifiers(usableIdentifiers({ domain: c.domain, ticker, exchange, companyName: c.name }))) {
+      summary.skippedNoIdentifiers++;
+      summary.perAccount.push({ companyId: c.id, name: c.name, fetched: 0, kept: 0, inserted: 0, dropped: 0, skipped: 'no_identifiers' });
+      continue;
+    }
+    if (paced) await sleep(PACE_MS);
+    paced = true;
     const opps = await db.opportunity.findMany({
       where: { orgId: c.orgId, companyId: c.id, deletedAt: null, ownerId: { not: null }, stage: { notIn: [...OPEN_STAGES_EXCLUDED] } },
       select: { ownerId: true },
@@ -161,13 +180,19 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
       companyId: c.id,
       companyName: c.name,
       domain: c.domain,
-      irFeedUrl: c.accountWatchSubjects[0]?.irFeedUrl ?? null,
+      ticker,
+      exchange,
+      irFeedUrl: ws?.irFeedUrl ?? null,
       linkedinUrl: linkedinFrom(c.firmographics?.providerIds),
       alertUserIds,
     };
     try {
-      const r = await runAccountNews(subject, { fetchImpl, cache, config, store, now });
+      const r = await runAccountNews(subject, { fetchImpl, cache, config: cfg, store, now, bodyFetch, sleep });
       summary.accounts++;
+      summary.dropped += r.dropped;
+      summary.perAccount.push({ companyId: c.id, name: c.name, fetched: r.fetched, kept: r.kept, inserted: r.inserted, dropped: r.dropped });
+      // GDELT asks for one call per 5 s per client; after a 429 leave it alone for this run.
+      if (r.errors.some((e) => e.startsWith('gdelt rate limited'))) cfg = { ...cfg, sources: cfg.sources.filter((x) => x !== 'gdelt') };
       summary.inserted += r.inserted;
       summary.merged += r.merged;
       summary.alerted += r.alerted;

@@ -527,7 +527,21 @@ const PHRASE: Record<DriverKey, { up: string; down: string }> = {
 
 export function momentumVerdict(trend: MomentumTrend, score: number, drivers: MomentumDriver[], coverage: number): string {
   if (coverage === 0) return 'Not enough signal yet: no deals, meetings, hiring or news on this account.';
-  const lead = trend === 'gaining' ? 'Gaining traction' : trend === 'declining' ? 'Losing momentum' : score >= 60 ? 'Healthy and steady' : score <= 40 ? 'Steady but weak' : 'Holding steady';
+  // The trend is the 4-week change, not the level, so say both when they disagree.
+  const lead =
+    trend === 'gaining'
+      ? score <= 40
+        ? 'Low level, but up over 4 weeks'
+        : 'Gaining traction over 4 weeks'
+      : trend === 'declining'
+        ? score >= 60
+          ? 'High level, but down over 4 weeks'
+          : 'Losing momentum over 4 weeks'
+        : score >= 60
+          ? 'Healthy and steady'
+          : score <= 40
+            ? 'Steady but weak'
+            : 'Holding steady';
   const fitting = drivers
     .filter((d) => (trend === 'declining' ? d.direction === 'down' : trend === 'gaining' ? d.direction === 'up' : d.direction !== 'flat'))
     .slice(0, 2)
