@@ -22,6 +22,7 @@ import {
   unspecifiedMicrosLabel,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import {

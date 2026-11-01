@@ -3,6 +3,7 @@
 // Display hooks (currency, i18n) are fine.
 import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
 import { isRestrictedCompany } from '@/lib/restrictedCompany';
+import { formatStage } from '@/lib/format';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 

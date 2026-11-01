@@ -94,7 +94,19 @@ function engagementAction(recent: number, openCount: number, onTrack: number): s
 
 function pipelineAction(
   openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>,
+  accountOpen?: number,
 ): string {
+  if (accountOpen != null && accountOpen > openDeals.length) {
+    const loaded =
+      openDeals.length === 1
+        ? '1 open deal is on the loaded page'
+        : `${openDeals.length} open deals are on the loaded page`;
+    const book =
+      accountOpen === 1
+        ? '1 open deal is on the account'
+        : `${accountOpen} open deals are on the account`;
+    return `${loaded}. ${book}. The loaded page is not every open deal.`;
+  }
   if (openDeals.length === 0) return 'No open deals are linked to this account.';
   const missingProbability = openDeals.filter((deal) => !(deal.probability > 0)).length;
   const missingOwner = openDeals.filter((deal) => deal.owner == null).length;
@@ -158,12 +170,18 @@ function factor(
   };
 }
 
-export function computeSignalCoverage(input: {
-  company: z.infer<typeof CrmCompany>;
-  contacts: Array<{ influence: number | null; email: string | null }>;
-  openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>;
-  tasks: Array<{ status: string; dueDate: Date | null; createdAt: Date }>;
-}): CompanyHealth {
+export function computeSignalCoverage(
+  input: {
+    company: z.infer<typeof CrmCompany>;
+    contacts: Array<{ influence: number | null; email: string | null }>;
+    openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>;
+    tasks: Array<{ status: string; dueDate: Date | null; createdAt: Date }>;
+  },
+  pages?: {
+    /** Open deals on the account. Larger than the loaded page means the page is not the book. */
+    openDealCount?: number;
+  },
+): CompanyHealth {
   const { company, contacts, openDeals, tasks } = input;
 
   const freshness = company.strategicIntel?.freshness;
@@ -217,23 +235,50 @@ export function computeSignalCoverage(input: {
   firmographics.recommendedAction = firmographicAction(company);
   contactFactor.recommendedAction = contactAction(contacts);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
-  pipeline.recommendedAction = pipelineAction(openDeals);
+  const accountOpen = pages?.openDealCount;
+  const pipelinePageIsShort = accountOpen != null && accountOpen > openDeals.length;
+  pipeline.recommendedAction = pipelineAction(
+    openDeals,
+    pipelinePageIsShort ? accountOpen : undefined,
+  );
+  if (pipelinePageIsShort) {
+    pipeline.scored = false;
+    pipeline.whatItMeasures += ' Not scored. The loaded page is not every open deal.';
+  }
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
-  // Weights: external intel is the cockpit's backbone; the rest split evenly.
-  const score = Math.round(
-    firmographics.score * 0.3 +
-      contactFactor.score * 0.25 +
-      engagement.score * 0.2 +
-      pipeline.score * 0.25,
-  );
+  const weighted = [
+    { factor: firmographics, weight: 0.3 },
+    { factor: contactFactor, weight: 0.25 },
+    { factor: engagement, weight: 0.2 },
+    { factor: pipeline, weight: 0.25 },
+  ];
+  const measured = weighted.filter((row) => row.factor.scored !== false);
+  const weightSum = measured.reduce((sum, row) => sum + row.weight, 0);
+  const measuredRaw = measured.reduce((sum, row) => sum + row.factor.score * row.weight, 0);
+  // A short open-deal page is left out. The other weights fill its share.
+  // When every factor is scored, keep the original mix so rounding stays put.
+  const score =
+    measured.length === weighted.length
+      ? Math.round(
+          firmographics.score * 0.3 +
+            contactFactor.score * 0.25 +
+            engagement.score * 0.2 +
+            pipeline.score * 0.25,
+        )
+      : weightSum === 0
+        ? 0
+        : Math.round(measuredRaw / weightSum);
   const counts: Record<string, number> = {
     strong: 0,
     good: 0,
     needs_attention: 0,
     critical: 0,
   };
-  for (const f of factors) counts[f.band] = (counts[f.band] ?? 0) + 1;
+  for (const f of factors) {
+    if (f.scored === false) continue;
+    counts[f.band] = (counts[f.band] ?? 0) + 1;
+  }
   return { score, band: bandFor(score), counts, factors };
 }
 
@@ -870,12 +915,17 @@ export function buildCockpit({
     // Score on THIS company's contacts/tasks only. A matching customer string
     // is not a link: historical rows keep companyId null until someone confirms
     // them, and a contact linked to another company must not land here.
-    health: computeSignalCoverage({
-      company,
-      contacts: accountContacts,
-      openDeals,
-      tasks: accountTasks,
-    }),
+    // Contacts are take 20 and tasks are take 50, with no account totals.
+    // A full page can be the whole book, so those factors stay scored.
+    health: computeSignalCoverage(
+      {
+        company,
+        contacts: accountContacts,
+        openDeals,
+        tasks: accountTasks,
+      },
+      performance?.book ? { openDealCount: performance.book.openCount } : undefined,
+    ),
     keyContacts: accountContacts.slice(0, 5).map((contact) => ({
       id: contact.id,
       source: 'external_crm',

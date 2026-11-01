@@ -173,6 +173,80 @@ describe('computeSignalCoverage', () => {
     const f = (h: typeof fresh) => h.factors!.find((x) => x.key === 'firmographics')!.score;
     expect(f(fresh)).toBeGreaterThan(f(stale));
   });
+
+  it('leaves a short open-deal page out of the account pipeline score', () => {
+    // Why: one complete deal on the loaded page used to score pipeline at 100
+    // and pull that page into the account mix. A book of 120 is not that page.
+    // Zeroing the factor would still spend its 25% weight. Dropping it lets the
+    // other weights fill the share: industry 20 over 0.75 is 8, not 31 and not 6.
+    const deal = {
+      id: 'open-1',
+      customer: 'Acme',
+      companyId: 'mantu',
+      name: 'Renewal',
+      stage: 'qualified',
+      pipelineStage: null,
+      valueMicros: 1_000_000n,
+      probability: 60,
+      dueDate: new Date('2026-09-15'),
+      owner: { name: 'Jane', email: 'jane@x.com' },
+    };
+    const book = (openCount: number) => ({
+      winLoss: {
+        wonCount: 0,
+        lostCount: 0,
+        wonValueMicros: '0',
+        lostValueMicros: '0',
+        winRate: null,
+      },
+      revenueEvolution: [],
+      book: { projectCount: openCount, openCount },
+    });
+    const args = {
+      company: company({ industry: 'technology' }),
+      companies: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    };
+    const otherDeals = Array.from({ length: 119 }, (_, index) => ({
+      ...deal,
+      id: `other-${index}`,
+      companyId: 'other-co',
+    }));
+    const shortPage = buildCockpit({
+      ...args,
+      opportunities: [deal, ...otherDeals],
+      performance: book(120),
+    });
+    const fullPage = buildCockpit({
+      ...args,
+      opportunities: [deal],
+      performance: book(1),
+    });
+
+    const shortPipeline = shortPage.health.factors?.find((factor) => factor.key === 'pipeline');
+    const fullPipeline = fullPage.health.factors?.find((factor) => factor.key === 'pipeline');
+    expect(shortPipeline?.score).toBe(100);
+    expect(shortPipeline?.scored).toBe(false);
+    expect(shortPipeline?.whatItMeasures).toContain('The loaded page is not every open deal.');
+    expect(shortPipeline?.recommendedAction).toContain('The loaded page is not every open deal.');
+    expect(shortPage.health.score).toBe(8);
+    expect(Object.values(shortPage.health.counts).reduce((sum, count) => sum + count, 0)).toBe(3);
+    expect(shortPage.health.factors?.find((factor) => factor.key === 'contacts')?.scored).not.toBe(
+      false,
+    );
+    expect(
+      shortPage.health.factors?.find((factor) => factor.key === 'engagement')?.scored,
+    ).not.toBe(false);
+
+    expect(fullPipeline?.scored).not.toBe(false);
+    expect(fullPipeline?.score).toBe(100);
+    expect(fullPipeline?.whatItMeasures).not.toContain('not every open deal');
+    expect(fullPage.health.score).toBe(31);
+  });
 });
 
 describe('applyFieldOverrides', () => {

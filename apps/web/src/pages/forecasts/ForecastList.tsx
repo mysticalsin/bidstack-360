@@ -54,6 +54,8 @@ interface ForecastListProps {
     currency: string,
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
+  canWrite: boolean;
+  readOnlyHint: string;
 }
 
 export function ForecastList({
@@ -65,6 +67,8 @@ export function ForecastList({
   onNewForecast,
   onSaveCell,
   onDeleteRow,
+  canWrite,
+  readOnlyHint,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);

@@ -19,6 +19,7 @@ import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
 import CommandButton from '@/components/kokonutui/command-button';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate } from '@/lib/format';
+import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
