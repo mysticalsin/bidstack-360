@@ -54,4 +54,16 @@ describe('OppKpiBar weighted tile', () => {
     expect(screen.getByText(/Open rows on this page × stored probability/)).toBeTruthy();
     expect(screen.queryByText(/WR/)).toBeNull();
   });
+
+  it('prints the open pipeline from integer micros', () => {
+    // WHY: Number(sum) / 1e6 moved this portfolio total to the next cent.
+    render(
+      <OppKpiBar
+        opps={[]}
+        summary={{ ...summary, pipelineValueMicros: '8598204328457184962' }}
+      />,
+    );
+    expect(screen.getByText('8,598,204,328,457.18')).toBeTruthy();
+    expect(screen.queryByText(/457\.19/)).toBeNull();
+  });
 });

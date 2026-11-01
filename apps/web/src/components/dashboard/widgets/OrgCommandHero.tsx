@@ -34,7 +34,7 @@ import {
 } from '../unspecified-currency';
 
 import { closedOutcome } from '@/lib/pipeline-stages';
-import type { Opportunity } from '@bidstack/shared';
+import { formatMicrosAmount, type Opportunity } from '@bidstack/shared';
 
 // Must match ClosingThisWeekCard's filter exactly so React Query serves both
 // widgets from a single fetch (object keys are hashed order-independently).
@@ -100,6 +100,11 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
       <HeroPanel
         summary={summary}
         heroValue={summary.pipelineValue ?? 0}
+        heroLabel={
+          summary.pipelineValueMicros
+            ? formatMicrosAmount(BigInt(summary.pipelineValueMicros))
+            : undefined
+        }
         formatValue={(n) => formatUnspecifiedAmount(n)}
         winRate={winRate}
         closingCount={closingItems.length}
@@ -123,13 +128,22 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
 interface HeroPanelProps {
   summary: OrgSummary;
   heroValue: number;
+  heroLabel?: string;
   formatValue: (n: number) => string;
   winRate: number | null;
   closingCount: number;
   t: TFunction;
 }
 
-function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }: HeroPanelProps) {
+function HeroPanel({
+  summary,
+  heroValue,
+  heroLabel,
+  formatValue,
+  winRate,
+  closingCount,
+  t,
+}: HeroPanelProps) {
   return (
     <div className="command-center-hero">
       <div className="command-center-kicker">
@@ -137,7 +151,7 @@ function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }
         <span>{t('orgHero.kicker', 'Open pipeline, portfolio-wide')}</span>
       </div>
       <h2>
-        <AnimatedNumber value={heroValue} format={formatValue} />
+        {heroLabel ? <AnimatedMetric value={heroLabel} /> : <AnimatedNumber value={heroValue} format={formatValue} />}
       </h2>
       <p className="text-xs text-[var(--fg-tertiary)]">
         {t('orgHero.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}

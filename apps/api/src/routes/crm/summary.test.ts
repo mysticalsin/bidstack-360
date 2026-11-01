@@ -219,6 +219,35 @@ describe('crm summary routes', () => {
     expect(shown.totalValueOpen).toBe(before.totalValueOpen + 2);
   });
 
+  failIfNoDb('a large open deal stays on the exact micros in the summary', async () => {
+    // WHY: Number(sum) / 1e6 moved this open total off the cent on the headline.
+    // Drop a summary cached before an earlier test reopened a deal.
+    invalidateCrmSummaryCache(orgId);
+    const before = await server.inject({ method: 'GET', url: '/api/crm/summary' });
+    expect(before.statusCode).toBe(200);
+    const beforeMicros = BigInt(
+      (before.json() as { pipelineValueMicros: string }).pipelineValueMicros,
+    );
+    const micros = 8_598_204_328_457_184_962n;
+    await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-BIG-${Date.now()}`,
+        customer: 'Large Book Co',
+        name: 'Exact micros',
+        stage: 's2_sent',
+        valueMicros: micros,
+        probability: 10,
+        intel: {},
+      },
+    });
+    invalidateCrmSummaryCache(orgId);
+    const after = await server.inject({ method: 'GET', url: '/api/crm/summary' });
+    expect(after.statusCode).toBe(200);
+    const afterBody = after.json() as { pipelineValueMicros: string };
+    expect(BigInt(afterBody.pipelineValueMicros) - beforeMicros).toBe(micros);
+  });
+
   failIfNoDb('GET /api/crm/summary rejects invalid limits', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/crm/summary?limit=0' });
     expect(res.statusCode).toBe(400);

@@ -25,7 +25,7 @@ import { formatStage } from '@/lib/format';
 import { closedOutcome } from '@/lib/pipeline-stages';
 import { useTranslation } from 'react-i18next';
 
-import type { Opportunity, PipelineStage } from '@bidstack/shared';
+import { formatMicrosAmount, type Opportunity, type PipelineStage } from '@bidstack/shared';
 
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,9 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: formatUnspecifiedAmount(summary.pipelineValue),
+          value: summary.pipelineValueMicros
+            ? formatMicrosAmount(BigInt(summary.pipelineValueMicros))
+            : formatUnspecifiedAmount(summary.pipelineValue),
           detail: currencyDetail,
         },
         {
