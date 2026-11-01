@@ -50,7 +50,12 @@ describe('viz-data', () => {
   });
 
   it('ranks accounts by won + open and ignores lost value', () => {
-    expect(accountBars(rows)).toEqual([{ label: 'B', open: 400, won: 300 }, { label: 'A', open: 10, won: 200 }]);
+    expect(accountBars(rows).map(({ label, open, won, openMicros, wonMicros }) => ({
+      label, open, won, openMicros, wonMicros,
+    }))).toEqual([
+      { label: 'B', open: 400, won: 300, openMicros: '400000000', wonMicros: '300000000' },
+      { label: 'A', open: 10, won: 200, openMicros: '10000000', wonMicros: '200000000' },
+    ]);
   });
 
   it('flags open bids past their due date', () => {
@@ -74,7 +79,9 @@ describe('viz-data', () => {
     });
     expect(statusMix([lost, open])).toEqual({ open: 1, won: 0, lost: 1 });
     expect(cumulativeOpen([lost, open])).toEqual([0, 20]);
-    expect(accountBars([lost, open])).toEqual([{ label: 'C', open: 20, won: 0 }]);
+    expect(accountBars([lost, open]).map(({ label, open, won, openMicros, wonMicros }) => ({
+      label, open, won, openMicros, wonMicros,
+    }))).toEqual([{ label: 'C', open: 20, won: 0, openMicros: '20000000', wonMicros: '0' }]);
     expect(stageFunnel([flaggedOpenKey])).toEqual([]);
     const named = row({ stage: 'Proposal review', value: 30, customer: 'C' });
     const funnel = stageFunnel([...rows, named]);
@@ -125,6 +132,33 @@ describe('viz-data', () => {
       '9,007,199,254,740,993',
     );
     expect(heroTooltipValue({ y: 12 }, (n) => String(n))).toBe('12');
+    const hugeUnit = 9007199254740993n;
+    const lowMicros = (9007199254740992n * 1_000_000n).toString();
+    const highMicros = (hugeUnit * 1_000_000n).toString();
+    const ranked = accountBars([
+      row({ customer: 'Low', stage: 's2_sent', value: 0, valueMicros: lowMicros }),
+      row({ customer: 'High', stage: 's2_sent', value: 0, valueMicros: highMicros }),
+    ]);
+    // WHY: both unit numbers collapse to the same safe integer, so number sort kept Low first.
+    expect(ranked.map((bar) => bar.label)).toEqual(['High', 'Low']);
+    expect(ranked[0]?.open).toBe(ranked[1]?.open);
+    expect(ranked[0]?.openMicros).toBe(highMicros);
+    expect(ranked[0]?.totalLabel).toBe('9,007,199,254,740,993');
+    expect(ranked[0]?.totalLabel).not.toBe(fmtCompact(ranked[0]?.open ?? 0));
+    const summed = accountBars([
+      row({ customer: 'Sum', stage: 's2_sent', value: 0, valueMicros: highMicros }),
+      row({
+        customer: 'Sum',
+        stage: 'closed_won',
+        value: 0,
+        valueMicros: '1000000',
+        dueDate: '2026-01-02T00:00:00.000Z',
+        closedAt: '2026-01-02T00:00:00.000Z',
+      }),
+    ]);
+    // WHY: adding the unit numbers was one short of the micros total.
+    expect(summed[0]?.totalLabel).toBe('9,007,199,254,740,994');
+    expect(summed[0]?.wonMicros).toBe('1000000');
     expect(cumulativeOpen([storedOpen])).toEqual([0, 10]);
     expect(fmtCompact(7_860_000)).toContain('7.86');
     expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);

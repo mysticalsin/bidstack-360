@@ -2,7 +2,11 @@
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
 import { microsToUnits } from '@bidstack/shared';
 
-import { headlineMicrosLabel, recordedMicros } from '@/components/dashboard/unspecified-currency';
+import {
+  headlineMicrosLabel,
+  recordedMicros,
+  recordedPipelineCompact,
+} from '@/components/dashboard/unspecified-currency';
 import { closedOutcome, LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -164,7 +168,7 @@ export function cumulativeWon(rows: OppRow[]) {
   });
 }
 
-/** Per-account open vs won value, top N by total. */
+/** Per-account open vs won value, top N by the micros total. Bar length stays a unit number. */
 export function accountBars(rows: OppRow[], n = 6) {
   const by = new Map<string, { open: bigint; won: bigint }>();
   for (const o of rows) {
@@ -175,8 +179,28 @@ export function accountBars(rows: OppRow[], n = 6) {
     by.set(o.customer, cur);
   }
   return [...by.entries()]
-    .map(([label, v]) => ({ label, open: microsToUnits(v.open), won: microsToUnits(v.won) }))
-    .sort((a, b) => b.open + b.won - (a.open + a.won))
+    .map(([label, v]) => {
+      const open = microsToUnits(v.open);
+      const won = microsToUnits(v.won);
+      const openMicros = v.open.toString();
+      const wonMicros = v.won.toString();
+      return {
+        label,
+        open,
+        won,
+        openMicros,
+        wonMicros,
+        openLabel: recordedPipelineCompact(openMicros, open),
+        wonLabel: recordedPipelineCompact(wonMicros, won),
+        totalLabel: recordedPipelineCompact((v.open + v.won).toString(), open + won),
+      };
+    })
+    .sort((a, b) => {
+      const aTotal = BigInt(a.openMicros) + BigInt(a.wonMicros);
+      const bTotal = BigInt(b.openMicros) + BigInt(b.wonMicros);
+      if (aTotal === bTotal) return a.label.localeCompare(b.label);
+      return aTotal > bTotal ? -1 : 1;
+    })
     .slice(0, n);
 }
 
