@@ -207,6 +207,26 @@ export function headlineMicrosLabel(micros: string | number | bigint, locale?: s
   return compactFormatter(locale).format(compactMicrosMagnitude(value));
 }
 
+/** Dashboard subtitle. The micros string keeps a cent the unit number cannot. */
+export function recordedPipelineCompact(
+  micros: string | null | undefined,
+  fallbackUnits: number,
+): string {
+  if (micros && /^-?\d+$/.test(micros)) return headlineMicrosLabel(micros, 'en-GB');
+  if (!Number.isFinite(fallbackUnits)) return '—';
+  if (!Number.isSafeInteger(fallbackUnits)) return fallbackUnits.toLocaleString('en-GB');
+  return headlineMicrosLabel(BigInt(fallbackUnits) * 1_000_000n, 'en-GB');
+}
+
+/** Tooltip total. Same micros string, full integer. */
+export function recordedPipelineExact(
+  micros: string | null | undefined,
+  fallbackUnits: number,
+): string {
+  if (micros && /^-?\d+$/.test(micros)) return formatMicrosAmount(BigInt(micros));
+  return formatUnspecifiedAmount(fallbackUnits);
+}
+
 /** Compact or full amount, with the missing-currency mark. */
 export function unspecifiedMicrosLabel(micros: string | number | bigint): string {
   return `${headlineMicrosLabel(micros)} unspecified`;

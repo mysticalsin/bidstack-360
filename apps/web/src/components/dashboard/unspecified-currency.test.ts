@@ -6,6 +6,8 @@ import {
   formatRecordedDealAmount,
   formatUnspecifiedCompactMicros,
   headlineMicrosLabel,
+  recordedPipelineCompact,
+  recordedPipelineExact,
   recordedMicros,
   sumRecordedDealMicros,
   sumRecordedDealUnits,
@@ -19,6 +21,15 @@ describe('exact unspecified amounts', () => {
     // off the cent. The map tooltip has to show the integer total.
     expect(formatExactUnspecified('8598204328457184962')).toBe('8,598,204,328,457.18 unspecified');
     expect(formatExactUnspecified('8598204328457184962')).not.toContain('457.19');
+  });
+
+  it('prints the org pipeline from micros when the unit number has moved', () => {
+    // WHY: the dashboard subtitle used Number(micros) / 1e6. This book is one unit low as a number.
+    const micros = (9007199254740993n * 1_000_000n).toString();
+    const drifted = Number(micros) / 1_000_000;
+    expect(recordedPipelineExact(micros, drifted)).toBe('9,007,199,254,740,993');
+    expect(recordedPipelineExact(micros, drifted)).not.toContain('9,007,199,254,740,992');
+    expect(recordedPipelineCompact(micros, drifted)).toContain('9,007,199,254,740,993');
   });
 
   it('sizes a bar from integer micros when float would call the two amounts equal', () => {
