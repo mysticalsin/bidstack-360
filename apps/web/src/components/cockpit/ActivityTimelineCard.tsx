@@ -46,6 +46,9 @@ const KIND_TONE: Record<CrmActivity['kind'], 'gray' | 'blue' | 'jade' | 'purple'
   dust: 'purple',
 };
 
+/** The feed is tasks. Emails and Dust runs are not in this list. */
+export const ACTIVITY_EMPTY_MESSAGE = 'Tasks for this account will appear here.';
+
 /** Last N is the whole loaded list. A longer task list says the rest is outside it. */
 export function activityListCaption(count: number, capped: boolean): string {
   if (!capped) return `Last ${count} items`;
@@ -77,7 +80,7 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
           title={t('activityTimeline.emptyTitle', 'Nothing yet')}
           message={t(
             'activityTimeline.emptyMessage',
-            'Tasks, emails, and Dust runs for this account will appear here.',
+            ACTIVITY_EMPTY_MESSAGE,
           )}
         />
       </Card>
