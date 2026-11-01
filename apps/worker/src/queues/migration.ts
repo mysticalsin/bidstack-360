@@ -114,7 +114,9 @@ export function mapStage(v: unknown): string {
   if (!s) return 's1_lead';
   if (OPP_STAGES.has(s)) return s;
   if (s.includes('won')) return 'closed_won';
-  if (s.includes('lost') || s.includes('closed')) return 'closed_lost';
+  // "Closed" without won or lost is not a loss. Counting it as closed_lost
+  // made an unspecified close show up as a lost event.
+  if (s.includes('lost')) return 'closed_lost';
   if (s.includes('negoti') || s.includes('contract')) return 's4_negotiation';
   if (s.includes('proposal') || s.includes('sent') || s.includes('quote')) return 's2_sent';
   if (s.includes('demo') || s.includes('technical') || s.includes('evaluation'))
