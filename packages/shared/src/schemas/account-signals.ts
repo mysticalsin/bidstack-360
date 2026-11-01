@@ -747,8 +747,14 @@ export const AccountPulse = z.object({
   sample: z.boolean(),
   /** True when open pipeline and win/loss used the latest 1,000 deals. */
   dealsCapped: z.boolean().optional(),
-  /** True when meetings or news used the latest 1,000 rows. */
+  /** True when meetings, job posts, or news filled a page. Kept for older clients. */
   feedsCapped: z.boolean().optional(),
+  /** True when meetings used the latest 1,000 rows. */
+  meetingsCapped: z.boolean().optional(),
+  /** True when job posts used the latest 1,000 rows. */
+  postingsCapped: z.boolean().optional(),
+  /** True when news used the latest 1,000 rows. */
+  newsCapped: z.boolean().optional(),
   /** True when subsidiary rollup used the latest 1,000 direct subsidiaries. */
   childrenCapped: z.boolean().optional(),
   /** What the watchdog is listening to right now. */
@@ -757,6 +763,26 @@ export const AccountPulse = z.object({
   computedAt: Iso,
 });
 export type AccountPulse = z.infer<typeof AccountPulse>;
+
+/** Which latest-page notes to show. A full news page does not mark meetings. */
+export function pulsePageNotes(caps: {
+  dealsCapped?: boolean;
+  meetingsCapped?: boolean;
+  postingsCapped?: boolean;
+  newsCapped?: boolean;
+  feedsCapped?: boolean;
+  childrenCapped?: boolean;
+}): string[] {
+  const specific = caps.meetingsCapped || caps.postingsCapped || caps.newsCapped;
+  return [
+    caps.dealsCapped ? 'Latest 1,000 deals' : '',
+    caps.meetingsCapped ? 'Latest 1,000 meetings' : '',
+    caps.postingsCapped ? 'Latest 1,000 job posts' : '',
+    caps.newsCapped ? 'Latest 1,000 news items' : '',
+    !specific && caps.feedsCapped ? 'Latest 1,000 signals' : '',
+    caps.childrenCapped ? 'Latest 1,000 subsidiaries' : '',
+  ].filter((note) => note.length > 0);
+}
 
 export const TimelineItem = z.object({
   id: z.string(),
@@ -856,6 +882,9 @@ export const PortfolioMomentum = z.object({
       dealsCapped: z.boolean().optional(),
       /** True when meetings, postings, or watch events used the latest 1000 rows. */
       feedsCapped: z.boolean().optional(),
+      meetingsCapped: z.boolean().optional(),
+      postingsCapped: z.boolean().optional(),
+      newsCapped: z.boolean().optional(),
       /** True when direct subsidiaries filled the 1000-row rollup. */
       childrenCapped: z.boolean().optional(),
       series: z.array(z.number().int()),

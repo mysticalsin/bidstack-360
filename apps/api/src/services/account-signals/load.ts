@@ -5,6 +5,7 @@ import { prisma } from '@bidstack/db';
 import {
   categoryForKind,
   computeMomentum,
+  pulsePageNotes,
   sentimentForRow,
   type Implication,
   type MomentumData,
@@ -108,6 +109,9 @@ export interface LoadedSignals {
   dealsCapped: boolean;
   /** True when meetings, postings, or watch events filled the momentum page. */
   feedsCapped: boolean;
+  meetingsCapped: boolean;
+  postingsCapped: boolean;
+  newsCapped: boolean;
   /** True when this account has more direct subsidiaries than the rollup page. */
   childrenCapped: boolean;
 }
@@ -188,7 +192,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   ]);
   const out = new Map<string, LoadedSignals>();
   for (const id of rootIds) {
-    out.set(id, { data: { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, sample: false, openPipelineMicros: 0n, dealsCapped: false, feedsCapped: false, childrenCapped: cappedRoots.has(id) });
+    out.set(id, { data: { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, sample: false, openPipelineMicros: 0n, dealsCapped: false, feedsCapped: false, meetingsCapped: false, postingsCapped: false, newsCapped: false, childrenCapped: cappedRoots.has(id) });
   }
   for (const group of oppGroups) {
     const t = out.get(group.root);
@@ -202,19 +206,28 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   for (const group of meetingGroups) {
     const t = out.get(group.root);
     if (!t) continue;
-    if (group.capped) t.feedsCapped = true;
+    if (group.capped) {
+      t.feedsCapped = true;
+      t.meetingsCapped = true;
+    }
     for (const m of group.rows) t.data.meetings.push(m.heldAt);
   }
   for (const group of postingGroups) {
     const t = out.get(group.root);
     if (!t) continue;
-    if (group.capped) t.feedsCapped = true;
+    if (group.capped) {
+      t.feedsCapped = true;
+      t.postingsCapped = true;
+    }
     for (const p of group.rows) if (p.postedAt) t.data.postings.push(p.postedAt);
   }
   for (const group of eventGroups) {
     const t = out.get(group.root);
     if (!t) continue;
-    if (group.capped) t.feedsCapped = true;
+    if (group.capped) {
+      t.feedsCapped = true;
+      t.newsCapped = true;
+    }
     for (const e of group.rows) {
       t.data.events.push({
         occurredAt: e.occurredAt,
@@ -239,16 +252,29 @@ export function momentumFor(loaded: LoadedSignals | undefined, now: Date): Momen
 /** A capped page is not the whole book. Say so on the lines that used that page. */
 export function annotatePulseRead<T extends { key: string; detail: string }>(
   drivers: readonly T[],
-  caps: { dealsCapped?: boolean; feedsCapped?: boolean },
+  caps: { dealsCapped?: boolean; meetingsCapped?: boolean; postingsCapped?: boolean; newsCapped?: boolean },
 ): T[] {
+  const note = (kind: 'deals' | 'meetings' | 'postings' | 'news') => {
+    const label = pulsePageNotes({
+      dealsCapped: kind === 'deals',
+      meetingsCapped: kind === 'meetings',
+      postingsCapped: kind === 'postings',
+      newsCapped: kind === 'news',
+    })[0];
+    return label ? `${label}.` : '';
+  };
   return drivers.map((driver) => {
-    if (caps.dealsCapped && (driver.key === 'pipeline' || driver.key === 'winloss')) {
-      return { ...driver, detail: `${driver.detail} Latest 1,000 deals.` };
-    }
-    if (caps.feedsCapped && (driver.key === 'meetings' || driver.key === 'news')) {
-      return { ...driver, detail: `${driver.detail} Latest 1,000 signals.` };
-    }
-    return driver;
+    const suffix =
+      caps.dealsCapped && (driver.key === 'pipeline' || driver.key === 'winloss')
+        ? note('deals')
+        : caps.meetingsCapped && driver.key === 'meetings'
+          ? note('meetings')
+          : caps.postingsCapped && driver.key === 'hiring'
+            ? note('postings')
+            : caps.newsCapped && driver.key === 'news'
+              ? note('news')
+              : '';
+    return suffix ? { ...driver, detail: `${driver.detail} ${suffix}` } : driver;
   });
 }
 

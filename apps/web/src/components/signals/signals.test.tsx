@@ -54,8 +54,9 @@ describe('PulseView', () => {
 
   it('says when the pulse is the latest page rather than the whole book', () => {
     // WHY: the account pulse had no caption, so a capped deal page read as every deal.
-    wrap(<PulseView pulse={{ ...pulse, dealsCapped: true, feedsCapped: true, childrenCapped: true }} />);
-    expect(screen.getByText('Latest 1,000 deals · Latest 1,000 signals · Latest 1,000 subsidiaries')).toBeTruthy();
+    wrap(<PulseView pulse={{ ...pulse, dealsCapped: true, newsCapped: true, childrenCapped: true }} />);
+    expect(screen.getByText('Latest 1,000 deals · Latest 1,000 news items · Latest 1,000 subsidiaries')).toBeTruthy();
+    expect(screen.queryByText(/Latest 1,000 meetings/)).toBeNull();
   });
 
   it('opens the drill panel for a driver with its contribution and a link', () => {
@@ -202,6 +203,13 @@ describe('Portfolio momentum', () => {
     };
     wrap(<MomentumList data={signaled} />);
     expect(screen.getByText(/Latest 1,000 signals/)).toBeTruthy();
+    const newsOnly = {
+      ...port,
+      accounts: port.accounts.map((account) => (account.companyId === 'b' ? { ...account, newsCapped: true } : account)),
+    };
+    wrap(<MomentumList data={newsOnly} />);
+    expect(screen.getByText(/Latest 1,000 news items/)).toBeTruthy();
+    expect(screen.queryByText(/Latest 1,000 meetings/)).toBeNull();
     const children = {
       ...port,
       accounts: port.accounts.map((account) => (account.companyId === 'c' ? { ...account, childrenCapped: true } : account)),

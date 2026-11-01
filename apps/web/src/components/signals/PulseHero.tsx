@@ -10,7 +10,7 @@ import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useReducedMotion } from 'motion/react';
 
-import type { AccountPulse } from '@bidstack/shared';
+import { pulsePageNotes, type AccountPulse } from '@bidstack/shared';
 
 import { AreaSparkline } from '@/components/charts/bklit-sparkline';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
@@ -75,6 +75,7 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
   const pad = Math.max(0, 30 - (hi - lo)) / 2 + 4;
   const yDomain: [number, number] = [Math.max(0, lo - pad), Math.min(100, hi + pad)];
   const thin = pulse.coverage < 0.4;
+  const pageNotes = pulsePageNotes(pulse);
 
   return (
     <section className="sg sg-surface sg-pulse" aria-labelledby={`${panelId}-h`} data-testid="account-pulse">
@@ -93,15 +94,7 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
           {pulse.sample ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
         </div>
         <p className="sg-verdict">{pulse.verdict}</p>
-        {pulse.dealsCapped || pulse.feedsCapped || pulse.childrenCapped ? (
-          <p className="sg-meta">
-            {[
-              pulse.dealsCapped ? 'Latest 1,000 deals' : '',
-              pulse.feedsCapped ? 'Latest 1,000 signals' : '',
-              pulse.childrenCapped ? 'Latest 1,000 subsidiaries' : '',
-            ].filter(Boolean).join(' · ')}
-          </p>
-        ) : null}
+        {pageNotes.length > 0 ? <p className="sg-meta">{pageNotes.join(' · ')}</p> : null}
         <div className="sg-drivers" role="group" aria-label="Top drivers">
           {top.map((d) => (
             <button
