@@ -44,6 +44,16 @@ export function initialsFor(name: string): string {
     .replace(/[^A-Z0-9]/g, '');
 }
 
+export function httpUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function slugFor(name: string): string {
   return (
     name
@@ -59,6 +69,90 @@ export { recordedConfidencePercent } from '@/lib/recorded-confidence';
 /** A field is either recorded or absent. Partial percents would invent progress. */
 export function recordedFill(recorded: boolean): number {
   return recorded ? 100 : 0;
+}
+
+export interface CompanyDraftSource {
+  name: string;
+  legalName: string | null;
+  domain: string | null;
+  website: string | null;
+  description: string | null;
+  headquarters: string | null;
+  employeeCount: number | null;
+  revenueLabel: string | null;
+  industry: string | null;
+}
+
+/**
+ * The official public name, domain, and website fill the draft.
+ * A field the seller already edited stays as they left it.
+ * An existing CRM company wins over a public preview so we do not
+ * overwrite a saved account with a lookalike.
+ */
+export function resolveCompanyDraft(input: {
+  typed: string;
+  domainTouched: boolean;
+  websiteTouched: boolean;
+  domainDraft: string;
+  websiteDraft: string;
+  company: CompanyDraftSource | null;
+  preview: CompanyDraftSource | null;
+}): CompanyDraftSource & { domain: string; website: string } {
+  const typedDomain = normalizeDomain(input.typed);
+  const source = input.company ?? input.preview;
+  const name =
+    source?.name.trim() || (typedDomain ? titleFromDomain(typedDomain) : input.typed.trim());
+  const domain = input.domainTouched
+    ? input.domainDraft.trim()
+    : (source?.domain ?? typedDomain ?? '');
+  const host = normalizeDomain(domain);
+  const website = input.websiteTouched
+    ? input.websiteDraft.trim()
+    : (source?.website ?? (host ? `https://${host}/` : ''));
+  return {
+    name,
+    legalName: source?.legalName ?? null,
+    domain: input.domainTouched ? domain : (host ?? ''),
+    website,
+    description: source?.description ?? null,
+    headquarters: source?.headquarters ?? null,
+    employeeCount: source?.employeeCount ?? null,
+    revenueLabel: source?.revenueLabel ?? null,
+    industry: source?.industry ?? null,
+  };
+}
+
+export function sourceFromCompany(company: CrmCompany): CompanyDraftSource {
+  return {
+    name: company.name,
+    legalName: company.legalName,
+    domain: company.domain,
+    website: company.website,
+    description: company.publicFacts?.description ?? null,
+    headquarters: company.publicFacts?.headquarters ?? null,
+    employeeCount: company.employeeCount,
+    revenueLabel: company.publicFacts?.revenueLabel ?? null,
+    industry: company.industry,
+  };
+}
+
+/** Same-origin logo proxy. Reserved domains never request a third-party mark. */
+export function logoProxyPath(domain: string | null | undefined): string | null {
+  const host = normalizeDomain(domain);
+  if (!host || isReservedDomain(host)) return null;
+  return `/api/v1/logo?domain=${encodeURIComponent(host)}`;
+}
+
+function isReservedDomain(domain: string): boolean {
+  return (
+    domain.endsWith('.example') ||
+    domain.endsWith('.invalid') ||
+    domain.endsWith('.localhost') ||
+    domain.endsWith('.test') ||
+    domain === 'example.com' ||
+    domain === 'example.org' ||
+    domain === 'example.net'
+  );
 }
 
 export function logoSourceLabel(source: NonNullable<CrmCompany['logo']>['source']): string {

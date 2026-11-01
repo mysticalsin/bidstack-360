@@ -991,7 +991,9 @@
       "domainSignal": "Domain signal",
       "logoPreview": "Logo preview",
       "openDataReady": "Open data ready",
-      "nameSignal": "Name signal"
+      "nameSignal": "Name signal",
+      "wikidata": "Wikidata",
+      "none": "No source receipts"
     },
     "autofill": {
       "legalProfile": "Legal profile",
@@ -1024,7 +1026,7 @@
     },
     "dialog": {
       "title": "Add company",
-      "description": "Match an existing account, or start from the name and domain you type."
+      "description": "Type a company name. The domain, website, and logo fill in from the public record."
     },
     "preview": {
       "companyFallback": "Company",
@@ -1034,7 +1036,9 @@
       "storedConfidence": "Stored",
       "notScored": "Not scored",
       "notScoredHint": "A typed name or domain is not a confidence score.",
-      "storedHint": "Stored company confidence."
+      "storedHint": "Stored company confidence.",
+      "facts": "Public facts",
+      "headcount": "{{formatted}} people"
     },
     "field": {
       "companyOrDomain": "Company or domain",

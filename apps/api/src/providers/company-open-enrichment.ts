@@ -99,6 +99,36 @@ const CURRENCY_CODE: Record<string, string> = {
   Q132643: 'NOK',
 };
 
+export function toPublicPreview(profile: OpenCompanyProfile | null): {
+  name: string;
+  legalName: string | null;
+  domain: string | null;
+  website: string | null;
+  description: string | null;
+  headquarters: string | null;
+  employeeCount: number | null;
+  revenueLabel: string | null;
+  industry: string | null;
+} | null {
+  if (!profile) return null;
+  const name = profile.tradeName?.trim() || profile.legalName?.trim() || '';
+  if (!name && !profile.domain) return null;
+  const count = profile.employeeCount;
+  const employeeCount =
+    count !== null && Number.isInteger(count) && count >= 0 ? count : null;
+  return {
+    name: name || profile.domain || '',
+    legalName: profile.legalName,
+    domain: profile.domain,
+    website: profile.website,
+    description: profile.description,
+    headquarters: profile.publicFacts.headquarters,
+    employeeCount,
+    revenueLabel: profile.publicFacts.revenueLabel,
+    industry: profile.industryLabels[0] ?? null,
+  };
+}
+
 export async function fetchOpenCompanyProfile({
   name,
   domain,

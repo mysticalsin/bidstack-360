@@ -260,10 +260,24 @@ export const CompanyLookupMatch = z.enum([
 ]);
 export type CompanyLookupMatch = z.infer<typeof CompanyLookupMatch>;
 
+export const CompanyPublicPreview = z.object({
+  name: z.string(),
+  legalName: z.string().nullable(),
+  domain: z.string().nullable(),
+  website: z.string().nullable(),
+  description: z.string().nullable(),
+  headquarters: z.string().nullable(),
+  employeeCount: z.number().int().nonnegative().nullable(),
+  revenueLabel: z.string().nullable(),
+  industry: z.string().nullable(),
+});
+export type CompanyPublicPreview = z.infer<typeof CompanyPublicPreview>;
+
 export const CompanyLookupResponse = z.object({
   match: CompanyLookupMatch,
   company: CrmCompany.nullable(),
   alternatives: z.array(CrmCompany),
+  preview: CompanyPublicPreview.nullable().default(null),
 });
 export type CompanyLookupResponse = z.infer<typeof CompanyLookupResponse>;
 

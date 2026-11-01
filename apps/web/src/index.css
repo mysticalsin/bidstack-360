@@ -3312,12 +3312,17 @@ select:focus-visible {
   animation: bs-chip-pop 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .smart-company-dialog {
+  overflow-x: clip;
   width: min(880px, 94vw);
 }
 .smart-company-shell {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1.22fr);
+}
+.smart-company-shell > *,
+.smart-field-grid > * {
+  min-width: 0;
 }
 .smart-company-preview {
   align-items: center;
@@ -3385,6 +3390,27 @@ select:focus-visible {
   font-size: 34px;
   font-weight: 850;
 }
+.smart-company-blurb {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--fg-secondary);
+  display: -webkit-box;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+.smart-fact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
 .smart-company-preview strong {
   color: var(--fg-primary);
   display: block;
@@ -3402,14 +3428,27 @@ select:focus-visible {
   position: relative;
   z-index: 1;
 }
+.smart-company-preview > .smart-fact-row > span {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--fg-secondary);
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  margin-top: 0;
+  padding: 6px 10px;
+}
 .smart-confidence {
   align-items: center;
   background: color-mix(in srgb, var(--surface-card) 82%, transparent);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   display: flex;
+  gap: 12px;
   justify-content: space-between;
-  min-width: 176px;
+  min-width: 0;
   padding: 10px 12px;
   position: relative;
   z-index: 1;
@@ -4787,6 +4826,7 @@ select:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .smart-company-orbit span,
   .rail-track::before,
   .rail-node {
     animation: none;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { faviconProfile, fetchOpenCompanyProfile } from './company-open-enrichment.js';
+import { faviconProfile, fetchOpenCompanyProfile, toPublicPreview } from './company-open-enrichment.js';
 
 const now = new Date('2026-05-11T00:00:00.000Z');
 
@@ -266,6 +266,49 @@ describe('company open data verification', () => {
     });
 
     expect(profile?.incorporationDate).toBeNull();
+  });
+
+  it('turns a verified profile into the fields the add-company dialog can fill', () => {
+    // WHY: the dialog must not invent a domain. It only fills one when the
+    // public profile actually resolved an official website.
+    const preview = toPublicPreview({
+      legalName: 'Microsoft Corporation',
+      tradeName: 'Microsoft',
+      domain: 'microsoft.com',
+      website: 'https://www.microsoft.com/',
+      description: 'American multinational technology corporation',
+      logoUrl: null,
+      logoSource: null,
+      imageUrl: null,
+      employeeCount: 228000.4,
+      incorporationDate: null,
+      industryLabels: ['software industry', 'technology'],
+      revenueAmount: null,
+      revenueCurrency: null,
+      publicFacts: {
+        description: 'American multinational technology corporation',
+        headquarters: 'Redmond, United States',
+        chiefExecutive: null,
+        stockExchange: null,
+        revenueLabel: '281.7 billion USD',
+        revenueCurrency: 'USD',
+      },
+      confidenceBps: 0,
+      sourceAttribution: [],
+      providerMetadata: {},
+    });
+    expect(preview).toEqual({
+      name: 'Microsoft',
+      legalName: 'Microsoft Corporation',
+      domain: 'microsoft.com',
+      website: 'https://www.microsoft.com/',
+      description: 'American multinational technology corporation',
+      headquarters: 'Redmond, United States',
+      employeeCount: null,
+      revenueLabel: '281.7 billion USD',
+      industry: 'software industry',
+    });
+    expect(toPublicPreview(null)).toBeNull();
   });
 
   it('builds a direct favicon fallback when open profiles are unavailable', () => {
