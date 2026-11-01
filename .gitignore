@@ -111,6 +111,7 @@ apps/web/scripts/_i18n_*
 *.png
 *.mjs
 !scripts/*.mjs
+!apps/polo-preview/**/*.mjs
 
 # Web app screenshot blobs (committed by QA runs, not source)
 apps/web/*.png

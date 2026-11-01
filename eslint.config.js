@@ -222,6 +222,19 @@ export default tseslint.config(
     },
   },
 
+  {
+    files: ['apps/polo-preview/src/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.worker,
+        DurableObject: 'readonly',
+        WebSocketPair: 'readonly',
+        WebSocketRequestResponsePair: 'readonly',
+      },
+    },
+  },
+
   // 7. Test files: relax a couple rules.
   {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'apps/web/e2e/**/*.{ts,tsx}'],
@@ -239,6 +252,8 @@ export default tseslint.config(
       '**/vitest.config.ts',
       '**/playwright.config.ts',
       'apps/marketing/scripts/**/*.mjs',
+      'apps/polo-preview/src/box-relay.mjs',
+      'apps/polo-preview/src/start-box.mjs',
       'packages/db/src/seed.ts',
       'packages/db/src/seed.rbac.ts',
       'packages/db/src/seed-demo.ts',

@@ -14,6 +14,18 @@ describe('cors origin allowlist', () => {
     expect(origins).toContain('http://localhost:4174');
     // 38081 is the Vite dev port — must be allowed so direct browser→API calls work.
     expect(origins).toContain('http://localhost:38081');
+    // 4180 is the Cloudflare preview box web port (apps/polo-preview).
+    expect(origins).toContain('http://localhost:4180');
+    expect(origins).toContain('http://127.0.0.1:4180');
+  });
+
+  it('treats the Cloudflare preview Worker origin as the only production origin when it is PUBLIC_BASE_URL', () => {
+    const origins = buildAllowedCorsOrigins(
+      'https://polo-preview.tony-walteur.workers.dev',
+      'production',
+    );
+
+    expect(origins).toEqual(['https://polo-preview.tony-walteur.workers.dev']);
   });
 
   it('does not add loopback origins in production', () => {
