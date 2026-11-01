@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { dealOutcome, outcomeWhere, requireCompanyLink } from './crm-tools.helpers.js';
+import { dealOutcome, liveStageName, outcomeWhere, recordedProbability, requireCompanyLink } from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -29,7 +29,7 @@ const Input = z.object({
 
 export const opportunitiesList: Tool<typeof Input> = {
   description:
-    'List opportunities. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. stage is the stored key. Pass outcome to keep the list to open, won, or lost: a live lost or won flag decides it, and lost wins when both are set. A deleted stage does not close the deal. currency is null and currencyBasis is unspecified when the row has no currency. probability is win likelihood, not account health.',
+    'List opportunities. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. Pass outcome to keep the list to open, won, or lost: a live lost or won flag decides it, and lost wins when both are set. A deleted stage does not close the deal. currency is null and currencyBasis is unspecified when the row has no currency. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -84,7 +84,7 @@ export const opportunitiesList: Tool<typeof Input> = {
       },
       include: {
         owner: true,
-        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+        pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
       },
       orderBy: { updatedAt: 'desc' },
       take: args.limit,
@@ -95,9 +95,10 @@ export const opportunitiesList: Tool<typeof Input> = {
       customer: o.customer,
       name: o.name,
       stage: o.stage,
+      stageName: liveStageName(o.stage, o.pipelineStage),
       outcome: dealOutcome(o),
       value: Number(o.valueMicros) / 1_000_000,
-      probability: o.probability,
+      probability: recordedProbability(o.probability),
       // Opportunity has no currency column. Do not label the value as EUR.
       currency: null,
       currencyBasis: 'unspecified' as const,

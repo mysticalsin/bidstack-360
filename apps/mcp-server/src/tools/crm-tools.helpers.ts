@@ -97,6 +97,25 @@ export function dealOutcome(deal: {
   return 'open';
 }
 
+/** A blank probability is stored as 0. Dust should not read that as a measured chance. */
+export function recordedProbability(probability: number): number | null {
+  return probability === 0 ? null : probability;
+}
+
+/** The live stage name. A deleted stage falls back to the stored key. */
+export function liveStageName(
+  stageKey: string,
+  pipelineStage: { name: string; deletedAt: Date | null } | null,
+): string {
+  const live = pipelineStage && pipelineStage.deletedAt == null ? pipelineStage.name.trim() : '';
+  if (live) return live;
+  return stageKey
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export function serializeDeal(deal: {
   id: string;
   code: string;
@@ -116,7 +135,7 @@ export function serializeDeal(deal: {
     name: deal.name,
     stage: deal.stage,
     value: Number(deal.valueMicros) / 1_000_000,
-    probability: deal.probability,
+    probability: recordedProbability(deal.probability),
     dueDate: deal.dueDate?.toISOString().slice(0, 10) ?? null,
     industry: deal.industry,
     updatedAt: deal.updatedAt.toISOString(),

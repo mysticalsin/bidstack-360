@@ -4,7 +4,7 @@ import { prisma } from '@bidstack/db';
 import { presentOpportunityIntel } from '@bidstack/shared';
 
 import type { Tool } from './index.js';
-import { dealOutcome } from './crm-tools.helpers.js';
+import { dealOutcome, liveStageName, recordedProbability } from './crm-tools.helpers.js';
 
 const Input = z
   .object({
@@ -16,17 +16,9 @@ const Input = z
   })
   .refine((v) => v.id || v.code, { message: 'Provide either id or code' });
 
-function stageWords(stage: string): string {
-  return stage
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
 export const opportunitiesGet: Tool<typeof Input> = {
   description:
-    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the label. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified. probability is win likelihood, not account health.',
+    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -58,17 +50,14 @@ export const opportunitiesGet: Tool<typeof Input> = {
       companyId: opp.companyId,
       name: opp.name,
       stage: opp.stage,
-      stageName:
-        (opp.pipelineStage && opp.pipelineStage.deletedAt == null
-          ? opp.pipelineStage.name?.trim()
-          : '') || stageWords(opp.stage),
+      stageName: liveStageName(opp.stage, opp.pipelineStage),
       outcome: dealOutcome(opp),
       value: Number(opp.valueMicros) / 1_000_000,
       currency: null,
       currencyBasis: 'unspecified' as const,
       health: 'not_account_health' as const,
       healthNote: 'Probability is win likelihood for this opportunity, not account health.',
-      probability: opp.probability,
+      probability: recordedProbability(opp.probability),
       dueDate: opp.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: opp.owner?.email ?? null,
       industry: opp.industry,

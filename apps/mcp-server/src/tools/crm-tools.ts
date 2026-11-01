@@ -113,7 +113,7 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
 
 export const crmCreateDeal: Tool<typeof DealCreateInput> = {
   description:
-    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. The stage key links the one live pipeline stage with that key. Two matches are refused. Omit probability when it is unknown; 0 is stored and adds nothing to weighted pipeline.',
+    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. The stage key links the one live pipeline stage with that key. Two matches are refused. Omit probability when it is unknown. The row stores 0, the response returns null, and that blank adds nothing to weighted pipeline.',
   input: DealCreateInput,
   inputJsonSchema: {
     type: 'object',

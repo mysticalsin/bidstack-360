@@ -119,10 +119,11 @@ describeDb('MCP tools', () => {
       currencyBasis: string;
       companyId: string | null;
       health: string;
-      probability: number;
+      probability: number | null;
     };
     // WHY: probability is win likelihood. Reporting it as account health, or
     // the value as EUR, would make a Dust read a false forecast.
+    expect(row.probability).toBe(50);
     expect(row.currency).toBeNull();
     expect(row.currencyBasis).toBe('unspecified');
     expect(row.health).toBe('not_account_health');
@@ -164,8 +165,10 @@ describeDb('MCP tools', () => {
     const out = (await tools['opportunities.list'].handler(
       { companyId: company.id, limit: 20 },
       ctx,
-    )) as Array<{ id: string }>;
+    )) as Array<{ id: string; probability: number | null; stageName: string }>;
     expect(out.map((row) => row.id)).toEqual([linked.id]);
+    expect(out[0]?.probability).toBeNull();
+    expect(out[0]?.stageName).toBe('S1 Lead');
     expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
 
     await expect(
@@ -331,8 +334,10 @@ describeDb('MCP tools', () => {
 
       const beforeDelete = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {
         stageName: string;
+        probability: number | null;
       };
       expect(beforeDelete.stageName).toBe('Price lost');
+      expect(beforeDelete.probability).toBeNull();
 
       await prisma.pipelineStage.update({ where: { id: lost.id }, data: { deletedAt: new Date() } });
       const afterGet = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {

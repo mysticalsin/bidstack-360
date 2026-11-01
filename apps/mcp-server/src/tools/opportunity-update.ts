@@ -7,6 +7,7 @@ import {
   companyIdForCustomerRename,
   dealOutcome,
   pipelineStageIdForStageChange,
+  recordedProbability,
   recordOpportunityStageMove,
 } from './crm-tools.helpers.js';
 
@@ -117,7 +118,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
       stage: updated.stage,
       outcome: dealOutcome(updated),
       value: Number(updated.valueMicros) / 1_000_000,
-      probability: updated.probability,
+      probability: recordedProbability(updated.probability),
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: updated.owner?.email ?? null,
       industry: updated.industry,
