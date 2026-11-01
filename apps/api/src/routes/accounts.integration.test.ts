@@ -187,6 +187,68 @@ describe('accounts routes', () => {
     });
   });
 
+  skipIfNoDb('GET /api/accounts/top keeps a large open amount on the exact cent', async () => {
+    // WHY: the leaderboard divided the micros sum as float8. This amount then
+    // read one cent high. A lost flag still adds nothing to the open total.
+    const name = `Wide Top ${Date.now()}`;
+    const micros = 8_598_204_328_457_184_962n;
+    const company = await prisma.company.create({ data: { orgId: orgId!, name } });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `${name} pipeline` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId: orgId!, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId: orgId!,
+          code: `OP-TW1-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Large open',
+          stage: 's1_lead',
+          valueMicros: micros,
+          probability: 100,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-TW2-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Large lost',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          valueMicros: micros,
+          probability: 100,
+          intel: {},
+        },
+      ],
+    });
+    await prisma.company.updateMany({
+      where: { orgId: orgId!, topAccountRank: { not: null } },
+      data: { topAccountRank: null },
+    });
+    try {
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/accounts/top?search=${encodeURIComponent(name)}&limit=5`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { items: Array<{ name: string; totalValue: number; wonValue: number }> };
+      const row = body.items.find((item) => item.name === name);
+      expect(row?.totalValue.toFixed(2)).toBe('8598204328457.18');
+      expect(row?.totalValue.toFixed(2)).not.toBe('8598204328457.19');
+      expect(row?.wonValue).toBe(0);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { companyId: company.id } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
+      await prisma.pipeline.delete({ where: { id: pipeline.id } });
+      await prisma.company.delete({ where: { id: company.id } });
+    }
+  });
+
   skipIfNoDb('GET /api/accounts/top supports search filter', async () => {
     const res = await server.inject({
       method: 'GET',

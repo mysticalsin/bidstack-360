@@ -8,7 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
-import { TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
+import { microsToUnits, TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
 
 import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
@@ -254,8 +254,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         keyAccountOwnerId: string | null;
         keyAccountNotes: string | null;
         topAccountRank: number | null;
-        totalValue: number;
-        wonValue: number;
+        openValueMicros: string;
+        wonValueMicros: string;
         openDeals: bigint; // Postgres COUNT → BigInt
         opportunityCount: bigint;
       };
@@ -280,7 +280,16 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
                  AND ps.deleted_at IS NULL
                  AND (ps.is_lost OR ps.is_won)
              )
-            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0 AS "totalValue",
+            THEN o.value_micros ELSE 0 END), 0) AS "openValueSort",
+          COALESCE(SUM(CASE
+            WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND (ps.is_lost OR ps.is_won)
+             )
+            THEN o.value_micros ELSE 0 END), 0)::text AS "openValueMicros",
           COALESCE(SUM(CASE
             WHEN o.stage <> 'closed_lost'::opportunity_stage
              AND NOT EXISTS (
@@ -299,7 +308,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
                    AND NOT ps.is_lost
                )
              )
-            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0 AS "wonValue",
+            THEN o.value_micros ELSE 0 END), 0)::text AS "wonValueMicros",
           COUNT(CASE
             WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
              AND NOT EXISTS (
@@ -323,7 +332,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           AND (${industryVal}::text IS NULL OR c.industry ILIKE ${industryVal})
           ${accountScopeSql}
         GROUP BY c.id
-        ORDER BY "totalValue" DESC
+        ORDER BY "openValueSort" DESC
         LIMIT ${limit}
       `;
 
@@ -347,8 +356,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         keyAccountOwnerId: row.keyAccountOwnerId,
         keyAccountNotes: row.keyAccountNotes,
         topAccountRank: index + 1, // rank = position in result (sorted by totalValue DESC)
-        totalValue: row.totalValue,
-        wonValue: row.wonValue,
+        totalValue: microsToUnits(BigInt(row.openValueMicros)),
+        wonValue: microsToUnits(BigInt(row.wonValueMicros)),
         openDeals: Number(row.openDeals),
         contactCount: contactMap.get(row.id) ?? 0,
         opportunityCount: Number(row.opportunityCount),
