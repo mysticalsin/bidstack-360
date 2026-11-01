@@ -39,7 +39,8 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {unspecifiedMicrosLabel(totals.totalValueMicros)}
+              · {unspecifiedMicrosLabel(totals.totalValueMicros)}{' '}
+              {t('oppIndustryBreakdown.portfolioScope', 'in the portfolio')}
             </span>
           ) : null}
         </span>

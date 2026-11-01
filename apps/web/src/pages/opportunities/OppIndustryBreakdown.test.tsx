@@ -34,7 +34,8 @@ describe('OppIndustryBreakdown summary', () => {
     render(<OppIndustryBreakdown />);
     const summary = screen.getByRole('button', { name: /Pipeline by industry/ });
     expect(summary.textContent).toMatch(/9 sectors/);
-    expect(summary.textContent).toMatch(/unspecified/);
+    expect(summary.textContent).toMatch(/23\.54M unspecified/);
+    expect(summary.textContent).toMatch(/in the portfolio/);
     expect(summary.textContent).not.toMatch(/unspecified currency/);
     expect(summary.textContent).not.toMatch(/EUR|€|\$/);
   });
