@@ -28,13 +28,10 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { springSnap, springSoft } from '@/lib/motion';
-import {
-  formatUnspecifiedAmount,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '../unspecified-currency';
+import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecified-currency';
 
 import { closedOutcome } from '@/lib/pipeline-stages';
-import { formatMicrosAmount, type Opportunity } from '@bidstack/shared';
+import { formatMicrosAmount, unitsToMicros, type Opportunity } from '@bidstack/shared';
 
 // Must match ClosingThisWeekCard's filter exactly so React Query serves both
 // widgets from a single fetch (object keys are hashed order-independently).
@@ -60,6 +57,13 @@ function isOpenOpp(o: Opportunity): boolean {
   return closedOutcome(o) === null;
 }
 
+function closingStakeMicros(items: Opportunity[]): bigint {
+  return items.reduce((sum, opp) => {
+    if (opp.valueMicros && /^\d+$/.test(opp.valueMicros)) return sum + BigInt(opp.valueMicros);
+    return sum + (unitsToMicros(opp.value ?? 0) ?? 0n);
+  }, 0n);
+}
+
 export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
@@ -72,7 +76,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
 
   const money = (value: number) => formatUnspecifiedAmount(value);
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);
-  const closingValue = closingItems.reduce((acc, opp) => acc + (opp.value ?? 0), 0);
+  const closingValue = closingStakeMicros(closingItems);
   const winRate = deriveWinRate(report.data);
 
   const signals = buildSignals({
@@ -151,7 +155,11 @@ function HeroPanel({
         <span>{t('orgHero.kicker', 'Open pipeline, portfolio-wide')}</span>
       </div>
       <h2>
-        {heroLabel ? <AnimatedMetric value={heroLabel} /> : <AnimatedNumber value={heroValue} format={formatValue} />}
+        {heroLabel ? (
+          <AnimatedMetric value={heroLabel} />
+        ) : (
+          <AnimatedNumber value={heroValue} format={formatValue} />
+        )}
       </h2>
       <p className="text-xs text-[var(--fg-tertiary)]">
         {t('orgHero.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
@@ -186,19 +194,33 @@ function HeroPanel({
 // dashboard copy — so the first screen tells the bid lead where to act.
 function deriveFocusLine(summary: OrgSummary, closingCount: number, t: TFunction): string {
   if (summary.overdueTasks > 0) {
-    return t('orgHero.focus.overdue', 'Clear {{count}} overdue follow-ups before new bids go out.', {
-      count: summary.overdueTasks,
-    });
+    return t(
+      'orgHero.focus.overdue',
+      'Clear {{count}} overdue follow-ups before new bids go out.',
+      {
+        count: summary.overdueTasks,
+      },
+    );
   }
   if (closingCount > 0) {
-    return t('orgHero.focus.closing', '{{count}} bids close within 7 days — run those reviews first.', {
-      count: closingCount,
-    });
+    return t(
+      'orgHero.focus.closing',
+      '{{count}} bids close within 7 days — run those reviews first.',
+      {
+        count: closingCount,
+      },
+    );
   }
   if (summary.openOpportunities === 0) {
-    return t('orgHero.focus.noOpen', 'No open bids yet. Qualify the next lead to start the pipeline.');
+    return t(
+      'orgHero.focus.noOpen',
+      'No open bids yet. Qualify the next lead to start the pipeline.',
+    );
   }
-  return t('orgHero.focus.clear', 'Nothing due this week — runway is clear to advance mid-stage bids.');
+  return t(
+    'orgHero.focus.clear',
+    'Nothing due this week — runway is clear to advance mid-stage bids.',
+  );
 }
 
 function winRateTone(rate: number | null): BadgeTone {
@@ -224,7 +246,7 @@ interface SignalInputs {
   reportPending: boolean;
   winRate: number | null;
   closingCount: number;
-  closingValue: number;
+  closingValue: bigint;
   closingPending: boolean;
   closingFailed: boolean;
   money: (value: number) => string;
@@ -279,7 +301,7 @@ function winRateSignal({ report, reportPending, winRate, t }: SignalInputs): Her
 }
 
 function closingSignal(inputs: SignalInputs): HeroSignal {
-  const { summary, closingCount, closingValue, closingPending, closingFailed, money, t } = inputs;
+  const { summary, closingCount, closingValue, closingPending, closingFailed, t } = inputs;
   const open = Math.max(1, summary.openOpportunities);
   return {
     key: 'closing',
@@ -288,7 +310,9 @@ function closingSignal(inputs: SignalInputs): HeroSignal {
     detail: closingFailed
       ? t('orgHero.signal.closing.failed', 'due list unavailable')
       : closingCount > 0
-        ? t('orgHero.signal.closing.detail', '{{value}} at stake', { value: money(closingValue) })
+        ? t('orgHero.signal.closing.detail', '{{value}} at stake', {
+            value: formatMicrosAmount(closingValue),
+          })
         : t('orgHero.signal.closing.empty', 'runway clear'),
     tone: closingFailed ? 'gray' : closingCount > 0 ? 'amber' : 'jade',
     progress:
@@ -321,7 +345,10 @@ function SignalCell({ signal, reduced }: { signal: HeroSignal; reduced: boolean 
     // so the cell loads "in place" per the PageSkeletons doctrine.
     return (
       <StaggerItem className="command-signal" aria-hidden>
-        <div data-testid="signal-skeleton" className="h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
+        <div
+          data-testid="signal-skeleton"
+          className="h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]"
+        />
         <div className="mt-4 h-8 w-20 animate-pulse rounded bg-[var(--surface-sunken)]" />
         <div className="mt-4 h-[7px] animate-pulse rounded-full bg-[var(--surface-sunken)]" />
       </StaggerItem>
