@@ -454,6 +454,8 @@ describe('useCurrencyStore', () => {
     const { result } = renderHook(() => useDisplayMoney(huge, 'EUR'));
     expect(result.current).toBe(full);
     expect(result.current).toContain('9,907,919,180,215,092');
+    const formatted = renderHook(() => useFormatMoney());
+    expect(formatted.result.current.formatMoney(huge, 'EUR')).toBe(full);
   });
 });
 

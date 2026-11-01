@@ -10,7 +10,7 @@ import {
   unspecifiedMicrosLabel,
 } from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
-import { formatMoney, formatMoneyMicros } from '@/lib/format';
+import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/format';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
@@ -63,7 +63,7 @@ export function formatStoredMicros(
  * based on the user's selected display currency.
  */
 export function useFormatMoney() {
-  const { currency, convert, convertMicros, fetchRates } = useCurrencyStore();
+  const { currency, convert, convertAmountMicros, convertMicros, fetchRates } = useCurrencyStore();
 
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
@@ -76,7 +76,9 @@ export function useFormatMoney() {
     formatMoney: (value: number, sourceCurrency?: string | null) => {
       const source = sourceCurrency?.trim();
       if (!source) return formatUnspecifiedAmount(value);
-      return formatMoney(convert(value, source), currency);
+      const converted = convertAmountMicros(value, source);
+      if (converted == null) return formatMoney(value, currency);
+      return formatConvertedMicros(converted, currency);
     },
     formatMoneyMicros: (
       micros: string | number | bigint,

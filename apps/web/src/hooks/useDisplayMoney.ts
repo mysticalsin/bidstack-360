@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 
-import { microsToUnits } from '@bidstack/shared';
-
 import { useCurrencyStore } from '@/stores/currency';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
-import { formatMoney, formatMoneyMicros } from '@/lib/format';
+import { formatConvertedMicros, formatMoney } from '@/lib/format';
 import { formatStoredMicros } from '@/hooks/useFormatMoney';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
@@ -23,11 +21,7 @@ export function useDisplayMoney(value: number, sourceCurrency?: string | null): 
   if (!source) return formatUnspecifiedAmount(value);
   const converted = convertAmountMicros(value, source);
   if (converted == null) return formatMoney(value, currency);
-  const abs = converted < 0n ? -converted : converted;
-  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) {
-    return formatMoneyMicros(converted, currency, { compact: false });
-  }
-  return formatMoney(microsToUnits(converted), currency);
+  return formatConvertedMicros(converted, currency);
 }
 
 /** Convert and format micros (string/number/bigint) for the display currency. */

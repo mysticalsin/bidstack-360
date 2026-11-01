@@ -1,4 +1,4 @@
-import { formatMicrosAmount } from '@bidstack/shared';
+import { formatMicrosAmount, microsToUnits } from '@bidstack/shared';
 
 // Locale-aware formatters used across cards and tables. All public functions
 // accept an optional `locale` string so they're safe to call from both React
@@ -57,6 +57,15 @@ export function formatMoney(value: number, currency?: string, locale?: string): 
     currency: resolvedCurrency,
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+/** Full integer when the unit count does not fit. Otherwise the usual currency format. */
+export function formatConvertedMicros(micros: bigint, currency: string): string {
+  const abs = micros < 0n ? -micros : micros;
+  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return formatMoneyMicros(micros, currency, { compact: false });
+  }
+  return formatMoney(microsToUnits(micros), currency);
 }
 
 export function formatDate(iso: string | null | undefined, locale?: string): string {
