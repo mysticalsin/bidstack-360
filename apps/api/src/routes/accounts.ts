@@ -272,7 +272,15 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           c.key_account_owner_id AS "keyAccountOwnerId",
           c.key_account_notes    AS "keyAccountNotes",
           c.top_account_rank     AS "topAccountRank",
-          COALESCE(SUM(o.value_micros), 0)::float8 / 1000000.0 AS "totalValue",
+          COALESCE(SUM(CASE
+            WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND (ps.is_lost OR ps.is_won)
+             )
+            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0 AS "totalValue",
           COALESCE(SUM(CASE
             WHEN o.stage <> 'closed_lost'::opportunity_stage
              AND NOT EXISTS (

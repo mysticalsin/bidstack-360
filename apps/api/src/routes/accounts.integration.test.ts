@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import { fetchAccountStats } from './accounts.helpers.js';
 import {
   createIsolatedOrg,
   dropIsolatedOrg,
@@ -171,7 +172,19 @@ describe('accounts routes', () => {
       items: Array<{ name: string; openDeals: number; wonValue: number; opportunityCount: number }>;
     };
     const row = body.items.find((item) => item.name === name);
-    expect(row).toMatchObject({ openDeals: 1, wonValue: 2, opportunityCount: 3 });
+    expect(row).toMatchObject({
+      openDeals: 1,
+      wonValue: 2,
+      opportunityCount: 3,
+      totalValue: 1,
+    });
+    const stats = await fetchAccountStats(orgId!, [company.id]);
+    expect(stats.get(company.id)).toMatchObject({
+      openDeals: 1,
+      wonValue: 2,
+      opportunityCount: 3,
+      totalValue: 1,
+    });
   });
 
   skipIfNoDb('GET /api/accounts/top supports search filter', async () => {

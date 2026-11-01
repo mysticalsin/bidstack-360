@@ -43,7 +43,6 @@ export async function fetchAccountStats(
     prisma.opportunity.groupBy({
       by: ['companyId'],
       where,
-      _sum: { valueMicros: true },
       _count: { _all: true },
     }),
     prisma.opportunity.groupBy({
@@ -54,6 +53,7 @@ export async function fetchAccountStats(
     prisma.opportunity.groupBy({
       by: ['companyId'],
       where: { ...where, ...excludeClosedOutcome() },
+      _sum: { valueMicros: true },
       _count: { _all: true },
     }),
     prisma.contact.groupBy({
@@ -74,13 +74,7 @@ export async function fetchAccountStats(
 
   for (const row of totals) {
     if (!row.companyId) continue;
-    const s = statsFor(row.companyId);
-    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds
-    // the BigInt→Number conversion before dividing, corrupting totals past
-    // ~$9.007B. Postgres already summed exactly via groupBy; don't reintroduce
-    // float error converting the result.
-    s.totalValue = microsToUnits(row._sum.valueMicros ?? 0);
-    s.opportunityCount = row._count._all;
+    statsFor(row.companyId).opportunityCount = row._count._all;
   }
   for (const row of won) {
     if (!row.companyId) continue;
@@ -88,7 +82,10 @@ export async function fetchAccountStats(
   }
   for (const row of open) {
     if (!row.companyId) continue;
-    statsFor(row.companyId).openDeals = row._count._all;
+    const s = statsFor(row.companyId);
+    // Pipeline on the account list is the open book. Lost and won stay out.
+    s.totalValue = microsToUnits(row._sum.valueMicros ?? 0);
+    s.openDeals = row._count._all;
   }
   for (const c of contacts) {
     if (!c.companyId) continue;
