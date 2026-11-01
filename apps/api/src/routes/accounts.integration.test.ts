@@ -87,6 +87,93 @@ describe('accounts routes', () => {
     }
   });
 
+  skipIfNoDb('GET /api/accounts/top leaves a lost stage flag out of open deals', async () => {
+    // WHY: the leaderboard counted any enum that was not closed_won or
+    // closed_lost. A stage marked lost still looked like an open deal.
+    const name = `Top Lost ${Date.now()}`;
+    const company = await prisma.company.create({
+      data: { orgId: orgId!, name },
+    });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `${name} pipeline` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'price_lost',
+        name: 'Price lost',
+        isLost: true,
+      },
+    });
+    const won = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'verbal_won',
+        name: 'Verbal won',
+        isWon: true,
+      },
+    });
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId: orgId!,
+          code: `OP-TL1-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Still looks open',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          valueMicros: 9_000_000n,
+          probability: 40,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-TL2-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Actually open',
+          stage: 's1_lead',
+          valueMicros: 1_000_000n,
+          probability: 10,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-TL3-${Date.now()}`,
+          customer: name,
+          companyId: company.id,
+          name: 'Flagged won',
+          stage: 's3_technical_iteration',
+          pipelineStageId: won.id,
+          valueMicros: 2_000_000n,
+          probability: 80,
+          intel: {},
+        },
+      ],
+    });
+
+    // Seeded ranks switch the route to the curated list, which never sees this
+    // company. Clear them so the value leaderboard SQL is what we assert.
+    await prisma.company.updateMany({
+      where: { orgId: orgId!, topAccountRank: { not: null } },
+      data: { topAccountRank: null },
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/accounts/top?search=${encodeURIComponent(name)}&limit=5`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      items: Array<{ name: string; openDeals: number; wonValue: number; opportunityCount: number }>;
+    };
+    const row = body.items.find((item) => item.name === name);
+    expect(row).toMatchObject({ openDeals: 1, wonValue: 2, opportunityCount: 3 });
+  });
+
   skipIfNoDb('GET /api/accounts/top supports search filter', async () => {
     const res = await server.inject({
       method: 'GET',

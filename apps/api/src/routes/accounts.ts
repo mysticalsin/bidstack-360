@@ -273,12 +273,34 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           c.key_account_notes    AS "keyAccountNotes",
           c.top_account_rank     AS "topAccountRank",
           COALESCE(SUM(o.value_micros), 0)::float8 / 1000000.0 AS "totalValue",
-          COALESCE(SUM(CASE WHEN o.stage = 'closed_won'::opportunity_stage
-                            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0
-                                                                         AS "wonValue",
-          COUNT(CASE WHEN o.stage NOT IN ('closed_won'::opportunity_stage,
-                                          'closed_lost'::opportunity_stage)
-                     THEN 1 ELSE NULL END)                               AS "openDeals",
+          COALESCE(SUM(CASE
+            WHEN o.stage <> 'closed_lost'::opportunity_stage
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND ps.is_lost
+             )
+             AND (
+               o.stage = 'closed_won'::opportunity_stage
+               OR EXISTS (
+                 SELECT 1 FROM pipeline_stages ps
+                 WHERE ps.id = o.pipeline_stage_id
+                   AND ps.deleted_at IS NULL
+                   AND ps.is_won
+                   AND NOT ps.is_lost
+               )
+             )
+            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0 AS "wonValue",
+          COUNT(CASE
+            WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND (ps.is_lost OR ps.is_won)
+             )
+            THEN 1 ELSE NULL END) AS "openDeals",
           COUNT(o.id)                                                    AS "opportunityCount"
         FROM companies c
         LEFT JOIN opportunities o
