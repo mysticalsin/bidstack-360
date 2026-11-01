@@ -90,11 +90,19 @@ export interface LoadedSignals {
   data: MomentumData;
   sample: boolean;
   openPipelineMicros: bigint;
+  /** True when this account has more deals than the momentum page. */
+  dealsCapped: boolean;
 }
 
 /** Query guard: every findMany needs take <= 1000, so accounts load in small chunks. */
 const CHUNK = 6;
 const TAKE = 1000;
+
+/** Keep the latest page and say when one more row proved it is not the book. */
+export function capMomentumDeals<T>(rows: readonly T[], limit = TAKE): { rows: T[]; capped: boolean } {
+  if (rows.length <= limit) return { rows: [...rows], capped: false };
+  return { rows: rows.slice(0, limit), capped: true };
+}
 
 /** Momentum inputs for many accounts (each with its children), in chunks of 6. */
 export async function loadMomentumInputs(orgId: string, scope: AccessScope, rootIds: string[], now: Date): Promise<Map<string, LoadedSignals>> {
@@ -113,8 +121,17 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   const all = [...owner.keys()];
   const live = await companiesWithLiveSignals(orgId, all);
   const since = new Date(now.getTime() - 400 * DAY);
-  const [opps, meetings, postings, events, firmo] = await Promise.all([
-    prisma.opportunity.findMany({ where: { orgId, companyId: { in: all }, deletedAt: null }, select: OPP_SELECT, orderBy: { updatedAt: 'desc' }, take: TAKE }),
+  const [oppGroups, meetings, postings, events, firmo] = await Promise.all([
+    Promise.all(rootIds.map(async (root) => {
+      const ids = groups.get(root) ?? [root];
+      const rows = await prisma.opportunity.findMany({
+        where: { orgId, companyId: { in: ids }, deletedAt: null },
+        select: OPP_SELECT,
+        orderBy: { updatedAt: 'desc' },
+        take: TAKE + 1,
+      });
+      return { root, rows };
+    })),
     prisma.meetingIntel.findMany({
       where: { AND: [scopedMeetingWhere(orgId, scope), { companyId: { in: all }, heldAt: { gte: since, lte: now } }] },
       select: { companyId: true, heldAt: true },
@@ -137,14 +154,18 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   ]);
   const out = new Map<string, LoadedSignals>();
   for (const id of rootIds) {
-    out.set(id, { data: { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, sample: false, openPipelineMicros: 0n });
+    out.set(id, { data: { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, sample: false, openPipelineMicros: 0n, dealsCapped: false });
   }
   const at = (companyId: string | null) => (companyId ? out.get(owner.get(companyId) ?? '') : undefined);
-  for (const o of opps) {
-    const t = at(o.companyId);
+  for (const group of oppGroups) {
+    const t = out.get(group.root);
     if (!t) continue;
-    t.data.opps.push(toMomentumOpp(o));
-    t.openPipelineMicros += openBookMicros(o);
+    const page = capMomentumDeals(group.rows);
+    t.dealsCapped = page.capped;
+    for (const o of page.rows) {
+      t.data.opps.push(toMomentumOpp(o));
+      t.openPipelineMicros += openBookMicros(o);
+    }
   }
   for (const m of meetings) at(m.companyId)?.data.meetings.push(m.heldAt);
   for (const p of postings) if (p.postedAt) at(p.companyId)?.data.postings.push(p.postedAt);

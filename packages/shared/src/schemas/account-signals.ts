@@ -785,6 +785,8 @@ export const PortfolioMomentum = z.object({
       verdict: z.string(),
       topDriver: z.string().nullable(),
       openPipelineMicros: z.string(),
+      /** True when open pipeline and momentum used the latest 1000 deals. */
+      dealsCapped: z.boolean().optional(),
       series: z.array(z.number().int()),
       sample: z.boolean(),
       coverage: z.number(),

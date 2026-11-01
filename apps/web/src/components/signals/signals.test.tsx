@@ -155,6 +155,17 @@ describe('Portfolio momentum', () => {
     expect(screen.getByRole('link', { name: 'Example Corp' }).getAttribute('href')).toBe('/accounts/c');
   });
 
+  it('says when momentum used the latest 1000 deals', () => {
+    // WHY: a shared page of 1000 deals was shown as each account's whole book.
+    const capped = {
+      ...port,
+      accounts: port.accounts.map((account) => (account.companyId === 'a' ? { ...account, dealsCapped: true } : account)),
+    };
+    wrap(<MomentumList data={capped} />);
+    expect(screen.getByText(/Latest 1,000 deals/)).toBeTruthy();
+    expect(screen.getByText('Holding steady').textContent).toBe('Holding steady');
+  });
+
   it('lists top alerts with category and Sample, linking to the account watchdog', () => {
     wrap(<AlertsList alerts={port.alerts} />);
     const link = screen.getByRole('link', { name: 'Example Corp announces job cuts' });
