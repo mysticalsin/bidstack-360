@@ -45,6 +45,9 @@ describe('extractMsaFields', () => {
   it('keeps a cent in the cap and drops a figure that does not fit', () => {
     // WHY: Math.round(amount * 1e6) cannot hold a cap past the safe integer range.
     expect(contractMicros('250,000.50')).toBe(250_000_500_000);
+    expect(contractMicros('250,000')).toBe(250_000_000_000);
+    expect(contractMicros('250,50')).toBe(250_500_000);
+    expect(contractMicros('1.250,50')).toBe(1_250_500_000);
     expect(contractMicros('1.015')).toBe(1_015_000);
     expect(contractMicros('99999999999.99')).toBeNull();
     const fields = extractMsaFields(
@@ -60,6 +63,10 @@ describe('extractMsaFields', () => {
       rateMicros: 1_015_000,
       unit: 'hour',
     });
+    const european = extractMsaFields(
+      "Supplier's aggregate liability under this Agreement is capped at 250,50 EUR.",
+    );
+    expect(european.liabilityCap.value).toEqual({ amountMicros: 250_500_000, currency: 'EUR' });
     const huge = extractMsaFields(
       "Supplier's aggregate liability under this Agreement is capped at 99999999999.99 EUR.",
     );
