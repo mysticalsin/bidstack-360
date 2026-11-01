@@ -119,7 +119,8 @@
       "inStageOne": "{{count}} opportunity in selected stage",
       "inStageMany": "{{count}} opportunities in selected stage",
       "totalOne": "{{count}} opportunity",
-      "totalMany": "{{count}} opportunities"
+      "totalMany": "{{count}} opportunities",
+      "pagePartial": "{{count}} on this page. This page is not the full match."
     },
     "error": {
       "title": "Couldn't load opportunities",
@@ -2173,6 +2174,9 @@
     "kpiRegionLabel": "Opportunities KPI summary",
     "title": "Opportunities",
     "resultsFor": "results for",
+    "pageForSearch": "on this page for",
+    "stageOnPage": "on this page.",
+    "pageNotFullMatch": "This page is not the full match.",
     "clear": "clear",
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",

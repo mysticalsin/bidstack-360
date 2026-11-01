@@ -134,8 +134,61 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByText('Acme Upgrade')).toBeTruthy();
     expect(screen.getByText('OP-0001')).toBeTruthy();
     // The list includes closed rows. The subtitle counts the page, not bids still in flight.
-    expect(screen.getByText('{{count}} on this page · click any cell to edit inline.')).toBeTruthy();
+    expect(
+      screen.getByText('{{count}} on this page · click any cell to edit inline.'),
+    ).toBeTruthy();
     expect(screen.queryByText(/in flight/i)).toBeNull();
+    expect(screen.queryByText('This page is not the full match.')).toBeNull();
+  });
+
+  it('does not call a later page the full search result', () => {
+    // WHY: nextCursor means the row count on screen is a slice, not every match.
+    mockOpportunities({
+      data: {
+        items: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            code: 'OP-0001',
+            name: 'Acme Upgrade',
+            customer: 'Acme Corp',
+            stage: 's1_lead',
+            pipelineStageId: null,
+            pipelineStage: null,
+            value: 10000,
+            probability: 20,
+            dueDate: '2026-10-10',
+            owner: 'owner@example.com',
+            industry: 'Consulting',
+            logo: null,
+            country: 'FR',
+            territoryId: null,
+            territoryName: null,
+            updatedAt: new Date().toISOString(),
+            taskCount: 0,
+            commentCount: 0,
+            viewCount: 0,
+          },
+        ],
+        nextCursor: 'more-matches',
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/opportunities?search=Acme']}>
+          <OpportunitiesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByText('This page is not the full match.').length).toBeGreaterThan(0);
+    expect(screen.getByText(/on this page for/)).toBeTruthy();
+    expect(screen.queryByText(/results for/)).toBeNull();
+    const live = screen.getAllByRole('status').find((el) => el.classList.contains('sr-only'));
+    expect(live?.textContent).toContain('This page is not the full match.');
   });
 
   // A1 (bid clock): the "Due ≤ 7d" quick filter must actually reach the API
@@ -198,8 +251,8 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByText('No open bids yet')).toBeTruthy();
     expect(screen.getByText(/Convert a qualified lead or log the RFP/)).toBeTruthy();
     // Secondary path must land on the real CSV import wizard in Settings.
-    expect(
-      screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href'),
-    ).toBe('/settings?tab=data-import');
+    expect(screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href')).toBe(
+      '/settings?tab=data-import',
+    );
   });
 });

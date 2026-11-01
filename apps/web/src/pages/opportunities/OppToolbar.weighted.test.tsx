@@ -77,6 +77,21 @@ describe('OppKpiBar weighted tile', () => {
     expect(screen.getByText('1,240,000')).toBeTruthy();
     expect(screen.getByText('806,000')).toBeTruthy();
     expect(screen.queryByText('19')).toBeNull();
+    expect(screen.queryByText('This page is not the full match.')).toBeNull();
+  });
+
+  it('says a partial page is not the full filtered match', () => {
+    // WHY: "(page)" on 50 rows still reads as the search total when a next cursor exists.
+    const open = {
+      value: 0,
+      valueMicros: '1240000000000',
+      probability: 65,
+      pipelineStage: null,
+      stage: 's3_technical_iteration',
+    } as Opportunity;
+    render(<OppKpiBar opps={[open]} partial />);
+    expect(screen.getByText('This page is not the full match.')).toBeTruthy();
+    expect(screen.getByText('1,240,000')).toBeTruthy();
   });
 
   it('prints the open pipeline from integer micros', () => {

@@ -56,7 +56,16 @@ function sumDealMicros(rows: Opportunity[], weight: boolean): bigint {
   }, 0n);
 }
 
-export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
+export function OppKpiBar({
+  opps,
+  summary,
+  partial = false,
+}: {
+  opps: Opportunity[];
+  summary?: OrgSummary;
+  /** True when this cursor page is not the whole filtered result. */
+  partial?: boolean;
+}) {
   const { t } = useTranslation('crm');
   const openOpps = opps.filter((o) => closedOutcome(o) === null);
   const wonMicros = sumDealMicros(
@@ -123,6 +132,11 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
       aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"
     >
+      {!summary && partial ? (
+        <p className="col-span-2 text-sm text-[var(--fg-secondary)] sm:col-span-4">
+          {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+        </p>
+      ) : null}
       {kpis.map((kpi) => (
         <div
           key={kpi.label}
@@ -153,6 +167,7 @@ export function OppPageHeader({
   stageOptions,
   itemCount,
   hasData,
+  partial = false,
   isExporting = false,
   onClearSearch,
   onClearStageFilter,
@@ -163,6 +178,8 @@ export function OppPageHeader({
   stageOptions: PipelineStage[];
   itemCount: number;
   hasData: boolean;
+  /** True when earlier or later pages hold more rows for this filter. */
+  partial?: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
   onClearSearch: () => void;
@@ -186,10 +203,20 @@ export function OppPageHeader({
           {search ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
-              {t('oppToolbar.resultsFor', 'results for')}{' '}
+              {partial
+                ? t('oppToolbar.pageForSearch', 'on this page for')
+                : t('oppToolbar.resultsFor', 'results for')}{' '}
               <span className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-mono text-xs">
                 &ldquo;{search}&rdquo;
-              </span>{' '}
+              </span>
+              {partial ? (
+                <>
+                  {'. '}
+                  <span>
+                    {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+                  </span>
+                </>
+              ) : null}{' '}
               <button type="button" onClick={onClearSearch} className={clearBtnClass}>
                 {t('oppToolbar.clear', 'clear')}
               </button>
@@ -197,9 +224,18 @@ export function OppPageHeader({
           ) : stageFilter ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
-              {t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
-                stage: stageFilterLabel.toLowerCase(),
-              })}
+              {partial ? (
+                <>
+                  {t('oppToolbar.stageOnPage', 'on this page.')}{' '}
+                  <span>
+                    {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+                  </span>
+                </>
+              ) : (
+                t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
+                  stage: stageFilterLabel.toLowerCase(),
+                })
+              )}
               <button type="button" onClick={onClearStageFilter} className={clearBtnClass}>
                 {t('oppToolbar.clearFilter', 'clear filter')}
               </button>
@@ -213,6 +249,14 @@ export function OppPageHeader({
                   count: itemCount,
                 },
               )}
+              {partial ? (
+                <>
+                  {' '}
+                  <span>
+                    {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+                  </span>
+                </>
+              ) : null}
             </>
           )}
         </p>

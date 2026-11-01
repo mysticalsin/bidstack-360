@@ -98,6 +98,9 @@ export function OpportunitiesPage() {
     ...(dueFilter === 'overdue' || excludeClosed ? { excludeClosed: true } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
+  // A cursor page is the whole result only on page 1 with no next page.
+  // Page 2 with a null next cursor is still a slice of a larger filter.
+  const pageIsPartial = Boolean(pager.cursor || data?.nextCursor);
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
   const orgSummary = useOrgSummary();
@@ -352,6 +355,7 @@ export function OpportunitiesPage() {
       ) : data && data.items.length > 0 ? (
         <OppKpiBar
           opps={data.items}
+          partial={pageIsPartial}
           summary={
             search || stageFilter || dueFilter || excludeClosed ? undefined : orgSummary.data
           }
@@ -361,37 +365,43 @@ export function OpportunitiesPage() {
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? search
-            ? data.items.length === 1
-              ? t(
-                  'opportunities.liveRegion.matchingOne',
-                  '{{count}} opportunity matching "{{search}}"',
-                  { count: data.items.length, search },
-                )
-              : t(
-                  'opportunities.liveRegion.matchingMany',
-                  '{{count}} opportunities matching "{{search}}"',
-                  { count: data.items.length, search },
-                )
-            : stageFilter
+          ? pageIsPartial
+            ? t(
+                'opportunities.liveRegion.pagePartial',
+                '{{count}} on this page. This page is not the full match.',
+                { count: data.items.length },
+              )
+            : search
               ? data.items.length === 1
                 ? t(
-                    'opportunities.liveRegion.inStageOne',
-                    '{{count}} opportunity in selected stage',
-                    { count: data.items.length },
+                    'opportunities.liveRegion.matchingOne',
+                    '{{count}} opportunity matching "{{search}}"',
+                    { count: data.items.length, search },
                   )
                 : t(
-                    'opportunities.liveRegion.inStageMany',
-                    '{{count}} opportunities in selected stage',
-                    { count: data.items.length },
+                    'opportunities.liveRegion.matchingMany',
+                    '{{count}} opportunities matching "{{search}}"',
+                    { count: data.items.length, search },
                   )
-              : data.items.length === 1
-                ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', {
-                    count: data.items.length,
-                  })
-                : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', {
-                    count: data.items.length,
-                  })
+              : stageFilter
+                ? data.items.length === 1
+                  ? t(
+                      'opportunities.liveRegion.inStageOne',
+                      '{{count}} opportunity in selected stage',
+                      { count: data.items.length },
+                    )
+                  : t(
+                      'opportunities.liveRegion.inStageMany',
+                      '{{count}} opportunities in selected stage',
+                      { count: data.items.length },
+                    )
+                : data.items.length === 1
+                  ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', {
+                      count: data.items.length,
+                    })
+                  : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', {
+                      count: data.items.length,
+                    })
           : ''}
       </p>
 
@@ -401,6 +411,7 @@ export function OpportunitiesPage() {
         stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
+        partial={pageIsPartial}
         isExporting={isExporting}
         onClearSearch={clearSearch}
         onClearStageFilter={() => setStageFilter(null)}
