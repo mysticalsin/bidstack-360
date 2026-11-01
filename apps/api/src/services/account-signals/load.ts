@@ -218,6 +218,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
     if (group.capped) {
       t.feedsCapped = true;
       t.postingsCapped = true;
+      t.data.postingsArePage = true;
     }
     for (const p of group.rows) if (p.postedAt) t.data.postings.push(p.postedAt);
   }
