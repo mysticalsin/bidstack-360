@@ -247,6 +247,76 @@ describe('computeSignalCoverage', () => {
     expect(fullPipeline?.whatItMeasures).not.toContain('not every open deal');
     expect(fullPage.health.score).toBe(31);
   });
+
+  it('leaves a short contact or task page out of the account score', () => {
+    // Why: twenty loaded contacts used to score as the whole stakeholder map.
+    // A book of 25 is not that page. Dropping the short factors leaves industry
+    // and the one complete deal: (20 * 0.3 + 100 * 0.25) / 0.55 = 56.
+    const cockpit = buildCockpit({
+      company: company({ industry: 'technology' }),
+      companies: [],
+      opportunities: [
+        {
+          id: 'open-1',
+          customer: 'Acme',
+          companyId: 'mantu',
+          name: 'Renewal',
+          stage: 'qualified',
+          pipelineStage: null,
+          valueMicros: 1_000_000n,
+          probability: 60,
+          dueDate: new Date('2026-09-15'),
+          owner: { name: 'Jane', email: 'jane@x.com' },
+        },
+      ],
+      contacts: [
+        {
+          id: 'c1',
+          customer: 'Acme',
+          companyId: 'mantu',
+          name: 'Ada',
+          role: null,
+          email: 'ada@x.com',
+          phone: null,
+          influence: 5,
+          createdAt: new Date('2026-06-01'),
+        },
+      ],
+      tasks: [
+        {
+          id: 't1',
+          title: 'Call',
+          status: 'open',
+          dueDate: null,
+          accountId: 'mantu',
+          opportunity: null,
+          assignee: null,
+          createdAt: new Date(),
+        },
+      ],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      performance: {
+        winLoss: {
+          wonCount: 0,
+          lostCount: 0,
+          wonValueMicros: '0',
+          lostValueMicros: '0',
+          winRate: null,
+        },
+        revenueEvolution: [],
+        book: { projectCount: 1, openCount: 1, contactCount: 25, taskCount: 80 },
+      },
+    });
+    const contacts = cockpit.health.factors?.find((factor) => factor.key === 'contacts');
+    const engagement = cockpit.health.factors?.find((factor) => factor.key === 'engagement');
+    expect(contacts?.scored).toBe(false);
+    expect(contacts?.whatItMeasures).toContain('not every linked contact');
+    expect(engagement?.scored).toBe(false);
+    expect(engagement?.whatItMeasures).toContain('not every follow-up');
+    expect(cockpit.health.score).toBe(56);
+  });
 });
 
 describe('applyFieldOverrides', () => {

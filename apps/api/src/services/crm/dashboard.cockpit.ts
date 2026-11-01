@@ -180,6 +180,10 @@ export function computeSignalCoverage(
   pages?: {
     /** Open deals on the account. Larger than the loaded page means the page is not the book. */
     openDealCount?: number;
+    /** Linked contacts on the account. Larger than the loaded page means the page is not the book. */
+    contactCount?: number;
+    /** Follow-ups on the account. Larger than the loaded page means the page is not the book. */
+    taskCount?: number;
   },
 ): CompanyHealth {
   const { company, contacts, openDeals, tasks } = input;
@@ -245,6 +249,14 @@ export function computeSignalCoverage(
     pipeline.scored = false;
     pipeline.whatItMeasures += ' Not scored. The loaded page is not every open deal.';
   }
+  if (pages?.contactCount != null && pages.contactCount > contacts.length) {
+    contactFactor.scored = false;
+    contactFactor.whatItMeasures += ' Not scored. The loaded page is not every linked contact.';
+  }
+  if (pages?.taskCount != null && pages.taskCount > tasks.length) {
+    engagement.scored = false;
+    engagement.whatItMeasures += ' Not scored. The loaded page is not every follow-up.';
+  }
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
   const weighted = [
@@ -293,10 +305,12 @@ export interface AccountPerformance {
     winRate: number | null;
   };
   revenueEvolution: Array<{ period: string; revenueMicros: string }>;
-  /** Exact account totals. The opportunity array on the cockpit is only a page. */
+  /** Exact account totals. The cockpit lists are only pages. */
   book?: {
     projectCount: number;
     openCount: number;
+    contactCount?: number;
+    taskCount?: number;
   };
 }
 
@@ -915,8 +929,6 @@ export function buildCockpit({
     // Score on THIS company's contacts/tasks only. A matching customer string
     // is not a link: historical rows keep companyId null until someone confirms
     // them, and a contact linked to another company must not land here.
-    // Contacts are take 20 and tasks are take 50, with no account totals.
-    // A full page can be the whole book, so those factors stay scored.
     health: computeSignalCoverage(
       {
         company,
@@ -924,7 +936,13 @@ export function buildCockpit({
         openDeals,
         tasks: accountTasks,
       },
-      performance?.book ? { openDealCount: performance.book.openCount } : undefined,
+      performance?.book
+        ? {
+            openDealCount: performance.book.openCount,
+            contactCount: performance.book.contactCount,
+            taskCount: performance.book.taskCount,
+          }
+        : undefined,
     ),
     keyContacts: accountContacts.slice(0, 5).map((contact) => ({
       id: contact.id,
