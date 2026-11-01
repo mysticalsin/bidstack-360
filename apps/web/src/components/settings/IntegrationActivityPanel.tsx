@@ -41,7 +41,7 @@ function AccountSources({ companyId }: { companyId: string }) {
 export function IntegrationActivityPanel() {
   const selectId = useId();
   const dashboard = useCrmDashboard();
-  const portfolio = usePortfolioMomentum(200);
+  const portfolio = usePortfolioMomentum(100);
   const accounts = useMemo(() => [...(portfolio.data?.accounts ?? [])].sort((a, b) => a.companyName.localeCompare(b.companyName)), [portfolio.data]);
   const [picked, setPicked] = useState('');
   const companyId = picked || accounts[0]?.companyId || '';
