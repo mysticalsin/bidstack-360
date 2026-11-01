@@ -46,6 +46,12 @@ const KIND_TONE: Record<CrmActivity['kind'], 'gray' | 'blue' | 'jade' | 'purple'
   dust: 'purple',
 };
 
+/** Last N is the whole loaded list. A longer task list says the rest is outside it. */
+export function activityListCaption(count: number, capped: boolean): string {
+  if (!capped) return `Last ${count} items`;
+  return `Latest ${count}. Older tasks are outside this list.`;
+}
+
 export const ActivityTimelineCard = memo(function ActivityTimelineCard({
   cockpit,
   limit = 8,
@@ -86,9 +92,11 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
     >
       <SectionHeader
         title={t('activityTimeline.title', 'Recent activity')}
-        caption={t('activityTimeline.itemCount', 'Last {{count}} items', {
-          count: items.length,
-        })}
+        caption={t(
+          cockpit.activityCapped ? 'activityTimeline.itemCountCapped' : 'activityTimeline.itemCount',
+          activityListCaption(items.length, Boolean(cockpit.activityCapped)),
+          { count: items.length },
+        )}
       />
       <div className="relative px-5 pb-5 pt-3">
         {/* The vertical rail that the dots sit on. Drawn once, sits behind
