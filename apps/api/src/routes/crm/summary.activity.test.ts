@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeLatestActivity } from './summary.js';
+import { mergeLatestActivity, opportunityActivitySubtitle } from './summary.js';
 
 describe('mergeLatestActivity', () => {
   it('keeps a newer opportunity past the first five of another type', () => {
@@ -23,5 +23,21 @@ describe('mergeLatestActivity', () => {
       'opp-2',
       'opp-1',
     ]);
+  });
+
+  it('names a live lost flag as closed lost in the feed', () => {
+    // WHY: the feed printed the stored key. A stage marked lost still looked open.
+    expect(
+      opportunityActivitySubtitle({
+        stage: 's1_lead',
+        pipelineStage: { key: 's1_lead', isWon: false, isLost: true, deletedAt: null },
+      }),
+    ).toBe('closed_lost');
+    expect(
+      opportunityActivitySubtitle({
+        stage: 's1_lead',
+        pipelineStage: { key: 's1_lead', isWon: false, isLost: true, deletedAt: new Date() },
+      }),
+    ).toBe('new');
   });
 });
