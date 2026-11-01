@@ -40,6 +40,16 @@ describe('exact unspecified amounts', () => {
     expect(headlineMicrosLabel('12015000000000', 'ja')).toBe('1201.5万');
     expect(headlineMicrosLabel('12015000000000', 'hi')).toBe('12,015,000');
     expect(headlineMicrosLabel('7860000000000', 'hi')).toContain('78.6');
+    // WHY: Eastern Arabic digits were stripped, so an exact ٧٫٨٦ مليون became the full integer.
+    const ar = new Intl.NumberFormat('ar-EG', {
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    });
+    expect(headlineMicrosLabel('7860000000000', 'ar-EG')).toBe(ar.format(7_860_000));
+    expect(headlineMicrosLabel('12015000000000', 'ar-EG')).toBe('12,015,000');
+    const bn = new Intl.NumberFormat('bn', { notation: 'compact', maximumFractionDigits: 2 });
+    expect(headlineMicrosLabel('7860000000000', 'bn')).toBe(bn.format(7_860_000));
+    expect(headlineMicrosLabel('12015000000000', 'bn')).toBe('12,015,000');
   });
 
   it('prints a deal from micros when the unit number is zero', () => {
