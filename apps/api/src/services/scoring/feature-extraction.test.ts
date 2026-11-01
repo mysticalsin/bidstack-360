@@ -17,7 +17,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { extractOpportunityFeatures } from './feature-extraction.js';
+import { extractLeadFeatures, extractOpportunityFeatures } from './feature-extraction.js';
 
 type GroupByRow = { type: string; _count: { _all: number } };
 
@@ -128,6 +128,10 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     expect(valueOf(vector!, 'owner_close_rate_observed')).toBe(0);
     expect(valueOf(vector!, 'qualification_score_norm')).toBe(0);
     expect(valueOf(vector!, 'qualification_score_observed')).toBe(0);
+    expect(valueOf(vector!, 'days_to_expected_close')).toBe(0);
+    expect(valueOf(vector!, 'days_to_expected_close_observed')).toBe(0);
+    expect(valueOf(vector!, 'last_activity_days_ago')).toBe(0);
+    expect(valueOf(vector!, 'last_activity_observed')).toBe(0);
     expect(Number.isFinite(valueOf(vector!, 'days_in_current_stage'))).toBe(true);
   });
 
@@ -224,5 +228,40 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     const recorded = await extractOpportunityFeatures('opp-3', 'org-1', enumWon as never);
     expect(valueOf(recorded!, 'is_won')).toBe(1);
     expect(valueOf(recorded!, 'is_lost')).toBe(0);
+  });
+
+  it('does not invent a domain age or an activity age for a bare lead', async () => {
+    // WHY: a missing email was a medium-aged domain, and no activity was 999 days ago.
+    const db = {
+      lead: {
+        findFirst: vi.fn(async () => ({
+          source: null,
+          title: null,
+          email: null,
+          intel: {},
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        })),
+      },
+      activity: { findMany: vi.fn(async () => []) },
+    };
+    const vector = await extractLeadFeatures('lead-1', 'org-1', db as never);
+    expect(valueOf(vector!, 'email_domain_age_bucket')).toBe(0);
+    expect(valueOf(vector!, 'activity_recency_days')).toBe(0);
+    expect(valueOf(vector!, 'activity_recency_observed')).toBe(0);
+    const known = await extractLeadFeatures('lead-2', 'org-1', {
+      lead: {
+        findFirst: vi.fn(async () => ({
+          source: null,
+          title: null,
+          email: 'ada@example.io',
+          intel: {},
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        })),
+      },
+      activity: { findMany: vi.fn(async () => []) },
+    } as never);
+    expect(valueOf(known!, 'email_domain_age_bucket')).toBe(1);
   });
 });

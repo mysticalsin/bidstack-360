@@ -43,7 +43,7 @@ function daysBetween(a: Date, b: Date): number {
 }
 
 function daysSince(d: Date | null | undefined, now = new Date()): number {
-  if (!d) return 999;
+  if (!d) return 0;
   return daysBetween(d, now);
 }
 
@@ -76,11 +76,11 @@ const ESTABLISHED_DOMAINS = new Set([
 const NEW_DOMAIN_TLDS = ['.io', '.ai', '.xyz', '.app', '.dev'];
 
 function emailDomainAgeBucket(email: string | null | undefined): number {
-  if (!email) return 2;
+  if (!email) return 0;
   const domain = email.split('@')[1]?.toLowerCase() ?? '';
   if (ESTABLISHED_DOMAINS.has(domain)) return 3;
   if (NEW_DOMAIN_TLDS.some((tld) => domain.endsWith(tld))) return 1;
-  return 2;
+  return 0;
 }
 
 // ─── Lead feature extraction ──────────────────────────────────────────────
@@ -140,6 +140,7 @@ export async function extractLeadFeatures(
     const val = (intel[field] as string | undefined) ?? 'unknown';
     push(`bant_${field}`, bantMap[val] ?? 0);
   }
+  push('activity_recency_observed', lastActivityDate ? 1 : 0);
 
   return { names, values };
 }
@@ -256,7 +257,7 @@ export async function extractOpportunityFeatures(
   push('stage_probability', Number(stage?.probability ?? opp.probability) / 100);
   push('days_in_current_stage', daysBetween(lastStageChangeDate, now));
   push('total_age_days', daysBetween(opp.createdAt, now));
-  push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 365);
+  push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 0);
   push('num_contacts_on_account', opp._count.contactLinks);
   push('num_meetings_held', meetingsCount);
   push('num_emails_sent_received', emailsCount);
@@ -269,6 +270,8 @@ export async function extractOpportunityFeatures(
   push('is_lost', lost ? 1 : 0);
   push('owner_close_rate_observed', ownerCloseRateObserved);
   push('qualification_score_observed', qualScore == null ? 0 : 1);
+  push('days_to_expected_close_observed', opp.dueDate ? 1 : 0);
+  push('last_activity_observed', lastActivity?.occurredAt ? 1 : 0);
 
   return { names, values };
 }
