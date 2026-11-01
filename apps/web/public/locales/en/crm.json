@@ -3499,8 +3499,8 @@
     "showError": "Show error"
   },
   "activityTimeline": {
-    "regionLabel": "Recent activity",
-    "title": "Recent activity",
+    "regionLabel": "Recent tasks",
+    "title": "Recent tasks",
     "itemCount_one": "Last {{count}} item",
     "itemCount_other": "Last {{count}} items",
     "itemCount": "Last {{count}} items",

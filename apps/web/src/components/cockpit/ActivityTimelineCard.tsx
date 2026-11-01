@@ -47,6 +47,7 @@ const KIND_TONE: Record<CrmActivity['kind'], 'gray' | 'blue' | 'jade' | 'purple'
 };
 
 /** The feed is tasks. Emails and Dust runs are not in this list. */
+export const ACTIVITY_TITLE = 'Recent tasks';
 export const ACTIVITY_EMPTY_MESSAGE = 'Tasks for this account will appear here.';
 
 /** Last N is the whole loaded list. A longer task list says the rest is outside it. */
@@ -74,8 +75,8 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
 
   if (items.length === 0) {
     return (
-      <Card role="region" aria-label={t('activityTimeline.regionLabel', 'Recent activity')}>
-        <SectionHeader title={t('activityTimeline.title', 'Recent activity')} />
+      <Card role="region" aria-label={t('activityTimeline.regionLabel', ACTIVITY_TITLE)}>
+        <SectionHeader title={t('activityTimeline.title', ACTIVITY_TITLE)} />
         <EmptyState
           title={t('activityTimeline.emptyTitle', 'Nothing yet')}
           message={t(
@@ -90,11 +91,11 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
   return (
     <Card
       role="region"
-      aria-label={t('activityTimeline.regionLabel', 'Recent activity')}
+      aria-label={t('activityTimeline.regionLabel', ACTIVITY_TITLE)}
       data-tour="activity-timeline"
     >
       <SectionHeader
-        title={t('activityTimeline.title', 'Recent activity')}
+        title={t('activityTimeline.title', ACTIVITY_TITLE)}
         caption={t(
           cockpit.activityCapped ? 'activityTimeline.itemCountCapped' : 'activityTimeline.itemCount',
           activityListCaption(items.length, Boolean(cockpit.activityCapped)),
