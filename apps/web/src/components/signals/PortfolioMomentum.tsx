@@ -8,7 +8,7 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useReducedMotion } from 'motion/react';
 
-import type { PortfolioMomentum as PortfolioData } from '@bidstack/shared';
+import { pulsePageNotes, type PortfolioMomentum as PortfolioData } from '@bidstack/shared';
 
 import { AreaSparkline } from '@/components/charts/bklit-sparkline';
 import { usePortfolioMomentum } from '@/hooks/useAccountSignals';
@@ -71,9 +71,7 @@ export function MomentumList({ data }: { data: PortfolioData }) {
                   <Link to={`/accounts/${encodeURIComponent(a.companyId)}`} title={a.companyName}>{a.companyName}</Link>
                   <span>
                     {noDash(a.verdict)}
-                    {a.dealsCapped ? ' · Latest 1,000 deals' : ''}
-                    {a.feedsCapped ? ' · Latest 1,000 signals' : ''}
-                    {a.childrenCapped ? ' · Latest 1,000 subsidiaries' : ''}
+                    {pulsePageNotes(a).map((note) => ` · ${note}`)}
                   </span>
                 </span>
                 <span className="sg-port-spark" aria-hidden>

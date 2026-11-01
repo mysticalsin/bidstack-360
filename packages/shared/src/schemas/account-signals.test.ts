@@ -13,6 +13,7 @@ import {
   signalDedupeKey,
   stripPublisher,
   matchedTheme,
+  pulsePageNotes,
   themeForText,
   titleSimilarity,
   trendFor,
@@ -198,6 +199,14 @@ describe('computeMomentum', () => {
     expect(trendFor(6)).toBe('gaining');
     expect(trendFor(-5)).toBe('declining');
     expect(trendFor(2)).toBe('steady');
+  });
+});
+
+describe('pulsePageNotes', () => {
+  it('names the feed that filled and leaves the others off', () => {
+    // WHY: one signals flag put a full news page on the meetings line.
+    expect(pulsePageNotes({ newsCapped: true, feedsCapped: true })).toEqual(['Latest 1,000 news items']);
+    expect(pulsePageNotes({ feedsCapped: true })).toEqual(['Latest 1,000 signals']);
   });
 });
 

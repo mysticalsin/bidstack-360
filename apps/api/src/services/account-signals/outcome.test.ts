@@ -86,13 +86,18 @@ describe('annotatePulseRead', () => {
         { key: 'news', detail: 'News mixed: 1 positive, 0 negative in 90 days' },
         { key: 'hiring', detail: 'Headcount +8% in 12 months' },
       ],
-      { dealsCapped: true, feedsCapped: true },
+      { dealsCapped: true, newsCapped: true },
     );
     expect(drivers.find((driver) => driver.key === 'pipeline')?.detail).toContain('Latest 1,000 deals.');
     expect(drivers.find((driver) => driver.key === 'winloss')?.detail).toContain('Latest 1,000 deals.');
-    expect(drivers.find((driver) => driver.key === 'meetings')?.detail).toContain('Latest 1,000 signals.');
-    expect(drivers.find((driver) => driver.key === 'news')?.detail).toContain('Latest 1,000 signals.');
+    expect(drivers.find((driver) => driver.key === 'news')?.detail).toContain('Latest 1,000 news items.');
+    expect(drivers.find((driver) => driver.key === 'meetings')?.detail).toBe('3 meetings in 60 days (1 before), last today');
     expect(drivers.find((driver) => driver.key === 'hiring')?.detail).toBe('Headcount +8% in 12 months');
+    const posts = annotatePulseRead(
+      [{ key: 'hiring', detail: '4 roles posted in 30 days (1 before)' }],
+      { postingsCapped: true },
+    );
+    expect(posts[0]?.detail).toContain('Latest 1,000 job posts.');
     const open = annotatePulseRead(
       [{ key: 'pipeline', detail: '2M open pipeline, flat over 90 days' }],
       {},
