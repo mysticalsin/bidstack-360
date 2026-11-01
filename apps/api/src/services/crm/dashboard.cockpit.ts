@@ -84,6 +84,14 @@ function contactAction(
   return `${countLabel}. ${ratedLabel}; ${emailLabel}.`;
 }
 
+/** A follow-up due today is still open. The task summary uses the UTC date, not the clock. */
+function followUpStillOpen(due: Date | null, now: number): boolean {
+  if (!due) return true;
+  const at = new Date(now);
+  const startOfTodayUTC = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return due.getTime() >= startOfTodayUTC;
+}
+
 function engagementAction(recent: number, openCount: number, onTrack: number, capped = false): string {
   const recentLabel =
     recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
@@ -300,7 +308,7 @@ export function computeSignalCoverage(
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   const recent = tasks.filter((t) => now - t.createdAt.getTime() < thirtyDays).length;
   const open = tasks.filter((t) => t.status !== 'done');
-  const onTrack = open.filter((t) => !t.dueDate || t.dueDate.getTime() >= now).length;
+  const onTrack = open.filter((t) => followUpStillOpen(t.dueDate, now)).length;
   const engagement = factor(
     'engagement',
     'Engagement recency',
