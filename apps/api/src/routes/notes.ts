@@ -46,6 +46,18 @@ function normalizeAccountId(raw: string): string {
 
 const ACCOUNT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** One exact company name, or null when none or several match. */
+async function companyIdForExactName(orgId: string, companyName: string): Promise<string | null> {
+  const name = companyName.trim();
+  if (!name) return null;
+  const matches = await prisma.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: name, mode: 'insensitive' } },
+    select: { id: true },
+    take: 2,
+  });
+  return matches.length === 1 ? (matches[0]?.id ?? null) : null;
+}
+
 /** A company id already passed in wins. A company UUID used as the account tag is the link. */
 async function companyIdForAccount(
   orgId: string,
@@ -227,11 +239,9 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         }).format(importedAt)}`;
 
       const persisted = await prisma.$transaction(async (tx) => {
-        const companyId = await companyIdForAccount(
-          req.auth.orgId,
-          req.body.accountId,
-          req.body.companyId,
-        );
+        const companyId =
+          (await companyIdForAccount(req.auth.orgId, req.body.accountId, req.body.companyId)) ??
+          (await companyIdForExactName(req.auth.orgId, companyName));
         const note = await tx.note.create({
           data: {
             orgId: req.auth.orgId,
@@ -246,7 +256,13 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         });
 
         const created = {
-          contacts: await persistContacts(tx, req.auth.orgId, companyName, extracted.contacts),
+          contacts: await persistContacts(
+            tx,
+            req.auth.orgId,
+            companyName,
+            extracted.contacts,
+            companyId,
+          ),
           risks: await persistRisks(tx, req.auth.orgId, companyName, extracted.risks),
           compliance: await persistCompliance(
             tx,
@@ -254,7 +270,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
             companyName,
             extracted.compliance,
           ),
-          tasks: await persistTasks(tx, req.auth.orgId, extracted.tasks),
+          tasks: await persistTasks(tx, req.auth.orgId, extracted.tasks, companyId),
           techStackItems: extracted.techStack.reduce(
             (sum, category) => sum + category.items.length,
             0,

@@ -281,4 +281,59 @@ describe('notes routes (integration)', () => {
     expect(JSON.stringify(enrichment?.providerMetadata)).toContain('meetingTechStack');
     expect(JSON.stringify(enrichment?.providerMetadata)).toContain('CrowdStrike');
   });
+
+  skipIfNoDb('POST import-meeting links people and tasks when one company matches', async () => {
+    // WHY: imported people were stored under the company name only. Dust
+    // listing the account by id never saw them.
+    const stamp = Date.now();
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: `probe-import-${stamp}`, title: 'Probe', bodyMd: 'org' },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = (probe.json() as { id: string }).id;
+    const probeRow = await prisma.note.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const companyName = `Linked Import ${stamp}`;
+    const company = await prisma.company.create({
+      data: { orgId: probeRow!.orgId, name: companyName },
+    });
+    const email = `linked.${stamp}@example.com`;
+    const taskTitle = `Send linked plan ${stamp} by 2026-06-15`;
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/notes/import-meeting',
+      payload: {
+        accountId: companyName,
+        companyName,
+        bodyMd: [
+          `Attendees: Linked Buyer ${stamp} - IT Security Manager, ${email}`,
+          `Action: ${taskTitle}`,
+          'Tech stack: Azure',
+        ].join('\n'),
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const contact = await prisma.contact.findFirst({
+      where: { orgId: probeRow!.orgId, email },
+      select: { id: true, companyId: true },
+    });
+    const task = await prisma.task.findFirst({
+      where: { orgId: probeRow!.orgId, title: taskTitle },
+      select: { id: true, accountId: true },
+    });
+    expect(contact?.companyId).toBe(company.id);
+    expect(task?.accountId).toBe(company.id);
+    if (contact) await prisma.contact.delete({ where: { id: contact.id } });
+    if (task) await prisma.task.delete({ where: { id: task.id } });
+    await prisma.companyEnrichment.deleteMany({
+      where: {
+        orgId: probeRow!.orgId,
+        normalizedName: companyName.toLowerCase().replaceAll(' ', '-'),
+      },
+    });
+    await prisma.note.deleteMany({ where: { orgId: probeRow!.orgId, accountId: companyName.toLowerCase() } });
+    await prisma.note.delete({ where: { id: probeId } });
+    await prisma.company.delete({ where: { id: company.id } });
+  });
 });

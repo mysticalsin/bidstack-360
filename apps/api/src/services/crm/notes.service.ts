@@ -29,6 +29,7 @@ export async function persistContacts(
   orgId: string,
   companyName: string,
   contacts: MeetingImportedContact[],
+  companyId?: string | null,
 ): Promise<number> {
   if (contacts.length === 0) return 0;
   const emails = contacts.map((c) => c.email).filter((e): e is string => !!e);
@@ -56,6 +57,7 @@ export async function persistContacts(
       data: newContacts.map((c) => ({
         orgId,
         customer: companyName,
+        companyId: companyId ?? null,
         name: c.name,
         role: c.title,
         email: c.email,
@@ -152,6 +154,7 @@ export async function persistTasks(
   tx: Prisma.TransactionClient,
   orgId: string,
   tasks: MeetingImportedTask[],
+  companyId?: string | null,
 ): Promise<number> {
   if (tasks.length === 0) return 0;
   const titles = tasks.map((t) => t.title);
@@ -166,6 +169,7 @@ export async function persistTasks(
     await tx.task.createMany({
       data: newTasks.map((t) => ({
         orgId,
+        accountId: companyId ?? null,
         title: t.title,
         dueDate: t.dueDate ? new Date(`${t.dueDate}T00:00:00.000Z`) : null,
         status: TaskStatus[t.status],
