@@ -98,6 +98,22 @@ const LEAD_STATUSES = new Set([
   'converted',
 ]);
 
+/** Blank stays new. An unknown label is not stored as new. */
+export function mapLeadStatus(v: unknown): string {
+  const raw = asTrimmed(v);
+  const s = raw?.toLowerCase().replace(/[\s-]+/g, '_');
+  if (!s) return 'new';
+  if (LEAD_STATUSES.has(s)) return s;
+  if (s.includes('disqualif') || s.includes('unqualif') || s === 'junk' || s === 'rejected') {
+    return 'disqualified';
+  }
+  if (s.includes('convert')) return 'converted';
+  if (s.includes('qualif')) return 'qualified';
+  if (s.includes('nurtur')) return 'nurture';
+  if (s.includes('contact')) return 'contacted';
+  throw new Error(`lead.status "${raw}" is not a known status, so it was not imported`);
+}
+
 const OPP_STAGES = new Set([
   's1_lead',
   's1_ongoing',
@@ -251,7 +267,6 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
   const companyName = asTrimmed(t['lead.company']) ?? asTrimmed(t['lead.companyName']) ?? '';
   if (!companyName) throw new Error('lead company is required');
   const email = asTrimmed(t['lead.email']);
-  const statusRaw = asTrimmed(t['lead.status'])?.toLowerCase();
   const data = {
     firstName,
     lastName,
@@ -260,7 +275,7 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
     companyName,
     title: asTrimmed(t['lead.title']),
     notes: asTrimmed(t['lead.notes']),
-    status: (statusRaw && LEAD_STATUSES.has(statusRaw) ? statusRaw : 'new') as never,
+    status: mapLeadStatus(t['lead.status']) as never,
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
     const rows = await prisma.lead.findMany({
