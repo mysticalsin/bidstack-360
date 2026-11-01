@@ -469,6 +469,17 @@ describe('useCurrencyStore', () => {
       compact: false,
     });
     expect(safe).toContain('110');
+    // WHY: this cent does not survive a JavaScript multiply, and the converted
+    // number was printed in the display currency.
+    const large = formatStoredMicros(
+      '8598204328457184962',
+      'USD',
+      (amount) => amount * 1.1,
+      'EUR',
+      { compact: false },
+    );
+    expect(large).toContain('8,598,204,328,457.18');
+    expect(large).not.toContain('457.19');
   });
 });
 

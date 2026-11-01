@@ -33,6 +33,13 @@ function fitsSafeUnitCount(micros: bigint): boolean {
   return abs / 1_000_000n <= BigInt(Number.MAX_SAFE_INTEGER);
 }
 
+/** A converted JavaScript number still has its cent. Above 2^42 the float step is coarser. */
+function convertedCentSurvives(amount: number): boolean {
+  if (!Number.isFinite(amount)) return false;
+  if (Number.isInteger(amount)) return Number.isSafeInteger(amount);
+  return Math.abs(amount) < 2 ** 42 && Number.isSafeInteger(Math.round(Math.abs(amount) * 100));
+}
+
 /** Format stored micros. An unchanged FX result keeps the integer. A count past the safe range is not converted through a JavaScript number. */
 export function formatStoredMicros(
   micros: string | number | bigint,
@@ -67,7 +74,7 @@ export function formatStoredMicros(
     return formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
   }
   const convertedMicros = unitsToMicros(converted);
-  if (convertedMicros == null) return exactSource();
+  if (convertedMicros == null || !convertedCentSurvives(converted)) return exactSource();
   return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
 }
 
