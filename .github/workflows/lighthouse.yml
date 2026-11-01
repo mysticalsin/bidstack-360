@@ -2,9 +2,9 @@ name: Lighthouse CI
 
 on:
   push:
-    branches: [main, demo, 'release/**']
+    branches: [main, 'release/**']
   pull_request:
-    branches: [main, demo]
+    branches: [main]
 
 # Cancel previous runs on the same branch.
 concurrency:

@@ -7,6 +7,7 @@ updates:
   # GitHub Actions — keep the SHA pins fresh.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: main
     schedule:
       interval: weekly
     commit-message:
@@ -20,6 +21,7 @@ updates:
   # majors come as individual PRs so breaking changes get reviewed alone.
   - package-ecosystem: npm
     directory: /
+    target-branch: main
     schedule:
       interval: weekly
     open-pull-requests-limit: 10

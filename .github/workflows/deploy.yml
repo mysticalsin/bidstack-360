@@ -16,7 +16,7 @@ on:
   workflow_run:
     workflows: ['CI', 'E2E (full suite)']
     types: [completed]
-    branches: [demo]
+    branches: [main]
   workflow_dispatch: {} # manual redeploy of a known-good SHA still passes gates
 
 permissions:

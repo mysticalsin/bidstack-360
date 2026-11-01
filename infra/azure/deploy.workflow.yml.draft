@@ -20,7 +20,7 @@ name: deploy (DRAFT)
 on:
   workflow_dispatch: {}
   # push:
-  #   branches: [demo]      # enable after maintainer review
+  #   branches: [main]      # enable after maintainer review
 
 permissions:
   id-token: write # OIDC login to Azure

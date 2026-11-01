@@ -18,9 +18,9 @@ name: Supply Chain — IaC + dependency scan
 
 on:
   push:
-    branches: [main, demo, 'release/**']
+    branches: [main, 'release/**']
   pull_request:
-    branches: [main, demo]
+    branches: [main]
 
 permissions:
   contents: read

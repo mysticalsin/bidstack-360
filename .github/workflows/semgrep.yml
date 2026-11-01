@@ -8,9 +8,9 @@ name: Semgrep SAST
 
 on:
   pull_request:
-    branches: [main, demo]
+    branches: [main]
   push:
-    branches: [main, demo, 'release/**']
+    branches: [main, 'release/**']
 
 # Limit GITHUB_TOKEN to the minimum surface needed: read source + write SARIF
 # results into GitHub Security. Anything broader is a privilege escalation

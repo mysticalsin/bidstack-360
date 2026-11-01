@@ -21,7 +21,7 @@ any email). The demo door is triple-gated (`DEMO_MODE=true`, no
 tenant. Stale demo orgs auto-reap after `DEMO_ORG_TTL_HOURS`.
 
 > Prereqs: the repo is already on GitHub (`mysticalsin/bidstack-360`, branch
-> `demo`). You'll need a Railway account and a Vercel account. An Apollo API key
+> `main`). You'll need a Railway account and a Vercel account. An Apollo API key
 > is optional (accounts are pre-seeded with realistic data either way).
 
 ---
@@ -29,7 +29,7 @@ tenant. Stale demo orgs auto-reap after `DEMO_ORG_TTL_HOURS`.
 ## Part A — Railway (backend)
 
 1. **New Project → Deploy from GitHub repo** → `mysticalsin/bidstack-360`,
-   branch `demo`.
+   branch `main`.
 2. **Add Postgres** (New → Database → PostgreSQL) and **Add Redis** (New →
    Database → Redis). Railway exposes `DATABASE_URL` and `REDIS_URL` as
    reference variables you can attach to the services below.
