@@ -54,6 +54,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-01 INFRA: CI "E2E smoke" ran the full Playwright suite
+
+- **What went wrong:** The main CI job named "E2E smoke" ran `pnpm --filter @bidstack/web e2e` (`playwright test`). That launches chromium + firefox + webkit and every spec. The job only installs Chromium, so Firefox/WebKit died in 1ms. Chromium also failed inherited v24 RBAC/mobile/baseline specs. Chromium `smoke.spec.ts` itself was 6/6 green.
+- **Root cause:** The smoke job reused the full-suite script instead of a Chromium-only smoke file. `e2e.yml` is the full suite and is extra, not the required main gate.
+- **Prevention rule:** The required CI e2e gate on main is `e2e:smoke` = `playwright test e2e/smoke.spec.ts --project=chromium-desktop`. Do not point that job at `playwright test` with no filter. Do not revert v24 or MARS to silence inherited full-suite/mobile/RBAC failures.
+- **Files affected:** `.github/workflows/ci.yml`, `apps/web/package.json`.
+
+---
+
 ### 2026-11-01 PROCESS: Logo plate drop from cursor/polo-logo-bca5 did not meet the main bar
 
 - **What went wrong:** The navy-plate lockup cherry-pick (`1bdb99ab`) landed on main from `cursor/polo-logo-bca5`. Tony then set the baseline as `polo/consolidated` `dbd7e904` + `polo/mars-integration` only; other `cursor/*-bca5` branches default to not merged unless proven safe with full CI green and no v24 regression.

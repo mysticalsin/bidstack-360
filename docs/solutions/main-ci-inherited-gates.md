@@ -9,6 +9,7 @@
 - Lighthouse config in this ESM repo must be `.lighthouserc.cjs` (`module.exports`). `.js` throws `module is not defined in ES module scope`.
 - Semgrep ERROR-only gate: `semgrep scan --severity=ERROR --error`. `semgrep ci` is Cloud-backed and rejects those flags.
 - Checkov 3.3.x frameworks: `dockerfile,bicep`. `docker_compose` is not a valid name.
+- Required CI e2e gate is Chromium `smoke.spec.ts` only (`pnpm --filter @bidstack/web e2e:smoke`). The job named "E2E smoke" previously ran the full suite (`playwright test`), which installs only Chromium and then fails Firefox/WebKit plus inherited v24 RBAC/mobile/baseline specs. Chromium smoke was already 6/6 green on `f9054fda` (https://github.com/mysticalsin/bidstack-360/actions/runs/41281301311). Full suite stays in `e2e.yml` as an extra, non-blocking workflow.
 
 **Evidence (SHA `3e678009`):**
 
