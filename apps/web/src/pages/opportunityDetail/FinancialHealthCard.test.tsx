@@ -41,6 +41,37 @@ describe('FinancialHealthCard', () => {
     expect(useCompany).toHaveBeenCalledWith('company-1');
   });
 
+  it('prints account revenue past the safe unit count in full', () => {
+    // WHY: compacting the collapsed unit number prints one unit low, and a bare
+    // integer can be read as the display currency.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    useCompany.mockReturnValue({
+      data: {
+        name: 'CI Financial',
+        annualRevenueMicros: Number(huge),
+        annualRevenueMicrosText: huge,
+      },
+    });
+    render(<FinancialHealthCard intel={{} as IntelPayload} companyId="company-1" />);
+    expect(
+      screen.getByText('9,007,199,254,740,993 unspecified recorded on the account'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
+  });
+
+  it('does not compact a revenue number that is no longer an exact micros integer', () => {
+    // WHY: the JSON number has already collapsed. Printing it would look recorded.
+    useCompany.mockReturnValue({
+      data: {
+        name: 'CI Financial',
+        annualRevenueMicros: Number('9007199254740993'),
+      },
+    });
+    render(<FinancialHealthCard intel={{} as IntelPayload} companyId="company-1" />);
+    expect(screen.queryByText(/recorded on the account/)).toBeNull();
+    expect(screen.getAllByText('unknown').length).toBeGreaterThan(0);
+  });
+
   it('does not invent a headcount when the deal is not linked', () => {
     useCompany.mockReturnValue({ data: undefined });
     render(<FinancialHealthCard intel={{} as IntelPayload} companyId={null} />);

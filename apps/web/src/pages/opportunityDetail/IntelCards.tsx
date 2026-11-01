@@ -6,12 +6,9 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useCompany } from '@/hooks/useCompanies';
 import { formatDate } from '@/lib/format';
-import { formatMicrosAmount, type IntelPayload } from '@bidstack/shared';
+import { type IntelPayload } from '@bidstack/shared';
 
-import {
-  formatUnspecifiedCompact,
-  unitsFromMicros,
-} from '@/components/dashboard/unspecified-currency';
+import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
 
 import { financialHonesty, type FinancialHonesty } from './intel-honesty';
 
@@ -24,6 +21,22 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-right text-xs font-medium text-[var(--fg-primary)]">{value}</span>
     </div>
   );
+}
+
+/**
+ * Account revenue. The digit string wins. A JSON number is used only while it
+ * is still an exact integer of micros. Compacting the collapsed number is one
+ * unit low, and it is not labeled as unspecified.
+ */
+function recordedRevenueFigure(
+  text: string | null | undefined,
+  micros: number | null | undefined,
+): string | null {
+  if (text && /^\d+$/.test(text)) return unspecifiedMicrosLabel(text);
+  if (typeof micros === 'number' && Number.isSafeInteger(micros) && micros > 0) {
+    return unspecifiedMicrosLabel(micros);
+  }
+  return null;
 }
 
 function honestyLabel(t: (key: string, defaultValue: string) => string, value: unknown): string {
@@ -103,23 +116,13 @@ export function FinancialHealthCard({
           formatted: recordedHeadcount.toLocaleString('en-US'),
         })
       : label(f?.headcount);
-  const exactRevenue =
-    recordedRevenueText && /^\d+$/.test(recordedRevenueText)
-      ? formatMicrosAmount(BigInt(recordedRevenueText))
-      : null;
-  const revenue = exactRevenue
+  const revenueFigure = recordedRevenueFigure(recordedRevenueText, recordedRevenue);
+  const revenue = revenueFigure
     ? t('intelCards.financial.recordedRevenue', '{{formatted}} recorded on the account', {
-        formatted: exactRevenue,
+        formatted: revenueFigure,
       })
-    : typeof recordedRevenue === 'number' && recordedRevenue > 0
-      ? t('intelCards.financial.recordedRevenue', '{{formatted}} recorded on the account', {
-          formatted: formatUnspecifiedCompact(unitsFromMicros(recordedRevenue)),
-        })
-      : label(f?.revenueAnnual);
-  const hasRecordedAccountFigure =
-    typeof recordedHeadcount === 'number' ||
-    exactRevenue != null ||
-    (typeof recordedRevenue === 'number' && recordedRevenue > 0);
+    : label(f?.revenueAnnual);
+  const hasRecordedAccountFigure = typeof recordedHeadcount === 'number' || revenueFigure != null;
   return (
     <Card>
       <SectionHeader

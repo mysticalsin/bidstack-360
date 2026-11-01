@@ -237,6 +237,29 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.getByText('DNB Bank Group')).toBeTruthy();
   });
 
+  it('prints stored revenue from integer micros and skips a collapsed number', () => {
+    // WHY: unitsFromMicros of a JSON number past the safe range moves the amount.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const { unmount } = render(
+      <BusinessSnapshotCard
+        cockpit={cockpit({
+          annualRevenueMicros: Number(huge),
+          annualRevenueMicrosText: huge,
+        })}
+      />,
+    );
+    expect(screen.getByText(/9,007,199,254,740,993 unspecified/)).toBeTruthy();
+    expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
+    unmount();
+
+    render(
+      <BusinessSnapshotCard
+        cockpit={cockpit({ annualRevenueMicros: Number('9007199254740993') })}
+      />,
+    );
+    expect(screen.queryByText(/9,007,199/)).toBeNull();
+  });
+
   it('does not invent a headquarters from the company name', () => {
     render(
       <BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: null })} />,

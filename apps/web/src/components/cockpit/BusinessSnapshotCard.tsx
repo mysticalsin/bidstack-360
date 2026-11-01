@@ -5,11 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import {
-  formatUnspecifiedAmount,
-  unitsFromMicros,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
@@ -156,8 +152,10 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         ? facts.revenueLabel
         : c.annualRevenueMicrosText && /^\d+$/.test(c.annualRevenueMicrosText)
           ? `${formatMicrosAmount(BigInt(c.annualRevenueMicrosText))} unspecified · ${UNSPECIFIED_CURRENCY_BASIS}`
-          : c.annualRevenueMicros
-            ? `${formatUnspecifiedAmount(unitsFromMicros(c.annualRevenueMicros))} · ${UNSPECIFIED_CURRENCY_BASIS}`
+          : typeof c.annualRevenueMicros === 'number' &&
+              Number.isSafeInteger(c.annualRevenueMicros) &&
+              c.annualRevenueMicros > 0
+            ? `${formatMicrosAmount(BigInt(c.annualRevenueMicros))} unspecified · ${UNSPECIFIED_CURRENCY_BASIS}`
             : notVerified,
       source: facts?.revenueLabel
         ? publicSource(c.sourceAttribution, t)
