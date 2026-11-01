@@ -9,6 +9,8 @@ import { springSnap, springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
 
+import { isOpenRisk } from './open-risk-headline';
+
 interface Props {
   cockpit: AccountCockpitSnapshot;
 }
@@ -233,7 +235,7 @@ export function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): s
 
   const urgentRisk = cockpit.risks.find(
     (risk) =>
-      risk.status !== 'mitigated' && (risk.severity === 'critical' || risk.severity === 'high'),
+      isOpenRisk(risk.status) && (risk.severity === 'critical' || risk.severity === 'high'),
   );
   if (urgentRisk) {
     return urgentRisk.owner
@@ -354,7 +356,8 @@ export function openRiskFigures(cockpit: {
   ).length;
   const openCount = cockpit.openRiskCount ?? shownOpen;
   const criticalOnPage = cockpit.risks.filter(
-    (risk) => risk.severity === 'critical' || risk.severity === 'high',
+    (risk) =>
+      isOpenRisk(risk.status) && (risk.severity === 'critical' || risk.severity === 'high'),
   ).length;
   const unseenOpen = Boolean(
     cockpit.risksCapped && cockpit.openRiskCount != null && cockpit.openRiskCount > shownOpen,

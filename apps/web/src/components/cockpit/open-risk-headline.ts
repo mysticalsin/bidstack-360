@@ -1,3 +1,8 @@
+/** Accepted and mitigated risks are recorded decisions, not open work. */
+export function isOpenRisk(status: string): boolean {
+  return status === 'open' || status === 'in_progress';
+}
+
 export interface OpenRiskSeverityCounts {
   critical: number;
   high: number;
@@ -31,7 +36,7 @@ export function openRiskHeadline(input: {
   openRiskCount?: number;
   openRiskSeverity?: OpenRiskSeverityCounts;
 }): { total: number; high: number; spark: [number, number, number, number] } {
-  const shown = input.risks.filter((risk) => risk.status !== 'mitigated');
+  const shown = input.risks.filter((risk) => isOpenRisk(risk.status));
   const buckets = input.openRiskSeverity ?? severityBucketCounts(shown);
   return {
     total: input.openRiskCount ?? shown.length,

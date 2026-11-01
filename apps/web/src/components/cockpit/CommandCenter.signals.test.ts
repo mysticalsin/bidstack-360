@@ -148,4 +148,36 @@ describe('command center counts', () => {
     });
     expect(deriveNextMove(named, t)).toBe('Unblock SOC evidence before the bid gate.');
   });
+
+  it('does not escalate a high risk the account already accepted', () => {
+    // WHY: accepted is a recorded decision. The next step used to treat it as
+    // still open because only mitigated risks were skipped.
+    const accepted = {
+      id: 'r1',
+      title: 'Plant',
+      severity: 'critical' as const,
+      status: 'accepted' as const,
+      owner: null,
+      mitigation: null,
+      dueDate: null,
+    };
+    expect(
+      deriveNextMove(
+        nextMoveCockpit({
+          keyContacts: [{ id: 'c1', name: 'Ada', roleInDecision: 'champion' } as never],
+          risks: [accepted],
+        }),
+        t,
+      ),
+    ).toBe('Use Ada as champion for the next presales milestone.');
+    expect(
+      deriveNextMove(
+        nextMoveCockpit({
+          risks: [{ ...accepted, status: 'open' }],
+        }),
+        t,
+      ),
+    ).toBe('Escalate Plant before proposal approval.');
+    expect(openRiskFigures({ risks: [accepted] }).criticalOnPage).toBe(0);
+  });
 });
