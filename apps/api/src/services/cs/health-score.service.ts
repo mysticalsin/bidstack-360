@@ -42,7 +42,19 @@ export interface ComputeHealthResult {
   accountId: string;
   score: number | null;
   factors: HealthFactors;
-  trend: 'IMPROVING' | 'STABLE' | 'DECLINING';
+  trend: 'IMPROVING' | 'STABLE' | 'DECLINING' | null;
+}
+
+/** A first score has no direction. Stable means the new score stayed within 5 points. */
+export function trendFromPrevious(
+  current: number,
+  previous: number | null,
+): 'IMPROVING' | 'STABLE' | 'DECLINING' | null {
+  if (previous == null) return null;
+  const delta = current - previous;
+  if (delta >= 5) return 'IMPROVING';
+  if (delta <= -5) return 'DECLINING';
+  return 'STABLE';
 }
 
 /** Weighted score from the factors that were actually measured. Null when none were. */
@@ -173,17 +185,13 @@ async function determineTrend(
   orgId: string,
   accountId: string,
   currentScore: number,
-): Promise<'IMPROVING' | 'STABLE' | 'DECLINING'> {
+): Promise<'IMPROVING' | 'STABLE' | 'DECLINING' | null> {
   const previous = await prisma.healthScore.findFirst({
     where: { orgId, accountId },
     orderBy: { capturedAt: 'desc' },
     select: { score: true },
   });
-  if (!previous) return 'STABLE';
-  const delta = currentScore - previous.score;
-  if (delta >= 5) return 'IMPROVING';
-  if (delta <= -5) return 'DECLINING';
-  return 'STABLE';
+  return trendFromPrevious(currentScore, previous?.score ?? null);
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -235,7 +243,7 @@ export async function computeAndPersistHealthScore(
 
   if (score == null) {
     log.info({ orgId, accountId }, 'cs: no measured health inputs; not storing a score');
-    return { accountId, score: null, factors, trend: 'STABLE' };
+    return { accountId, score: null, factors, trend: null };
   }
 
   const trend = await determineTrend(orgId, accountId, score);
@@ -246,7 +254,8 @@ export async function computeAndPersistHealthScore(
       accountId,
       score,
       factors: factors as unknown as Prisma.InputJsonValue,
-      trend,
+      // The column cannot be empty. A first snapshot has no measured direction.
+      ...(trend ? { trend } : {}),
     },
   });
 
@@ -260,15 +269,18 @@ export async function getLatestHealthScore(
   orgId: string,
   accountId: string,
 ): Promise<ComputeHealthResult | null> {
-  const row = await prisma.healthScore.findFirst({
+  const rows = await prisma.healthScore.findMany({
     where: { orgId, accountId },
     orderBy: { capturedAt: 'desc' },
+    take: 2,
   });
+  const row = rows[0];
   if (!row) return null;
   return {
     accountId,
     score: row.score,
     factors: row.factors as unknown as HealthFactors,
-    trend: row.trend as 'IMPROVING' | 'STABLE' | 'DECLINING',
+    // One snapshot has no earlier score to compare. The column default is not a trend.
+    trend: rows.length < 2 ? null : (row.trend as 'IMPROVING' | 'STABLE' | 'DECLINING'),
   };
 }

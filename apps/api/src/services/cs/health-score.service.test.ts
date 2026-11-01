@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { composeHealthScore } from './health-score.service.js';
+import { composeHealthScore, trendFromPrevious } from './health-score.service.js';
 
 describe('composeHealthScore', () => {
   it('does not turn an empty account into a mid health score', () => {
@@ -28,5 +28,15 @@ describe('composeHealthScore', () => {
         execSponsorStability: null,
       }),
     ).toBe(80);
+  });
+});
+
+describe('trendFromPrevious', () => {
+  it('does not call the first score stable', () => {
+    // WHY: the column default is STABLE. A single measurement has no direction.
+    expect(trendFromPrevious(70, null)).toBeNull();
+    expect(trendFromPrevious(70, 70)).toBe('STABLE');
+    expect(trendFromPrevious(80, 70)).toBe('IMPROVING');
+    expect(trendFromPrevious(60, 70)).toBe('DECLINING');
   });
 });
