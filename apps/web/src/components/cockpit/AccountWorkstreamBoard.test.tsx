@@ -39,11 +39,40 @@ describe('AccountWorkstreamBoard', () => {
     expect(chart.textContent).toMatch(/Not recorded/);
     const dealLink = screen.getByRole('link', { name: /Pursuit · screening/ });
     expect(dealLink.getAttribute('href')).toBe('/opportunities/deal-1');
+    expect(screen.getAllByText('2.7M unspecified').length).toBeGreaterThan(0);
     expect(screen.getAllByText('No one recorded')).toHaveLength(5);
     // WHY: Ada is linked. Hiding her would read as an empty account.
     // She is not placed in a role, because a missing decision role is not Buyer.
     expect(screen.getByRole('heading', { name: 'Decision role not recorded' })).toBeTruthy();
     expect(screen.getByText('Ada')).toBeTruthy();
+  });
+
+  it('prints a lane past the safe unit count in full', () => {
+    // WHY: compacting the collapsed unit number prints one unit low.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    render(
+      <MemoryRouter>
+        <AccountWorkstreamBoard
+          deals={[
+            {
+              id: 'deal-huge',
+              name: 'Large pursuit',
+              stage: 'proposal',
+              value: 0,
+              valueMicros: huge,
+              owner: null,
+            },
+          ]}
+          people={[]}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('img', { name: /Pursuit, 9,007,199,254,740,993 unspecified/ }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
+    expect(screen.getAllByText('9,007,199,254,740,993 unspecified').length).toBeGreaterThan(0);
   });
 
   it('places a recorded buyer on that station and leaves them off the unassigned list', () => {

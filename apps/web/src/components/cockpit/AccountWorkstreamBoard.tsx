@@ -7,9 +7,9 @@ import { BarChart } from '@/components/charts/bar-chart';
 import { BarYAxis } from '@/components/charts/bar-y-axis';
 import {
   formatUnspecifiedCompact,
+  unspecifiedMicrosLabel,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
-import { formatMicrosAmount } from '@bidstack/shared';
 
 import {
   buyingRoleSlots,
@@ -59,16 +59,11 @@ export function AccountWorkstreamBoard({
     };
   });
   const barValues = workstreamBarValues(laneTotals);
+  const notRecorded = t('accountWorkstreams.notRecorded', 'Not recorded');
   const chartLabel = laneTotals
     .map((row) => {
       const name = t(`accountWorkstreams.lane.${row.lane}`, laneTitle(row.lane));
-      const amount =
-        row.valueMicros != null && row.valueMicros !== '0'
-          ? `${formatMicrosAmount(BigInt(row.valueMicros))} unspecified`
-          : row.value > 0
-            ? formatUnspecifiedCompact(row.value)
-            : t('accountWorkstreams.notRecorded', 'Not recorded');
-      return `${name}, ${amount}`;
+      return `${name}, ${laneScanLabel(row.valueMicros, notRecorded)}`;
     })
     .join('. ');
 
@@ -115,13 +110,7 @@ export function AccountWorkstreamBoard({
         </BarChart>
         <ul className="deal-chart-values">
           {laneTotals.map((row) => (
-            <li key={row.lane}>
-              {row.valueMicros != null && row.valueMicros !== '0'
-                ? `${formatMicrosAmount(BigInt(row.valueMicros))} unspecified`
-                : row.value > 0
-                  ? formatUnspecifiedCompact(row.value)
-                  : t('accountWorkstreams.notRecorded', 'Not recorded')}
-            </li>
+            <li key={row.lane}>{laneScanLabel(row.valueMicros, notRecorded)}</li>
           ))}
         </ul>
       </div>
@@ -138,9 +127,7 @@ export function AccountWorkstreamBoard({
                     deal.stage ||
                     t('accountWorkstreams.stageUnknown', 'Stage unknown')}
                   {' · '}
-                  {deal.valueMicros != null
-                    ? `${formatMicrosAmount(BigInt(deal.valueMicros))} unspecified`
-                    : formatUnspecifiedCompact(deal.value)}
+                  {dealScanLabel(deal, notRecorded)}
                   {' · '}
                   {deal.owner ?? t('accountWorkstreams.ownerUnknown', 'Owner unknown')}
                 </span>
@@ -220,6 +207,23 @@ export function AccountWorkstreamBoard({
       </div>
     </section>
   );
+}
+
+/** Lane headline. A zero micros total is not a recorded amount. */
+function laneScanLabel(micros: string, whenZero: string): string {
+  if (/^\d+$/.test(micros) && BigInt(micros) !== 0n) return unspecifiedMicrosLabel(micros);
+  return whenZero;
+}
+
+/**
+ * Deal line. The micros sum wins, including a unit number that converts exactly.
+ * A unit number that does not convert is not printed from the collapsed figure.
+ */
+function dealScanLabel(deal: WorkDeal, whenMissing: string): string {
+  const micros = laneRecordedMicros([deal]);
+  if (micros !== 0n) return unspecifiedMicrosLabel(micros.toString());
+  if (deal.value === 0) return formatUnspecifiedCompact(0);
+  return whenMissing;
 }
 
 function laneTitle(lane: LiveWorkstream): string {
