@@ -127,30 +127,36 @@ export function winRateByQuarter(rows: OppRow[]) {
 
 /** Won value per close quarter (actuals), oldest first. */
 export function wonByQuarter(rows: OppRow[]) {
-  const by = new Map<string, { v: number; t: number }>();
+  const by = new Map<string, { v: bigint; t: number }>();
   for (const o of rows.filter(isWon)) {
     const at = closeDate(o);
     if (!at) continue;
     const q = quarterOf(at);
-    const cur = by.get(q) ?? { v: 0, t: new Date(at).getTime() };
-    cur.v += o.value ?? 0;
+    const cur = by.get(q) ?? { v: 0n, t: new Date(at).getTime() };
+    cur.v += recordedMicros(o.value ?? 0, o.valueMicros);
     by.set(q, cur);
   }
-  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: v.v }));
+  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: microsToUnits(v.v) }));
 }
 
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
 /** Cumulative won value by close month for the year of the latest close. */
 export function cumulativeWon(rows: OppRow[]) {
-  const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: o.value ?? 0 })).filter((r): r is { at: string; v: number } => Boolean(r.at));
+  const won = rows.filter(isWon).flatMap((o) => {
+    const at = closeDate(o);
+    return at ? [{ at, v: recordedMicros(o.value ?? 0, o.valueMicros) }] : [];
+  });
   if (!won.length) return [];
   const year = Math.max(...won.map((r) => new Date(r.at).getUTCFullYear()));
   const lastMonth = Math.max(...won.filter((r) => new Date(r.at).getUTCFullYear() === year).map((r) => new Date(r.at).getUTCMonth()));
-  let run = 0;
+  let run = 0n;
   return Array.from({ length: lastMonth + 1 }, (_, m) => {
-    run += won.filter((r) => { const d = new Date(r.at); return d.getUTCFullYear() === year && d.getUTCMonth() === m; }).reduce((n, r) => n + r.v, 0);
+    for (const deal of won) {
+      const d = new Date(deal.at);
+      if (d.getUTCFullYear() === year && d.getUTCMonth() === m) run += deal.v;
+    }
     const date = new Date(year, m, 1); // local midnight, for axis display only
-    return { x: monFmt.format(date), date, y: run };
+    return { x: monFmt.format(date), date, y: microsToUnits(run) };
   });
 }
 
@@ -187,8 +193,8 @@ export function cumulativeOpen(rows: OppRow[]) {
   const open = rows.filter((o) => !isClosed(o)).sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
   if (!open.length) return [];
   // Starts at 0 so a single open bid still draws a rising line.
-  let run = 0;
-  return [0, ...open.map((o) => (run += o.value ?? 0))];
+  let run = 0n;
+  return [0, ...open.map((o) => microsToUnits((run += recordedMicros(o.value ?? 0, o.valueMicros))))];
 }
 
 /** Currency-free amount. One compact digit is kept only when it names the same cent. */
