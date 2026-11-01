@@ -92,6 +92,7 @@
 .wd-empty { margin: 8px 0 0; font-size: 13px; color: var(--wd-muted); display: grid; gap: 4px; }
 .wd-empty > span { font-size: 14px; font-weight: 500; color: var(--wd-ink); }
 .wd-news-hint { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: var(--wd-ink); background: color-mix(in srgb, var(--wd-muted) 10%, transparent); }
+.wd-group { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; }
 .wd-skel { height: 48px; border-radius: 8px; background: var(--surface-sunken, #f4f4f4); margin: 8px 0; }
 
 .wd-arrive { animation: wd-arrive 320ms var(--wd-ease) both; animation-delay: calc(var(--i, 0) * 40ms); }

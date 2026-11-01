@@ -50,6 +50,33 @@ describe('AccountWatchdogSection', () => {
     expect(screen.queryByTestId('wd-news-hint')).toBeNull();
   });
 
+  it('shows grouped analyst notes as one Market / analyst row with each note linked (v22.1)', () => {
+    state.data = {
+      ...base,
+      events: [
+        {
+          id: 'grp:market:x', source: 'google_news', kind: 'MARKET_COMMENTARY', title: '3 analyst notes this week', displayTitle: '3 analyst notes this week',
+          summary: 'a; b; c', sourceUrl: 'https://news.example/1', occurredAt: '2026-10-30T00:00:00Z', implication: 'NEUTRAL',
+          implicationRationale: 'Stock and analyst chatter: context for the conversation, not a buying signal on its own.', severity: 1, status: 'NEW',
+          importance: 15, category: 'market', mentions: 3, sample: false,
+          group: [
+            { id: 'n1', title: 'Aritzia (TSE:ATZ) Stock Price Target Raised at Canaccord', sourceUrl: 'https://news.example/1', occurredAt: '2026-10-30T00:00:00Z' },
+            { id: 'n2', title: 'Aritzia Inc. (TSE:ATZ) Rated Moderate Buy', sourceUrl: 'https://news.example/2', occurredAt: '2026-10-29T00:00:00Z' },
+            { id: 'n3', title: 'Can Aritzia (TSX:ATZ) Expand Its Boutique Network?', sourceUrl: 'https://news.example/3', occurredAt: '2026-10-28T00:00:00Z' },
+          ],
+        },
+      ],
+    };
+    render(<MemoryRouter><AccountWatchdogSection companyId="c1" /></MemoryRouter>);
+    const row = screen.getByRole('button', { name: /3 analyst notes this week/ });
+    expect(row.textContent).toContain('Market / analyst');
+    expect(row.textContent).not.toContain('outlets');
+    fireEvent.click(row);
+    const list = screen.getByRole('list', { name: 'Analyst notes in this group' });
+    expect(list.querySelectorAll('a')).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: /Dismiss signal/ })).toBeNull();
+  });
+
   const ev = (n: number, implication: 'RISK' | 'OPPORTUNITY' | 'NEUTRAL' = 'RISK') => ({
     id: `e${n}`, source: 'sec_edgar', kind: 'RESTRUCTURING', title: `8-K Item 2.05 exit costs ${n}`,
     summary: `Restructuring announced ${n}.`, sourceUrl: `https://www.sec.gov/${n}`, occurredAt: '2026-10-20T00:00:00Z',

@@ -6,7 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { categoryForKind, enrichmentWatchRows, importanceScore, stripSamplePrefix } from '@bidstack/shared';
+import { categoryForKind, collapseMarketNotes, enrichmentWatchRows, importanceScore, stripSamplePrefix } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
 import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from '../services/account-signals/live-signals.js';
@@ -33,6 +33,8 @@ const WatchEvent = z.object({
   mentions: z.number().int(),
   sample: z.boolean(),
   displayTitle: z.string(),
+  // v22.1: several market / analyst notes in one week collapse into one row.
+  group: z.array(z.object({ id: z.string(), title: z.string(), sourceUrl: z.string(), occurredAt: z.string() })).optional(),
 });
 
 const EarningsDate = z.object({
@@ -336,7 +338,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           lastCheckedAt: subject?.lastCheckedAt?.toISOString() ?? null,
           lastError: subject?.lastError ?? null,
         },
-        events: events.map((e) => ({
+        events: collapseMarketNotes(events.map((e) => ({
           id: e.id,
           source: e.source,
           kind: e.kind,
@@ -353,7 +355,23 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           mentions: e.mentions,
           sample: e.sample,
           displayTitle: stripSamplePrefix(e.title),
-        })),
+        })), {
+          now,
+          isMarket: (e) => e.category === 'market' && !e.sample,
+          at: (e) => new Date(e.occurredAt),
+          merge: (g, title) => ({
+            ...g[0]!,
+            id: `grp:market:${g[0]!.id}`,
+            title,
+            displayTitle: title,
+            summary: g.slice(0, 5).map((x) => x.displayTitle).join('; '),
+            implication: g.some((x) => x.implication === 'RISK') ? ('RISK' as const) : ('NEUTRAL' as const),
+            implicationRationale: 'Stock and analyst chatter: context for the conversation, not a buying signal on its own.',
+            importance: Math.max(...g.map((x) => x.importance)),
+            mentions: g.length,
+            group: g.map((x) => ({ id: x.id, title: x.displayTitle, sourceUrl: x.sourceUrl, occurredAt: x.occurredAt })),
+          }),
+        }),
         earnings: earnings.map((d) => ({
           id: d.id,
           fiscalPeriod: d.fiscalPeriod,

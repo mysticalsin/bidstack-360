@@ -13,6 +13,7 @@ export const CATEGORY_LABEL: Record<SignalCategory, string> = {
   m_and_a: 'M&A',
   partnership: 'Partnership',
   filing: 'Filing',
+  market: 'Market / analyst',
   news: 'News',
   meeting: 'Meeting',
   deal: 'Deal',
@@ -31,13 +32,14 @@ export const CATEGORY_TONE: Record<SignalCategory, 'growth' | 'change' | 'risk' 
   risk: 'risk',
   earnings: 'results',
   filing: 'results',
+  market: 'neutral',
   news: 'neutral',
   meeting: 'ours',
   deal: 'ours',
   bid: 'ours',
 };
 
-export const THEIR_FILTERS: SignalCategory[] = ['funding', 'launch', 'initiative', 'exec_move', 'm_and_a', 'partnership', 'hiring', 'earnings', 'risk', 'filing', 'news'];
+export const THEIR_FILTERS: SignalCategory[] = ['funding', 'launch', 'initiative', 'exec_move', 'm_and_a', 'partnership', 'hiring', 'earnings', 'risk', 'filing', 'market', 'news'];
 export const OUR_FILTERS: SignalCategory[] = ['meeting', 'deal', 'bid'];
 
 /** UI copy never shows em or en dashes (provider titles sometimes carry them). */

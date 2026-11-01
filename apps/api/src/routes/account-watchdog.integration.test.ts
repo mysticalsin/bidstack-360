@@ -60,6 +60,28 @@ const ev = (o: string, c: string, externalId: string, occurredAt: string, extra:
 });
 
 describe('GET /accounts/:companyId/watchdog', () => {
+  skipIfNoDb('v22.1: collapses a week of analyst notes into one Market / analyst row', async () => {
+    const company = await prisma.company.create({ data: { orgId: orgId!, name: `Market Co ${Date.now()}`, domain: 'market-co.com' } });
+    const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+    const titles = ['Market Co (TSX:MKT) Stock Price Target Raised at RBC', 'Market Co (TSX:MKT) Rated Moderate Buy by Analysts', 'Can Market Co (TSX:MKT) Expand Its Store Network?'];
+    await prisma.accountWatchEvent.createMany({
+      data: [
+        ...titles.map((t, i) => ev(orgId!, company.id, `M${i}-${company.id}`, day(i + 1), { source: 'google_news', kind: 'MARKET_COMMENTARY', title: t, importance: 15, sourceUrl: `https://news.example/${i}`, status: 'ACKNOWLEDGED' as const })),
+        ev(orgId!, company.id, `F-${company.id}`, day(2), { source: 'google_news', kind: 'FUNDING_ROUND', title: 'Market Co raises $40M Series B', importance: 75, implication: 'OPPORTUNITY', status: 'ACKNOWLEDGED' as const }),
+        ev(orgId!, company.id, `M9-${company.id}`, day(20), { source: 'google_news', kind: 'MARKET_COMMENTARY', title: 'Old lone note on Market Co (TSX:MKT)', importance: 15, status: 'ACKNOWLEDGED' as const }),
+      ],
+    });
+    const body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${company.id}/watchdog` })).json();
+    const titlesOut = body.events.map((e: { displayTitle: string }) => e.displayTitle);
+    expect(titlesOut).toEqual(['3 analyst notes this week', 'Market Co raises $40M Series B', 'Old lone note on Market Co (TSX:MKT)']);
+    const grp = body.events[0];
+    expect(grp.category).toBe('market');
+    expect(grp.group.map((g: { title: string }) => g.title)).toEqual(titles);
+    expect(grp.id.startsWith('grp:market:')).toBe(true);
+    const tl = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${company.id}/timeline` })).json();
+    const g = tl.items.find((i: { category: string; groupCount?: number }) => i.category === 'market' && i.groupCount);
+    expect(g).toMatchObject({ title: '3 analyst notes this week', groupCount: 3 });
+  });
   skipIfNoDb('v22: hides sample rows once a real row exists and ignores reserved domains', async () => {
     const company = await prisma.company.create({ data: { orgId: orgId!, name: `Sample Co ${Date.now()}`, domain: 'example.org' } });
     await prisma.accountWatchEvent.create({ data: ev(orgId!, company.id, `S-${company.id}`, '2026-10-20T00:00:00Z', { source: 'sample', sample: true, title: 'Sample: thing' }) });

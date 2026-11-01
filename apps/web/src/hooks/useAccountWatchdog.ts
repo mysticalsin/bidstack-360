@@ -36,6 +36,8 @@ export interface AccountWatchdog {
     sample?: boolean;
     /** v21: title without the "Sample: " prefix. */
     displayTitle?: string;
+    /** v22.1: analyst notes collapsed into this row, newest first. */
+    group?: Array<{ id: string; title: string; sourceUrl: string; occurredAt: string }>;
   }>;
   earnings: Array<{
     id: string;

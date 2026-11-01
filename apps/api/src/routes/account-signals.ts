@@ -21,6 +21,7 @@ import {
   type InitiativeTheme,
   type PortfolioAlert,
   type TimelineItem,
+  collapseMarketNotes,
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
@@ -181,9 +182,27 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           push({ id: `hire:${w}`, at: new Date(w * 7 * DAY + 3 * DAY).toISOString(), lane: 'theirs', category: 'hiring', title: `Hiring spike: ${n} roles posted in one week`, summary: `Typical week: ${median}`, source: 'Job postings', sourceUrl: null, href: null, importance: 55, implication: 'OPPORTUNITY', sample: false });
         }
       }
+      // v22.1: several analyst notes in a week read as one row.
+      const grouped = collapseMarketNotes(
+        [...items].sort((a, b) => b.at.localeCompare(a.at)),
+        {
+          now: new Date(),
+          isMarket: (i) => i.category === 'market' && !i.sample,
+          at: (i) => new Date(i.at),
+          merge: (g, title) => ({
+            ...g[0]!,
+            id: `grp:market:${g[0]!.id}`,
+            title,
+            summary: g.slice(0, 5).map((x) => x.title).join('; '),
+            importance: Math.max(...g.map((x) => x.importance)),
+            implication: g.some((x) => x.implication === 'RISK') ? ('RISK' as const) : ('NEUTRAL' as const),
+            groupCount: g.length,
+          }),
+        },
+      );
       const tally: Record<string, number> = {};
-      for (const i of items) tally[i.category] = (tally[i.category] ?? 0) + 1;
-      const shown = (wanted ? items.filter((i) => wanted.has(i.category)) : items).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 300);
+      for (const i of grouped) tally[i.category] = (tally[i.category] ?? 0) + 1;
+      const shown = (wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped).slice(0, 300);
       return { companyId: company.id, from: from.toISOString(), to: to.toISOString(), items: shown, counts: tally };
     },
   );

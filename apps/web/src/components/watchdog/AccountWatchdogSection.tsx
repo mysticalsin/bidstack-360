@@ -106,7 +106,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
           <span className="wd-row-meta">
             {category ? `${category} · ` : ''}
             {sourceName(e.source)}
-            {e.mentions && e.mentions > 1 ? ` · ${e.mentions} outlets` : ''} · <time dateTime={e.occurredAt}>{dateFmt.format(new Date(e.occurredAt))}</time>
+            {!e.group && e.mentions && e.mentions > 1 ? ` · ${e.mentions} outlets` : ''} · <time dateTime={e.occurredAt}>{dateFmt.format(new Date(e.occurredAt))}</time>
             {e.status === 'NEW' ? <span className="wd-new"> · New</span> : null}
             {isSample(e) ? <span className="wd-sample-badge">Sample</span> : null}
           </span>
@@ -115,9 +115,22 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
         <ChevronDown className="wd-chev" size={16} strokeWidth={1.5} aria-hidden />
       </button>
       <div id={`${id}-d`} className="wd-detail" data-open={open} hidden={!open}>
-        <p>{noDash(e.summary)}</p>
+        {e.group ? (
+          <ul className="wd-group" aria-label="Analyst notes in this group">
+            {e.group.map((g) => (
+              <li key={g.id}>
+                <a className="wd-link" href={g.sourceUrl} target="_blank" rel="noreferrer">
+                  {noDash(g.title)}
+                </a>{' '}
+                <time className="wd-row-meta" dateTime={g.occurredAt}>{dateFmt.format(new Date(g.occurredAt))}</time>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>{noDash(e.summary)}</p>
+        )}
         {e.implicationRationale ? <p className="wd-row-meta">{e.implicationRationale}</p> : null}
-        {!e.sourceUrl ? null : e.sourceUrl.startsWith('/') ? (
+        {e.group || !e.sourceUrl ? null : e.sourceUrl.startsWith('/') ? (
           <Link className="wd-link" to={e.sourceUrl}>{INTERNAL_LINK[e.source] ?? 'Open'}</Link>
         ) : (
           <a className="wd-link" href={e.sourceUrl} target="_blank" rel="noreferrer">
