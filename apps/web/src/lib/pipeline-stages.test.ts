@@ -108,5 +108,11 @@ describe('closedOutcome', () => {
     expect(closedOutcome({ stage: 'closed_lost', pipelineStage: null })).toBe('lost');
     expect(closedOutcome({ stage: 'closed_won', pipelineStage: null })).toBe('won');
     expect(closedOutcome({ stage: 's2_sent', pipelineStage: null })).toBeNull();
+    expect(
+      closedOutcome({
+        stage: 's2_sent',
+        pipelineStage: { isWon: false, isLost: true, deletedAt: '2026-02-01T00:00:00.000Z' },
+      }),
+    ).toBeNull();
   });
 });

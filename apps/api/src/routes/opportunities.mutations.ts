@@ -187,6 +187,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
               color: true,
               isWon: true,
               isLost: true,
+              deletedAt: true,
             },
           },
         },

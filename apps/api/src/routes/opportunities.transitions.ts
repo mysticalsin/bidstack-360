@@ -142,6 +142,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
                 color: true,
                 isWon: true,
                 isLost: true,
+                deletedAt: true,
               },
             },
           },

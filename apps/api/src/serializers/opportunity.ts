@@ -25,7 +25,7 @@ type SerializedOpportunity = {
   name: string;
   stage: OpportunityStage;
   pipelineStageId: string | null;
-  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null;
+  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean; deletedAt?: Date | null } | null;
   valueMicros: bigint | number;
   probability: number;
   dueDate: Date | null;
@@ -52,9 +52,10 @@ export interface OpportunityCounts {
 }
 
 function serializePipelineStage(
-  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null | undefined,
+  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean; deletedAt?: Date | null } | null | undefined,
 ): SerializedPipelineStage | null {
-  if (!ps) return null;
+  // A removed stage does not keep its name or its won/lost flags on the deal.
+  if (!ps || ps.deletedAt) return null;
   return {
     id: ps.id,
     name: ps.name,
@@ -75,7 +76,7 @@ export function serializeOpportunity(
     customer: o.customer,
     companyId: o.companyId ?? null,
     name: o.name,
-    stage: o.pipelineStage?.name ?? o.stage ?? null,
+    stage: serializePipelineStage(o.pipelineStage)?.name ?? o.stage ?? null,
     pipelineStageId: o.pipelineStageId ?? null,
     pipelineStage: serializePipelineStage(o.pipelineStage),
     value: Number(o.valueMicros) / 1_000_000,

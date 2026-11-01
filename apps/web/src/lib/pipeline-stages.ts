@@ -30,13 +30,14 @@ export function isLegacyOpportunityStage(value: string): value is OpportunitySta
   return LEGACY_BY_ID.has(value);
 }
 
-/** Won or lost from either the stage row or the stored stage key. A missing stage row is not an open deal. */
+/** Won or lost from either a live stage row or the stored stage key. A missing or deleted stage row is not a close. */
 export function closedOutcome(opp: {
   stage?: string | null;
-  pipelineStage?: { isWon?: boolean; isLost?: boolean } | null;
+  pipelineStage?: { isWon?: boolean; isLost?: boolean; deletedAt?: string | Date | null } | null;
 }): 'won' | 'lost' | null {
-  if (opp.pipelineStage?.isLost || opp.stage === 'closed_lost') return 'lost';
-  if (opp.pipelineStage?.isWon || opp.stage === 'closed_won') return 'won';
+  const stage = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
+  if (stage?.isLost || opp.stage === 'closed_lost') return 'lost';
+  if (stage?.isWon || opp.stage === 'closed_won') return 'won';
   return null;
 }
 
