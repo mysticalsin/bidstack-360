@@ -91,19 +91,41 @@ function StageBarTip({ active, label, rows }: {
 }
 
 /* ---------- won/lost by year ---------- */
-export function YearBars({ data, format, height = 160 }: { data: Array<{ year: string; won: number; lost: number }>; format: (v: number) => string; height?: number }) {
+export function YearBars({ data, format, height = 160 }: {
+  data: Array<{ year: string; won: number; lost: number; wonLabel?: string; lostLabel?: string }>;
+  format: (v: number) => string;
+  height?: number;
+}) {
   const reduced = useReducedMotion();
+  const labeled = data.some((d) => d.wonLabel || d.lostLabel);
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }} barGap={4} barCategoryGap="30%">
         <CartesianGrid vertical={false} />
         <XAxis dataKey="year" tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }} />
         <YAxis width={56} tickLine={false} axisLine={false} tickFormatter={(v) => format(Number(v))} />
-        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<ChartTip format={format} />} />
+        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={labeled ? <YearBarTip rows={data} /> : <ChartTip format={format} />} />
         <Bar dataKey="won" name="Won" fill="color-mix(in srgb, var(--success, #177048) 75%, transparent)" radius={[4, 4, 0, 0]} maxBarSize={36} {...anim(reduced)} />
         <Bar dataKey="lost" name="Lost" fill="color-mix(in srgb, var(--fg-tertiary, #6b6b6b) 30%, transparent)" radius={[4, 4, 0, 0]} maxBarSize={36} {...anim(reduced)} />
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+function YearBarTip({ active, label, rows }: {
+  active?: boolean;
+  label?: string | number;
+  rows: Array<{ year: string; wonLabel?: string; lostLabel?: string }>;
+}) {
+  if (!active || label === undefined) return null;
+  const row = rows.find((d) => d.year === String(label));
+  if (!row) return null;
+  return (
+    <div className="viz-tip">
+      <div style={{ marginBottom: 4 }}><b>{label}</b></div>
+      <div>Won: {row.wonLabel}</div>
+      <div>Lost: {row.lostLabel}</div>
+    </div>
   );
 }
 

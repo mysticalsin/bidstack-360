@@ -274,15 +274,21 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
   const total = data.pastProjects.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonValue = won.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonShare = total > 0n ? Number((wonValue * 1000n) / total) / 10 : 0;
-  const byYear = new Map<string, { won: number; lost: number }>();
+  const byYear = new Map<string, { won: bigint; lost: bigint }>();
   for (const p of data.pastProjects) {
     const y = String(new Date(p.closedAt).getUTCFullYear());
-    const cur = byYear.get(y) ?? { won: 0, lost: 0 };
-    const v = microsToUnits(BigInt(p.valueMicros));
+    const cur = byYear.get(y) ?? { won: 0n, lost: 0n };
+    const v = BigInt(p.valueMicros);
     if (p.outcome === 'won') cur.won += v; else cur.lost += v;
     byYear.set(y, cur);
   }
-  const years = [...byYear.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([year, v]) => ({ year, ...v }));
+  const years = [...byYear.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([year, v]) => ({
+    year,
+    won: microsToUnits(v.won),
+    lost: microsToUnits(v.lost),
+    wonLabel: amount(v.won),
+    lostLabel: amount(v.lost),
+  }));
 
   return (
     <section className="wd-surface" aria-labelledby="wd-track-h">
@@ -316,7 +322,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
           <figure
             className="wd-years viz-figure"
             role="img"
-            aria-label={`Won and lost value by close year: ${years.map((y) => `${y.year} won ${fmtCompact(y.won)}, lost ${fmtCompact(y.lost)}`).join('; ')}`}
+            aria-label={`Won and lost value by close year: ${years.map((y) => `${y.year} won ${y.wonLabel}, lost ${y.lostLabel}`).join('; ')}`}
           >
             <YearBars data={years} format={fmtCompact} />
             <ul className="viz-legend" aria-hidden>
