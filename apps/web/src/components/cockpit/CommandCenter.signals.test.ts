@@ -1,7 +1,11 @@
+import type { TFunction } from 'i18next';
 import { describe, expect, it } from 'vitest';
+
+import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
 import {
   complianceShare,
+  deriveNextMove,
   influenceProxyScore,
   openRiskFigures,
   readinessDetailFallback,
@@ -9,6 +13,24 @@ import {
   riskPenaltyFromRegister,
   sourceReceiptTotal,
 } from './CommandCenter';
+
+const t = ((key: string, fallback: string, options?: Record<string, unknown>) => {
+  if (!options) return fallback;
+  return Object.entries(options).reduce(
+    (text, [name, value]) => text.replaceAll(`{{${name}}}`, String(value)),
+    fallback,
+  );
+}) as unknown as TFunction;
+
+function nextMoveCockpit(partial: Partial<AccountCockpitSnapshot>): AccountCockpitSnapshot {
+  return {
+    compliance: [],
+    risks: [],
+    keyContacts: [],
+    company: { sourceAttribution: [{}, {}, {}] },
+    ...partial,
+  } as AccountCockpitSnapshot;
+}
 
 describe('command center counts', () => {
   it('counts a stored logo once and does not add a receipt that is not there', () => {
@@ -90,5 +112,40 @@ describe('command center counts', () => {
     // Why: the bar used to fill to 100% when the count was 0 open.
     expect(riskLoadProgress(0, 0)).toBe(0);
     expect(riskLoadProgress(2, 1)).toBe(40);
+  });
+
+  it('does not advance while high-severity risks or blocked checks sit off the six cards', () => {
+    // WHY: the next step read the six cards. Ten open critical risks, and three
+    // blocked checks, used to leave the sentence on the champion.
+    const low = {
+      id: 'r1',
+      title: 'Plant',
+      severity: 'low' as const,
+      status: 'open' as const,
+      owner: null,
+      mitigation: null,
+      dueDate: null,
+    };
+    const champion = nextMoveCockpit({
+      keyContacts: [{ id: 'c1', name: 'Ada', roleInDecision: 'champion' } as never],
+      risks: [low],
+      openRiskSeverity: { critical: 10, high: 0, medium: 0, low: 1 },
+    });
+    expect(deriveNextMove(champion, t)).toBe(
+      'Open high-severity risks past the six shown: 10. Review them before proposal approval.',
+    );
+    const blocked = nextMoveCockpit({
+      blockedCount: 3,
+      openRiskSeverity: { critical: 10, high: 0, medium: 0, low: 0 },
+      risks: [low],
+    });
+    expect(deriveNextMove(blocked, t)).toBe(
+      'Blocked checks past the six shown: 3. Unblock them before the bid gate.',
+    );
+    const named = nextMoveCockpit({
+      compliance: [{ id: 'k1', label: 'SOC evidence', status: 'blocked' } as never],
+      blockedCount: 4,
+    });
+    expect(deriveNextMove(named, t)).toBe('Unblock SOC evidence before the bid gate.');
   });
 });

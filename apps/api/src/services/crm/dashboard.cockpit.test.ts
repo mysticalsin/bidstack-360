@@ -804,11 +804,13 @@ describe('buildCockpit recorded facts only', () => {
       openRiskSeverity: { critical: 10, high: 0, medium: 0, low: 1 },
       compliantCount: 40,
       complianceTotal: 46,
+      blockedCount: 3,
       coveragePages: { dealsCapped: true },
     });
     expect(cockpit.openRiskSeverity).toEqual({ critical: 10, high: 0, medium: 0, low: 1 });
     expect(cockpit.compliantCount).toBe(40);
     expect(cockpit.complianceTotal).toBe(46);
+    expect(cockpit.blockedCount).toBe(3);
     expect(cockpit.registerDealsCapped).toBe(true);
   });
 });

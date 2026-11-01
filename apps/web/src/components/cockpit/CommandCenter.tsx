@@ -193,6 +193,30 @@ export function riskPenaltyFromRegister(input: {
   return input.risks.reduce((acc, risk) => acc + riskPenaltyFor(risk), 0);
 }
 
+/** Blocked checks on the loaded deals that the six cards do not show. */
+export function unseenBlockedCount(input: {
+  compliance: readonly { status: string | null }[];
+  blockedCount?: number;
+}): number {
+  if (input.blockedCount == null) return 0;
+  const shown = input.compliance.filter((item) => item.status === 'blocked').length;
+  return Math.max(0, input.blockedCount - shown);
+}
+
+/** Open critical and high risks on the loaded deals that the six cards do not show. */
+export function unseenHighSeverityCount(input: {
+  risks: readonly { status: string; severity: string | null }[];
+  openRiskSeverity?: { critical: number; high: number };
+}): number {
+  if (!input.openRiskSeverity) return 0;
+  const shown = input.risks.filter(
+    (risk) =>
+      (risk.status === 'open' || risk.status === 'in_progress') &&
+      (risk.severity === 'critical' || risk.severity === 'high'),
+  ).length;
+  return Math.max(0, input.openRiskSeverity.critical + input.openRiskSeverity.high - shown);
+}
+
 /** A full opportunity page means the register counts skip older deals. */
 export function readinessDetailFallback(registerDealsCapped?: boolean): string {
   return registerDealsCapped
@@ -223,6 +247,24 @@ export function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): s
           'Escalate {{title}} before proposal approval.',
           { title: urgentRisk.title },
         );
+  }
+
+  const blockedPastCards = unseenBlockedCount(cockpit);
+  if (blockedPastCards > 0) {
+    return t(
+      'commandCenter.nextMove.reviewUnseenBlocked',
+      'Blocked checks past the six shown: {{count}}. Unblock them before the bid gate.',
+      { count: blockedPastCards },
+    );
+  }
+
+  const highPastCards = unseenHighSeverityCount(cockpit);
+  if (highPastCards > 0) {
+    return t(
+      'commandCenter.nextMove.reviewUnseenHigh',
+      'Open high-severity risks past the six shown: {{count}}. Review them before proposal approval.',
+      { count: highPastCards },
+    );
   }
 
   if (openRiskFigures(cockpit).unseenOpen) {

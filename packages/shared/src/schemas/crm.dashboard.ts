@@ -249,6 +249,8 @@ export const AccountCockpitSnapshot = z.object({
   /** Checks marked compliant, and every check, on the loaded deals. */
   compliantCount: z.number().int().nonnegative().optional(),
   complianceTotal: z.number().int().nonnegative().optional(),
+  /** Checks marked blocked on the loaded deals. The six cards are not this. */
+  blockedCount: z.number().int().nonnegative().optional(),
   /** True when those deals are the latest 100, not the whole account. */
   registerDealsCapped: z.boolean().optional(),
   risksCapped: z.boolean().optional(),

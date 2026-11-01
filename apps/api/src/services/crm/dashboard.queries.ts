@@ -411,7 +411,7 @@ export async function loadAccountCompliance(
   prismaClient: PrismaClient,
   where: { orgId: string; deletedAt: null; opportunityId: { in: string[] } },
 ) {
-  const [page, compliantCount, complianceTotal] = await Promise.all([
+  const [page, compliantCount, complianceTotal, blockedCount] = await Promise.all([
     loadRegisterPage(
       (pageWhere, take) =>
         prismaClient.complianceCheck.findMany({
@@ -426,8 +426,9 @@ export async function loadAccountCompliance(
     ),
     prismaClient.complianceCheck.count({ where: { ...where, status: 'compliant' } }),
     prismaClient.complianceCheck.count({ where }),
+    prismaClient.complianceCheck.count({ where: { ...where, status: 'blocked' } }),
   ]);
-  return { ...page, compliantCount, complianceTotal };
+  return { ...page, compliantCount, complianceTotal, blockedCount };
 }
 
 export async function buildCompanyCockpit(
@@ -580,7 +581,14 @@ export async function buildCompanyCockpit(
         }
       : loadAccountRisks(prismaClient, registerWhere),
     accountOpportunityIds.length === 0
-      ? { rows: [], openCount: 0, capped: false, compliantCount: 0, complianceTotal: 0 }
+      ? {
+          rows: [],
+          openCount: 0,
+          capped: false,
+          compliantCount: 0,
+          complianceTotal: 0,
+          blockedCount: 0,
+        }
       : loadAccountCompliance(prismaClient, registerWhere),
     fetchBuyingRoleFacts(orgId, contactIds, prismaClient, company.id),
   ]);
@@ -600,6 +608,7 @@ export async function buildCompanyCockpit(
     openRiskSeverity: riskPage.openBySeverity,
     compliantCount: compliancePage.compliantCount,
     complianceTotal: compliancePage.complianceTotal,
+    blockedCount: compliancePage.blockedCount,
     risksCapped: riskPage.capped,
     complianceCapped: compliancePage.capped,
     buyingRoleFacts: buyingRoleFacts.rows,
