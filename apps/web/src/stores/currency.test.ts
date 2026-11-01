@@ -381,6 +381,20 @@ describe('useCurrencyStore', () => {
     expect(useCurrencyStore.getState().convert(100, 'eur')).toBeCloseTo(110, 2);
     expect(useCurrencyStore.getState().convert(150, ' cad ')).toBeCloseTo(110, 2);
   });
+
+  it('converts a unit amount through integer micros', async () => {
+    // WHY: 0.1 * 1.1 is 0.11000000000000001, not 0.11.
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    expect(useCurrencyStore.getState().convert(0.1, 'EUR')).toBe(0.11);
+  });
 });
 
 describe('useFormatMoney hook integration', () => {

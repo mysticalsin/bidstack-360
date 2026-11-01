@@ -1,3 +1,4 @@
+import { microsToUnits, unitsToMicros } from '@bidstack/shared';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -403,8 +404,12 @@ export const useCurrencyStore = create<CurrencyStore>()(
         const fromRate = source === base ? 1.0 : rates.rates[source];
         const toRate = to === base ? 1.0 : rates.rates[to];
         if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return amount;
-        // Convert through the provider base: amount / fromRate * toRate.
-        return (amount / fromRate) * toRate;
+        const negative = amount < 0;
+        const micros = unitsToMicros(negative ? -amount : amount);
+        if (micros == null) return amount;
+        const converted = convertMicrosByRates(negative ? -micros : micros, fromRate, toRate);
+        if (converted == null) return amount;
+        return microsToUnits(converted);
       },
 
       convertMicros: (micros, from) => {
