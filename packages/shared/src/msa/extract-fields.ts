@@ -204,8 +204,24 @@ function detectLiability(pages: TextPage[]): { amountMicros: number | null; curr
   };
 }
 
-function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }[] {
-  const lines: { role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }[] = [];
+/** Rows safe to store on the agreement. An unreadable rate stays on the review and is left off the record. */
+export function storableRateCard(value: unknown): Array<{ role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }> {
+  if (!Array.isArray(value)) return [];
+  const out: Array<{ role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }> = [];
+  for (const row of value) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const item = row as { role?: unknown; rateMicros?: unknown; unit?: unknown };
+    if (typeof item.role !== 'string' || !item.role.trim()) continue;
+    if (typeof item.rateMicros !== 'number' || !Number.isSafeInteger(item.rateMicros) || item.rateMicros < 0) continue;
+    if (item.rateMicros > 1_000_000_000_000) continue;
+    const unit = item.unit === 'hour' || item.unit === 'month' || item.unit === 'year' ? item.unit : 'day';
+    out.push({ role: item.role.trim(), rateMicros: item.rateMicros, unit });
+  }
+  return out;
+}
+
+function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number | null; unit: 'day' | 'hour' | 'month' | 'year' }[] {
+  const lines: { role: string; rateMicros: number | null; unit: 'day' | 'hour' | 'month' | 'year' }[] = [];
   const unitMap: Record<string, 'day' | 'hour' | 'month' | 'year'> = {
     day: 'day',
     daily: 'day',
@@ -216,13 +232,13 @@ function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number; 
   for (const page of pages) {
     for (const raw of page.text.split(/\r?\n/)) {
       const m = raw.match(
-        /^\s*([A-Za-z][A-Za-z /&'-]{2,60}?)\s*[:.\t|]*\s*[€£$]?\s*([\d.,]{2,12})\s*(?:EUR|USD|GBP)?\s*(?:\/|per|par)?\s*(day|daily|hour|month|year)\b/i,
+        /^\s*([A-Za-z][A-Za-z /&'-]{2,60}?)\s*[:.\t|]*\s*[€£$]?\s*([\d.,]{2,24})\s*(?:EUR|USD|GBP)?\s*(?:\/|per|par)?\s*(day|daily|hour|month|year)\b/i,
       );
       if (!m) continue;
       const role = m[1]!.trim().replace(/[:.-]+$/, '');
       const rateMicros = contractMicros(m[2] ?? '');
       const unit = unitMap[m[3]!.toLowerCase()] ?? 'day';
-      if (!role || rateMicros == null) continue;
+      if (!role) continue;
       lines.push({ role, rateMicros, unit });
     }
   }
