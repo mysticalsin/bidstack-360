@@ -91,5 +91,9 @@ describe('getPipelineKpis money precision', () => {
 
     const args = opportunityGroupBy.mock.calls[0]![0] as { where?: Record<string, unknown> };
     expect(args.where).toMatchObject({ orgId: 'org-42', deletedAt: null });
+    const lost = opportunityGroupBy.mock.calls[1]![0] as { where: { pipelineStage: unknown } };
+    const won = opportunityGroupBy.mock.calls[2]![0] as { where: { pipelineStage: unknown } };
+    expect(lost.where.pipelineStage).toMatchObject({ isLost: true, deletedAt: null });
+    expect(won.where.pipelineStage).toMatchObject({ isWon: true, isLost: false, deletedAt: null });
   });
 });

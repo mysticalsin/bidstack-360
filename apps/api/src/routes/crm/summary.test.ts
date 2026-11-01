@@ -167,6 +167,40 @@ describe('crm summary routes', () => {
     expect(after.velocity.closedThisQuarter).toBe(before.velocity.closedThisQuarter + 1);
   });
 
+  failIfNoDb('a deleted lost stage returns to the open pipeline', async () => {
+    // WHY: the headline still moved a deal into lost after its stage row was
+    // deleted, so the open total stayed short.
+    const before = await getPipelineKpis(orgId);
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Deleted flag ${Date.now()}` },
+    });
+    const stage = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: 'price_lost', name: 'Price lost', isLost: true },
+    });
+    await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-DLF-${Date.now()}`,
+        customer: 'Deleted Flag Co',
+        name: 'Hidden while the flag is live',
+        stage: 's2_sent',
+        pipelineStageId: stage.id,
+        valueMicros: 2_000_000n,
+        probability: 10,
+        intel: {},
+      },
+    });
+    const hidden = await getPipelineKpis(orgId);
+    expect(hidden.totalOpen).toBe(before.totalOpen);
+    await prisma.pipelineStage.update({
+      where: { id: stage.id },
+      data: { deletedAt: new Date() },
+    });
+    const shown = await getPipelineKpis(orgId);
+    expect(shown.totalOpen).toBe(before.totalOpen + 1);
+    expect(shown.totalValueOpen).toBe(before.totalValueOpen + 2);
+  });
+
   failIfNoDb('GET /api/crm/summary rejects invalid limits', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/crm/summary?limit=0' });
     expect(res.statusCode).toBe(400);

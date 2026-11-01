@@ -52,7 +52,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
       where: {
         ...live,
         NOT: { stage: 'closed_lost' },
-        pipelineStage: { isLost: true },
+        pipelineStage: { isLost: true, deletedAt: null },
       },
       _count: { _all: true },
       _sum: { valueMicros: true },
@@ -62,7 +62,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
       where: {
         ...live,
         NOT: { stage: 'closed_won' },
-        pipelineStage: { isLost: false, isWon: true },
+        pipelineStage: { isLost: false, isWon: true, deletedAt: null },
       },
       _count: { _all: true },
       _sum: { valueMicros: true },
@@ -75,6 +75,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   }
   // The enum key can still say an open stage after the stage row is marked
   // lost or won. Those deals belong with the closed outcome, not the open book.
+  // A deleted stage row does not.
   moveFlagged(sums, lostFlagged, 'closed_lost');
   moveFlagged(sums, wonFlagged, 'closed_won');
 
