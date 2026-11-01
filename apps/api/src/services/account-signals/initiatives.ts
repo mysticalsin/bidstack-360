@@ -232,13 +232,16 @@ export async function loadInitiatives(
         ...it,
         confidenceScore: Math.round(score * 100) / 100,
         confidence: label(score),
-        evidence: it.evidence.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).slice(0, 8),
+        evidence: (() => {
+          const sorted = it.evidence.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+          return sorted.slice(0, 8);
+        })(),
+        evidenceHidden: Math.max(0, it.evidence.length - 8),
       };
     })
     .sort(
       (a, b) =>
         b.confidenceScore - a.confidenceScore || (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''),
-    )
-    .slice(0, 8);
+    );
   return { items, evidenceCapped };
 }

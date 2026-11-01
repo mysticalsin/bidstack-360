@@ -751,6 +751,8 @@ export const Initiative = z.object({
   firstSeen: Iso.nullable(),
   lastSeen: Iso.nullable(),
   evidence: z.array(InitiativeEvidence),
+  /** Evidence chips older than the eight shown. */
+  evidenceHidden: z.number().int().nonnegative().optional(),
   hook: z.object({ offering: z.string(), pitch: z.string(), nextStep: z.string(), alreadySold: z.boolean() }),
   sample: z.boolean(),
 });

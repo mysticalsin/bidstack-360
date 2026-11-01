@@ -126,6 +126,14 @@ describe('InitiativesView', () => {
     expect(screen.getByText('Latest 100 news and meetings')).toBeTruthy();
   });
 
+  it('says when older evidence is not listed', () => {
+    // WHY: the card said "3 evidence items" after four older rows had been dropped.
+    wrap(<InitiativesView items={[init(1, { evidenceHidden: 4 })]} />);
+    expect(screen.getByRole('button', { name: 'See 3 of 7 evidence items' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'See 3 of 7 evidence items' }));
+    expect(screen.getByText('4 older items are not listed.')).toBeTruthy();
+  });
+
   it('shows confidence, evidence counts, the hook, evidence on click and caps at four', () => {
     wrap(<InitiativesView items={[init(1), init(2, { confidence: 'low', hook: { offering: 'Cloud', pitch: '', nextStep: '', alreadySold: true } }), init(3), init(4), init(5)]} />);
     expect(screen.getAllByRole('article')).toHaveLength(4);
