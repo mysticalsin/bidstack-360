@@ -53,6 +53,28 @@ describe('computeSignalCoverage', () => {
     }
   });
 
+  it('names a coverage factor when its list is only a page', () => {
+    // WHY: the latest 100 opportunities and the 20 highest-influence contacts were scored as the whole account.
+    const health = computeSignalCoverage(
+      {
+        company: company(),
+        contacts: [{ influence: 5, email: 'a@x.com' }],
+        openDeals: [{ probability: 40, dueDate: new Date(), owner: { email: 'o@x.com' } }],
+        tasks: [],
+      },
+      { contactsCapped: true, dealsCapped: true, tasksCapped: true },
+    );
+    expect(health.factors?.find((factor) => factor.key === 'contacts')?.whatItMeasures).toContain(
+      '20 highest-influence contacts',
+    );
+    expect(health.factors?.find((factor) => factor.key === 'pipeline')?.whatItMeasures).toContain(
+      'latest 100 opportunities',
+    );
+    expect(health.factors?.find((factor) => factor.key === 'engagement')?.whatItMeasures).toContain(
+      'latest 50 tasks',
+    );
+  });
+
   it('rewards a fully covered account with a strong composite', () => {
     const health = computeSignalCoverage({
       company: company({
@@ -211,6 +233,25 @@ describe('applyFieldOverrides', () => {
     });
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Annual revenue')?.value).toBe(
       '8,598,204,328,457.18 unspecified',
+    );
+  });
+
+  it('uses the exact open-deal count when the opportunity page is full', () => {
+    // WHY: the latest 100 updated opportunities can be closed while older deals are still open.
+    const cockpit = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      openDealCount: 40,
+      coveragePages: { dealsCapped: true },
+    });
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('40');
+    expect(cockpit.health.factors?.find((factor) => factor.key === 'pipeline')?.whatItMeasures).toContain(
+      'latest 100 opportunities',
     );
   });
 

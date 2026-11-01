@@ -158,12 +158,19 @@ function factor(
   };
 }
 
-export function computeSignalCoverage(input: {
-  company: z.infer<typeof CrmCompany>;
-  contacts: Array<{ influence: number | null; email: string | null }>;
-  openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>;
-  tasks: Array<{ status: string; dueDate: Date | null; createdAt: Date }>;
-}): CompanyHealth {
+export const COCKPIT_OPP_PAGE = 100;
+export const COCKPIT_CONTACT_PAGE = 20;
+export const COCKPIT_TASK_PAGE = 50;
+
+export function computeSignalCoverage(
+  input: {
+    company: z.infer<typeof CrmCompany>;
+    contacts: Array<{ influence: number | null; email: string | null }>;
+    openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>;
+    tasks: Array<{ status: string; dueDate: Date | null; createdAt: Date }>;
+  },
+  pages?: { contactsCapped?: boolean; dealsCapped?: boolean; tasksCapped?: boolean },
+): CompanyHealth {
   const { company, contacts, openDeals, tasks } = input;
 
   const freshness = company.strategicIntel?.freshness;
@@ -218,6 +225,15 @@ export function computeSignalCoverage(input: {
   contactFactor.recommendedAction = contactAction(contacts);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
   pipeline.recommendedAction = pipelineAction(openDeals);
+  if (pages?.contactsCapped) {
+    contactFactor.whatItMeasures += ` Scored from the ${COCKPIT_CONTACT_PAGE} highest-influence contacts.`;
+  }
+  if (pages?.dealsCapped) {
+    pipeline.whatItMeasures += ` Scored from the latest ${COCKPIT_OPP_PAGE} opportunities.`;
+  }
+  if (pages?.tasksCapped) {
+    engagement.whatItMeasures += ` Scored from the latest ${COCKPIT_TASK_PAGE} tasks.`;
+  }
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
   // Weights: external intel is the cockpit's backbone; the rest split evenly.
@@ -590,6 +606,8 @@ export function buildCockpit({
   performance,
   buyingRoleFacts = [],
   now = new Date(),
+  coveragePages,
+  openDealCount,
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
@@ -672,6 +690,10 @@ export function buildCockpit({
     observedAt: Date | null;
   }>;
   now?: Date;
+  /** Set when a cockpit list filled its page, so coverage is not the whole account. */
+  coveragePages?: { contactsCapped?: boolean; dealsCapped?: boolean; tasksCapped?: boolean };
+  /** Exact open-deal count when the opportunity page is not the whole book. */
+  openDealCount?: number;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
   const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
@@ -838,7 +860,7 @@ export function buildCockpit({
       },
       {
         label: 'Open deals',
-        value: openDeals.length.toString(),
+        value: (openDealCount ?? openDeals.length).toString(),
         detail: 'count of open opportunities on this account',
         tone: 'amber',
         ...internalSource,
@@ -868,7 +890,7 @@ export function buildCockpit({
       contacts: accountContacts,
       openDeals,
       tasks: accountTasks,
-    }),
+    }, coveragePages),
     keyContacts: accountContacts.slice(0, 5).map((contact) => ({
       id: contact.id,
       source: 'external_crm',

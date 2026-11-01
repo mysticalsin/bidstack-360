@@ -16,6 +16,7 @@
 import { type z } from 'zod';
 
 import { type PrismaClient } from '@bidstack/db';
+import { excludeClosedOutcome } from '../../routes/opportunities.helpers.js';
 import type { CrmDashboardSnapshot } from '@bidstack/shared';
 
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
@@ -35,6 +36,9 @@ import { refreshPublicCompanyFacts } from './enrichment.service.js';
 import {
   buildActivities,
   buildCockpit,
+  COCKPIT_CONTACT_PAGE,
+  COCKPIT_OPP_PAGE,
+  COCKPIT_TASK_PAGE,
   mapStoredInsights,
   serializeBidOpportunity,
 } from './dashboard.cockpit.js';
@@ -381,7 +385,7 @@ export async function buildDashboardSnapshot(
             createdAt: true,
           },
           orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
-          take: 20,
+          take: COCKPIT_CONTACT_PAGE,
         })
       : Promise.resolve([]),
     accountOpportunityWhere
@@ -412,7 +416,7 @@ export async function buildDashboardSnapshot(
             },
           },
           orderBy: { updatedAt: 'desc' },
-          take: 100,
+          take: COCKPIT_OPP_PAGE,
         })
       : Promise.resolve([]),
     isCompanyUuid(selectedCompany.id) || accountOpportunityWhere
@@ -436,9 +440,44 @@ export async function buildDashboardSnapshot(
             assignee: { select: { name: true, email: true } },
           },
           orderBy: { createdAt: 'desc' },
-          take: 50,
+          take: COCKPIT_TASK_PAGE,
         })
       : Promise.resolve([]),
+  ]);
+  const accountTaskWhere = {
+    orgId,
+    deletedAt: null as null,
+    OR: [
+      ...(isCompanyUuid(selectedCompany.id) ? [{ accountId: selectedCompany.id }] : []),
+      ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
+    ],
+  };
+  const [dealsCapped, contactsCapped, tasksCapped, openDealCount] = await Promise.all([
+    !accountOpportunityWhere || accountOpportunities.length < COCKPIT_OPP_PAGE
+      ? Promise.resolve(false)
+      : prisma.opportunity.count({ where: accountOpportunityWhere }).then((total) => total > COCKPIT_OPP_PAGE),
+    !isCompanyUuid(selectedCompany.id) || contacts.length < COCKPIT_CONTACT_PAGE
+      ? Promise.resolve(false)
+      : prisma.contact
+          .count({ where: { orgId, companyId: selectedCompany.id, deletedAt: null } })
+          .then((total) => total > COCKPIT_CONTACT_PAGE),
+    accountTasks.length < COCKPIT_TASK_PAGE
+      ? Promise.resolve(false)
+      : prisma.task.count({ where: accountTaskWhere }).then((total) => total > COCKPIT_TASK_PAGE),
+    !accountOpportunityWhere || accountOpportunities.length < COCKPIT_OPP_PAGE
+      ? Promise.resolve(undefined)
+      : (async () => {
+          const total = await prisma.opportunity.count({ where: accountOpportunityWhere });
+          if (total <= COCKPIT_OPP_PAGE) return undefined;
+          const { NOT } = excludeClosedOutcome();
+          return prisma.opportunity.count({
+            where: {
+              ...accountOpportunityWhere,
+              stage: { notIn: ['closed_won', 'closed_lost', 'customer'] },
+              NOT,
+            },
+          });
+        })(),
   ]);
   const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
   const contactIds = contacts.map((contact) => contact.id);
@@ -499,6 +538,8 @@ export async function buildDashboardSnapshot(
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
       performance,
+      coveragePages: { contactsCapped, dealsCapped, tasksCapped },
+      openDealCount,
     }),
     companies,
     deals: snapshotDeals,
