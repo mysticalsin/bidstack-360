@@ -628,6 +628,9 @@ export function buildCockpit({
   openDealCount,
   openRiskCount,
   openComplianceCount,
+  openRiskSeverity,
+  compliantCount,
+  complianceTotal,
   risksCapped,
   complianceCapped,
   buyingRolesCapped = false,
@@ -719,6 +722,9 @@ export function buildCockpit({
   openDealCount?: number;
   openRiskCount?: number;
   openComplianceCount?: number;
+  openRiskSeverity?: { critical: number; high: number; medium: number; low: number };
+  compliantCount?: number;
+  complianceTotal?: number;
   risksCapped?: boolean;
   complianceCapped?: boolean;
   /** Accepted buying-role facts filled their page, so one role is not the whole set. */
@@ -955,6 +961,10 @@ export function buildCockpit({
     compliance: visibleCompliance.map(serializeCompliance),
     openRiskCount,
     openComplianceCount,
+    openRiskSeverity,
+    compliantCount,
+    complianceTotal,
+    registerDealsCapped: coveragePages?.dealsCapped,
     risksCapped,
     complianceCapped,
     buyingRolesCapped,

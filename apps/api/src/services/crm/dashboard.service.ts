@@ -491,10 +491,15 @@ export async function buildDashboardSnapshot(
   const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
   const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
-      ? { rows: [], openCount: 0, capped: false }
+      ? {
+          rows: [],
+          openCount: 0,
+          capped: false,
+          openBySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+        }
       : loadAccountRisks(prisma, registerWhere),
     accountOpportunityIds.length === 0
-      ? { rows: [], openCount: 0, capped: false }
+      ? { rows: [], openCount: 0, capped: false, compliantCount: 0, complianceTotal: 0 }
       : loadAccountCompliance(prisma, registerWhere),
     fetchBuyingRoleFacts(orgId, contactIds, prisma, selectedCompany.id),
   ]);
@@ -517,6 +522,9 @@ export async function buildDashboardSnapshot(
       compliance: compliancePage.rows,
       openRiskCount: riskPage.openCount,
       openComplianceCount: compliancePage.openCount,
+      openRiskSeverity: riskPage.openBySeverity,
+      compliantCount: compliancePage.compliantCount,
+      complianceTotal: compliancePage.complianceTotal,
       risksCapped: riskPage.capped,
       complianceCapped: compliancePage.capped,
       buyingRoleFacts: buyingRoleFacts.rows,

@@ -237,6 +237,20 @@ export const AccountCockpitSnapshot = z.object({
   /** Exact open counts. Set when the register page is not the whole list. */
   openRiskCount: z.number().int().nonnegative().optional(),
   openComplianceCount: z.number().int().nonnegative().optional(),
+  /** Open risks on the loaded deals, by severity. The six cards are not this. */
+  openRiskSeverity: z
+    .object({
+      critical: z.number().int().nonnegative(),
+      high: z.number().int().nonnegative(),
+      medium: z.number().int().nonnegative(),
+      low: z.number().int().nonnegative(),
+    })
+    .optional(),
+  /** Checks marked compliant, and every check, on the loaded deals. */
+  compliantCount: z.number().int().nonnegative().optional(),
+  complianceTotal: z.number().int().nonnegative().optional(),
+  /** True when those deals are the latest 100, not the whole account. */
+  registerDealsCapped: z.boolean().optional(),
   risksCapped: z.boolean().optional(),
   complianceCapped: z.boolean().optional(),
   /** True when accepted buying-role facts filled the 200-row page. */

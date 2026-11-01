@@ -39,10 +39,10 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
       label: t('commandCenter.signal.readiness.label', 'Bid readiness proxy'),
       value: `${readiness}%`,
       detail: t(
-        'commandCenter.signal.readiness.detail',
-        riskLoad.unseenOpen
-          ? 'weighted mix from the latest 50 register rows, not the whole account'
-          : 'weighted mix of recorded signals on this account, not a measured score',
+        cockpit.registerDealsCapped
+          ? 'commandCenter.signal.readiness.detailDealPage'
+          : 'commandCenter.signal.readiness.detail',
+        readinessDetailFallback(cockpit.registerDealsCapped),
       ),
       progress: readiness,
       tone: readiness >= 85 ? 'jade' : readiness >= 68 ? 'blue' : 'amber',
@@ -141,12 +141,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
 
 function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
   const health = cockpit.health.score;
-  const compliance =
-    cockpit.compliance.length === 0
-      ? 0
-      : (cockpit.compliance.filter((item) => item.status === 'compliant').length /
-          cockpit.compliance.length) *
-        100;
+  const compliance = complianceShare(cockpit);
   const sources = Math.min(
     100,
     sourceReceiptTotal(cockpit.company.sourceAttribution.length, Boolean(cockpit.company.logo)) * 18,
@@ -155,10 +150,54 @@ function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
     100,
     cockpit.keyContacts.reduce((acc, person) => acc + (person.influence ?? 0), 0) * 12,
   );
-  const riskPenalty = cockpit.risks.reduce((acc, risk) => acc + riskPenaltyFor(risk), 0);
+  const riskPenalty = riskPenaltyFromRegister(cockpit);
   return clamp(
     Math.round(health * 0.34 + compliance * 0.26 + sources * 0.2 + contacts * 0.2 - riskPenalty),
   );
+}
+
+/** The six cards are a sample. Counts are the checks on the loaded deals. */
+export function complianceShare(input: {
+  compliance: readonly { status: string | null }[];
+  compliantCount?: number;
+  complianceTotal?: number;
+}): number {
+  if (input.complianceTotal != null && input.compliantCount != null) {
+    if (input.complianceTotal === 0) return 0;
+    return (input.compliantCount / input.complianceTotal) * 100;
+  }
+  if (input.compliance.length === 0) return 0;
+  return (
+    (input.compliance.filter((item) => item.status === 'compliant').length /
+      input.compliance.length) *
+    100
+  );
+}
+
+const SEVERITY_PENALTY = { critical: 14, high: 9, medium: 4, low: 1 } as const;
+
+/** Open risks on the loaded deals, not the six rows on the card. */
+export function riskPenaltyFromRegister(input: {
+  risks: readonly RiskItem[];
+  openRiskSeverity?: { critical: number; high: number; medium: number; low: number };
+}): number {
+  const counted = input.openRiskSeverity;
+  if (counted) {
+    return (
+      counted.critical * SEVERITY_PENALTY.critical +
+      counted.high * SEVERITY_PENALTY.high +
+      counted.medium * SEVERITY_PENALTY.medium +
+      counted.low * SEVERITY_PENALTY.low
+    );
+  }
+  return input.risks.reduce((acc, risk) => acc + riskPenaltyFor(risk), 0);
+}
+
+/** A full opportunity page means the register counts skip older deals. */
+export function readinessDetailFallback(registerDealsCapped?: boolean): string {
+  return registerDealsCapped
+    ? 'weighted mix of checks on the latest 100 opportunities, not the whole account'
+    : 'weighted mix of recorded signals on this account, not a measured score';
 }
 
 export function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): string {
@@ -293,11 +332,8 @@ export function riskLoadProgress(openRisks: number, criticalRisks: number): numb
 
 function riskPenaltyFor(risk: RiskItem): number {
   if (risk.status === 'mitigated' || risk.status === 'accepted') return 0;
-  if (risk.severity === 'critical') return 14;
-  if (risk.severity === 'high') return 9;
-  if (risk.severity === 'medium') return 4;
-  if (risk.severity === 'low') return 1;
-  return 0;
+  if (risk.severity == null) return 0;
+  return SEVERITY_PENALTY[risk.severity];
 }
 
 function clamp(value: number): number {
