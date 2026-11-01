@@ -232,7 +232,7 @@ export function TerritoriesPage() {
             value={String(totals.totalCountries)}
             detail={t(
               'territories.kpiCountriesBasis',
-              'countries with at least one opportunity in this view',
+              'countries with at least one open opportunity',
             )}
             tone="jade"
           />
@@ -241,7 +241,7 @@ export function TerritoriesPage() {
             value={String(totals.totalOpportunities)}
             detail={t(
               'territories.kpiOpportunitiesBasis',
-              'opportunity count in this territory view',
+              'open opportunities in this view',
             )}
             tone="amber"
           />
@@ -250,7 +250,7 @@ export function TerritoriesPage() {
             value={`${totals.avgProbability}%`}
             detail={t(
               'territories.kpiProbabilityBasis',
-              'stored average on these opportunities, not a measured win rate',
+              'open deals only. A live stage supplies the number. A deal with no live stage uses its stored probability.',
             )}
             tone="purple"
           />

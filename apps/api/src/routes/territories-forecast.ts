@@ -213,7 +213,12 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           COALESCE(o.country, t.country_codes[1], 'Unknown') AS "countryCode",
           COUNT(*)::int AS "opportunityCount",
           COALESCE(SUM(o.value_micros), 0)::text AS "totalValueMicros",
-          COALESCE(SUM(o.probability), 0)::float8 AS "sumProbability",
+          COALESCE(SUM(
+            CASE
+              WHEN live.id IS NOT NULL THEN live.probability::float8
+              ELSE o.probability::float8
+            END
+          ), 0)::float8 AS "sumProbability",
           COALESCE(
             array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL),
             ARRAY[]::text[]
@@ -225,8 +230,18 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         FROM opportunities o
         LEFT JOIN territories t ON t.id = o.territory_id
         LEFT JOIN users u ON u.id = o.owner_id
+        LEFT JOIN pipeline_stages live
+          ON live.id = o.pipeline_stage_id
+         AND live.deleted_at IS NULL
         WHERE o.org_id = ${req.auth.orgId}::uuid
           AND o.deleted_at IS NULL
+          AND o.stage NOT IN ('closed_won', 'closed_lost')
+          AND NOT EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND (ps.is_lost OR ps.is_won)
+          )
         GROUP BY COALESCE(o.country, t.country_codes[1], 'Unknown')
       `);
 
@@ -346,7 +361,12 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           ${keyExpr} AS "key",
           COUNT(*)::int AS "opportunityCount",
           COALESCE(SUM(o.value_micros), 0)::text AS "totalValueMicros",
-          COALESCE(SUM(o.probability), 0)::float8 AS "sumProbability",
+          COALESCE(SUM(
+            CASE
+              WHEN live.id IS NOT NULL THEN live.probability::float8
+              ELSE o.probability::float8
+            END
+          ), 0)::float8 AS "sumProbability",
           COALESCE(
             array_agg(DISTINCT u.name) FILTER (WHERE u.name IS NOT NULL),
             ARRAY[]::text[]
@@ -354,8 +374,18 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         FROM opportunities o
         LEFT JOIN companies c ON c.id = o.company_id
         LEFT JOIN users u ON u.id = o.owner_id
+        LEFT JOIN pipeline_stages live
+          ON live.id = o.pipeline_stage_id
+         AND live.deleted_at IS NULL
         WHERE o.org_id = ${req.auth.orgId}::uuid
           AND o.deleted_at IS NULL
+          AND o.stage NOT IN ('closed_won', 'closed_lost')
+          AND NOT EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND (ps.is_lost OR ps.is_won)
+          )
         GROUP BY ${keyExpr}
       `);
 

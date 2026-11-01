@@ -590,7 +590,7 @@ export const WorldMap = memo(function WorldMap({
           <div className="text-[10px] font-medium tabular-nums text-[var(--fg-tertiary)] mt-0.5">
             {t(
               'worldMap.tooltip.avgProbability',
-              'Average stored stage probability {{probability}}%',
+              'Average open-stage probability {{probability}}%',
               { probability: hovered.item.avgProbability },
             )}
           </div>

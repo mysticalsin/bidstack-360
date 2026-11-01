@@ -541,7 +541,7 @@
       "opportunityCount": "{{count}} opportunities",
       "opportunityCount_one": "{{count}} opportunity",
       "opportunityCount_other": "{{count}} opportunities",
-      "avgProbability": "Stored avg probability {{probability}}%, not a measured win rate"
+      "avgProbability": "Average open-stage probability {{probability}}%"
     }
   },
   "territoryPanels": {
@@ -1209,9 +1209,9 @@
     "sectionCaptionRegion": "Heat is unspecified pipeline by country. Currency not recorded; not a euro forecast.",
     "sectionCaptionSegment": "Bar length is share of the largest segment. Amounts are unspecified opportunity value.",
     "kpiPipelineBasis": "currency not recorded; not a euro forecast",
-    "kpiProbabilityBasis": "stored average on these opportunities, not a measured win rate",
-    "kpiCountriesBasis": "countries with at least one opportunity in this view",
-    "kpiOpportunitiesBasis": "opportunity count in this territory view",
+    "kpiProbabilityBasis": "open deals only. A live stage supplies the number. A deal with no live stage uses its stored probability.",
+    "kpiCountriesBasis": "countries with at least one open opportunity",
+    "kpiOpportunitiesBasis": "open opportunities in this view",
     "breakdownTablistLabel": "Breakdown dimension",
     "tabRegion": "Region",
     "tabIndustry": "Industry",
@@ -3569,7 +3569,7 @@
     "emptyTitle": "No data yet",
     "oppCountOne": "{{count}} opp",
     "oppCountOther": "{{count}} opps",
-    "avgProbability": "{{percent}}% stored avg probability",
+    "avgProbability": "{{percent}}% open-stage probability",
     "overflowOne": "+ {{count}} more {{noun}} not shown",
     "overflowIndustryOther": "+ {{count}} more {{noun}} segments not shown",
     "overflowOther": "+ {{count}} more {{noun}}s not shown"

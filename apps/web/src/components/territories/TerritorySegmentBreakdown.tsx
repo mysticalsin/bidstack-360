@@ -123,7 +123,7 @@ export function TerritorySegmentBreakdown({
                 <span>
                   {t(
                     'territorySegmentBreakdown.avgProbability',
-                    '{{percent}}% stored avg probability',
+                    '{{percent}}% open-stage probability',
                     { percent: s.avgProbability },
                   )}
                 </span>

@@ -163,6 +163,105 @@ describe('territories analytics — money precision', () => {
   );
 });
 
+describe('territories analytics — open stage probability', () => {
+  skipIfNoDb('a lost deal stays out and a linked stage supplies the average', async () => {
+    // WHY: the map averaged every deal's own probability, including lost
+    // deals. The number on the map is the live stage probability for open deals.
+    const stamp = Date.now();
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `Map ${stamp}` },
+    });
+    const stage = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 's2_sent',
+        name: 'Sent',
+        probability: 70,
+      },
+    });
+    const lostStage = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'price_lost',
+        name: 'Price lost',
+        isLost: true,
+        probability: 90,
+      },
+    });
+    await prisma.opportunity.createMany({
+      data: [
+        {
+          orgId: orgId!,
+          code: `OP-MAP1-${stamp}`,
+          customer: 'Map Co',
+          name: 'On the stage',
+          stage: 's2_sent',
+          pipelineStageId: stage.id,
+          probability: 10,
+          country: 'ZZ',
+          valueMicros: 2_000_000n,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-MAP2-${stamp}`,
+          customer: 'Map Co',
+          name: 'Lost flag',
+          stage: 's2_sent',
+          pipelineStageId: lostStage.id,
+          probability: 90,
+          country: 'ZZ',
+          valueMicros: 9_000_000n,
+          intel: {},
+        },
+        {
+          orgId: orgId!,
+          code: `OP-MAP3-${stamp}`,
+          customer: 'Map Co',
+          name: 'No stage',
+          stage: 's1_lead',
+          probability: 40,
+          country: 'ZY',
+          valueMicros: 1_000_000n,
+          intel: {},
+        },
+      ],
+    });
+    try {
+      const res = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        items: Array<{
+          countryCode: string;
+          opportunityCount: number;
+          totalValueMicros: number;
+          avgProbability: number;
+        }>;
+      };
+      const linked = body.items.find((item) => item.countryCode === 'ZZ');
+      const stored = body.items.find((item) => item.countryCode === 'ZY');
+      expect(linked).toMatchObject({
+        opportunityCount: 1,
+        totalValueMicros: 2_000_000,
+        avgProbability: 70,
+      });
+      expect(stored).toMatchObject({
+        opportunityCount: 1,
+        totalValueMicros: 1_000_000,
+        avgProbability: 40,
+      });
+    } finally {
+      await prisma.opportunity.deleteMany({
+        where: { orgId: orgId!, code: { in: [`OP-MAP1-${stamp}`, `OP-MAP2-${stamp}`, `OP-MAP3-${stamp}`] } },
+      });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
+      await prisma.pipeline.delete({ where: { id: pipeline.id } });
+    }
+  });
+});
+
 describe('forecast owner scoping', () => {
   // WHY: the Forecasts grid lists every owner's rows and edits them inline, so
   // POST /forecasts must write the row's owner — and only if that owner is in
