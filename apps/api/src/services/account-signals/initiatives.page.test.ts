@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { confirmThemeFromProbes, evidencePageCapped, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
+import { confirmThemeFromProbes, evidencePageCapped, meetingEvidenceLines, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
 
 describe('evidencePageCapped', () => {
   it('names a full news or meeting page only when another row exists', () => {
@@ -49,5 +49,15 @@ describe('evidencePageCapped', () => {
     });
     expect(confirmed).toBe(true);
     expect(words).toEqual(['cloud', 'kubernetes']);
+  });
+
+  it('keeps the seventh line from a meeting', () => {
+    // WHY: slice(0, 6) dropped a challenge before it could be evidence.
+    const lines = meetingEvidenceLines({
+      opportunities: ['one', 'two', 'three'],
+      challenges: ['four', 'five', 'six', 'seven'],
+    });
+    expect(lines).toHaveLength(7);
+    expect(lines[6]).toBe('seven');
   });
 });

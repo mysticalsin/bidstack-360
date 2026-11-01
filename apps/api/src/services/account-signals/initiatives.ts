@@ -46,6 +46,11 @@ export function themeConfirmedByRows(
   return rows.some((row) => themeForText(`${row.category} ${row.name}`) === theme);
 }
 
+/** Every opportunity and challenge line. A meeting is not shortened to six. */
+export function meetingEvidenceLines(meeting: { opportunities: string[]; challenges: string[] }): string[] {
+  return [...meeting.opportunities, ...meeting.challenges];
+}
+
 /** Each probe word is its own lookup, so one noisy word cannot hide the next. */
 export async function confirmThemeFromProbes(
   theme: InitiativeTheme,
@@ -286,10 +291,15 @@ export async function loadInitiatives(
   }
   // 3. What they told us in meetings (only themes already on the board).
   for (const m of meetings) {
-    for (const line of [...m.opportunities, ...m.challenges].slice(0, 6)) {
-      const it = byTheme.get(themeForText(line));
+    const bumped = new Set<InitiativeTheme>();
+    for (const line of meetingEvidenceLines(m)) {
+      const theme = themeForText(line);
+      const it = byTheme.get(theme);
       if (!it) continue;
-      it.confidenceScore = Math.min(0.95, it.confidenceScore + 0.1);
+      if (!bumped.has(theme)) {
+        bumped.add(theme);
+        it.confidenceScore = Math.min(0.95, it.confidenceScore + 0.1);
+      }
       const at = m.heldAt.toISOString();
       it.evidence.push({
         kind: 'meeting',
