@@ -193,6 +193,13 @@ export function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): s
     );
   }
 
+  if (cockpit.buyingRolesCapped) {
+    return t(
+      'commandCenter.nextMove.buyingRoles',
+      'Buying-role evidence stopped at 200 accepted facts. Confirm the champion before the next milestone.',
+    );
+  }
+
   const champion = cockpit.keyContacts.find((person) => person.roleInDecision === 'champion');
   if (champion)
     return t(

@@ -612,6 +612,7 @@ export function buildCockpit({
   openComplianceCount,
   risksCapped,
   complianceCapped,
+  buyingRolesCapped = false,
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
@@ -702,6 +703,8 @@ export function buildCockpit({
   openComplianceCount?: number;
   risksCapped?: boolean;
   complianceCapped?: boolean;
+  /** Accepted buying-role facts filled their page, so one role is not the whole set. */
+  buyingRolesCapped?: boolean;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
   const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
@@ -910,7 +913,9 @@ export function buildCockpit({
       influence: contact.influence,
       // A job title stays in `title`. Only one fresh accepted buying role
       // on a deal for this account fills the station.
-      roleInDecision: recordedDecisionRole(
+      roleInDecision: buyingRolesCapped
+        ? null
+        : recordedDecisionRole(
         buyingRoleFacts
           .filter((fact) => fact.contactId === contact.id)
           .map(buyingRoleFactView)
@@ -927,6 +932,7 @@ export function buildCockpit({
     openComplianceCount,
     risksCapped,
     complianceCapped,
+    buyingRolesCapped,
     roadmap: [],
   };
 }

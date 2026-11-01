@@ -558,7 +558,7 @@ export async function buildCompanyCockpit(
     accountOpportunityIds.length === 0
       ? { rows: [], openCount: 0, capped: false }
       : loadAccountCompliance(prismaClient, registerWhere),
-    fetchBuyingRoleFacts(orgId, contactIds, prismaClient),
+    fetchBuyingRoleFacts(orgId, contactIds, prismaClient, accountOpportunityIds),
   ]);
 
   return buildCockpit({
@@ -575,7 +575,8 @@ export async function buildCompanyCockpit(
     openComplianceCount: compliancePage.openCount,
     risksCapped: riskPage.capped,
     complianceCapped: compliancePage.capped,
-    buyingRoleFacts,
+    buyingRoleFacts: buyingRoleFacts.rows,
+    buyingRolesCapped: buyingRoleFacts.capped,
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
     performance,
@@ -584,10 +585,35 @@ export async function buildCompanyCockpit(
   });
 }
 
-export function fetchBuyingRoleFacts(orgId: string, contactIds: string[], prismaClient: PrismaClient) {
-  if (contactIds.length === 0) return Promise.resolve([]);
-  return prismaClient.contactFact.findMany({
-    where: { orgId, deletedAt: null, kind: 'buying_role', contactId: { in: contactIds } },
+export const BUYING_ROLE_PAGE = 200;
+
+/** Accepted roles only, newest first. A page of suggestions must not hide a champion. */
+export async function fetchBuyingRoleFacts(
+  orgId: string,
+  contactIds: string[],
+  prismaClient: PrismaClient,
+  opportunityIds: string[],
+): Promise<{
+  rows: Array<{
+    contactId: string;
+    status: string;
+    linkLabel: string | null;
+    opportunityId: string | null;
+    observedAt: Date | null;
+  }>;
+  capped: boolean;
+}> {
+  if (contactIds.length === 0 || opportunityIds.length === 0) return { rows: [], capped: false };
+  const where = {
+    orgId,
+    deletedAt: null,
+    kind: 'buying_role' as const,
+    status: 'accepted' as const,
+    contactId: { in: contactIds },
+    opportunityId: { in: opportunityIds },
+  };
+  const rows = await prismaClient.contactFact.findMany({
+    where,
     select: {
       contactId: true,
       status: true,
@@ -595,8 +621,13 @@ export function fetchBuyingRoleFacts(orgId: string, contactIds: string[], prisma
       opportunityId: true,
       observedAt: true,
     },
-    take: 200,
+    orderBy: [{ observedAt: 'desc' }, { id: 'asc' }],
+    take: BUYING_ROLE_PAGE,
   });
+  const capped =
+    rows.length === BUYING_ROLE_PAGE &&
+    (await prismaClient.contactFact.count({ where })) > BUYING_ROLE_PAGE;
+  return { rows, capped };
 }
 
 /**

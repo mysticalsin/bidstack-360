@@ -491,7 +491,7 @@ export async function buildDashboardSnapshot(
     accountOpportunityIds.length === 0
       ? { rows: [], openCount: 0, capped: false }
       : loadAccountCompliance(prisma, registerWhere),
-    fetchBuyingRoleFacts(orgId, contactIds, prisma),
+    fetchBuyingRoleFacts(orgId, contactIds, prisma, accountOpportunityIds),
   ]);
 
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
@@ -514,7 +514,8 @@ export async function buildDashboardSnapshot(
       openComplianceCount: compliancePage.openCount,
       risksCapped: riskPage.capped,
       complianceCapped: compliancePage.capped,
-      buyingRoleFacts,
+      buyingRoleFacts: buyingRoleFacts.rows,
+      buyingRolesCapped: buyingRoleFacts.capped,
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
       performance,

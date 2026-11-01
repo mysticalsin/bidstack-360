@@ -239,6 +239,8 @@ export const AccountCockpitSnapshot = z.object({
   openComplianceCount: z.number().int().nonnegative().optional(),
   risksCapped: z.boolean().optional(),
   complianceCapped: z.boolean().optional(),
+  /** True when accepted buying-role facts filled the 200-row page. */
+  buyingRolesCapped: z.boolean().optional(),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
