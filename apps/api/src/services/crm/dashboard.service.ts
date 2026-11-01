@@ -491,7 +491,7 @@ export async function buildDashboardSnapshot(
     accountOpportunityIds.length === 0
       ? { rows: [], openCount: 0, capped: false }
       : loadAccountCompliance(prisma, registerWhere),
-    fetchBuyingRoleFacts(orgId, contactIds, prisma, accountOpportunityIds),
+    fetchBuyingRoleFacts(orgId, contactIds, prisma, selectedCompany.id),
   ]);
 
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));

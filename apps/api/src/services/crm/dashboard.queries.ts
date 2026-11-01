@@ -558,7 +558,7 @@ export async function buildCompanyCockpit(
     accountOpportunityIds.length === 0
       ? { rows: [], openCount: 0, capped: false }
       : loadAccountCompliance(prismaClient, registerWhere),
-    fetchBuyingRoleFacts(orgId, contactIds, prismaClient, accountOpportunityIds),
+    fetchBuyingRoleFacts(orgId, contactIds, prismaClient, company.id),
   ]);
 
   return buildCockpit({
@@ -592,7 +592,7 @@ export async function fetchBuyingRoleFacts(
   orgId: string,
   contactIds: string[],
   prismaClient: PrismaClient,
-  opportunityIds: string[],
+  companyId: string,
 ): Promise<{
   rows: Array<{
     contactId: string;
@@ -603,14 +603,14 @@ export async function fetchBuyingRoleFacts(
   }>;
   capped: boolean;
 }> {
-  if (contactIds.length === 0 || opportunityIds.length === 0) return { rows: [], capped: false };
+  if (contactIds.length === 0 || !companyId) return { rows: [], capped: false };
   const where = {
     orgId,
     deletedAt: null,
     kind: 'buying_role' as const,
     status: 'accepted' as const,
     contactId: { in: contactIds },
-    opportunityId: { in: opportunityIds },
+    opportunity: { orgId, companyId, deletedAt: null },
   };
   const rows = await prismaClient.contactFact.findMany({
     where,

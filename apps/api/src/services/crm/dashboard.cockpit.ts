@@ -737,6 +737,10 @@ export function buildCockpit({
       ? formatMicrosCompact(company.annualRevenueMicros)
       : (company.publicFacts?.revenueLabel ?? 'Not verified'));
   const accountOpportunityIds = new Set(companyOpps.map((opp) => opp.id));
+  const roleDealIds = new Set(accountOpportunityIds);
+  for (const fact of buyingRoleFacts) {
+    if (fact.opportunityId) roleDealIds.add(fact.opportunityId);
+  }
   const companyRisks = risks.filter(
     (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),
   );
@@ -921,7 +925,7 @@ export function buildCockpit({
           .map(buyingRoleFactView)
           .filter((fact): fact is PersonFactView => fact !== null),
         now,
-        accountOpportunityIds,
+        roleDealIds,
       ),
       updatedAt: contact.createdAt.toISOString(),
     })),

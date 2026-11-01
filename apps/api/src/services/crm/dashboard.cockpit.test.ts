@@ -415,6 +415,28 @@ describe('buildCockpit recorded facts only', () => {
     });
     // WHY: a page of 200 accepted facts can hide a second role, so one label is not the champion.
     expect(capped.keyContacts[0]?.roleInDecision).toBeNull();
+    const olderDeal = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [opportunity],
+      contacts: [contact],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: [
+        {
+          contactId: 'c1',
+          status: 'accepted',
+          linkLabel: 'champion',
+          opportunityId: 'older-deal',
+          observedAt: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    // WHY: the latest 100 deals must not hide a champion on an older deal.
+    expect(olderDeal.keyContacts[0]?.roleInDecision).toBe('champion');
 
     const titledOnly = buildCockpit({
       company: company({ name: 'Acme' }),
