@@ -25,13 +25,15 @@ export function sentimentWord(v: number): string {
   return 'Neutral';
 }
 
-export function formatValue(n: KeyNumber): string {
+export type MicrosFormatter = (micros: string | number) => string;
+
+export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
   if (n.value === null) return 'No data';
   switch (n.unit) {
     case 'money':
       return fmtMoney(n.value, n.currency ?? 'USD');
     case 'money_micros':
-      return formatMoneyMicros(Math.round(n.value), undefined, { compact: true });
+      return fmtMicros ? fmtMicros(Math.round(n.value)) : formatMoneyMicros(Math.round(n.value), undefined, { compact: true });
     case 'pct':
       return `${n.value.toFixed(1)}%`;
     case 'score':

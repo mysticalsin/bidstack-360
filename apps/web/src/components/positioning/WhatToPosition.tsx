@@ -10,7 +10,7 @@ import { composeBrief, type AccountGap, type EvidenceChip, type PositioningPlay 
 
 import { fmtMoney } from '@/components/financials/financials-format';
 import { useAccountPositioning } from '@/hooks/useAccountPositioning';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 
 const CONF_LABEL: Record<PositioningPlay['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
 const CONF_BARS: Record<PositioningPlay['confidence'], number> = { high: 3, medium: 2, low: 1 };
@@ -27,7 +27,6 @@ const KIND_LABEL: Record<EvidenceChip['kind'], string> = {
 const SEN_LABEL: Record<string, string> = { c_level: 'C-level', vp: 'VP', director: 'Director', manager: 'Manager', ic: 'Individual contributor', unknown: 'Level unknown' };
 const dateFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 const fmtDate = (iso: string | null) => (iso ? dateFmt.format(new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso)) : null);
-const micros = (m: string) => formatMoneyMicros(m, undefined, { compact: true });
 
 function Chip({ e }: { e: EvidenceChip }) {
   const ext = Boolean(e.url);
@@ -74,7 +73,7 @@ function Person({ p }: { p: PositioningPlay['approach'][number] }) {
   );
 }
 
-function PlayCard({ play }: { play: PositioningPlay }) {
+function PlayCard({ play, micros }: { play: PositioningPlay; micros: (m: string) => string }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const first = play.approach[0];
@@ -159,6 +158,9 @@ function Gap({ g }: { g: AccountGap }) {
 
 export function WhatToPosition({ companyId }: { companyId: string }) {
   const q = useAccountPositioning(companyId);
+  const money = useFormatMoney();
+  // Pipeline micros are EUR at rest; show them in the user's display currency.
+  const micros = (m: string) => money.formatMoneyMicros(m, 'EUR', { compact: true });
   if (q.isLoading) return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
   if (q.isError || !q.data) {
     return (
@@ -181,7 +183,7 @@ export function WhatToPosition({ companyId }: { companyId: string }) {
       <p className="wp-brief" data-testid="account-brief">{brief}</p>
       {d.plays.length ? (
         <ol className="wp-plays">
-          {d.plays.map((p) => <PlayCard key={p.theme} play={p} />)}
+          {d.plays.map((p) => <PlayCard key={p.theme} play={p} micros={micros} />)}
         </ol>
       ) : (
         <p className="sg-empty">

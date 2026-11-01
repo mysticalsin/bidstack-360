@@ -9,8 +9,9 @@ import { useId } from 'react';
 import type { KeyNumber } from '@bidstack/shared';
 
 import { useAccountKeyNumbers } from '@/hooks/useAccountPositioning';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 
-import { directionOf, formatDelta, formatValue, sparkPoints, toneOf } from './positioning-format';
+import { directionOf, formatDelta, formatValue, sparkPoints, toneOf, type MicrosFormatter } from './positioning-format';
 
 const ARROW = { up: ArrowUp, down: ArrowDown, flat: ArrowRight } as const;
 
@@ -24,7 +25,7 @@ function Spark({ series, tone }: { series: number[]; tone: string | null }) {
   );
 }
 
-function Tile({ n }: { n: KeyNumber }) {
+function Tile({ n, fmtMicros }: { n: KeyNumber; fmtMicros: MicrosFormatter }) {
   const tipId = useId();
   const dir = directionOf(n);
   const tone = toneOf(n);
@@ -37,7 +38,7 @@ function Tile({ n }: { n: KeyNumber }) {
         {n.label}
         {n.sample ? <span className="sg-sample">Sample</span> : null}
       </span>
-      <span className="kn-value">{formatValue(n)}</span>
+      <span className="kn-value">{formatValue(n, fmtMicros)}</span>
       <span className="kn-foot">
         {Arrow && delta ? (
           <span className="kn-delta" data-tone={tone}>
@@ -67,6 +68,9 @@ function Tile({ n }: { n: KeyNumber }) {
 }
 
 export function KeyNumbersStrip({ companyId }: { companyId: string }) {
+  const money = useFormatMoney();
+  // Pipeline micros are EUR at rest; show them in the user's display currency like the rest of the page.
+  const fmtMicros: MicrosFormatter = (m) => money.formatMoneyMicros(m, 'EUR', { compact: true });
   const q = useAccountKeyNumbers(companyId);
   if (q.isLoading) return <div className="kn" aria-busy="true"><div className="sg-skel" style={{ minHeight: 196 }} /></div>;
   if (q.isError || !q.data) {
@@ -87,13 +91,13 @@ export function KeyNumbersStrip({ companyId }: { companyId: string }) {
       <div className="kn-group">
         <p className="kn-eyebrow">Company</p>
         <ul className="kn-row" data-count={company.length}>
-          {company.map((n) => <Tile key={n.id} n={n} />)}
+          {company.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} />)}
         </ul>
       </div>
       <div className="kn-group">
         <p className="kn-eyebrow">Account health</p>
         <ul className="kn-row" data-count={health.length}>
-          {health.map((n) => <Tile key={n.id} n={n} />)}
+          {health.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} />)}
         </ul>
       </div>
     </section>
