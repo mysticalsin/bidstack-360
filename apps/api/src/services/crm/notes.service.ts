@@ -62,8 +62,9 @@ export async function persistContacts(
         role: c.title,
         email: c.email,
         phone: c.phone,
-        influence: influenceFromRole(c.roleInDecision),
-        sentiment: c.roleInDecision === 'blocker' ? 'cold' : 'warm',
+        // A title or a guessed decision-role word is not temperature or influence.
+        influence: null,
+        sentiment: null,
       })),
     });
   }
@@ -309,14 +310,6 @@ export function asJsonArray(value: unknown[]): Prisma.InputJsonArray {
 }
 
 // ─── Persistence-private helpers ──────────────────────────────────────────────
-
-function influenceFromRole(role: MeetingImportedContact['roleInDecision']): number | null {
-  if (role === 'champion' || role === 'buyer') return 5;
-  if (role === 'blocker') return 2;
-  if (role === 'influencer') return 4;
-  if (role === 'user') return 3;
-  return null;
-}
 
 function mergeTechStack(
   existing: TechnicalStackCategory[],

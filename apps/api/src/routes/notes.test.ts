@@ -284,7 +284,8 @@ describe('notes routes (integration)', () => {
 
   skipIfNoDb('POST import-meeting links people and tasks when one company matches', async () => {
     // WHY: imported people were stored under the company name only. Dust
-    // listing the account by id never saw them.
+    // listing the account by id never saw them. A guessed role word in the
+    // name ("Buyer") is not an influence score or a warm/cold temperature.
     const stamp = Date.now();
     const probe = await server.inject({
       method: 'POST',
@@ -316,13 +317,15 @@ describe('notes routes (integration)', () => {
     expect(res.statusCode).toBe(201);
     const contact = await prisma.contact.findFirst({
       where: { orgId: probeRow!.orgId, email },
-      select: { id: true, companyId: true },
+      select: { id: true, companyId: true, influence: true, sentiment: true },
     });
     const task = await prisma.task.findFirst({
       where: { orgId: probeRow!.orgId, title: taskTitle },
       select: { id: true, accountId: true },
     });
     expect(contact?.companyId).toBe(company.id);
+    expect(contact?.influence).toBeNull();
+    expect(contact?.sentiment).toBeNull();
     expect(task?.accountId).toBe(company.id);
     if (contact) await prisma.contact.delete({ where: { id: contact.id } });
     if (task) await prisma.task.delete({ where: { id: task.id } });
