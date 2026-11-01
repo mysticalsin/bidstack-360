@@ -23,7 +23,7 @@ type SalesCompanyCandidate = {
   website: string | null;
   countryCode: string | null;
   reason: string;
-  score: number;
+  score: bigint;
 };
 
 export async function buildSalesCompanyCandidates({
@@ -66,7 +66,7 @@ export async function buildSalesCompanyCandidates({
         website: websiteFor(row.name),
         countryCode: normalizeCountry(row.countryCode),
         reason: `${row.orderCount} sales record${row.orderCount === 1 ? '' : 's'}`,
-        score: Number(row.revenueMicros),
+        score: row.revenueMicros > 0n ? row.revenueMicros : 0n,
       });
     }
   }
@@ -85,7 +85,10 @@ export async function buildSalesCompanyCandidates({
         website: websiteFor(opportunity.customer),
         countryCode: null,
         reason: 'External CRM opportunity',
-        score: Math.round(Number(opportunity.valueMicros ?? 0)),
+        score:
+          opportunity.valueMicros != null && opportunity.valueMicros > 0n
+            ? opportunity.valueMicros
+            : 0n,
       });
     }
   }
@@ -93,7 +96,9 @@ export async function buildSalesCompanyCandidates({
   return mergeSalesCompanyCandidates(candidates).slice(0, limit);
 }
 
-function mergeSalesCompanyCandidates(candidates: SalesCompanyCandidate[]): SalesCompanyCandidate[] {
+export function mergeSalesCompanyCandidates(
+  candidates: SalesCompanyCandidate[],
+): SalesCompanyCandidate[] {
   const byName = new Map<string, SalesCompanyCandidate>();
   for (const candidate of candidates) {
     const key = normalizeName(candidate.name);
@@ -114,7 +119,7 @@ function mergeSalesCompanyCandidates(candidates: SalesCompanyCandidate[]): Sales
       score: existing.score + candidate.score,
     });
   }
-  return [...byName.values()].sort((a, b) => b.score - a.score);
+  return [...byName.values()].sort((a, b) => (a.score > b.score ? -1 : a.score < b.score ? 1 : 0));
 }
 
 export function isFreshCompanyEnrichment(enrichment: CompanyEnrichment, now: Date): boolean {
