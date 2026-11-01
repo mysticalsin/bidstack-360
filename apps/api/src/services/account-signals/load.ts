@@ -92,6 +92,8 @@ export interface LoadedSignals {
   openPipelineMicros: bigint;
   /** True when this account has more deals than the momentum page. */
   dealsCapped: boolean;
+  /** True when meetings, postings, or watch events filled the momentum page. */
+  feedsCapped: boolean;
 }
 
 /** Query guard: every findMany needs take <= 1000, so accounts load in small chunks. */
@@ -121,64 +123,78 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   const all = [...owner.keys()];
   const live = await companiesWithLiveSignals(orgId, all);
   const since = new Date(now.getTime() - 400 * DAY);
-  const [oppGroups, meetings, postings, events, firmo] = await Promise.all([
+  const postedSince = new Date(now.getTime() - 160 * DAY);
+  const pages = <T,>(load: (ids: string[]) => Promise<T[]>) =>
     Promise.all(rootIds.map(async (root) => {
-      const ids = groups.get(root) ?? [root];
-      const rows = await prisma.opportunity.findMany({
-        where: { orgId, companyId: { in: ids }, deletedAt: null },
-        select: OPP_SELECT,
-        orderBy: { updatedAt: 'desc' },
-        take: TAKE + 1,
-      });
-      return { root, rows };
+      const loaded = await load(groups.get(root) ?? [root]);
+      const page = capMomentumDeals(loaded);
+      return { root, rows: page.rows, capped: page.capped };
+    }));
+  const [oppGroups, meetingGroups, postingGroups, eventGroups, firmo] = await Promise.all([
+    pages((ids) => prisma.opportunity.findMany({
+      where: { orgId, companyId: { in: ids }, deletedAt: null },
+      select: OPP_SELECT,
+      orderBy: { updatedAt: 'desc' },
+      take: TAKE + 1,
     })),
-    prisma.meetingIntel.findMany({
-      where: { AND: [scopedMeetingWhere(orgId, scope), { companyId: { in: all }, heldAt: { gte: since, lte: now } }] },
-      select: { companyId: true, heldAt: true },
+    pages((ids) => prisma.meetingIntel.findMany({
+      where: { AND: [scopedMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: since, lte: now } }] },
+      select: { heldAt: true },
       orderBy: { heldAt: 'desc' },
-      take: TAKE,
-    }),
-    prisma.companyJobPosting.findMany({
-      where: { orgId, companyId: { in: all }, postedAt: { gte: new Date(now.getTime() - 160 * DAY) } },
-      select: { companyId: true, postedAt: true },
+      take: TAKE + 1,
+    })),
+    pages((ids) => prisma.companyJobPosting.findMany({
+      where: { orgId, companyId: { in: ids }, postedAt: { gte: postedSince } },
+      select: { postedAt: true },
       orderBy: { postedAt: 'desc' },
-      take: TAKE,
-    }),
-    prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: all }, status: { not: 'DISMISSED' }, occurredAt: { gte: since, lte: now }, ...hideSampleWhere(live) },
-      select: { companyId: true, occurredAt: true, importance: true, severity: true, sentiment: true, implication: true, kind: true, sample: true },
+      take: TAKE + 1,
+    })),
+    pages((ids) => prisma.accountWatchEvent.findMany({
+      where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: since, lte: now }, ...hideSampleWhere(live) },
+      select: { occurredAt: true, importance: true, severity: true, sentiment: true, implication: true, kind: true, sample: true },
       orderBy: { occurredAt: 'desc' },
-      take: TAKE,
-    }),
+      take: TAKE + 1,
+    })),
     prisma.companyFirmographics.findMany({ where: { orgId, companyId: { in: rootIds } }, select: { companyId: true, headcountGrowth12m: true }, take: CHUNK }),
   ]);
   const out = new Map<string, LoadedSignals>();
   for (const id of rootIds) {
-    out.set(id, { data: { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, sample: false, openPipelineMicros: 0n, dealsCapped: false });
+    out.set(id, { data: { opps: [], meetings: [], postings: [], events: [], headcountGrowth12m: null }, sample: false, openPipelineMicros: 0n, dealsCapped: false, feedsCapped: false });
   }
-  const at = (companyId: string | null) => (companyId ? out.get(owner.get(companyId) ?? '') : undefined);
   for (const group of oppGroups) {
     const t = out.get(group.root);
     if (!t) continue;
-    const page = capMomentumDeals(group.rows);
-    t.dealsCapped = page.capped;
-    for (const o of page.rows) {
+    t.dealsCapped = group.capped;
+    for (const o of group.rows) {
       t.data.opps.push(toMomentumOpp(o));
       t.openPipelineMicros += openBookMicros(o);
     }
   }
-  for (const m of meetings) at(m.companyId)?.data.meetings.push(m.heldAt);
-  for (const p of postings) if (p.postedAt) at(p.companyId)?.data.postings.push(p.postedAt);
-  for (const e of events) {
-    const t = at(e.companyId);
+  for (const group of meetingGroups) {
+    const t = out.get(group.root);
     if (!t) continue;
-    t.data.events.push({
-      occurredAt: e.occurredAt,
-      importance: e.importance || e.severity * 20,
-      sentiment: sentimentForRow({ sentiment: e.sentiment, implication: e.implication as Implication, kind: e.kind }),
-      category: categoryForKind(e.kind, e.implication as Implication),
-    });
-    if (e.sample) t.sample = true;
+    if (group.capped) t.feedsCapped = true;
+    for (const m of group.rows) t.data.meetings.push(m.heldAt);
+  }
+  for (const group of postingGroups) {
+    const t = out.get(group.root);
+    if (!t) continue;
+    if (group.capped) t.feedsCapped = true;
+    for (const p of group.rows) if (p.postedAt) t.data.postings.push(p.postedAt);
+  }
+  for (const group of eventGroups) {
+    const t = out.get(group.root);
+    if (!t) continue;
+    if (group.capped) t.feedsCapped = true;
+    for (const e of group.rows) {
+      t.data.events.push({
+        occurredAt: e.occurredAt,
+        importance: e.importance || e.severity * 20,
+        sentiment: sentimentForRow({ sentiment: e.sentiment, implication: e.implication as Implication, kind: e.kind }),
+        category: categoryForKind(e.kind, e.implication as Implication),
+      });
+      if (e.sample) t.sample = true;
+    }
   }
   for (const f of firmo) {
     const t = out.get(f.companyId);

@@ -292,6 +292,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
             topDriver: m.drivers[0]?.detail ?? null,
             openPipelineMicros: (l?.openPipelineMicros ?? 0n).toString(),
             dealsCapped: l?.dealsCapped ?? false,
+            feedsCapped: l?.feedsCapped ?? false,
             series: m.series.slice(-8).map((p) => p.score),
             sample: l?.sample ?? false,
             coverage: m.coverage,

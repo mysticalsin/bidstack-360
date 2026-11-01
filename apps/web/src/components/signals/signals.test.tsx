@@ -164,6 +164,12 @@ describe('Portfolio momentum', () => {
     wrap(<MomentumList data={capped} />);
     expect(screen.getByText(/Latest 1,000 deals/)).toBeTruthy();
     expect(screen.getByText('Holding steady').textContent).toBe('Holding steady');
+    const signaled = {
+      ...port,
+      accounts: port.accounts.map((account) => (account.companyId === 'b' ? { ...account, feedsCapped: true } : account)),
+    };
+    wrap(<MomentumList data={signaled} />);
+    expect(screen.getByText(/Latest 1,000 signals/)).toBeTruthy();
   });
 
   it('lists top alerts with category and Sample, linking to the account watchdog', () => {

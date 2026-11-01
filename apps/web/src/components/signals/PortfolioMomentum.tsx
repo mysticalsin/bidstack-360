@@ -69,7 +69,11 @@ export function MomentumList({ data }: { data: PortfolioData }) {
               <li key={a.companyId} className="sg-port-row" style={{ '--i': Math.min(i, 5) } as React.CSSProperties}>
                 <span className="sg-port-name">
                   <Link to={`/accounts/${encodeURIComponent(a.companyId)}`} title={a.companyName}>{a.companyName}</Link>
-                  <span>{noDash(a.verdict)}{a.dealsCapped ? ' · Latest 1,000 deals' : ''}</span>
+                  <span>
+                    {noDash(a.verdict)}
+                    {a.dealsCapped ? ' · Latest 1,000 deals' : ''}
+                    {a.feedsCapped ? ' · Latest 1,000 signals' : ''}
+                  </span>
                 </span>
                 <span className="sg-port-spark" aria-hidden>
                   {a.series.length > 1 ? (
