@@ -17,6 +17,7 @@ import {
   type CrmCompany,
   type CrmDashboardSnapshot,
   type FactStatus,
+  formatMicrosAmount,
   type PersonFactView,
   type SignalFactor,
 } from '@bidstack/shared';
@@ -319,6 +320,23 @@ export interface CockpitFieldOverride {
   value: unknown;
 }
 
+function revenueOverrideMicros(value: unknown): bigint | null {
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value);
+  return null;
+}
+
+/** Exact revenue text from a manual override, when one is stored. */
+export function revenueOverrideLabel(overrides: CockpitFieldOverride[]): string | null {
+  for (const override of overrides) {
+    if (override.fieldKey !== 'annualRevenueMicros') continue;
+    const micros = revenueOverrideMicros(override.value);
+    if (micros == null || micros <= 0n) continue;
+    return `${formatMicrosAmount(micros)} unspecified`;
+  }
+  return null;
+}
+
 /** Apply manual overrides on top of the (immutable) enrichment-derived company. */
 export function applyFieldOverrides(
   company: z.infer<typeof CrmCompany>,
@@ -334,13 +352,11 @@ export function applyFieldOverrides(
     } else if (o.fieldKey === 'employeeCount' && typeof o.value === 'number' && o.value > 0) {
       next.employeeCount = Math.round(o.value);
       overriddenKeys.add('employeeCount');
-    } else if (
-      o.fieldKey === 'annualRevenueMicros' &&
-      typeof o.value === 'number' &&
-      o.value > 0
-    ) {
-      next.annualRevenueMicros = o.value;
+    } else if (o.fieldKey === 'annualRevenueMicros') {
+      const micros = revenueOverrideMicros(o.value);
+      if (micros == null || micros <= 0n) continue;
       overriddenKeys.add('annualRevenueMicros');
+      if (micros <= BigInt(Number.MAX_SAFE_INTEGER)) next.annualRevenueMicros = Number(micros);
     }
   }
   return { company: next, overriddenKeys };
@@ -652,9 +668,11 @@ export function buildCockpit({
       if (influenceDelta !== 0) return influenceDelta;
       return a.name.localeCompare(b.name);
     });
-  const annualRevenue = company.annualRevenueMicros
-    ? formatMicrosCompact(company.annualRevenueMicros)
-    : 'Not verified';
+  const annualRevenue =
+    revenueOverrideLabel(fieldOverrides) ??
+    (company.annualRevenueMicros
+      ? formatMicrosCompact(company.annualRevenueMicros)
+      : 'Not verified');
   const accountOpportunityIds = new Set(companyOpps.map((opp) => opp.id));
   const companyRisks = risks.filter(
     (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),

@@ -562,9 +562,8 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     z.object({ fieldKey: z.literal('employeeCount'), value: z.number().int().positive().max(10_000_000) }),
     z.object({
       fieldKey: z.literal('annualRevenueMicros'),
-      // Micros (int × 1e6); bounded to the same €9e15 float8-exact ceiling
-      // the analytics engine documents.
-      value: z.number().int().positive().max(9e15),
+      // Integer micros. A string keeps a large amount; a number is only exact while safe.
+      value: z.union([z.string().regex(/^\d+$/), z.number().int().positive()]),
     }),
   ]);
   const FieldOverrideResponse = z.object({

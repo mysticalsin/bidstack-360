@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import { springSnap, staggerChild, staggerParent } from '@/lib/motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 
-import type { AccountCockpitSnapshot, CockpitKpi } from '@bidstack/shared';
+import { unitsTextToMicros, type AccountCockpitSnapshot, type CockpitKpi } from '@bidstack/shared';
 
 import { KPI_TONE_FG, iconForKpi } from './_tokens';
 
@@ -163,13 +163,23 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
       save.mutate(trimmed);
       return;
     }
+    if (fieldKey === 'annualRevenueMicros') {
+      const micros = unitsTextToMicros(trimmed);
+      if (micros == null || micros <= 0n) {
+        toast.error(t('kpiRow.toastInvalidValue', 'Invalid value'), {
+          description: t('kpiRow.toastEnterAmount', 'Enter an amount with up to 6 decimal places.'),
+        });
+        return;
+      }
+      save.mutate(micros.toString());
+      return;
+    }
     const numeric = Number(trimmed.replace(/[,\s]/g, ''));
     if (!Number.isFinite(numeric) || numeric <= 0) {
       toast.error(t('kpiRow.toastInvalidValue', 'Invalid value'), { description: t('kpiRow.toastEnterPositiveNumber', 'Enter a positive number.') });
       return;
     }
-    // Revenue is entered in plain currency units; the wire wants micros.
-    save.mutate(fieldKey === 'annualRevenueMicros' ? Math.round(numeric * 1_000_000) : numeric);
+    save.mutate(numeric);
   };
 
   if (!open) {

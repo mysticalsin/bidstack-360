@@ -192,6 +192,28 @@ describe('applyFieldOverrides', () => {
     expect(overriddenKeys.has('annualRevenueMicros')).toBe(false);
   });
 
+  it('keeps a large revenue override exact on the annual revenue kpi', () => {
+    // WHY: the editor multiplied the typed number by 1e6, so the cockpit showed the wrong cent.
+    const micros = '8598204328457184962';
+    const { overriddenKeys } = applyFieldOverrides(company(), [
+      { fieldKey: 'annualRevenueMicros', value: micros },
+    ]);
+    expect(overriddenKeys.has('annualRevenueMicros')).toBe(true);
+    const cockpit = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [{ fieldKey: 'annualRevenueMicros', value: micros }],
+    });
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Annual revenue')?.value).toBe(
+      '8,598,204,328,457.18 unspecified',
+    );
+  });
+
   it('ignores malformed override values instead of corrupting the snapshot', () => {
     const original = company({ industry: 'banking' });
     const { company: next, overriddenKeys } = applyFieldOverrides(original, [
