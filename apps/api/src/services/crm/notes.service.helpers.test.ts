@@ -72,4 +72,22 @@ describe('extractMeetingNotes', () => {
     expect(unranked?.severity).toBeNull();
     expect(ranked?.severity).toBe('high');
   });
+
+  it('reads each framework status from its own clause', () => {
+    // WHY: one compliance line used to give every framework the first status
+    // word on that line, and a bare name became "not started".
+    const extracted = extractMeetingNotes(
+      [
+        'Compliance: ISO 27001 complete, SOC 2 in progress, GDPR',
+        'Owner: Jane',
+      ].join('\n'),
+      'Northwind',
+      source,
+    );
+    const byLabel = new Map(extracted.compliance.map((check) => [check.label, check]));
+    expect(byLabel.get('ISO 27001')?.status).toBe('compliant');
+    expect(byLabel.get('SOC 2')?.status).toBe('in_progress');
+    expect(byLabel.get('GDPR')?.status).toBeNull();
+    expect(byLabel.get('GDPR')?.owner).toBeNull();
+  });
 });

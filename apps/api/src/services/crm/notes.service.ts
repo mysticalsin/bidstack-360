@@ -130,7 +130,8 @@ export async function persistCompliance(
         tx.complianceCheck.update({
           where: { id: existingByLabel.get(c.label.toLowerCase())! },
           data: {
-            status: c.status,
+            // A later note that only names the framework must not wipe a status.
+            ...(c.status ? { status: c.status } : {}),
             owner: c.owner,
             sourceAttribution: asJsonArray(c.sourceAttribution),
           },
@@ -143,7 +144,8 @@ export async function persistCompliance(
       data: toCreate.map((c) => ({
         orgId,
         label: c.label,
-        status: c.status,
+        // The column cannot be empty. This token is not a status.
+        status: c.status ?? 'unspecified',
         owner: c.owner,
         sourceAttribution: asJsonArray(c.sourceAttribution),
       })),

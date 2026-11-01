@@ -161,7 +161,10 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {c.owner ?? t('openIssues.noOwner', 'No owner')}
                   </div>
                 </div>
-                <Badge tone="amber">{c.status.replace('_', ' ')}</Badge>
+                <Badge tone="amber">
+                  {c.status?.replace('_', ' ') ??
+                    t('openIssues.statusUnspecified', 'Unspecified')}
+                </Badge>
               </motion.li>
             ))}
           </ul>

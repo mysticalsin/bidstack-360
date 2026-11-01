@@ -259,7 +259,7 @@ describe('notes routes (integration)', () => {
         techStack: Array<{ label: string; items: Array<{ name: string }> }>;
         contacts: unknown[];
         risks: Array<{ title: string; severity: string | null }>;
-        compliance: unknown[];
+        compliance: Array<{ label: string; status: string | null }>;
         tasks: unknown[];
       };
       created: { techStackItems: number };
@@ -280,6 +280,9 @@ describe('notes routes (integration)', () => {
     expect(stored.find((row) => /unclear/i.test(row.title))?.severity).toBe('unspecified');
     expect(stored.find((row) => /high concern/i.test(row.title))?.severity).toBe('high');
     expect(json.extracted.compliance.length).toBeGreaterThanOrEqual(2);
+    const compliance = new Map(json.extracted.compliance.map((check) => [check.label, check.status]));
+    expect(compliance.get('ISO 27001')).toBe('compliant');
+    expect(compliance.get('SOC 2')).toBe('in_progress');
     expect(json.extracted.tasks.length).toBeGreaterThanOrEqual(1);
     expect(json.created.techStackItems).toBeGreaterThanOrEqual(4);
 

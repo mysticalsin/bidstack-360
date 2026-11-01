@@ -70,7 +70,7 @@ export type RiskItem = z.infer<typeof RiskItem>;
 export const ComplianceCheck = z.object({
   id: z.string(),
   label: z.string().min(1),
-  status: z.enum(['compliant', 'in_progress', 'blocked', 'not_started']),
+  status: z.enum(['compliant', 'in_progress', 'blocked', 'not_started']).nullable(),
   owner: z.string().nullable(),
   sourceAttribution: z.array(SourceAttribution).default([]),
 });

@@ -79,14 +79,14 @@ export function asRiskStatus(
 }
 
 export function asComplianceStatus(
-  value: string,
+  value: string | null,
 ): z.infer<typeof AccountCockpitSnapshot>['compliance'][number]['status'] {
   return value === 'compliant' ||
     value === 'in_progress' ||
     value === 'blocked' ||
     value === 'not_started'
     ? value
-    : 'not_started';
+    : null;
 }
 
 export function asProviderStatus(value: string): z.infer<typeof ProviderHealth>['status'] {

@@ -222,11 +222,18 @@ function extractCompliance(
       .split('\n')
       .find((line) => item.aliases.some((alias) => line.toLowerCase().includes(alias)));
     if (!item.aliases.some((alias) => lower.includes(alias))) continue;
+    // Status and owner come from the clause that names this framework.
+    // The rest of the line, and the rest of the note, belong to other facts.
+    const clause =
+      matchingLine
+        ?.split(/[,;]+/)
+        .map((part) => part.trim())
+        .find((part) => item.aliases.some((alias) => part.toLowerCase().includes(alias))) ?? null;
     checks.push({
       id: `meeting-compliance-${slug(item.label)}`,
       label: item.label,
-      status: complianceStatusFromText(matchingLine ?? bodyMd),
-      owner: ownerFromText(matchingLine ?? bodyMd),
+      status: clause ? complianceStatusFromText(clause) : null,
+      owner: clause ? ownerFromText(clause) : null,
       sourceAttribution: [
         {
           ...source,
@@ -298,9 +305,10 @@ function severityFromText(value: string): RiskItem['severity'] {
 
 function complianceStatusFromText(value: string): ComplianceCheck['status'] {
   if (/blocked|missing|failed|gap/i.test(value)) return 'blocked';
+  if (/\bnot started\b|\bnot yet\b/i.test(value)) return 'not_started';
   if (/progress|review|pending|in flight|working/i.test(value)) return 'in_progress';
   if (/compliant|complete|completed|certified|approved|done/i.test(value)) return 'compliant';
-  return 'not_started';
+  return null;
 }
 
 function roleFromText(value: string): MeetingImportedContact['roleInDecision'] {
