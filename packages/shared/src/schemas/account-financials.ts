@@ -153,11 +153,17 @@ export const AccountFinancials = z.object({
   lastPulledAt: z.string().nullable(),
   nextPullAt: z.string().nullable(),
   periods: z.array(FinancialPeriod),
+  /** True when fiscal years are the latest 20, so the trend is not the whole history. */
+  periodsCapped: z.boolean().optional(),
   signals: z.array(FinancialSignal),
   /** True when the section shows the built-in example instead of filings. */
   sample: z.boolean(),
 });
 export type AccountFinancials = z.infer<typeof AccountFinancials>;
+
+/** Annual filings kept for the trend. Quarters are a separate short page so they cannot push a fiscal year out. */
+export const FY_PERIOD_PAGE = 20;
+export const QUARTER_PERIOD_PAGE = 8;
 
 export const TrackFinancialsUpdate = z.object({ trackFinancials: z.boolean() });
 export type TrackFinancialsUpdate = z.infer<typeof TrackFinancialsUpdate>;

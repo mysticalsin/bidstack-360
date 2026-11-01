@@ -9,6 +9,8 @@ import { prisma } from '@bidstack/db';
 import {
   AccountFinancials,
   FINANCIALS_STATUS_COPY,
+  FY_PERIOD_PAGE,
+  QUARTER_PERIOD_PAGE,
   FinancialSignal,
   GATE_COPY,
   SAMPLE_FINANCIAL_PERIODS,
@@ -43,14 +45,30 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       topAccountRank: true,
       trackFinancials: true,
       financialProfile: true,
-      financialPeriods: { orderBy: [{ periodEnd: 'desc' }], take: 20 },
     },
   });
   if (!c) throw Object.assign(new Error('Account not found'), { statusCode: 404 });
+  const periodWhere = { orgId, companyId };
+  const [fyRows, quarterRows] = await Promise.all([
+    prisma.accountFinancialPeriod.findMany({
+      where: { ...periodWhere, periodType: 'FY' },
+      orderBy: [{ periodEnd: 'desc' }, { id: 'asc' }],
+      take: FY_PERIOD_PAGE,
+    }),
+    prisma.accountFinancialPeriod.findMany({
+      where: { ...periodWhere, periodType: 'Q' },
+      orderBy: [{ periodEnd: 'desc' }, { id: 'asc' }],
+      take: QUARTER_PERIOD_PAGE,
+    }),
+  ]);
+  const fyCount = fyRows.length === FY_PERIOD_PAGE
+    ? await prisma.accountFinancialPeriod.count({ where: { ...periodWhere, periodType: 'FY' } })
+    : fyRows.length;
+  const periodsCapped = fyCount > FY_PERIOD_PAGE;
   const gate = financialsGate(c);
   const p = c.financialProfile;
   const status = !financialsEligible(c) ? 'paused' : (p?.status ?? 'pending');
-  const periods: FinancialPeriod[] = c.financialPeriods.map((r) => {
+  const periods: FinancialPeriod[] = [...fyRows, ...quarterRows].map((r) => {
     const { _derived, ...metrics } = r.metrics as Record<string, { value: number; concept: string }> & { _derived?: FinancialPeriod['derived'] };
     return {
       periodType: r.periodType === 'Q' ? 'Q' : 'FY',
@@ -83,6 +101,7 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
     lastPulledAt: p?.lastPulledAt ? p.lastPulledAt.toISOString() : null,
     nextPullAt: p?.nextPullAt && financialsEligible(c) ? p.nextPullAt.toISOString() : null,
     periods: sample ? SAMPLE_FINANCIAL_PERIODS : periods,
+    periodsCapped: sample ? false : periodsCapped,
     signals: sample ? SAMPLE_FINANCIAL_SIGNALS : signals,
     sample,
   };

@@ -247,6 +247,25 @@ describe('composeBrief', () => {
     expect(txt).toContain('2 open deals worth 100 among the latest 500 deals');
   });
 
+  it('names the highest-importance signal instead of calling it the latest', () => {
+    // WHY: the row is the highest importance in 180 days, which can be older than a newer quieter event.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 0, openMicros: '0', won24m: 0, lost24m: 0 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: { title: 'Plant closure', at: '2026-06-01T00:00:00Z', source: 'GDELT news', sample: false },
+    };
+    const txt = composeBrief(f, (v) => String(v), (m) => m);
+    expect(txt).toContain('Highest-importance signal in the last 180 days: Plant closure');
+    expect(txt).not.toContain('Latest notable');
+  });
+
   it('says when subsidiary figures are a page of children', () => {
     // WHY: a parent with more than 1,000 subsidiaries was described as the whole group.
     const f: BriefFacts = {
