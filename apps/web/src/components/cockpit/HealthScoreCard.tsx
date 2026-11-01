@@ -159,10 +159,18 @@ function SignalFactorPanel({
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium text-[var(--fg-primary)]">{f.label}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-xs tabular-nums text-[var(--fg-tertiary)]">
-                    {f.score}/100
-                  </span>
-                  <Badge tone={badgeTone(f.band)}>{labelForHealth(f.band, t)}</Badge>
+                  {f.scored === false ? (
+                    <span className="text-xs text-[var(--fg-tertiary)]">
+                      {t('healthScore.notScored', 'Not scored')}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-xs tabular-nums text-[var(--fg-tertiary)]">
+                        {f.score}/100
+                      </span>
+                      <Badge tone={badgeTone(f.band)}>{labelForHealth(f.band, t)}</Badge>
+                    </>
+                  )}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{f.whatItMeasures}</p>
