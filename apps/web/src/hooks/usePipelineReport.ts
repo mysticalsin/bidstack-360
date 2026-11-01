@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 interface PipelineReport {
-  byStage: { stage: string; count: number; valueSum: number }[];
+  byStage: { stage: string; count: number; valueSum: number; valueSumMicros?: string }[];
   totalOpen: number;
   totalValueOpen: number;
   weightedPipeline: number;

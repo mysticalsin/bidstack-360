@@ -4,7 +4,7 @@ import { microsToUnits, quarterStart } from '@bidstack/shared';
 import { wonOutcomeWhere } from '../../routes/opportunities.helpers.js';
 
 export interface PipelineKpis {
-  byStage: Array<{ stage: string; count: number; valueSum: number }>;
+  byStage: Array<{ stage: string; count: number; valueSum: number; valueSumMicros: string }>;
   totalOpen: number;
   totalValueOpen: number;
   weightedPipeline: number;
@@ -103,6 +103,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
       // Number.MAX_SAFE_INTEGER micros (~$9.007B) silently corrupts. The shared
       // helper keeps BigInt arithmetic through the whole/remainder split.
       valueSum: microsToUnits(row.micros),
+      valueSumMicros: row.micros >= 0n ? row.micros.toString() : '0',
     }));
 
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');

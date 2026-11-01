@@ -14,6 +14,7 @@ const PipelineKpis = z.object({
       stage: z.string(),
       count: z.number().int(),
       valueSum: z.number(),
+      valueSumMicros: z.string(),
     }),
   ),
   totalOpen: z.number().int(),

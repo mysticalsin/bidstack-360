@@ -1,3 +1,5 @@
+import { microsSharePercent, recordedMicros } from '@/components/dashboard/unspecified-currency';
+
 const CLOSED_STAGES = new Set(['closed_won', 'closed_lost']);
 
 /** Closed won and lost are outcomes. The pipeline chart is the open book. */
@@ -9,6 +11,16 @@ export interface PipelineStagePoint {
   stage: string;
   count: number;
   valueSum: number;
+  /** Integer micros. Bar length uses this when the unit number has collapsed. */
+  valueSumMicros?: string;
+}
+
+/** Bar length as a share of the largest stage. Micros win over the unit number. */
+export function stageBarShares(stages: readonly PipelineStagePoint[]): number[] {
+  const amounts = stages.map((stage) => recordedMicros(stage.valueSum, stage.valueSumMicros));
+  const max = amounts.reduce((best, amount) => (amount > best ? amount : best), 0n);
+  if (max <= 0n) return amounts.map(() => 0);
+  return amounts.map((amount) => microsSharePercent(amount, max));
 }
 
 /**

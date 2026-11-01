@@ -4,6 +4,7 @@ import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-c
 import {
   openPipelineStages,
   pipelineHeadline,
+  stageBarShares,
   type PipelineStagePoint,
 } from '@/components/dashboard/widgets/pipeline-headline';
 
@@ -69,7 +70,7 @@ export function PipelineMetricStrip({
       value: compactAmount(headline.openValue),
       detail: t('pipeline.metricOpenDetail', 'Open stages only.'),
       basis: UNSPECIFIED_CURRENCY_BASIS,
-      bars: open.map((stage) => stage.valueSum),
+      bars: stageBarShares(open),
     },
     {
       label: t('pipeline.kpiWonValue', 'Won'),

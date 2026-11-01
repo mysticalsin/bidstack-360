@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { openPipelineStages, pipelineHeadline } from './pipeline-headline';
+import { openPipelineStages, pipelineHeadline, stageBarShares } from './pipeline-headline';
 
 describe('openPipelineStages', () => {
   it('keeps closed won and lost out of the open pipeline chart', () => {
@@ -25,5 +25,20 @@ describe('openPipelineStages', () => {
     expect(headline.wonValue).toBe(9_000_000);
     expect(headline.lostValue).toBe(1_000_000);
     expect(headline.winRate).toBeCloseTo(4 / 6);
+  });
+
+  it('sizes stage bars from micros when the unit numbers collapse', () => {
+    // WHY: the open chart divided valueSum. These two stages became one
+    // number, so the shorter stage drew a full bar.
+    const smaller = (9007199254740992n * 1_000_000n).toString();
+    const larger = (9007199254740993n * 1_000_000n).toString();
+    const collapsed = Number(9007199254740993n);
+    expect(collapsed).toBe(9007199254740992);
+    const shares = stageBarShares([
+      { stage: 'proposal', count: 1, valueSum: collapsed, valueSumMicros: smaller },
+      { stage: 'negotiation', count: 1, valueSum: collapsed, valueSumMicros: larger },
+    ]);
+    expect(shares[0]).toBeLessThan(shares[1]!);
+    expect(shares[1]).toBe(100);
   });
 });

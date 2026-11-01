@@ -4,9 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Bar } from '@/components/charts/bar';
 import { BarChart } from '@/components/charts/bar-chart';
 import { BarYAxis } from '@/components/charts/bar-y-axis';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompactMicros,
+  recordedMicros,
+} from '@/components/dashboard/unspecified-currency';
 import {
   openPipelineStages,
+  stageBarShares,
   type PipelineStagePoint,
 } from '@/components/dashboard/widgets/pipeline-headline';
 
@@ -24,15 +28,17 @@ export function PipelineOpenChart({ stages }: { stages: readonly PipelineStagePo
   const reducedMotion = useReducedMotion();
   const open = openPipelineStages(stages);
   if (open.length === 0) return null;
-  const rows = open.map((stage) => ({
+  const shares = stageBarShares(open);
+  const rows = open.map((stage, index) => ({
     stage: stageName(stage.stage),
-    value: stage.valueSum,
+    value: shares[index] ?? 0,
+    amount: formatUnspecifiedCompactMicros(recordedMicros(stage.valueSum, stage.valueSumMicros)),
     count: stage.count,
   }));
   const label = rows
     .map(
       (stage) =>
-        `${stage.stage}, ${formatUnspecifiedCompact(stage.value)}, ${stage.count}`,
+        `${stage.stage}, ${stage.amount}, ${stage.count}`,
     )
     .join('. ');
 
@@ -75,7 +81,7 @@ export function PipelineOpenChart({ stages }: { stages: readonly PipelineStagePo
             key={stage.stage}
             className="flex items-center justify-end text-xs tabular-nums text-[var(--fg-secondary)]"
           >
-            {formatUnspecifiedCompact(stage.value)}
+            {stage.amount}
             <span className="text-[var(--fg-tertiary)]">
               {' · '}
               {stage.count === 1

@@ -48,6 +48,7 @@ describe('getPipelineKpis money precision', () => {
     const result = await getPipelineKpis('org-1');
 
     expect(result.byStage[0]!.valueSum).toBe(600_000_000_001);
+    expect(result.byStage[0]!.valueSumMicros).toBe(bigSumMicros.toString());
     // `proposal` is an open stage, so the rollup must be exact too.
     expect(result.totalValueOpen).toBe(600_000_000_001);
     expect(result.velocity.avgDaysOpen).toBeNull();
@@ -74,11 +75,13 @@ describe('getPipelineKpis money precision', () => {
       stage: 's4_negotiation',
       count: 1,
       valueSum: 1,
+      valueSumMicros: '1000000',
     });
     expect(result.byStage.find((stage) => stage.stage === 'closed_lost')).toEqual({
       stage: 'closed_lost',
       count: 2,
       valueSum: 3,
+      valueSumMicros: '3000000',
     });
     expect(result.totalOpen).toBe(1);
     expect(result.totalValueOpen).toBe(1);
