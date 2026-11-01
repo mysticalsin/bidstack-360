@@ -84,9 +84,12 @@ function contactAction(
   return `${countLabel}. ${ratedLabel}; ${emailLabel}.`;
 }
 
-function engagementAction(recent: number, openCount: number, onTrack: number): string {
+function engagementAction(recent: number, openCount: number, onTrack: number, capped = false): string {
   const recentLabel =
     recent === 1 ? '1 task in the last 30 days' : `${recent} tasks in the last 30 days`;
+  if (capped) {
+    return `${recentLabel} on the latest page. Older follow-ups are outside this score.`;
+  }
   if (recent === 0 && openCount === 0) {
     return 'No tasks in the last 30 days and no open follow-ups.';
   }
@@ -317,11 +320,12 @@ export function computeSignalCoverage(
 
   firmographics.recommendedAction = firmographicAction(company);
   contactFactor.recommendedAction = contactAction(contacts, pages?.contactsCapped);
-  engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
+  engagement.recommendedAction = engagementAction(recent, open.length, onTrack, pages?.tasksCapped);
   const accountOpen = pages?.dealsCapped ? pages.openDealCount : undefined;
   pipeline.recommendedAction = pipelineAction(openDeals, accountOpen);
   // A sample of the open book is not the account's pipeline quality.
   if (accountOpen != null && accountOpen !== openDeals.length) pipeline.scored = false;
+  if (pages?.tasksCapped) engagement.scored = false;
   if (pages?.contactsCapped) {
     contactFactor.whatItMeasures += ` Scored from the ${COCKPIT_CONTACT_PAGE} highest-influence contacts.`;
   }
@@ -331,7 +335,7 @@ export function computeSignalCoverage(
       : ` Scored from the latest ${COCKPIT_OPP_PAGE} opportunities.`;
   }
   if (pages?.tasksCapped) {
-    engagement.whatItMeasures += ` Scored from the latest ${COCKPIT_TASK_PAGE} tasks.`;
+    engagement.whatItMeasures += ` Not scored. The latest ${COCKPIT_TASK_PAGE} tasks do not hold every follow-up.`;
   }
 
   const factors = [firmographics, contactFactor, engagement, pipeline];

@@ -85,6 +85,7 @@ describe('computeSignalCoverage', () => {
     expect(health.factors?.find((factor) => factor.key === 'engagement')?.whatItMeasures).toContain(
       'latest 50 tasks',
     );
+    expect(health.factors?.find((factor) => factor.key === 'engagement')?.scored).toBe(false);
   });
 
   it('names the account open-deal count when the page holds only some of them', () => {
@@ -104,6 +105,23 @@ describe('computeSignalCoverage', () => {
     // WHY: one complete deal on the page would otherwise score the account pipeline at 100.
     expect(pipeline?.scored).toBe(false);
     expect(pipeline?.whatItMeasures).toContain('Not scored');
+  });
+
+  it('does not treat the newest tasks as every follow-up', () => {
+    // WHY: the newest 50 can all be on time while an older open task is overdue.
+    const health = computeSignalCoverage(
+      {
+        company: company(),
+        contacts: [],
+        openDeals: [],
+        tasks: [{ status: 'open', dueDate: new Date(Date.now() + 86_400_000), createdAt: new Date() }],
+      },
+      { tasksCapped: true },
+    );
+    const engagement = health.factors?.find((factor) => factor.key === 'engagement');
+    expect(engagement?.scored).toBe(false);
+    expect(engagement?.recommendedAction).toContain('Older follow-ups are outside this score');
+    expect(engagement?.recommendedAction).not.toContain('inside their due dates');
   });
 
   it('rewards a fully covered account with a strong composite', () => {
