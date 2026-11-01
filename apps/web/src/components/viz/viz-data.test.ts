@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -73,6 +73,14 @@ describe('viz-data', () => {
     expect(cumulativeOpen([lost, open])).toEqual([0, 20]);
     expect(accountBars([lost, open])).toEqual([{ label: 'C', open: 20, won: 0 }]);
     expect(stageFunnel([flaggedOpenKey])).toEqual([]);
+    const named = row({ stage: 'Proposal review', value: 30, customer: 'C' });
+    const funnel = stageFunnel([...rows, named]);
+    expect(funnel.map((stage) => stage.label)).toEqual(['S1 lead', 'S4 negotiation', 'Proposal review']);
+    expect(funnel.find((stage) => stage.id === 'Proposal review')).toMatchObject({ value: 30, count: 1 });
+    expect(stageBuckets([named, row({ stage: 'closed_won', value: 9 })]).map((stage) => stage.id)).toEqual([
+      'Proposal review',
+      'closed_won',
+    ]);
     expect(pastDueOpen([lost], Date.parse('2026-06-01'))).toEqual([]);
     expect(statusMix([row({
       stage: 's2_sent',
