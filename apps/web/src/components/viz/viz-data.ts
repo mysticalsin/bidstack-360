@@ -136,7 +136,11 @@ export function wonByQuarter(rows: OppRow[]) {
     cur.v += recordedMicros(o.value ?? 0, o.valueMicros);
     by.set(q, cur);
   }
-  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: microsToUnits(v.v) }));
+  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({
+    label,
+    won: microsToUnits(v.v),
+    wonMicros: v.v.toString(),
+  }));
 }
 
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
@@ -195,6 +199,59 @@ export function cumulativeOpen(rows: OppRow[]) {
   // Starts at 0 so a single open bid still draws a rising line.
   let run = 0n;
   return [0, ...open.map((o) => microsToUnits((run += recordedMicros(o.value ?? 0, o.valueMicros))))];
+}
+
+function forecastMicros(value: string | number | null | undefined): bigint | null {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value)) return null;
+    return BigInt(value);
+  }
+  if (!/^\d+$/.test(value)) return null;
+  return BigInt(value);
+}
+
+export interface ForecastPoint {
+  label: string;
+  won: number;
+  weighted: number;
+  open: number;
+  wonLabel: string;
+  weightedLabel: string;
+  openLabel: string;
+}
+
+/** Bar height from integer micros. A digit string that does not fit in a JavaScript number is not divided. */
+export function forecastPoint(period: {
+  label: string;
+  wonMicros: string | number;
+  weightedMicros: string | number;
+  openMicros: string | number;
+}): ForecastPoint {
+  const one = (raw: string | number) => {
+    const micros = forecastMicros(raw);
+    if (micros == null) return { units: 0, label: 'amount not readable' };
+    return { units: microsToUnits(micros), label: headlineMicrosLabel(micros, 'en-GB') };
+  };
+  const won = one(period.wonMicros);
+  const weighted = one(period.weightedMicros);
+  const open = one(period.openMicros);
+  return {
+    label: period.label,
+    won: won.units,
+    weighted: weighted.units,
+    open: open.units,
+    wonLabel: won.label,
+    weightedLabel: weighted.label,
+    openLabel: open.label,
+  };
+}
+
+/** Commit target label. Null when no commit is set. */
+export function forecastCommitLabel(micros: string | number | null | undefined): string | null {
+  const value = forecastMicros(micros);
+  if (value == null || value === 0n) return null;
+  return headlineMicrosLabel(value, 'en-GB');
 }
 
 /** Currency-free amount. One compact digit is kept only when it names the same cent. */
