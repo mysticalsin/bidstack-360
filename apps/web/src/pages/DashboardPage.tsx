@@ -35,7 +35,7 @@ import { HiringNowCard } from '@/components/enrichment/HiringNowCard';
 import { PotentialProjectsCard } from '@/components/enrichment/PotentialProjectsCard';
 import { OppDrill } from '@/components/drill/OppDrill';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
-import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { opportunityVizIsPartial, useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { AccountDetailsFold } from '@/components/account/AccountDetailsFold';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
@@ -426,6 +426,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
             onFilterChange={setDrill}
             onClose={() => setDrill(null)}
             rootLabel={cockpit.company.name}
+            rowsCapped={opportunityVizIsPartial(oppRows.data)}
           />
         </>
       ) : null}

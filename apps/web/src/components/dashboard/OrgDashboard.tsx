@@ -285,7 +285,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
         <HemaLeverageTile />
         <PipelineCard rows={oppRows} onDrill={setDrill} rowsCapped={rowsCapped} />
         <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} rowsCapped={rowsCapped} />
-        <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
+        <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} rowsCapped={rowsCapped} />
 
         <details className="dash-more">
           <summary>{t('orgDashboard.moreDetail', 'Workspace detail')}</summary>
