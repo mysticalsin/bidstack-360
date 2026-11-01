@@ -561,7 +561,7 @@ export async function buildCompanyCockpit(
     deletedAt: null,
     OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
   };
-  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders, registerDeals] =
+  const [dealsCapped, contactsCapped, tasksCapped, dealCounts, roleHolders, registerDeals] =
     await Promise.all([
     opportunities.length < COCKPIT_OPP_PAGE
       ? Promise.resolve(false)
@@ -578,13 +578,14 @@ export async function buildCompanyCockpit(
           const total = await prismaClient.opportunity.count({ where: opportunityWhere });
           if (total <= COCKPIT_OPP_PAGE) return undefined;
           const { NOT } = excludeClosedOutcome();
-          return prismaClient.opportunity.count({
+          const open = await prismaClient.opportunity.count({
             where: {
               ...opportunityWhere,
               stage: { notIn: ['closed_won', 'closed_lost', 'customer'] },
               NOT,
             },
           });
+          return { total, open };
         })(),
     includeBuyingRoleContacts(orgId, company.id, contacts, prismaClient),
     loadRegisterDealIds(prismaClient, opportunityWhere),
@@ -646,7 +647,8 @@ export async function buildCompanyCockpit(
       dealsCapped,
       tasksCapped,
     },
-    openDealCount,
+    openDealCount: dealCounts?.open,
+    dealCount: dealCounts?.total,
   });
 }
 

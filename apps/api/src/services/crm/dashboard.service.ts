@@ -456,7 +456,7 @@ export async function buildDashboardSnapshot(
       ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
     ],
   };
-  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders, registerDeals] =
+  const [dealsCapped, contactsCapped, tasksCapped, dealCounts, roleHolders, registerDeals] =
     await Promise.all([
     !accountOpportunityWhere || accountOpportunities.length < COCKPIT_OPP_PAGE
       ? Promise.resolve(false)
@@ -475,13 +475,14 @@ export async function buildDashboardSnapshot(
           const total = await prisma.opportunity.count({ where: accountOpportunityWhere });
           if (total <= COCKPIT_OPP_PAGE) return undefined;
           const { NOT } = excludeClosedOutcome();
-          return prisma.opportunity.count({
+          const open = await prisma.opportunity.count({
             where: {
               ...accountOpportunityWhere,
               stage: { notIn: ['closed_won', 'closed_lost', 'customer'] },
               NOT,
             },
           });
+          return { total, open };
         })(),
     isCompanyUuid(selectedCompany.id)
       ? includeBuyingRoleContacts(orgId, selectedCompany.id, contacts, prisma)
@@ -552,7 +553,8 @@ export async function buildDashboardSnapshot(
         dealsCapped,
         tasksCapped,
       },
-      openDealCount,
+      openDealCount: dealCounts?.open,
+      dealCount: dealCounts?.total,
     }),
     companies,
     deals: snapshotDeals,
