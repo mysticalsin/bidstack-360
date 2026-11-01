@@ -120,6 +120,7 @@ async function buildDustStatus(
       where: {
         orgId,
         source: 'dust.poll',
+        eventType: 'poll.completed',
         receivedAt: { gte: since },
       },
     }),
@@ -135,7 +136,7 @@ async function buildDustStatus(
       orderBy: { receivedAt: 'desc' },
     }),
     prisma.syncEvent.findFirst({
-      where: { orgId, source: 'dust.poll', status: 'processed' },
+      where: { orgId, source: 'dust.poll', eventType: 'poll.completed', status: 'processed' },
       orderBy: { receivedAt: 'desc' },
     }),
     listDustAgents(orgId, log),
@@ -145,6 +146,7 @@ async function buildDustStatus(
 
   return {
     workspace: creds?.workspaceId ?? 'Not configured',
+    // tick.stub is a local "not configured" heartbeat. It is not a Dust pull.
     lastSyncAt: lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
     // This handler does not probe Dust. A next-sync timestamp would advertise
     // a live schedule, including the local stub tick.
