@@ -142,6 +142,55 @@ const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 describe('notes routes (integration)', () => {
   const accountId = `test-account-${Date.now()}`;
 
+  skipIfNoDb('POST stores the company id when the account tag is that company', async () => {
+    // WHY: the cockpit saves a note with the company id in accountId and no
+    // companyId. A later read by company id missed it, and a note already
+    // linked by companyId was invisible when its label differed.
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: `probe-${Date.now()}`, title: 'Probe', bodyMd: 'org' },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = (probe.json() as { id: string }).id;
+    const probeRow = await prisma.note.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const company = await prisma.company.create({
+      data: { orgId: probeRow!.orgId, name: `Note Co ${Date.now()}` },
+    });
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: company.id.toUpperCase(), title: 'On the account', bodyMd: 'linked' },
+    });
+    expect(created.statusCode).toBe(201);
+    const note = created.json() as { id: string; companyId?: string };
+    expect(note.companyId).toBe(company.id);
+
+    const labeled = await prisma.note.create({
+      data: {
+        orgId: probeRow!.orgId,
+        accountId: `label-${Date.now()}`,
+        companyId: company.id,
+        authorUserId: (await prisma.note.findUnique({ where: { id: note.id }, select: { authorUserId: true } }))!
+          .authorUserId,
+        title: 'Labeled',
+        bodyMd: 'already linked',
+      },
+    });
+
+    const list = await server.inject({
+      method: 'GET',
+      url: `/api/notes?accountId=${company.id}`,
+    });
+    expect(list.statusCode).toBe(200);
+    const ids = (list.json() as { items: Array<{ id: string }> }).items.map((item) => item.id);
+    expect(ids).toContain(note.id);
+    expect(ids).toContain(labeled.id);
+
+    await prisma.note.deleteMany({ where: { id: { in: [probeId, note.id, labeled.id] } } });
+    await prisma.company.delete({ where: { id: company.id } });
+  });
+
   skipIfNoDb('POST → GET → PATCH → DELETE round-trips a note', async () => {
     const created = await server.inject({
       method: 'POST',
