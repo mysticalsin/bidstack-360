@@ -46,6 +46,8 @@ describe('positioning-format', () => {
   it('formats values, deltas and direction tones', () => {
     expect(formatValue(kn({ value: 1234 }))).toBe('1,234');
     expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1.70bn');
+    expect(formatValue(kn({ value: 1.7e9, unit: 'money' }))).toBe('1.70bn unspecified');
+    expect(formatValue(kn({ value: 1.7e9, unit: 'money' }))).not.toContain('USD');
     expect(formatValue(kn({ value: 18.34, unit: 'pct' }))).toBe('18.3%');
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');
