@@ -157,6 +157,7 @@ export async function extractOpportunityFeatures(
     where: { id: opportunityId, orgId, deletedAt: null },
     select: {
       valueMicros: true,
+      stage: true,
       probability: true,
       dueDate: true,
       createdAt: true,
@@ -211,14 +212,26 @@ export async function extractOpportunityFeatures(
         where: {
           orgId, ownerId: opp.ownerId, deletedAt: null,
           updatedAt: { gte: ninetyDaysAgo },
-          pipelineStage: { isWon: true, isLost: false, deletedAt: null },
+          NOT: {
+            OR: [
+              { stage: 'closed_lost' },
+              { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+            ],
+          },
+          OR: [
+            { stage: 'closed_won' },
+            { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+          ],
         },
       }),
       db.opportunity.count({
         where: {
           orgId, ownerId: opp.ownerId, deletedAt: null,
           updatedAt: { gte: ninetyDaysAgo },
-          pipelineStage: { isLost: true, deletedAt: null },
+          OR: [
+            { stage: 'closed_lost' },
+            { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+          ],
         },
       }),
     ]);
@@ -246,8 +259,10 @@ export async function extractOpportunityFeatures(
   push('last_activity_days_ago', daysSince(lastActivity?.occurredAt ?? null, now));
   push('owner_close_rate_last_90d', ownerCloseRate);
   push('qualification_score_norm', qualScore / 100);
-  push('is_won', stage?.isWon && !stage.isLost ? 1 : 0);
-  push('is_lost', stage?.isLost ? 1 : 0);
+  const lost = opp.stage === 'closed_lost' || stage?.isLost === true;
+  const won = !lost && (opp.stage === 'closed_won' || stage?.isWon === true);
+  push('is_won', won ? 1 : 0);
+  push('is_lost', lost ? 1 : 0);
 
   return { names, values };
 }

@@ -144,6 +144,7 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
           dueDate: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
           ownerId: 'owner-1',
+          stage: 's2_sent',
           pipelineStage: {
             probability: 0,
             isWon: true,
@@ -159,11 +160,19 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     const removed = await extractOpportunityFeatures('opp-1', 'org-1', deleted as never);
     expect(valueOf(removed!, 'is_won')).toBe(0);
     expect(valueOf(removed!, 'is_lost')).toBe(0);
-    const wheres = count.mock.calls.map(
-      (call) => (call[0] as { where: { pipelineStage: unknown } }).where.pipelineStage,
-    );
-    expect(wheres[0]).toMatchObject({ isWon: true, isLost: false, deletedAt: null });
-    expect(wheres[1]).toMatchObject({ isLost: true, deletedAt: null });
+    const wheres = count.mock.calls.map((call) => (call[0] as { where: unknown }).where);
+    expect(wheres[0]).toMatchObject({
+      NOT: {
+        OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+      },
+      OR: [
+        { stage: 'closed_won' },
+        { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+      ],
+    });
+    expect(wheres[1]).toMatchObject({
+      OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+    });
 
     const both = {
       activity,
@@ -174,6 +183,7 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
           dueDate: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
           ownerId: null,
+          stage: 'closed_won',
           pipelineStage: { probability: 0, isWon: true, isLost: true, deletedAt: null },
           _count: { contactLinks: 0 },
           intel: {},
@@ -184,5 +194,26 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     const flagged = await extractOpportunityFeatures('opp-2', 'org-1', both as never);
     expect(valueOf(flagged!, 'is_won')).toBe(0);
     expect(valueOf(flagged!, 'is_lost')).toBe(1);
+
+    const enumWon = {
+      activity,
+      opportunity: {
+        findFirst: vi.fn(async () => ({
+          valueMicros: 1n,
+          probability: 10,
+          dueDate: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          ownerId: null,
+          stage: 'closed_won',
+          pipelineStage: null,
+          _count: { contactLinks: 0 },
+          intel: {},
+        })),
+        count,
+      },
+    };
+    const recorded = await extractOpportunityFeatures('opp-3', 'org-1', enumWon as never);
+    expect(valueOf(recorded!, 'is_won')).toBe(1);
+    expect(valueOf(recorded!, 'is_lost')).toBe(0);
   });
 });
