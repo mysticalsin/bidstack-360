@@ -25,8 +25,9 @@ export async function loadInitiatives(
   scope: AccessScope,
   company: { id: string },
   now: Date,
+  companyIds?: string[],
 ): Promise<Initiative[]> {
-  const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
+  const ids = companyIds ?? (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
   const live = await companiesWithLiveSignals(orgId, ids);
   const [firmo, events, solutions, meetings] = await Promise.all([
     prisma.companyFirmographics.findFirst({

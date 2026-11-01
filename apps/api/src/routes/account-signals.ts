@@ -28,6 +28,7 @@ import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import {
   closedAtOf,
   groupMap,
+  groupRollup,
   loadMomentumInputs,
   momentumFor,
   OPP_SELECT,
@@ -222,8 +223,10 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const company = await readable(req, req.params.companyId);
       const scope = await getAccessScope(orgId, userId);
-      const items = await loadInitiatives(orgId, scope, company, new Date());
-      return { companyId: company.id, items };
+      const rollup = await groupRollup(orgId, [company.id]);
+      const ids = rollup.groups.get(company.id) ?? [company.id];
+      const items = await loadInitiatives(orgId, scope, company, new Date(), ids);
+      return { companyId: company.id, items, subsidiariesCapped: rollup.cappedRoots.has(company.id) };
     },
   );
 

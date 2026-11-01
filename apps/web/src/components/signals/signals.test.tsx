@@ -114,6 +114,12 @@ const init = (n: number, over: Partial<Initiative> = {}): Initiative => ({
 });
 
 describe('InitiativesView', () => {
+  it('says when initiatives used the latest 1000 subsidiaries', () => {
+    // WHY: hiring and meetings from a full subsidiary page were shown as the whole group.
+    wrap(<InitiativesView items={[init(1)]} subsidiariesCapped />);
+    expect(screen.getByText('Latest 1,000 subsidiaries')).toBeTruthy();
+  });
+
   it('shows confidence, evidence counts, the hook, evidence on click and caps at four', () => {
     wrap(<InitiativesView items={[init(1), init(2, { confidence: 'low', hook: { offering: 'Cloud', pitch: '', nextStep: '', alreadySold: true } }), init(3), init(4), init(5)]} />);
     expect(screen.getAllByRole('article')).toHaveLength(4);

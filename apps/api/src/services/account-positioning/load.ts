@@ -134,7 +134,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const [company, firmo, initiatives, fin, { people, lastMeeting }, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, tier: true, industry: true, countryCode: true, employeeCount: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, provenance: true } }),
-    loadInitiatives(orgId, scope, { id: companyId }, now),
+    loadInitiatives(orgId, scope, { id: companyId }, now, ids),
     loadAccountFinancials(orgId, companyId, false),
     loadPeople(c, ids),
     prisma.opportunity.findMany({

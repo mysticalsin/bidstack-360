@@ -85,20 +85,25 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
   );
 }
 
-export function InitiativesView({ items }: { items: Initiative[] }) {
+export function InitiativesView({ items, subsidiariesCapped }: { items: Initiative[]; subsidiariesCapped?: boolean }) {
   const [all, setAll] = useState(false);
   const listId = useId();
+  const note = subsidiariesCapped ? <p className="sg-meta">Latest 1,000 subsidiaries</p> : null;
   if (!items.length) {
     return (
-      <p className="sg-empty">
-        <span>No initiatives spotted yet</span>
-        They appear when hiring, news or meeting notes point to a project.
-      </p>
+      <>
+        {note}
+        <p className="sg-empty">
+          <span>No initiatives spotted yet</span>
+          They appear when hiring, news or meeting notes point to a project.
+        </p>
+      </>
     );
   }
   const shown = all ? items : items.slice(0, TOP);
   return (
     <>
+      {note}
       <div id={listId} className="sg-init-grid">
         {shown.map((it, i) => <InitiativeCard key={it.id} it={it} i={i} />)}
       </div>
@@ -127,7 +132,7 @@ export function InitiativesBoard({ companyId }: { companyId: string }) {
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
       ) : (
-        <InitiativesView items={q.data.items} />
+        <InitiativesView items={q.data.items} subsidiariesCapped={q.data.subsidiariesCapped} />
       )}
     </section>
   );

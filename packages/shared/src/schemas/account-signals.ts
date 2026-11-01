@@ -756,7 +756,12 @@ export const Initiative = z.object({
 });
 export type Initiative = z.infer<typeof Initiative>;
 
-export const AccountInitiatives = z.object({ companyId: z.string(), items: z.array(Initiative) });
+export const AccountInitiatives = z.object({
+  companyId: z.string(),
+  items: z.array(Initiative),
+  /** True when hiring, news, and meetings include only the latest 1,000 direct subsidiaries. */
+  subsidiariesCapped: z.boolean().optional(),
+});
 export type AccountInitiatives = z.infer<typeof AccountInitiatives>;
 
 export const PortfolioAlert = z.object({
