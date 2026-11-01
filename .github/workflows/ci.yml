@@ -235,6 +235,12 @@ jobs:
           pnpm db:migrate:deploy
           pnpm db:seed
 
+      - name: Build workspace packages
+        run: >
+          pnpm --filter @bidstack/shared --filter @bidstack/dust-client
+          --filter @bidstack/odoo-mcp-client --filter @bidstack/db
+          --filter @bidstack/memos --filter @bidstack/integrations build
+
       - name: API integration tests
         run: pnpm --filter @bidstack/api test
 
@@ -315,12 +321,48 @@ jobs:
 
       - name: Build web
         run: pnpm --filter @bidstack/web build
+        env:
+          VITE_API_URL: http://127.0.0.1:4000
+          VITE_AUTH_MODE: stub
+          BIDSTACK_ALLOW_STUB_AUTH: 'true'
 
-      # Playwright webServer starts the API; a second process on :4000 fails.
+      - name: Start API
+        run: |
+          pnpm --filter @bidstack/api exec tsx src/main.ts &
+          for i in $(seq 1 45); do
+            if curl -sf http://127.0.0.1:4000/health >/dev/null; then
+              echo "API ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become ready" >&2
+          exit 1
+        env:
+          NODE_ENV: test
+          PORT_API: '4000'
+          DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
+          REDIS_URL: redis://localhost:6379
+          BIDSTACK_ALLOW_STUB_AUTH: 'true'
+          BIDSTACK_ALLOW_STUB_ROLE_HEADER: 'true'
+
+      - name: Start web preview
+        run: |
+          pnpm --filter @bidstack/web exec vite preview --host 127.0.0.1 --port 4174 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4174 >/dev/null; then
+              echo "Preview ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview did not become ready" >&2
+          exit 1
 
       - name: Run Playwright smoke suite
         env:
-          E2E_API_URL: http://localhost:4000
+          E2E_BASE_URL: http://127.0.0.1:4174
+          E2E_API_URL: http://127.0.0.1:4000
         run: pnpm --filter @bidstack/web e2e
 
       - name: Upload Playwright report on failure
