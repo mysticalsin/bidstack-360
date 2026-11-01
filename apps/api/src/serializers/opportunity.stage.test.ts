@@ -25,7 +25,7 @@ const base = {
 describe('serializeOpportunity stage', () => {
   it('drops a deleted stage so its lost flag is not the deal', () => {
     // WHY: the list was still named and flagged from a stage row that had
-    // been deleted, so the board kept the bid closed.
+    // been deleted, and the stage id still pointed at that removed row.
     const deal = serializeOpportunity({
       ...base,
       pipelineStage: {
@@ -40,6 +40,7 @@ describe('serializeOpportunity stage', () => {
     });
     expect(deal.stage).toBe('s2_sent');
     expect(deal.pipelineStage).toBeNull();
+    expect(deal.pipelineStageId).toBeNull();
   });
 
   it('keeps a live lost flag on the deal', () => {
@@ -57,5 +58,6 @@ describe('serializeOpportunity stage', () => {
     });
     expect(deal.stage).toBe('Price lost');
     expect(deal.pipelineStage?.isLost).toBe(true);
+    expect(deal.pipelineStageId).toBe('stage-1');
   });
 });

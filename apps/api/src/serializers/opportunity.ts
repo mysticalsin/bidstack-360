@@ -70,15 +70,18 @@ export function serializeOpportunity(
   o: WithOwner & { territory?: { name: string } | null },
   counts?: OpportunityCounts,
 ): ApiOpportunity {
+  const liveStage = serializePipelineStage(o.pipelineStage);
+  // The stored id can still point at a removed stage. The read must not.
+  const stageRemoved = Boolean(o.pipelineStage?.deletedAt);
   return {
     id: o.id,
     code: o.code,
     customer: o.customer,
     companyId: o.companyId ?? null,
     name: o.name,
-    stage: serializePipelineStage(o.pipelineStage)?.name ?? o.stage ?? null,
-    pipelineStageId: o.pipelineStageId ?? null,
-    pipelineStage: serializePipelineStage(o.pipelineStage),
+    stage: liveStage?.name ?? o.stage ?? null,
+    pipelineStageId: stageRemoved ? null : (o.pipelineStageId ?? null),
+    pipelineStage: liveStage,
     value: Number(o.valueMicros) / 1_000_000,
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
