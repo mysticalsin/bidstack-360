@@ -45,6 +45,7 @@ async function main() {
       dropped: s.dropped,
       skippedNoIdentifiers: s.skippedNoIdentifiers,
       errored: s.errored,
+      perAccount: s.perAccount,
     },
   );
   await redis?.quit().catch(() => undefined);
