@@ -5,6 +5,8 @@
 // Contract: /workspace/fleet/polo-signals-api.md
 import { z } from 'zod';
 
+import { formatMicrosAmount } from '../utils/money.js';
+
 // ── Categories ──────────────────────────────────────────────────────────────
 
 /** Watch event kinds, mirroring the Prisma enum watchdog_event_kind. */
@@ -406,25 +408,68 @@ export const MOMENTUM_WEIGHTS: Record<DriverKey, number> = { pipeline: 0.3, meet
 const LABEL: Record<DriverKey, string> = { pipeline: 'Pipeline', winloss: 'Win and loss', meetings: 'Meetings', hiring: 'Hiring', news: 'News' };
 
 const clamp = (v: number, lo = -1, hi = 1) => Math.max(lo, Math.min(hi, v));
-const toNum = (v: bigint | number) => (typeof v === 'bigint' ? Number(v) : v);
 const ratioChange = (now: number, before: number) => (now === before ? 0 : (now - before) / Math.max(now, before));
 const inWindow = (d: Date, from: number, to: number) => d.getTime() > from && d.getTime() <= to;
 
-function compactMoney(micros: number): string {
-  const v = micros / 1_000_000;
-  if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
-  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  if (Math.abs(v) >= 1e3) return `${Math.round(v / 1e3)}K`;
-  return `${Math.round(v)}`;
+function ratioChangeMicros(now: bigint, before: bigint): number {
+  if (now === before) return 0;
+  const denom = now > before ? now : before;
+  if (denom === 0n) return 0;
+  return Number(((now - before) * 1_000_000n) / denom) / 1_000_000;
 }
 
-function openValueAt(opps: MomentumOpp[], t: number): number {
-  let sum = 0;
+function roundedPercent(delta: bigint, base: bigint): number {
+  const negative = (delta < 0n) !== (base < 0n);
+  const ad = delta < 0n ? -delta : delta;
+  const ab = base < 0n ? -base : base;
+  const rounded = (ad * 100n + ab / 2n) / ab;
+  const value = Number(rounded);
+  return negative ? -value : value;
+}
+
+/** Compact only when the label is the same amount. Otherwise the full integer. */
+function compactMoney(micros: bigint): string {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const sign = negative ? '-' : '';
+  if (abs % 1_000_000n !== 0n) return `${sign}${formatMicrosAmount(abs)}`;
+  const units = abs / 1_000_000n;
+  const band =
+    units >= 1_000_000_000n
+      ? exactCompact(units, 1_000_000_000n, 'B', 1)
+      : units >= 1_000_000n
+        ? exactCompact(units, 1_000_000n, 'M', 2)
+        : units >= 1_000n
+          ? exactCompact(units, 1_000n, 'K', 0)
+          : null;
+  return band ? `${sign}${band}` : `${sign}${formatMicrosAmount(abs)}`;
+}
+
+function exactCompact(units: bigint, scale: bigint, suffix: string, digits: number): string | null {
+  const factor = 10n ** BigInt(digits);
+  const step = scale / factor;
+  if (step === 0n || units % step !== 0n) return null;
+  const shown = units / step;
+  const whole = shown / factor;
+  const frac = shown % factor;
+  if (frac === 0n) return `${whole}${suffix}`;
+  const fracText = frac.toString().padStart(digits, '0').replace(/0+$/, '');
+  return `${whole}.${fracText}${suffix}`;
+}
+
+function asMicros(value: bigint | number): bigint {
+  if (typeof value === 'bigint') return value;
+  if (!Number.isSafeInteger(value)) return 0n;
+  return BigInt(value);
+}
+
+function openValueAt(opps: MomentumOpp[], t: number): bigint {
+  let sum = 0n;
   for (const o of opps) {
     if (o.createdAt.getTime() > t) continue;
     if (o.closedAt && o.closedAt.getTime() <= t) continue;
     if (!o.closedAt && o.outcome !== 'open') continue; // closed, date unknown
-    sum += toNum(o.valueMicros);
+    sum += asMicros(o.valueMicros);
   }
   return sum;
 }
@@ -440,9 +485,9 @@ function components(d: MomentumData, asOf: number): Component[] {
   // Pipeline: open value now vs 90 days earlier.
   const nowV = openValueAt(d.opps, asOf);
   const prevV = openValueAt(d.opps, asOf - 90 * DAY);
-  if (nowV > 0 || prevV > 0) {
-    const s = clamp(ratioChange(nowV, prevV) * 1.25);
-    const pct = prevV > 0 ? Math.round(((nowV - prevV) / prevV) * 100) : null;
+  if (nowV > 0n || prevV > 0n) {
+    const s = clamp(ratioChangeMicros(nowV, prevV) * 1.25);
+    const pct = prevV > 0n ? roundedPercent(nowV - prevV, prevV) : null;
     const detail =
       pct === null
         ? `${compactMoney(nowV)} open pipeline, all opened in the last 90 days`
