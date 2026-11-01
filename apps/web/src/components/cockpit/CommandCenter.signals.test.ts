@@ -68,6 +68,27 @@ describe('command center counts', () => {
     );
   });
 
+  it('does not call off-card critical risks manageable', () => {
+    // WHY: the tile counted high severity on the six cards. Ten open critical
+    // risks behind a low card read as a manageable load.
+    const low = {
+      id: 'r1',
+      title: 'Plant',
+      severity: 'low' as const,
+      status: 'open' as const,
+      owner: null,
+      mitigation: null,
+      dueDate: null,
+    };
+    expect(
+      openRiskFigures({
+        risks: [low],
+        openRiskCount: 11,
+        openRiskSeverity: { critical: 10, high: 0 },
+      }).highSeverity,
+    ).toBe(10);
+  });
+
   it('does not treat the six visible checks as the account compliance rate', () => {
     // WHY: the card keeps six rows, open ones first. Six blocked cards and
     // forty compliant checks used to read as 0% compliant.
@@ -178,7 +199,7 @@ describe('command center counts', () => {
         t,
       ),
     ).toBe('Escalate Plant before proposal approval.');
-    expect(openRiskFigures({ risks: [accepted] }).criticalOnPage).toBe(0);
+    expect(openRiskFigures({ risks: [accepted] }).highSeverity).toBe(0);
     expect(
       riskPenaltyFromRegister({
         risks: [{ ...accepted, status: 'unspecified', severity: 'critical' }],
