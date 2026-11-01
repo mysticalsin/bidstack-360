@@ -857,6 +857,26 @@ export function buildCockpit({
   const { winLoss, revenueEvolution } = performance ?? deriveAccountPerformance(companyOpps);
   const wonDeals = winLoss.wonCount;
   const lostDeals = winLoss.lostCount;
+  const decisionRole = (contactId: string) =>
+    buyingRolesCapped
+      ? null
+      : recordedDecisionRole(
+          buyingRoleFacts
+            .filter((fact) => fact.contactId === contactId)
+            .map(buyingRoleFactView)
+            .filter((fact): fact is PersonFactView => fact !== null),
+          now,
+          roleDealIds,
+        );
+  let championCount = 0;
+  let buyerCount = 0;
+  if (!buyingRolesCapped) {
+    for (const contact of accountContacts) {
+      const role = decisionRole(contact.id);
+      if (role === 'champion') championCount += 1;
+      else if (role === 'buyer') buyerCount += 1;
+    }
+  }
 
   return {
     company,
@@ -960,16 +980,7 @@ export function buildCockpit({
       influence: contact.influence,
       // A job title stays in `title`. Only one fresh accepted buying role
       // on a deal for this account fills the station.
-      roleInDecision: buyingRolesCapped
-        ? null
-        : recordedDecisionRole(
-        buyingRoleFacts
-          .filter((fact) => fact.contactId === contact.id)
-          .map(buyingRoleFactView)
-          .filter((fact): fact is PersonFactView => fact !== null),
-        now,
-        roleDealIds,
-      ),
+      roleInDecision: decisionRole(contact.id),
       updatedAt: contact.createdAt.toISOString(),
     })),
     recentActivity: buildActivities(accountTasks).slice(0, 5),
@@ -985,6 +996,9 @@ export function buildCockpit({
     risksCapped,
     complianceCapped,
     buyingRolesCapped,
+    championCount: buyingRolesCapped ? undefined : championCount,
+    buyerCount: buyingRolesCapped ? undefined : buyerCount,
+    contactsCapped: coveragePages?.contactsCapped,
     roadmap: [],
   };
 }

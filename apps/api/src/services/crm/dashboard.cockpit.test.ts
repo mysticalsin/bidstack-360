@@ -525,6 +525,58 @@ describe('buildCockpit recorded facts only', () => {
     expect(cockpit.keyContacts.map((person) => person.id)).toEqual(['cio', 'ada', 'no-score']);
   });
 
+  it('counts a champion who does not fit the five key seats', () => {
+    // WHY: the five seats used to be the champion count. A sixth accepted
+    // champion on the loaded contacts was dropped.
+    const now = new Date('2026-10-31T00:00:00.000Z');
+    const contacts = [1, 2, 3, 4, 5, 6].map((n) => ({
+      id: `c${n}`,
+      customer: 'Acme',
+      companyId: 'mantu',
+      name: `Person ${n}`,
+      role: null,
+      email: null,
+      phone: null,
+      influence: n,
+      createdAt: now,
+    }));
+    const cockpit = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [
+        {
+          id: 'deal-1',
+          customer: 'Acme',
+          companyId: 'mantu',
+          name: 'Platform',
+          stage: 'proposal',
+          pipelineStage: null,
+          valueMicros: 0,
+          probability: 0,
+          dueDate: null,
+          owner: null,
+        },
+      ],
+      contacts,
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: contacts.map((contact) => ({
+        contactId: contact.id,
+        status: 'accepted',
+        linkLabel: 'champion',
+        opportunityId: 'deal-1',
+        observedAt: new Date('2026-10-01T00:00:00.000Z'),
+      })),
+      coveragePages: { contactsCapped: true },
+    });
+    expect(cockpit.keyContacts).toHaveLength(5);
+    expect(cockpit.championCount).toBe(6);
+    expect(cockpit.contactsCapped).toBe(true);
+  });
+
   it('keeps an accepted role holder in the key people ahead of louder names', () => {
     // WHY: five seats ordered by influence used to hide the champion when
     // louder people on the account had no recorded buying role.

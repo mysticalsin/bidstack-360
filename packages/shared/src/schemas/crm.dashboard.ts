@@ -257,6 +257,11 @@ export const AccountCockpitSnapshot = z.object({
   complianceCapped: z.boolean().optional(),
   /** True when accepted buying-role facts filled the 200-row page. */
   buyingRolesCapped: z.boolean().optional(),
+  /** Champions and buyers on the loaded contacts, not only the five key seats. */
+  championCount: z.number().int().nonnegative().optional(),
+  buyerCount: z.number().int().nonnegative().optional(),
+  /** True when those contacts are a page, not the whole account. */
+  contactsCapped: z.boolean().optional(),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;

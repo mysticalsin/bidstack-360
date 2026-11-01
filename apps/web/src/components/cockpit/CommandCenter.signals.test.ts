@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
 import {
+  committeeSummary,
   complianceShare,
   deriveNextMove,
   influenceProxyScore,
@@ -66,6 +67,18 @@ describe('command center counts', () => {
     expect(openRiskFigures({ risks: [risk], openRiskCount: 0, risksCapped: true }).unseenOpen).toBe(
       false,
     );
+  });
+
+  it('counts champions beyond the five key seats', () => {
+    // WHY: the influence line counted champions only on the five seats. A sixth
+    // champion on the loaded contacts disappeared.
+    const seats = Array.from({ length: 5 }, () => ({ roleInDecision: 'champion' as const }));
+    expect(committeeSummary({ keyContacts: seats, championCount: 6 }).text).toBe(
+      '6 champion mapped',
+    );
+    expect(
+      committeeSummary({ keyContacts: seats, championCount: 6, contactsCapped: true }).text,
+    ).toBe('6 champion on the loaded contacts');
   });
 
   it('does not call off-card critical risks manageable', () => {
