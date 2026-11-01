@@ -62,6 +62,23 @@ describe('OppKpiBar weighted tile', () => {
     expect(screen.queryByText(/WR/)).toBeNull();
   });
 
+  it('counts the rows on this page when the portfolio summary is withheld', () => {
+    // WHY: a filtered list of one open bid was sitting under the whole-portfolio 19.
+    const open = {
+      value: 0,
+      valueMicros: '1240000000000',
+      probability: 65,
+      pipelineStage: null,
+      stage: 's3_technical_iteration',
+    } as Opportunity;
+    render(<OppKpiBar opps={[open]} />);
+    expect(screen.getByText('Opportunities (page)')).toBeTruthy();
+    expect(screen.getByText('1')).toBeTruthy();
+    expect(screen.getByText('1,240,000')).toBeTruthy();
+    expect(screen.getByText('806,000')).toBeTruthy();
+    expect(screen.queryByText('19')).toBeNull();
+  });
+
   it('prints the open pipeline from integer micros', () => {
     // WHY: Number(sum) / 1e6 moved this portfolio total to the next cent.
     render(

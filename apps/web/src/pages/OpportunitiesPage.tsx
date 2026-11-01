@@ -350,7 +350,12 @@ export function OpportunitiesPage() {
           ))}
         </div>
       ) : data && data.items.length > 0 ? (
-        <OppKpiBar opps={data.items} summary={orgSummary.data} />
+        <OppKpiBar
+          opps={data.items}
+          summary={
+            search || stageFilter || dueFilter || excludeClosed ? undefined : orgSummary.data
+          }
+        />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
