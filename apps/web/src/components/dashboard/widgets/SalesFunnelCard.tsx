@@ -17,6 +17,12 @@ import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecif
 
 // ─── SalesFunnelCard ─────────────────────────────────────────────────────────
 
+/** Count bars share one scale. A currency amount is not a count, so it does not set the width. */
+export function funnelCountWidths(counts: number[]): number[] {
+  const maxVal = Math.max(...counts, 1);
+  return counts.map((count) => (count <= 0 ? 0 : Math.max(20, Math.round((count / maxVal) * 100))));
+}
+
 export function SalesFunnelCard({
   leads,
   opportunities,
@@ -31,35 +37,37 @@ export function SalesFunnelCard({
   reduced: boolean | null;
 }) {
   const { t } = useTranslation('crm');
+  const countWidths = funnelCountWidths([leads, opportunities, openOpps]);
   const stages = [
     {
       label: t('salesFunnel.stageLeads', 'Leads'),
-      count: leads,
+      display: leads.toLocaleString(),
+      widthPct: countWidths[0] ?? 0,
       color: 'var(--fg-secondary)',
       bg: 'var(--surface-sunken)',
     },
     {
       label: t('salesFunnel.stageOpportunities', 'Opportunities'),
-      count: opportunities,
+      display: opportunities.toLocaleString(),
+      widthPct: countWidths[1] ?? 0,
       color: 'var(--fg-secondary)',
       bg: 'var(--surface-sunken)',
     },
     {
       label: t('salesFunnel.stageOpenDeals', 'Open Deals'),
-      count: openOpps,
+      display: openOpps.toLocaleString(),
+      widthPct: countWidths[2] ?? 0,
       color: 'var(--fg-secondary)',
       bg: 'var(--surface-sunken)',
     },
     {
       label: t('salesFunnel.stagePipeline', 'Pipeline'),
-      count: pipelineValue,
       display: `${formatUnspecifiedAmount(pipelineValue)} (${UNSPECIFIED_CURRENCY_BASIS})`,
+      widthPct: 100,
       color: 'var(--brand-primary)',
       bg: 'var(--brand-primary-tint)',
     },
   ];
-
-  const maxVal = Math.max(leads, opportunities, openOpps, pipelineValue, 1);
 
   return (
     <GlassCard padding="md" hoverable={false}>
@@ -78,7 +86,7 @@ export function SalesFunnelCard({
       </div>
       <div className="funnel-viz">
         {stages.map((stage, i) => {
-          const widthPct = Math.max(20, (stage.count / maxVal) * 100);
+          const widthPct = stage.widthPct;
           return (
             <motion.div
               key={stage.label}
@@ -107,7 +115,7 @@ export function SalesFunnelCard({
                     {stage.label}
                   </span>
                   <span className="funnel-stage-value" style={{ color: 'var(--fg-primary)' }}>
-                    {stage.display ?? stage.count.toLocaleString()}
+                    {stage.display}
                   </span>
                 </motion.div>
               </div>
