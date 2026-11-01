@@ -118,6 +118,7 @@ export const CrmDealStage = z.enum([
   'meeting',
   'proposal',
   'customer',
+  'unspecified',
   'closed_won',
   'closed_lost',
 ]);
@@ -130,6 +131,8 @@ export const CrmDeal = z.object({
   companyName: z.string().nullable(),
   name: z.string().min(1),
   stage: CrmDealStage,
+  /** Live pipeline stage label. Absent when the deal has no live stage row. */
+  stageName: z.string().min(1).nullable().optional(),
   amountMicros: z.number().int().nonnegative(),
   currencyCode: z.string().length(3).nullable(),
   probability: z.number().int().min(0).max(100).nullable(),

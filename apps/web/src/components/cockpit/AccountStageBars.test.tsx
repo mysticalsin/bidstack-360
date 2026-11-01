@@ -36,6 +36,20 @@ describe('stageBars', () => {
     expect(bars[0]?.label).not.toMatch(/[$€]/);
   });
 
+  it('keeps a custom stage name off the new-lead bar', () => {
+    // WHY: a custom stage used to share the "new" bucket with real new leads.
+    const bars = stageBars([
+      deal({ id: 'new-1', stage: 'new', amountMicros: 1_000_000 }),
+      deal({
+        id: 'review-1',
+        stage: 'unspecified',
+        stageName: 'Price review',
+        amountMicros: 4_000_000,
+      }),
+    ]);
+    expect(bars.map((bar) => bar.name ?? bar.stage)).toEqual(['Price review', 'new']);
+  });
+
   it('keeps a recorded code only when every deal in the stage shares it', () => {
     const bars = stageBars([
       deal({ currencyCode: 'NOK', amountMicros: 1_000_000 }),

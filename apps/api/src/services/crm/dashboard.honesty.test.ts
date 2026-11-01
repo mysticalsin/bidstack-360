@@ -265,5 +265,33 @@ describe('deal currency is omitted when the opportunity has none', () => {
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
     expect(deal.stage).toBe('meeting');
+    expect(deal.stageName).toBeNull();
+  });
+
+  it('does not call a custom open stage a new lead', () => {
+    // WHY: an unrecognized stage key became "new", so a late review sat in the
+    // new-lead bar. The account keeps the stage name and an unspecified bucket.
+    const deal = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5e',
+      customer: 'Acme',
+      name: 'Price review',
+      stage: 's4_negotiation',
+      pipelineStage: {
+        key: 'price_review',
+        name: 'Price review',
+        probability: 55,
+        color: null,
+        isWon: false,
+        isLost: false,
+      },
+      valueMicros: 1_000_000,
+      probability: 40,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(deal.stage).toBe('unspecified');
+    expect(deal.stageName).toBe('Price review');
   });
 });

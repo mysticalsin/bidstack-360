@@ -206,7 +206,8 @@ export function mapDealStage(stage: string): z.infer<typeof CrmDeal>['stage'] {
     case 'closed_lost':
       return 'closed_lost';
     default:
-      return 'new';
+      // A custom key is not a new lead. The account bar uses the stage name.
+      return 'unspecified';
   }
 }
 

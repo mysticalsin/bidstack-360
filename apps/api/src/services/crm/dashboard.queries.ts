@@ -46,6 +46,7 @@ export function serializeDeal(opportunity: {
     color: string | null;
     isWon: boolean;
     isLost: boolean;
+    deletedAt?: Date | null;
   } | null;
   valueMicros: bigint | number | unknown;
   probability: number;
@@ -57,6 +58,7 @@ export function serializeDeal(opportunity: {
   currencyCode?: string | null;
 }): z.infer<typeof CrmDeal> {
   const recorded = opportunity.currencyCode?.trim();
+  const liveStage = opportunity.pipelineStage?.deletedAt ? null : opportunity.pipelineStage;
   return {
     id: opportunity.id,
     source: 'external_crm',
@@ -64,6 +66,7 @@ export function serializeDeal(opportunity: {
     companyName: opportunity.customer,
     name: opportunity.name,
     stage: recordedDealStage(opportunity),
+    stageName: liveStage?.name ?? null,
     amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
     currencyCode: recorded && recorded.length === 3 ? recorded : null,
     probability: opportunity.probability,

@@ -11,15 +11,21 @@ interface StageBar {
   count: number;
   amountMicros: number;
   label: string;
+  name: string | null;
+}
+
+function barKey(deal: CrmDeal): string {
+  return deal.stageName ?? deal.stage;
 }
 
 /** One bar per stage on this account. Mixed or missing currency stays unspecified. */
 export function stageBars(deals: readonly CrmDeal[]): StageBar[] {
   const grouped = new Map<string, CrmDeal[]>();
   for (const deal of deals) {
-    const rows = grouped.get(deal.stage) ?? [];
+    const key = barKey(deal);
+    const rows = grouped.get(key) ?? [];
     rows.push(deal);
-    grouped.set(deal.stage, rows);
+    grouped.set(key, rows);
   }
   return [...grouped.entries()]
     .map(([stage, rows]) => {
@@ -30,7 +36,7 @@ export function stageBars(deals: readonly CrmDeal[]): StageBar[] {
         codes.size === 1
           ? `${formatUnspecifiedCompact(major).replace(/ unspecified$/, '')} ${[...codes][0]}`
           : formatUnspecifiedCompact(major);
-      return { stage, count: rows.length, amountMicros, label };
+      return { stage, count: rows.length, amountMicros, label, name: rows[0]?.stageName ?? null };
     })
     .sort((a, b) => b.amountMicros - a.amountMicros);
 }
@@ -57,7 +63,7 @@ export function AccountStageBars({ deals }: { deals: readonly CrmDeal[] }) {
           bars.map((bar) => (
             <div key={bar.stage}>
               <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-                <span className="font-medium text-[var(--fg-primary)]">{formatStage(bar.stage)}</span>
+                <span className="font-medium text-[var(--fg-primary)]">{bar.name ?? formatStage(bar.stage)}</span>
                 <span className="tabular-nums text-xs text-[var(--fg-secondary)]">
                   {t('accountStageBars.meta', '{{count}} · {{amount}}', {
                     count: bar.count,
