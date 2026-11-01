@@ -81,6 +81,25 @@ function engagementAction(recent: number, openCount: number, onTrack: number): s
   return `${recentLabel}. Open follow-ups are inside their due dates.`;
 }
 
+function pipelineAction(
+  openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>,
+): string {
+  if (openDeals.length === 0) return 'No open deals are linked to this account.';
+  const missingProbability = openDeals.filter((deal) => !(deal.probability > 0)).length;
+  const missingOwner = openDeals.filter((deal) => deal.owner == null).length;
+  const missingDate = openDeals.filter((deal) => deal.dueDate == null).length;
+  const countLabel = openDeals.length === 1 ? '1 open deal' : `${openDeals.length} open deals`;
+  if (missingProbability === 0 && missingOwner === 0 && missingDate === 0) {
+    return `${countLabel} with a probability above 0, an owner, and a close date.`;
+  }
+  const gaps = [
+    missingProbability > 0 ? `${missingProbability} without a probability above 0` : null,
+    missingOwner > 0 ? `${missingOwner} without an owner` : null,
+    missingDate > 0 ? `${missingDate} without a close date` : null,
+  ].filter((gap): gap is string => gap !== null);
+  return `${countLabel}. ${gaps.join('; ')}.`;
+}
+
 function bandFor(score: number): HealthBandValue {
   if (score >= 75) return 'strong';
   if (score >= 50) return 'good';
@@ -189,6 +208,7 @@ export function computeSignalCoverage(input: {
   firmographics.recommendedAction = firmographicAction(company);
   contactFactor.recommendedAction = contactAction(contacts);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
+  pipeline.recommendedAction = pipelineAction(openDeals);
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
   // Weights: external intel is the cockpit's backbone; the rest split evenly.

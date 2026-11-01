@@ -144,6 +144,16 @@ describe('computeSignalCoverage', () => {
     });
     expect(missing.factors?.find((factor) => factor.key === 'pipeline')?.score).toBe(0);
     expect(complete.factors?.find((factor) => factor.key === 'pipeline')?.score).toBe(100);
+    const missingAction =
+      missing.factors?.find((factor) => factor.key === 'pipeline')?.recommendedAction ?? '';
+    expect(missingAction).toContain('without a probability above 0');
+    expect(missingAction).toContain('without an owner');
+    expect(missingAction).toContain('without a close date');
+    expect(missingAction).not.toMatch(/missing stage/i);
+    const completeAction =
+      complete.factors?.find((factor) => factor.key === 'pipeline')?.recommendedAction ?? '';
+    expect(completeAction).toContain('probability above 0');
+    expect(completeAction).not.toMatch(/records are complete/i);
   });
 
   it('stale Apollo data scores firmographics lower than fresh data', () => {
