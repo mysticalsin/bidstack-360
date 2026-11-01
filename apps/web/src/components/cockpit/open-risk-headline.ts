@@ -35,12 +35,41 @@ export function openRiskHeadline(input: {
   risks: readonly { status: string; severity: string | null }[];
   openRiskCount?: number;
   openRiskSeverity?: OpenRiskSeverityCounts;
-}): { total: number; high: number; spark: [number, number, number, number] } {
+}): { total: number; high: number; unranked: number; spark: [number, number, number, number] } {
   const shown = input.risks.filter((risk) => isOpenRisk(risk.status));
   const buckets = input.openRiskSeverity ?? severityBucketCounts(shown);
+  const spark: [number, number, number, number] = [
+    buckets.low,
+    buckets.medium,
+    buckets.high,
+    buckets.critical,
+  ];
+  const ranked = spark.reduce((sum, count) => sum + count, 0);
+  const total = input.openRiskCount ?? shown.length;
+  const unranked =
+    input.openRiskSeverity && input.openRiskCount != null
+      ? Math.max(0, input.openRiskCount - ranked)
+      : shown.filter(
+          (risk) =>
+            risk.severity !== 'critical' &&
+            risk.severity !== 'high' &&
+            risk.severity !== 'medium' &&
+            risk.severity !== 'low',
+        ).length;
   return {
-    total: input.openRiskCount ?? shown.length,
+    total,
     high: buckets.critical + buckets.high,
-    spark: [buckets.low, buckets.medium, buckets.high, buckets.critical],
+    unranked,
+    spark,
   };
+}
+
+/** The severity sentence. Unranked open risks stay in the total. */
+export function openRiskSparkLabel(input: {
+  spark: readonly [number, number, number, number];
+  unranked: number;
+}): string {
+  const [low, med, high, crit] = input.spark;
+  const ranked = `Open risks: ${low} low, ${med} medium, ${high} high, ${crit} critical`;
+  return input.unranked > 0 ? `${ranked}, ${input.unranked} unranked` : ranked;
 }

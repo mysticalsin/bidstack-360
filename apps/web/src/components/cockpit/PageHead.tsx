@@ -29,7 +29,7 @@ import { useAccountHistory } from '@/stores/accountHistory';
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
 import { deriveNextMove } from './CommandCenter';
-import { openRiskHeadline } from './open-risk-headline';
+import { openRiskHeadline, openRiskSparkLabel } from './open-risk-headline';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -252,7 +252,23 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             <span className="acct-key-label">{t('pageHead.keyOpenRisks', 'Open risks')}</span>
             <span className="acct-key-value">{riskHeadline.total}</span>
             {riskHeadline.total > 0 ? (
-              <Spark mode="bars" values={riskSpark} hotFrom={2} width={48} label={t('pageHead.sparkRisk', 'Open risks: {{low}} low, {{med}} medium, {{high}} high, {{crit}} critical', { low: riskSpark[0], med: riskSpark[1], high: riskSpark[2], crit: riskSpark[3] })} />
+              <Spark
+                mode="bars"
+                values={riskSpark}
+                hotFrom={2}
+                width={48}
+                label={t(
+                  riskHeadline.unranked > 0 ? 'pageHead.sparkRiskUnranked' : 'pageHead.sparkRisk',
+                  openRiskSparkLabel(riskHeadline),
+                  {
+                    low: riskSpark[0],
+                    med: riskSpark[1],
+                    high: riskSpark[2],
+                    crit: riskSpark[3],
+                    unranked: riskHeadline.unranked,
+                  },
+                )}
+              />
             ) : null}
             <span>
               {highRisks > 0

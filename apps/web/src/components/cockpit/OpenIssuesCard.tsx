@@ -11,7 +11,11 @@ import { springSoft } from '@/lib/motion';
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
 import { severityBg, severityShort, severityTone } from './_tokens';
-import { severityBucketCounts, type OpenRiskSeverityCounts } from './open-risk-headline';
+import {
+  openRiskHeadline,
+  severityBucketCounts,
+  type OpenRiskSeverityCounts,
+} from './open-risk-headline';
 
 interface Props {
   risks: RiskItem[];
@@ -46,6 +50,11 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
   // Register counts are open risks on the loaded deals. Without them, the
   // visible rows are the only book.
   const severity = severityBucketCounts(openRisks, openRiskSeverity);
+  const unranked = openRiskHeadline({
+    risks,
+    openRiskCount,
+    openRiskSeverity,
+  }).unranked;
   const buckets = [
     {
       label: 'Critical',
@@ -71,6 +80,16 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
       count: severity.low,
       tone: 'gray',
     },
+    ...(unranked > 0
+      ? [
+          {
+            label: 'Unranked',
+            labelText: t('openIssues.severityUnranked', 'Unranked'),
+            count: unranked,
+            tone: 'gray' as const,
+          },
+        ]
+      : []),
   ] as const;
 
   return (

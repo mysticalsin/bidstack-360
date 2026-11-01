@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { openRiskHeadline, severityBucketCounts } from './open-risk-headline';
+import { openRiskHeadline, openRiskSparkLabel, severityBucketCounts } from './open-risk-headline';
 
 describe('open risk headline', () => {
   it('does not count the six cards as the open-risk book', () => {
@@ -32,5 +32,21 @@ describe('open risk headline', () => {
     expect(headline.total).toBe(1);
     expect(headline.high).toBe(1);
     expect(headline.spark).toEqual([0, 0, 1, 0]);
+    expect(headline.unranked).toBe(0);
+  });
+
+  it('keeps an open risk with no rank in the mix', () => {
+    // WHY: the total counted every open row and the bars only counted four
+    // ranks. Three unranked risks read as a mix of zero.
+    const headline = openRiskHeadline({
+      risks: [{ status: 'open', severity: null }],
+      openRiskCount: 5,
+      openRiskSeverity: { critical: 2, high: 0, medium: 0, low: 0 },
+    });
+    expect(headline.total).toBe(5);
+    expect(headline.unranked).toBe(3);
+    expect(openRiskSparkLabel(headline)).toBe(
+      'Open risks: 0 low, 0 medium, 0 high, 2 critical, 3 unranked',
+    );
   });
 });
