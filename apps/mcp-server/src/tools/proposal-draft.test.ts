@@ -46,7 +46,7 @@ describe('proposal.draft grounded builder', () => {
           id: 'contact-1',
           name: 'Pat Sponsor',
           role: 'CIO',
-          influence: 90,
+          influence: 5,
           sentiment: 'warm',
           aiOptOut: false,
         },
@@ -68,6 +68,8 @@ describe('proposal.draft grounded builder', () => {
     expect(result.markdown).not.toMatch(/EUR|€/);
     expect(result.markdown).toContain('Core banking transformation reference');
     expect(result.markdown).toContain('Confirm legal assumptions');
+    expect(result.markdown).toContain('influence 5/5');
+    expect(result.markdown).not.toMatch(/\/100|stage probability/);
     expect(result.markdown).not.toMatch(/stub|DUST_API_KEY|ANTHROPIC_API_KEY/i);
     expect(result.citations).toEqual(
       expect.arrayContaining([
@@ -110,7 +112,7 @@ describe('proposal.draft grounded builder', () => {
       notes: [],
     });
 
-    expect(result.markdown).toContain('stored stage probability');
+    expect(result.markdown).toContain('Stored probability is below 40%');
     expect(result.markdown).not.toMatch(/win probability/i);
     expect(result.markdown).toContain('Opted-out stakeholder (PII withheld)');
     expect(result.markdown).not.toContain('Private Person');

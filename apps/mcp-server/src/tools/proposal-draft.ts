@@ -54,33 +54,29 @@ export const proposalDraft: Tool<typeof Input> = {
         take: 5,
         select: { id: true, title: true, status: true, dueDate: true },
       }),
-      prisma.contact.findMany({
-        where: {
-          orgId: ctx.orgId,
-          deletedAt: null,
-          OR: [{ customer: opp.customer }, ...(opp.companyId ? [{ companyId: opp.companyId }] : [])],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          name: true,
-          role: true,
-          influence: true,
-          sentiment: true,
-          aiOptOut: true,
-        },
-      }),
-      prisma.note.findMany({
-        where: {
-          orgId: ctx.orgId,
-          deletedAt: null,
-          OR: [{ accountId: opp.customer }, ...(opp.companyId ? [{ companyId: opp.companyId }] : [])],
-        },
-        orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-        take: 3,
-        select: { id: true, title: true, bodyMd: true, pinned: true, updatedAt: true },
-      }),
+      opp.companyId
+        ? prisma.contact.findMany({
+            where: { orgId: ctx.orgId, deletedAt: null, companyId: opp.companyId },
+            orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
+            take: 5,
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              influence: true,
+              sentiment: true,
+              aiOptOut: true,
+            },
+          })
+        : Promise.resolve([]),
+      opp.companyId
+        ? prisma.note.findMany({
+            where: { orgId: ctx.orgId, deletedAt: null, companyId: opp.companyId },
+            orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+            take: 3,
+            select: { id: true, title: true, bodyMd: true, pinned: true, updatedAt: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     return buildGroundedProposalDraft({
@@ -185,7 +181,7 @@ function formatStakeholder(contact: DraftContact): string {
   return [
     contact.name,
     contact.role ? `(${contact.role})` : '',
-    contact.influence !== null ? `influence ${contact.influence}/100` : '',
+    contact.influence !== null ? `influence ${contact.influence}/5` : '',
     contact.sentiment ? `sentiment ${contact.sentiment}` : '',
   ]
     .filter(Boolean)
@@ -251,10 +247,10 @@ function sectionBody(input: GroundedDraftInput): string[] {
   }
 
   return [
-    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${opportunity.stage}), stored stage probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
+    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${opportunity.stage}), stored probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
     opportunity.probability < 40
-      ? 'Stored stage probability is below 40%. Challenge the bid/no-bid decision before major drafting continues.'
-      : 'Stored stage probability is recorded. Test assumptions against legal, finance, delivery, and procurement gates.',
+      ? 'Stored probability is below 40%. Challenge the bid/no-bid decision before major drafting continues.'
+      : 'Stored probability is recorded. Test assumptions against legal, finance, delivery, and procurement gates.',
     `${stakeholderLine} ${refLine}`,
     activeTasks.some((task) => task.status === 'blocked')
       ? 'At least one task is blocked; unblock it or mark the proposal risk as high.'
