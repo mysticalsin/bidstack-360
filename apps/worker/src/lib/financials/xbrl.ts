@@ -234,6 +234,20 @@ function inclusive(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** A filed amount. An integer Number would round is omitted. */
+export function filedAmount(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const text = raw.trim();
+  if (!text) return null;
+  if (/^-?\d+$/.test(text)) {
+    const whole = Number(text);
+    return Number.isSafeInteger(whole) ? whole : null;
+  }
+  const amount = Number(text);
+  if (!Number.isFinite(amount) || Math.abs(amount) > Number.MAX_SAFE_INTEGER) return null;
+  return amount;
+}
+
 export function factsFromXbrlJson(doc: XbrlJson, filed: string | null): RawFact[] {
   const out: RawFact[] = [];
   for (const f of Object.values(doc.facts)) {
@@ -241,8 +255,8 @@ export function factsFromXbrlJson(doc: XbrlJson, filed: string | null): RawFact[
     if (Object.keys(dims).some((k) => !CORE_DIMS.has(k))) continue;
     const concept = dims.concept ?? '';
     if (!(Object.keys(CONCEPTS) as FinancialMetric[]).some((m) => rank(m, concept) >= 0)) continue;
-    const v = Number(f.value);
-    if (f.value == null || !Number.isFinite(v)) continue;
+    const v = filedAmount(f.value);
+    if (v == null) continue;
     const period = dims.period ?? '';
     const unit = (dims.unit ?? '').replace(/^iso4217:/, '') || 'pure';
     const [a, b] = period.split('/');
