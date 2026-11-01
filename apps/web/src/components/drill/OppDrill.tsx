@@ -13,6 +13,15 @@ export type { OppDrillFilter } from './filterOpps';
 
 const STATUS_LABEL: Record<OppStatus | 'all', string> = { all: 'All bids', open: 'Open', won: 'Won', lost: 'Lost' };
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+/** The sheet lists the largest bids. The caption still counts every match. */
+const DRILL_BID_LIST = 100;
+
+function byRecordedValue(a: OppRow, b: OppRow): number {
+  const av = recordedMicros(a.value ?? 0, a.valueMicros);
+  const bv = recordedMicros(b.value ?? 0, b.valueMicros);
+  if (av === bv) return (a.name ?? a.id).localeCompare(b.name ?? b.id);
+  return av > bv ? -1 : 1;
+}
 
 export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'Dashboard' }: {
   rows: OppRow[];
@@ -24,7 +33,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
   const [q, setQ] = useState('');
   const f = useMemo<OppDrillFilter>(() => filter ?? {}, [filter]);
   const status = f.status ?? 'all';
-  const shown = useMemo(() => filterOpps(rows, f, q).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)), [rows, f, q]);
+  const shown = useMemo(() => filterOpps(rows, f, q).sort(byRecordedValue), [rows, f, q]);
   const totalMicros = shown.reduce((n, o) => n + recordedMicros(o.value ?? 0, o.valueMicros), 0n);
   const weightedMicros = shown.reduce(
     (n, o) => n + (recordedMicros(o.value ?? 0, o.valueMicros) * BigInt(Math.trunc(o.probability ?? 0))) / 100n,
@@ -46,7 +55,10 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
       ...extra.map((stage) => ({ id: stage.id, label: stage.label })),
     ];
   }, [rows]);
-  const maxStage = Math.max(1, ...byStage.map((s) => s.value));
+  const maxStageMicros = byStage.reduce((max, stage) => {
+    const value = BigInt(stage.micros);
+    return value > max ? value : max;
+  }, 1n);
 
   const title = f.account ?? (f.stage ? stageText(f.stage) : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
   const trail: DrillCrumb[] = [
@@ -97,7 +109,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
                 <tr key={s.id}>
                   <td>
                     <button type="button" className="drill-link" onClick={() => onFilterChange({ ...f, stage: s.id })}>{s.label}</button>
-                    <span className="drill-bar" style={{ width: `${Math.max(4, (s.value / maxStage) * 100)}%` }} aria-hidden />
+                    <span className="drill-bar" style={{ width: `${Math.max(4, Number((BigInt(s.micros) * 10_000n) / maxStageMicros) / 100)}%` }} aria-hidden />
                   </td>
                   <td className="num">{s.count}</td>
                   <td className="num">{s.amount}</td>
@@ -109,13 +121,16 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
       ) : null}
       <section aria-labelledby="drill-recs-t">
         <h3 id="drill-recs-t" className="drill-section-title">Bids</h3>
+        {shown.length > DRILL_BID_LIST ? (
+          <p className="drill-caption">Showing the largest {DRILL_BID_LIST} of {shown.length}.</p>
+        ) : null}
         {shown.length === 0 ? <p className="drill-empty">No bids match these filters.</p> : (
           <table className="drill-table">
             <thead>
               <tr><th scope="col">Bid</th><th scope="col">Stage</th><th scope="col" className="num">Value</th><th scope="col" className="num">Due</th></tr>
             </thead>
             <tbody>
-              {shown.slice(0, 100).map((o) => {
+              {shown.slice(0, DRILL_BID_LIST).map((o) => {
                 const d = closeDate(o);
                 return (
                   <tr key={o.id}>
