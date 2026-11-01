@@ -17,22 +17,37 @@ import { excludeClosedOutcome } from '../routes/opportunities.helpers.js';
 
 import { sanitiseContactForPrompt } from './ai-assistant.helpers.js';
 
-/** Deal line for a model prompt. Amounts have no currency. Outcome follows a live stage flag. */
-export function formatDealForPrompt(deal: {
+type PromptDeal = {
   name: string;
   stage: string;
-  valueMicros: bigint | number | null;
+  valueMicros?: bigint | number | null;
   pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt: Date | null } | null;
-}): string {
+};
+
+/** Lost wins when the enum and a live stage flag disagree. A deleted stage does not close the deal. */
+export function dealOutcomeForPrompt(deal: PromptDeal): 'open' | 'won' | 'lost' {
   const stage =
     deal.pipelineStage && deal.pipelineStage.deletedAt == null ? deal.pipelineStage : null;
-  const lost = deal.stage === 'closed_lost' || stage?.isLost === true;
-  const won = !lost && (deal.stage === 'closed_won' || stage?.isWon === true);
-  const outcome = lost ? 'lost' : won ? 'won' : 'open';
+  if (deal.stage === 'closed_lost' || stage?.isLost === true) return 'lost';
+  if (deal.stage === 'closed_won' || stage?.isWon === true) return 'won';
+  return 'open';
+}
+
+export function countRecordedDealOutcomes(deals: readonly PromptDeal[]): {
+  won: number;
+  lost: number;
+  open: number;
+} {
+  const counts = { won: 0, lost: 0, open: 0 };
+  for (const deal of deals) counts[dealOutcomeForPrompt(deal)] += 1;
+  return counts;
+}
+
+/** Deal line for a model prompt. Amounts have no currency. Outcome follows a live stage flag. */
+export function formatDealForPrompt(deal: PromptDeal): string {
   const micros = deal.valueMicros == null ? 0 : Number(deal.valueMicros);
-  const amount =
-    micros === 0 ? '' : `, value ${micros / 1_000_000} (currency not recorded)`;
-  return `"${deal.name}" (stage ${deal.stage}, outcome ${outcome}${amount})`;
+  const amount = micros === 0 ? '' : `, value ${micros / 1_000_000} (currency not recorded)`;
+  return `"${deal.name}" (stage ${deal.stage}, outcome ${dealOutcomeForPrompt(deal)}${amount})`;
 }
 
 // ─── Email draft context ──────────────────────────────────────────────────
@@ -80,7 +95,13 @@ export async function buildEmailDraftContext(
 export async function buildSentimentContext(orgId: string, dealId: string) {
   const opp = await prisma.opportunity.findFirst({
     where: { id: dealId, orgId, deletedAt: null },
-    select: { id: true, name: true, stage: true },
+    select: {
+      id: true,
+      name: true,
+      stage: true,
+      valueMicros: true,
+      pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+    },
   });
   if (!opp) {
     throw Object.assign(new Error('Deal not found'), { statusCode: 404 });
@@ -101,7 +122,7 @@ export async function buildSentimentContext(orgId: string, dealId: string) {
     .join('\n');
 
   return {
-    opp: { id: opp.id, name: opp.name, stage: String(opp.stage) },
+    opp,
     activitiesSummary,
     activities,
   };
@@ -158,7 +179,13 @@ export async function buildMeetingContext(orgId: string, calendarEventId: string
         // A live lost or won flag is not an open deal in the brief.
         ...excludeClosedOutcome(),
       },
-      select: { id: true, name: true, stage: true },
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        valueMicros: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
       take: 5,
     });
     openOpps = opps.map((o) => ({ id: o.id, title: o.name, stage: String(o.stage) }));

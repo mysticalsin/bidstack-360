@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDealForPrompt } from './ai-assistant.context.js';
+import { countRecordedDealOutcomes, formatDealForPrompt } from './ai-assistant.context.js';
 
 describe('formatDealForPrompt', () => {
   it('does not invent a dollar amount, and a lost flag is lost', () => {
@@ -26,5 +26,24 @@ describe('formatDealForPrompt', () => {
       pipelineStage: { isWon: false, isLost: true, deletedAt: new Date('2026-02-01') },
     });
     expect(line).toBe('"Back in play" (stage s2_sent, outcome open)');
+  });
+
+  it('counts a both-flagged deal once, as lost', () => {
+    // WHY: the account stub counted closed_won keys only. A live lost flag
+    // on an open key, or on a won key, was left out of the lost total.
+    const counts = countRecordedDealOutcomes([
+      { name: 'Open', stage: 's2_sent', pipelineStage: null },
+      {
+        name: 'Flagged',
+        stage: 's3_technical_iteration',
+        pipelineStage: { isWon: false, isLost: true, deletedAt: null },
+      },
+      {
+        name: 'Both',
+        stage: 'closed_won',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+      },
+    ]);
+    expect(counts).toEqual({ open: 1, won: 0, lost: 2 });
   });
 });

@@ -16,7 +16,12 @@ import {
   persistSession,
   recordCost,
 } from './ai-assistant.helpers.js';
-import { buildAccountIntelContext, buildSentimentContext } from './ai-assistant.context.js';
+import {
+  buildAccountIntelContext,
+  buildSentimentContext,
+  countRecordedDealOutcomes,
+  formatDealForPrompt,
+} from './ai-assistant.context.js';
 
 // ─── Deal sentiment ───────────────────────────────────────────────────────────
 
@@ -71,7 +76,7 @@ export async function analyzeDealSentiment(
   );
 
   const prompt =
-    `Analyse deal sentiment for "${opp.name}" (stage: ${opp.stage}).\n` +
+    `Analyse deal sentiment for ${formatDealForPrompt(opp)}.\n` +
     `Recent activities (newest first):\n${activitiesSummary || 'No activities recorded.'}\n\n` +
     `Return JSON: {"score": <-1..1>, "label": "positive|neutral|negative", "summary": "...", "riskFlags": [...], "suggestedActions": [...]}`;
 
@@ -214,8 +219,7 @@ export async function summarizeAccountIntel(
   }
 
   if (!responseText) {
-    const wonCount = opps.filter((o) => String(o.stage) === 'closed_won').length;
-    const lostCount = opps.filter((o) => String(o.stage) === 'closed_lost').length;
+    const { won: wonCount, lost: lostCount } = countRecordedDealOutcomes(opps);
     const recorded = recordedAccountIntel({
       opportunityCount: opps.length,
       wonCount,
