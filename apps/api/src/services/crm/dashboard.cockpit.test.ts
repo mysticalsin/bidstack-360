@@ -749,8 +749,176 @@ describe('buildCockpit recorded facts only', () => {
       compliance: [],
       fieldOverrides: [],
     });
-    expect(cockpit.recentActivity.map((item) => item.subject)).toEqual(['Send the deployment plan']);
+    expect(cockpit.recentActivity.map((item) => item.subject)).toEqual([
+      'Send the deployment plan',
+    ]);
     expect(cockpit.recentActivity[0]?.companyId).toBe('mantu');
+  });
+
+  it('keeps an Acme deal on mantu by company id and does not adopt Acme by name', () => {
+    // Why: the mantu fixture id is not a UUID, and its deals say customer Acme.
+    // Matching the customer name would pull an unlinked Acme deal onto mantu.
+    const deal = {
+      customer: 'Acme',
+      name: 'Renewal',
+      stage: 's2_sent',
+      pipelineStage: null,
+      valueMicros: 1n,
+      probability: 40,
+      dueDate: null,
+      owner: null,
+    };
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [
+        { ...deal, id: 'by-id', companyId: 'mantu' },
+        { ...deal, id: 'by-name', companyId: null },
+      ],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('1');
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('1');
+  });
+
+  it('includes the open deal for a customer-only slug and scores the book, not the page', () => {
+    // Why: the account id is normalizeName(customer). Filtering companyId with
+    // that slug dropped the book, and a zero total is not greater than the
+    // loaded page, so the empty page was scored as the whole account.
+    const deal = {
+      name: 'Campus network',
+      stage: 's2_sent',
+      pipelineStage: null,
+      valueMicros: 1n,
+      probability: 40,
+      dueDate: null,
+      owner: null,
+    };
+    const rush = {
+      ...deal,
+      id: 'rush-open',
+      customer: 'Rush University System for Health',
+      companyId: null,
+    };
+    const other = {
+      ...deal,
+      id: 'other-open',
+      customer: 'Other Health System',
+      companyId: null,
+    };
+    const contact = {
+      id: 'pat',
+      customer: 'Rush University System for Health',
+      companyId: null,
+      name: 'Pat',
+      role: null,
+      email: null,
+      phone: null,
+      influence: 4,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    const task = {
+      title: 'Call the buyer',
+      status: 'open',
+      dueDate: null,
+      accountId: null,
+      assignee: null,
+      createdAt: new Date('2026-06-02T00:00:00.000Z'),
+    };
+    const args = {
+      company: company({
+        id: 'rush-university-system-for-health',
+        name: 'Rush University System for Health',
+      }),
+      companies: [],
+      opportunities: [rush, other],
+      contacts: [contact],
+      tasks: [
+        {
+          ...task,
+          id: 'task-rush',
+          opportunity: {
+            id: 'rush-open',
+            customer: 'Rush University System for Health',
+            companyId: null,
+            name: 'Campus network',
+          },
+        },
+        {
+          ...task,
+          id: 'task-other',
+          createdAt: new Date('2026-06-03T00:00:00.000Z'),
+          opportunity: {
+            id: 'other-open',
+            customer: 'Other Health System',
+            companyId: null,
+            name: 'Elsewhere',
+          },
+        },
+      ],
+      risks: [
+        {
+          id: 'risk-rush',
+          opportunityId: 'rush-open',
+          title: 'Data residency',
+          severity: 'high',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'open',
+          companyName: null,
+        },
+        {
+          id: 'risk-other',
+          opportunityId: 'other-open',
+          title: 'Someone else',
+          severity: 'high',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'open',
+          companyName: 'Other Health System',
+        },
+      ],
+      compliance: [],
+      fieldOverrides: [],
+    };
+    const page = buildCockpit(args);
+    expect(page.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('1');
+    expect(page.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('1');
+    expect(page.risks.map((risk) => risk.id)).toEqual(['risk-rush']);
+    expect(page.keyContacts).toEqual([]);
+    expect(page.recentActivity.map((item) => item.dealId)).toEqual(['rush-open']);
+
+    const withBook = buildCockpit({
+      ...args,
+      performance: {
+        winLoss: {
+          wonCount: 0,
+          lostCount: 0,
+          wonValueMicros: '0',
+          lostValueMicros: '0',
+          winRate: null,
+        },
+        revenueEvolution: [],
+        book: { projectCount: 6, openCount: 3, contactCount: 0, taskCount: 4 },
+      },
+    });
+    expect(withBook.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('3');
+    expect(withBook.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('6');
+    const pipeline = withBook.health.factors?.find((factor) => factor.key === 'pipeline');
+    const engagement = withBook.health.factors?.find((factor) => factor.key === 'engagement');
+    expect(pipeline?.scored).toBe(false);
+    expect(pipeline?.whatItMeasures).toContain('The loaded page is not every open deal.');
+    expect(engagement?.scored).toBe(false);
+    expect(engagement?.whatItMeasures).toContain('The loaded page is not every follow-up.');
+    expect(withBook.health.factors?.find((factor) => factor.key === 'contacts')?.scored).not.toBe(
+      false,
+    );
   });
 });
 

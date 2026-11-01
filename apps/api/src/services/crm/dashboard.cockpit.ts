@@ -27,6 +27,7 @@ import {
   asRiskSeverity,
   asRiskStatus,
   formatMicrosCompact,
+  isCompanyUuid,
   livePipelineStage,
   normalizeName,
   parseAttribution,
@@ -642,6 +643,21 @@ export function serializeBidOpportunity(row: {
 
 // ─── Main cockpit builder ─────────────────────────────────────────────────────
 
+/**
+ * A deal is on this account when its company id matches. A customer-only
+ * account id is normalizeName(customer), so that slug matches too. A UUID
+ * account does not adopt deals by name, and an empty slug is not a customer
+ * (normalizeName('---') === '').
+ */
+function opportunityBelongsToAccount(
+  opportunity: { companyId: string | null; customer: string },
+  accountId: string,
+): boolean {
+  if (opportunity.companyId === accountId) return true;
+  if (isCompanyUuid(accountId) || accountId === '') return false;
+  return normalizeName(opportunity.customer) === accountId;
+}
+
 export function buildCockpit({
   company: rawCompany,
   opportunities,
@@ -738,9 +754,11 @@ export function buildCockpit({
   now?: Date;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
-  const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
+  const companyOpps = opportunities.filter((opp) => opportunityBelongsToAccount(opp, company.id));
   const accountTasks = tasks.filter(
-    (task) => task.accountId === company.id || task.opportunity?.companyId === company.id,
+    (task) =>
+      task.accountId === company.id ||
+      (task.opportunity != null && opportunityBelongsToAccount(task.opportunity, company.id)),
   );
   const openDeals = companyOpps.filter((opp) => {
     const stage = livePipelineStage(opp.pipelineStage);

@@ -25,8 +25,10 @@ import { buildCockpit, microsText, type AccountPerformance } from './dashboard.c
 import { defaultReleaseScore } from './dashboard.defaults.js';
 import {
   asProviderStatus,
+  isCompanyUuid,
   normalizeName,
   OPPORTUNITY_CUSTOMER_KEY_SQL,
+  opportunityCustomerKeySql,
   record,
   recordedDealStage,
 } from './dashboard.utils.js';
@@ -454,6 +456,180 @@ export async function resolveCockpitCompany(
   return buildCompanies(opportunities, []).find((c) => c.id === companyId) ?? null;
 }
 
+// ─── Customer-key book (slug account id, not a company UUID) ────────────────
+
+/** Joined slug-book expression. Same slug as OPPORTUNITY_CUSTOMER_KEY_SQL. */
+export const SLUG_ACCOUNT_CUSTOMER_KEY_SQL = opportunityCustomerKeySql('o.customer');
+
+const WON_OPPORTUNITY_SQL = `
+o.stage <> 'closed_lost'
+AND NOT EXISTS (
+  SELECT 1 FROM pipeline_stages ps
+  WHERE ps.id = o.pipeline_stage_id
+    AND ps.deleted_at IS NULL
+    AND ps.is_lost
+)
+AND (
+  o.stage = 'closed_won'
+  OR EXISTS (
+    SELECT 1 FROM pipeline_stages ps
+    WHERE ps.id = o.pipeline_stage_id
+      AND ps.deleted_at IS NULL
+      AND ps.is_won
+      AND NOT ps.is_lost
+  )
+)`;
+
+const LOST_OPPORTUNITY_SQL = `
+(
+  o.stage = 'closed_lost'
+  OR EXISTS (
+    SELECT 1 FROM pipeline_stages ps
+    WHERE ps.id = o.pipeline_stage_id
+      AND ps.deleted_at IS NULL
+      AND ps.is_lost
+  )
+)`;
+
+const OPEN_OPPORTUNITY_SQL = `
+(
+  o.stage NOT IN ('closed_won', 'closed_lost')
+  AND NOT EXISTS (
+    SELECT 1 FROM pipeline_stages ps
+    WHERE ps.id = o.pipeline_stage_id
+      AND ps.deleted_at IS NULL
+      AND (ps.is_won OR ps.is_lost)
+  )
+)`;
+
+/**
+ * Same country / territory / owner predicate as applyOpportunityScope.
+ * Empty country lists stay owner-only, matching the Prisma scope.
+ */
+function opportunityVisibilitySql(scope?: AccessScope): { join: Prisma.Sql; where: Prisma.Sql } {
+  if (!scope || scope.unrestricted) return { join: Prisma.empty, where: Prisma.empty };
+  const variants = countryVariantsForScope(scope);
+  const countrySql =
+    variants.length > 0
+      ? Prisma.sql`o.country = ANY(ARRAY[${Prisma.join(variants)}]::text[])
+        OR t.country_codes && ARRAY[${Prisma.join(variants)}]::text[]
+        OR`
+      : Prisma.empty;
+  return {
+    join: Prisma.sql`LEFT JOIN territories t ON t.id = o.territory_id`,
+    where: Prisma.sql`AND (
+      ${countrySql}
+      o.owner_id = ${scope.userId}::uuid
+    )`,
+  };
+}
+
+function accountOpportunityMatchSql(companyId: string): Prisma.Sql | null {
+  if (isCompanyUuid(companyId)) return Prisma.sql`o.company_id = ${companyId}::uuid`;
+  // normalizeName('---') is ''. That key matches blank customers.
+  if (companyId === '') return null;
+  return Prisma.sql`${Prisma.raw(SLUG_ACCOUNT_CUSTOMER_KEY_SQL)} = ${companyId}`;
+}
+
+const CUSTOMER_KEY_OPPORTUNITY_SELECT = {
+  id: true,
+  customer: true,
+  companyId: true,
+  name: true,
+  stage: true,
+  valueMicros: true,
+  probability: true,
+  dueDate: true,
+  ownerId: true,
+  updatedAt: true,
+  owner: { select: { name: true, email: true } },
+  pipelineStage: {
+    select: {
+      key: true,
+      name: true,
+      probability: true,
+      color: true,
+      isWon: true,
+      isLost: true,
+      deletedAt: true,
+    },
+  },
+} satisfies Prisma.OpportunitySelect;
+
+const CUSTOMER_KEY_TASK_SELECT = {
+  id: true,
+  title: true,
+  status: true,
+  createdAt: true,
+  dueDate: true,
+  accountId: true,
+  opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
+  assignee: { select: { name: true, email: true } },
+} satisfies Prisma.TaskSelect;
+
+/** Opportunities whose customer key is the slug. Does not filter company_id. */
+export async function findCustomerKeyOpportunities(
+  orgId: string,
+  companyId: string,
+  prismaClient: PrismaClient,
+  scope?: AccessScope,
+) {
+  const match = accountOpportunityMatchSql(companyId);
+  if (!match || isCompanyUuid(companyId)) return [];
+  const visibility = opportunityVisibilitySql(scope);
+  const rows = await prismaClient.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT o.id
+    FROM opportunities o
+    ${visibility.join}
+    WHERE o.org_id = ${orgId}::uuid
+      AND o.deleted_at IS NULL
+      AND ${match}
+      ${visibility.where}
+    ORDER BY o.updated_at DESC
+    LIMIT 100
+  `);
+  const ids = rows.map((row) => row.id);
+  if (ids.length === 0) return [];
+  return prismaClient.opportunity.findMany({
+    where: { orgId, id: { in: ids }, deletedAt: null },
+    select: CUSTOMER_KEY_OPPORTUNITY_SELECT,
+    orderBy: { updatedAt: 'desc' },
+  });
+}
+
+/** Tasks hanging off those opportunities. accountId is a UUID and is not queried. */
+export async function findCustomerKeyTasks(
+  orgId: string,
+  companyId: string,
+  prismaClient: PrismaClient,
+  scope?: AccessScope,
+) {
+  const match = accountOpportunityMatchSql(companyId);
+  if (!match || isCompanyUuid(companyId)) return [];
+  const visibility = opportunityVisibilitySql(scope);
+  const rows = await prismaClient.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT task.id
+    FROM tasks task
+    INNER JOIN opportunities o ON o.id = task.opp_id
+    ${visibility.join}
+    WHERE task.org_id = ${orgId}::uuid
+      AND task.deleted_at IS NULL
+      AND o.org_id = ${orgId}::uuid
+      AND o.deleted_at IS NULL
+      AND ${match}
+      ${visibility.where}
+    ORDER BY task.created_at DESC
+    LIMIT 50
+  `);
+  const ids = rows.map((row) => row.id);
+  if (ids.length === 0) return [];
+  return prismaClient.task.findMany({
+    where: { orgId, id: { in: ids }, deletedAt: null },
+    select: CUSTOMER_KEY_TASK_SELECT,
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 // ─── Per-company cockpit query ────────────────────────────────────────────────
 
 /**
@@ -489,87 +665,99 @@ export async function buildCompanyCockpit(
     if (!access.allowed) return null;
   }
 
-  const opportunityWhere = scope
-    ? applyOpportunityScope({ orgId, companyId: company.id, deletedAt: null }, scope)
-    : { orgId, companyId: company.id, deletedAt: null };
-  const taskOpportunityWhere = scope
-    ? applyOpportunityScope({ companyId: company.id, deletedAt: null }, scope)
-    : { companyId: company.id, deletedAt: null };
+  const accountIsUuid = isCompanyUuid(company.id);
+  const opportunityWhere = accountIsUuid
+    ? scope
+      ? applyOpportunityScope({ orgId, companyId: company.id, deletedAt: null }, scope)
+      : { orgId, companyId: company.id, deletedAt: null }
+    : null;
+  const taskOpportunityWhere = accountIsUuid
+    ? scope
+      ? applyOpportunityScope({ companyId: company.id, deletedAt: null }, scope)
+      : { companyId: company.id, deletedAt: null }
+    : null;
 
-  // Step 2: load company-specific data in parallel (filtered by company)
+  // Step 2: load company-specific data in parallel (filtered by company).
+  // A slug is a customer key. companyId and accountId are UUID columns.
   const [opportunities, contacts, tasks, performance, fieldOverrides] = await Promise.all([
-      prismaClient.opportunity.findMany({
-        where: opportunityWhere,
-        select: {
-          id: true,
-          customer: true,
-          companyId: true,
-          name: true,
-          stage: true,
-          valueMicros: true,
-          probability: true,
-          dueDate: true,
-          owner: { select: { name: true, email: true } },
-          pipelineStage: {
-            select: {
-              key: true,
-              name: true,
-              probability: true,
-              color: true,
-              isWon: true,
-              isLost: true,
-              deletedAt: true,
+    accountIsUuid && opportunityWhere
+      ? prismaClient.opportunity.findMany({
+          where: opportunityWhere,
+          select: {
+            id: true,
+            customer: true,
+            companyId: true,
+            name: true,
+            stage: true,
+            valueMicros: true,
+            probability: true,
+            dueDate: true,
+            owner: { select: { name: true, email: true } },
+            pipelineStage: {
+              select: {
+                key: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+                deletedAt: true,
+              },
             },
           },
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: 100,
-      }),
-      prismaClient.contact.findMany({
-        where: { orgId, companyId, deletedAt: null },
-        select: {
-          id: true,
-          customer: true,
-          companyId: true,
-          name: true,
-          role: true,
-          email: true,
-          phone: true,
-          influence: true,
-          createdAt: true,
-        },
-        orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
-        take: 20,
-      }),
-      prismaClient.task.findMany({
-        where: {
-          orgId,
-          deletedAt: null,
-          OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
-        },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          createdAt: true,
-          dueDate: true,
-          accountId: true,
-          opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
-          assignee: { select: { name: true, email: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      }),
-      fetchAccountPerformance(orgId, company.id, prismaClient, scope),
-      // WHY: folded into the Promise.all (was a 7th serial query after it) so the
-      // cockpit's per-company reads all run in parallel. company.name is already
-      // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
-      prismaClient.companyFieldOverride.findMany({
-        where: { orgId, companyKey: normalizeName(company.name) },
-        select: { fieldKey: true, value: true },
-        take: 10,
-      }),
-    ]);
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+        })
+      : findCustomerKeyOpportunities(orgId, company.id, prismaClient, scope),
+    accountIsUuid
+      ? prismaClient.contact.findMany({
+          where: { orgId, companyId: company.id, deletedAt: null },
+          select: {
+            id: true,
+            customer: true,
+            companyId: true,
+            name: true,
+            role: true,
+            email: true,
+            phone: true,
+            influence: true,
+            createdAt: true,
+          },
+          orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
+          take: 20,
+        })
+      : Promise.resolve([]),
+    accountIsUuid && taskOpportunityWhere
+      ? prismaClient.task.findMany({
+          where: {
+            orgId,
+            deletedAt: null,
+            OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            dueDate: true,
+            accountId: true,
+            opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
+            assignee: { select: { name: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        })
+      : findCustomerKeyTasks(orgId, company.id, prismaClient, scope),
+    fetchAccountPerformance(orgId, company.id, prismaClient, scope),
+    // WHY: folded into the Promise.all (was a 7th serial query after it) so the
+    // cockpit's per-company reads all run in parallel. company.name is already
+    // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
+    prismaClient.companyFieldOverride.findMany({
+      where: { orgId, companyKey: normalizeName(company.name) },
+      select: { fieldKey: true, value: true },
+      take: 10,
+    }),
+  ]);
 
   const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
   const contactIds = contacts.map((contact) => contact.id);
@@ -648,10 +836,6 @@ export function fetchBuyingRoleFacts(orgId: string, contactIds: string[], prisma
  * (the cockpit's opportunity list is take-capped for display; aggregates must
  * not be). Sums stay integer micros strings so a large book is not rounded.
  */
-function isCompanyUuid(id: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-}
-
 const EMPTY_ACCOUNT_PERFORMANCE: AccountPerformance = {
   winLoss: {
     wonCount: 0,
@@ -670,8 +854,11 @@ export async function fetchAccountPerformance(
   prismaClient: PrismaClient,
   scope?: AccessScope,
 ): Promise<AccountPerformance> {
-  // A customer string is not a company. Placeholder accounts use a slug id.
-  if (!isCompanyUuid(companyId)) return EMPTY_ACCOUNT_PERFORMANCE;
+  if (!isCompanyUuid(companyId)) {
+    // normalizeName('---') is ''. Matching it would count blank customers.
+    if (companyId === '') return EMPTY_ACCOUNT_PERFORMANCE;
+    return fetchCustomerKeyPerformance(orgId, companyId, prismaClient, scope);
+  }
   const base = { orgId, companyId, deletedAt: null };
   const lostWhere: Prisma.OpportunityWhereInput = {
     ...base,
@@ -744,16 +931,106 @@ export async function fetchAccountPerformance(
     book: { projectCount: projects, openCount: open, contactCount, taskCount },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
     // oldest-first.
-    revenueEvolution: revenueRows
-      .map((r) => ({
-        period: r.period,
-        revenueMicros: microsText(
-          typeof r.revenue === 'bigint' || typeof r.revenue === 'number' || typeof r.revenue === 'string'
-            ? r.revenue
-            : null,
-        ),
-      }))
-      .reverse(),
+    revenueEvolution: revenueEvolutionFrom(revenueRows),
+  };
+}
+
+function revenueEvolutionFrom(
+  revenueRows: Array<{ period: string; revenue: string | null }>,
+): AccountPerformance['revenueEvolution'] {
+  return revenueRows
+    .map((r) => ({
+      period: r.period,
+      revenueMicros: microsText(
+        typeof r.revenue === 'bigint' ||
+          typeof r.revenue === 'number' ||
+          typeof r.revenue === 'string'
+          ? r.revenue
+          : null,
+      ),
+    }))
+    .reverse();
+}
+
+function sqlCount(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
+  return 0;
+}
+
+async function fetchCustomerKeyPerformance(
+  orgId: string,
+  companyId: string,
+  prismaClient: PrismaClient,
+  scope?: AccessScope,
+): Promise<AccountPerformance> {
+  if (!accountOpportunityMatchSql(companyId)) return EMPTY_ACCOUNT_PERFORMANCE;
+  const [totals, taskRows, revenueRows] = await Promise.all([
+    prismaClient.$queryRaw<
+      Array<{
+        wonCount: number | string | bigint;
+        wonValueMicros: string | null;
+        lostCount: number | string | bigint;
+        lostValueMicros: string | null;
+        projectCount: number | string | bigint;
+        openCount: number | string | bigint;
+      }>
+    >(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE ${Prisma.raw(WON_OPPORTUNITY_SQL)})::int AS "wonCount",
+        COALESCE((SUM(o.value_micros) FILTER (WHERE ${Prisma.raw(WON_OPPORTUNITY_SQL)}))::text, '0') AS "wonValueMicros",
+        COUNT(*) FILTER (WHERE ${Prisma.raw(LOST_OPPORTUNITY_SQL)})::int AS "lostCount",
+        COALESCE((SUM(o.value_micros) FILTER (WHERE ${Prisma.raw(LOST_OPPORTUNITY_SQL)}))::text, '0') AS "lostValueMicros",
+        COUNT(*)::int AS "projectCount",
+        COUNT(*) FILTER (WHERE ${Prisma.raw(OPEN_OPPORTUNITY_SQL)})::int AS "openCount"
+      FROM opportunities o
+      ${opportunityVisibilitySql(scope).join}
+      WHERE o.org_id = ${orgId}::uuid
+        AND o.deleted_at IS NULL
+        AND ${accountOpportunityMatchSql(companyId)!}
+        ${opportunityVisibilitySql(scope).where}
+    `),
+    prismaClient.$queryRaw<Array<{ taskCount: number | string | bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::int AS "taskCount"
+      FROM tasks task
+      WHERE task.org_id = ${orgId}::uuid
+        AND task.deleted_at IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM opportunities o
+          ${opportunityVisibilitySql(scope).join}
+          WHERE o.id = task.opp_id
+            AND o.org_id = ${orgId}::uuid
+            AND o.deleted_at IS NULL
+            AND ${accountOpportunityMatchSql(companyId)!}
+            ${opportunityVisibilitySql(scope).where}
+        )
+    `),
+    fetchRevenueRows(orgId, companyId, prismaClient, scope),
+  ]);
+  const row = totals[0];
+  const taskRow = taskRows[0];
+  if (!row || !taskRow) throw new Error('customer-key book aggregate returned no row');
+  const wonCount = sqlCount(row.wonCount);
+  const lostCount = sqlCount(row.lostCount);
+  const decided = wonCount + lostCount;
+  return {
+    winLoss: {
+      wonCount,
+      lostCount,
+      wonValueMicros: microsText(row.wonValueMicros),
+      lostValueMicros: microsText(row.lostValueMicros),
+      winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
+    },
+    // Contacts link by company UUID only. A matching customer string is not a link.
+    book: {
+      projectCount: sqlCount(row.projectCount),
+      openCount: sqlCount(row.openCount),
+      contactCount: 0,
+      taskCount: sqlCount(taskRow.taskCount),
+    },
+    revenueEvolution: revenueEvolutionFrom(revenueRows),
   };
 }
 
@@ -763,82 +1040,23 @@ async function fetchRevenueRows(
   prismaClient: PrismaClient,
   scope?: AccessScope,
 ): Promise<Array<{ period: string; revenue: string | null }>> {
-  if (!scope?.unrestricted && scope) {
-    // Aggregate in Postgres for the scoped path too — a JS findMany summed in
-    // app code was take-capped (5k rows), so an account with >5k closed_won opps
-    // silently under-reported. Mirror the unrestricted SQL below, AND-ed with the
-    // same OR-predicate applyOpportunityScope builds (country / territory overlap
-    // / own deals). Predicate construction (variants + empty-variants → own-deals
-    // only) matches the proven raw-SQL scope in lib/account-access.ts.
-    const variants = countryVariantsForScope(scope);
-    const countryScopeSql =
-      variants.length > 0
-        ? Prisma.sql`
-            o.country = ANY(ARRAY[${Prisma.join(variants)}]::text[])
-            OR t.country_codes && ARRAY[${Prisma.join(variants)}]::text[]
-            OR`
-        : Prisma.empty;
-    return prismaClient.$queryRaw<Array<{ period: string; revenue: string | null }>>(Prisma.sql`
-      SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
-             SUM(o.value_micros)::text AS revenue
-      FROM opportunities o
-      LEFT JOIN territories t ON t.id = o.territory_id
-      WHERE o.org_id = ${orgId}::uuid
-        AND o.company_id = ${companyId}::uuid
-        AND o.deleted_at IS NULL
-        AND o.stage <> 'closed_lost'
-        AND NOT EXISTS (
-          SELECT 1 FROM pipeline_stages ps
-          WHERE ps.id = o.pipeline_stage_id
-            AND ps.deleted_at IS NULL
-            AND ps.is_lost
-        )
-        AND (
-          o.stage = 'closed_won'
-          OR EXISTS (
-            SELECT 1 FROM pipeline_stages ps
-            WHERE ps.id = o.pipeline_stage_id
-              AND ps.deleted_at IS NULL
-              AND ps.is_won
-              AND NOT ps.is_lost
-          )
-        )
-        AND o.due_date IS NOT NULL
-        AND (
-          ${countryScopeSql}
-          o.owner_id = ${scope.userId}::uuid
-        )
-      GROUP BY 1
-      ORDER BY 1 DESC
-      LIMIT 12
-    `);
-  }
-
+  const match = accountOpportunityMatchSql(companyId);
+  if (!match) return [];
+  // Won months stay in Postgres. A JS sum of the take-capped page under-reports
+  // a book larger than that page. Slug accounts match the customer key; UUID
+  // accounts match company_id. Stage rules are WON_OPPORTUNITY_SQL either way.
+  const visibility = opportunityVisibilitySql(scope);
   return prismaClient.$queryRaw<Array<{ period: string; revenue: string | null }>>(Prisma.sql`
     SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
            SUM(o.value_micros)::text AS revenue
     FROM opportunities o
+    ${visibility.join}
     WHERE o.org_id = ${orgId}::uuid
-      AND o.company_id = ${companyId}::uuid
+      AND ${match}
       AND o.deleted_at IS NULL
       AND o.due_date IS NOT NULL
-      AND o.stage <> 'closed_lost'
-      AND NOT EXISTS (
-        SELECT 1 FROM pipeline_stages ps
-        WHERE ps.id = o.pipeline_stage_id
-          AND ps.deleted_at IS NULL
-          AND ps.is_lost
-      )
-      AND (
-        o.stage = 'closed_won'
-        OR EXISTS (
-          SELECT 1 FROM pipeline_stages ps
-          WHERE ps.id = o.pipeline_stage_id
-            AND ps.deleted_at IS NULL
-            AND ps.is_won
-            AND NOT ps.is_lost
-        )
-      )
+      AND ${Prisma.raw(WON_OPPORTUNITY_SQL)}
+      ${visibility.where}
     GROUP BY 1
     ORDER BY 1 DESC
     LIMIT 12
