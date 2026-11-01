@@ -10,6 +10,7 @@ import {
   compareMicros,
   formatExactUnspecified,
   microsSharePercent,
+  shareBarWidth,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
@@ -93,7 +94,7 @@ export function TerritorySegmentBreakdown({
       </p>
       <ul className="space-y-2">
         {shown.map((s) => {
-          const widthPct = Math.max(2, Math.round(microsSharePercent(s.totalValueMicros, maxValue)));
+          const widthPct = shareBarWidth(microsSharePercent(s.totalValueMicros, maxValue), 2);
           return (
             <li
               key={s.key}

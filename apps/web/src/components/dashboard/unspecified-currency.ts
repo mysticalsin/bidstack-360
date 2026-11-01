@@ -17,6 +17,12 @@ function asMicros(micros: string | number | bigint): bigint {
   return BigInt(micros);
 }
 
+/** A zero share draws no bar. A positive share keeps a visible floor. */
+export function shareBarWidth(sharePercent: number, floor: number): number {
+  if (!(sharePercent > 0)) return 0;
+  return Math.max(floor, Math.round(sharePercent));
+}
+
 /** Share of whole, in percent, from integer micros. */
 export function microsSharePercent(
   part: string | number | bigint,

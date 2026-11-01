@@ -23,6 +23,7 @@ import {
   compareMicros,
   formatExactUnspecified,
   microsSharePercent,
+  shareBarWidth,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
@@ -469,7 +470,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span
               className="block h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-500"
               style={{
-                width: `${Math.max(3, Math.round(microsSharePercent(seg.totalValueMicros, max)))}%`,
+                width: `${shareBarWidth(microsSharePercent(seg.totalValueMicros, max), 3)}%`,
               }}
             />
           </div>
