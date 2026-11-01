@@ -1254,6 +1254,235 @@ function apolloOrganizationId(org: ApolloOrganization): string | null {
   return value === null || value === undefined ? null : String(value);
 }
 
+export async function processCompanyEnrichApolloJob(
+  data: ApolloEnrichJobData,
+  jobLog: pino.Logger,
+): Promise<{ enrichmentId: string } | { skipped: true; reason: string }> {
+  const transport = resolveApolloEnrichmentTransport({
+    hasDomain: Boolean(data.domain),
+  });
+  let organization: ApolloOrganization;
+  let syncMode: ApolloSyncMode;
+  let creditPolicy: ApolloCreditPolicy;
+  let rawMcp: Record<string, unknown> | null = null;
+  let rawNewsCrossCheck: unknown = null;
+  let jobPostings: unknown = null;
+  let executives: unknown = null;
+
+  if (transport.kind === 'mcp') {
+    const mcpIntel = await callApolloMcpCompanyIntel({
+      url: transport.url,
+      bearerToken: transport.bearerToken,
+      companyName: data.companyName,
+      ...(data.domain ? { domain: data.domain } : {}),
+      timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
+      includeCreditTools: process.env.APOLLO_MCP_ENABLE_CREDIT_TOOLS === 'true',
+      tools: {
+        searchCompanies: process.env.APOLLO_MCP_SEARCH_COMPANIES_TOOL ?? 'search_companies',
+        getCompany: process.env.APOLLO_MCP_GET_COMPANY_TOOL ?? 'get_company',
+        getJobPostings: process.env.APOLLO_MCP_GET_JOB_POSTINGS_TOOL ?? 'get_job_postings',
+      },
+    });
+    organization = mcpIntel.organization;
+    syncMode = mcpIntel.syncMode;
+    creditPolicy = mcpIntel.creditPolicy;
+    rawMcp = mcpIntel.raw;
+    jobPostings = mcpIntel.jobPostings;
+    executives = mcpIntel.executives;
+  } else if (transport.kind === 'none') {
+    jobLog.warn(
+      {
+        companyName: data.companyName,
+        hasDomain: Boolean(data.domain),
+        reason: transport.reason,
+      },
+      'Apollo enrichment is a no-op: configure complete Apollo MCP credentials, or APOLLO_API_KEY with a domain',
+    );
+    return { skipped: true, reason: transport.reason };
+  } else {
+    const domain = data.domain;
+    if (!domain) {
+      jobLog.warn(
+        { companyName: data.companyName },
+        'Apollo REST enrichment skipped because no company domain was provided',
+      );
+      return { skipped: true, reason: 'Apollo REST fallback requires a company domain' };
+    }
+    organization = await callApolloEnrich({
+      apiKey: transport.apiKey,
+      companyName: data.companyName,
+      domain,
+    });
+    syncMode = 'apollo_api_organization_enrich';
+    creditPolicy = 'uses_credits';
+  }
+
+  if (process.env.APOLLO_NEWS_CROSSCHECK_ENABLED !== 'false') {
+    try {
+      const newsDomain = data.domain ?? normalizeDomain(organization.primary_domain ?? null);
+      rawNewsCrossCheck = await fetchCompanyNewsCrossCheck({
+        companyName: data.companyName,
+        ...(newsDomain ? { domain: newsDomain } : {}),
+      });
+    } catch (err) {
+      jobLog.warn(
+        { err, companyName: data.companyName },
+        'Company news cross-check skipped; continuing with Apollo company intelligence',
+      );
+    }
+  }
+
+  const mapped = mapApolloOrganization(organization, {
+    syncMode,
+    creditPolicy,
+    jobPostings,
+    executives,
+    newsCrossCheck: rawNewsCrossCheck,
+  });
+
+  const normalizedName = normalizeName(data.companyName);
+  const sourceUrl = mapped.website ?? (mapped.domain ? `https://${mapped.domain}/` : null);
+  const nowIso = mapped.strategicIntel.lastSyncedAt;
+  const sourceAttribution = [
+    {
+      source: 'apollo_io',
+      label:
+        syncMode === 'apollo_api_organization_enrich'
+          ? 'Apollo.io organization enrichment'
+          : 'Apollo MCP company intelligence',
+      sourceUrl,
+      fetchedAt: nowIso,
+      confidence: null,
+      providerMetadata: {
+        transport: syncMode.startsWith('apollo_mcp') ? 'mcp_streamable_http' : 'rest_api',
+        endpoint: syncMode.startsWith('apollo_mcp') ? '/mcp' : APOLLO_ENDPOINT,
+        organizationName: organization.name ?? null,
+        creditPolicy,
+      },
+    },
+  ];
+  const meetingTechStack =
+    mapped.technicalStack.length > 0
+      ? [{ label: 'Apollo technologies', items: mapped.technicalStack }]
+      : undefined;
+  const apolloMetadata = {
+    provider: 'apollo_io',
+    lastSyncedAt: nowIso,
+    syncMode,
+    creditPolicy,
+    strategicIntel: mapped.strategicIntel,
+    limitations: mapped.strategicIntel.limitations,
+    rawMcp,
+    rawNewsCrossCheck: sanitizeApolloPayload(rawNewsCrossCheck),
+  };
+
+  // legal_name is NOT NULL. Apollo does not return a legal name, so the
+  // required column keeps the organization label. The company serializer
+  // still withholds that label until public facts record a legal name.
+  const tradeName = organization.name?.trim() || data.companyName;
+  const legalName = mapped.legalName?.trim() || tradeName;
+
+  const enrichment = await prisma.companyEnrichment.upsert({
+    where: { orgId_normalizedName: { orgId: data.orgId, normalizedName } },
+    create: {
+      orgId: data.orgId,
+      normalizedName,
+      legalName,
+      tradeName,
+      domain: mapped.domain ?? data.domain ?? null,
+      website: mapped.website ?? sourceUrl,
+      logoUrl: mapped.logoUrl,
+      logoSource: mapped.logoUrl ? 'manual' : null,
+      registryIds: {},
+      formerNames: mapped.formerNames,
+      industryCodes: mapped.industryCodes,
+      incorporationDate: mapped.incorporationDate,
+      employeeCount: mapped.employeeCount,
+      annualRevenueMicros: mapped.annualRevenueMicros,
+      status: 'active',
+      confidenceBps: 0,
+      sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
+      providerMetadata: {
+        apollo: apolloMetadata,
+        apolloOrganization: sanitizeApolloPayload(organization),
+        mappedIndustry: mapped.industry,
+        ...(meetingTechStack ? { meetingTechStack } : {}),
+      } as unknown as Prisma.InputJsonValue,
+      cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
+    },
+    update: {
+      ...(mapped.legalName?.trim() ? { legalName: mapped.legalName.trim() } : {}),
+      tradeName,
+      domain: mapped.domain ?? data.domain ?? null,
+      website: mapped.website ?? sourceUrl,
+      logoUrl: mapped.logoUrl,
+      logoSource: mapped.logoUrl ? 'manual' : null,
+      formerNames: mapped.formerNames,
+      industryCodes: mapped.industryCodes,
+      incorporationDate: mapped.incorporationDate,
+      employeeCount: mapped.employeeCount,
+      annualRevenueMicros: mapped.annualRevenueMicros,
+      status: 'active',
+      confidenceBps: 0,
+      sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
+      providerMetadata: {
+        apollo: apolloMetadata,
+        apolloOrganization: sanitizeApolloPayload(organization),
+        mappedIndustry: mapped.industry,
+        ...(meetingTechStack ? { meetingTechStack } : {}),
+      } as unknown as Prisma.InputJsonValue,
+      cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
+    },
+  });
+
+  const companyMatches: Prisma.CompanyWhereInput[] = [
+    { name: { equals: data.companyName, mode: 'insensitive' } },
+  ];
+  if (mapped.domain) {
+    companyMatches.push({ domain: { equals: mapped.domain, mode: 'insensitive' } });
+  }
+
+  await prisma.company.updateMany({
+    where: {
+      orgId: data.orgId,
+      deletedAt: null,
+      OR: companyMatches,
+    },
+    data: {
+      legalName: mapped.legalName ?? undefined,
+      domain: mapped.domain ?? data.domain ?? undefined,
+      website: mapped.website ?? undefined,
+      logoUrl: mapped.logoUrl ?? undefined,
+      industry: mapped.industry ?? undefined,
+      employeeCount: mapped.employeeCount ?? undefined,
+      source: 'apollo_io',
+      enrichedAt: new Date(nowIso),
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      orgId: data.orgId,
+      action: 'crm.company.enrich.apollo',
+      targetType: 'company_enrichment',
+      targetId: enrichment.id,
+      diff: {
+        companyName: data.companyName,
+        domain: mapped.domain,
+        employeeCount: mapped.employeeCount,
+        syncMode,
+        creditPolicy,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  jobLog.info(
+    { enrichmentId: enrichment.id, employees: mapped.employeeCount },
+    'apollo enrichment cache updated',
+  );
+  return { enrichmentId: enrichment.id };
+}
+
 export async function startCompanyEnrichApollo(
   connection: IORedis,
   log: pino.Logger,
@@ -1275,224 +1504,7 @@ export async function startCompanyEnrichApollo(
         jobLog.warn({ companyName: data.companyName }, 'apollo enrichment job signature rejected');
         throw new Error('Invalid Apollo enrichment job signature');
       }
-
-      const transport = resolveApolloEnrichmentTransport({
-        hasDomain: Boolean(data.domain),
-      });
-      let organization: ApolloOrganization;
-      let syncMode: ApolloSyncMode;
-      let creditPolicy: ApolloCreditPolicy;
-      let rawMcp: Record<string, unknown> | null = null;
-      let rawNewsCrossCheck: unknown = null;
-      let jobPostings: unknown = null;
-      let executives: unknown = null;
-
-      if (transport.kind === 'mcp') {
-        const mcpIntel = await callApolloMcpCompanyIntel({
-          url: transport.url,
-          bearerToken: transport.bearerToken,
-          companyName: data.companyName,
-          ...(data.domain ? { domain: data.domain } : {}),
-          timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
-          includeCreditTools: process.env.APOLLO_MCP_ENABLE_CREDIT_TOOLS === 'true',
-          tools: {
-            searchCompanies: process.env.APOLLO_MCP_SEARCH_COMPANIES_TOOL ?? 'search_companies',
-            getCompany: process.env.APOLLO_MCP_GET_COMPANY_TOOL ?? 'get_company',
-            getJobPostings: process.env.APOLLO_MCP_GET_JOB_POSTINGS_TOOL ?? 'get_job_postings',
-          },
-        });
-        organization = mcpIntel.organization;
-        syncMode = mcpIntel.syncMode;
-        creditPolicy = mcpIntel.creditPolicy;
-        rawMcp = mcpIntel.raw;
-        jobPostings = mcpIntel.jobPostings;
-        executives = mcpIntel.executives;
-      } else if (transport.kind === 'none') {
-        jobLog.warn(
-          {
-            companyName: data.companyName,
-            hasDomain: Boolean(data.domain),
-            reason: transport.reason,
-          },
-          'Apollo enrichment is a no-op: configure complete Apollo MCP credentials, or APOLLO_API_KEY with a domain',
-        );
-        return { skipped: true, reason: transport.reason };
-      } else {
-        const domain = data.domain;
-        if (!domain) {
-          jobLog.warn(
-            { companyName: data.companyName },
-            'Apollo REST enrichment skipped because no company domain was provided',
-          );
-          return { skipped: true, reason: 'Apollo REST fallback requires a company domain' };
-        }
-        organization = await callApolloEnrich({
-          apiKey: transport.apiKey,
-          companyName: data.companyName,
-          domain,
-        });
-        syncMode = 'apollo_api_organization_enrich';
-        creditPolicy = 'uses_credits';
-      }
-
-      if (process.env.APOLLO_NEWS_CROSSCHECK_ENABLED !== 'false') {
-        try {
-          const newsDomain = data.domain ?? normalizeDomain(organization.primary_domain ?? null);
-          rawNewsCrossCheck = await fetchCompanyNewsCrossCheck({
-            companyName: data.companyName,
-            ...(newsDomain ? { domain: newsDomain } : {}),
-          });
-        } catch (err) {
-          jobLog.warn(
-            { err, companyName: data.companyName },
-            'Company news cross-check skipped; continuing with Apollo company intelligence',
-          );
-        }
-      }
-
-      const mapped = mapApolloOrganization(organization, {
-        syncMode,
-        creditPolicy,
-        jobPostings,
-        executives,
-        newsCrossCheck: rawNewsCrossCheck,
-      });
-
-      const normalizedName = normalizeName(data.companyName);
-      const sourceUrl = mapped.website ?? (mapped.domain ? `https://${mapped.domain}/` : null);
-      const nowIso = mapped.strategicIntel.lastSyncedAt;
-      const sourceAttribution = [
-        {
-          source: 'apollo_io',
-          label:
-            syncMode === 'apollo_api_organization_enrich'
-              ? 'Apollo.io organization enrichment'
-              : 'Apollo MCP company intelligence',
-          sourceUrl,
-          fetchedAt: nowIso,
-          confidence: null,
-          providerMetadata: {
-            transport: syncMode.startsWith('apollo_mcp') ? 'mcp_streamable_http' : 'rest_api',
-            endpoint: syncMode.startsWith('apollo_mcp') ? '/mcp' : APOLLO_ENDPOINT,
-            organizationName: organization.name ?? null,
-            creditPolicy,
-          },
-        },
-      ];
-      const meetingTechStack =
-        mapped.technicalStack.length > 0
-          ? [{ label: 'Apollo technologies', items: mapped.technicalStack }]
-          : undefined;
-      const apolloMetadata = {
-        provider: 'apollo_io',
-        lastSyncedAt: nowIso,
-        syncMode,
-        creditPolicy,
-        strategicIntel: mapped.strategicIntel,
-        limitations: mapped.strategicIntel.limitations,
-        rawMcp,
-        rawNewsCrossCheck: sanitizeApolloPayload(rawNewsCrossCheck),
-      };
-
-      const enrichment = await prisma.companyEnrichment.upsert({
-        where: { orgId_normalizedName: { orgId: data.orgId, normalizedName } },
-        create: {
-          orgId: data.orgId,
-          normalizedName,
-          legalName: mapped.legalName,
-          tradeName: organization.name ?? data.companyName,
-          domain: mapped.domain ?? data.domain ?? null,
-          website: mapped.website ?? sourceUrl,
-          logoUrl: mapped.logoUrl,
-          logoSource: mapped.logoUrl ? 'manual' : null,
-          registryIds: {},
-          formerNames: mapped.formerNames,
-          industryCodes: mapped.industryCodes,
-          incorporationDate: mapped.incorporationDate,
-          employeeCount: mapped.employeeCount,
-          annualRevenueMicros: mapped.annualRevenueMicros,
-          status: 'active',
-          confidenceBps: 0,
-          sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
-          providerMetadata: {
-            apollo: apolloMetadata,
-            apolloOrganization: sanitizeApolloPayload(organization),
-            mappedIndustry: mapped.industry,
-            ...(meetingTechStack ? { meetingTechStack } : {}),
-          } as unknown as Prisma.InputJsonValue,
-          cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
-        },
-        update: {
-          ...(mapped.legalName ? { legalName: mapped.legalName } : {}),
-          tradeName: organization.name ?? data.companyName,
-          domain: mapped.domain ?? data.domain ?? null,
-          website: mapped.website ?? sourceUrl,
-          logoUrl: mapped.logoUrl,
-          logoSource: mapped.logoUrl ? 'manual' : null,
-          formerNames: mapped.formerNames,
-          industryCodes: mapped.industryCodes,
-          incorporationDate: mapped.incorporationDate,
-          employeeCount: mapped.employeeCount,
-          annualRevenueMicros: mapped.annualRevenueMicros,
-          status: 'active',
-          confidenceBps: 0,
-          sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
-          providerMetadata: {
-            apollo: apolloMetadata,
-            apolloOrganization: sanitizeApolloPayload(organization),
-            mappedIndustry: mapped.industry,
-            ...(meetingTechStack ? { meetingTechStack } : {}),
-          } as unknown as Prisma.InputJsonValue,
-          cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
-        },
-      });
-
-      const companyMatches: Prisma.CompanyWhereInput[] = [
-        { name: { equals: data.companyName, mode: 'insensitive' } },
-      ];
-      if (mapped.domain) {
-        companyMatches.push({ domain: { equals: mapped.domain, mode: 'insensitive' } });
-      }
-
-      await prisma.company.updateMany({
-        where: {
-          orgId: data.orgId,
-          deletedAt: null,
-          OR: companyMatches,
-        },
-        data: {
-          legalName: mapped.legalName ?? undefined,
-          domain: mapped.domain ?? data.domain ?? undefined,
-          website: mapped.website ?? undefined,
-          logoUrl: mapped.logoUrl ?? undefined,
-          industry: mapped.industry ?? undefined,
-          employeeCount: mapped.employeeCount ?? undefined,
-          source: 'apollo_io',
-          enrichedAt: new Date(nowIso),
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          orgId: data.orgId,
-          action: 'crm.company.enrich.apollo',
-          targetType: 'company_enrichment',
-          targetId: enrichment.id,
-          diff: {
-            companyName: data.companyName,
-            domain: mapped.domain,
-            employeeCount: mapped.employeeCount,
-            syncMode,
-            creditPolicy,
-          } as Prisma.InputJsonValue,
-        },
-      });
-
-      jobLog.info(
-        { enrichmentId: enrichment.id, employees: mapped.employeeCount },
-        'apollo enrichment cache updated',
-      );
-      return { enrichmentId: enrichment.id };
+      return processCompanyEnrichApolloJob(data, jobLog);
     },
     { connection, concurrency: APOLLO_CONCURRENCY },
   );

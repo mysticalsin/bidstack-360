@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+
+import { prisma } from '@bidstack/db';
+import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -9,6 +13,7 @@ import {
   fetchCompanyNewsCrossCheck,
   mapApolloOrganization,
   normalizeName,
+  processCompanyEnrichApolloJob,
   resolveApolloEnrichmentTransport,
   sanitizeApolloPayload,
   verifyApolloEnrichJobSignature,
@@ -667,5 +672,101 @@ describe('callApolloMcpCompanyIntel', () => {
       .map((body) => body.params.name);
     expect(toolCalls).toEqual(['search_companies', 'get_company']);
     expect(toolCalls).not.toContain('search_people');
+  });
+});
+
+describe('processCompanyEnrichApolloJob persistence', () => {
+  it('stores revenue micros and an open-job count from a company enrich fixture', async () => {
+    // WHY: CompanyEnrichment.legalName is NOT NULL, and Apollo does not return a
+    // legal name. A null write rejects the whole upsert, so revenue and the
+    // open-job count never land. Phones and leads must not be stored either.
+    const org = await prisma.org.create({
+      data: {
+        clerkOrg: `apollo-fixture-${randomUUID()}`,
+        name: 'Apollo fixture pull',
+      },
+    });
+    const previous = {
+      APOLLO_API_KEY: process.env.APOLLO_API_KEY,
+      APOLLO_MCP_URL: process.env.APOLLO_MCP_URL,
+      APOLLO_MCP_BEARER_TOKEN: process.env.APOLLO_MCP_BEARER_TOKEN,
+      APOLLO_NEWS_CROSSCHECK_ENABLED: process.env.APOLLO_NEWS_CROSSCHECK_ENABLED,
+    };
+    const calls: string[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      calls.push(`${url.origin}${url.pathname}`);
+      if (url.pathname !== '/api/v1/organizations/enrich') {
+        throw new Error(`unexpected Apollo request ${url.origin}${url.pathname}`);
+      }
+      return new Response(
+        JSON.stringify({
+          organization: {
+            name: 'Apollo Fixture Industries',
+            primary_domain: 'apollo-fixture.example',
+            website_url: 'https://apollo-fixture.example',
+            industry: 'information technology & services',
+            estimated_num_employees: 1200,
+            annual_revenue: 125_000_000,
+            organization_num_jobs: 17,
+            phone: '+1-555-0100',
+            primary_phone: { number: '+1-555-0100', sanitized_number: '+15550100' },
+            numbers: ['+1-555-0199'],
+            leads: [{ name: 'Pat Prospect', email: 'pat@example.com', title: 'Director' }],
+            people: [{ first_name: 'Ada', email: 'ada@example.com', title: 'VP Sales' }],
+            job_postings: [{ title: 'Data Engineer', department: 'IT' }],
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    try {
+      process.env.APOLLO_API_KEY = 'fixture-pull';
+      delete process.env.APOLLO_MCP_URL;
+      delete process.env.APOLLO_MCP_BEARER_TOKEN;
+      process.env.APOLLO_NEWS_CROSSCHECK_ENABLED = 'false';
+
+      const result = await processCompanyEnrichApolloJob(
+        {
+          orgId: org.id,
+          companyName: 'Apollo Fixture Industries',
+          domain: 'apollo-fixture.example',
+        },
+        pino({ level: 'silent' }),
+      );
+
+      expect(result).toEqual({ enrichmentId: expect.any(String) });
+      expect(calls).toEqual(['https://api.apollo.io/api/v1/organizations/enrich']);
+      expect(calls.join(' ')).not.toMatch(/mixed_people|search_people|people\/match/);
+
+      const row = await prisma.companyEnrichment.findUniqueOrThrow({
+        where: {
+          orgId_normalizedName: {
+            orgId: org.id,
+            normalizedName: 'apollo-fixture-industries',
+          },
+        },
+      });
+      const stored = JSON.stringify(row, (_key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      expect(row.annualRevenueMicros).toBe(125_000_000_000_000n);
+      expect(row.legalName).toBe('Apollo Fixture Industries');
+      expect(stored).not.toMatch(/555|pat@example|ada@example|Pat Prospect|\bAda\b|primary_phone/);
+      const metadata = row.providerMetadata as {
+        apollo?: { strategicIntel?: { openJobCount?: number; annualRevenueMicros?: number } };
+      };
+      expect(metadata.apollo?.strategicIntel?.annualRevenueMicros).toBe(125_000_000_000_000);
+      expect(metadata.apollo?.strategicIntel?.openJobCount).toBe(17);
+    } finally {
+      globalThis.fetch = originalFetch;
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      await prisma.org.delete({ where: { id: org.id } });
+    }
   });
 });
