@@ -123,7 +123,7 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
     desc: 'Fetch one opportunity with related CRM context.',
   },
   { group: 'legacy', name: 'opportunity.update', desc: 'Patch fields and write audit log.' },
-  { group: 'legacy', name: 'contacts.list', desc: 'List decision-unit contacts by customer.' },
+  { group: 'legacy', name: 'contacts.list', desc: 'List people linked to one company by company id.' },
   { group: 'legacy', name: 'tasks.create', desc: 'Create a follow-up task on an opportunity.' },
   {
     group: 'legacy',

@@ -3,30 +3,43 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { isCompanyUuid, requireCompanyLink } from './crm-tools.helpers.js';
 
 const Input = z.object({
+  companyId: z.string().uuid().optional(),
   customer: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(50),
 });
 
 export const contactsList: Tool<typeof Input> = {
   description:
-    'List contacts, optionally filtered by customer name. Includes companyId and linkState (linked or needs_review). Contacts with aiOptOut have null email and phone.',
+    'List contacts. Pass companyId, or a customer name that matches exactly one company, to return people linked by that company id. An unlinked contact whose customer text matches is not included. Includes linkState. Contacts with aiOptOut have null email and phone.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
     properties: {
-      customer: { type: 'string' },
+      companyId: { type: 'string', format: 'uuid' },
+      customer: {
+        type: 'string',
+        description: 'Company id, or a name that matches exactly one company. Not a free-text customer label.',
+      },
       limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
     },
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
+    const requested = args.companyId?.trim() || args.customer?.trim() || '';
+    const company = requested
+      ? await requireCompanyLink(
+          ctx.orgId,
+          isCompanyUuid(requested) ? { companyId: requested } : { name: requested },
+        )
+      : null;
     const items = await prisma.contact.findMany({
       where: {
         orgId: ctx.orgId,
         deletedAt: null, // never surface soft-deleted rows to agents (Review)
-        ...(args.customer ? { customer: args.customer } : {}),
+        ...(company ? { companyId: company.id } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: args.limit,

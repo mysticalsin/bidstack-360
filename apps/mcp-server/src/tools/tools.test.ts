@@ -152,6 +152,46 @@ describeDb('MCP tools', () => {
     expect(Array.isArray(out)).toBe(true);
   });
 
+  it('contacts.list returns people linked by company id, not the customer string', async () => {
+    // WHY: a matching customer label is not a company link. Dust asking for
+    // the account must see the linked person and must not see the name-only row.
+    const company = await prisma.company.create({
+      data: { orgId, name: `List Co ${randomBytes(4).toString('hex')}` },
+    });
+    await prisma.contact.create({
+      data: { orgId, customer: 'Stored label', companyId: company.id, name: 'Linked Person' },
+    });
+    await prisma.contact.create({
+      data: { orgId, customer: company.name, name: 'Name Only Person' },
+    });
+
+    const byName = (await tools['contacts.list'].handler(
+      { customer: company.name, limit: 20 },
+      ctx,
+    )) as Array<{ name: string; companyId: string | null }>;
+    expect(byName.map((contact) => contact.name)).toEqual(['Linked Person']);
+    expect(byName[0]?.companyId).toBe(company.id);
+
+    const byId = (await tools['contacts.list'].handler(
+      { companyId: company.id, limit: 20 },
+      ctx,
+    )) as Array<{ name: string }>;
+    expect(byId.map((contact) => contact.name)).toEqual(['Linked Person']);
+  });
+
+  it('contacts.list refuses a customer name that is not one company', async () => {
+    // Names are unique per org, so the ambiguous case is two casings of one label.
+    const token = randomBytes(4).toString('hex');
+    await prisma.company.create({ data: { orgId, name: `Twin ${token}` } });
+    await prisma.company.create({ data: { orgId, name: `twin ${token}` } });
+    await expect(
+      tools['contacts.list'].handler({ customer: `Missing ${token}` }, ctx),
+    ).rejects.toThrow(/company id/);
+    await expect(
+      tools['contacts.list'].handler({ customer: `Twin ${token}` }, ctx),
+    ).rejects.toThrow(/company id/);
+  });
+
   it('tasks.create creates a task and writes audit_log', async () => {
     const out = (await tools['tasks.create'].handler({ oppId, title: 'Follow-up call' }, ctx)) as {
       title: string;
