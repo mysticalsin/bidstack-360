@@ -34,6 +34,8 @@ export interface OppRow {
   probability?: number | null;
   dueDate: string | null;
   customer: string | null;
+  /** Stored company link. A matching customer name is not this. */
+  companyId?: string | null;
   closedAt?: string | null;
   /** Present on API rows; used by drill-down tables. */
   name?: string | null;
