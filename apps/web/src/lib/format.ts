@@ -1,3 +1,5 @@
+import { formatMicrosAmount } from '@bidstack/shared';
+
 // Locale-aware formatters used across cards and tables. All public functions
 // accept an optional `locale` string so they're safe to call from both React
 // (thread locale via useUserLocale) and non-React callsites (selectors, loaders,
@@ -85,6 +87,23 @@ export function formatStage(stage: string): string {
  * Compacts ≥ 1M as `$1.2M`, ≥ 1k as `$12k`, otherwise full currency.
  * The string-encoded micros preserve BigInt precision over JSON.
  */
+function currencyAffix(currency: string, locale: string): { symbol: string; symbolFirst: boolean } {
+  try {
+    const parts = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    const symbol = parts.find((part) => part.type === 'currency')?.value ?? currency;
+    const symbolFirst =
+      parts.findIndex((part) => part.type === 'currency') <
+      parts.findIndex((part) => part.type === 'integer');
+    return { symbol, symbolFirst };
+  } catch {
+    return { symbol: currency, symbolFirst: false };
+  }
+}
+
 export function formatMoneyMicros(
   micros: string | number | bigint,
   currency?: string,
@@ -98,16 +117,22 @@ export function formatMoneyMicros(
       : typeof micros === 'number'
         ? BigInt(Math.trunc(micros))
         : BigInt(micros);
+  const abs = asBigInt < 0n ? -asBigInt : asBigInt;
+  const compact = options.compact ?? abs >= 1_000n * 1_000_000n;
+  if (!compact) {
+    const text = formatMicrosAmount(asBigInt);
+    const { symbol, symbolFirst } = currencyAffix(resolvedCurrency, resolvedLocale);
+    return symbolFirst ? `${symbol}${text}` : `${text} ${symbol}`;
+  }
   const million = BigInt(1_000_000);
   const whole = asBigInt / million;
   const remainder = asBigInt % million;
   const value = Number(whole) + Number(remainder) / 1_000_000;
-  const compact = options.compact ?? Math.abs(value) >= 1000;
   return new Intl.NumberFormat(resolvedLocale, {
     style: 'currency',
     currency: resolvedCurrency,
-    notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits: compact ? 1 : 2,
+    notation: 'compact',
+    maximumFractionDigits: 1,
   }).format(value);
 }
 
@@ -167,7 +192,10 @@ export function relativeTime(iso: string, locale?: string): string {
 export function formatBytes(bytes: number, locale?: string): string {
   const resolvedLocale = locale ?? detectLocale();
   const safe = Math.max(0, bytes);
-  const units: Array<{ unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte'; threshold: number }> = [
+  const units: Array<{
+    unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte';
+    threshold: number;
+  }> = [
     { unit: 'terabyte', threshold: 1024 ** 4 },
     { unit: 'gigabyte', threshold: 1024 ** 3 },
     { unit: 'megabyte', threshold: 1024 ** 2 },

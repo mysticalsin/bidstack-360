@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatStage, formatMoney, daysUntil } from './format.js';
+import { formatStage, formatMoney, formatMoneyMicros, daysUntil } from './format.js';
 
 describe('formatStage', () => {
   it('humanizes snake_case enum values for display', () => {
@@ -19,6 +19,18 @@ describe('formatMoney', () => {
   it('uses zero-decimal notation under 1M', () => {
     const out = formatMoney(320_000, 'EUR');
     expect(out).toMatch(/320,000/);
+  });
+});
+
+describe('formatMoneyMicros', () => {
+  it('prints a large recorded amount on the cent', () => {
+    // WHY: Number(micros) / 1e6 moved this USD figure to the next cent.
+    const formatted = formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+      locale: 'en',
+    });
+    expect(formatted).toContain('457.18');
+    expect(formatted).not.toContain('457.19');
   });
 });
 

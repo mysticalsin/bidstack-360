@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { formatMicrosAmount, unitsToMicros } from '@bidstack/shared';
+import { unitsToMicros } from '@bidstack/shared';
 
 import {
   formatUnspecifiedAmount,
@@ -11,24 +11,6 @@ import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
-
-function formatExactMoney(micros: bigint, currency: string): string {
-  const text = formatMicrosAmount(micros);
-  try {
-    const parts = new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency,
-      currencyDisplay: 'narrowSymbol',
-    }).formatToParts(0);
-    const symbol = parts.find((part) => part.type === 'currency')?.value ?? currency;
-    const symbolFirst =
-      parts.findIndex((part) => part.type === 'currency') <
-      parts.findIndex((part) => part.type === 'integer');
-    return symbolFirst ? `${symbol}${text}` : `${text} ${symbol}`;
-  } catch {
-    return `${text} ${currency}`;
-  }
-}
 
 function microsBigInt(micros: string | number | bigint): bigint | null {
   try {
@@ -60,15 +42,11 @@ export function formatStoredMicros(
   }
   const converted = convert(value, source);
   if (!Number.isFinite(converted) || converted === value) {
-    return options?.compact === false
-      ? formatExactMoney(asBigInt, displayCurrency)
-      : formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
+    return formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
   }
   const convertedMicros = unitsToMicros(converted);
   if (convertedMicros == null) return formatMoney(converted, displayCurrency);
-  return options?.compact === false
-    ? formatExactMoney(convertedMicros, displayCurrency)
-    : formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
+  return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
 }
 
 /**
