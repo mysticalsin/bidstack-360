@@ -304,11 +304,21 @@ function complianceStatusFromText(value: string): ComplianceCheck['status'] {
 }
 
 function roleFromText(value: string): MeetingImportedContact['roleInDecision'] {
-  if (/champion/i.test(value)) return 'champion';
-  if (/blocker/i.test(value)) return 'blocker';
-  if (/buyer|procurement|economic/i.test(value)) return 'buyer';
-  if (/user|technical/i.test(value)) return 'user';
-  if (/influencer|stakeholder|owner/i.test(value)) return 'influencer';
+  // A name, a job title, or a contact-line marker is not a buying role.
+  // Only an explicit label on the note is.
+  const labeled = value.match(
+    /\b(?:decision role|buying role|role in decision)\s*[:=-]\s*(buyer|blocker|champion|influencer|user)\b/i,
+  );
+  const role = labeled?.[1]?.toLowerCase();
+  if (
+    role === 'buyer' ||
+    role === 'blocker' ||
+    role === 'champion' ||
+    role === 'influencer' ||
+    role === 'user'
+  ) {
+    return role;
+  }
   return null;
 }
 

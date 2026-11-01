@@ -28,5 +28,26 @@ describe('extractMeetingNotes', () => {
     expect(vendors.every((item) => item.confidence === null)).toBe(true);
     expect(extracted.contacts[0]?.confidence).toBeNull();
     expect(extracted.tasks[0]?.confidence).toBeNull();
+    // "Security" and a name are not a buying role.
+    expect(extracted.contacts[0]?.roleInDecision).toBeNull();
+  });
+
+  it('keeps a decision role only when the note names one', () => {
+    // WHY: "Buyer" in a name, or "technical" in a title, used to become a
+    // stored buying role. The account then showed a station nobody recorded.
+    const guessed = extractMeetingNotes(
+      'Attendees: Linked Buyer - Technical Lead, buyer@example.com',
+      'Northwind',
+      source,
+    );
+    expect(guessed.contacts[0]?.roleInDecision).toBeNull();
+    expect(guessed.contacts[0]?.title).toContain('Technical Lead');
+
+    const stated = extractMeetingNotes(
+      'Attendees: Ada Lovelace - CFO, ada@example.com. Decision role: champion',
+      'Northwind',
+      source,
+    );
+    expect(stated.contacts[0]?.roleInDecision).toBe('champion');
   });
 });
