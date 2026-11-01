@@ -65,6 +65,16 @@ describe('dealRangeFor', () => {
     expect(dealRangeFor('cyber', here, themeForText)).toMatchObject({ lowMicros: '5000000', highMicros: '9000000', deals: 2 });
     expect(dealRangeFor('cyber', [here[0]!], themeForText)).toBeNull();
   });
+
+  it('names the sample when the wins are not the whole book', () => {
+    // WHY: a silent take of 1000 was described as every won deal in the pipeline.
+    const won = [1, 2, 3, 4].map((m) => ({ name: 'Cloud migration', valueMicros: BigInt(m * 1_000_000) * 1_000_000n, here: false }));
+    const ranged = dealRangeFor('cloud', won, themeForText, 1000);
+    expect(ranged?.basis).toContain('latest 1000');
+    expect(ranged?.basis).not.toContain('your pipeline');
+    const here = [{ name: 'Payroll', valueMicros: 5_000_000n, here: true }, { name: 'Audit', valueMicros: 9_000_000n, here: true }];
+    expect(dealRangeFor('cyber', here, themeForText, 1000)?.basis).toContain('latest 1000');
+  });
 });
 
 describe('buildPlays', () => {

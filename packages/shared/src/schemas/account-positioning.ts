@@ -271,15 +271,26 @@ const pct = (sorted: bigint[], q: number) => sorted[Math.min(sorted.length - 1, 
  * theme (3 or more, middle half), else this account's own wins (2 or more,
  * min to max). Otherwise null: no range is shown.
  */
-export function dealRangeFor(theme: InitiativeTheme, won: WonDeal[], themeOf: (name: string) => InitiativeTheme): DealRange | null {
+export function dealRangeFor(
+  theme: InitiativeTheme,
+  won: WonDeal[],
+  themeOf: (name: string) => InitiativeTheme,
+  latestWins?: number | null,
+): DealRange | null {
   const label = OFFERING_HOOKS[theme].label;
   const onTheme = won.filter((w) => w.valueMicros > 0n && themeOf(w.name) === theme).map((w) => w.valueMicros).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   if (onTheme.length >= 3) {
-    return { lowMicros: pct(onTheme, 0.25).toString(), highMicros: pct(onTheme, 0.75).toString(), basis: `Middle half of ${onTheme.length} won ${label} deals in your pipeline`, deals: onTheme.length };
+    const basis = latestWins
+      ? `Middle half of ${onTheme.length} won ${label} deals in the latest ${latestWins} wins`
+      : `Middle half of ${onTheme.length} won ${label} deals in your pipeline`;
+    return { lowMicros: pct(onTheme, 0.25).toString(), highMicros: pct(onTheme, 0.75).toString(), basis, deals: onTheme.length };
   }
   const here = won.filter((w) => w.here && w.valueMicros > 0n).map((w) => w.valueMicros).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   if (here.length >= 2) {
-    return { lowMicros: here[0]!.toString(), highMicros: here[here.length - 1]!.toString(), basis: `Range of ${here.length} deals won at this account`, deals: here.length };
+    const basis = latestWins
+      ? `Range of ${here.length} deals won at this account in the latest ${latestWins} wins`
+      : `Range of ${here.length} deals won at this account`;
+    return { lowMicros: here[0]!.toString(), highMicros: here[here.length - 1]!.toString(), basis, deals: here.length };
   }
   return null;
 }
@@ -312,6 +323,8 @@ export interface PlayInputs {
   financialSource: string | null;
   people: KnownPerson[];
   won: WonDeal[];
+  /** Set when `won` is the latest N wins, not the whole book. */
+  wonSampleLimit?: number | null;
   themeOf: (name: string) => InitiativeTheme;
   now: Date;
 }
@@ -380,7 +393,7 @@ export function buildPlays(input: PlayInputs): PositioningPlay[] {
       confidence: label(score),
       confidenceScore: score,
       alreadySold: d.alreadySold,
-      dealRange: dealRangeFor(d.theme, input.won, input.themeOf),
+      dealRange: dealRangeFor(d.theme, input.won, input.themeOf, input.wonSampleLimit),
       sample: d.sample,
     } satisfies PositioningPlay;
   });
