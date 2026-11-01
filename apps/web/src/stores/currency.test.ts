@@ -438,7 +438,7 @@ describe('useCurrencyStore', () => {
   });
 
   it('prints a converted count past the safe unit range in full', () => {
-    // WHY: microsToUnits of this result is one unit low. The label must use the integer.
+    // WHY: the display must stay on the micros integer, and formatMoney must not move it.
     useCurrencyStore.setState({
       currency: 'USD',
       rates: {
@@ -450,7 +450,8 @@ describe('useCurrencyStore', () => {
     const huge = 9_007_199_254_740_992;
     const micros = convertMicrosByRates(BigInt(huge) * 1_000_000n, 1, 1.1)!;
     const full = formatMoneyMicros(micros, 'USD', { compact: false });
-    expect(full).not.toBe(formatMoney(microsToUnits(micros), 'USD'));
+    // WHY: a compact float of this count used to disagree with the micros label.
+    expect(formatMoney(microsToUnits(micros), 'USD')).toBe(full);
     const { result } = renderHook(() => useDisplayMoney(huge, 'EUR'));
     expect(result.current).toBe(full);
     expect(result.current).toContain('9,907,919,180,215,092');
