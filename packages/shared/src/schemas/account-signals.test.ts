@@ -12,6 +12,7 @@ import {
   oneLine,
   signalDedupeKey,
   stripPublisher,
+  matchedTheme,
   themeForText,
   titleSimilarity,
   trendFor,
@@ -176,6 +177,10 @@ describe('themeForText', () => {
     expect(themeForText('Zero Trust rollout')).toBe('cyber');
     expect(themeForText('Acquisition of Beta')).toBe('m_and_a');
     expect(themeForText('Opens office in Lisbon')).toBe('expansion');
+    expect(matchedTheme('Kubernetes landing zone')).toBe('cloud');
+    // WHY: unmatched chatter must stay null so a meeting does not invent expansion.
+    expect(matchedTheme('follow up next week')).toBeNull();
+    expect(themeForText('follow up next week')).toBe('expansion');
   });
 });
 
