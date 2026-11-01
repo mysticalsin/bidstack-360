@@ -50,7 +50,7 @@ const HealthScoreResponse = z.object({
   accountId: z.string().uuid(),
   score: z.number(),
   factors: z.record(z.unknown()),
-  trend: z.enum(['IMPROVING', 'STABLE', 'DECLINING']),
+  trend: z.enum(['IMPROVING', 'STABLE', 'DECLINING']).nullable(),
 });
 
 const MessageResponse = z.object({ message: z.string() });
@@ -283,13 +283,28 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
       const healthy = recentHealthScores.filter((h) => h.score >= 75).length;
       const atRisk = recentHealthScores.filter((h) => h.score >= 50 && h.score < 75).length;
       const critical = recentHealthScores.filter((h) => h.score < 50).length;
+      const accountIds = recentHealthScores.map((row) => row.accountId);
+      const counts =
+        accountIds.length === 0
+          ? []
+          : await prisma.healthScore.groupBy({
+              by: ['accountId'],
+              where: { orgId, accountId: { in: accountIds } },
+              _count: { _all: true },
+            });
+      const snapshots = new Map(counts.map((row) => [row.accountId, row._count._all]));
+      const latestHealthScores = recentHealthScores.slice(0, 10).map((row) => ({
+        ...row,
+        // One snapshot has no earlier score. The column default is not a trend.
+        trend: (snapshots.get(row.accountId) ?? 0) < 2 ? null : row.trend,
+      }));
 
       return {
         activeSubscriptions,
         openChurnSignals,
         pendingRenewals,
         accountsByHealth: { healthy, atRisk, critical },
-        latestHealthScores: recentHealthScores.slice(0, 10),
+        latestHealthScores,
       };
     },
   );

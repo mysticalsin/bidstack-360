@@ -33,6 +33,18 @@ export function healthScoreFromSignals(input: {
   return clampScore(parts.reduce((sum, part) => sum + part, 0) / parts.length);
 }
 
+/** A first score has no direction. Stable means the new score stayed within 5 points. */
+export function healthTrend(
+  current: number,
+  previous: number | null,
+): 'IMPROVING' | 'STABLE' | 'DECLINING' | null {
+  if (previous == null) return null;
+  const delta = current - previous;
+  if (delta >= 5) return 'IMPROVING';
+  if (delta <= -5) return 'DECLINING';
+  return 'STABLE';
+}
+
 export async function computeAndPersistHealthScore(
   orgId: string,
   accountId: string,
@@ -78,19 +90,14 @@ export async function computeAndPersistHealthScore(
     log.debug({ orgId, accountId }, 'cs.health: no measured inputs; not storing a score');
     return null;
   }
-  const trend =
-    previousScore && score > previousScore.score + 3
-      ? 'IMPROVING'
-      : previousScore && score < previousScore.score - 3
-        ? 'DECLINING'
-        : 'STABLE';
+  const trend = healthTrend(score, previousScore?.score ?? null);
 
   await prisma.healthScore.create({
     data: {
       orgId,
       accountId,
       score,
-      trend,
+      ...(trend ? { trend } : {}),
       factors: jsonObject({
         subscriptionCount,
         openCases,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { healthScoreFromSignals } from './index.js';
+import { healthScoreFromSignals, healthTrend } from './index.js';
 
 describe('healthScoreFromSignals', () => {
   it('does not start an account at 70 when nothing was measured', () => {
@@ -14,5 +14,15 @@ describe('healthScoreFromSignals', () => {
     expect(npsOnly).toBe(100);
     const cases = healthScoreFromSignals({ openCases: 2, criticalCases: 0, npsScore: null });
     expect(cases).toBe(92);
+  });
+});
+
+describe('healthTrend', () => {
+  it('does not call the first score stable', () => {
+    // WHY: the nightly job stored STABLE whenever there was no earlier score.
+    expect(healthTrend(70, null)).toBeNull();
+    expect(healthTrend(74, 70)).toBe('STABLE');
+    expect(healthTrend(75, 70)).toBe('IMPROVING');
+    expect(healthTrend(65, 70)).toBe('DECLINING');
   });
 });
