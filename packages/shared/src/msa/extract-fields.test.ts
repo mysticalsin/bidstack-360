@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contractMicros, extractMsaFields, storableLiabilityCap } from './extract-fields.js';
+import { contractMicros, extractMsaFields, storableLiabilityCap, storableRateCard } from './extract-fields.js';
 import { SYNTHETIC_NORTHWIND_MSA_TEXT } from './synthetic-msa.js';
 
 describe('extractMsaFields', () => {
@@ -80,6 +80,16 @@ describe('extractMsaFields', () => {
       amountMicros: 250_000_500_000,
       currency: 'EUR',
     });
+    const oversized = extractMsaFields(
+      ['Partner: 9007199254.8 EUR per day', 'Specialist: 1.015 EUR per hour'].join('\n'),
+    );
+    const card = oversized.rateCard.value as Array<{ role: string; rateMicros: number | null; unit: string }>;
+    expect(card.find((row) => row.role === 'Partner')).toEqual({
+      role: 'Partner',
+      rateMicros: null,
+      unit: 'day',
+    });
+    expect(storableRateCard(card).map((row) => row.role)).toEqual(['Specialist']);
   });
 
   it('returns blank not-found fields when the document has no commercial terms', () => {

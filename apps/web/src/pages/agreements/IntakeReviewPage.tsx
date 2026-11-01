@@ -38,6 +38,7 @@ function display(field: MsaExtractedField): string {
       .map((row) => {
         if (!row || typeof row !== 'object') return JSON.stringify(row);
         const item = row as { name?: string; role?: string; rateMicros?: number; unit?: string };
+        if (item.role && item.rateMicros == null) return `${item.role}: amount not readable`;
         if (item.role && item.rateMicros != null) {
           return `${item.role}: ${formatExtractedMicros(item.rateMicros)} / ${item.unit ?? 'day'}`;
         }
