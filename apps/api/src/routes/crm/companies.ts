@@ -195,6 +195,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         scope,
         req.query.q,
         req.query.limit,
+        req.query.country,
       );
       return { items };
     },
