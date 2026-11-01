@@ -31,7 +31,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const committee = deriveCommittee(cockpit, t);
   const riskLoad = openRiskFigures(cockpit);
   const openRisks = riskLoad.openCount;
-  const criticalRisks = riskLoad.criticalOnPage;
+  const criticalRisks = riskLoad.highSeverity;
   const attributionCount = cockpit.company.sourceAttribution.length;
   const hasLogo = Boolean(cockpit.company.logo);
   const proofCount = sourceReceiptTotal(attributionCount, hasLogo);
@@ -79,21 +79,19 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
       label: t('commandCenter.signal.risk.label', 'Open risk load'),
       value: riskLoad.noneRecorded
         ? t('commandCenter.signal.risk.valueNone', 'None recorded')
-        : riskLoad.unseenOpen
-          ? t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks })
-          : criticalRisks
-            ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
-            : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
+        : criticalRisks
+          ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
+          : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
       detail: riskLoad.noneRecorded
         ? t('commandCenter.signal.risk.detailNone', 'no risk rows on this account')
-        : riskLoad.unseenOpen
-          ? t('commandCenter.signal.risk.detailPage', 'latest 50 open risks')
-          : criticalRisks
-            ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+        : criticalRisks
+          ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+          : riskLoad.unseenOpen
+            ? t('commandCenter.signal.risk.detailPage', 'latest 50 open risks')
             : openRisks
               ? t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up')
               : t('commandCenter.signal.risk.detailNoneOpen', 'recorded register has no open risks'),
-      progress: riskLoad.noneRecorded ? null : riskLoadProgress(openRisks, riskLoad.unseenOpen ? 0 : criticalRisks),
+      progress: riskLoad.noneRecorded ? null : riskLoadProgress(openRisks, criticalRisks),
       tone: riskLoad.noneRecorded ? 'amber' : riskLoad.unseenOpen || criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
     },
   ];
@@ -349,23 +347,26 @@ export function influenceProxyScore(
 export function openRiskFigures(cockpit: {
   risks: readonly RiskItem[];
   openRiskCount?: number;
+  openRiskSeverity?: { critical: number; high: number };
   risksCapped?: boolean;
-}): { noneRecorded: boolean; openCount: number; criticalOnPage: number; unseenOpen: boolean } {
+}): { noneRecorded: boolean; openCount: number; highSeverity: number; unseenOpen: boolean } {
   const shownOpen = cockpit.risks.filter(
     (risk) => risk.status === 'open' || risk.status === 'in_progress',
   ).length;
   const openCount = cockpit.openRiskCount ?? shownOpen;
-  const criticalOnPage = cockpit.risks.filter(
-    (risk) =>
-      isOpenRisk(risk.status) && (risk.severity === 'critical' || risk.severity === 'high'),
-  ).length;
+  const highSeverity = cockpit.openRiskSeverity
+    ? cockpit.openRiskSeverity.critical + cockpit.openRiskSeverity.high
+    : cockpit.risks.filter(
+        (risk) =>
+          isOpenRisk(risk.status) && (risk.severity === 'critical' || risk.severity === 'high'),
+      ).length;
   const unseenOpen = Boolean(
     cockpit.risksCapped && cockpit.openRiskCount != null && cockpit.openRiskCount > shownOpen,
   );
   return {
     noneRecorded: cockpit.risks.length === 0 && openCount === 0 && !cockpit.risksCapped,
     openCount,
-    criticalOnPage,
+    highSeverity,
     unseenOpen,
   };
 }
