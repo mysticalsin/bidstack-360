@@ -42,6 +42,7 @@ function getQueue(): Queue {
 function jobId(job: MeetingIntelJob): string {
   if (job.kind === 'process') return `${job.orgId}--item--${job.itemId}`;
   if (job.kind === 'sync') return `${job.orgId}--sync--${job.connectionId}--${Date.now()}`;
+  if (job.kind === 'mars-sync') return `${job.orgId}--mars--${Math.floor(Date.now() / 60_000)}`;
   return `${job.orgId}--flags--${job.meetingId}--${Date.now()}`;
 }
 

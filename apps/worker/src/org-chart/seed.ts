@@ -4,8 +4,8 @@
  *
  * Candidates, in order of trust:
  *   1. CRM contacts of the account and its subsidiaries (source 'contacts').
- *   2. External meeting-intel attendees not linked to a contact, from ABC or
- *      Metis (source 'abc' / 'metis'), when includeMeetingAttendees.
+ *   2. External meeting-intel attendees not linked to a contact, from ABC,
+ *      Metis or MARS (source 'abc' / 'metis' / 'mars'), when includeMeetingAttendees.
  *   3. Apollo People API Search (source 'apollo'), when includeApollo. The
  *      search costs 0 credits; the run still refuses when the month's Apollo
  *      usage is at or over ENRICHMENT_MONTHLY_BUDGET_APOLLO, and writes a
@@ -144,7 +144,7 @@ export async function runOrgChartSeed(job: OrgChartSeedJob, deps: Pick<Enrichmen
         key: `${src}:${ref}`,
         contactId: null,
         externalRef: ref.slice(0, 160),
-        source: src === 'metis' ? 'metis' : 'abc',
+        source: src === 'metis' || src === 'mars' ? src : 'abc',
         name: a.name.trim().slice(0, 200),
         title: a.title,
         seniority: a.seniority !== 'unknown' ? a.seniority : nodeSeniorityFromTitle(a.title),

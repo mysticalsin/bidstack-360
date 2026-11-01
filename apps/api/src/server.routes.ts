@@ -61,6 +61,7 @@ import { crossSellRoutes } from './routes/cross-sell.js';
 import { contractAgreementRoutes } from './routes/contract-agreements.js';
 import { msaRoutes } from './routes/msa.js';
 import { meetingIntelRoutes } from './routes/meeting-intel.js';
+import { marsRoutes } from './routes/mars.js';
 import { accountEnrichmentRoutes } from './routes/account-enrichment.js';
 import orgChartRoutes from './routes/org-chart.js';
 import orgChartFileRoutes from './routes/org-chart-files.js';
@@ -177,6 +178,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(contractAgreementRoutes, { prefix: '/api/v1' });
   await server.register(msaRoutes, { prefix: '/api/v1' });
   await server.register(meetingIntelRoutes, { prefix: '/api/v1' });
+  await server.register(marsRoutes, { prefix: '/api/v1' });
   await server.register(accountEnrichmentRoutes, { prefix: '/api/v1' });
   await server.register(orgChartRoutes, { prefix: '/api/v1' });
   await server.register(orgChartFileRoutes, { prefix: '/api/v1' });

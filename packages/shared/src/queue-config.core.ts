@@ -122,7 +122,9 @@ export type MeetingIntelJob =
   | { kind: 'sync'; orgId: string; connectionId: string }
   | { kind: 'process'; orgId: string; itemId: string }
   /** Manual entries created by the API: raise cross-region flags only. */
-  | { kind: 'flags'; orgId: string; meetingId: string };
+  | { kind: 'flags'; orgId: string; meetingId: string }
+  /** MARS weekly meeting log pull (cursor based). Only runs with MARS_INTEGRATION_ENABLED=true. */
+  | { kind: 'mars-sync'; orgId: string; reason: 'schedule' | 'webhook' | 'manual' };
 
 /**
  * Account enrichment (2026-10-31): firmographics, open jobs and potential
