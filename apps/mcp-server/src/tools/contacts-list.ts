@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { isCompanyUuid, requireCompanyLink } from './crm-tools.helpers.js';
+import { capPage, isCompanyUuid, requireCompanyLink } from './crm-tools.helpers.js';
 
 const Input = z.object({
   companyId: z.string().uuid().optional(),
@@ -13,7 +13,7 @@ const Input = z.object({
 
 export const contactsList: Tool<typeof Input> = {
   description:
-    'List contacts. Pass companyId, or a customer name that matches exactly one company, to return people linked by that company id. An unlinked contact whose customer text matches is not included. Includes linkState. Contacts with aiOptOut have null email and phone.',
+    'List contacts. Returns { items, limit, truncated }. truncated means more people match than items. Pass companyId, or a customer name that matches exactly one company, to return people linked by that company id. An unlinked contact whose customer text matches is not included. Includes linkState. Contacts with aiOptOut have null email and phone.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -42,9 +42,9 @@ export const contactsList: Tool<typeof Input> = {
         ...(company ? { companyId: company.id } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
-    return items.map((c) => ({
+    return capPage(items.map((c) => ({
       id: c.id,
       customer: c.customer,
       name: c.name,
@@ -57,6 +57,6 @@ export const contactsList: Tool<typeof Input> = {
       influence: c.influence,
       sentiment: c.sentiment,
       createdAt: c.createdAt.toISOString(),
-    }));
+    })), args.limit);
   },
 };

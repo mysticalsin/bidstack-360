@@ -107,14 +107,15 @@ describeDb('MCP tools', () => {
   });
 
   it('opportunities.list returns opps for the org', async () => {
-    // Per handoff/mcp.tools.md, opportunities.list returns a bare array
-    // of Opportunity, not a paginated wrapper.
-    const out = (await tools['opportunities.list'].handler({ limit: 10 }, ctx)) as Array<{
-      id: string;
-    }>;
-    expect(Array.isArray(out)).toBe(true);
-    expect(out.some((o) => o.id === oppId)).toBe(true);
-    const row = out.find((o) => o.id === oppId) as {
+    // WHY: a bare array of the default page was the whole pipeline. truncated
+    // says when more deals match than this page.
+    const out = (await tools['opportunities.list'].handler({ limit: 10 }, ctx)) as {
+      items: Array<{ id: string }>;
+      truncated: boolean;
+    };
+    expect(Array.isArray(out.items)).toBe(true);
+    expect(out.items.some((o) => o.id === oppId)).toBe(true);
+    const row = out.items.find((o) => o.id === oppId) as {
       currency: null;
       currencyBasis: string;
       companyId: string | null;
@@ -165,11 +166,11 @@ describeDb('MCP tools', () => {
     const out = (await tools['opportunities.list'].handler(
       { companyId: company.id, limit: 20 },
       ctx,
-    )) as Array<{ id: string; probability: number | null; stageName: string }>;
-    expect(out.map((row) => row.id)).toEqual([linked.id]);
-    expect(out[0]?.probability).toBeNull();
-    expect(out[0]?.stageName).toBe('S1 Lead');
-    expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
+    )) as { items: Array<{ id: string; probability: number | null; stageName: string }> };
+    expect(out.items.map((row) => row.id)).toEqual([linked.id]);
+    expect(out.items[0]?.probability).toBeNull();
+    expect(out.items[0]?.stageName).toBe('S1 Lead');
+    expect(out.items.some((row) => row.id === nameOnly.id)).toBe(false);
 
     await expect(
       tools['opportunities.list'].handler(
@@ -271,9 +272,9 @@ describeDb('MCP tools', () => {
     const listed = (await tools['opportunities.list'].handler(
       { search: `OP-OL`, limit: 20 },
       ctx,
-    )) as Array<{ id: string; outcome: string }>;
-    expect(listed.find((row) => row.id === lostOpp.id)?.outcome).toBe('lost');
-    expect(listed.find((row) => row.id === bothOpp.id)?.outcome).toBe('lost');
+    )) as { items: Array<{ id: string; outcome: string }> };
+    expect(listed.items.find((row) => row.id === lostOpp.id)?.outcome).toBe('lost');
+    expect(listed.items.find((row) => row.id === bothOpp.id)?.outcome).toBe('lost');
 
     const renamed = (await tools['crm_update_deal'].handler(
       { id: lostOpp.id, patch: { name: 'Still lost' } },
@@ -323,14 +324,14 @@ describeDb('MCP tools', () => {
       const openRows = (await tools['opportunities.list'].handler(
         { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
         ctx,
-      )) as Array<{ id: string }>;
-      expect(openRows.map((row) => row.id)).toEqual([open.id]);
+      )) as { items: Array<{ id: string }> };
+      expect(openRows.items.map((row) => row.id)).toEqual([open.id]);
 
       const lostRows = (await tools['opportunities.list'].handler(
         { outcome: 'lost', search: token, limit: 20 },
         ctx,
-      )) as Array<{ id: string }>;
-      expect(lostRows.map((row) => row.id)).toEqual([flagged.id]);
+      )) as { items: Array<{ id: string }> };
+      expect(lostRows.items.map((row) => row.id)).toEqual([flagged.id]);
 
       const beforeDelete = (await tools['opportunities.get'].handler({ id: flagged.id }, ctx)) as {
         stageName: string;
@@ -349,8 +350,8 @@ describeDb('MCP tools', () => {
       const afterDelete = (await tools['opportunities.list'].handler(
         { stage: 's2_sent', outcome: 'open', search: token, limit: 20 },
         ctx,
-      )) as Array<{ id: string }>;
-      expect(afterDelete.map((row) => row.id).sort()).toEqual([flagged.id, open.id].sort());
+      )) as { items: Array<{ id: string }> };
+      expect(afterDelete.items.map((row) => row.id).sort()).toEqual([flagged.id, open.id].sort());
     } finally {
       await prisma.opportunity.deleteMany({ where: { id: { in: [open.id, flagged.id] } } });
       await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
@@ -653,8 +654,12 @@ describeDb('MCP tools', () => {
   });
 
   it('contacts.list returns empty when no contacts', async () => {
-    const out = (await tools['contacts.list'].handler({ limit: 10 }, ctx)) as unknown[];
-    expect(Array.isArray(out)).toBe(true);
+    const out = (await tools['contacts.list'].handler({ limit: 10 }, ctx)) as {
+      items: unknown[];
+      truncated: boolean;
+    };
+    expect(out.items).toEqual([]);
+    expect(out.truncated).toBe(false);
   });
 
   it('contacts.list returns people linked by company id, not the customer string', async () => {
@@ -673,15 +678,15 @@ describeDb('MCP tools', () => {
     const byName = (await tools['contacts.list'].handler(
       { customer: company.name, limit: 20 },
       ctx,
-    )) as Array<{ name: string; companyId: string | null }>;
-    expect(byName.map((contact) => contact.name)).toEqual(['Linked Person']);
-    expect(byName[0]?.companyId).toBe(company.id);
+    )) as { items: Array<{ name: string; companyId: string | null }> };
+    expect(byName.items.map((contact) => contact.name)).toEqual(['Linked Person']);
+    expect(byName.items[0]?.companyId).toBe(company.id);
 
     const byId = (await tools['contacts.list'].handler(
       { companyId: company.id, limit: 20 },
       ctx,
-    )) as Array<{ name: string }>;
-    expect(byId.map((contact) => contact.name)).toEqual(['Linked Person']);
+    )) as { items: Array<{ name: string }> };
+    expect(byId.items.map((contact) => contact.name)).toEqual(['Linked Person']);
   });
 
   it('contacts.list refuses a customer name that is not one company', async () => {
@@ -815,19 +820,20 @@ describeDb('MCP tools', () => {
     // prove the list does not treat the name as membership.
     await prisma.lead.update({ where: { id: nameOnly.id }, data: { companyId: null } });
 
-    const out = (await tools['leads.list'].handler({ companyId: company.id, limit: 20 }, ctx)) as Array<{
-      id: string;
-      companyId: string | null;
-    }>;
-    expect(out.map((row) => row.id)).toContain(linked.id);
-    expect(out.some((row) => row.id === nameOnly.id)).toBe(false);
-    expect(out.every((row) => row.companyId === company.id)).toBe(true);
+    const out = (await tools['leads.list'].handler({ companyId: company.id, limit: 20 }, ctx)) as {
+      items: Array<{ id: string; companyId: string | null }>;
+    };
+    expect(out.items.map((row) => row.id)).toContain(linked.id);
+    expect(out.items.some((row) => row.id === nameOnly.id)).toBe(false);
+    expect(out.items.every((row) => row.companyId === company.id)).toBe(true);
   });
 
   it('leads.list returns leads for the org', async () => {
-    const out = (await tools['leads.list'].handler({ limit: 10 }, ctx)) as Array<{ id: string }>;
-    expect(Array.isArray(out)).toBe(true);
-    expect(out.length).toBeGreaterThan(0);
+    const out = (await tools['leads.list'].handler({ limit: 10 }, ctx)) as {
+      items: Array<{ id: string }>;
+    };
+    expect(Array.isArray(out.items)).toBe(true);
+    expect(out.items.length).toBeGreaterThan(0);
   });
 
   it('leads.get returns a single lead', async () => {
@@ -1052,8 +1058,8 @@ describeDb('MCP tools', () => {
     const out = (await tools['crm_list_activities'].handler(
       { company: company.id, limit: 20 },
       ctx,
-    )) as Array<{ subject: string | null }>;
-    const subjects = out.map((row) => row.subject);
+    )) as { items: Array<{ subject: string | null }> };
+    const subjects = out.items.map((row) => row.subject);
     expect(subjects).toEqual(
       expect.arrayContaining(['Linked meeting', 'Company note', 'Linked email', 'Account task']),
     );
@@ -1063,8 +1069,8 @@ describeDb('MCP tools', () => {
     const otherDeal = (await tools['crm_list_activities'].handler(
       { company: company.id, dealId: nameOnly.id, limit: 20 },
       ctx,
-    )) as unknown[];
-    expect(otherDeal).toEqual([]);
+    )) as { items: unknown[]; limit: number; truncated: boolean };
+    expect(otherDeal).toEqual({ items: [], limit: 20, truncated: false });
   });
 
   it('tasks.list includes a pursuit task through the opportunity company', async () => {
@@ -1087,17 +1093,19 @@ describeDb('MCP tools', () => {
       },
     });
     await tools['tasks.create'].handler({ oppId: opp.id, title: 'Pursuit follow-up' }, ctx);
-    const out = (await tools['tasks.list'].handler({ accountId: company.id, limit: 20 }, ctx)) as Array<{
-      title: string;
-    }>;
-    expect(out.some((task) => task.title === 'Pursuit follow-up')).toBe(true);
+    const out = (await tools['tasks.list'].handler({ accountId: company.id, limit: 20 }, ctx)) as {
+      items: Array<{ title: string }>;
+    };
+    expect(out.items.some((task) => task.title === 'Pursuit follow-up')).toBe(true);
   });
 
   it('tasks.list returns tasks for the org', async () => {
     await tools['tasks.create'].handler({ oppId, title: 'Task A' }, ctx);
-    const out = (await tools['tasks.list'].handler({ limit: 10 }, ctx)) as Array<{ title: string }>;
-    expect(Array.isArray(out)).toBe(true);
-    expect(out.some((t) => t.title === 'Task A')).toBe(true);
+    const out = (await tools['tasks.list'].handler({ limit: 10 }, ctx)) as {
+      items: Array<{ title: string }>;
+    };
+    expect(Array.isArray(out.items)).toBe(true);
+    expect(out.items.some((t) => t.title === 'Task A')).toBe(true);
   });
 
   it('tasks.update patches a task', async () => {
@@ -1152,10 +1160,10 @@ describeDb('MCP tools', () => {
       },
       ctx,
     );
-    const out = (await tools['notes.list'].handler({ accountId, limit: 10 }, ctx)) as Array<{
-      title: string;
-    }>;
-    expect(out.some((n) => n.title === 'Call notes')).toBe(true);
+    const out = (await tools['notes.list'].handler({ accountId, limit: 10 }, ctx)) as {
+      items: Array<{ title: string }>;
+    };
+    expect(out.items.some((n) => n.title === 'Call notes')).toBe(true);
     await expect(
       tools['notes.list'].handler({ accountId: 'Beta Corp', limit: 10 }, ctx),
     ).rejects.toThrow(/UUID/);
@@ -1179,8 +1187,8 @@ describeDb('MCP tools', () => {
     const out = (await tools['notes.list'].handler(
       { accountId: accountId.toUpperCase(), limit: 10 },
       ctx,
-    )) as Array<{ title: string; companyId: string | null }>;
-    expect(out.some((note) => note.title === 'Lowercase tag')).toBe(true);
+    )) as { items: Array<{ title: string; companyId: string | null }> };
+    expect(out.items.some((note) => note.title === 'Lowercase tag')).toBe(true);
   });
 
   it('crm_search_companies returns a company id and does not invent confidence for text-only matches', async () => {
@@ -1190,16 +1198,16 @@ describeDb('MCP tools', () => {
     const hits = (await tools.crm_search_companies.handler(
       { query: 'Canonical Search', limit: 10 },
       ctx,
-    )) as Array<{ id: string | null; matchKind: string; confidence: number | null }>;
-    const canonical = hits.find((hit) => hit.id === company.id);
+    )) as { items: Array<{ id: string | null; matchKind: string; confidence: number | null }> };
+    const canonical = hits.items.find((hit) => hit.id === company.id);
     expect(canonical?.matchKind).toBe('company');
     expect(canonical?.confidence).toBeNull();
 
     const text = (await tools.crm_search_companies.handler(
       { query: 'TestCorp', limit: 10 },
       ctx,
-    )) as Array<{ matchKind: string; confidence: number | null; name: string }>;
-    const onlyText = text.find((hit) => hit.name === 'TestCorp');
+    )) as { items: Array<{ matchKind: string; confidence: number | null; name: string }> };
+    const onlyText = text.items.find((hit) => hit.name === 'TestCorp');
     expect(onlyText?.matchKind).toBe('opportunity_text_only');
     expect(onlyText?.confidence).toBeNull();
   });

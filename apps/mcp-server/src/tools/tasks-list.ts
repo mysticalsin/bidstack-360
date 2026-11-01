@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, type TaskStatus as PrismaTaskStatus } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { capPage } from './crm-tools.helpers.js';
 
 const Input = z.object({
   oppId: z.string().uuid().optional(),
@@ -14,7 +15,7 @@ const Input = z.object({
 
 export const tasksList: Tool<typeof Input> = {
   description:
-    'List tasks, optionally filtered by opportunity, company id, status, or assignee. A company id matches Task.accountId or the opportunity company. A company name is not accepted.',
+    'List tasks. Returns { items, limit, truncated }. truncated means more tasks match than items. Optionally filtered by opportunity, company id, status, or assignee. A company id matches Task.accountId or the opportunity company. A company name is not accepted.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -52,10 +53,10 @@ export const tasksList: Tool<typeof Input> = {
       },
       include: { opportunity: true, assignee: true },
       orderBy: { createdAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
 
-    return items.map((t) => ({
+    return capPage(items.map((t) => ({
       id: t.id,
       oppId: t.oppId,
       accountId: t.accountId,
@@ -65,6 +66,6 @@ export const tasksList: Tool<typeof Input> = {
       dueDate: t.dueDate?.toISOString().slice(0, 10) ?? null,
       assignee: t.assignee?.email ?? null,
       createdAt: t.createdAt.toISOString(),
-    }));
+    })), args.limit);
   },
 };

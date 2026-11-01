@@ -15,7 +15,7 @@ List opportunities matching filters.
   "limit":    50
 }
 ```
-**Output:** array of `Opportunity` (see `openapi.yaml`).
+**Output:** `{ items, limit, truncated }`. `items` is the page of `Opportunity`. `truncated` is true when more deals match than `items`.
 
 ## `opportunities.get`
 Fetch one opportunity with full intel payload.
@@ -31,7 +31,7 @@ Patch an opportunity. Common use: agent updates `stage`, `probability`, or `inte
 
 ## `contacts.list`
 **Input:** `{ "customer": "CI Financial", "limit": 50 }`
-**Output:** array of `Contact`.
+**Output:** `{ items, limit, truncated }`. `items` is the page of `Contact`. `truncated` is true when more people match.
 
 ## `tasks.create`
 **Input:**

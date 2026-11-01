@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { capPage } from './crm-tools.helpers.js';
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,8 @@ const ListAccountsInput = z.object({
 });
 
 export const kamListAccounts: Tool<typeof ListAccountsInput> = {
-  description: 'List Key Account Management accounts (companies) with their KAM status.',
+  description:
+    'List Key Account Management accounts (companies) with their KAM status. Returns accounts plus limit and truncated. truncated means more accounts match than this page.',
   input: ListAccountsInput,
   inputJsonSchema: {
     type: 'object',
@@ -37,9 +39,10 @@ export const kamListAccounts: Tool<typeof ListAccountsInput> = {
       where: { orgId: ctx.orgId, deletedAt: null, ...(args.status ? { kamStatus: args.status } : {}) },
       select: { id: true, name: true, countryCode: true, kamStatus: true, kamOwnerModel: true },
       orderBy: { name: 'asc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
-    return { accounts: rows };
+    const page = capPage(rows, args.limit);
+    return { accounts: page.items, limit: page.limit, truncated: page.truncated };
   },
 };
 
@@ -50,7 +53,8 @@ const ListInitiativesInput = z.object({
 });
 
 export const kamListInitiatives: Tool<typeof ListInitiativesInput> = {
-  description: "List a KAM account's initiatives, optionally filtered by stage.",
+  description:
+    "List a KAM account's initiatives, optionally filtered by stage. Returns initiatives plus limit and truncated. truncated means more initiatives match than this page.",
   input: ListInitiativesInput,
   inputJsonSchema: {
     type: 'object',
@@ -72,9 +76,13 @@ export const kamListInitiatives: Tool<typeof ListInitiativesInput> = {
       where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null, ...(args.stage ? { stage: args.stage } : {}) },
       select: { id: true, title: true, stage: true, priority: true, lastActivityAt: true },
       orderBy: { lastActivityAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
-    return { initiatives: rows.map((r) => ({ ...r, lastActivityAt: r.lastActivityAt.toISOString() })) };
+    const page = capPage(
+      rows.map((r) => ({ ...r, lastActivityAt: r.lastActivityAt.toISOString() })),
+      args.limit,
+    );
+    return { initiatives: page.items, limit: page.limit, truncated: page.truncated };
   },
 };
 
@@ -289,7 +297,8 @@ const ReadProspectionsInput = z.object({
 });
 
 export const kamReadProspections: Tool<typeof ReadProspectionsInput> = {
-  description: 'Read prospection actions (the director KPI) mirrored from ABC for an account.',
+  description:
+    'Read prospection actions (the director KPI) mirrored from ABC for an account. Returns prospections plus limit and truncated. truncated means more actions match than this page.',
   input: ReadProspectionsInput,
   inputJsonSchema: {
     type: 'object',
@@ -301,10 +310,14 @@ export const kamReadProspections: Tool<typeof ReadProspectionsInput> = {
     const rows = await prisma.kamProspection.findMany({
       where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null },
       orderBy: { occurredAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
       select: { id: true, actionType: true, occurredAt: true, ownerId: true, source: true, externalId: true },
     });
-    return { prospections: rows.map((r) => ({ ...r, occurredAt: r.occurredAt.toISOString() })) };
+    const page = capPage(
+      rows.map((r) => ({ ...r, occurredAt: r.occurredAt.toISOString() })),
+      args.limit,
+    );
+    return { prospections: page.items, limit: page.limit, truncated: page.truncated };
   },
 };
 

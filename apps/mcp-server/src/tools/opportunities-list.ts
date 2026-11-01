@@ -4,6 +4,7 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
 import {
+  capPage,
   dealOutcome,
   dealValueMicros,
   dealValueUnits,
@@ -37,7 +38,7 @@ const Input = z.object({
 
 export const opportunitiesList: Tool<typeof Input> = {
   description:
-    'List opportunities. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. Pass outcome to keep the list to open, won, or lost: a live lost or won flag decides it, and lost wins when both are set. A deleted stage does not close the deal. currency is null and currencyBasis is unspecified when the row has no currency. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health.',
+    'List opportunities. Returns { items, limit, truncated }. truncated means more deals match than items, so items is not the pipeline. companyId returns deals linked to that company. search matches customer text, name, or code and is not a company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. Pass outcome to keep the list to open, won, or lost: a live lost or won flag decides it, and lost wins when both are set. A deleted stage does not close the deal. currency is null and currencyBasis is unspecified when the row has no currency. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -95,9 +96,9 @@ export const opportunitiesList: Tool<typeof Input> = {
         pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
       },
       orderBy: { updatedAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
-    return items.map((o) => ({
+    return capPage(items.map((o) => ({
       id: o.id,
       code: o.code,
       customer: o.customer,
@@ -118,6 +119,6 @@ export const opportunitiesList: Tool<typeof Input> = {
       owner: o.owner?.email ?? null,
       industry: o.industry,
       updatedAt: o.updatedAt.toISOString(),
-    }));
+    })), args.limit);
   },
 };

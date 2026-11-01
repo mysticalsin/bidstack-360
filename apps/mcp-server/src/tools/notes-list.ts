@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { capPage } from './crm-tools.helpers.js';
 
 const Input = z.object({
   accountId: z.string().uuid(),
@@ -11,7 +12,7 @@ const Input = z.object({
 
 export const notesList: Tool<typeof Input> = {
   description:
-    'List notes for a company or stored account id (UUID), newest first. The account tag match ignores case. A company name is not resolved. Pass Company.id or the note accountId uuid; org scope is always applied.',
+    'List notes for a company or stored account id (UUID), newest first. Returns { items, limit, truncated }. truncated means more notes match than items. The account tag match ignores case. A company name is not resolved. Pass Company.id or the note accountId uuid; org scope is always applied.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -41,10 +42,10 @@ export const notesList: Tool<typeof Input> = {
       },
       include: { author: true },
       orderBy: { createdAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
 
-    return items.map((n) => ({
+    return capPage(items.map((n) => ({
       id: n.id,
       accountId: n.accountId,
       companyId: n.companyId,
@@ -54,6 +55,6 @@ export const notesList: Tool<typeof Input> = {
       author: n.author?.email ?? null,
       createdAt: n.createdAt.toISOString(),
       updatedAt: n.updatedAt.toISOString(),
-    }));
+    })), args.limit);
   },
 };

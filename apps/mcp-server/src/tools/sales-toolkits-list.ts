@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { capPage } from './crm-tools.helpers.js';
 
 const Input = z.object({
   sector: z.string().optional(),
@@ -12,7 +13,7 @@ const Input = z.object({
 
 export const salesToolkitsList: Tool<typeof Input> = {
   description:
-    'List stored sales toolkits (decks, templates, battle-cards, case studies, playbooks), optionally filtered by sector tag or category. Use these to find pitch collateral for an account or sector.',
+    'List stored sales toolkits (decks, templates, battle-cards, case studies, playbooks), optionally filtered by sector tag or category. Returns { items, limit, truncated }. truncated means more toolkits match than items.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -35,9 +36,9 @@ export const salesToolkitsList: Tool<typeof Input> = {
         ...(args.sector ? { sectorTags: { has: args.sector } } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
-    return items.map((t) => ({
+    return capPage(items.map((t) => ({
       id: t.id,
       title: t.title,
       description: t.description,
@@ -46,6 +47,6 @@ export const salesToolkitsList: Tool<typeof Input> = {
       url: t.url,
       source: t.source,
       createdAt: t.createdAt.toISOString(),
-    }));
+    })), args.limit);
   },
 };

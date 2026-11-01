@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { storedMicros, uniqueCompanyLink, valueToMicros } from './crm-tools.helpers.js';
+import { capPage, storedMicros, uniqueCompanyLink, valueToMicros } from './crm-tools.helpers.js';
 
 describe('valueToMicros', () => {
   it('keeps a string amount as integer micros', () => {
@@ -21,6 +21,14 @@ describe('storedMicros', () => {
     expect(storedMicros(micros)).toBe(9007199254740993n);
     expect(storedMicros(750_000_000)).toBe(750_000_000n);
     expect(() => storedMicros(Number(micros))).toThrow(/JSON number/);
+  });
+});
+
+describe('capPage', () => {
+  it('does not call a full page the whole match when another row was loaded', () => {
+    // WHY: Dust was reading the default page as the pipeline and summing it.
+    expect(capPage(['a', 'b', 'c'], 2)).toEqual({ items: ['a', 'b'], limit: 2, truncated: true });
+    expect(capPage(['a'], 2)).toEqual({ items: ['a'], limit: 2, truncated: false });
   });
 });
 

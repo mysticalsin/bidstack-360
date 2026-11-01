@@ -147,6 +147,19 @@ export function recordedProbability(probability: number): number | null {
   return probability === 0 ? null : probability;
 }
 
+/**
+ * Page from a query that loaded `limit + 1` rows.
+ * The extra row means `items` is not every match.
+ */
+export function capPage<T>(rows: T[], limit: number): {
+  items: T[];
+  limit: number;
+  truncated: boolean;
+} {
+  const truncated = rows.length > limit;
+  return { items: truncated ? rows.slice(0, limit) : rows, limit, truncated };
+}
+
 /** The live stage name. A deleted stage falls back to the stored key. */
 export function liveStageName(
   stageKey: string,
