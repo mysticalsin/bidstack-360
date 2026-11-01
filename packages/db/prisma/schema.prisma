@@ -5827,6 +5827,12 @@ enum WatchdogEventKind {
   INSOLVENCY
   OTHER_DISCLOSURE
   NEWS_SIGNAL
+  FUNDING_ROUND
+  PRODUCT_LAUNCH
+  STRATEGIC_INITIATIVE
+  HIRING_SPIKE
+  LAYOFFS
+  PARTNERSHIP
 
   @@map("watchdog_event_kind")
 }
@@ -5900,6 +5906,16 @@ model AccountWatchEvent {
   status               WatchdogEventStatus @default(NEW)
   linkedOpportunityId  String?             @map("linked_opportunity_id") @db.Uuid
   payload              Json?
+  /// 0..100, from the shared signal scorer (kind, source tier, mentions).
+  importance           Int                 @default(0)
+  /// sha256 of kind + normalized title tokens; same story across sources.
+  dedupeKey            String?             @map("dedupe_key") @db.VarChar(64)
+  /// -1..1, rule based (kind and wording), null when unknown.
+  sentiment            Float?
+  /// How many sources carried the same story (dedupe merges bump it).
+  mentions             Int                 @default(1)
+  /// Demo data. The UI labels these 'Sample'.
+  sample               Boolean             @default(false)
 
   org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -5907,6 +5923,8 @@ model AccountWatchEvent {
   @@unique([orgId, source, externalId])
   @@index([orgId, companyId, occurredAt(sort: Desc)])
   @@index([orgId, status, severity])
+  @@index([orgId, companyId, dedupeKey])
+  @@index([orgId, importance(sort: Desc), occurredAt(sort: Desc)])
   @@map("account_watch_events")
 }
 

@@ -86,6 +86,21 @@ export interface ProviderResult {
   retryAfterMs?: number;
   /** Short, secret-free reason (status code and provider error code). */
   error?: string;
+  /** Company events the provider returned with the enrichment (no extra credits). */
+  signals?: ProviderSignal[];
+  /** Public LinkedIn company page URL, when the provider knows it. */
+  linkedinUrl?: string;
+}
+
+/** A dated company event from a provider (Apollo funding_events today). */
+export interface ProviderSignal {
+  provider: EnrichmentProviderId;
+  externalId: string;
+  kind: 'FUNDING_ROUND';
+  occurredAt: string;
+  title: string;
+  summary: string;
+  url: string | null;
 }
 
 export interface EnrichmentInput {
@@ -296,6 +311,45 @@ export function mapApolloOrganization(org: Record<string, unknown>): Firmographi
   return f;
 }
 
+/**
+ * Apollo organization `funding_events` -> funding signals. Comes with the
+ * organizations.enrich call (no extra credits). Unknown shapes are skipped.
+ */
+export function mapApolloFundingEvents(org: Record<string, unknown>, companyName: string): ProviderSignal[] {
+  const rows = Array.isArray(org.funding_events) ? org.funding_events : [];
+  const out: ProviderSignal[] = [];
+  for (const raw of rows.slice(0, 20)) {
+    const r = rec(raw);
+    const date = str(r.date);
+    const at = date ? new Date(date) : null;
+    if (!at || Number.isNaN(at.getTime())) continue;
+    const type = str(r.type) ?? 'Funding round';
+    const amount = parseAmount(r.amount);
+    const currency = str(r.currency) ?? '';
+    const investors = str(r.investors);
+    const money = amount !== null ? ` of ${currency === '$' || currency === 'USD' || !currency ? '$' : `${currency} `}${compact(amount)}` : '';
+    const id = str(r.id) ?? `${type}:${at.toISOString().slice(0, 10)}`;
+    const url = str(r.news_url);
+    out.push({
+      provider: 'apollo',
+      externalId: `funding:${id}`,
+      kind: 'FUNDING_ROUND',
+      occurredAt: at.toISOString(),
+      title: `${companyName}: ${type}${money}`,
+      summary: investors ? `Investors: ${investors}` : `${type} reported by Apollo`,
+      url: url && /^https?:\/\//.test(url) ? url : null,
+    });
+  }
+  return out;
+}
+
+function compact(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
+  return String(Math.round(n));
+}
+
 export function mapApolloJobPosting(row: unknown): ProviderJobPosting | null {
   const r = rec(row);
   const id = str(r.id);
@@ -347,7 +401,18 @@ export function createApolloProvider(opts: ProviderOptions = {}): EnrichmentProv
       const orgId = str(org.id);
       if (!orgId) return { ...base, creditsUsed: credits, status: 'not_found' };
       const fields = mapApolloOrganization(org);
-      const result: ProviderResult = { ...base, status: 'ok', fields, providerCompanyId: orgId, creditsUsed: credits };
+      const signals = mapApolloFundingEvents(org, input.name);
+      const li = str(org.linkedin_url);
+      const linkedinUrl = li && /^https?:\/\/(www\.)?linkedin\.com\/company\//.test(li) ? li.replace(/^http:/, 'https:') : undefined;
+      const result: ProviderResult = {
+        ...base,
+        status: 'ok',
+        fields,
+        providerCompanyId: orgId,
+        creditsUsed: credits,
+        ...(signals.length ? { signals } : {}),
+        ...(linkedinUrl ? { linkedinUrl } : {}),
+      };
       if (ctx.maxJobPages <= 0) return result;
       const postings: ProviderJobPosting[] = [];
       for (let page = 1; page <= ctx.maxJobPages; page++) {

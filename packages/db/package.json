@@ -21,6 +21,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed.ts",
     "seed:demo": "tsx src/seed-demo.ts",
+    "seed:signals": "tsx src/seed-signals.ts",
     "seed:prod": "tsx src/seed-prod.ts",
     "purge:demo": "tsx scripts/purge-demo-data.ts",
     "reset": "prisma migrate reset --force",

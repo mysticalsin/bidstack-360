@@ -48,6 +48,7 @@ export * from './contract-agreement.js';
 export * from './msa.js';
 export * from './meeting-intel.js';
 export * from './account-enrichment.js';
+export * from './account-signals.js';
 export * from './win-loss.js';
 export * from './tenant-export.js';
 export * from './erasure.js';
