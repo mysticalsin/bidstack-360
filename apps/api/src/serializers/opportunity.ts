@@ -3,6 +3,7 @@
 
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
 import {
+  microsToUnits,
   presentOpportunityIntel,
   type Opportunity as ApiOpportunity,
   type OpportunityFull as ApiOpportunityFull,
@@ -82,7 +83,7 @@ export function serializeOpportunity(
     stage: liveStage?.name ?? o.stage ?? null,
     pipelineStageId: stageRemoved ? null : (o.pipelineStageId ?? null),
     pipelineStage: liveStage,
-    value: Number(o.valueMicros) / 1_000_000,
+    value: microsToUnits(o.valueMicros),
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,

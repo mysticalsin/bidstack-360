@@ -6,6 +6,7 @@ import type { Tool } from './index.js';
 import {
   companyIdForCustomerRename,
   dealOutcome,
+  dealValueUnits,
   pipelineStageIdForStageChange,
   recordedProbability,
   recordOpportunityStageMove,
@@ -117,7 +118,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
       name: updated.name,
       stage: updated.stage,
       outcome: dealOutcome(updated),
-      value: Number(updated.valueMicros) / 1_000_000,
+      value: dealValueUnits(updated.valueMicros),
       probability: recordedProbability(updated.probability),
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: updated.owner?.email ?? null,

@@ -9,6 +9,19 @@ export function formatUnspecifiedAmount(value: number): string {
   return amount;
 }
 
+/** Integer micros to units. Number(bigint) / 1e6 moves a large amount by one cent. */
+export function unitsFromMicros(micros: string | number | bigint): number {
+  const asBigInt =
+    typeof micros === 'bigint'
+      ? micros
+      : typeof micros === 'number'
+        ? BigInt(Math.trunc(micros))
+        : BigInt(micros);
+  const whole = asBigInt / 1_000_000n;
+  const remainder = asBigInt % 1_000_000n;
+  return Number(whole) + Number(remainder) / 1_000_000;
+}
+
 /** Compact amount with an explicit missing-currency mark. Not a dollar or euro figure. */
 export function formatUnspecifiedCompact(value: number): string {
   const amount = new Intl.NumberFormat(undefined, {

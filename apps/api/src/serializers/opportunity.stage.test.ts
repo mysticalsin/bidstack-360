@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { microsToUnits } from '@bidstack/shared';
+
 import { serializeOpportunity } from './opportunity.js';
 
 const base = {
@@ -23,6 +25,14 @@ const base = {
 };
 
 describe('serializeOpportunity stage', () => {
+  it('keeps a large amount on the exact cent', () => {
+    // WHY: Number(bigint) / 1e6 rounds this amount to the next cent.
+    const micros = 8_598_204_328_457_184_962n;
+    const deal = serializeOpportunity({ ...base, valueMicros: micros, pipelineStage: null });
+    expect(deal.value.toFixed(2)).toBe('8598204328457.18');
+    expect(deal.value.toFixed(2)).toBe(microsToUnits(micros).toFixed(2));
+  });
+
   it('drops a deleted stage so its lost flag is not the deal', () => {
     // WHY: the list was still named and flagged from a stage row that had
     // been deleted, and the stage id still pointed at that removed row.

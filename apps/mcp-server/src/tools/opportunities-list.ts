@@ -3,7 +3,14 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { dealOutcome, liveStageName, outcomeWhere, recordedProbability, requireCompanyLink } from './crm-tools.helpers.js';
+import {
+  dealOutcome,
+  dealValueUnits,
+  liveStageName,
+  outcomeWhere,
+  recordedProbability,
+  requireCompanyLink,
+} from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -97,7 +104,7 @@ export const opportunitiesList: Tool<typeof Input> = {
       stage: o.stage,
       stageName: liveStageName(o.stage, o.pipelineStage),
       outcome: dealOutcome(o),
-      value: Number(o.valueMicros) / 1_000_000,
+      value: dealValueUnits(o.valueMicros),
       probability: recordedProbability(o.probability),
       // Opportunity has no currency column. Do not label the value as EUR.
       currency: null,

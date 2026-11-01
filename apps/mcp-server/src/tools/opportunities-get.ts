@@ -4,7 +4,7 @@ import { prisma } from '@bidstack/db';
 import { presentOpportunityIntel } from '@bidstack/shared';
 
 import type { Tool } from './index.js';
-import { dealOutcome, liveStageName, recordedProbability } from './crm-tools.helpers.js';
+import { dealOutcome, dealValueUnits, liveStageName, recordedProbability } from './crm-tools.helpers.js';
 
 const Input = z
   .object({
@@ -52,7 +52,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
       stage: opp.stage,
       stageName: liveStageName(opp.stage, opp.pipelineStage),
       outcome: dealOutcome(opp),
-      value: Number(opp.valueMicros) / 1_000_000,
+      value: dealValueUnits(opp.valueMicros),
       currency: null,
       currencyBasis: 'unspecified' as const,
       health: 'not_account_health' as const,

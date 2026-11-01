@@ -5,6 +5,7 @@
  * Import via crm-tools.ts (consumed internally, not re-exported to callers).
  */
 import { prisma, type Prisma } from '@bidstack/db';
+import { microsToUnits } from '@bidstack/shared';
 
 export async function mintNextCode(orgId: string): Promise<string> {
   const last = await prisma.opportunity.findFirst({
@@ -97,6 +98,12 @@ export function dealOutcome(deal: {
   return 'open';
 }
 
+/** Integer micros to units. A float division moves a large amount by one cent. */
+export function dealValueUnits(valueMicros: bigint | number | unknown): number {
+  if (typeof valueMicros === 'bigint' || typeof valueMicros === 'number') return microsToUnits(valueMicros);
+  return 0;
+}
+
 /** A blank probability is stored as 0. Dust should not read that as a measured chance. */
 export function recordedProbability(probability: number): number | null {
   return probability === 0 ? null : probability;
@@ -134,7 +141,7 @@ export function serializeDeal(deal: {
     customer: deal.customer,
     name: deal.name,
     stage: deal.stage,
-    value: Number(deal.valueMicros) / 1_000_000,
+    value: dealValueUnits(deal.valueMicros),
     probability: recordedProbability(deal.probability),
     dueDate: deal.dueDate?.toISOString().slice(0, 10) ?? null,
     industry: deal.industry,

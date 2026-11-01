@@ -21,6 +21,7 @@ import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
 import {
   formatUnspecifiedCompact,
+  unitsFromMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 
@@ -147,7 +148,7 @@ export function OpportunityTab({
                 <Badge tone="gray">{o.stage}</Badge>
               </TableCell>
               <TableCell className="font-medium text-[var(--fg-primary)]">
-                {formatUnspecifiedCompact(Number(o.valueMicros) / 1_000_000)}
+                {formatUnspecifiedCompact(unitsFromMicros(o.valueMicros))}
               </TableCell>
               <TableCell>
                 {o.probability === 0
