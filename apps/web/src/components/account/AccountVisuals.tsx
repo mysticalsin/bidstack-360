@@ -11,7 +11,7 @@ import { fmtCompact, stageFunnel, statusMix, type OppRow } from '@/components/vi
 import { peopleMapPageNotes } from '@bidstack/shared';
 
 import { usePeopleMap } from '@/hooks/useAccountPeople';
-import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { opportunityVizIsPartial, useOpportunityRows } from '@/hooks/useOpportunityRows';
 
 import { layoutOrg, type MapPerson } from './org-layout';
 
@@ -71,6 +71,7 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
 export function AccountVisuals({ companyId, companyName, onDrill }: { companyId: string; companyName: string; onDrill?: (f: OppDrillFilter) => void }) {
   const opps = useOpportunityRows();
   const people = usePeopleMap({ companyId });
+  const rowsCapped = opportunityVizIsPartial(opps.data);
   const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase());
   const stages = stageFunnel(rows);
   const mix = statusMix(rows);
@@ -84,17 +85,17 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
         title="Pipeline by stage"
         interactive={Boolean(onDrill)}
         testId="account-pipeline"
-        meta={(() => { const n = stages.reduce((m, s) => m + s.count, 0); return `${n} open bid${n === 1 ? '' : 's'}`; })()}
+        meta={(() => { const n = stages.reduce((m, s) => m + s.count, 0); return rowsCapped ? `Latest 100 updated bids · ${n} open here` : `${n} open bid${n === 1 ? '' : 's'}`; })()}
         summary={stages.map((s) => `${s.label}: ${s.amount}`).join('; ') || 'No open bids for this account'}
         table={{ columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, s.amount]) }}
       >
         {stages.length ? (
           <StageBars data={stages} format={fmtCompact}
             onSelect={onDrill ? (label) => { const hit = stages.find((x) => x.label === label); onDrill({ status: 'open', stage: hit?.id ?? null }); } : undefined} />
-        ) : <p className="viz-empty">No open bids for this account.</p>}
+        ) : <p className="viz-empty">{rowsCapped ? 'No open bids for this account in the latest 100 updated bids.' : 'No open bids for this account.'}</p>}
         {onDrill && rows.length ? (
           <>
-            <div className="viz-caption">Select a stage bar or a status to see the bids behind it.</div>
+            <div className="viz-caption">{rowsCapped ? 'These bars are this account inside the latest 100 updated bids. Select a stage or a status to see those bids.' : 'Select a stage bar or a status to see the bids behind it.'}</div>
             <div className="dash-chips" role="group" aria-label="Bids by status">
               {([['open', 'Open', mix.open], ['won', 'Won', mix.won], ['lost', 'Lost', mix.lost]] as const).map(([k, label, n]) => (
                 <button key={k} type="button" className="dash-chip" onClick={() => onDrill({ status: k })}>{label} <b>{n}</b></button>
