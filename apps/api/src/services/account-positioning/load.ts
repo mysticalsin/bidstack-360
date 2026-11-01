@@ -29,7 +29,7 @@ import type { AccessScope } from '../../lib/access-scope.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
-import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
+import { groupRollup, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
 
 const DAY = 86_400_000;
@@ -121,9 +121,14 @@ const marginOf = (p: FinancialPeriod) =>
 const STALE_DAYS = 548;
 const WON_REFERENCE_SAMPLE = 1000;
 
+async function accountIds(orgId: string, companyId: string) {
+  const rollup = await groupRollup(orgId, [companyId]);
+  return { ids: rollup.groups.get(companyId) ?? [companyId], childrenCapped: rollup.cappedRoots.has(companyId) };
+}
+
 export async function loadPositioning(orgId: string, scope: AccessScope, companyId: string, now = new Date()): Promise<AccountPositioning> {
   const c: Ctx = { orgId, scope, companyId, now };
-  const ids = (await groupMap(orgId, [companyId])).get(companyId) ?? [companyId];
+  const { ids, childrenCapped } = await accountIds(orgId, companyId);
   const live = await companiesWithLiveSignals(orgId, ids);
   const since24 = new Date(now.getTime() - 730 * DAY);
   const [company, firmo, initiatives, fin, { people, lastMeeting }, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
@@ -242,6 +247,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       lastMeeting,
     },
     topSignal: top ? { title: cleanText(stripSamplePrefix(top.title)), at: top.occurredAt.toISOString(), source: sourceLabel(top.source), sample: top.sample } : null,
+    subsidiariesCapped: childrenCapped,
   };
   const gaps = buildGaps({
     people,
@@ -290,7 +296,7 @@ function monthly(dates: Date[], now: Date, n: number): number[] {
 
 export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyId: string, now = new Date()): Promise<AccountKeyNumbers> {
   const c: Ctx = { orgId, scope, companyId, now };
-  const ids = (await groupMap(orgId, [companyId])).get(companyId) ?? [companyId];
+  const { ids, childrenCapped } = await accountIds(orgId, companyId);
   const live = await companiesWithLiveSignals(orgId, ids);
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
@@ -408,6 +414,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
         period: 'Now, change vs 90 days ago',
         anchor: 'deals',
         missing: 'Open pipeline does not fit in one number',
+        sub: childrenCapped ? 'latest 1,000 subsidiaries' : null,
       }),
     );
   } else {
@@ -421,7 +428,10 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
         delta: pctChange(nowOpen, ago),
         deltaUnit: 'pct',
         series: series.filter((point): point is number => point != null),
-        sub: dealSample.capped ? `${open.length} open deals in the latest ${POSITIONING_DEAL_SAMPLE}` : `${open.length} open deals`,
+        sub: [
+          dealSample.capped ? `${open.length} open deals in the latest ${POSITIONING_DEAL_SAMPLE}` : `${open.length} open deals`,
+          childrenCapped ? 'latest 1,000 subsidiaries' : '',
+        ].filter(Boolean).join(' · '),
         source: 'Polo pipeline',
         period: 'Now, change vs 90 days ago',
         anchor: 'deals',

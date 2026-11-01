@@ -102,6 +102,8 @@ export const BriefFacts = z.object({
   }),
   people: z.object({ known: z.number().int(), senior: z.number().int(), metLast12m: z.number().int(), lastMeeting: z.object({ at: Iso, title: z.string() }).nullable() }),
   topSignal: z.object({ title: z.string(), at: Iso.nullable(), source: z.string(), sample: z.boolean() }).nullable(),
+  /** True when subsidiary deals and people are the latest 1,000 direct children. */
+  subsidiariesCapped: z.boolean().optional(),
 });
 export type BriefFacts = z.infer<typeof BriefFacts>;
 
@@ -494,6 +496,7 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
     s.push(`We know ${pe.known} people there (${pe.senior} senior), ${pe.metLast12m} met in the last 12 months${last}.`);
   } else s.push('No contacts are mapped yet.');
   if (f.topSignal) s.push(`Latest notable signal: ${f.topSignal.title}${f.topSignal.at ? ` (${monthYear(f.topSignal.at)}, ${f.topSignal.source})` : ''}${f.topSignal.sample ? ' [sample]' : ''}.`);
+  if (f.subsidiariesCapped) s.push('Subsidiary figures use the latest 1,000 direct subsidiaries.');
   return s.join(' ');
 }
 

@@ -184,6 +184,24 @@ describe('composeBrief', () => {
     const txt = composeBrief(f, (v) => String(v), (m) => m);
     expect(txt).toContain('2 open deals worth 100 among the latest 500 deals');
   });
+
+  it('says when subsidiary figures are a page of children', () => {
+    // WHY: a parent with more than 1,000 subsidiaries was described as the whole group.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 0, openMicros: '0', won24m: 0, lost24m: 0 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+      subsidiariesCapped: true,
+    };
+    expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 1,000 direct subsidiaries');
+  });
 });
 
 describe('labels', () => {
