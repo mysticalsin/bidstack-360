@@ -3,6 +3,8 @@
 // Nothing is estimated: a number with no source comes back as null.
 import { prisma } from '@bidstack/db';
 import { recordedOutcome } from '../account-signals/load.js';
+import { wonOutcomeWhere } from '../../routes/opportunities.helpers.js';
+import { sumMicrosAsNumber } from './micros.js';
 import {
   buildGaps,
   buildPlays,
@@ -143,7 +145,12 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       },
       take: 500,
     }),
-    prisma.opportunity.findMany({ where: { orgId, deletedAt: null, stage: 'closed_won', valueMicros: { gt: 0n } }, select: { name: true, valueMicros: true, companyId: true }, orderBy: { closedAt: 'desc' }, take: 1000 }),
+    prisma.opportunity.findMany({
+      where: { orgId, deletedAt: null, valueMicros: { gt: 0n }, ...wonOutcomeWhere() },
+      select: { name: true, valueMicros: true, companyId: true },
+      orderBy: { closedAt: 'desc' },
+      take: 1000,
+    }),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, kind: { in: [...RISK_KINDS] }, occurredAt: { gte: new Date(now.getTime() - 365 * DAY) }, ...hideSampleWhere(live) },
       select: { kind: true, title: true, occurredAt: true, sourceUrl: true, source: true, sample: true },
@@ -369,13 +376,45 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const outcomeOf = (o: (typeof opps)[number]) => recordedOutcome(o);
   const open = opps.filter((o) => outcomeOf(o) === 'open');
   const openAt = (t: Date) =>
-    opps
-      .filter((o) => o.createdAt <= t && (outcomeOf(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
-      .reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
-  const nowOpen = open.reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
+    sumMicrosAsNumber(
+      opps
+        .filter((o) => o.createdAt <= t && (outcomeOf(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
+        .map((o) => o.valueMicros),
+    );
+  const nowOpen = sumMicrosAsNumber(open.map((o) => o.valueMicros));
   const series = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(nowOpen);
-  const ago = series[2]!;
-  items.push(base({ id: 'pipeline', group: 'health', label: 'Open pipeline', unit: 'money_micros', value: nowOpen, delta: pctChange(nowOpen, ago), deltaUnit: 'pct', series, sub: `${open.length} open deals`, source: 'Polo pipeline', period: 'Now, change vs 90 days ago', anchor: 'deals' }));
+  const ago = series[2];
+  if (nowOpen == null || ago == null || series.some((point) => point == null)) {
+    items.push(
+      base({
+        id: 'pipeline',
+        group: 'health',
+        label: 'Open pipeline',
+        unit: 'money_micros',
+        source: 'Polo pipeline',
+        period: 'Now, change vs 90 days ago',
+        anchor: 'deals',
+        missing: 'Open pipeline does not fit in one number',
+      }),
+    );
+  } else {
+    items.push(
+      base({
+        id: 'pipeline',
+        group: 'health',
+        label: 'Open pipeline',
+        unit: 'money_micros',
+        value: nowOpen,
+        delta: pctChange(nowOpen, ago),
+        deltaUnit: 'pct',
+        series: series.filter((point): point is number => point != null),
+        sub: `${open.length} open deals`,
+        source: 'Polo pipeline',
+        period: 'Now, change vs 90 days ago',
+        anchor: 'deals',
+      }),
+    );
+  }
 
   // Financial warnings.
   const warnings = fin.sample ? [] : fin.signals.filter((s) => s.implication === 'RISK' && !s.sample);
