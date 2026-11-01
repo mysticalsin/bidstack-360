@@ -29,6 +29,7 @@ import {
   OrgChartTreeQuery,
   OrgChartTreeResponse,
   SENIORITY_ORDER,
+  isOrgChartSenior,
   nodeSeniorityFromTitle,
   wouldCreateCycle,
   type OrgChartNode,
@@ -261,7 +262,7 @@ const orgChartRoutes: FastifyPluginAsyncZod = async (server) => {
         met: rows.filter((r) => r.met).length,
         nodes: rows.map(({ seniority: _s, ...r }) => r),
         bySeniority,
-        unmetSenior: rows.filter((r) => !r.met && (r.seniority === 'c_level' || r.seniority === 'vp')).map((r) => r.nodeId),
+        unmetSenior: rows.filter((r) => !r.met && isOrgChartSenior(r.seniority)).map((r) => r.nodeId),
       };
     },
   );

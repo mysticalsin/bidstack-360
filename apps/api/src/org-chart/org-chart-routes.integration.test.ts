@@ -267,6 +267,20 @@ describe('node detail and coverage', () => {
     expect(cov.unmetSenior).toEqual(expect.arrayContaining([n.ceo, n.hans]));
     expect(cov.bySeniority.find((b: { seniority: string }) => b.seniority === 'c_level')).toEqual({ seniority: 'c_level', total: 2, met: 1 });
   });
+
+  it('counts directors as senior gaps (c_level, vp and director), not managers', async () => {
+    const add = async (title: string, seniority: string) => {
+      const r = await call('POST', `/companies/${c.root}/org-chart/nodes`, { payload: { name: title, title, parentId: n.ceo, seniority } });
+      expect(r.statusCode, r.body).toBe(201);
+      return r.json().node.id as string;
+    };
+    const dir = await add('Director of Data', 'director');
+    const mgr = await add('Data Manager', 'manager');
+    const cov = (await call('GET', `/companies/${c.root}/org-chart/coverage?windowDays=3650`)).json();
+    expect(cov.unmetSenior).toContain(dir);
+    expect(cov.unmetSenior).not.toContain(mgr);
+    for (const id of [dir, mgr]) expect((await call('DELETE', `/org-chart/nodes/${id}?version=${await nodeVersion(id)}`)).statusCode).toBe(200);
+  });
 });
 
 describe('audit', () => {

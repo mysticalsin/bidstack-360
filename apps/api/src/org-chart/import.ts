@@ -61,7 +61,7 @@ export interface ImportInput {
   /** HTML: match existing nodes by unique name even when they are linked to a contact. */
   nameMatchAny?: boolean;
   sprite?: HtmlSprite | null;
-  extra?: { format?: string; found?: number; skipped?: number };
+  extra?: { format?: string; found?: number; skipped?: number; skippedBy?: Array<{ reason: 'system' | 'external' | 'own_firm' | 'other_employer'; label: string; count: number }> };
 }
 
 interface Planned {

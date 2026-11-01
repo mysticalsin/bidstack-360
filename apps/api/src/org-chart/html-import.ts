@@ -28,6 +28,7 @@ import {
   ORG_CHART_MAX_NODES,
   ORG_CHART_PHOTO_MAX_BYTES,
   type OrgChartPhotoType,
+  type OrgChartSkipReason,
   type OrgChartProfile,
   normalizeLinkedinUrl,
   normalizePhone,
@@ -71,6 +72,8 @@ export interface HtmlParseResult {
   people: HtmlPerson[];
   found: number;
   skipped: number;
+  /** Who was left out and why (system accounts, people marked external, our own firm, other employers). */
+  skippedBy: Array<{ reason: OrgChartSkipReason; label: string; count: number }>;
   sprite: HtmlSprite | null;
   errors: Array<{ line: number; message: string; name?: string }>;
   warnings: Array<{ line: number; message: string; name?: string }>;
@@ -184,7 +187,12 @@ const ALIASES = {
   startDate: ['startdate', 'hiredate', 'joined', 'since'],
   headline: ['headline', 'tagline'],
   summary: ['bio', 'summary', 'about', 'rolenow', 'description'],
-  employer: ['company', 'employer', 'worksfor', 'vendor'],
+  employer: ['company', 'employer', 'worksfor', 'vendor', 'organization', 'organisation', 'companyname'],
+  // Staff markers used to keep only the account's own people.
+  kind: ['kind', 'type', 'persontype', 'personkind', 'stafftype', 'workertype', 'employmenttype', 'employeetype', 'affiliation', 'relationship', 'category'],
+  employerCat: ['companycat', 'companycategory', 'vendortype', 'suppliertype', 'employertype'],
+  external: ['external', 'isexternal', 'contractor', 'iscontractor', 'thirdparty', 'isvendor'],
+  internal: ['internal', 'isinternal', 'isemployee', 'isstaff'],
 } as const;
 type Field = keyof typeof ALIASES;
 const ALIAS_INDEX = new Map<string, Field>();
@@ -343,8 +351,63 @@ function build(line: number, raw: Raw, errors: HtmlParseResult['errors'], warnin
   };
 }
 
+
+// ── who counts as the account's own staff ──────────────────────────────────
+/** Names the import uses to tell client staff from everyone else. */
+export interface StaffContext {
+  /** The account: its name, legal name, domain and parent names. An employer matching any of these is staff. */
+  accountNames: string[];
+  /** Our own firm (the tenant, e.g. Amaris or Mantu). People employed by it are never client staff. */
+  ownFirmNames: string[];
+}
+const SYSTEM_KINDS = new Set(['system', 'bot', 'service', 'serviceaccount', 'shared', 'sharedmailbox', 'mailbox', 'room', 'resource', 'generic']);
+const EXTERNAL_KINDS = new Set([
+  'external', 'vendor', 'itvendor', 'contractor', 'supplier', 'agency', 'partner', 'freelancer', 'freelance', 'consultant',
+  'staffing', 'thirdparty', 'temp', 'temporary', 'outsourced', 'interim', 'subcontractor', 'contingent',
+]);
+const STAFF_KINDS = new Set(['internal', 'employee', 'staff', 'client', 'person', 'fte', 'permanent', 'member']);
+const LEGAL = /\b(the|inc|incorporated|ltd|limited|llc|llp|plc|sa|sas|sarl|srl|spa|ag|gmbh|nv|bv|ab|as|oy|co|company|corp|corporation|group|groupe|holding|holdings|international|intl|global)\b/g;
+/** Company name reduced to its core words: lowercase, no accents, no legal suffixes. */
+export function companyCore(v: string | null | undefined): string {
+  if (!v) return '';
+  let s = v.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s)) s = s.split('.').slice(0, -1).join(' '); // domain -> stem
+  return s.replace(/[^a-z0-9]+/g, ' ').replace(LEGAL, ' ').replace(/\s+/g, ' ').trim();
+}
+/** True when two company names are the same company (whole-word containment either way, or same letters). */
+export function sameCompany(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = companyCore(a), y = companyCore(b);
+  if (!x || !y) return false;
+  if (x === y || x.replace(/ /g, '') === y.replace(/ /g, '')) return true;
+  const inside = (s: string, t: string) => t.length >= 3 && ` ${s} `.includes(` ${t} `);
+  return inside(x, y) || inside(y, x);
+}
+const truthy = (v: unknown) => v === true || v === 1 || (typeof v === 'string' && /^(true|yes|y|1|x)$/i.test(v.trim()));
+const falsy = (v: unknown) => v === false || v === 0 || (typeof v === 'string' && /^(false|no|n|0)$/i.test(v.trim()));
+const SKIP_LABEL: Record<OrgChartSkipReason, string> = {
+  system: 'system or shared accounts',
+  external: 'marked external in the file (vendors, agencies, contractors)',
+  own_firm: 'our own firm',
+  other_employer: 'work for another company',
+};
+
+/** Null when the person is the account's own staff, else why they are left out. */
+export function skipReason(f: Partial<Record<Field, unknown>>, ctx: StaffContext): OrgChartSkipReason | null {
+  const kind = norm(str(f.kind, ['value', 'name']) ?? '');
+  const employer = str(f.employer, ['name', 'value']);
+  const cat = norm(str(f.employerCat, ['value', 'name']) ?? '');
+  const own = (v: string | null) => !!v && ctx.ownFirmNames.some((n) => sameCompany(v, n));
+  if (SYSTEM_KINDS.has(kind)) return 'system';
+  if (own(kind) || own(cat) || own(employer)) return 'own_firm';
+  if (EXTERNAL_KINDS.has(kind) || EXTERNAL_KINDS.has(cat)) return 'external';
+  if (truthy(f.external) || falsy(f.internal)) return 'external';
+  if (kind && !STAFF_KINDS.has(kind) && /extern|vendor|contract|supplier|agency/.test(kind)) return 'external';
+  if (employer && ctx.accountNames.length && !ctx.accountNames.some((n) => sameCompany(employer, n))) return 'other_employer';
+  return null;
+}
+
 // ── layout 1: JSON data islands ────────────────────────────────────────────
-const SKIP_KINDS = new Set(['system', 'bot', 'service', 'shared', 'room']);
 const isPersonish = (o: unknown): o is Record<string, unknown> => {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
   const f = fieldsOf(o as Record<string, unknown>);
@@ -461,10 +524,15 @@ function tablePeople(doc: Doc): Raw[] {
 }
 
 // ── entry point ────────────────────────────────────────────────────────────
-export function parseOrgChartHtml(html: string): HtmlParseResult {
+/**
+ * Parse an org-chart HTML file into people. Only the account's own staff come back: system accounts, people the file
+ * marks external, our own firm's consultants and anyone whose employer is not the account are counted in `skippedBy`
+ * instead (no per-row warnings). Reports to a skipped manager climb to the nearest kept manager.
+ */
+export function parseOrgChartHtml(html: string, ctx: StaffContext = { accountNames: [], ownFirmNames: [] }): HtmlParseResult {
   const errors: HtmlParseResult['errors'] = [];
   const warnings: HtmlParseResult['warnings'] = [];
-  const empty = (format: HtmlParseResult['format'] = 'none'): HtmlParseResult => ({ format, people: [], found: 0, skipped: 0, sprite: null, errors, warnings });
+  const empty = (format: HtmlParseResult['format'] = 'none'): HtmlParseResult => ({ format, people: [], found: 0, skipped: 0, skippedBy: [], sprite: null, errors, warnings });
   if (Buffer.byteLength(html, 'utf8') > ORG_CHART_HTML_MAX_BYTES) {
     errors.push({ line: 1, message: 'The HTML file is over 5 MB' });
     return empty();
@@ -474,27 +542,13 @@ export function parseOrgChartHtml(html: string): HtmlParseResult {
   let format: HtmlParseResult['format'] = 'none';
   let raws: Raw[] = [];
   let sprite: HtmlSprite | null = null;
-  let skipped = 0;
+  let root: Record<string, unknown> | null = null;
   for (const island of jsonIslands(doc)) {
     const found = findPeopleArrays(island).sort((a, b) => b.arr.length - a.arr.length)[0];
     if (!found || found.arr.length <= raws.length) continue;
     format = 'json';
-    raws = [];
-    skipped = 0;
-    for (const obj of found.arr) {
-      const kind = typeof obj.kind === 'string' ? obj.kind.toLowerCase() : '';
-      if (SKIP_KINDS.has(kind)) {
-        skipped++;
-        continue;
-      }
-      raws.push({ f: fieldsOf(obj), obj });
-    }
-    const cols = found.root?.phCols ?? found.root?.spriteCols;
-    if (typeof cols === 'number' && Number.isInteger(cols) && cols > 0 && cols <= 200 && raws.some((r) => typeof r.obj?.ph === 'number')) {
-      const sheet = spriteFromStyles(doc);
-      if (sheet) sprite = { ...sheet, cols };
-      else warnings.push({ line: 1, message: 'Avatar sprite sheet not found; photos skipped' });
-    }
+    raws = found.arr.map((obj) => ({ f: fieldsOf(obj), obj }));
+    root = found.root;
   }
   if (!raws.length) {
     // Markup layouts: the one that yields the most people wins (ties: microdata, hCard, table).
@@ -507,20 +561,70 @@ export function parseOrgChartHtml(html: string): HtmlParseResult {
     ).reduce((a, b) => (b[1].length > a[1].length ? b : a));
     if (best[1].length) [format, raws] = [best[0], [...best[1]]];
   }
+
+  // Keep only the account's own staff; count the rest by reason.
+  const kept: Array<{ line: number; raw: Raw }> = [];
+  const left: Array<{ line: number; raw: Raw }> = [];
+  const counts = new Map<OrgChartSkipReason, number>();
+  raws.forEach((raw, i) => {
+    const why = skipReason(raw.f, ctx);
+    if (!why) return kept.push({ line: i + 1, raw });
+    counts.set(why, (counts.get(why) ?? 0) + 1);
+    left.push({ line: i + 1, raw });
+  });
+  const skipped = left.length;
+  const firm = ctx.ownFirmNames[0];
+  const skippedBy = (['system', 'external', 'own_firm', 'other_employer'] as const)
+    .filter((r) => counts.has(r))
+    .map((reason) => ({ reason, count: counts.get(reason)!, label: reason === 'own_firm' && firm ? `our own firm (${firm})` : SKIP_LABEL[reason] }));
+  const result = (people: HtmlPerson[]): HtmlParseResult => ({ format, people, found: raws.length, skipped, skippedBy, sprite, errors, warnings });
+
   if (!raws.length) {
     errors.push({ line: 1, message: 'No people found. Use a table with a Name column, schema.org Person markup, hCards, or a JSON people list.' });
     return empty(format);
   }
-  if (raws.length > ORG_CHART_MAX_NODES) {
+  if (!kept.length) {
+    errors.push({ line: 1, message: "Nobody in this file looks like the account's own staff (everyone is external, our firm or a system account)." });
+    return result([]);
+  }
+  if (kept.length > ORG_CHART_MAX_NODES) {
     errors.push({ line: 1, message: `Too many people (max ${ORG_CHART_MAX_NODES})` });
-    return { ...empty(format), found: raws.length, skipped };
+    return result([]);
+  }
+  if (format === 'json') {
+    const cols = root?.phCols ?? root?.spriteCols;
+    if (typeof cols === 'number' && Number.isInteger(cols) && cols > 0 && cols <= 200 && kept.some((k) => typeof k.raw.obj?.ph === 'number')) {
+      const sheet = spriteFromStyles(doc);
+      if (sheet) sprite = { ...sheet, cols };
+      else warnings.push({ line: 1, message: 'Avatar sprite sheet not found; photos skipped' });
+    }
   }
   const people: HtmlPerson[] = [];
-  raws.forEach((r, i) => {
-    const p = build(i + 1, r, errors, warnings);
-    if (!p) return;
+  for (const { line, raw } of kept) {
+    const p = build(line, raw, errors, warnings);
+    if (!p) continue;
     if (p.photo?.kind === 'sprite' && !sprite) p.photo = null;
     people.push(p);
-  });
-  return { format, people, found: raws.length + skipped, skipped, sprite, errors, warnings };
+  }
+  // A kept person reporting to a skipped one (say an external interim head) moves up to that person's own manager.
+  const gone: HtmlPerson[] = [];
+  for (const { line, raw } of left) {
+    const p = build(line, raw, [], []);
+    if (p) gone.push(p);
+  }
+  if (gone.length) {
+    const lc = (v: string | null) => (v ? v.toLowerCase() : null);
+    const keptKeys = new Set(people.flatMap((p) => [p.ref && `r:${p.ref}`, p.email && `e:${p.email}`, `n:${p.name.toLowerCase()}`]).filter(Boolean));
+    const byKey = new Map<string, HtmlPerson>();
+    for (const g of gone) for (const k of [g.ref && `r:${g.ref}`, g.email && `e:${g.email}`, `n:${g.name.toLowerCase()}`]) if (k && !keptKeys.has(k) && !byKey.has(k)) byKey.set(k, g);
+    for (const p of people) {
+      for (let hop = 0; hop < 50; hop++) {
+        const key = (p.managerRef && `r:${p.managerRef}`) || (p.managerEmail && `e:${p.managerEmail}`) || (p.managerName && `n:${lc(p.managerName)}`);
+        const via = key ? byKey.get(key) : undefined;
+        if (!via) break;
+        [p.managerRef, p.managerEmail, p.managerName] = [via.managerRef, via.managerEmail, via.managerName];
+      }
+    }
+  }
+  return result(people);
 }

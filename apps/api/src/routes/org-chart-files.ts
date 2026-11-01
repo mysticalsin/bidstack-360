@@ -34,10 +34,29 @@ import {
   toNode,
   walkTree,
 } from '../org-chart/access.js';
-import { parseOrgChartHtml } from '../org-chart/html-import.js';
+import { type StaffContext, parseOrgChartHtml } from '../org-chart/html-import.js';
 import { type ImportRow, runPeopleImport } from '../org-chart/import.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { auditOrgChart, sendConflict } from './org-chart.js';
+
+/** Our own firm, never client staff. ORG_CHART_OWN_FIRM_NAMES (comma list) overrides the default. */
+const OWN_FIRM_DEFAULT = ['Amaris', 'Mantu'];
+const ownFirmNames = () => {
+  const env = (process.env.ORG_CHART_OWN_FIRM_NAMES ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return env.length ? env : OWN_FIRM_DEFAULT;
+};
+
+/** The account's names (name, legal name, domain, parent) and our firm's, for the HTML import staff rule. */
+async function staffContext(orgId: string, companyId: string): Promise<StaffContext> {
+  const [c, org] = await Promise.all([
+    prisma.company.findFirst({ where: { id: companyId, orgId }, select: { name: true, legalName: true, domain: true, parent: { select: { name: true } } } }),
+    prisma.org.findUnique({ where: { id: orgId }, select: { name: true } }),
+  ]);
+  const accountNames = [c?.name, c?.legalName, c?.domain, c?.parent?.name].filter((x): x is string => !!x);
+  const orgName = org?.name.replace(/\(.*?\)/g, '').trim();
+  const firms = [...ownFirmNames(), ...(orgName ? [orgName] : [])];
+  return { accountNames, ownFirmNames: [...new Set(firms)] };
+}
 
 const IdParams = z.object({ id: z.string().uuid() });
 const NodeParams = z.object({ nodeId: z.string().uuid() });
@@ -100,7 +119,7 @@ const orgChartFileRoutes: FastifyPluginAsyncZod = async (server) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const company = await accountInScope(req.auth.orgId, scope, req.params.id);
       if (!company) throw server.httpErrors.notFound('Company not found');
-      const parsed = parseOrgChartHtml(req.body.html);
+      const parsed = parseOrgChartHtml(req.body.html, await staffContext(req.auth.orgId, company.id));
       const rows: ImportRow[] = parsed.people.map((p) => ({
         line: p.line,
         name: p.name,
@@ -135,7 +154,7 @@ const orgChartFileRoutes: FastifyPluginAsyncZod = async (server) => {
           autoRoot: true,
           nameMatchAny: true,
           sprite: parsed.sprite,
-          extra: { format: parsed.format, found: parsed.found, skipped: parsed.skipped },
+          extra: { format: parsed.format, found: parsed.found, skipped: parsed.skipped, skippedBy: parsed.skippedBy },
         },
         IMPORT_HELPERS,
       );
