@@ -150,18 +150,20 @@ model Org {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   // Wave 8 — Voice + Video calls
-  callSessions           CallSession[]
-  callSummaries          CallSummary[]
+  callSessions             CallSession[]
+  callSummaries            CallSummary[]
   // Wave 8 — Customer Success
-  subscriptions          Subscription[]
-  renewalOpportunities   RenewalOpportunity[]
-  healthScores           HealthScore[]
-  npsSurveys             NpsSurvey[]
-  churnSignals           ChurnSignal[]
-  accountWatchSubjects   AccountWatchSubject[]
-  accountWatchEvents     AccountWatchEvent[]
-  accountEarningsDates   AccountEarningsDate[]
-  expansionOpportunities ExpansionOpportunity[]
+  subscriptions            Subscription[]
+  renewalOpportunities     RenewalOpportunity[]
+  healthScores             HealthScore[]
+  npsSurveys               NpsSurvey[]
+  churnSignals             ChurnSignal[]
+  accountWatchSubjects     AccountWatchSubject[]
+  accountWatchEvents       AccountWatchEvent[]
+  accountEarningsDates     AccountEarningsDate[]
+  accountFinancialProfiles AccountFinancialProfile[]
+  accountFinancialPeriods  AccountFinancialPeriod[]
+  expansionOpportunities   ExpansionOpportunity[]
 
   // Sprint 1 — Krayin import (Tags, EmailTemplates, LeadStageRot)
   tags                        Tag[]
@@ -333,11 +335,11 @@ model User {
   groupMemberships UserGroupMember[]
 
   // Wave A — pre-sales governance assignments
-  crossSellAssignments   CrossSellAction[]     @relation("CrossSellAssignee")
-  governanceActionsOwned GovernanceAction[]    @relation("GovernanceActionOwner")
-  notifications          Notification[]
-  contractsOwned         ContractAgreement[]   @relation("ContractOwner")
-  contractVersionsAdded  ContractFileVersion[] @relation("ContractFileVersionCreatedBy")
+  crossSellAssignments     CrossSellAction[]         @relation("CrossSellAssignee")
+  governanceActionsOwned   GovernanceAction[]        @relation("GovernanceActionOwner")
+  notifications            Notification[]
+  contractsOwned           ContractAgreement[]       @relation("ContractOwner")
+  contractVersionsAdded    ContractFileVersion[]     @relation("ContractFileVersionCreatedBy")
   meetingSourceConnections MeetingSourceConnection[]
   orgChartNodesOwned       OrgChartNode[]            @relation("OrgChartNodeOwner")
 
@@ -383,6 +385,8 @@ model Company {
   kamOwnerModel     KamOwnerModel?   @map("kam_owner_model")
   directorSponsorId String?          @map("director_sponsor_id") @db.Uuid
   topAccountRank    Int?             @map("top_account_rank")
+  /// v23: General accounts opted into the scheduled financials pull (Admin/AE).
+  trackFinancials   Boolean          @default(false) @map("track_financials")
   parentId          String?          @map("parent_id") @db.Uuid
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -410,6 +414,8 @@ model Company {
   accountWatchSubjects   AccountWatchSubject[]
   accountWatchEvents     AccountWatchEvent[]
   accountEarningsDates   AccountEarningsDate[]
+  financialProfile       AccountFinancialProfile?
+  financialPeriods       AccountFinancialPeriod[]
   expansionOpportunities ExpansionOpportunity[]
 
   // KAM front layer (all FK to this Company as the canonical KAM account)
@@ -425,8 +431,8 @@ model Company {
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  contracts ContractAgreement[] @relation("CompanyContracts")
-  meetingIntel MeetingIntel[]
+  contracts     ContractAgreement[]   @relation("CompanyContracts")
+  meetingIntel  MeetingIntel[]
   firmographics CompanyFirmographics?
   jobPostings   CompanyJobPosting[]
   orgChart      OrgChart?
@@ -672,11 +678,11 @@ model Contact {
   reportsTo     Contact?  @relation("ContactReportsTo", fields: [reportsToContactId], references: [id], onDelete: SetNull)
   directReports Contact[] @relation("ContactReportsTo")
 
-  opportunityLinks  OpportunityContact[]
-  activityAttendees ActivityAttendee[]
-  facts             ContactFact[]        @relation("FactSubject")
-  reportedByFacts   ContactFact[]        @relation("FactReportsTo")
-  ownedCommitments  CustomerCommitment[]
+  opportunityLinks   OpportunityContact[]
+  activityAttendees  ActivityAttendee[]
+  facts              ContactFact[]          @relation("FactSubject")
+  reportedByFacts    ContactFact[]          @relation("FactReportsTo")
+  ownedCommitments   CustomerCommitment[]
   meetingAttendances MeetingIntelAttendee[]
   orgChartNodes      OrgChartNode[]
 
@@ -6136,33 +6142,33 @@ model MeetingCrossRegionFlag {
 /// Separate from company_enrichments, which is the name-keyed verification
 /// snapshot used by company search and create.
 model CompanyFirmographics {
-  id                 String    @id @default(uuid()) @db.Uuid
-  orgId              String    @map("org_id") @db.Uuid
-  companyId          String    @unique @map("company_id") @db.Uuid
+  id                  String    @id @default(uuid()) @db.Uuid
+  orgId               String    @map("org_id") @db.Uuid
+  companyId           String    @unique @map("company_id") @db.Uuid
   /// ok | partial | pending | not_found | not_configured | budget_exceeded | error
-  status             String    @default("pending")
-  annualRevenueUsd   BigInt?   @map("annual_revenue_usd")
-  revenueRange       String?   @map("revenue_range")
-  employeeCount      Int?      @map("employee_count")
-  employeeRange      String?   @map("employee_range")
-  headcountGrowth6m  Float?    @map("headcount_growth_6m")
-  headcountGrowth12m Float?    @map("headcount_growth_12m")
-  headcountGrowth24m Float?    @map("headcount_growth_24m")
-  industry           String?
-  industries         String[]  @default([])
-  locations          Json      @default("[]")
-  techStack          String[]  @default([]) @map("tech_stack")
-  departmentHeadcount Json?    @map("department_headcount")
-  providerIds        Json      @default("{}") @map("provider_ids")
-  provenance         Json      @default("{}")
-  providerStatus     Json      @default("{}") @map("provider_status")
-  hiring             Json?
-  projects           Json      @default("[]")
-  fetchedAt          DateTime? @map("fetched_at") @db.Timestamptz(6)
-  expiresAt          DateTime? @map("expires_at") @db.Timestamptz(6)
-  requestedById      String?   @map("requested_by_id") @db.Uuid
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  status              String    @default("pending")
+  annualRevenueUsd    BigInt?   @map("annual_revenue_usd")
+  revenueRange        String?   @map("revenue_range")
+  employeeCount       Int?      @map("employee_count")
+  employeeRange       String?   @map("employee_range")
+  headcountGrowth6m   Float?    @map("headcount_growth_6m")
+  headcountGrowth12m  Float?    @map("headcount_growth_12m")
+  headcountGrowth24m  Float?    @map("headcount_growth_24m")
+  industry            String?
+  industries          String[]  @default([])
+  locations           Json      @default("[]")
+  techStack           String[]  @default([]) @map("tech_stack")
+  departmentHeadcount Json?     @map("department_headcount")
+  providerIds         Json      @default("{}") @map("provider_ids")
+  provenance          Json      @default("{}")
+  providerStatus      Json      @default("{}") @map("provider_status")
+  hiring              Json?
+  projects            Json      @default("[]")
+  fetchedAt           DateTime? @map("fetched_at") @db.Timestamptz(6)
+  expiresAt           DateTime? @map("expires_at") @db.Timestamptz(6)
+  requestedById       String?   @map("requested_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -6303,4 +6309,61 @@ model OrgChartNode {
   @@index([chartId, importRef])
   @@index([deletedAt])
   @@map("org_chart_nodes")
+}
+
+/// v23: which public filer an account maps to and when its financials were pulled.
+model AccountFinancialProfile {
+  id           String    @id @default(uuid()) @db.Uuid
+  orgId        String    @map("org_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  /// sec_edgar | esef | null when no source
+  source       String?
+  /// CIK (EDGAR) or LEI (ESEF)
+  entityId     String?   @map("entity_id")
+  entityName   String?   @map("entity_name")
+  /// ok | pending | no_identifier | no_source | mismatch | error | paused
+  status       String    @default("pending")
+  lastError    String?   @map("last_error")
+  lastPulledAt DateTime? @map("last_pulled_at") @db.Timestamptz(6)
+  /// Null = not scheduled (General account without Track financials).
+  nextPullAt   DateTime? @map("next_pull_at") @db.Timestamptz(6)
+  /// Early-warning signals of the last pull, with evidence links.
+  signals      Json      @default("[]")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId])
+  @@index([orgId, nextPullAt])
+  @@map("account_financial_profiles")
+}
+
+/// v23: one filed reporting period (annual or quarterly) with its key lines.
+model AccountFinancialPeriod {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  source      String
+  entityId    String    @map("entity_id")
+  /// FY | Q
+  periodType  String    @map("period_type")
+  fiscalYear  Int       @map("fiscal_year")
+  periodStart DateTime? @map("period_start") @db.Date
+  periodEnd   DateTime  @map("period_end") @db.Date
+  currency    String
+  sourceUrl   String    @map("source_url")
+  filedAt     DateTime? @map("filed_at") @db.Timestamptz(6)
+  /// { revenue: { value, concept }, ... } exactly as filed, nothing estimated.
+  metrics     Json
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, source, periodType, periodEnd])
+  @@index([orgId, companyId, periodEnd])
+  @@map("account_financial_periods")
 }

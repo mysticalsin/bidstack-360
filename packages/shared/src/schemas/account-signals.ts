@@ -327,7 +327,7 @@ const KIND_BASE: Partial<Record<WatchEventKind, number>> = {
 };
 
 /** Sources that publish first-hand (the company itself or a regulator). */
-const PRIMARY_SOURCES = new Set(['sec_edgar', 'companies_house', 'amf', 'ir_feed', 'company_rss', 'apollo', 'seamless']);
+const PRIMARY_SOURCES = new Set(['sec_edgar', 'financials', 'companies_house', 'amf', 'ir_feed', 'company_rss', 'apollo', 'seamless']);
 
 export const ALERT_IMPORTANCE = 70;
 
