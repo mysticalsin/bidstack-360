@@ -174,3 +174,12 @@ If you'd rather run everything on Railway (one URL, no Vercel), add a third
 service with Docker target **`web`** (nginx serving the SPA) — but build it in
 demo mode and point its `VITE_API_URL` at the api service. The hybrid above is
 recommended for the best frontend performance + a `vercel.app` link.
+
+## Polo Cloudflare preview (Access-gated)
+
+The internal preview at `https://polo-preview.tony-walteur.workers.dev` is not
+Vercel/Railway. A Cloudflare Worker (Access in front, Durable Object relay
+behind) forwards HTTP to a box that must be checked out on `main`.
+
+Do not upload that Worker from CI. The runbook, Worker source, and box client
+live in `apps/polo-preview/`.

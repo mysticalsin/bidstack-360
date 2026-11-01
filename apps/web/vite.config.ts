@@ -80,7 +80,9 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     preview: {
-      port: 4173,
+      // 4173 is local `pnpm preview`. The Cloudflare preview box overrides
+      // this with `--port 4180` (see apps/polo-preview).
+      port: Number(process.env.POLO_PREVIEW_WEB_PORT ?? 4173),
       strictPort: true,
       proxy: {
         '/api': { target: apiUrl, changeOrigin: true },
