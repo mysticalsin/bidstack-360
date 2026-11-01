@@ -80,6 +80,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   });
 
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);
+  const closingCapped = Boolean(closing.data?.nextCursor);
   const closingValue = closingStakeMicros(closingItems);
   const winRate = deriveWinRate(report.data);
 
@@ -89,6 +90,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
     reportPending: report.isLoading,
     winRate,
     closingCount: closingItems.length,
+    closingCapped,
     closingValue,
     closingPending: closing.isLoading,
     closingFailed: closing.isError,
@@ -115,6 +117,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
         formatValue={(n) => formatUnspecifiedAmount(n)}
         winRate={winRate}
         closingCount={closingItems.length}
+        closingCapped={closingCapped}
         t={t}
       />
       <StaggerList
@@ -139,6 +142,7 @@ interface HeroPanelProps {
   formatValue: (n: number) => string;
   winRate: number | null;
   closingCount: number;
+  closingCapped: boolean;
   t: TFunction;
 }
 
@@ -149,6 +153,7 @@ function HeroPanel({
   formatValue,
   winRate,
   closingCount,
+  closingCapped,
   t,
 }: HeroPanelProps) {
   return (
@@ -167,7 +172,7 @@ function HeroPanel({
       <p className="text-xs text-[var(--fg-tertiary)]">
         {t('orgHero.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
       </p>
-      <p>{deriveFocusLine(summary, closingCount, t)}</p>
+      <p>{deriveFocusLine(summary, closingCount, closingCapped, t)}</p>
       <div
         className="command-center-actions"
         aria-label={t('orgHero.badges.ariaLabel', 'Portfolio status badges')}
@@ -195,7 +200,7 @@ function HeroPanel({
 // The single sentence under the hero number. Mirrors the account cockpit's
 // deriveNextMove: always a concrete, data-backed instruction — never generic
 // dashboard copy — so the first screen tells the bid lead where to act.
-function deriveFocusLine(summary: OrgSummary, closingCount: number, t: TFunction): string {
+function deriveFocusLine(summary: OrgSummary, closingCount: number, closingCapped: boolean, t: TFunction): string {
   if (summary.overdueTasks > 0) {
     return t(
       'orgHero.focus.overdue',
@@ -206,12 +211,22 @@ function deriveFocusLine(summary: OrgSummary, closingCount: number, t: TFunction
     );
   }
   if (closingCount > 0) {
+    return closingCapped
+      ? t(
+          'orgHero.focus.closingMore',
+          'More bids close within 7 days than the {{count}} loaded here — run those reviews first.',
+          { count: closingCount },
+        )
+      : t(
+          'orgHero.focus.closing',
+          '{{count}} bids close within 7 days — run those reviews first.',
+          { count: closingCount },
+        );
+  }
+  if (closingCapped) {
     return t(
-      'orgHero.focus.closing',
-      '{{count}} bids close within 7 days — run those reviews first.',
-      {
-        count: closingCount,
-      },
+      'orgHero.focus.closingPage',
+      'More bids close within 7 days than this page shows.',
     );
   }
   if (summary.openOpportunities === 0) {
@@ -249,6 +264,7 @@ interface SignalInputs {
   reportPending: boolean;
   winRate: number | null;
   closingCount: number;
+  closingCapped: boolean;
   closingValue: bigint;
   closingPending: boolean;
   closingFailed: boolean;
@@ -303,19 +319,24 @@ function winRateSignal({ report, reportPending, winRate, t }: SignalInputs): Her
 }
 
 function closingSignal(inputs: SignalInputs): HeroSignal {
-  const { summary, closingCount, closingValue, closingPending, closingFailed, t } = inputs;
+  const { summary, closingCount, closingCapped, closingValue, closingPending, closingFailed, t } = inputs;
   const open = Math.max(1, summary.openOpportunities);
+  const stake = formatMicrosAmount(closingValue);
   return {
     key: 'closing',
     label: t('orgHero.signal.closing.label', 'Closing within 7 days'),
-    display: closingFailed ? '—' : String(closingCount),
+    display: closingFailed ? '—' : closingCapped ? `${closingCount}+` : String(closingCount),
     detail: closingFailed
       ? t('orgHero.signal.closing.failed', 'due list unavailable')
       : closingCount > 0
-        ? t('orgHero.signal.closing.detail', '{{value}} at stake', {
-            value: formatMicrosAmount(closingValue),
-          })
-        : t('orgHero.signal.closing.empty', 'runway clear'),
+        ? t(
+            closingCapped ? 'orgHero.signal.closing.detailMore' : 'orgHero.signal.closing.detail',
+            closingCapped ? 'at least {{value}} at stake' : '{{value}} at stake',
+            { value: stake },
+          )
+        : closingCapped
+          ? t('orgHero.signal.closing.more', 'more bids due than this page')
+          : t('orgHero.signal.closing.empty', 'runway clear'),
     tone: closingFailed ? 'gray' : closingCount > 0 ? 'amber' : 'jade',
     progress:
       closingCount > 0 ? Math.max(8, Math.min(100, Math.round((closingCount / open) * 100))) : 0,

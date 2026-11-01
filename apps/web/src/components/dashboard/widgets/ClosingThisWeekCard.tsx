@@ -41,10 +41,21 @@ export function ClosingThisWeekCard() {
     limit: 25,
   });
 
-  const items = (closing.data?.items ?? [])
+  const openItems = (closing.data?.items ?? [])
     .filter(isOpenOpp)
-    .sort((a, b) => daysUntilDueUtc(a.dueDate ?? '') - daysUntilDueUtc(b.dueDate ?? ''))
-    .slice(0, DISPLAY_LIMIT);
+    .sort((a, b) => daysUntilDueUtc(a.dueDate ?? '') - daysUntilDueUtc(b.dueDate ?? ''));
+  const items = openItems.slice(0, DISPLAY_LIMIT);
+  const moreBeyond = Boolean(closing.data?.nextCursor);
+  const listNote = moreBeyond
+    ? t('closingThisWeek.moreBeyond', 'Showing {{shown}} soonest. More bids close this week.', {
+        shown: items.length,
+      })
+    : openItems.length > items.length
+      ? t('closingThisWeek.showingPage', 'Showing {{shown}} of {{total}}.', {
+          shown: items.length,
+          total: openItems.length,
+        })
+      : null;
 
   return (
     <GlassCard padding="md" hoverable={false}>
@@ -86,9 +97,13 @@ export function ClosingThisWeekCard() {
         </div>
       ) : items.length === 0 ? (
         <p className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5 text-xs text-[var(--fg-secondary)]">
-          {t('closingThisWeek.empty', 'No bids closing this week.')}
+          {moreBeyond
+            ? t('closingThisWeek.emptyBeyond', 'More bids close this week than this page shows.')
+            : t('closingThisWeek.empty', 'No bids closing this week.')}
         </p>
       ) : (
+        <>
+        {listNote ? <p className="mb-2 text-xs text-[var(--fg-secondary)]">{listNote}</p> : null}
         <ul className="space-y-1">
           {items.map((opp, i) => (
             <motion.li
@@ -115,6 +130,7 @@ export function ClosingThisWeekCard() {
             </motion.li>
           ))}
         </ul>
+        </>
       )}
     </GlassCard>
   );

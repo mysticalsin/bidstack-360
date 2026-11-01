@@ -11,7 +11,7 @@ import type { Opportunity } from '@bidstack/shared';
 import { ClosingThisWeekCard } from './ClosingThisWeekCard';
 
 const hookMocks = vi.hoisted(() => ({
-  data: undefined as { items: Opportunity[] } | undefined,
+  data: undefined as { items: Opportunity[]; nextCursor?: string | null } | undefined,
   isLoading: false,
   isError: false,
   refetch: vi.fn(),
@@ -200,5 +200,25 @@ describe('ClosingThisWeekCard', () => {
     renderCard();
     expect(screen.getByText(/8,598,204,328,457\.18/)).toBeDefined();
     expect(screen.queryByText(/457\.19/)).toBeNull();
+  });
+
+  it('says the six rows are not every bid due this week', () => {
+    // WHY: the card keeps six rows. Without the note, six looked like the whole week.
+    hookMocks.data = {
+      items: Array.from({ length: 7 }, (_, i) =>
+        makeOpp({ id: `b${i}`, name: `Bid ${i}`, dueDate: `2026-07-0${i + 1}` }),
+      ),
+    };
+    renderCard();
+    expect(screen.getByText('Showing 6 of 7.')).toBeDefined();
+    expect(screen.queryByText('Bid 6')).toBeNull();
+  });
+
+  it('does not call an unfinished page an empty week', () => {
+    // WHY: a cursor means more due rows exist. The empty sentence would hide them.
+    hookMocks.data = { items: [], nextCursor: 'more' };
+    renderCard();
+    expect(screen.getByText('More bids close this week than this page shows.')).toBeDefined();
+    expect(screen.queryByText('No bids closing this week.')).toBeNull();
   });
 });
