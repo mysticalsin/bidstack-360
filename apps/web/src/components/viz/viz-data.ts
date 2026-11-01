@@ -1,6 +1,6 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
-import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
+import { closedOutcome, LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
 
@@ -32,10 +32,12 @@ export interface OppRow {
   name?: string | null;
   code?: string | null;
   owner?: string | null;
+  /** Live stage flags. A deleted stage row is not a close. */
+  pipelineStage?: { isWon?: boolean; isLost?: boolean; deletedAt?: string | Date | null } | null;
 }
 
-const isWon = (o: OppRow) => stageKey(o.stage) === 'closed_won';
-const isLost = (o: OppRow) => stageKey(o.stage) === 'closed_lost';
+const isWon = (o: OppRow) => closedOutcome(o) === 'won';
+const isLost = (o: OppRow) => closedOutcome(o) === 'lost';
 const isClosed = (o: OppRow) => isWon(o) || isLost(o);
 /** When a closed bid closed: closedAt when recorded, else its due date. */
 export const closeDate = (o: OppRow): string | null => o.closedAt ?? o.dueDate;
@@ -48,7 +50,7 @@ export function quarterOf(iso: string): string {
 
 export function stageFunnel(rows: OppRow[]) {
   return OPEN_STAGES.map((id) => {
-    const inStage = rows.filter((o) => stageKey(o.stage) === id);
+    const inStage = rows.filter((o) => !isClosed(o) && stageKey(o.stage) === id);
     return { label: stageText(id), value: inStage.reduce((n, o) => n + (o.value ?? 0), 0), count: inStage.length };
   }).filter((s) => s.count > 0);
 }

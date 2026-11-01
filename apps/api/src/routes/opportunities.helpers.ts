@@ -78,12 +78,19 @@ export function excludeClosedOutcome(): Prisma.OpportunityWhereInput {
   };
 }
 
-/** Won book. Lost wins when the enum or the live stage flag says lost. */
-export function wonOutcomeWhere(): Prisma.OpportunityWhereInput {
+/** Still in play or already won. A live lost stage is not current account activity. */
+export function excludeLostOutcome(): Prisma.OpportunityWhereInput {
   return {
     NOT: {
       OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
     },
+  };
+}
+
+/** Won book. Lost wins when the enum or the live stage flag says lost. */
+export function wonOutcomeWhere(): Prisma.OpportunityWhereInput {
+  return {
+    ...excludeLostOutcome(),
     OR: [
       { stage: 'closed_won' },
       { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },

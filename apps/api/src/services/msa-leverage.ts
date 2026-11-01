@@ -10,6 +10,7 @@ import {
 import { prisma } from '@bidstack/db';
 
 import { applyCompanyScope, type AccessScope } from '../lib/access-scope.js';
+import { excludeLostOutcome } from '../routes/opportunities.helpers.js';
 
 function asCitation(value: unknown): MsaCitation | null {
   if (!value || typeof value !== 'object') return null;
@@ -33,7 +34,7 @@ export async function loadAccountActivity(orgId: string, companyIds: string[]): 
 
   const [opps, projects, subscriptions] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { orgId, companyId: { in: companyIds }, deletedAt: null, stage: { not: 'closed_lost' } },
+      where: { orgId, companyId: { in: companyIds }, deletedAt: null, ...excludeLostOutcome() },
       select: { companyId: true, name: true, industry: true },
       take: 1000,
     }),

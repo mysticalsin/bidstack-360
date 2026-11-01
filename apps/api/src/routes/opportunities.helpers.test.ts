@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { patchedValueMicros, rememberCompanyName, stageMoveDiff } from './opportunities.helpers';
+import { excludeLostOutcome, patchedValueMicros, rememberCompanyName, stageMoveDiff } from './opportunities.helpers';
+
+describe('excludeLostOutcome', () => {
+  it('drops a live lost stage and keeps a deleted stage in play', () => {
+    // WHY: agreement leverage treated a custom lost pursuit as current activity.
+    expect(excludeLostOutcome()).toEqual({
+      NOT: {
+        OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+      },
+    });
+  });
+});
 
 describe('patchedValueMicros', () => {
   it('keeps an explicit micros string instead of rounding the unit number', () => {
