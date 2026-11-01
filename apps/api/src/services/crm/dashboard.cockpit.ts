@@ -187,6 +187,17 @@ export function recordedComplianceWhere<T extends object>(
   return { ...where, status: { not: UNSPECIFIED_CHECK_STATUS } };
 }
 
+/**
+ * The rest of a register page replaces status. Name the omitted token here
+ * or an unnamed framework fills a seat a real check should have.
+ */
+export function registerRestStatuses(
+  openStatuses: readonly string[],
+  omitStatuses: readonly string[] = [],
+): string[] {
+  return [...openStatuses, ...omitStatuses];
+}
+
 function observedAtRank(value: string | null): number {
   if (!value) return Number.NEGATIVE_INFINITY;
   const time = Date.parse(value);

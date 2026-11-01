@@ -11,6 +11,7 @@ import {
   buildCockpit,
   computeSignalCoverage,
   recordedComplianceWhere,
+  registerRestStatuses,
   registerDealsAreCapped,
   roleHolderProbeIds,
   roleHoldersAreCapped,
@@ -1001,6 +1002,14 @@ describe('buildCockpit recorded facts only', () => {
     // WHY: a note that only names a framework stores status unspecified. That
     // token is not a failed check, so it must not sit in the compliance share.
     expect(recordedComplianceWhere({ orgId: 'org' }).status).toEqual({ not: 'unspecified' });
+    // WHY: the rest of the page replaces status. Without unspecified in that
+    // list, an unnamed framework takes a seat from a compliant check.
+    expect(registerRestStatuses(['blocked', 'in_progress', 'not_started'], ['unspecified'])).toEqual([
+      'blocked',
+      'in_progress',
+      'not_started',
+      'unspecified',
+    ]);
     expect(roleHoldersAreCapped(20, true)).toBe(false);
     expect(roleHoldersAreCapped(1000, false)).toBe(false);
     expect(roleHoldersAreCapped(1000, true)).toBe(true);

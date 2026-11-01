@@ -30,6 +30,8 @@ import {
   ROLE_HOLDER_PROBE,
   microsText,
   recordedComplianceWhere,
+  UNSPECIFIED_CHECK_STATUS,
+  registerRestStatuses,
   registerDealsAreCapped,
   roleHolderProbeIds,
   roleHoldersAreCapped,
@@ -351,13 +353,17 @@ export async function loadRegisterPage<T, W extends Record<string, unknown>>(
   count: (where: W) => Promise<number>,
   where: W,
   openStatuses: readonly string[],
+  omitStatuses: readonly string[] = [],
 ): Promise<{ rows: T[]; openCount: number; capped: boolean }> {
   const openWhere = { ...where, status: { in: [...openStatuses] } } as W;
   const openRows = await find(openWhere, ISSUE_PAGE);
   const openCount = openRows.length < ISSUE_PAGE ? openRows.length : await count(openWhere);
   let rows = openRows;
   if (openCount <= ISSUE_PAGE && rows.length < ISSUE_PAGE) {
-    const restWhere = { ...where, status: { notIn: [...openStatuses] } } as W;
+    const restWhere = {
+      ...where,
+      status: { notIn: registerRestStatuses(openStatuses, omitStatuses) },
+    } as W;
     rows = [...rows, ...(await find(restWhere, ISSUE_PAGE - rows.length))];
   }
   const capped =
@@ -431,8 +437,9 @@ export async function loadAccountCompliance(
           take,
         }),
       (pageWhere) => prismaClient.complianceCheck.count({ where: pageWhere }),
-      where,
+      recordedComplianceWhere(where),
       COMPLIANCE_OPEN,
+      [UNSPECIFIED_CHECK_STATUS],
     ),
     prismaClient.complianceCheck.count({ where: { ...where, status: 'compliant' } }),
     prismaClient.complianceCheck.count({ where: recordedComplianceWhere(where) }),
