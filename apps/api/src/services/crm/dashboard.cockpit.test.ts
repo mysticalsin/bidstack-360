@@ -689,4 +689,19 @@ describe('buildCockpit win/loss + revenue derivation', () => {
       { period: '2026-03', revenueMicros: 100_000_000_000 },
     ]);
   });
+
+  it('keeps a deleted lost stage in the open count', () => {
+    // WHY: a removed stage row was still a loss, so the bid left the open book.
+    const cockpit = buildCockpit(
+      baseArgs([
+        opp({
+          stage: 's2_sent',
+          pipelineStage: { isWon: false, isLost: true, deletedAt: new Date('2026-02-01') },
+        }),
+      ]),
+    );
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('1');
+    expect(cockpit.winLoss?.lostCount).toBe(0);
+    expect(cockpit.winLoss?.wonCount).toBe(0);
+  });
 });

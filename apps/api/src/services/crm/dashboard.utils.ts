@@ -210,25 +210,33 @@ export function mapDealStage(stage: string): z.infer<typeof CrmDeal>['stage'] {
   }
 }
 
+/** A soft-deleted stage row does not close the deal or rename its key. */
+export function livePipelineStage<T extends { deletedAt?: Date | null }>(
+  stage: T | null | undefined,
+): T | null {
+  if (!stage || stage.deletedAt) return null;
+  return stage;
+}
+
 /**
  * A lost or won flag closes the deal on the account list. The mapped key
  * alone turned a custom lost stage into "new", so its value stayed in the
- * open pipeline. Lost wins when both flags are set.
+ * open pipeline. Lost wins when both flags are set. A deleted stage does not.
  */
 export function recordedDealStage(opportunity: {
   stage: string;
-  pipelineStage: { key: string; isWon: boolean; isLost: boolean } | null;
+  pipelineStage: {
+    key: string;
+    isWon: boolean;
+    isLost: boolean;
+    deletedAt?: Date | null;
+  } | null;
 }): z.infer<typeof CrmDeal>['stage'] {
-  const key = opportunity.pipelineStage?.key ?? opportunity.stage;
-  const lost =
-    opportunity.pipelineStage?.isLost === true ||
-    opportunity.stage === 'closed_lost' ||
-    key === 'closed_lost';
+  const stage = livePipelineStage(opportunity.pipelineStage);
+  const key = stage?.key ?? opportunity.stage;
+  const lost = stage?.isLost === true || opportunity.stage === 'closed_lost' || key === 'closed_lost';
   if (lost) return 'closed_lost';
-  const won =
-    opportunity.pipelineStage?.isWon === true ||
-    opportunity.stage === 'closed_won' ||
-    key === 'closed_won';
+  const won = stage?.isWon === true || opportunity.stage === 'closed_won' || key === 'closed_won';
   if (won) return 'closed_won';
   return mapDealStage(key);
 }

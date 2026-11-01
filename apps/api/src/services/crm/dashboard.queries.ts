@@ -366,6 +366,7 @@ export async function buildCompanyCockpit(
               color: true,
               isWon: true,
               isLost: true,
+              deletedAt: true,
             },
           },
         },

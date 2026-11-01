@@ -26,6 +26,7 @@ import {
   asRiskSeverity,
   asRiskStatus,
   formatMicrosCompact,
+  livePipelineStage,
   normalizeName,
   parseAttribution,
   record,
@@ -252,21 +253,24 @@ export function deriveAccountPerformance(
     stage: string;
     valueMicros: bigint | number | unknown;
     dueDate: Date | null | unknown;
-    pipelineStage?: { isWon: boolean; isLost: boolean } | null;
+    pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
   }>,
 ): AccountPerformance {
   const toMicros = (v: bigint | number | unknown): number =>
     typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
-  const lostOpps = opps.filter(
-    (o) => o.pipelineStage?.isLost === true || o.stage === 'closed_lost',
-  );
+  const lostOpps = opps.filter((o) => {
+    const stage = livePipelineStage(o.pipelineStage);
+    return stage?.isLost === true || o.stage === 'closed_lost';
+  });
   // Lost wins when the enum and a won flag disagree, and when both flags are set.
-  const wonOpps = opps.filter(
-    (o) =>
-      o.pipelineStage?.isLost !== true &&
+  const wonOpps = opps.filter((o) => {
+    const stage = livePipelineStage(o.pipelineStage);
+    return (
+      stage?.isLost !== true &&
       o.stage !== 'closed_lost' &&
-      (o.pipelineStage?.isWon === true || o.stage === 'closed_won'),
-  );
+      (stage?.isWon === true || o.stage === 'closed_won')
+    );
+  });
   const decided = wonOpps.length + lostOpps.length;
 
   const revenueByMonth = new Map<string, number>();
@@ -553,6 +557,7 @@ export function buildCockpit({
       color: string | null;
       isWon: boolean;
       isLost: boolean;
+      deletedAt?: Date | null;
     } | null;
     valueMicros: bigint | number | unknown;
     probability: number;
@@ -614,14 +619,16 @@ export function buildCockpit({
   const accountTasks = tasks.filter(
     (task) => task.accountId === company.id || task.opportunity?.companyId === company.id,
   );
-  const openDeals = companyOpps.filter(
-    (opp) =>
-      !opp.pipelineStage?.isWon &&
-      !opp.pipelineStage?.isLost &&
+  const openDeals = companyOpps.filter((opp) => {
+    const stage = livePipelineStage(opp.pipelineStage);
+    return (
+      !stage?.isWon &&
+      !stage?.isLost &&
       opp.stage !== 'customer' &&
       opp.stage !== 'closed_won' &&
-      opp.stage !== 'closed_lost',
-  );
+      opp.stage !== 'closed_lost'
+    );
+  });
   const accountContacts = contacts
     .filter((contact) => contact.companyId === company.id)
     .slice()

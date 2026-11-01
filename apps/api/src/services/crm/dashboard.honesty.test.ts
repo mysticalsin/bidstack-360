@@ -239,4 +239,31 @@ describe('deal currency is omitted when the opportunity has none', () => {
     });
     expect(enumLost.stage).toBe('closed_lost');
   });
+
+  it('keeps a deleted stage from closing the deal', () => {
+    // WHY: the stage row was still joined after it was deleted, so a removed
+    // lost flag kept the bid out of the open account list.
+    const deal = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5d',
+      customer: 'Acme',
+      name: 'Back in play',
+      stage: 's2_sent',
+      pipelineStage: {
+        key: 'price_lost',
+        name: 'Price lost',
+        probability: 0,
+        color: null,
+        isWon: false,
+        isLost: true,
+        deletedAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+      valueMicros: 1_000_000,
+      probability: 40,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(deal.stage).toBe('meeting');
+  });
 });
