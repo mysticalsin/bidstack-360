@@ -109,7 +109,7 @@ export function InitiativesView({
     <>
       {subsidiariesCapped ? <p className="sg-meta">Latest 1,000 subsidiaries</p> : null}
       {evidenceCapped ? <p className="sg-meta">Latest 100 news and meetings</p> : null}
-      {solutionsCapped ? <p className="sg-meta">Already-sold check used the latest 100 solutions.</p> : null}
+      {solutionsCapped ? <p className="sg-meta">Already-sold check used the latest 5,000 solutions.</p> : null}
     </>
   );
   if (!items.length) {

@@ -126,10 +126,10 @@ describe('InitiativesView', () => {
     expect(screen.getByText('Latest 100 news and meetings')).toBeTruthy();
   });
 
-  it('says when the already-sold check used the latest 100 solutions', () => {
+  it('says when the already-sold check stopped at 5000 solutions', () => {
     // WHY: a solution past the page left the theme looking unsold.
     wrap(<InitiativesView items={[init(1)]} solutionsCapped />);
-    expect(screen.getByText('Already-sold check used the latest 100 solutions.')).toBeTruthy();
+    expect(screen.getByText('Already-sold check used the latest 5,000 solutions.')).toBeTruthy();
   });
 
   it('says when older evidence is not listed', () => {
