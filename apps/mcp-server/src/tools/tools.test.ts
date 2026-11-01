@@ -247,11 +247,15 @@ describeDb('MCP tools', () => {
   });
 
   it('contacts.create creates a contact and writes audit_log', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Acme Inc Tools' },
+    });
     const out = (await tools['contacts.create'].handler(
-      { customer: 'Acme Inc', name: 'Alice Smith', email: 'alice@acme.com' },
+      { customer: 'ignored', companyId: company.id, name: 'Alice Smith', email: 'alice@acme.com' },
       ctx,
-    )) as { id: string; name: string };
+    )) as { id: string; name: string; companyId: string | null };
     expect(out.name).toBe('Alice Smith');
+    expect(out.companyId).toBe(company.id);
 
     const audit = await prisma.auditLog.findFirst({
       where: { orgId, targetType: 'contact', action: 'contact.create.mcp' },
@@ -260,11 +264,21 @@ describeDb('MCP tools', () => {
     expect(audit).toBeTruthy();
   });
 
+  it('contacts.create refuses a name that is not one company', async () => {
+    await expect(
+      tools['contacts.create'].handler({ customer: 'Nobody Ltd', name: 'No Link' }, ctx),
+    ).rejects.toThrow(/company id/);
+  });
+
   it('contacts.get returns a single contact', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Beta Corp Tools' },
+    });
     const created = (await tools['contacts.create'].handler(
-      { customer: 'Beta Corp', name: 'Bob Jones' },
+      { customer: company.name, name: 'Bob Jones' },
       ctx,
-    )) as { id: string };
+    )) as { id: string; companyId: string | null };
+    expect(created.companyId).toBe(company.id);
     const out = (await tools['contacts.get'].handler({ id: created.id }, ctx)) as {
       id: string;
       name: string;

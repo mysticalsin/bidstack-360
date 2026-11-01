@@ -43,6 +43,42 @@ export function serializeDeal(deal: {
   };
 }
 
+const COMPANY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isCompanyUuid(value: string): boolean {
+  return COMPANY_UUID.test(value);
+}
+
+/** One company, or a refusal. A name that matches none or several is not a link. */
+export function uniqueCompanyLink(
+  matches: readonly { id: string; name: string }[],
+): { id: string; name: string } {
+  if (matches.length === 1 && matches[0]) return matches[0];
+  throw new Error('Pass a company id. A name is not a company link unless it matches one company.');
+}
+
+export async function requireCompanyLink(
+  orgId: string,
+  input: { companyId?: string; name?: string },
+): Promise<{ id: string; name: string }> {
+  if (input.companyId) {
+    const company = await prisma.company.findFirst({
+      where: { id: input.companyId, orgId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!company) throw new Error('Company not found');
+    return company;
+  }
+  const name = input.name?.trim();
+  if (!name) throw new Error('Pass a company id.');
+  const matches = await prisma.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: name, mode: 'insensitive' } },
+    select: { id: true, name: true },
+    take: 2,
+  });
+  return uniqueCompanyLink(matches);
+}
+
 export function normalizeName(value: string) {
   return value
     .trim()

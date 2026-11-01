@@ -26,7 +26,9 @@ export const DealCreateInput = z.object({
   name: z.string().min(1),
   stage: Stage.default('s1_lead'),
   value: z.number().nonnegative().default(0),
-  probability: z.number().int().min(0).max(100).default(25),
+  // Omitted stays 0. A default of 25 made an unstated chance look like a forecast.
+  probability: z.number().int().min(0).max(100).optional(),
+  companyId: z.string().uuid().optional(),
   dueDate: z.string().date().nullable().optional(),
   industry: z.string().nullable().optional(),
 });

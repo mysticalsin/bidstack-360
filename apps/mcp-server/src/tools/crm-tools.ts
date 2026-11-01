@@ -15,7 +15,9 @@ import {
   logoUrl,
   mintNextCode,
   normalizeDomain,
+  isCompanyUuid,
   normalizeName,
+  requireCompanyLink,
   serializeDeal,
   source,
 } from './crm-tools.helpers.js';
@@ -105,7 +107,8 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
 };
 
 export const crmCreateDeal: Tool<typeof DealCreateInput> = {
-  description: 'Create a CRM deal/opportunity in the Twenty-compatible opportunity table.',
+  description:
+    'Create a CRM deal linked to one company. Pass companyId, or a customer name that matches exactly one company. Omit probability when it is unknown; 0 is stored and adds nothing to weighted pipeline.',
   input: DealCreateInput,
   inputJsonSchema: {
     type: 'object',
@@ -115,23 +118,29 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
       name: { type: 'string', minLength: 1 },
       stage: { type: 'string', enum: Stage.options, default: 's1_lead' },
       value: { type: 'number', minimum: 0, default: 0 },
-      probability: { type: 'integer', minimum: 0, maximum: 100, default: 25 },
+      probability: { type: 'integer', minimum: 0, maximum: 100 },
+      companyId: { type: 'string', format: 'uuid' },
       dueDate: { type: ['string', 'null'], format: 'date' },
       industry: { type: ['string', 'null'] },
     },
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
+    const company = await requireCompanyLink(ctx.orgId, {
+      companyId: args.companyId,
+      name: args.customer,
+    });
     const code = await mintNextCode(ctx.orgId);
     const created = await prisma.opportunity.create({
       data: {
         orgId: ctx.orgId,
         code,
-        customer: args.customer,
+        customer: company.name,
+        companyId: company.id,
         name: args.name,
         stage: args.stage as PrismaStage,
         valueMicros: BigInt(Math.round(args.value * 1_000_000)),
-        probability: args.probability,
+        probability: args.probability ?? 0,
         dueDate: args.dueDate ? new Date(args.dueDate) : null,
         industry: args.industry ?? null,
         intel: {},
@@ -148,7 +157,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
       },
     });
 
-    return serializeDeal(created);
+    return { ...serializeDeal(created), companyId: created.companyId };
   },
 };
 
@@ -278,7 +287,18 @@ export const crmListActivities: Tool<typeof ActivityListInput> = {
         orgId: ctx.orgId,
         deletedAt: null, // skip soft-deleted (Review)
         ...(args.dealId ? { oppId: args.dealId } : {}),
-        ...(args.company ? { opportunity: { customer: args.company } } : {}),
+        ...(args.company
+          ? {
+              opportunity: {
+                companyId: (
+                  await requireCompanyLink(
+                    ctx.orgId,
+                    isCompanyUuid(args.company) ? { companyId: args.company } : { name: args.company },
+                  )
+                ).id,
+              },
+            }
+          : {}),
       },
       include: { opportunity: true, assignee: true },
       orderBy: { createdAt: 'desc' },
@@ -351,7 +371,16 @@ export const crmGenerateInsights: Tool<typeof GenerateInsightsInput> = {
           where: {
             orgId: ctx.orgId,
             deletedAt: null, // skip soft-deleted (Review)
-            ...(args.company ? { customer: args.company } : {}),
+            ...(args.company
+              ? {
+                  companyId: (
+                    await requireCompanyLink(
+                      ctx.orgId,
+                      isCompanyUuid(args.company) ? { companyId: args.company } : { name: args.company },
+                    )
+                  ).id,
+                }
+              : {}),
           },
           orderBy: { updatedAt: 'desc' },
         });
