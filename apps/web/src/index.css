@@ -31,13 +31,12 @@
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
-  /* Brand — deep green, one accent for the whole product (see docs/DESIGN.md §1).
-     Fills always carry #ffffff on top. Ratios measured, not assumed. */
-  --brand-primary: #006b4f; /* 6.53:1 on white ✅; white on it = 6.53:1 ✅ */
-  --brand-primary-hover: #005a42; /* darker than base → ratio only rises */
-  --brand-primary-press: #004a37;
-  --brand-primary-tint: #e3f2ec; /* brand-primary on this tint = 5.65:1 ✅ */
-  --brand-deep: #00402f;
+  /* Brand — Mantu purple. Fills carry white type. Ratios measured. */
+  --brand-primary: #6600ae; /* 9.65:1 white on fill and fill on white */
+  --brand-primary-hover: #52008c;
+  --brand-primary-press: #3d0068;
+  --brand-primary-tint: #f3e8fa; /* #6600ae on this tint = 8.15:1 */
+  --brand-deep: #3d0068;
 
   /* SERUM Glass system */
   --serum-bg: #f7f9fc;
@@ -56,29 +55,28 @@
      inherited from the old blue accent; with a green accent that cast reads as
      dirt, and the reference's calm comes from neutrals that are actually
      neutral. Lightness is preserved step for step, only the hue is removed. */
-  --surface-page: #fafafa;
+  --surface-page: #f6f3ee;
   --surface-card: #ffffff;
-  --surface-sidebar: #f7f7f7;
-  --surface-sunken: #f0f0f0;
-  --surface-overlay: rgba(0, 0, 0, 0.32);
-  --surface-soft: #f8f8f8;
-  --surface-hover: #f2f2f2;
+  --surface-sidebar: #fbfaf7;
+  --surface-sunken: #efebe4;
+  --surface-overlay: rgba(5, 7, 26, 0.32);
+  --surface-soft: #f7f4ef;
+  --surface-hover: #f3efe8;
   --surface-raised: #ffffff;
 
-  /* Foreground */
-  --fg-primary: #171717; /* 16.9:1 on white ✅ */
-  --fg-secondary: #5c5c5c; /* 7.0:1 on white ✅ (was #5a6478, 6.3:1) */
-  /* fg-tertiary must clear WCAG 1.4.3 normal text on white; #6b6b6b = 5.3:1. */
-  --fg-tertiary: #6b6b6b;
-  --fg-muted: #6b6b6b; /* 5.3:1 on white ✅ */
+  /* Foreground — Mantu black pearl on the warm canvas */
+  --fg-primary: #05071a; /* 18:1 on the page */
+  --fg-secondary: #5c534a; /* 7.52:1 on white */
+  --fg-tertiary: #6a6158; /* 5.48:1 on the page */
+  --fg-muted: #6a6158;
   --fg-inverted: #ffffff;
   --fg-on-brand: #ffffff;
 
   /* Borders */
-  --border-subtle: #efefef;
-  --border-default: #e2e2e2;
-  --border-strong: #c7c7c7;
-  --border-focus: #006b4f; /* 6.53:1 on white — clears the 3:1 UI floor ✅ */
+  --border-subtle: #efeae3;
+  --border-default: #e4ddd4;
+  --border-strong: #cfc6bb;
+  --border-focus: #6600ae;
 
   /* Semantic — all foreground values verified ≥ 4.5:1 on white AND on their tint. */
   --success: #177048; /* was #1f8a5b (4.33:1); now 6.09:1 on white, 5.35:1 on tint */
@@ -105,7 +103,7 @@
   --sidebar-fg: #6b6b6b; /* = --fg-tertiary; 5.3:1 on the sidebar surface ✅ */
   --sidebar-fg-active: #171717; /* = --fg-primary */
   --sidebar-hover: rgba(0, 0, 0, 0.04);
-  --sidebar-active: rgba(0, 107, 79, 0.08);
+  --sidebar-active: rgba(102, 0, 174, 0.08);
 
   /* Component tokens — surfaces, shadows, code, inputs */
   --surface-subtle: #f7f7f7; /* between card and sunken */
@@ -116,22 +114,22 @@
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
   --code-bg: #f2f2f2;
   --code-fg: #262626; /* 12.4:1 on code-bg ✅ */
-  --ring: rgba(0, 107, 79, 0.35); /* = --focus-ring-color */
-  --sidebar-badge-bg: rgba(0, 107, 79, 0.1);
-  --sidebar-badge-fg: #006b4f; /* = --brand-primary; 6.53:1 on white ✅ */
+  --ring: rgba(102, 0, 174, 0.35);
+  --sidebar-badge-bg: rgba(102, 0, 174, 0.1);
+  --sidebar-badge-fg: #6600ae;
 
   /* Brand shorthands (alias to primary) */
-  --brand: #006b4f;
-  --brand-hover: #005a42;
-  --brand-muted: #e3f2ec;
+  --brand: #6600ae;
+  --brand-hover: #52008c;
+  --brand-muted: #f3e8fa;
 
   /* Legacy token aliases — AuditLog & older components */
-  --text-primary: #171717; /* = --fg-primary */
-  --text-secondary: #5c5c5c; /* = --fg-secondary */
-  --text-muted: #6b6b6b; /* = --fg-muted */
+  --text-primary: #05071a;
+  --text-secondary: #5c534a;
+  --text-muted: #6a6158;
   --surface-primary: #ffffff; /* = --surface-card */
   --surface-secondary: #f0f0f0; /* = --surface-sunken */
-  --accent-primary: #006b4f; /* = --brand-primary; 6.53:1 on white ✅ */
+  --accent-primary: #6600ae;
 
   /* Tag palette */
   --tag-blue-bg: #e5ecff;
@@ -154,7 +152,7 @@
   /* Chart palette — sequential, accessible, dark-mode ready.
      Slot 1 carries the brand so the primary series matches the accent; the blue
      it displaced moves to slot 2 (which was a green that now collides). */
-  --chart-1: #006b4f;
+  --chart-1: #6600ae;
   --chart-2: #2c4bff;
   --chart-3: #d08a00;
   --chart-4: #8b5cf6;
@@ -168,13 +166,13 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.09), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --focus-ring: 0 0 0 3px rgba(0, 107, 79, 0.14);
-  --focus-ring-color: rgba(0, 107, 79, 0.35);
+  --focus-ring: 0 0 0 3px rgba(102, 0, 174, 0.16);
+  --focus-ring-color: rgba(102, 0, 174, 0.35);
 
   /* Glassmorphism tokens */
   --surface-glass: rgba(255, 255, 255, 0.72);
-  --border-glow: rgba(0, 107, 79, 0.08);
-  --border-glow-strong: rgba(0, 107, 79, 0.16);
+  --border-glow: rgba(102, 0, 174, 0.08);
+  --border-glow-strong: rgba(102, 0, 174, 0.16);
 
   /* Button variant tokens — theme-relative tints (P1 #23) */
   --btn-success-border: color-mix(in srgb, var(--success) 35%, transparent);
@@ -190,8 +188,8 @@
   --row-hover-tint: transparent;
 
   /* Gradient text tokens — needed by .gradient-text in both themes */
-  --brand-gradient-start: #006b4f;
-  --brand-gradient-end: #00402f;
+  --brand-gradient-start: #6600ae;
+  --brand-gradient-end: #3d0068;
 }
 
 /* ---------- Dark theme — MDM ROI Navigator purple-black aesthetic ---------- */
@@ -200,14 +198,14 @@
      cannot both sit on the page AND carry white text, so fill and foreground
      split here (docs/DESIGN.md §1). The reference ships #006b4f unchanged in
      dark; that only works because it never uses it as a foreground. */
-  --brand-primary: #00805e; /* fill: white on it 4.94:1 ✅, vs page 3.95:1 ✅ */
-  --brand-primary-hover: #009a71;
-  --brand-primary-press: #006b4f;
-  --brand-primary-tint: rgba(63, 190, 147, 0.18);
-  --brand-deep: #3fbe93; /* foreground accent: 8.38:1 on near-black ✅ */
-  --brand-gradient-start: #00805e;
-  --brand-gradient-end: #3fbe93;
-  --brand-gradient: linear-gradient(135deg, #00805e 0%, #3fbe93 100%);
+  --brand-primary: #7c3aed; /* white on this fill ≈ 5.7:1 */
+  --brand-primary-hover: #8b5cf6;
+  --brand-primary-press: #6d28d9;
+  --brand-primary-tint: rgba(167, 139, 250, 0.18);
+  --brand-deep: #d4b4ff; /* text accent on near-black */
+  --brand-gradient-start: #7c3aed;
+  --brand-gradient-end: #d4b4ff;
+  --brand-gradient: linear-gradient(135deg, #7c3aed 0%, #d4b4ff 100%);
 
   /* SERUM Glass system */
   --serum-bg: #05070d;
@@ -223,9 +221,9 @@
   --serum-shadow-md: 0 28px 64px rgba(0, 0, 0, 0.42);
 
   /* Surface — deep void black */
-  --surface-page: #010102;
-  --surface-card: #0c0c0e;
-  --surface-sidebar: #09090b;
+  --surface-page: #0c0a12;
+  --surface-card: #16131e;
+  --surface-sidebar: #100e16;
   --surface-sunken: #070708;
   --surface-overlay: rgba(0, 0, 0, 0.85);
   --surface-glass: rgba(12, 12, 14, 0.72);
@@ -245,9 +243,9 @@
   --border-subtle: #22242a;
   --border-default: #2d3039;
   --border-strong: #3e424f;
-  --border-focus: #3fbe93; /* foreground accent — 8.38:1 on near-black, clears the 3:1 UI floor ✅ */
-  --border-glow: rgba(63, 190, 147, 0.15);
-  --border-glow-strong: rgba(63, 190, 147, 0.3);
+  --border-focus: #d4b4ff;
+  --border-glow: rgba(167, 139, 250, 0.18);
+  --border-glow-strong: rgba(167, 139, 250, 0.32);
 
   /* Semantic — harmonized with the clean look */
   --success: #34d399;
@@ -274,7 +272,7 @@
   --sidebar-fg: #a1a1aa; /* = --fg-secondary dark */
   --sidebar-fg-active: #f8fafc; /* = --fg-primary dark */
   --sidebar-hover: rgba(255, 255, 255, 0.05);
-  --sidebar-active: rgba(63, 190, 147, 0.18);
+  --sidebar-active: rgba(167, 139, 250, 0.18);
 
   /* Component tokens — surfaces, shadows, code, inputs */
   --surface-subtle: #121214; /* = --surface-soft dark */
@@ -285,14 +283,14 @@
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.4);
   --code-bg: #111113;
   --code-fg: #c0caf5; /* muted violet — readable on near-black ✅ */
-  --ring: rgba(63, 190, 147, 0.45); /* = --focus-ring-color dark */
-  --sidebar-badge-bg: rgba(63, 190, 147, 0.18);
-  --sidebar-badge-fg: #3fbe93; /* = --brand-deep dark; 8.38:1 on near-black ✅ */
+  --ring: rgba(212, 180, 255, 0.45);
+  --sidebar-badge-bg: rgba(167, 139, 250, 0.18);
+  --sidebar-badge-fg: #d4b4ff;
 
   /* Brand shorthands (alias to primary) */
-  --brand: #00805e;
-  --brand-hover: #009a71;
-  --brand-muted: rgba(63, 190, 147, 0.18);
+  --brand: #7c3aed;
+  --brand-hover: #8b5cf6;
+  --brand-muted: rgba(167, 139, 250, 0.18);
 
   /* Legacy token aliases — AuditLog & older components */
   --text-primary: #f8fafc; /* = --fg-primary dark */
@@ -300,7 +298,7 @@
   --text-muted: #8b8b94; /* = --fg-muted dark */
   --surface-primary: #0c0c0e; /* = --surface-card dark */
   --surface-secondary: #070708; /* = --surface-sunken dark */
-  --accent-primary: #3fbe93; /* foreground accent, not the fill — 8.38:1 ✅ */
+  --accent-primary: #d4b4ff;
 
   /* Tag palette — vibrant against near-black, contrast verified */
   --tag-blue-bg: rgba(101, 132, 255, 0.18);
@@ -324,7 +322,7 @@
 
   /* Chart palette — vivid neons against near-black. Slot 1 = brand foreground
      accent, matching light mode; the displaced green becomes a blue. */
-  --chart-1: #3fbe93;
+  --chart-1: #c084fc;
   --chart-2: #6584ff;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
@@ -338,8 +336,8 @@
   --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 30px rgba(0, 0, 0, 0.5);
-  --focus-ring: 0 0 0 3px rgba(63, 190, 147, 0.22);
-  --focus-ring-color: rgba(63, 190, 147, 0.45);
+  --focus-ring: 0 0 0 3px rgba(167, 139, 250, 0.28);
+  --focus-ring-color: rgba(212, 180, 255, 0.45);
 
   /* Button variant tokens — theme-relative tints (P1 #23) */
   --btn-brand-glow: color-mix(in srgb, var(--brand-primary) 25%, transparent);
@@ -818,7 +816,7 @@ select:focus-visible {
 
 /* ---------- Sidebar ---------- */
 .sidebar {
-  background: var(--surface-card);
+  background: var(--surface-sidebar);
   border-right: 0.5px solid var(--border-default);
   padding: 14px 10px 24px;
   position: sticky;
@@ -1130,7 +1128,7 @@ select:focus-visible {
   gap: 10px;
   padding: 8px 12px;
   margin: 1px 0;
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--fg-secondary);
   cursor: pointer;
   font-size: 13px;
@@ -1367,7 +1365,7 @@ select:focus-visible {
   padding: 0 28px;
   min-width: 0;
   border-bottom: 1px solid var(--border-default);
-  background: var(--surface-card);
+  background: color-mix(in srgb, var(--surface-card) 88%, var(--surface-page));
   position: sticky;
   top: 0;
   z-index: 40;
@@ -4012,7 +4010,7 @@ select:focus-visible {
 }
 .account-card-shell {
   height: 100%;
-  border-radius: 16px;
+  border-radius: 20px;
 }
 .account-card {
   display: flex;
@@ -4021,7 +4019,7 @@ select:focus-visible {
   padding: 20px;
   background: var(--surface-card);
   border: 0.5px solid var(--border-default);
-  border-radius: 16px;
+  border-radius: 20px;
   text-decoration: none;
   color: inherit;
   transition:
@@ -5097,7 +5095,7 @@ select:focus-visible {
 .sales-country-map {
   align-items: center;
   background:
-    radial-gradient(circle at 18% 28%, rgba(0, 107, 79, 0.12), transparent 22%),
+    radial-gradient(circle at 18% 28%, rgba(102, 0, 174, 0.12), transparent 22%),
     radial-gradient(circle at 74% 34%, rgba(44, 75, 255, 0.1), transparent 26%),
     linear-gradient(180deg, var(--surface-page), var(--surface-card));
   border: 1px solid var(--border-subtle);
