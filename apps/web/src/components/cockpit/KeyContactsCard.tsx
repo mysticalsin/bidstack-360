@@ -22,8 +22,10 @@ export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props)
       <SectionHeader
         title={t('keyContacts.title', 'Key contacts')}
         caption={t(
-          'keyContacts.caption',
-          'Up to 5 people linked to this account, highest recorded influence first.',
+          cockpit.contactsCapped ? 'keyContacts.captionCapped' : 'keyContacts.caption',
+          cockpit.contactsCapped
+            ? 'Up to 5 linked people. Buying-role holders come first, then highest recorded influence. Some buying-role holders are outside this page.'
+            : 'Up to 5 linked people. Buying-role holders come first, then highest recorded influence.',
         )}
       />
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>

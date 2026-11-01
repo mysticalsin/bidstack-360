@@ -26,9 +26,9 @@ afterEach(() => {
 });
 
 describe('KeyContactsCard', () => {
-  it('says the list is linked people ordered by recorded influence', () => {
-    // Why: "key" used to mean the first five names. The caption has to say
-    // the list is the company link, capped, and ordered by influence.
+  it('says buying-role holders lead the five seats', () => {
+    // WHY: the list puts an accepted buying role ahead of a louder name.
+    // "Highest influence first" described the old order.
     render(
       <KeyContactsCard
         cockpit={
@@ -54,8 +54,37 @@ describe('KeyContactsCard', () => {
 
     expect(screen.getByText('Ada').textContent).toBe('Ada');
     expect(
-      screen.getByText('Up to 5 people linked to this account, highest recorded influence first.')
-        .textContent,
-    ).toContain('linked to this account');
+      screen.getByText(
+        'Up to 5 linked people. Buying-role holders come first, then highest recorded influence.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('says some buying-role holders are outside the page', () => {
+    // WHY: the role-holder probe stops at 1,000. The five seats are not every holder.
+    render(
+      <KeyContactsCard
+        cockpit={
+          {
+            contactsCapped: true,
+            keyContacts: [
+              {
+                id: 'ada',
+                source: 'external_crm',
+                companyId: 'co-1',
+                name: 'Ada',
+                title: 'CIO',
+                email: null,
+                phone: null,
+                influence: 1,
+                roleInDecision: 'champion',
+                updatedAt: '2026-06-01T00:00:00.000Z',
+              },
+            ],
+          } as AccountCockpitSnapshot
+        }
+      />,
+    );
+    expect(screen.getByText(/Some buying-role holders are outside this page/)).toBeTruthy();
   });
 });
