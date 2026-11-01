@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { mapStoredInsights } from './dashboard.cockpit.js';
+import { mapStoredInsights, serializeBidOpportunity } from './dashboard.cockpit.js';
 import * as dashboardDefaults from './dashboard.defaults.js';
 import { defaultQueueHealth } from './dashboard.defaults.js';
 import { defaultProviderHealth } from './dashboard.providers.js';
@@ -346,5 +346,31 @@ describe('deal currency is omitted when the opportunity has none', () => {
     });
     expect(deal.stage).toBe('unspecified');
     expect(deal.stageName).toBe('Price review');
+  });
+});
+
+describe('serializeBidOpportunity', () => {
+  it('keeps the bid amount digits when the number collapses', () => {
+    // WHY: Number(estimatedValueMicros) moved this bid to the next unit.
+    const micros = 9007199254740993n;
+    const bid = serializeBidOpportunity({
+      id: 'bid-1',
+      source: 'sam.gov',
+      externalId: 'ext-1',
+      title: 'Harbor works',
+      buyer: null,
+      country: null,
+      region: null,
+      status: 'open',
+      dueDate: null,
+      estimatedValueMicros: micros,
+      currencyCode: 'USD',
+      url: null,
+      recommendation: null,
+      readinessScore: null,
+      sourceAttribution: [],
+    });
+    expect(bid.estimatedValueMicrosText).toBe('9007199254740993');
+    expect(bid.estimatedValueMicros).toBe(9007199254740992);
   });
 });

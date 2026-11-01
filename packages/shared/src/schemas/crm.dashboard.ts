@@ -95,6 +95,8 @@ export const BidOpportunity = z.object({
   status: z.string().min(1),
   dueDate: z.string().datetime().nullable(),
   estimatedValueMicros: z.number().int().nonnegative().nullable(),
+  /** Exact integer. The number is only exact while it fits a safe integer. */
+  estimatedValueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   currencyCode: z.string().length(3).nullable(),
   url: z.string().url().nullable(),
   recommendation: z.enum(['bid', 'review', 'no_bid']).nullable(),

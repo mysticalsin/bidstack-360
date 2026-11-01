@@ -37,6 +37,7 @@ import {
   TECHNICAL_STACK_FIELD_KEY,
   parseTechnicalStackOverride,
 } from './technical-stack.service.js';
+import { microsWireFields } from '../../lib/micros-wire.js';
 
 const COCKPIT_RISK_LIMIT = 6;
 const COCKPIT_COMPLIANCE_LIMIT = 6;
@@ -554,6 +555,7 @@ export function serializeBidOpportunity(row: {
   readinessScore: number | null;
   sourceAttribution: unknown;
 }): z.infer<typeof BidOpportunity> {
+  const value = row.estimatedValueMicros === null ? null : microsWireFields(row.estimatedValueMicros);
   return {
     id: row.id,
     source: row.source,
@@ -564,8 +566,8 @@ export function serializeBidOpportunity(row: {
     region: row.region,
     status: row.status,
     dueDate: row.dueDate?.toISOString() ?? null,
-    estimatedValueMicros:
-      row.estimatedValueMicros === null ? null : Number(row.estimatedValueMicros),
+    estimatedValueMicros: value?.valueMicros ?? null,
+    estimatedValueMicrosText: value?.valueMicrosText ?? null,
     currencyCode: row.currencyCode,
     url: row.url,
     recommendation: row.recommendation as z.infer<typeof BidOpportunity>['recommendation'],
