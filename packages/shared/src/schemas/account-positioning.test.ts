@@ -202,6 +202,24 @@ describe('composeBrief', () => {
     };
     expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 1,000 direct subsidiaries');
   });
+
+  it('says when initiative evidence is a page', () => {
+    // WHY: the latest 100 news items and meetings were read as the whole year.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 0, openMicros: '0', won24m: 0, lost24m: 0 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+      evidenceCapped: true,
+    };
+    expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 100 news items and meetings');
+  });
 });
 
 describe('labels', () => {

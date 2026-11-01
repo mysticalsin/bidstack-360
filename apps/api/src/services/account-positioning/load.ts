@@ -131,7 +131,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const { ids, childrenCapped } = await accountIds(orgId, companyId);
   const live = await companiesWithLiveSignals(orgId, ids);
   const since24 = new Date(now.getTime() - 730 * DAY);
-  const [company, firmo, initiatives, fin, { people, lastMeeting }, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
+  const [company, firmo, initiativeLoad, fin, { people, lastMeeting }, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, tier: true, industry: true, countryCode: true, employeeCount: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, provenance: true } }),
     loadInitiatives(orgId, scope, { id: companyId }, now, ids),
@@ -195,6 +195,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   })) > WON_REFERENCE_SAMPLE;
   const wonRows = wonOrg;
   const won: WonDeal[] = wonRows.map((o) => ({ name: o.name, valueMicros: o.valueMicros ?? 0n, here: !!o.companyId && ids.includes(o.companyId) }));
+  const initiatives = initiativeLoad.items;
   const plays = buildPlays({ initiatives, financialSignals: finSignals, financialSource: finSource, people, won, wonSampleLimit: wonCapped ? WON_REFERENCE_SAMPLE : null, themeOf: themeForText, now });
 
   const dealSample = capDealSample(opps);
@@ -248,6 +249,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     },
     topSignal: top ? { title: cleanText(stripSamplePrefix(top.title)), at: top.occurredAt.toISOString(), source: sourceLabel(top.source), sample: top.sample } : null,
     subsidiariesCapped: childrenCapped,
+    evidenceCapped: initiativeLoad.evidenceCapped,
   };
   const gaps = buildGaps({
     people,

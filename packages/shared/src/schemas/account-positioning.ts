@@ -104,6 +104,8 @@ export const BriefFacts = z.object({
   topSignal: z.object({ title: z.string(), at: Iso.nullable(), source: z.string(), sample: z.boolean() }).nullable(),
   /** True when subsidiary deals and people are the latest 1,000 direct children. */
   subsidiariesCapped: z.boolean().optional(),
+  /** True when initiative news or meetings stopped at the latest 100. */
+  evidenceCapped: z.boolean().optional(),
 });
 export type BriefFacts = z.infer<typeof BriefFacts>;
 
@@ -497,6 +499,7 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   } else s.push('No contacts are mapped yet.');
   if (f.topSignal) s.push(`Latest notable signal: ${f.topSignal.title}${f.topSignal.at ? ` (${monthYear(f.topSignal.at)}, ${f.topSignal.source})` : ''}${f.topSignal.sample ? ' [sample]' : ''}.`);
   if (f.subsidiariesCapped) s.push('Subsidiary figures use the latest 1,000 direct subsidiaries.');
+  if (f.evidenceCapped) s.push('Initiative evidence is the latest 100 news items and meetings.');
   return s.join(' ');
 }
 
