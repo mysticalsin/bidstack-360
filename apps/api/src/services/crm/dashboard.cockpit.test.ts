@@ -200,7 +200,23 @@ describe('computeSignalCoverage', () => {
     });
     const action = health.factors?.find((factor) => factor.key === 'engagement')?.recommendedAction ?? '';
     expect(action).toContain('1 task in the last 30 days');
+    expect(action).toContain('past its due date');
     expect(action).not.toMatch(/No recent activity/i);
+  });
+
+  it('keeps a follow-up due today on track', () => {
+    // WHY: the clock past midnight UTC used to call today overdue. The task badge keeps today open.
+    const start = new Date();
+    const dueToday = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+    const health = computeSignalCoverage({
+      company: company(),
+      contacts: [],
+      openDeals: [],
+      tasks: [{ status: 'open', dueDate: dueToday, createdAt: new Date() }],
+    });
+    const action = health.factors?.find((factor) => factor.key === 'engagement')?.recommendedAction ?? '';
+    expect(action).toContain('inside their due dates');
+    expect(action).not.toContain('past its due date');
   });
 
   it('does not tell the seller to confirm a champion that was not recorded', () => {
