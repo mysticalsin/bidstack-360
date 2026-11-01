@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { runFinancialsScan, syncFinancialsSchedule } from './scan.js';
-import { detectFinancialSignals, findTextCues, sentenceAround, type SignalPeriod } from './signals.js';
+import { buildVocab, detectFinancialSignals, findTextCues, repairSplitWords, sentenceAround, type SignalPeriod } from './signals.js';
 import { entityNameMatches, pacer, pullEdgar, pullEsef, type FinFetch } from './sources.js';
 import { buildPeriods, derived, factsFromCompanyFacts, factsFromXbrlJson, type CompanyFacts, type XbrlJson } from './xbrl.js';
 
@@ -150,6 +150,24 @@ describe('signal rules', () => {
     const g = s.find((x) => x.rule === 'guidance_cut');
     expect(g?.snippet).toContain('lowered its full-year guidance');
     expect(g?.sourceUrl).toBe('https://example.test/report');
+  });
+
+  it('repairs words split by PDF conversion in snippets (NOS 2025 report example)', () => {
+    const nos = [
+      { concept: 'ifrs-full:DisclosureOfGeneralInformationAboutFinancialStatementsExplanatory',
+        text: 'On 17 Ma rch 2025, NOS acquired the entire share capi tal of C laranet Por tugal Group. Other text.' },
+      { concept: 'ifrs-full:DisclosureOfBusinessCombinationsExplanatory',
+        text: 'Claranet Portugal provides cloud services in Portugal. The share capital of Claranet was paid in cash. Capital increase in March.' },
+    ];
+    const cue = findTextCues(nos).find((c) => c.rule === 'acquisitions');
+    expect(cue?.snippet).toBe('On 17 March 2025, NOS acquired the entire share capital of Claranet Portugal Group.');
+    const v = buildVocab(['the investment into the company, in to the market, a man and a plan; acquisition of the acquisition target']);
+    // real word pairs stay apart, hyphen line breaks and stray spaces are fixed
+    expect(repairSplitWords('invested in to  new  plants , a man', v)).toBe('invested in to new plants, a man');
+    expect(repairSplitWords('the acquisi-\n tion was completed', v)).toBe('the acquisition was completed');
+    expect(repairSplitWords('the acqui si tion of X', v)).toBe('the acquisition of X');
+    // unknown joins are left alone rather than guessed
+    expect(repairSplitWords('Zorg plex Ltd', v)).toBe('Zorg plex Ltd');
   });
 
   it('sentenceAround returns null for numeric tables', () => {
