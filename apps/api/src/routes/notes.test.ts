@@ -537,4 +537,53 @@ describe('notes routes (integration)', () => {
     });
     await prisma.company.deleteMany({ where: { id: { in: [other.id, fresh.id] } } });
   });
+
+  skipIfNoDb('POST import-meeting records a risk again after the old row is deleted', async () => {
+    // WHY: dedupe ignored deleted rows. A removed risk with the same title
+    // blocked the note from recording it again.
+    const stamp = Date.now();
+    const probe = await server.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { accountId: `probe-risk-${stamp}`, title: 'Probe', bodyMd: 'org' },
+    });
+    expect(probe.statusCode).toBe(201);
+    const probeId = (probe.json() as { id: string }).id;
+    const probeRow = await prisma.note.findUnique({ where: { id: probeId }, select: { orgId: true } });
+    const orgId = probeRow!.orgId;
+    const companyName = `Risk Again ${stamp}`;
+    const title = `Cutover timing ${stamp} is unclear`;
+    const removed = await prisma.riskRegisterItem.create({
+      data: {
+        orgId,
+        companyName,
+        title,
+        severity: 'high',
+        status: 'open',
+        deletedAt: new Date(),
+      },
+    });
+    const payload = {
+      accountId: companyName,
+      companyName,
+      bodyMd: `Risk: ${title}`,
+    };
+    const first = await server.inject({ method: 'POST', url: '/api/notes/import-meeting', payload });
+    expect(first.statusCode).toBe(201);
+    const second = await server.inject({ method: 'POST', url: '/api/notes/import-meeting', payload });
+    expect(second.statusCode).toBe(201);
+    const live = await prisma.riskRegisterItem.findMany({
+      where: { orgId, companyName, title, deletedAt: null },
+      select: { id: true },
+    });
+    expect(live).toHaveLength(1);
+    expect(live[0]?.id).not.toBe(removed.id);
+    await prisma.riskRegisterItem.deleteMany({ where: { orgId, companyName, title } });
+    await prisma.companyEnrichment.deleteMany({
+      where: { orgId, normalizedName: companyName.toLowerCase().replaceAll(' ', '-') },
+    });
+    await prisma.note.deleteMany({
+      where: { orgId, accountId: { in: [companyName.toLowerCase(), `probe-risk-${stamp}`] } },
+    });
+  });
 });

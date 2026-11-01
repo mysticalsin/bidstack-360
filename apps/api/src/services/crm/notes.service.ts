@@ -116,6 +116,7 @@ export async function persistRisks(
     where: {
       orgId,
       companyName,
+      deletedAt: null,
       title: { in: titles, mode: 'insensitive' },
     },
     select: { title: true },
