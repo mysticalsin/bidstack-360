@@ -27,7 +27,7 @@ import {
 } from '../lib/access-scope.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
-import { resolveCompanyIdByName, stageMoveDiff } from './opportunities.helpers.js';
+import { excludeClosedOutcome, resolveCompanyIdByName, stageMoveDiff } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
@@ -199,9 +199,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 orgId: req.auth.orgId,
                 deletedAt: null,
                 ...(pipelineStageId ? { pipelineStageId } : {}),
-                ...(excludeClosed
-                  ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
-                  : {}),
+                ...(excludeClosed ? excludeClosedOutcome() : {}),
               },
               accessScope,
             ),

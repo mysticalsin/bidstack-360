@@ -152,6 +152,36 @@ describe('analytics workload route', () => {
           ownerId: aliceId,
         },
       }),
+      // The enum still says an open stage. The stage row is marked lost, so
+      // this value must not land on Alice's open book.
+      (async () => {
+        const pipeline = await prisma.pipeline.create({
+          data: { orgId, name: `Workload lost ${ns}` },
+        });
+        const stage = await prisma.pipelineStage.create({
+          data: {
+            orgId,
+            pipelineId: pipeline.id,
+            key: 'price_lost',
+            name: 'Price lost',
+            isLost: true,
+          },
+        });
+        await prisma.opportunity.create({
+          data: {
+            orgId,
+            code: 'OP-9708',
+            customer: 'Nordbahn AG',
+            name: 'Marked lost',
+            stage: 's2_sent',
+            pipelineStageId: stage.id,
+            valueMicros: 80_000_000n,
+            probability: 90,
+            ownerId: aliceId,
+            dueDate: inWeek,
+          },
+        });
+      })(),
       prisma.opportunity.create({
         data: {
           orgId,
@@ -259,7 +289,8 @@ describe('analytics workload route', () => {
 
     const alice = owners.find((o) => o.ownerId === aliceId);
     expect(alice).toBeDefined();
-    // Closed and soft-deleted bids excluded; 10M×50% + 30M×10% = 8M weighted.
+    // Closed, soft-deleted, and lost-flagged bids excluded. The lost-flagged
+    // row is still stage s2_sent. 10M×50% + 30M×10% = 8M weighted.
     expect(alice).toMatchObject({
       name: 'Alice Bidlead',
       openBids: 2,

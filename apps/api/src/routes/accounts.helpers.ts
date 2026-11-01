@@ -7,6 +7,8 @@
 import { prisma } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 
+import { excludeClosedOutcome, wonOutcomeWhere } from './opportunities.helpers.js';
+
 export interface AccountStats {
   totalValue: number;
   wonValue: number;
@@ -46,12 +48,12 @@ export async function fetchAccountStats(
     }),
     prisma.opportunity.groupBy({
       by: ['companyId'],
-      where: { ...where, stage: 'closed_won' },
+      where: { ...where, ...wonOutcomeWhere() },
       _sum: { valueMicros: true },
     }),
     prisma.opportunity.groupBy({
       by: ['companyId'],
-      where: { ...where, stage: { notIn: ['closed_won', 'closed_lost'] } },
+      where: { ...where, ...excludeClosedOutcome() },
       _count: { _all: true },
     }),
     prisma.contact.groupBy({

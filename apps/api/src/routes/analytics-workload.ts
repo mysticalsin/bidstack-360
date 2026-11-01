@@ -43,7 +43,8 @@ interface BidAggRow {
  * Open-bid aggregates per owner. Raw SQL because weighted pipeline is a
  * row-wise product (valueMicros × probability/100) reduced per group — not
  * expressible via prisma.groupBy — mirroring services/reports/funnel.service.ts.
- * "Open" matches that service's definition: stage not in the two closed states.
+ * "Open" matches that service's definition: the enum is not closed, and a
+ * live pipeline stage is not marked lost or won.
  * The 7-day window is [today, today+7) on the DB's date, matching the
  * dueWithinDays semantics of the opportunities list route.
  */
@@ -63,6 +64,12 @@ function aggregateBids(orgId: string): Promise<BidAggRow[]> {
     WHERE o.org_id = ${orgId}::uuid
       AND o.deleted_at IS NULL
       AND o.stage NOT IN ('closed_won', 'closed_lost')
+      AND NOT EXISTS (
+        SELECT 1 FROM pipeline_stages ps
+        WHERE ps.id = o.pipeline_stage_id
+          AND ps.deleted_at IS NULL
+          AND (ps.is_lost OR ps.is_won)
+      )
     GROUP BY o.owner_id
   `);
 }

@@ -4,6 +4,8 @@ import { prisma } from '@bidstack/db';
 
 import { getPipelineKpis } from '../../services/reports/funnel.service.js';
 import { buildServer } from '../../server.js';
+import { fetchAccountStats } from '../accounts.helpers.js';
+import { excludeClosedOutcome } from '../opportunities.helpers.js';
 import { invalidateCrmSummaryCache } from './summary.js';
 import {
   createIsolatedOrg,
@@ -76,11 +78,15 @@ describe('crm summary routes', () => {
         isLost: true,
       },
     });
+    const company = await prisma.company.create({
+      data: { orgId, name: `Lost Flag Co ${Date.now()}` },
+    });
     await prisma.opportunity.create({
       data: {
         orgId,
         code: `OP-LOST-${Date.now()}`,
         customer: 'Lost Flag Co',
+        companyId: company.id,
         name: 'Should not be open',
         stage: 's1_lead',
         pipelineStageId: stage.id,
@@ -100,6 +106,13 @@ describe('crm summary routes', () => {
     const kpisAfter = await getPipelineKpis(orgId);
     expect(kpisAfter.totalOpen).toBe(kpisBefore.totalOpen);
     expect(kpisAfter.totalValueOpen).toBe(kpisBefore.totalValueOpen);
+
+    const stats = await fetchAccountStats(orgId, [company.id]);
+    expect(stats.get(company.id)?.openDeals).toBe(0);
+    const openOnAccount = await prisma.opportunity.count({
+      where: { orgId, deletedAt: null, companyId: company.id, ...excludeClosedOutcome() },
+    });
+    expect(openOnAccount).toBe(0);
   });
 
   failIfNoDb('GET /api/crm/summary rejects invalid limits', async () => {

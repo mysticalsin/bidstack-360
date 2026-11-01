@@ -61,6 +61,40 @@ export function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
+ * Open book. A live pipeline stage marked lost or won is closed even when the
+ * enum key still looks open. A soft-deleted stage row does not close the deal.
+ */
+export function excludeClosedOutcome(): Prisma.OpportunityWhereInput {
+  return {
+    stage: { notIn: ['closed_won', 'closed_lost'] },
+    NOT: {
+      pipelineStage: {
+        is: {
+          deletedAt: null,
+          OR: [{ isLost: true }, { isWon: true }],
+        },
+      },
+    },
+  };
+}
+
+/** Won book. Lost wins when the enum or the live stage flag says lost. */
+export function wonOutcomeWhere(): Prisma.OpportunityWhereInput {
+  return {
+    NOT: {
+      OR: [
+        { stage: 'closed_lost' },
+        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+      ],
+    },
+    OR: [
+      { stage: 'closed_won' },
+      { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+    ],
+  };
+}
+
+/**
  * Builds a normalizedName → Company.id index for an org (one query).
  *
  * WHY in code, not SQL: Company has no `normalizedName` column, so the
