@@ -7,7 +7,7 @@ import {
 } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { requireCompanyLink } from './crm-tools.helpers.js';
+import { capPage, requireCompanyLink } from './crm-tools.helpers.js';
 
 const Input = z.object({
   status: z
@@ -24,7 +24,7 @@ const Input = z.object({
 
 export const leadsList: Tool<typeof Input> = {
   description:
-    'List leads. companyId returns leads linked to that company. search matches name, email, or company name and is not a company link. score 0 has scoreBasis not_scored; a positive score is stored.',
+    'List leads. Returns { items, limit, truncated }. truncated means more leads match than items. companyId returns leads linked to that company. search matches name, email, or company name and is not a company link. score 0 has scoreBasis not_scored; a positive score is stored.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -72,9 +72,9 @@ export const leadsList: Tool<typeof Input> = {
       },
       include: { owner: true },
       orderBy: { updatedAt: 'desc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
-    return items.map((l) => ({
+    return capPage(items.map((l) => ({
       id: l.id,
       firstName: l.firstName,
       lastName: l.lastName,
@@ -92,6 +92,6 @@ export const leadsList: Tool<typeof Input> = {
       convertedToOpportunityId: l.convertedToOpportunityId,
       createdAt: l.createdAt.toISOString(),
       updatedAt: l.updatedAt.toISOString(),
-    }));
+    })), args.limit);
   },
 };

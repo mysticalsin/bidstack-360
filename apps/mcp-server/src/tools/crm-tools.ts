@@ -14,6 +14,7 @@ import {
 import {
   companyIdForCustomerRename,
   recordOpportunityStageMove,
+  capPage,
   logoUrl,
   mintNextCode,
   normalizeDomain,
@@ -30,7 +31,7 @@ import {
 
 export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
   description:
-    'Search Company rows in the caller org. Returns the canonical company id. Opportunity customer text that does not match a company row is labeled opportunity_text_only and has no match confidence.',
+    'Search Company rows in the caller org. Returns { items, limit, truncated }. truncated means more matches exist than items. Each item has the canonical company id. Opportunity customer text that does not match a company row is labeled opportunity_text_only and has no match confidence.',
   input: CompanySearchInput,
   inputJsonSchema: {
     type: 'object',
@@ -65,10 +66,11 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
         logoUrl: true,
       },
       orderBy: { name: 'asc' },
-      take: args.limit,
+      take: args.limit + 1,
     });
 
-    const companyHits = companies.map((company) => ({
+    const companyPage = capPage(companies, args.limit);
+    const companyHits = companyPage.items.map((company) => ({
       id: company.id,
       name: company.name,
       legalName: company.legalName,
@@ -80,9 +82,11 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
       confidence: null,
     }));
 
-    const remaining = args.limit - companyHits.length;
-    if (remaining <= 0) return companyHits;
+    if (companyPage.truncated) {
+      return { items: companyHits, limit: args.limit, truncated: true };
+    }
 
+    const remaining = args.limit - companyHits.length;
     const seen = new Set(companyHits.map((company) => company.id));
     const opportunities = await prisma.opportunity.findMany({
       where: {
@@ -92,10 +96,10 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
       },
       select: { customer: true, logoUrl: true, companyId: true },
       distinct: ['customer'],
-      take: remaining,
+      take: remaining + 1,
     });
-
-    const textHits = opportunities
+    const textPage = capPage(opportunities, remaining);
+    const textHits = textPage.items
       .filter((row) => !row.companyId || !seen.has(row.companyId))
       .map((row) => ({
         id: row.companyId,
@@ -108,7 +112,11 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
         confidence: null,
       }));
 
-    return [...companyHits, ...textHits];
+    return {
+      items: [...companyHits, ...textHits].slice(0, args.limit),
+      limit: args.limit,
+      truncated: textPage.truncated,
+    };
   },
 };
 
@@ -310,7 +318,7 @@ export const crmEnrichCompany: Tool<typeof EnrichCompanyInput> = {
 
 export const crmListActivities: Tool<typeof ActivityListInput> = {
   description:
-    'List follow-up tasks and logged activities for one company or deal. A company name must match exactly one company. Tasks match the company id or the opportunity company. Activities match the company, its linked deals, or its linked people. A matching customer label is not included.',
+    'List follow-up tasks and logged activities for one company or deal. Returns { items, limit, truncated }. truncated means more events match than items. A company name must match exactly one company. Tasks match the company id or the opportunity company. Activities match the company, its linked deals, or its linked people. A matching customer label is not included.',
   input: ActivityListInput,
   inputJsonSchema: {
     type: 'object',
@@ -342,7 +350,7 @@ export const crmListActivities: Tool<typeof ActivityListInput> = {
         select: { id: true },
       });
       // The deal is not this company's. Do not return its timeline under the account.
-      if (!deal) return [];
+      if (!deal) return { items: [], limit: args.limit, truncated: false };
     }
 
     const linkedIds = await linkedActivityIds(ctx.orgId, company?.id, args.dealId);
@@ -363,7 +371,7 @@ export const crmListActivities: Tool<typeof ActivityListInput> = {
         },
         include: { opportunity: true, assignee: true },
         orderBy: { createdAt: 'desc' },
-        take: args.limit,
+        take: args.limit + 1,
       }),
       prisma.activity.findMany({
         where: {
@@ -373,11 +381,11 @@ export const crmListActivities: Tool<typeof ActivityListInput> = {
         },
         include: { owner: true },
         orderBy: { occurredAt: 'desc' },
-        take: args.limit,
+        take: args.limit + 1,
       }),
     ]);
 
-    return [
+    return capPage([
       ...tasks.map((task) => ({
         id: task.id,
         kind: 'task' as const,
@@ -397,8 +405,9 @@ export const crmListActivities: Tool<typeof ActivityListInput> = {
         occurredAt: activity.occurredAt.toISOString(),
       })),
     ]
-      .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0))
-      .slice(0, args.limit);
+      .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0)),
+      args.limit,
+    );
   },
 };
 
