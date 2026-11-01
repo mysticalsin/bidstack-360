@@ -63,6 +63,8 @@ export interface StageBucket {
   value: number;
   /** Exact total, compact only when that label is the same cent. */
   amount: string;
+  /** Integer micros behind `amount`. Bar length still uses `value`. */
+  micros: string;
   count: number;
 }
 
@@ -74,7 +76,7 @@ const STAGE_RANK = new Map<string, number>([
 
 /** One bar per stage that actually has rows. Legacy open keys stay in pipeline order, a named stage follows, then won and lost. */
 export function stageBuckets(rows: OppRow[]): StageBucket[] {
-  const buckets = new Map<string, StageBucket & { rank: number; micros: bigint }>();
+  const buckets = new Map<string, Omit<StageBucket, 'micros'> & { rank: number; micros: bigint }>();
   for (const row of rows) {
     const id = stageKey(row.stage);
     const current = buckets.get(id) ?? {
@@ -96,6 +98,7 @@ export function stageBuckets(rows: OppRow[]): StageBucket[] {
       ...bucket,
       value: microsToUnits(micros),
       amount: headlineMicrosLabel(micros, 'en-GB'),
+      micros: micros.toString(),
     }));
 }
 
