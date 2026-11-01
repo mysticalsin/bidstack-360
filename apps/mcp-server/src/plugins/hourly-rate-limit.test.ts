@@ -191,10 +191,24 @@ describe('mcp hourly rate-limit (Redis-backed)', () => {
     }
   });
 
-  it('fails open by default outside production when Redis is unreachable', async () => {
-    // Local/test runs should not require Redis just to exercise MCP tool
-    // contracts. Production flips this default through mcpRateLimitFailsClosed.
+  it('refuses MCP traffic when Redis is unreachable', async () => {
+    // WHY: development and test used to allow the call, so the shared hourly
+    // cap was skipped whenever Redis was down.
     const replica = await buildReplica({ redis: new FailingRedis() });
+    try {
+      const res = await callMcp(replica, 'any-token');
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({ message: 'MCP rate limiter unavailable' });
+    } finally {
+      await replica.close();
+    }
+  });
+
+  it('allows MCP traffic outside production only when fail-open is explicit', async () => {
+    const replica = await buildReplica({
+      redis: new FailingRedis(),
+      failClosedOnRedisError: false,
+    });
     try {
       const res = await callMcp(replica, 'any-token');
       expect(res.statusCode).toBe(200);
@@ -220,22 +234,24 @@ describe('mcp hourly rate-limit (Redis-backed)', () => {
     }
   });
 
-  it('defaults to fail-closed in production and allows explicit override', () => {
+  it('fails closed unless a non-production process explicitly opens the cap', () => {
+    // WHY: production used to honor MCP_RATE_LIMIT_FAIL_CLOSED=false inside
+    // the limiter even though boot validation rejects that setting.
     expect(mcpRateLimitFailsClosed({ NODE_ENV: 'production' })).toBe(true);
-    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'test' })).toBe(false);
-    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'development' })).toBe(false);
+    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'test' })).toBe(true);
+    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'development' })).toBe(true);
     expect(
       mcpRateLimitFailsClosed({
         NODE_ENV: 'development',
-        MCP_RATE_LIMIT_FAIL_CLOSED: 'true',
+        MCP_RATE_LIMIT_FAIL_CLOSED: 'false',
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       mcpRateLimitFailsClosed({
         NODE_ENV: 'production',
         MCP_RATE_LIMIT_FAIL_CLOSED: 'false',
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('only enforces on /mcp paths, leaving /health alone', async () => {
