@@ -76,12 +76,31 @@ describe('computeSignalCoverage', () => {
     expect(health.factors?.find((factor) => factor.key === 'contacts')?.whatItMeasures).toContain(
       '20 highest-influence contacts',
     );
+    expect(health.factors?.find((factor) => factor.key === 'contacts')?.recommendedAction).toContain(
+      'loaded page',
+    );
     expect(health.factors?.find((factor) => factor.key === 'pipeline')?.whatItMeasures).toContain(
       'latest 100 opportunities',
     );
     expect(health.factors?.find((factor) => factor.key === 'engagement')?.whatItMeasures).toContain(
       'latest 50 tasks',
     );
+  });
+
+  it('names the account open-deal count when the page holds only some of them', () => {
+    // WHY: one open deal on the latest page is not the account's open book.
+    const health = computeSignalCoverage(
+      {
+        company: company(),
+        contacts: [],
+        openDeals: [{ probability: 40, dueDate: new Date('2026-12-01T00:00:00.000Z'), owner: { email: 'o@x.com' } }],
+        tasks: [],
+      },
+      { dealsCapped: true, openDealCount: 40 },
+    );
+    const action = health.factors?.find((factor) => factor.key === 'pipeline')?.recommendedAction;
+    expect(action).toContain('1 open deal');
+    expect(action).toContain('40 open deals are on the account.');
   });
 
   it('rewards a fully covered account with a strong composite', () => {
@@ -260,6 +279,9 @@ describe('applyFieldOverrides', () => {
       coveragePages: { dealsCapped: true },
     });
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('40');
+    expect(cockpit.health.factors?.find((factor) => factor.key === 'pipeline')?.recommendedAction).toBe(
+      '40 open deals are on this account. None of them are in the latest opportunity page.',
+    );
     // WHY: Projects used the loaded page, so a full page of 100 read as the whole account.
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('140');
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.detail).toContain('latest page');

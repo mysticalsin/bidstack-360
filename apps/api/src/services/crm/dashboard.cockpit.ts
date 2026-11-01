@@ -61,16 +61,26 @@ function firmographicAction(company: z.infer<typeof CrmCompany>): string {
 
 function contactAction(
   contacts: Array<{ influence: number | null; email: string | null }>,
+  capped = false,
 ): string {
-  if (contacts.length === 0) return 'No stakeholders are linked to this account.';
+  if (contacts.length === 0) {
+    return capped
+      ? 'No stakeholders are in the loaded contact page.'
+      : 'No stakeholders are linked to this account.';
+  }
   const rated = contacts.filter((contact) => contact.influence != null).length;
   const withEmail = contacts.filter((contact) => contact.email).length;
   const ratedLabel =
     rated === 0 ? 'none have an influence rating' : `${rated} have an influence rating`;
   const emailLabel =
     withEmail === contacts.length ? 'all have an email' : `${withEmail} have an email`;
-  const countLabel =
-    contacts.length === 1 ? '1 linked contact' : `${contacts.length} linked contacts`;
+  const countLabel = capped
+    ? contacts.length === 1
+      ? '1 linked contact on the loaded page'
+      : `${contacts.length} linked contacts on the loaded page`
+    : contacts.length === 1
+      ? '1 linked contact'
+      : `${contacts.length} linked contacts`;
   return `${countLabel}. ${ratedLabel}; ${emailLabel}.`;
 }
 
@@ -94,21 +104,32 @@ function engagementAction(recent: number, openCount: number, onTrack: number): s
 
 function pipelineAction(
   openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>,
+  accountOpen?: number,
 ): string {
-  if (openDeals.length === 0) return 'No open deals are linked to this account.';
+  if (openDeals.length === 0) {
+    if (accountOpen != null && accountOpen > 0) {
+      const label = accountOpen === 1 ? '1 open deal is' : `${accountOpen} open deals are`;
+      return `${label} on this account. None of them are in the latest opportunity page.`;
+    }
+    return 'No open deals are linked to this account.';
+  }
   const missingProbability = openDeals.filter((deal) => !(deal.probability > 0)).length;
   const missingOwner = openDeals.filter((deal) => deal.owner == null).length;
   const missingDate = openDeals.filter((deal) => deal.dueDate == null).length;
   const countLabel = openDeals.length === 1 ? '1 open deal' : `${openDeals.length} open deals`;
+  const accountNote =
+    accountOpen != null && accountOpen !== openDeals.length
+      ? ` ${accountOpen === 1 ? '1 open deal is' : `${accountOpen} open deals are`} on the account.`
+      : '';
   if (missingProbability === 0 && missingOwner === 0 && missingDate === 0) {
-    return `${countLabel} with a probability above 0, an owner, and a close date.`;
+    return `${countLabel} with a probability above 0, an owner, and a close date.${accountNote}`;
   }
   const gaps = [
     missingProbability > 0 ? `${missingProbability} without a probability above 0` : null,
     missingOwner > 0 ? `${missingOwner} without an owner` : null,
     missingDate > 0 ? `${missingDate} without a close date` : null,
   ].filter((gap): gap is string => gap !== null);
-  return `${countLabel}. ${gaps.join('; ')}.`;
+  return `${countLabel}. ${gaps.join('; ')}.${accountNote}`;
 }
 
 function bandFor(score: number): HealthBandValue {
@@ -237,7 +258,12 @@ export function computeSignalCoverage(
     openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>;
     tasks: Array<{ status: string; dueDate: Date | null; createdAt: Date }>;
   },
-  pages?: { contactsCapped?: boolean; dealsCapped?: boolean; tasksCapped?: boolean },
+  pages?: {
+    contactsCapped?: boolean;
+    dealsCapped?: boolean;
+    tasksCapped?: boolean;
+    openDealCount?: number;
+  },
 ): CompanyHealth {
   const { company, contacts, openDeals, tasks } = input;
 
@@ -290,9 +316,9 @@ export function computeSignalCoverage(
   );
 
   firmographics.recommendedAction = firmographicAction(company);
-  contactFactor.recommendedAction = contactAction(contacts);
+  contactFactor.recommendedAction = contactAction(contacts, pages?.contactsCapped);
   engagement.recommendedAction = engagementAction(recent, open.length, onTrack);
-  pipeline.recommendedAction = pipelineAction(openDeals);
+  pipeline.recommendedAction = pipelineAction(openDeals, pages?.dealsCapped ? pages.openDealCount : undefined);
   if (pages?.contactsCapped) {
     contactFactor.whatItMeasures += ` Scored from the ${COCKPIT_CONTACT_PAGE} highest-influence contacts.`;
   }
@@ -1037,7 +1063,7 @@ export function buildCockpit({
       contacts: accountContacts,
       openDeals,
       tasks: accountTasks,
-    }, coveragePages),
+    }, { ...coveragePages, openDealCount }),
     keyContacts: keyContactRows.map((contact) => ({
       id: contact.id,
       source: 'external_crm',
