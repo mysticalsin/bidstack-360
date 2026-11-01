@@ -1,0 +1,5 @@
+# Layers the boot script onto an already built polo-preview image.
+FROM polo-preview:local
+COPY preview-entrypoint.sh /usr/local/bin/preview-entrypoint.sh
+RUN chmod 755 /usr/local/bin/preview-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/preview-entrypoint.sh"]

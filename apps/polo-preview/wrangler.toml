@@ -1,13 +1,16 @@
-# polo-preview Worker. Deploy ONLY from the preview box with
-# `npx wrangler deploy` after a human review. CI must never upload this
-# script: a binding/secret/migration mismatch drops the box relay and the
-# Access-gated URL goes 502.
+# polo-preview Worker. The Access front door stays. The origin is a Cloudflare
+# Container (PreviewOrigin), kept awake by the cron below. The box relay is
+# only a fallback when PREVIEW is not bound.
 #
 # Existing production identity (do not recreate):
 #   account 294885a27b3cc0a1cbe5d0ccbe38de4f
 #   worker  polo-preview
 #   DO      RELAY / Relay / namespace 0d921e2b3ba74386afdb1147745866d0
 #   secret  RELAY_KEY (set once on the Worker; never committed)
+#
+# v1 must stay exactly as it was applied. v2 only adds PreviewOrigin. Do not
+# delete Relay, rename it, or drop RELAY_KEY. Wrangler keeps secrets that are
+# not in this file. CI must not upload this script.
 
 name = "polo-preview"
 main = "src/worker.js"
@@ -19,12 +22,33 @@ workers_dev = true
 ACCESS_AUD = "826c47f72e2aa2bb7973d533363fcc2b536137578c33a3f1972afb90584e686c"
 ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com"
 
+[secrets]
+required = ["RELAY_KEY"]
+
 [[durable_objects.bindings]]
 name = "RELAY"
 class_name = "Relay"
 
-# v1 already exists on the live Worker. Do not add a second migration tag
-# unless you intend to replace the namespace (that disconnects the box).
+[[durable_objects.bindings]]
+name = "PREVIEW"
+class_name = "PreviewOrigin"
+
+# v1 already exists on the live Worker. Leave it unchanged.
 [[migrations]]
 tag = "v1"
 new_classes = ["Relay"]
+
+# Adds the container class. Does not replace the Relay namespace.
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["PreviewOrigin"]
+
+[[containers]]
+class_name = "PreviewOrigin"
+image = "./Dockerfile"
+image_build_context = "../.."
+max_instances = 5
+instance_type = "standard-3"
+
+[triggers]
+crons = ["* * * * *"]

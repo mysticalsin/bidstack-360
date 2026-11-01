@@ -7,6 +7,26 @@ export const API_PATHS = ['/api', '/readyz', '/livez', '/health', '/metrics', '/
 
 export const PUBLIC_PREVIEW_ORIGIN = 'https://polo-preview.tony-walteur.workers.dev';
 
+// The box socket is optional. When the Worker has a container binding, that
+// container is the origin even if no laptop is connected. The offline sentence
+// is only for a Worker that still has nothing else to serve.
+export const BOX_OFFLINE = 'Polo preview backend is offline (box relay not connected).';
+export const ORIGIN_STARTING =
+  'Polo preview is starting on Cloudflare. Try again in a moment.';
+
+export function originKind({ hasContainer, relayConnected }) {
+  if (hasContainer) return 'container';
+  if (relayConnected) return 'relay';
+  return 'offline';
+}
+
+// Nginx returns text/html 502 while Postgres is still migrating. A JSON 502
+// is the API speaking and must be returned as-is (agreements stay JSON).
+export function replaceUpstreamFailure(status, contentType) {
+  if (status !== 502 && status !== 503) return false;
+  return !String(contentType || '').toLowerCase().includes('application/json');
+}
+
 export const DROP_REQUEST = [
   'host',
   'cf-access-jwt-assertion',
