@@ -23,12 +23,14 @@ function byRecordedValue(a: OppRow, b: OppRow): number {
   return av > bv ? -1 : 1;
 }
 
-export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'Dashboard' }: {
+export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'Dashboard', rowsCapped = false }: {
   rows: OppRow[];
   filter: OppDrillFilter | null;
   onFilterChange: (f: OppDrillFilter) => void;
   onClose: () => void;
   rootLabel?: string;
+  /** The rows are the latest 100 updated bids, not the whole book. */
+  rowsCapped?: boolean;
 }) {
   const [q, setQ] = useState('');
   const f = useMemo<OppDrillFilter>(() => filter ?? {}, [filter]);
@@ -60,7 +62,13 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
     return value > max ? value : max;
   }, 1n);
 
-  const title = f.account ?? (f.stage ? stageText(f.stage) : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
+  const title = rowsCapped && f.thisYear && !f.account && !f.stage
+    ? 'Won this year · latest 100 bids'
+    : f.account ?? (f.stage ? stageText(f.stage) : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
+  const bidCount = `${shown.length} bid${shown.length === 1 ? '' : 's'}`;
+  const caption = rowsCapped
+    ? `${bidCount} in the latest 100 updated bids, worth ${totalLabel}. Pick a stage or a bid to go deeper.`
+    : `${bidCount} worth ${totalLabel}. Pick a stage or a bid to go deeper.`;
   const trail: DrillCrumb[] = [
     { label: rootLabel, onSelect: onClose },
     { label: STATUS_LABEL[status], onSelect: f.stage || f.account ? () => onFilterChange({ status, thisYear: f.thisYear }) : undefined },
@@ -74,11 +82,11 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
       onOpenChange={(o) => { if (!o) onClose(); }}
       testId="opp-drill"
       title={title}
-      caption={`${shown.length} bid${shown.length === 1 ? '' : 's'} worth ${totalLabel}. Pick a stage or a bid to go deeper.`}
+      caption={caption}
       trail={trail}
       stats={[
         { label: 'Bids', value: shown.length },
-        { label: 'Total value', value: totalLabel },
+        { label: rowsCapped ? 'Value on this page' : 'Total value', value: totalLabel },
         ...(status === 'open' || status === 'all' ? [{ label: 'Weighted', value: weightedLabel }] : []),
       ]}
       filters={

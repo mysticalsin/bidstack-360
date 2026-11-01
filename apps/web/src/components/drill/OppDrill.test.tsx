@@ -94,4 +94,23 @@ describe('OppDrill', () => {
     expect(screen.getByRole('link', { name: 'Bid 100' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Bid 0' })).toBeNull();
   });
+
+  it('says the sheet is the latest 100 updated bids when the snapshot continues', () => {
+    // WHY: the drill counted the loaded rows as the year. Another page means older wins are missing.
+    render(
+      <MemoryRouter>
+        <OppDrill
+          rows={rows}
+          filter={{ status: 'won', thisYear: true }}
+          onFilterChange={() => {}}
+          onClose={() => {}}
+          rowsCapped
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Won this year · latest 100 bids')).toBeTruthy();
+    expect(screen.getByText(/in the latest 100 updated bids, worth/)).toBeTruthy();
+    expect(screen.getByText('Value on this page')).toBeTruthy();
+    expect(screen.queryByText('Total value')).toBeNull();
+  });
 });
