@@ -13,6 +13,20 @@ export interface PipelineKpis {
 
 type StageSum = { stage: string; _count: { _all: number }; _sum: { valueMicros: bigint | number | null } };
 
+function weightedMicrosFromText(value: string | null | undefined): bigint {
+  const whole = (value ?? '0').split('.')[0]?.trim() || '0';
+  return BigInt(whole);
+}
+
+/** Round to the cent in integer micros, then convert. Float rounding moves this amount by one cent. */
+function unitsRoundedToCents(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const cents = (abs + 5_000n) / 10_000n;
+  const rounded = cents * 10_000n;
+  return microsToUnits(negative ? -rounded : rounded);
+}
+
 function asMicros(value: bigint | number | null | undefined): bigint {
   if (typeof value === 'bigint') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value));
@@ -107,16 +121,15 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   });
 
   // Weighted pipeline + avg-open-age over the FULL open set, not a take:1000
-  // sample. WHY raw SQL: weighted = SUM(value/1e6 * prob/100) is a row-wise
-  // product reduced to a scalar, and avg-open-age floors fractional days PER ROW
-  // (matching the prior daysBetween → Math.floor) before averaging — neither is
-  // expressible via prisma.aggregate. floor(epoch/86400) mirrors Math.floor on
-  // (now - created_at) in whole days.
+  // sample. WHY raw SQL: weighted micros are a row-wise product reduced to a
+  // scalar, kept in numeric so a large amount is not rounded before the cent.
+  // Avg-open-age floors fractional days per row. Neither is a prisma aggregate.
+  // floor(epoch/86400) mirrors Math.floor on (now - created_at) in whole days.
   const [agg] = await prisma.$queryRaw<
-    Array<{ weighted: number | null; avgDaysOpen: number | null; openCount: number }>
+    Array<{ weightedMicros: string | null; avgDaysOpen: number | null; openCount: number }>
   >(Prisma.sql`
     SELECT
-      SUM((o.value_micros::float8 / 1000000.0) * (o.probability::float8 / 100.0)) AS "weighted",
+      COALESCE(SUM(ROUND((o.value_micros::numeric * o.probability) / 100)), 0)::text AS "weightedMicros",
       AVG(floor(EXTRACT(EPOCH FROM (now() - o.created_at)) / 86400.0)) AS "avgDaysOpen",
       COUNT(*)::int AS "openCount"
     FROM opportunities o
@@ -130,7 +143,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
           AND (ps.is_lost OR ps.is_won)
       )
   `);
-  const weighted = agg?.weighted ?? 0;
+  const weighted = unitsRoundedToCents(weightedMicrosFromText(agg?.weightedMicros));
   const avgDaysOpen =
     agg && agg.openCount > 0 && agg.avgDaysOpen != null ? Math.round(agg.avgDaysOpen) : null;
 
@@ -138,7 +151,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
     byStage,
     totalOpen: open.reduce((acc, s) => acc + s.count, 0),
     totalValueOpen: open.reduce((acc, s) => acc + s.valueSum, 0),
-    weightedPipeline: Math.round(weighted * 100) / 100,
+    weightedPipeline: weighted,
     velocity: { avgDaysOpen, closedThisQuarter },
   };
 }
