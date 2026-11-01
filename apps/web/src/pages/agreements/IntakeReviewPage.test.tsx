@@ -31,7 +31,7 @@ vi.mock('@/hooks/useSigningEntities', () => ({
 
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 
-import IntakeReviewPage from './IntakeReviewPage';
+import IntakeReviewPage, { formatExtractedMicros } from './IntakeReviewPage';
 
 afterEach(cleanup);
 
@@ -88,5 +88,12 @@ describe('IntakeReviewPage', () => {
     fireEvent.click(screen.getByTestId('msa-review-confirm'));
     await waitFor(() => expect(confirm).toHaveBeenCalled());
     expect(document.body.textContent).not.toMatch(/[\u2014]/);
+  });
+
+  it('prints a contract cent and refuses an unsafe amount', () => {
+    // WHY: dividing micros by 1e6 showed 250,000.5 and 333.333 on the review.
+    expect(formatExtractedMicros(250_000_500_000)).toBe('250,000.50');
+    expect(formatExtractedMicros(333_333_333)).toBe('333.33');
+    expect(formatExtractedMicros(Number.MAX_SAFE_INTEGER + 2)).toBe('amount not readable');
   });
 });

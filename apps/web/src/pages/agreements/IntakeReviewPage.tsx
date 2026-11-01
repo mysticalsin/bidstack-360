@@ -3,13 +3,19 @@ import '@/components/agreements/agreements.css';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { LOW_CONFIDENCE_BPS, type MsaExtractedField } from '@bidstack/shared';
+import { formatMicrosAmount, LOW_CONFIDENCE_BPS, type MsaExtractedField } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 import { useSigningEntities } from '@/hooks/useSigningEntities';
+
+/** A contract amount in micros. An unsafe number is not printed as a nearby figure. */
+export function formatExtractedMicros(micros: number): string {
+  if (!Number.isSafeInteger(micros) || micros < 0) return 'amount not readable';
+  return formatMicrosAmount(micros);
+}
 
 function cite(field: MsaExtractedField): string {
   if (!field.found) return 'not found';
@@ -25,7 +31,7 @@ function display(field: MsaExtractedField): string {
   if (typeof field.value === 'string') return field.value;
   if (field.key === 'liabilityCap' && typeof field.value === 'object') {
     const cap = field.value as { amountMicros?: number; currency?: string };
-    if (cap.amountMicros != null) return `${(cap.amountMicros / 1_000_000).toLocaleString('en-GB')} ${cap.currency ?? ''}`.trim();
+    if (cap.amountMicros != null) return `${formatExtractedMicros(cap.amountMicros)} ${cap.currency ?? ''}`.trim();
   }
   if (Array.isArray(field.value)) {
     return field.value
@@ -33,7 +39,7 @@ function display(field: MsaExtractedField): string {
         if (!row || typeof row !== 'object') return JSON.stringify(row);
         const item = row as { name?: string; role?: string; rateMicros?: number; unit?: string };
         if (item.role && item.rateMicros != null) {
-          return `${item.role}: ${(item.rateMicros / 1_000_000).toLocaleString('en-GB')} / ${item.unit ?? 'day'}`;
+          return `${item.role}: ${formatExtractedMicros(item.rateMicros)} / ${item.unit ?? 'day'}`;
         }
         if (item.name) return item.name;
         return JSON.stringify(row);
