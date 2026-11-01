@@ -27,6 +27,7 @@ import {
   formatUnspecifiedCompact,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
+import { pipelineHeadline } from '@/components/dashboard/widgets/PipelineByStageMini';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -37,6 +38,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
+import { PipelineOpenChart } from './pipelineBoard/PipelineOpenChart';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
@@ -237,37 +239,28 @@ export function PipelinePage() {
       {!isLoading && data && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
           {(() => {
-            const rep = report.data;
-            const byStage = rep?.byStage ?? [];
-            const totalValue = byStage.reduce((acc, s) => acc + s.valueSum, 0);
-            const closedWon = byStage.find((s) => s.stage === 'closed_won')?.count ?? 0;
-            const closedLost = byStage.find((s) => s.stage === 'closed_lost')?.count ?? 0;
-            const closedTotal = closedWon + closedLost;
+            const headline = pipelineHeadline(report.data?.byStage ?? []);
             const winRate =
-              closedTotal > 0
-                ? `${Math.round((closedWon / closedTotal) * 100)}%`
-                : t('pipeline.winRateNoClosedBids', 'No closed bids');
+              headline.winRate === null
+                ? t('pipeline.winRateNoClosedBids', 'No closed bids')
+                : `${Math.round(headline.winRate * 100)}%`;
             const loading = report.isLoading;
             return [
               {
-                label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatUnspecifiedCompact(totalValue),
-                tone: 'blue' as const,
+                label: t('pipeline.kpiOpenValue', 'Open pipeline'),
+                value: loading ? '…' : formatUnspecifiedCompact(headline.openValue),
               },
               {
-                label: t('pipeline.kpiOpenValue', 'Open value'),
-                value: loading ? '…' : formatUnspecifiedCompact(rep?.totalValueOpen ?? 0),
-                tone: 'jade' as const,
+                label: t('pipeline.kpiWonValue', 'Won'),
+                value: loading ? '…' : formatUnspecifiedCompact(headline.wonValue),
+              },
+              {
+                label: t('pipeline.kpiLostValue', 'Lost'),
+                value: loading ? '…' : formatUnspecifiedCompact(headline.lostValue),
               },
               {
                 label: t('pipeline.kpiWinRate', 'Win rate'),
                 value: loading ? '…' : winRate,
-                tone: 'amber' as const,
-              },
-              {
-                label: t('pipeline.kpiActiveDeals', 'Active deals'),
-                value: loading ? '…' : String(rep?.totalOpen ?? 0),
-                tone: 'purple' as const,
               },
             ];
           })().map((kpi) => (
@@ -289,11 +282,12 @@ export function PipelinePage() {
         <p className="text-xs text-[var(--fg-tertiary)]">
           {t(
             'pipeline.amountBasis',
-            'Pipeline amounts are unspecified opportunity value on this board. {{basis}}. Win rate is recorded closed-won ÷ closed deals in this view.',
+            'These figures are every recorded opportunity, not the cards on this board and not the stage filter. {{basis}}. Open pipeline leaves out closed won and lost. Win rate is closed-won count divided by closed deals.',
             { basis: UNSPECIFIED_CURRENCY_BASIS },
           )}
         </p>
       ) : null}
+      {!isLoading && report.data ? <PipelineOpenChart stages={report.data.byStage} /> : null}
 
       {isError ? (
         <ErrorState
