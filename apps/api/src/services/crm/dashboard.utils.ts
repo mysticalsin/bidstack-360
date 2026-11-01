@@ -174,6 +174,13 @@ export function normalizeName(value: string) {
     .replace(/^-|-$/g, '');
 }
 
+/**
+ * Postgres expression for normalizeName(customer). The cockpit looks a
+ * customer-only company up by this key instead of the newest 1000 names.
+ */
+export const OPPORTUNITY_CUSTOMER_KEY_SQL =
+  "trim(both '-' from regexp_replace(lower(btrim(customer)), '[^a-z0-9]+', '-', 'g'))";
+
 export function normalizeCountry(country: string | null | undefined) {
   if (!country) return null;
   const normalized = country.trim().toUpperCase();

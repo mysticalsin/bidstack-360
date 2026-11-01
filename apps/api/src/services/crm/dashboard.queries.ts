@@ -23,7 +23,13 @@ import type {
 import { buildCompanies } from './company-enrichment.service.js';
 import { buildCockpit, microsText, type AccountPerformance } from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
-import { asProviderStatus, normalizeName, record, recordedDealStage } from './dashboard.utils.js';
+import {
+  asProviderStatus,
+  normalizeName,
+  OPPORTUNITY_CUSTOMER_KEY_SQL,
+  record,
+  recordedDealStage,
+} from './dashboard.utils.js';
 import {
   applyOpportunityScope,
   countryVariantsForScope,
@@ -297,16 +303,18 @@ export async function resolveCockpitCompany(
     }
     return resolved ?? null;
   }
-  // Opportunity-only company: no normalized column to index on, so match within
-  // a bounded set of distinct customers (kept under the dev query-guard's 1000
-  // cap; ~5x the old 200 window).
-  const opportunities = await prisma.opportunity.findMany({
-    where: { orgId },
-    select: OPP_COMPANY_SELECT,
-    orderBy: { updatedAt: 'desc' },
-    distinct: ['customer'],
-    take: 1000,
-  });
+  // Opportunity-only company. The id is normalizeName(customer). Match that key
+  // in Postgres so a name outside the newest 1000 customers still resolves.
+  const opportunities = await prisma.$queryRaw<
+    Array<{ customer: string; industry: string | null; logoUrl: string | null; updatedAt: Date }>
+  >(Prisma.sql`
+    SELECT customer, industry, logo_url AS "logoUrl", updated_at AS "updatedAt"
+    FROM opportunities
+    WHERE org_id = ${orgId}::uuid
+      AND ${Prisma.raw(OPPORTUNITY_CUSTOMER_KEY_SQL)} = ${companyId}
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `);
   return buildCompanies(opportunities, []).find((c) => c.id === companyId) ?? null;
 }
 
