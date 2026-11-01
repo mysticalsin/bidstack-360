@@ -151,7 +151,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       where: { orgId, deletedAt: null, valueMicros: { gt: 0n }, ...wonOutcomeWhere() },
       select: { name: true, valueMicros: true, companyId: true },
       orderBy: { closedAt: 'desc' },
-      take: WON_REFERENCE_SAMPLE + 1,
+      take: WON_REFERENCE_SAMPLE,
     }),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, kind: { in: [...RISK_KINDS] }, occurredAt: { gte: new Date(now.getTime() - 365 * DAY) }, ...hideSampleWhere(live) },
@@ -185,8 +185,10 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const finSignals = finLite(fin).filter((s) => !s.sample);
   const finSource = latest?.source ?? fin.entity?.source ?? null;
 
-  const wonCapped = wonOrg.length > WON_REFERENCE_SAMPLE;
-  const wonRows = wonCapped ? wonOrg.slice(0, WON_REFERENCE_SAMPLE) : wonOrg;
+  const wonCapped = wonOrg.length === WON_REFERENCE_SAMPLE && (await prisma.opportunity.count({
+    where: { orgId, deletedAt: null, valueMicros: { gt: 0n }, ...wonOutcomeWhere() },
+  })) > WON_REFERENCE_SAMPLE;
+  const wonRows = wonOrg;
   const won: WonDeal[] = wonRows.map((o) => ({ name: o.name, valueMicros: o.valueMicros ?? 0n, here: !!o.companyId && ids.includes(o.companyId) }));
   const plays = buildPlays({ initiatives, financialSignals: finSignals, financialSource: finSource, people, won, wonSampleLimit: wonCapped ? WON_REFERENCE_SAMPLE : null, themeOf: themeForText, now });
 

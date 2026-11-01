@@ -789,6 +789,8 @@ export const PortfolioMomentum = z.object({
       dealsCapped: z.boolean().optional(),
       /** True when meetings, postings, or watch events used the latest 1000 rows. */
       feedsCapped: z.boolean().optional(),
+      /** True when direct subsidiaries filled the 1000-row rollup. */
+      childrenCapped: z.boolean().optional(),
       series: z.array(z.number().int()),
       sample: z.boolean(),
       coverage: z.number(),
