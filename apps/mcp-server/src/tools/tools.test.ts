@@ -341,12 +341,21 @@ describeDb('MCP tools', () => {
       },
       ctx,
     )) as { id: string };
+    const company = await prisma.company.create({
+      data: { orgId, name: `Lead Co ${randomBytes(4).toString('hex')}` },
+    });
+    await prisma.lead.update({ where: { id: created.id }, data: { companyId: company.id } });
     const out = (await tools['leads.get'].handler({ id: created.id }, ctx)) as {
       id: string;
       firstName: string;
+      companyId: string | null;
+      companyName: string;
     };
     expect(out.id).toBe(created.id);
     expect(out.firstName).toBe('Bob');
+    // WHY: the company name on the lead is a label. Dust needs the id to know the link.
+    expect(out.companyName).toBe('Beta Corp');
+    expect(out.companyId).toBe(company.id);
   });
 
   it('leads.update patches a lead', async () => {
@@ -405,9 +414,13 @@ describeDb('MCP tools', () => {
     const out = (await tools['contacts.get'].handler({ id: created.id }, ctx)) as {
       id: string;
       name: string;
+      companyId: string | null;
+      linkState: string;
     };
     expect(out.id).toBe(created.id);
     expect(out.name).toBe('Bob Jones');
+    expect(out.companyId).toBe(company.id);
+    expect(out.linkState).toBe('linked');
   });
 
   it('crm_list_activities returns linked events, not a customer-name match', async () => {
