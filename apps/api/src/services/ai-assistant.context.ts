@@ -13,6 +13,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+import { excludeClosedOutcome } from '../routes/opportunities.helpers.js';
+
 import { sanitiseContactForPrompt } from './ai-assistant.helpers.js';
 
 // ─── Email draft context ──────────────────────────────────────────────────
@@ -134,8 +136,9 @@ export async function buildMeetingContext(orgId: string, calendarEventId: string
       where: {
         orgId,
         id: event.relatedEntityId,
-        stage: { not: 'closed_lost' },
         deletedAt: null,
+        // A live lost or won flag is not an open deal in the brief.
+        ...excludeClosedOutcome(),
       },
       select: { id: true, name: true, stage: true },
       take: 5,
