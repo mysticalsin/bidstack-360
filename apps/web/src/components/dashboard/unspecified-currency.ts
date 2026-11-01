@@ -122,37 +122,72 @@ function compactMicrosMagnitude(micros: bigint): number {
   return negative ? -magnitude : magnitude;
 }
 
-function compactScale(units: bigint): bigint {
-  const abs = units < 0n ? -units : units;
-  if (abs >= 1_000_000_000_000n) return 1_000_000_000_000n;
-  if (abs >= 1_000_000_000n) return 1_000_000_000n;
-  if (abs >= 1_000_000n) return 1_000_000n;
-  if (abs >= 1_000n) return 1_000n;
-  return 1n;
+function compactFormatter(locale?: string): Intl.NumberFormat {
+  return new Intl.NumberFormat(locale, {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  });
 }
 
-/** Two compact fraction digits recover this cent. 12,015,000 does not survive as 12.02M. */
-function compactKeepsCents(absMicros: bigint): boolean {
+/**
+ * The unit count a compact label actually names, using that locale's step.
+ * Japanese 万 is 10,000. English M is 1,000,000. Null when the label cannot be read.
+ */
+function compactDisplayedUnits(absMicros: bigint, locale?: string): bigint | null {
   const cents = (absMicros + 5_000n) / 10_000n;
-  const scale = compactScale(cents / 100n);
-  const rounded = ((cents + scale / 2n) / scale) * scale;
-  return rounded === cents;
+  const units = cents / 100n;
+  const frac = cents % 100n;
+  if (units > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const magnitude = Number(units) + Number(frac) / 100;
+  if (frac !== 0n && magnitude === Number(units)) return null;
+  const formatter = compactFormatter(locale);
+  const parts = formatter.formatToParts(magnitude);
+  let digits = '';
+  let fractionLen = 0;
+  let hasCompact = false;
+  for (const part of parts) {
+    if (part.type === 'integer' || part.type === 'fraction') {
+      const numerals = part.value.replace(/\D/g, '');
+      digits += numerals;
+      if (part.type === 'fraction') fractionLen = numerals.length;
+    } else if (part.type === 'compact' && part.value.trim()) hasCompact = true;
+  }
+  if (!digits) return null;
+  const coefficient = BigInt(digits);
+  if (!hasCompact) {
+    const recovered =
+      fractionLen >= 2
+        ? coefficient / 10n ** BigInt(fractionLen - 2)
+        : coefficient * 10n ** BigInt(2 - fractionLen);
+    return recovered === cents ? units : null;
+  }
+  const label = formatter.format(magnitude);
+  for (let exponent = fractionLen; exponent <= fractionLen + 18; exponent += 1) {
+    const recovered = coefficient * 10n ** BigInt(exponent - fractionLen);
+    if (recovered > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    if (formatter.format(Number(recovered)) === label) return recovered;
+  }
+  return null;
+}
+
+/** The locale's compact label names this cent. 12.02M does not name 12,015,000. 1201.5万 does. */
+function compactKeepsCents(absMicros: bigint, locale?: string): boolean {
+  const cents = (absMicros + 5_000n) / 10_000n;
+  const shown = compactDisplayedUnits(absMicros, locale);
+  return shown != null && shown * 100n === cents;
 }
 
 /**
  * Compact while that label is the same cent. Past the safe unit count, or when
  * compact rounding moves the amount, the full integer.
  */
-export function headlineMicrosLabel(micros: string | number | bigint): string {
+export function headlineMicrosLabel(micros: string | number | bigint, locale?: string): string {
   const value = asMicros(micros);
   const abs = value < 0n ? -value : value;
-  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER) || !compactKeepsCents(abs)) {
+  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER) || !compactKeepsCents(abs, locale)) {
     return formatMicrosAmount(value);
   }
-  return new Intl.NumberFormat(undefined, {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(compactMicrosMagnitude(value));
+  return compactFormatter(locale).format(compactMicrosMagnitude(value));
 }
 
 /** Compact or full amount, with the missing-currency mark. */

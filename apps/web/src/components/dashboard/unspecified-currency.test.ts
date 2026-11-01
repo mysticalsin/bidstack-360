@@ -36,6 +36,10 @@ describe('exact unspecified amounts', () => {
     expect(headlineMicrosLabel('12015000000000')).not.toBe('12.02M');
     expect(headlineMicrosLabel('7860000000000')).toBe('7.86M');
     expect(headlineMicrosLabel('200000500000')).toBe('200,000.50');
+    // WHY: Japanese counts by 10,000, so 1201.5万 is this amount. Hindi 1.2 करोड़ is not.
+    expect(headlineMicrosLabel('12015000000000', 'ja')).toBe('1201.5万');
+    expect(headlineMicrosLabel('12015000000000', 'hi')).toBe('12,015,000');
+    expect(headlineMicrosLabel('7860000000000', 'hi')).toContain('78.6');
   });
 
   it('prints a deal from micros when the unit number is zero', () => {
