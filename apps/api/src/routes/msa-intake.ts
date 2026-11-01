@@ -8,6 +8,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import {
   citationsFromFields,
   extractMsaFields,
+  storableLiabilityCap,
   MsaAccountMatch,
   MsaExtractedFields,
   MsaIntakeConfirm,
@@ -336,9 +337,7 @@ export const msaIntakeRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const cap = overrides.liabilityCap !== undefined
         ? overrides.liabilityCap
-        : fields.liabilityCap.found
-          ? (fields.liabilityCap.value as { amountMicros: number; currency: string })
-          : null;
+        : storableLiabilityCap(fields.liabilityCap.value);
       const contractId = randomUUID();
       const title =
         req.body.title ??
