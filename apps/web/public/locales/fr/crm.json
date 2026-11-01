@@ -346,6 +346,7 @@
       "exportFailed": "Échec de l'exportation",
       "exportFailedDescription": "Réessayez dans un instant."
     },
+    "probabilityUnrecorded": "Non enregistrée",
     "confirmDelete": {
       "titleOne": "Supprimer {{count}} opportunité ?",
       "titleMany": "Supprimer {{count}} opportunités ?",
@@ -3555,8 +3556,8 @@
     "columnTerritory": "Territoire",
     "columnStage": "Étape",
     "columnValue": "Valeur",
-    "columnProbability": "Proxy d'étape",
-    "columnProbabilityTitle": "Probabilité d'étape enregistrée",
+    "columnProbability": "Probabilité enregistrée",
+    "columnProbabilityTitle": "Enregistrée sur l'affaire. Une valeur vide est stockée à 0 et n'est pas une chance de gain mesurée.",
     "columnDue": "Échéance"
   },
   "territorySegmentBreakdown": {

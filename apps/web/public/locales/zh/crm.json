@@ -106,6 +106,7 @@
       "exportFailed": "导出失败",
       "exportFailedDescription": "请稍后重试。"
     },
+    "probabilityUnrecorded": "未记录",
     "confirmDelete": {
       "titleOne": "删除 {{count}} 个商机？",
       "titleMany": "删除 {{count}} 个商机？",
@@ -3500,8 +3501,8 @@
     "columnTerritory": "地区",
     "columnStage": "阶段",
     "columnValue": "金额",
-    "columnProbability": "阶段代理",
-    "columnProbabilityTitle": "已记录的阶段概率",
+    "columnProbability": "已记录概率",
+    "columnProbabilityTitle": "记在商机上。空白会存成 0，不是测得的赢单概率。",
     "columnDue": "到期"
   },
   "territorySegmentBreakdown": {

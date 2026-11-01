@@ -449,7 +449,7 @@ export function OpportunitiesPage() {
             title={t('opportunities.empty.headline', 'No open bids yet')}
             message={t(
               'opportunities.empty.body',
-              "Convert a qualified lead or log the RFP you're chasing. Stage, value, and a stored stage probability are tracked from day one.",
+              "Convert a qualified lead or log the RFP you're chasing. Stage, value, and a stored probability are tracked from day one.",
             )}
             action={<CreateOpportunityDialog />}
             secondary={

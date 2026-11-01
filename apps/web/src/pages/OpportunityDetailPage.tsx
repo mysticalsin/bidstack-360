@@ -352,10 +352,14 @@ export function OpportunityDetailPage() {
                     min={0}
                     max={100}
                     step={5}
-                    suffix="%"
+                    display={(v) =>
+                      v === 0
+                        ? t('opportunities.probabilityUnrecorded', 'Not recorded')
+                        : `${v}%`
+                    }
                   />
                   <span>
-                    {t('opportunityDetail.storedProbabilityProxy', 'stored probability proxy')}
+                    {t('opportunityDetail.storedProbabilityProxy', 'not a measured win chance')}
                   </span>
                 </>
               ) : null}

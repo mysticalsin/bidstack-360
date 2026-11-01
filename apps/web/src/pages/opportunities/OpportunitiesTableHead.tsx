@@ -101,7 +101,7 @@ export function OpportunitiesTableHead({
           aria-sort={getSortableHeaderAriaSort('probability', sortState)}
           title={t(
             'opportunitiesTableHead.columnProbabilityTitle',
-            'Stored stage probability',
+            'Stored on the deal. A blank is saved as 0 and is not a measured win chance.',
           )}
           className="px-5 py-3 font-semibold"
         >
@@ -111,7 +111,7 @@ export function OpportunitiesTableHead({
             onChange={setSortState}
             align="right"
           >
-            {t('opportunitiesTableHead.columnProbability', 'Stage proxy')}
+            {t('opportunitiesTableHead.columnProbability', 'Stored probability')}
           </SortableHeader>
         </th>
         <th

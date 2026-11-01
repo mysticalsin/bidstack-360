@@ -26,6 +26,7 @@ import type { usePatchOpportunity } from '@/hooks/useOpportunities';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { celebratesWonMove, isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
+import { storedProbabilityLabel } from '@/lib/stored-probability';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -232,7 +233,10 @@ export const Row = memo(function Row({
 
       <td
         className="px-5 py-3 text-right"
-        title={t('opportunitiesTableHead.columnProbabilityTitle', 'Stored stage probability')}
+        title={t(
+          'opportunitiesTableHead.columnProbabilityTitle',
+          'Stored on the deal. A blank is saved as 0 and is not a measured win chance.',
+        )}
       >
         <NumberCell
           value={opp.probability}
@@ -241,7 +245,9 @@ export const Row = memo(function Row({
           step={5}
           align="right"
           isSaving={saving.probability}
-          format={(v) => `${v}%`}
+          format={(v) =>
+            storedProbabilityLabel(v, t('opportunities.probabilityUnrecorded', 'Not recorded'))
+          }
           onSave={(next) => {
             startSave('probability');
             patch.mutate(
@@ -249,7 +255,7 @@ export const Row = memo(function Row({
               {
                 onSuccess: () => {
                   endSave('probability');
-                  savedToast(t('opportunitiesTableHead.columnProbability', 'Stage proxy'));
+                  savedToast(t('opportunitiesTableHead.columnProbability', 'Stored probability'));
                   flash('probability');
                 },
                 onError: (err) => {

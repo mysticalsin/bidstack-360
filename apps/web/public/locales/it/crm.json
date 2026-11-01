@@ -106,6 +106,7 @@
       "exportFailed": "Esportazione non riuscita",
       "exportFailedDescription": "Riprova tra poco."
     },
+    "probabilityUnrecorded": "Non registrata",
     "confirmDelete": {
       "titleOne": "Eliminare {{count}} opportunità?",
       "titleMany": "Eliminare {{count}} opportunità?",
@@ -3500,8 +3501,8 @@
     "columnTerritory": "Territorio",
     "columnStage": "Fase",
     "columnValue": "Valore",
-    "columnProbability": "Proxy di fase",
-    "columnProbabilityTitle": "Probabilità di fase registrata",
+    "columnProbability": "Probabilità registrata",
+    "columnProbabilityTitle": "Registrata sull'affare. Un valore vuoto è salvato come 0 e non è una probabilità di vittoria misurata.",
     "columnDue": "Scadenza"
   },
   "territorySegmentBreakdown": {

@@ -41,7 +41,7 @@ export function GettingStarted() {
       title: t('orgDashboard.gettingStarted.opportunityTitle', 'Open your first opportunity'),
       body: t(
         'orgDashboard.gettingStarted.opportunityBody',
-        'Log the bid you are pursuing. Polo PreSales tracks its stage, value, and stored stage probability from qualification to signature.',
+        'Log the bid you are pursuing. Polo PreSales tracks its stage, value, and stored probability from qualification to signature.',
       ),
       cta: t('orgDashboard.gettingStarted.opportunityCta', 'Open an opportunity'),
       to: '/opportunities',
@@ -51,7 +51,7 @@ export function GettingStarted() {
       title: t('orgDashboard.gettingStarted.bidMatrixTitle', 'Score a bid/no-bid'),
       body: t(
         'orgDashboard.gettingStarted.bidMatrixBody',
-        'Before you commit a team, weigh the opportunity on fit and value with the Bid/No-Bid Matrix. Stored probability is a stage proxy.',
+        'Before you commit a team, weigh the opportunity on fit and value with the Bid/No-Bid Matrix. A blank stored probability is not a measured win chance.',
       ),
       cta: t('orgDashboard.gettingStarted.bidMatrixCta', 'Run the matrix'),
       to: '/bid-matrix',

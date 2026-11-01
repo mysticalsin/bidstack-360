@@ -150,9 +150,11 @@ export function OpportunityTab({
                 {formatUnspecifiedCompact(Number(o.valueMicros) / 1_000_000)}
               </TableCell>
               <TableCell>
-                {t('companyTabs.opportunities.probabilityValue', '{{percent}}% stored', {
-                  percent: o.probability,
-                })}
+                {o.probability === 0
+                  ? t('opportunities.probabilityUnrecorded', 'Not recorded')
+                  : t('companyTabs.opportunities.probabilityValue', '{{percent}}% stored', {
+                      percent: o.probability,
+                    })}
               </TableCell>
             </TableRow>
           ))}

@@ -10,8 +10,8 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('OpportunitiesTableHead probability column', () => {
-  it('labels the stored stage probability as a stage proxy', () => {
-    // Why: the column used to say Probability, which reads as a measured win chance.
+  it('labels the deal probability as stored, not a stage proxy', () => {
+    // Why: the column is the deal field. Calling it a stage proxy, or a bare win chance, is false.
     render(
       <table>
         <OpportunitiesTableHead
@@ -24,9 +24,11 @@ describe('OpportunitiesTableHead probability column', () => {
       </table>,
     );
 
-    const header = screen.getByRole('columnheader', { name: /Stage proxy/ });
-    expect(header.getAttribute('title')).toBe('Stored stage probability');
-    expect(screen.queryByRole('columnheader', { name: 'Probability' })).toBeNull();
+    const header = screen.getByRole('columnheader', { name: 'Stored probability' });
+    expect(header.getAttribute('title')).toBe(
+      'Stored on the deal. A blank is saved as 0 and is not a measured win chance.',
+    );
+    expect(screen.queryByRole('columnheader', { name: 'Stage proxy' })).toBeNull();
     const value = screen.getByRole('columnheader', { name: 'Value' });
     expect(value.getAttribute('title')).toBe('currency not recorded; not a euro forecast');
   });

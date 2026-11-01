@@ -106,6 +106,7 @@
       "exportFailed": "Falha na exportação",
       "exportFailedDescription": "Tente novamente em instantes."
     },
+    "probabilityUnrecorded": "Não registrada",
     "confirmDelete": {
       "titleOne": "Excluir {{count}} oportunidade?",
       "titleMany": "Excluir {{count}} oportunidades?",
@@ -3500,8 +3501,8 @@
     "columnTerritory": "Território",
     "columnStage": "Etapa",
     "columnValue": "Valor",
-    "columnProbability": "Proxy de etapa",
-    "columnProbabilityTitle": "Probabilidade de etapa registrada",
+    "columnProbability": "Probabilidade registrada",
+    "columnProbabilityTitle": "Registrada no negócio. Um valor em branco é salvo como 0 e não é uma chance de ganho medida.",
     "columnDue": "Vencimento"
   },
   "territorySegmentBreakdown": {

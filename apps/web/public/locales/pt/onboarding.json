@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Execute sua primeira decisão de propor ou não",
-        "description": "Pontue uma oportunidade por adequação e valor antes de se comprometer. A probabilidade registrada é um proxy de etapa."
+        "description": "Pontue uma oportunidade por adequação e valor antes de se comprometer. Uma probabilidade em branco não é uma chance de ganho medida."
       },
       "firstRfp": {
         "label": "Inicie sua primeira resposta a RFP",

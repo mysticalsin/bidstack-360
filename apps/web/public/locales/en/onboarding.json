@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "Run your first bid/no-bid",
-        "description": "Score an opportunity on fit and value before you commit. Stored probability is a stage proxy."
+        "description": "Score an opportunity on fit and value before you commit. A blank stored probability is not a measured win chance."
       },
       "firstRfp": {
         "label": "Start your first RFP response",

@@ -87,7 +87,7 @@ export function QuickStartPage() {
       label: t('quickStart.items.firstBidNoBid.label', 'Run your first bid/no-bid'),
       description: t(
         'quickStart.items.firstBidNoBid.description',
-        'Score an opportunity on fit and value before you commit. Stored probability is a stage proxy.',
+        'Score an opportunity on fit and value before you commit. A blank stored probability is not a measured win chance.',
       ),
       action: () => navigate('/bid-matrix'),
     },
