@@ -60,7 +60,11 @@ export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
         />
       ) : null}
       {diagram ? (
-        <div className="overflow-x-auto px-4 pb-2" aria-hidden="true">
+        <div
+          className="overflow-x-auto px-4 pb-2"
+          role="img"
+          aria-label={diagram.nodes.map((node) => node.name).join(', ')}
+        >
           <div className="min-w-[640px]">
             <SankeyChart
               data={{ nodes: diagram.nodes, links: diagram.links }}
@@ -69,9 +73,15 @@ export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
               animationDuration={reduced ? 0 : 400}
               margin={{ top: 8, right: 148, bottom: 8, left: 128 }}
             >
-              <SankeyLink useGradient={false} stroke="var(--chart-1)" strokeOpacity={0.4} />
+              <SankeyLink
+                useGradient={false}
+                stroke="var(--chart-1)"
+                strokeOpacity={0.45}
+                fadedOpacity={1}
+              />
               <SankeyNode
                 showValueLabels={false}
+                fadedOpacity={1}
                 labelOrientation="horizontal"
                 getNodeColor={(_node, index) =>
                   index === 0 ? 'var(--chart-1)' : 'var(--fg-tertiary)'
