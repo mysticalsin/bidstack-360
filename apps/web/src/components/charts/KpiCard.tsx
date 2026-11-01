@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
 import { Sparkline } from './Sparkline';
@@ -24,10 +25,12 @@ interface Props {
   className?: string;
 }
 
-function defaultFormat(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+export function formatKpiValue(n: number): string {
+  if (!Number.isFinite(n)) return '—';
+  if (!Number.isSafeInteger(n)) {
+    return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  }
+  return headlineMicrosLabel(BigInt(n) * 1_000_000n);
 }
 
 export function KpiCard({
@@ -37,7 +40,7 @@ export function KpiCard({
   deltaPercent,
   deltaPeriod,
   sparklineData,
-  format = defaultFormat,
+  format = formatKpiValue,
   loading = false,
   className,
 }: Props) {
