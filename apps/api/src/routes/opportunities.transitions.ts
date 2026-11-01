@@ -220,7 +220,9 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        include: { pipelineStage: { select: { name: true } } },
+        include: {
+          pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
+        },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
@@ -264,6 +266,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           name: opp.name,
           stage: opp.stage,
           pipelineStageName: opp.pipelineStage?.name ?? null,
+          pipelineStage: opp.pipelineStage,
           valueMicros: opp.valueMicros,
           probability: opp.probability,
           dueDate: opp.dueDate,
