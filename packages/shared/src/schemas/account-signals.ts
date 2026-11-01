@@ -419,6 +419,13 @@ const clamp = (v: number, lo = -1, hi = 1) => Math.max(lo, Math.min(hi, v));
 const ratioChange = (now: number, before: number) => (now === before ? 0 : (now - before) / Math.max(now, before));
 const inWindow = (d: Date, from: number, to: number) => d.getTime() > from && d.getTime() <= to;
 
+/** True when the oldest row is at or before the start of the window, so the window was fully read. */
+function pageReaches(dates: readonly Date[], asOf: number, days: number): boolean {
+  if (dates.length === 0) return false;
+  const oldest = Math.min(...dates.map((date) => date.getTime()));
+  return oldest <= asOf - days * DAY;
+}
+
 function ratioChangeMicros(now: bigint, before: bigint): number {
   if (now === before) return 0;
   const denom = now > before ? now : before;
@@ -531,7 +538,9 @@ function components(d: MomentumData, asOf: number): Component[] {
     out.push({
       key: 'winloss',
       signal: d.dealsArePage ? 0 : clamp((won - lost) / (won + lost)),
-      detail: `${won} won, ${lost} lost in the last 6 months`,
+      detail: d.dealsArePage
+        ? `${won} won, ${lost} lost on the latest page`
+        : `${won} won, ${lost} lost in the last 6 months`,
       scored: !d.dealsArePage,
     });
   }
@@ -546,17 +555,21 @@ function components(d: MomentumData, asOf: number): Component[] {
     const freq = a + b === 0 ? -0.5 : ratioChange(a, b);
     const when = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
     const count = `${a} meeting${a === 1 ? '' : 's'}`;
+    const fullCompare = !d.meetingsArePage || pageReaches(past, asOf, 120);
+    const recentComplete = !d.meetingsArePage || pageReaches(past, asOf, 60);
     out.push(
-      d.meetingsArePage
+      fullCompare
         ? {
-            key: 'meetings',
-            signal: recency,
-            detail: `${count} in 60 days on this page, last ${when}`,
-          }
-        : {
             key: 'meetings',
             signal: clamp(freq * 0.6 + recency * 0.4),
             detail: `${count} in 60 days (${b} before), last ${when}`,
+          }
+        : {
+            key: 'meetings',
+            signal: recency,
+            detail: recentComplete
+              ? `${count} in 60 days, last ${when}`
+              : `At least ${count} in 60 days, last ${when}`,
           },
     );
   }
@@ -568,8 +581,9 @@ function components(d: MomentumData, asOf: number): Component[] {
   if (hasPostings || hc !== null) {
     const parts: number[] = [];
     const words: string[] = [];
+    const postsCover = !d.postingsArePage || pageReaches(d.postings, asOf, 60);
     if (hasPostings) {
-      if (!d.postingsArePage) parts.push(ratioChange(pa, pb));
+      if (postsCover) parts.push(ratioChange(pa, pb));
       words.push(`${pa} roles posted in 30 days (${pb} before)`);
     }
     if (hc !== null) {
@@ -599,11 +613,14 @@ function components(d: MomentumData, asOf: number): Component[] {
     const neg = recent.filter((e) => e.sentiment < -0.15).length;
     const avg = s / w;
     const tone = avg > 0.15 ? 'mostly positive' : avg < -0.15 ? 'mostly negative' : 'mixed';
+    const newsCovers = !d.newsArePage || pageReaches(d.events.map((event) => event.occurredAt), asOf, 90);
     out.push({
       key: 'news',
-      signal: d.newsArePage ? 0 : clamp(avg * 1.4),
-      detail: `News ${tone}: ${pos} positive, ${neg} negative in 90 days`,
-      scored: !d.newsArePage,
+      signal: newsCovers ? clamp(avg * 1.4) : 0,
+      detail: newsCovers
+        ? `News ${tone}: ${pos} positive, ${neg} negative in 90 days`
+        : `News ${tone} on the latest page: ${pos} positive, ${neg} negative`,
+      scored: newsCovers,
     });
   }
   return out;
