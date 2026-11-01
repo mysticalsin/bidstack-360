@@ -15,6 +15,19 @@ import { prisma } from '@bidstack/db';
 import type { Tool } from './index.js';
 import { capPage } from './crm-tools.helpers.js';
 
+const DAY_MS = 86_400_000;
+
+/**
+ * An activity strictly before this instant is at least `days` UTC dates old.
+ * Subtracting `days` periods of 24 hours from the afternoon leaves that
+ * morning's activity inside the window.
+ */
+export function staleBefore(days: number, now = Date.now()): Date {
+  const at = new Date(now);
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  return new Date(today - (days - 1) * DAY_MS);
+}
+
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 const ListAccountsInput = z.object({
@@ -263,7 +276,8 @@ export const kamUpdateTaskStatus: Tool<typeof UpdateTaskStatusInput> = {
 const GetKpisInput = z.object({ companyId: z.string().uuid() });
 
 export const kamGetKpis: Tool<typeof GetKpisInput> = {
-  description: "Per-account KAM KPIs: initiatives by stage, open/done tasks, prospection count, stale-initiative count.",
+  description:
+    'Per-account KAM KPIs: initiatives by stage, open/done tasks, prospection count, and initiatives whose last activity is at least 14 UTC dates old.',
   input: GetKpisInput,
   inputJsonSchema: {
     type: 'object',
@@ -277,7 +291,7 @@ export const kamGetKpis: Tool<typeof GetKpisInput> = {
       select: { id: true },
     });
     if (!company) throw new Error('Account not found');
-    const threshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const threshold = staleBefore(14);
     const [stageGroups, openTasks, doneTasks, prospectionCount, staleCount] = await Promise.all([
       prisma.kamInitiative.groupBy({ by: ['stage'], where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null }, _count: { _all: true } }),
       prisma.task.count({ where: { orgId: ctx.orgId, accountId: args.companyId, deletedAt: null, status: { not: 'done' } } }),
