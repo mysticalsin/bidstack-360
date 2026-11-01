@@ -65,6 +65,7 @@ import { accountEnrichmentRoutes } from './routes/account-enrichment.js';
 import orgChartRoutes from './routes/org-chart.js';
 import orgChartFileRoutes from './routes/org-chart-files.js';
 import { accountWatchdogRoutes } from './routes/account-watchdog.js';
+import { accountFinancialsRoutes } from './routes/account-financials.js';
 import { accountSignalsRoutes } from './routes/account-signals.js';
 import { winLossRoutes } from './routes/win-loss.js';
 import { governanceRoutes } from './routes/governance.js';
@@ -182,6 +183,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(orgChartRoutes, { prefix: '/api/v1' });
   await server.register(orgChartFileRoutes, { prefix: '/api/v1' });
   await server.register(accountWatchdogRoutes, { prefix: '/api/v1' });
+  await server.register(accountFinancialsRoutes, { prefix: '/api/v1' });
   await server.register(accountSignalsRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });

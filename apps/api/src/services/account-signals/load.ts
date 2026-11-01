@@ -138,11 +138,12 @@ export function momentumFor(loaded: LoadedSignals | undefined, now: Date): Momen
 
 /** Watchdog sources and whether each one is feeding this account now. */
 export async function sourceStatus(orgId: string, companyId: string, env: Record<string, string | undefined> = process.env) {
-  const [subject, firmo, meetings, company] = await Promise.all([
+  const [subject, firmo, meetings, company, finProfile] = await Promise.all([
     prisma.accountWatchSubject.findFirst({ where: { orgId, companyId }, select: { enabled: true, secCik: true, companiesHouseNumber: true, irFeedUrl: true, identifiersConfirmedAt: true, ticker: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { status: true, fetchedAt: true } }),
     prisma.meetingIntel.count({ where: { orgId, companyId, deletedAt: null } }),
     prisma.company.findFirst({ where: { orgId, id: companyId }, select: { domain: true } }),
+    prisma.accountFinancialProfile.findFirst({ where: { orgId, companyId }, select: { status: true } }),
   ]);
   const ids = newsIdentifiers(company?.domain, subject);
   const news = (env.WATCHDOG_NEWS_SOURCES ?? '').split(',').map((s) => s.trim());
@@ -154,6 +155,7 @@ export async function sourceStatus(orgId: string, companyId: string, env: Record
     { id: 'news', label: 'News (GDELT, Google News)', active: (news.includes('gdelt') || news.includes('google_news')) && !ids.hint, hint: ids.hint },
     { id: 'press', label: 'Company press feed', active: news.includes('company_rss') && Boolean(subject?.irFeedUrl) },
     { id: 'filings', label: 'Public filings', active: confirmed && Boolean(subject?.secCik || subject?.companiesHouseNumber) },
+    { id: 'financials', label: 'Financial statements (EDGAR, ESEF)', active: finProfile?.status === 'ok' },
     { id: 'linkedin', label: 'LinkedIn updates (provider)', active: env.WATCHDOG_APIFY_LINKEDIN_ENABLED === 'true' && Boolean(env.APIFY_TOKEN) },
   ];
 }

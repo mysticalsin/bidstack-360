@@ -1,0 +1,15 @@
+/* v23 Financial health: same surface and type scale as the watchdog. */
+.fh-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .fh-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fh-tile { display: grid; gap: 4px; align-content: start; min-width: 0; padding: 12px; border: 1px solid var(--wd-line); border-radius: 8px; }
+.fh-value { font-size: 18px; font-weight: 500; color: var(--wd-ink); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fh-delta { font-size: 13px; font-weight: 400; color: var(--wd-muted); }
+.fh-none { font-size: 14px; color: var(--wd-muted); }
+.fh-src { font-size: 12px; color: var(--wd-muted); }
+.fh-cards .fh-card + .fh-card { border-top: 1px solid var(--wd-line); }
+.fh-quote { margin: 0; padding: 8px 12px; border-left: 2px solid var(--wd-line); font-size: 13px; line-height: 1.5; color: var(--fg-secondary, #444); }
+.fh-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-top: 16px; }
+.fh-empty { display: grid; gap: 12px; max-width: 64ch; }
+.fh-empty p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--fg-secondary, #444); }
+.fh-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--wd-ink); cursor: pointer; }
+.fh-toggle input { width: 18px; height: 18px; accent-color: var(--brand-primary, #006b4f); }

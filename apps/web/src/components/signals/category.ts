@@ -58,6 +58,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   seamless: 'Seamless',
   enrichment: 'Hiring signals',
   meeting_intel: 'Meeting intel',
+  financials: 'Filed financials',
   sample: 'Sample data',
 };
 

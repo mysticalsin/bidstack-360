@@ -12,6 +12,7 @@ import {
 } from '@bidstack/shared';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
+import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
@@ -277,6 +278,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         ...cfOps,
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
+      // v23: a tier change starts or stops the financials schedule right away.
+      if (patch.tier !== undefined && patch.tier !== null) await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
 
       const changedFields: string[] = [];
       const changes: Record<string, unknown> = {};

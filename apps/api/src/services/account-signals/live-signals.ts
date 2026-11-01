@@ -7,7 +7,8 @@
  */
 import { prisma, type Prisma } from '@bidstack/db';
 
-export const LIVE_SIGNAL_SOURCES = ['gdelt', 'google_news', 'company_rss', 'apify_linkedin'] as const;
+// v23: 'financials' rows come from filed statements (EDGAR / ESEF), so they count as real.
+export const LIVE_SIGNAL_SOURCES = ['gdelt', 'google_news', 'company_rss', 'apify_linkedin', 'financials'] as const;
 
 export async function companiesWithLiveSignals(orgId: string, companyIds: string[]): Promise<string[]> {
   if (!companyIds.length) return [];

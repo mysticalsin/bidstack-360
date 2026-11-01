@@ -39,6 +39,7 @@ const SOURCE: Record<string, string> = {
   gdelt: 'News',
   meeting_intel: 'Meeting intel',
   enrichment: 'Hiring signals',
+  financials: 'Filed financials',
 };
 
 const TOP_SIGNALS = 3;

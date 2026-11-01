@@ -25,6 +25,7 @@ import {
 } from '@/components/cockpit';
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { AccountWatchdogSection } from '@/components/watchdog/AccountWatchdogSection';
+import { FinancialHealthSection } from '@/components/financials/FinancialHealthSection';
 import { PulseHero } from '@/components/signals/PulseHero';
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
@@ -400,6 +401,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           <Suspense fallback={sectionSkeleton(280)}>
             <InitiativesBoard companyId={cockpit.company.id} />
           </Suspense>
+          <FinancialHealthSection companyId={cockpit.company.id} />
           <FirmographicsStrip companyId={cockpit.company.id} />
         </>
       ) : null}
