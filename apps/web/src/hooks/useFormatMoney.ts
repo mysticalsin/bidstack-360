@@ -28,7 +28,12 @@ function microsBigInt(micros: string | number | bigint): bigint | null {
   }
 }
 
-/** Format stored micros. An unchanged FX result keeps the integer. A converted amount is not rounded through an unsafe float. */
+function fitsSafeUnitCount(micros: bigint): boolean {
+  const abs = micros < 0n ? -micros : micros;
+  return abs / 1_000_000n <= BigInt(Number.MAX_SAFE_INTEGER);
+}
+
+/** Format stored micros. An unchanged FX result keeps the integer. A count past the safe range is not converted through a JavaScript number. */
 export function formatStoredMicros(
   micros: string | number | bigint,
   sourceCurrency: string | null | undefined,
@@ -48,13 +53,17 @@ export function formatStoredMicros(
   if (convertMicros) {
     return formatMoneyMicros(convertMicros(asBigInt, source).toString(), displayCurrency, options);
   }
+  // No integer converter. A unit count past the safe range has already lost digits
+  // inside a JavaScript number, so print the stored integer in its own currency.
+  const exactSource = () => formatMoneyMicros(asBigInt.toString(), source, { compact: false });
+  if (!fitsSafeUnitCount(asBigInt)) return exactSource();
   const value = unitsFromMicros(asBigInt);
   const converted = convert(value, source);
   if (!Number.isFinite(converted) || converted === value) {
     return formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
   }
   const convertedMicros = unitsToMicros(converted);
-  if (convertedMicros == null) return formatMoney(converted, displayCurrency);
+  if (convertedMicros == null) return exactSource();
   return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
 }
 

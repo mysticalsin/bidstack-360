@@ -4,7 +4,7 @@ import { microsToUnits } from '@bidstack/shared';
 
 import { convertMicrosByRates, useCurrencyStore } from './currency';
 import { useDisplayMoney } from '../hooks/useDisplayMoney';
-import { useFormatMoney } from '../hooks/useFormatMoney';
+import { formatStoredMicros, useFormatMoney } from '../hooks/useFormatMoney';
 import { formatMoney, formatMoneyMicros } from '../lib/format';
 
 async function loadCurrency() {
@@ -456,6 +456,19 @@ describe('useCurrencyStore', () => {
     expect(result.current).toContain('9,907,919,180,215,092');
     const formatted = renderHook(() => useFormatMoney());
     expect(formatted.result.current.formatMoney(huge, 'EUR')).toBe(full);
+  });
+
+  it('does not print a collapsed number when the micros converter is omitted', () => {
+    // WHY: dividing these micros by 1e6 is one unit low, and formatting that
+    // float used to show the wrong amount in the display currency.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const formatted = formatStoredMicros(huge, 'EUR', (amount) => amount * 1.1, 'USD');
+    expect(formatted).toContain('9,007,199,254,740,993');
+    expect(formatted).not.toContain('9,007,199,254,740,992');
+    const safe = formatStoredMicros('100000000', 'EUR', (amount) => amount * 1.1, 'USD', {
+      compact: false,
+    });
+    expect(safe).toContain('110');
   });
 });
 
