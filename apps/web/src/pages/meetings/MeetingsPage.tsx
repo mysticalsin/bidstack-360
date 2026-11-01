@@ -21,7 +21,7 @@ import {
 import { MeetingsTabs } from './MeetingsTabs';
 
 const LEVELS: SeniorityLevel[] = ['c_level', 'vp', 'director', 'manager', 'ic', 'unknown'];
-const SOURCES: MeetingSource[] = ['manual', 'metis', 'abc'];
+const SOURCES: MeetingSource[] = ['manual', 'metis', 'abc', 'mars'];
 const PAGE = 50;
 
 export default function MeetingsPage() {

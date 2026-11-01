@@ -89,7 +89,15 @@ export function normalizeMarsAccountKey(s: string | null | undefined): string {
   return (s ?? '').normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-const AccountKey = z.string().trim().min(1).max(200).refine((s) => !/[\u0000-\u001f]/.test(s), 'control characters are not allowed');
+/** Reject ASCII C0 controls so account/column names cannot smuggle newlines or NULs. */
+function hasAsciiControlChars(s: string): boolean {
+  for (let i = 0; i < s.length; i += 1) {
+    if (s.charCodeAt(i) < 32) return true;
+  }
+  return false;
+}
+
+const AccountKey = z.string().trim().min(1).max(200).refine((s) => !hasAsciiControlChars(s), 'control characters are not allowed');
 
 /** Admin-confirmed mapping: Polo companyId to the account value(s) used in the MARS dataset. */
 export const MarsAccountKeyMap = z.record(z.string().uuid(), z.array(AccountKey).min(1).max(20)).refine((m) => Object.keys(m).length <= 1000, 'at most 1000 mapped accounts');
@@ -126,7 +134,7 @@ export function parseMarsSettings(v: unknown): MarsConnectionSettings {
 // ─── tabular column mapping (Power BI dataset or exported sheet) ───────────
 
 /** A table or column name as it appears in the dataset or sheet header. Escaped before it reaches DAX. */
-const ColumnName = z.string().trim().min(1).max(128).refine((s) => !/[\u0000-\u001f]/.test(s), 'control characters are not allowed');
+const ColumnName = z.string().trim().min(1).max(128).refine((s) => !hasAsciiControlChars(s), 'control characters are not allowed');
 
 export const MARS_TABULAR_FIELDS = [
   'account', 'contactName', 'contactEmail', 'contactTitle', 'company', 'meetingDate', 'internalAttendee', 'notes',

@@ -29,7 +29,7 @@ export const SENIORITY_SHORT: Record<SeniorityLevel, string> = {
 /** Levels the coverage map shows as columns; IC and unknown fold into the people count only. */
 export const COVERAGE_LEVELS: SeniorityLevel[] = ['c_level', 'vp', 'director', 'manager'];
 export const SENIOR_LEVELS = new Set<SeniorityLevel>(['c_level', 'vp', 'director']);
-export const SOURCE_LABEL: Record<MeetingSource, string> = { abc: 'ABC', metis: 'Métis', manual: 'Manual' };
+export const SOURCE_LABEL: Record<MeetingSource, string> = { abc: 'ABC', metis: 'Métis', manual: 'Manual', mars: 'MARS' };
 
 export function meetingQueryString(q: MeetingListQuery): string {
   const p = new URLSearchParams();

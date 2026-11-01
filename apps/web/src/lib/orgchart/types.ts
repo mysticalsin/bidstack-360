@@ -1,9 +1,9 @@
 // Org chart model used by the UI. Live charts come from the org chart API
 // (/workspace/fleet/polo-orgchart-api.md, @bidstack/shared OrgChartNode) and
 // are mapped onto this shape in ./client.ts; unsaved accounts get a Sample.
-import type { OrgChartProfile, SeniorityLevel } from '@bidstack/shared';
+import type { OrgChartProfile, OrgChartSource, SeniorityLevel } from '@bidstack/shared';
 
-export type OrgNodeSource = 'sample' | 'manual' | 'contacts' | 'meetings' | 'csv' | 'html' | 'apollo' | 'abc' | 'metis' | 'seed';
+export type OrgNodeSource = OrgChartSource | 'sample' | 'meetings';
 
 export interface OrgNode {
   id: string;
