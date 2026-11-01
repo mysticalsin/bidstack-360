@@ -26,6 +26,7 @@ import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNote
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { ScheduleReviewDialog } from '@/components/calls/ScheduleReviewDialog';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
+import { closedOutcome } from '@/lib/pipeline-stages';
 import { useTasks } from '@/hooks/useTasks';
 import {
   formatUnspecifiedAmount,
@@ -148,8 +149,9 @@ export function OpportunityDetailPage() {
     );
   }
 
-  const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
-  const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
+  const outcome = closedOutcome(data);
+  const isWon = outcome === 'won';
+  const isLost = outcome === 'lost';
   const isOutcomeLocked = isWon || isLost;
   const nextTask = pickNextTask(dealTasks.data?.items);
   const moveToOutcome = (stage: 'closed_won' | 'closed_lost') => {

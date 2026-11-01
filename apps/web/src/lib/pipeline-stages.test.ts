@@ -115,4 +115,21 @@ describe('closedOutcome', () => {
       }),
     ).toBeNull();
   });
+
+  it('counts both flags as lost', () => {
+    // WHY: the deal page showed Won and Lost together. Lost wins, including
+    // when the stored key says won.
+    expect(
+      closedOutcome({
+        stage: 'closed_won',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+      }),
+    ).toBe('lost');
+    expect(
+      closedOutcome({
+        stage: 's4_negotiation',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+      }),
+    ).toBe('lost');
+  });
 });
