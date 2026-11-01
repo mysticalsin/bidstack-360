@@ -92,4 +92,13 @@ describe('daysUntil', () => {
     const past = new Date(Date.now() - 3 * 86400 * 1000).toISOString();
     expect(daysUntil(past)).toBeLessThan(0);
   });
+
+  it('keeps a due date of today at zero after midnight UTC', () => {
+    // WHY: rounding the clock made today overdue in the afternoon and due today in the morning.
+    const now = Date.parse('2026-11-01T15:00:00.000Z');
+    expect(daysUntil('2026-11-01', now)).toBe(0);
+    expect(daysUntil('2026-10-31', now)).toBe(-1);
+    expect(daysUntil('2026-11-02T23:00:00.000Z', now)).toBe(1);
+    expect(daysUntil('not-a-date', now)).toBeNull();
+  });
 });
