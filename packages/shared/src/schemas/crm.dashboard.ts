@@ -63,7 +63,7 @@ export const RiskItem = z.object({
   owner: z.string().nullable(),
   mitigation: z.string().nullable(),
   dueDate: z.string().date().nullable(),
-  status: z.enum(['open', 'in_progress', 'mitigated', 'accepted']),
+  status: z.enum(['open', 'in_progress', 'mitigated', 'accepted', 'unspecified']),
 });
 export type RiskItem = z.infer<typeof RiskItem>;
 
