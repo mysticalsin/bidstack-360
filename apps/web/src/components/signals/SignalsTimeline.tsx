@@ -81,7 +81,21 @@ function Detail({ item }: { item: TimelineItem }) {
   );
 }
 
-export function TimelineView({ items, from, to, dealsCapped }: { items: TimelineItem[]; from: string; to: string; dealsCapped?: boolean }) {
+export function TimelineView({
+  items,
+  from,
+  to,
+  dealsCapped,
+  meetingsCapped,
+  newsCapped,
+}: {
+  items: TimelineItem[];
+  from: string;
+  to: string;
+  dealsCapped?: boolean;
+  meetingsCapped?: boolean;
+  newsCapped?: boolean;
+}) {
   const narrow = useNarrow();
   const id = useId();
   const present = useMemo(() => {
@@ -117,7 +131,12 @@ export function TimelineView({ items, from, to, dealsCapped }: { items: Timeline
     });
   const hovered = hover ? items.find((i) => i.id === hover.id) : null;
 
-  const dealPage = dealsCapped ? <p className="sg-meta">Latest 1,000 deals</p> : null;
+  const pageNotes = [
+    dealsCapped ? 'Latest 1,000 deals' : '',
+    meetingsCapped ? 'Latest 200 meetings' : '',
+    newsCapped ? 'Latest 300 news items' : '',
+  ].filter(Boolean);
+  const dealPage = pageNotes.length ? <p className="sg-meta">{pageNotes.join(' · ')}</p> : null;
   if (!items.length) {
     return (
       <>
@@ -276,7 +295,14 @@ export function SignalsTimeline({ companyId }: { companyId: string }) {
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
       ) : (
-        <TimelineView items={q.data.items} from={q.data.from} to={q.data.to} dealsCapped={q.data.dealsCapped} />
+        <TimelineView
+          items={q.data.items}
+          from={q.data.from}
+          to={q.data.to}
+          dealsCapped={q.data.dealsCapped}
+          meetingsCapped={q.data.meetingsCapped}
+          newsCapped={q.data.newsCapped}
+        />
       )}
     </section>
   );
