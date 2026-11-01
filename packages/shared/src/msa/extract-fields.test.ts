@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contractMicros, extractMsaFields } from './extract-fields.js';
+import { contractMicros, extractMsaFields, storableLiabilityCap } from './extract-fields.js';
 import { SYNTHETIC_NORTHWIND_MSA_TEXT } from './synthetic-msa.js';
 
 describe('extractMsaFields', () => {
@@ -72,7 +72,14 @@ describe('extractMsaFields', () => {
     const huge = extractMsaFields(
       "Supplier's aggregate liability under this Agreement is capped at 99999999999.99 EUR.",
     );
-    expect(huge.liabilityCap.found).toBe(false);
+    expect(huge.liabilityCap.found).toBe(true);
+    expect(huge.liabilityCap.value).toBe('amount not readable');
+    expect(huge.liabilityCap.citation?.excerpt).toMatch(/99999999999/);
+    expect(storableLiabilityCap(huge.liabilityCap.value)).toBeNull();
+    expect(storableLiabilityCap({ amountMicros: 250_000_500_000, currency: 'eur' })).toEqual({
+      amountMicros: 250_000_500_000,
+      currency: 'EUR',
+    });
   });
 
   it('returns blank not-found fields when the document has no commercial terms', () => {

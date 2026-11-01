@@ -182,15 +182,22 @@ export function contractMicros(raw: string): number | null {
   return Number(micros);
 }
 
-function detectLiability(pages: TextPage[]): { amountMicros: number; currency: string; citation: MsaCitation; confidenceBps: number } | null {
+/** A cap object safe to store. A sentence such as "amount not readable" is not a cap. */
+export function storableLiabilityCap(value: unknown): { amountMicros: number; currency: string } | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const cap = value as { amountMicros?: unknown; currency?: unknown };
+  if (typeof cap.amountMicros !== 'number' || !Number.isSafeInteger(cap.amountMicros) || cap.amountMicros < 0) return null;
+  if (typeof cap.currency !== 'string' || !/^[A-Za-z]{3}$/.test(cap.currency)) return null;
+  return { amountMicros: cap.amountMicros, currency: cap.currency.toUpperCase() };
+}
+
+function detectLiability(pages: TextPage[]): { amountMicros: number | null; currency: string; citation: MsaCitation; confidenceBps: number } | null {
   const hit = findInPages(pages, /liability[^.%]{0,120}?(?:capped at|cap(?:ped)? of|not exceed)\s*([€£$])?\s*([\d,.\s]{3,16})\s*(EUR|USD|GBP|CHF)?/i);
   if (!hit) return null;
-  const amountMicros = contractMicros(hit.match[2] ?? '');
-  if (amountMicros == null) return null;
   const symbol = hit.match[1];
   const code = (hit.match[3] ?? (symbol === '€' ? 'EUR' : symbol === '£' ? 'GBP' : symbol === '$' ? 'USD' : 'EUR')).toUpperCase();
   return {
-    amountMicros,
+    amountMicros: contractMicros(hit.match[2] ?? ''),
     currency: code,
     citation: cite(hit.source, hit.match.index ?? 0, hit.page),
     confidenceBps: LABELLED,
@@ -283,12 +290,22 @@ export function extractMsaFields(input: string | TextPage[]): MsaExtractedFields
     renewalTerms: field('renewalTerms', renewal?.text ?? null, renewal?.confidenceBps ?? 0, renewal?.citation ?? null),
     expiryDate: field('expiryDate', expiry ? toIsoDate(expiry.text) : null, expiry?.confidenceBps ?? 0, expiry?.citation ?? null),
     governingLaw: field('governingLaw', law?.text ?? null, law?.confidenceBps ?? 0, law?.citation ?? null),
-    liabilityCap: field(
-      'liabilityCap',
-      liability ? { amountMicros: liability.amountMicros, currency: liability.currency } : null,
-      liability?.confidenceBps ?? 0,
-      liability?.citation ?? null,
-    ),
+    liabilityCap: liability
+      ? liability.amountMicros == null
+        ? {
+            key: 'liabilityCap',
+            value: 'amount not readable',
+            found: true,
+            confidenceBps: liability.confidenceBps,
+            citation: liability.citation,
+          }
+        : field(
+            'liabilityCap',
+            { amountMicros: liability.amountMicros, currency: liability.currency },
+            liability.confidenceBps,
+            liability.citation,
+          )
+      : { key: 'liabilityCap', ...EMPTY },
     paymentTerms: field('paymentTerms', pay?.text ?? null, pay?.confidenceBps ?? 0, pay?.citation ?? null),
     noticePeriodDays: field('noticePeriodDays', noticeDays ? Number(noticeDays) : null, notice?.confidenceBps ?? 0, notice?.citation ?? null),
     ip: field('ip', ip?.text ?? null, ip?.confidenceBps ?? 0, ip?.citation ?? null),
