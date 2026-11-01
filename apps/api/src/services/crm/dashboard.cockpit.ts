@@ -337,6 +337,7 @@ export function buildActivities(
     id: string;
     title: string;
     status: string;
+    accountId?: string | null;
     opportunity?: { id: string; customer: string; name: string; companyId: string | null } | null;
     assignee?: { name: string | null; email: string } | null;
     createdAt: Date;
@@ -348,7 +349,7 @@ export function buildActivities(
     subject: task.title,
     body: `Task is ${task.status.replace('_', ' ')}.`,
     kind: 'task',
-    companyId: task.opportunity?.companyId ?? null,
+    companyId: task.opportunity?.companyId ?? task.accountId ?? null,
     dealId: task.opportunity?.id ?? null,
     personId: null,
     actorName: task.assignee?.name ?? task.assignee?.email ?? null,
@@ -566,6 +567,7 @@ export function buildCockpit({
     title: string;
     status: string;
     dueDate: Date | null;
+    accountId?: string | null;
     opportunity: { customer: string; companyId: string | null; id: string; name: string } | null;
     assignee: { name: string | null; email: string } | null;
     createdAt: Date;
@@ -601,7 +603,9 @@ export function buildCockpit({
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
   const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
-  const accountTasks = tasks.filter((task) => task.opportunity?.companyId === company.id);
+  const accountTasks = tasks.filter(
+    (task) => task.accountId === company.id || task.opportunity?.companyId === company.id,
+  );
   const openDeals = companyOpps.filter(
     (opp) =>
       !opp.pipelineStage?.isWon &&

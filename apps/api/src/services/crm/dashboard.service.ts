@@ -388,15 +388,23 @@ export async function buildDashboardSnapshot(
           take: 100,
         })
       : Promise.resolve([]),
-    accountOpportunityWhere
+    isCompanyUuid(selectedCompany.id) || accountOpportunityWhere
       ? prisma.task.findMany({
-          where: { orgId, deletedAt: null, opportunity: accountOpportunityWhere },
+          where: {
+            orgId,
+            deletedAt: null,
+            OR: [
+              ...(isCompanyUuid(selectedCompany.id) ? [{ accountId: selectedCompany.id }] : []),
+              ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
+            ],
+          },
           select: {
             id: true,
             title: true,
             status: true,
             createdAt: true,
             dueDate: true,
+            accountId: true,
             opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
             assignee: { select: { name: true, email: true } },
           },

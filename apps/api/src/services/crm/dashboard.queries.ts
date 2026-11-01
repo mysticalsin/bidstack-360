@@ -389,13 +389,18 @@ export async function buildCompanyCockpit(
         take: 20,
       }),
       prismaClient.task.findMany({
-        where: { orgId, deletedAt: null, opportunity: taskOpportunityWhere },
+        where: {
+          orgId,
+          deletedAt: null,
+          OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
+        },
         select: {
           id: true,
           title: true,
           status: true,
           createdAt: true,
           dueDate: true,
+          accountId: true,
           opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
           assignee: { select: { name: true, email: true } },
         },

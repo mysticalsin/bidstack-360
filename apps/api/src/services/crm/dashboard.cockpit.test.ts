@@ -548,6 +548,44 @@ describe('buildCockpit recorded facts only', () => {
     expect(JSON.stringify(cockpit)).not.toContain('SOC 2');
     expect(JSON.stringify(cockpit)).not.toContain('Name match');
   });
+
+  it('keeps a follow-up stored on the account when it has no deal', () => {
+    // WHY: a meeting import links the task by company id. The cockpit used
+    // to keep only tasks hanging off a deal, so that follow-up disappeared.
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [
+        {
+          id: 'task-account',
+          title: 'Send the deployment plan',
+          status: 'open',
+          dueDate: null,
+          accountId: 'mantu',
+          opportunity: null,
+          assignee: null,
+          createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+        {
+          id: 'task-other',
+          title: 'Someone else',
+          status: 'open',
+          dueDate: null,
+          accountId: 'other-co',
+          opportunity: null,
+          assignee: null,
+          createdAt: new Date('2026-06-02T00:00:00.000Z'),
+        },
+      ],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(cockpit.recentActivity.map((item) => item.subject)).toEqual(['Send the deployment plan']);
+    expect(cockpit.recentActivity[0]?.companyId).toBe('mantu');
+  });
 });
 
 describe('buildCockpit win/loss + revenue derivation', () => {
