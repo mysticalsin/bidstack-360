@@ -122,14 +122,33 @@ function compactMicrosMagnitude(micros: bigint): number {
   return negative ? -magnitude : magnitude;
 }
 
+function compactScale(units: bigint): bigint {
+  const abs = units < 0n ? -units : units;
+  if (abs >= 1_000_000_000_000n) return 1_000_000_000_000n;
+  if (abs >= 1_000_000_000n) return 1_000_000_000n;
+  if (abs >= 1_000_000n) return 1_000_000n;
+  if (abs >= 1_000n) return 1_000n;
+  return 1n;
+}
+
+/** Two compact fraction digits recover this cent. 12,015,000 does not survive as 12.02M. */
+function compactKeepsCents(absMicros: bigint): boolean {
+  const cents = (absMicros + 5_000n) / 10_000n;
+  const scale = compactScale(cents / 100n);
+  const rounded = ((cents + scale / 2n) / scale) * scale;
+  return rounded === cents;
+}
+
 /**
- * Compact while the unit count fits in a safe integer. Past that, the full
- * amount, because the collapsed unit number is one unit low.
+ * Compact while that label is the same cent. Past the safe unit count, or when
+ * compact rounding moves the amount, the full integer.
  */
 export function headlineMicrosLabel(micros: string | number | bigint): string {
   const value = asMicros(micros);
   const abs = value < 0n ? -value : value;
-  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) return formatMicrosAmount(value);
+  if (abs / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER) || !compactKeepsCents(abs)) {
+    return formatMicrosAmount(value);
+  }
   return new Intl.NumberFormat(undefined, {
     notation: 'compact',
     maximumFractionDigits: 2,

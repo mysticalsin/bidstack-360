@@ -78,6 +78,25 @@ describe('PipelineMetricStrip', () => {
     expect(open.textContent).not.toMatch(/9,007,199,254,740,992/);
   });
 
+  it('prints the open headline in full when compact rounding moves it', () => {
+    // WHY: 12,015,000 was the open book and the card said 12.02M.
+    render(
+      <PipelineMetricStrip
+        stages={[
+          { stage: 'proposal', count: 1, valueSum: 0, valueSumMicros: '12015000000000' },
+          { stage: 'closed_won', count: 8, valueSum: 0, valueSumMicros: '7860000000000' },
+          { stage: 'closed_lost', count: 4, valueSum: 0, valueSumMicros: '3660000000000' },
+        ]}
+        weightedMicros="7110500000000"
+      />,
+    );
+    const open = screen.getByLabelText(/Open pipeline/);
+    expect(open.textContent).toMatch(/12,015,000/);
+    expect(open.textContent).not.toMatch(/12\.02M/);
+    expect(screen.getByLabelText(/Won/).textContent).toMatch(/7\.86M/);
+    expect(screen.getByLabelText(/Lost/).textContent).toMatch(/3\.66M/);
+  });
+
   it('prints an ordinary weighted total from micros', () => {
     render(
       <PipelineMetricStrip

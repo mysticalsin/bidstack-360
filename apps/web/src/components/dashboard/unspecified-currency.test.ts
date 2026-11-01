@@ -5,6 +5,7 @@ import {
   formatExactUnspecified,
   formatRecordedDealAmount,
   formatUnspecifiedCompactMicros,
+  headlineMicrosLabel,
   recordedMicros,
   sumRecordedDealMicros,
   sumRecordedDealUnits,
@@ -27,6 +28,14 @@ describe('exact unspecified amounts', () => {
     expect(compareMicros(smaller, larger)).toBe(-1);
     expect(microsSharePercent(smaller, larger)).toBeLessThan(100);
     expect(microsSharePercent(larger, larger)).toBe(100);
+  });
+
+  it('prints the full integer when compact rounding moves the amount', () => {
+    // WHY: 12,015,000 was shown as 12.02M, five thousand higher.
+    expect(headlineMicrosLabel('12015000000000')).toBe('12,015,000');
+    expect(headlineMicrosLabel('12015000000000')).not.toBe('12.02M');
+    expect(headlineMicrosLabel('7860000000000')).toBe('7.86M');
+    expect(headlineMicrosLabel('200000500000')).toBe('200,000.50');
   });
 
   it('prints a deal from micros when the unit number is zero', () => {
@@ -71,9 +80,9 @@ describe('exact unspecified amounts', () => {
     expect(collapsed).toBe(9007199254740992);
     expect(recordedMicros(collapsed, smaller).toString()).toBe(smaller);
     expect(recordedMicros(collapsed, larger).toString()).toBe(larger);
-    expect(microsSharePercent(recordedMicros(collapsed, smaller), recordedMicros(collapsed, larger))).toBeLessThan(
-      100,
-    );
+    expect(
+      microsSharePercent(recordedMicros(collapsed, smaller), recordedMicros(collapsed, larger)),
+    ).toBeLessThan(100);
     const summed = recordedMicros(collapsed, smaller) + recordedMicros(collapsed, larger);
     expect(summed).toBe((9007199254740992n + 9007199254740993n) * 1_000_000n);
     expect(formatUnspecifiedCompactMicros(summed)).toContain('unspecified');
