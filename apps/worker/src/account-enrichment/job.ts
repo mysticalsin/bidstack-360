@@ -22,7 +22,10 @@ import {
   type HiringRegion,
   type JobFunction,
   type JobSeniority,
+  importanceScore,
   type PotentialProject,
+  severityFromImportance,
+  signalDedupeKey,
 } from '@bidstack/shared';
 
 import { buildHiringBreakdown, type ClassifiedPosting, classifyPosting, inferPotentialProjects } from './hiring.js';
@@ -34,6 +37,7 @@ import {
   FIRMOGRAPHIC_FIELDS,
   type FirmographicFields,
   type ProviderResult,
+  type ProviderSignal,
 } from './providers.js';
 
 export type EnrichmentConfig = AccountEnrichmentConfig;
@@ -329,6 +333,7 @@ export async function runAccountEnrichment(
       ...(r.pendingRequestId && r.status === 'pending' ? { pendingRequestId: r.pendingRequestId } : {}),
     };
     if (r.providerCompanyId) providerIds[r.provider] = r.providerCompanyId;
+    if (r.linkedinUrl) providerIds.linkedin_url = r.linkedinUrl;
   }
   const fresh = status === 'ok' || status === 'partial';
   const v = merged.values;
@@ -360,6 +365,7 @@ export async function runAccountEnrichment(
     create: { orgId: job.orgId, companyId: company.id, ...data },
     update: data,
   });
+  await saveProviderSignals(job.orgId, company.id, company.name, results.flatMap((r) => r.signals ?? [])).catch(() => undefined);
   return {
     outcome: 'refreshed',
     status,
@@ -382,4 +388,37 @@ export async function dueCompanies(limit: number, now: Date): Promise<Array<{ or
     take: Math.min(Math.max(limit, 0), 1000),
   });
   return rows.map((r) => ({ orgId: r.orgId, companyId: r.id }));
+}
+
+/**
+ * Provider company events (Apollo funding today) become watch events, insert
+ * only, so a dismissed one stays dismissed. Scored with the shared rules.
+ */
+export async function saveProviderSignals(orgId: string, companyId: string, companyName: string, signals: ProviderSignal[]): Promise<number> {
+  if (!signals.length) return 0;
+  const res = await prisma.accountWatchEvent.createMany({
+    skipDuplicates: true,
+    data: signals.map((s) => {
+      const importance = importanceScore({ kind: s.kind, implication: 'OPPORTUNITY', source: s.provider });
+      return {
+        orgId,
+        companyId,
+        source: s.provider,
+        externalId: s.externalId,
+        kind: s.kind,
+        occurredAt: new Date(s.occurredAt),
+        title: s.title,
+        sourceUrl: s.url ?? '',
+        summary: s.summary,
+        implication: 'OPPORTUNITY' as const,
+        implicationRationale: 'New money usually funds hiring and projects in the next two quarters.',
+        severity: severityFromImportance(importance),
+        importance,
+        sentiment: 0.8,
+        dedupeKey: signalDedupeKey(s.kind, s.title, companyName),
+        payload: { provider: s.provider } as Prisma.InputJsonValue,
+      };
+    }),
+  });
+  return res.count;
 }
