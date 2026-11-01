@@ -305,16 +305,26 @@ describeDb('MCP tools', () => {
   });
 
   it('notes.create creates a note and writes audit_log', async () => {
+    const company = await prisma.company.create({
+      data: { orgId, name: 'Notes Co' },
+    });
     const out = (await tools['notes.create'].handler(
       {
-        accountId: 'Acme Inc',
+        accountId: company.id,
         title: 'Meeting notes',
         bodyMd: '# Notes\n\nDiscussed pricing.',
         pinned: false,
       },
       ctx,
-    )) as { id: string; title: string };
+    )) as { id: string; title: string; companyId: string | null };
     expect(out.title).toBe('Meeting notes');
+    expect(out.companyId).toBe(company.id);
+    await expect(
+      tools['notes.create'].handler(
+        { accountId: 'Acme Inc', title: 'Nope', bodyMd: 'Name is not a link.', pinned: false },
+        ctx,
+      ),
+    ).rejects.toThrow(/UUID/);
 
     const audit = await prisma.auditLog.findFirst({
       where: { orgId, targetType: 'note', action: 'note.create.mcp' },
