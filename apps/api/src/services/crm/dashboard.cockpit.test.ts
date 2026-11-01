@@ -788,6 +788,29 @@ describe('buildCockpit recorded facts only', () => {
     expect(cockpit.recentActivity.map((item) => item.subject)).toEqual(['Send the deployment plan']);
     expect(cockpit.recentActivity[0]?.companyId).toBe('mantu');
   });
+
+  it('keeps register counts that the six cards do not show', () => {
+    // WHY: readiness was reading the visible cards. The counts have to survive
+    // onto the snapshot or the share collapses back to those six rows.
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      openRiskSeverity: { critical: 10, high: 0, medium: 0, low: 1 },
+      compliantCount: 40,
+      complianceTotal: 46,
+      coveragePages: { dealsCapped: true },
+    });
+    expect(cockpit.openRiskSeverity).toEqual({ critical: 10, high: 0, medium: 0, low: 1 });
+    expect(cockpit.compliantCount).toBe(40);
+    expect(cockpit.complianceTotal).toBe(46);
+    expect(cockpit.registerDealsCapped).toBe(true);
+  });
 });
 
 describe('buildCockpit win/loss + revenue derivation', () => {

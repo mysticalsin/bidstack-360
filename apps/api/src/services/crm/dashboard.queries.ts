@@ -377,40 +377,57 @@ const complianceSelect = {
   sourceAttribution: true,
 } as const;
 
-export function loadAccountRisks(
+type OpenRiskSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+export async function loadAccountRisks(
   prismaClient: PrismaClient,
   where: { orgId: string; deletedAt: null; opportunityId: { in: string[] } },
 ) {
-  return loadRegisterPage(
-    (pageWhere, take) =>
-      prismaClient.riskRegisterItem.findMany({
-        where: pageWhere,
-        select: riskSelect,
-        orderBy: { updatedAt: 'desc' },
-        take,
-      }),
-    (pageWhere) => prismaClient.riskRegisterItem.count({ where: pageWhere }),
-    where,
-    RISK_OPEN,
-  );
+  const openWhere = { ...where, status: { in: [...RISK_OPEN] } };
+  const countSeverity = (severity: OpenRiskSeverity) =>
+    prismaClient.riskRegisterItem.count({ where: { ...openWhere, severity } });
+  const [page, critical, high, medium, low] = await Promise.all([
+    loadRegisterPage(
+      (pageWhere, take) =>
+        prismaClient.riskRegisterItem.findMany({
+          where: pageWhere,
+          select: riskSelect,
+          orderBy: { updatedAt: 'desc' },
+          take,
+        }),
+      (pageWhere) => prismaClient.riskRegisterItem.count({ where: pageWhere }),
+      where,
+      RISK_OPEN,
+    ),
+    countSeverity('critical'),
+    countSeverity('high'),
+    countSeverity('medium'),
+    countSeverity('low'),
+  ]);
+  return { ...page, openBySeverity: { critical, high, medium, low } };
 }
 
-export function loadAccountCompliance(
+export async function loadAccountCompliance(
   prismaClient: PrismaClient,
   where: { orgId: string; deletedAt: null; opportunityId: { in: string[] } },
 ) {
-  return loadRegisterPage(
-    (pageWhere, take) =>
-      prismaClient.complianceCheck.findMany({
-        where: pageWhere,
-        select: complianceSelect,
-        orderBy: { updatedAt: 'desc' },
-        take,
-      }),
-    (pageWhere) => prismaClient.complianceCheck.count({ where: pageWhere }),
-    where,
-    COMPLIANCE_OPEN,
-  );
+  const [page, compliantCount, complianceTotal] = await Promise.all([
+    loadRegisterPage(
+      (pageWhere, take) =>
+        prismaClient.complianceCheck.findMany({
+          where: pageWhere,
+          select: complianceSelect,
+          orderBy: { updatedAt: 'desc' },
+          take,
+        }),
+      (pageWhere) => prismaClient.complianceCheck.count({ where: pageWhere }),
+      where,
+      COMPLIANCE_OPEN,
+    ),
+    prismaClient.complianceCheck.count({ where: { ...where, status: 'compliant' } }),
+    prismaClient.complianceCheck.count({ where }),
+  ]);
+  return { ...page, compliantCount, complianceTotal };
 }
 
 export async function buildCompanyCockpit(
@@ -555,10 +572,15 @@ export async function buildCompanyCockpit(
   const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
   const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
-      ? { rows: [], openCount: 0, capped: false }
+      ? {
+          rows: [],
+          openCount: 0,
+          capped: false,
+          openBySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+        }
       : loadAccountRisks(prismaClient, registerWhere),
     accountOpportunityIds.length === 0
-      ? { rows: [], openCount: 0, capped: false }
+      ? { rows: [], openCount: 0, capped: false, compliantCount: 0, complianceTotal: 0 }
       : loadAccountCompliance(prismaClient, registerWhere),
     fetchBuyingRoleFacts(orgId, contactIds, prismaClient, company.id),
   ]);
@@ -575,6 +597,9 @@ export async function buildCompanyCockpit(
     compliance: compliancePage.rows,
     openRiskCount: riskPage.openCount,
     openComplianceCount: compliancePage.openCount,
+    openRiskSeverity: riskPage.openBySeverity,
+    compliantCount: compliancePage.compliantCount,
+    complianceTotal: compliancePage.complianceTotal,
     risksCapped: riskPage.capped,
     complianceCapped: compliancePage.capped,
     buyingRoleFacts: buyingRoleFacts.rows,
