@@ -1,6 +1,7 @@
 // Compact org chart card on the account page; drills into the full chart.
 import './orgchart.css';
 
+import { isOrgChartSenior } from '@bidstack/shared';
 import { Link } from 'react-router-dom';
 
 import { useOrgChart } from '@/hooks/useOrgChart';
@@ -9,7 +10,6 @@ import type { NodeCov, OrgNode } from '@/lib/orgchart/types';
 
 import { OrgPhoto } from './OrgPhoto';
 
-const SENIOR = ['c_level', 'vp', 'director'];
 
 export function OrgChartCard({ companyId }: { companyId: string }) {
   const { chart, covOf, unmetSenior, live, isLoading, error } = useOrgChart(companyId);
@@ -18,7 +18,7 @@ export function OrgChartCard({ companyId }: { companyId: string }) {
   const reports = root ? (childrenOf(nodes).get(root.id) ?? []) : [];
   const met = nodes.filter((n) => covOf(n)?.met).length;
   // Live charts use the API's senior-gap list so the card matches the full page.
-  const gaps = live ? unmetSenior.size : nodes.filter((n) => SENIOR.includes(n.seniority) && !covOf(n)?.met).length;
+  const gaps = live ? unmetSenior.size : nodes.filter((n) => isOrgChartSenior(n.seniority) && !covOf(n)?.met).length;
   return (
     <section className="en-section oc-card" aria-labelledby="oc-card-h" data-testid="account-orgchart-card" style={{ marginBottom: 24 }}>
       <div className="en-head">

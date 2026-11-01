@@ -7,7 +7,7 @@
 import '@xyflow/react/dist/style.css';
 import '@/components/orgchart/orgchart.css';
 
-import { SENIORITY_ORDER, type SeniorityLevel } from '@bidstack/shared';
+import { SENIORITY_ORDER, isOrgChartSenior, type SeniorityLevel } from '@bidstack/shared';
 import {
   Background, BackgroundVariant, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, useViewport,
   type Edge, type NodeChange, type NodeMouseHandler, type OnNodeDrag,
@@ -110,7 +110,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
         className: dropTarget === n.id ? 'oc-drop' : undefined,
         data: {
           node: n, cov, strength: strengthOf(cov, asOf), showMet, showStrength, asOf,
-          seniorGap: live ? unmetSenior.has(n.id) : SENIOR.includes(n.seniority) && !cov?.met,
+          seniorGap: live ? unmetSenior.has(n.id) : isOrgChartSenior(n.seniority) && !cov?.met,
           match: q ? (hitIds.has(n.id) ? 'hit' : 'miss') : 'none',
           childCount: kids.get(n.id)?.length ?? 0, collapsed: collapsed.has(n.id), isRoot: n.id === work.rootId, onToggle: toggle,
         },
@@ -307,7 +307,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
   // ---- summary for the overview panel ------------------------------------
   const metCount = work.nodes.filter((n) => covOf(n)?.met).length;
-  const seniorGaps = work.nodes.filter((n) => (live && !dirty ? unmetSenior.has(n.id) : SENIOR.includes(n.seniority) && !covOf(n)?.met));
+  const seniorGaps = work.nodes.filter((n) => (live && !dirty ? unmetSenior.has(n.id) : isOrgChartSenior(n.seniority) && !covOf(n)?.met));
 
   // Portalled to <body>: the route transition wrapper is transformed, which
   // would turn position:fixed into a box the size of the (empty) page.
@@ -494,7 +494,7 @@ function PersonPanel(props: {
           {meetings.slice(0, 6).map((m) => <li key={m.id}><Link className="oc-row" to={`/meetings/${m.id}`}><span><span className="oc-row-name">{m.title}</span><span className="oc-row-sub">{fmtDate(m.heldAt)}</span></span></Link></li>)}
         </ul>
       ) : meetingTotal ? <p className="oc-muted">Met {meetingTotal} time{meetingTotal === 1 ? '' : 's'}; those meetings aren&apos;t visible to you.</p>
-        : <p className="oc-muted">Not met yet. A gap worth closing{SENIOR.includes(node.seniority) ? ' at this level' : ''}.</p>}
+        : <p className="oc-muted">Not met yet. A gap worth closing{isOrgChartSenior(node.seniority) ? ' at this level' : ''}.</p>}
       <h3>Challenges raised</h3>
       {challenges.length ? <ul className="oc-bullets">{challenges.slice(0, 6).map((c) => <li key={c}>{c}</li>)}</ul> : <p className="oc-muted">None recorded.</p>}
       {node.profile && !node.redacted ? <ProfileDetails profile={node.profile} fn={node.function ?? null} /> : null}
@@ -576,8 +576,18 @@ function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { kind: 'csv' | 'ht
       <p className="oc-muted">{csv.name}: dry run, nothing written yet.</p>
       {html && r.found !== undefined ? (
         <p className="oc-src" data-testid="orgchart-import-found">
-          Found {r.found} {r.found === 1 ? 'person' : 'people'}{r.skipped ? `, skipped ${r.skipped} system account${r.skipped === 1 ? '' : 's'}` : ''}{r.photos ? `, ${r.photos} with a photo` : ''}. Scripts in the file are never run.
+          Found {r.found} {r.found === 1 ? 'person' : 'people'}{r.skipped ? `, ${r.found - r.skipped} of them this account's own staff` : ''}{r.photos ? `, ${r.photos} with a photo` : ''}. Scripts in the file are never run.
         </p>
+      ) : null}
+      {html && r.skipped ? (
+        <div className="oc-imp-skip" data-testid="orgchart-import-skipped">
+          <p className="oc-src">Skipped {r.skipped}, not imported:</p>
+          <ul className="oc-bullets">
+            {(r.skippedBy?.length ? r.skippedBy : [{ reason: 'system', label: 'not the account\'s own staff', count: r.skipped }]).map((s) => (
+              <li key={s.reason} data-reason={s.reason}><strong>{s.count}</strong> {s.label}</li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       {r.errors.length ? null : <p className="oc-big"><strong>{r.created}</strong> to add · <strong>{r.updated}</strong> to update</p>}
       {r.errors.length ? (
@@ -622,7 +632,6 @@ function CsvPreview({ csv, busy, onApply, onCancel }: { csv: { kind: 'csv' | 'ht
 }
 
 const HTML_MAX = 5 * 1024 * 1024;
-const SENIOR: string[] = ['c_level', 'vp', 'director'];
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });

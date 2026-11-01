@@ -15,6 +15,8 @@ vi.mock('@/lib/auth', () => ({ useUser: () => ({ user: { fullName: 'Jane Smith' 
 import { ApiError, api } from '@/lib/api';
 import { fakeOrgChartServer } from '@/lib/orgchart/fakeOrgChartServer.testutil';
 
+import { OrgChartCard } from '@/components/orgchart/OrgChartCard';
+
 import OrgChartPage from './OrgChartPage';
 
 const CI = 'c0000000-0000-4000-8000-000000000001';
@@ -75,6 +77,30 @@ describe('OrgChartPage', () => {
     expect(within(panel).getByText('Cloud cost review with the CIO')).toBeTruthy();
     expect(within(panel).getByText('Cloud cost overruns')).toBeTruthy();
     expect(within(panel).getByText('Jane Smith (from meetings)')).toBeTruthy();
+  });
+
+  it('directors count as senior gaps: the account card, the full page and the Sample agree', async () => {
+    // Sample: an unmet Head of (director) is a gap.
+    const sample = renderPage();
+    expect(await screen.findByText('Sample')).toBeTruthy();
+    expect((await node('Samuel Reyes')).dataset.gap).toBe('true');
+    sample.unmount();
+    // Live chart: the API list (c_level, vp, director) drives both the page and the card.
+    const ceo = srv.add({ name: 'Ana Silva', title: 'Chief Executive Officer', seniority: 'c_level', meetingCount: 1, lastMetAt: '2026-10-25T10:00:00Z' }, null);
+    srv.add({ name: 'Bruno Costa', title: 'Director of Operations', seniority: 'director' }, ceo.id);
+    srv.add({ name: 'Hana Park', title: 'Supply Chain Manager', seniority: 'manager' }, ceo.id);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[`/accounts/${CI}/org-chart`]}>
+          <OrgChartCard companyId={CI} />
+          <Routes><Route path="/accounts/:accountId/org-chart" element={<OrgChartPage />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect((await node('Bruno Costa')).dataset.gap).toBe('true');
+    expect((await node('Hana Park')).dataset.gap).toBeUndefined();
+    await waitFor(() => expect(screen.getByTestId('account-orgchart-card').textContent).toMatch(/· 1 senior gap(?!s)/));
   });
 
   it('is read-only without orgchart:write', async () => {
@@ -159,12 +185,22 @@ describe('OrgChartPage', () => {
     renderPage();
     fireEvent.click(await screen.findByTestId('orgchart-edit'));
     const html = '<ul><li data-name="Nora Lee" data-title="VP Cloud" data-email="nora@example.com" data-phone="+14165550100" data-linkedin="https://www.linkedin.com/in/nora-example"></li>'
-      + '<li data-name="Omar Haddad" data-title="Director Data" data-manager="Nora Lee" data-linkedin="https://www.linkedin.com/posts/x"></li></ul>';
+      + '<li data-name="Omar Haddad" data-title="Director Data" data-manager="Nora Lee" data-linkedin="https://www.linkedin.com/posts/x"></li>'
+      + '<li data-name="Vic Vendor" data-kind="external" data-linkedin="https://www.linkedin.com/posts/y"></li><li data-name="Kim Ours" data-kind="amaris"></li><li data-name="Desk Bot" data-kind="system"></li></ul>';
     const file = new File([html], 'people.html', { type: 'text/html' });
     await act(async () => { fireEvent.change(screen.getByTestId('orgchart-html-input'), { target: { files: [file] } }); });
     const prev = await screen.findByTestId('orgchart-csv-preview');
     expect(prev.dataset.kind).toBe('html');
-    expect(within(prev).getByTestId('orgchart-import-found').textContent).toMatch(/Found 2 people/);
+    expect(within(prev).getByTestId('orgchart-import-found').textContent).toMatch(/Found 5 people, 2 of them this account's own staff/);
+    const skipped = within(prev).getByTestId('orgchart-import-skipped');
+    expect(skipped.textContent).toMatch(/Skipped 3, not imported/);
+    expect([...skipped.querySelectorAll('li')].map((li) => [li.dataset.reason, li.textContent])).toEqual([
+      ['system', '1 system or shared accounts'],
+      ['external', '1 marked external in the file (vendors, agencies, contractors)'],
+      ['own_firm', '1 our own firm (Amaris)'],
+    ]);
+    expect(within(prev).getByTestId('orgchart-import-preview').textContent).not.toMatch(/Vic Vendor|Kim Ours|Desk Bot/);
+    expect(within(prev).getByTestId('orgchart-import-warnings').textContent).not.toMatch(/Vic Vendor/);
     expect(within(prev).getByTestId('orgchart-import-preview').textContent).toMatch(/Nora Lee.*Omar Haddad/s);
     expect(within(prev).getByTestId('orgchart-import-warnings').textContent).toMatch(/Omar Haddad: LinkedIn/);
     expect(srv.nodes.size).toBe(1); // dry run wrote nothing

@@ -1,7 +1,7 @@
 // In-memory stand-in for the org chart API (tests only). Follows the
 // contract: node versions, chart version, 409 version_conflict, 422 cycles,
 // children move up on delete, set-root puts the old root under the new one.
-import type { OrgChartNode, SeniorityLevel } from '@bidstack/shared';
+import { isOrgChartSenior, type OrgChartNode, type SeniorityLevel } from '@bidstack/shared';
 
 import { ApiError } from '@/lib/api';
 
@@ -58,7 +58,7 @@ export function fakeOrgChartServer(companyId: string) {
         return {
           companyId, windowDays: 365, total: all.length, met: all.filter((n) => n.meetingCount > 0).length,
           nodes: all.map((n) => ({ nodeId: n.id, met: n.meetingCount > 0, meetingCount: n.meetingCount, lastMetAt: n.lastMetAt })), bySeniority: [],
-          unmetSenior: all.filter((n) => ['c_level', 'vp', 'director'].includes(n.seniority) && !n.meetingCount).map((n) => n.id),
+          unmetSenior: all.filter((n) => isOrgChartSenior(n.seniority) && !n.meetingCount).map((n) => n.id),
         };
       }
       if (method === 'POST' && p === `${C}/nodes`) {
@@ -85,7 +85,18 @@ export function fakeOrgChartServer(companyId: string) {
         const html = String(body?.html ?? '');
         const attr = (tag: string, k: string) => new RegExp(`data-${k}="([^"]*)"`).exec(tag)?.[1] ?? null;
         const tags = html.match(/<[^>]*data-name="[^"]*"[^>]*>/g) ?? [];
-        const people = tags.map((t, i) => ({ line: i + 1, name: attr(t, 'name')!, title: attr(t, 'title'), email: attr(t, 'email'), phone: attr(t, 'phone'), linkedinUrl: attr(t, 'linkedin'), manager: attr(t, 'manager') }));
+        // Staff rule stand-in: data-kind system / external / amaris is skipped and counted by reason.
+        const reasonOf = (k: string | null) => (k === 'system' ? 'system' : k === 'external' ? 'external' : k === 'amaris' ? 'own_firm' : null);
+        const LABEL = { system: 'system or shared accounts', external: 'marked external in the file (vendors, agencies, contractors)', own_firm: 'our own firm (Amaris)' } as const;
+        const counts = new Map<'system' | 'external' | 'own_firm', number>();
+        for (const t of tags) {
+          const r = reasonOf(attr(t, 'kind'));
+          if (r) counts.set(r, (counts.get(r) ?? 0) + 1);
+        }
+        const skippedBy = (['system', 'external', 'own_firm'] as const).filter((r) => counts.has(r)).map((reason) => ({ reason, count: counts.get(reason)!, label: LABEL[reason] }));
+        const people = tags
+          .filter((t) => !reasonOf(attr(t, 'kind')))
+          .map((t, i) => ({ line: i + 1, name: attr(t, 'name')!, title: attr(t, 'title'), email: attr(t, 'email'), phone: attr(t, 'phone'), linkedinUrl: attr(t, 'linkedin'), manager: attr(t, 'manager') }));
         if (!people.length) throw new ApiError('Import has errors', 422, { dryRun: Boolean(body?.dryRun), created: 0, updated: 0, errors: [{ line: 1, message: 'No people found in this HTML.' }], chartVersion: version });
         const preview = people.map((x) => ({ ...x, hasPhoto: false, action: 'create' as const, extras: [] }));
         const warnings = people.filter((x) => x.linkedinUrl && !x.linkedinUrl.includes('linkedin.com/in/')).map((x) => ({ line: x.line, name: x.name, message: 'LinkedIn is not a linkedin.com profile URL (left empty)' }));
@@ -97,7 +108,7 @@ export function fakeOrgChartServer(companyId: string) {
             ids.set(x.name, n.id);
           }
         }
-        return { dryRun: Boolean(body?.dryRun), created: people.length, updated: 0, errors: [], warnings, chartVersion: version, format: 'table', found: people.length, skipped: 0, photos: 0, preview };
+        return { dryRun: Boolean(body?.dryRun), created: people.length, updated: 0, errors: [], warnings, chartVersion: version, format: 'table', found: tags.length, skipped: tags.length - people.length, skippedBy, photos: 0, preview };
       }
       if (method === 'POST' && p === `${C}/import`) {
         const rows = String(body?.csv ?? '').trim().split('\n').slice(1).filter(Boolean);
