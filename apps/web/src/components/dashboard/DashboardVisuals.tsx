@@ -22,12 +22,29 @@ import type { OppDrillFilter } from '@/components/drill/OppDrill';
 /** Opens the bid drill-down sheet with a starting filter. */
 export type OnDrill = (f: OppDrillFilter) => void;
 import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
+import { recordedPipelineCompact } from './unspecified-currency';
 
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill }: {
-  rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
+export function DashboardHero({
+  rows,
+  openValue,
+  weighted,
+  openCount,
+  feed,
+  onDrill,
+  openMicros,
+  weightedMicros,
+}: {
+  rows: OppRow[];
+  openValue: number;
+  weighted: number;
+  openCount: number;
+  feed?: WatchdogFeed;
+  onDrill?: OnDrill;
+  openMicros?: string | null;
+  weightedMicros?: string | null;
 }) {
   const fresh = feed?.newAlertCount ?? 0;
   const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
@@ -37,20 +54,22 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
     : 'Watchdog: all quiet';
   const trend = cumulativeWon(rows);
   const wonTotal = trend.at(-1)?.y ?? 0;
+  const openLabel = recordedPipelineCompact(openMicros, openValue);
+  const weightedLabel = recordedPipelineCompact(weightedMicros, weighted);
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
+      summary={`Open pipeline ${openLabel}, weighted ${weightedLabel}. Won so far this year ${fmtCompact(wonTotal)}.`}
       table={{ columns: ['Month', 'Won to date'], rows: trend.map((p) => [p.x, fmtCompact(p.y)]) }}
       className="dash-hero"
       interactive={Boolean(onDrill)}
     >
       <div className="dash-hero-figs">
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
-          <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
-          <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
+        <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${openLabel}: show the open bids`}>
+          <span className="dash-hero-num">{openLabel}</span>
+          <div className="viz-meta">Weighted {weightedLabel}</div>
         </HeroFig>
         <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
           <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />

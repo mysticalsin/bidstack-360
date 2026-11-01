@@ -261,7 +261,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <DashboardHero
             rows={oppRows}
             openValue={pipelineReport.data?.totalValueOpen ?? s?.pipelineValue ?? 0}
+            openMicros={pipelineReport.data?.totalValueOpenMicros ?? s?.pipelineValueMicros}
             weighted={pipelineReport.data?.weightedPipeline ?? 0}
+            weightedMicros={pipelineReport.data?.weightedPipelineMicros}
             openCount={s?.openOpportunities ?? 0}
             feed={feed.data}
             onDrill={setDrill}
