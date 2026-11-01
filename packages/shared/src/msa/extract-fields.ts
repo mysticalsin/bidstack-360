@@ -151,9 +151,32 @@ function cleanParty(raw: string): string {
     .trim();
 }
 
+/**
+ * Contract text to a dot-decimal unit string.
+ * `250,000` is thousands. `250,50` and `1.250,50` keep the comma as cents.
+ */
+export function normalizeContractAmount(raw: string): string {
+  const text = raw.replace(/[\s\u00a0\u202f]/g, '');
+  const lastDot = text.lastIndexOf('.');
+  const lastComma = text.lastIndexOf(',');
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimalIsDot = lastDot > lastComma;
+    const thousands = decimalIsDot ? ',' : '.';
+    const decimal = decimalIsDot ? '.' : ',';
+    return text.split(thousands).join('').replace(decimal, '.');
+  }
+  if (lastComma >= 0) {
+    const parts = text.split(',');
+    const grouped = parts.slice(1).every((part) => part.length === 3);
+    if (grouped && parts.length > 1) return parts.join('');
+    return `${parts.slice(0, -1).join('')}.${parts[parts.length - 1] ?? ''}`;
+  }
+  return text;
+}
+
 /** Contract text to integer micros. A figure that does not fit a safe integer is omitted. */
 export function contractMicros(raw: string): number | null {
-  const micros = unitsTextToMicros(raw.replace(/[,\s]/g, ''));
+  const micros = unitsTextToMicros(normalizeContractAmount(raw));
   if (micros == null || micros <= 0n || micros > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(micros);
 }
