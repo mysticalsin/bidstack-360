@@ -4,11 +4,15 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  BOX_OFFLINE,
+  ORIGIN_STARTING,
   PUBLIC_PREVIEW_ORIGIN,
   filterCookieHeader,
   filterRequestHeaders,
   filterResponseHeaders,
   isApiPath,
+  originKind,
+  replaceUpstreamFailure,
   rewriteLocalUrl,
   rewriteResponseHeaders,
   safePathname,
@@ -121,12 +125,39 @@ describe('polo-preview header contract', () => {
   });
 });
 
+describe('preview origin', () => {
+  it('uses the Cloudflare container when one is configured, even if the box socket is down', () => {
+    // WHY: the 502 "box relay not connected" is what visitors see whenever the
+    // laptop process stops. A configured container is the origin by itself.
+    expect(originKind({ hasContainer: true, relayConnected: false })).toBe('container');
+    expect(originKind({ hasContainer: true, relayConnected: true })).toBe('container');
+  });
+
+  it('uses the box only when no container is bound, and says offline when neither is', () => {
+    expect(originKind({ hasContainer: false, relayConnected: true })).toBe('relay');
+    expect(originKind({ hasContainer: false, relayConnected: false })).toBe('offline');
+    expect(BOX_OFFLINE).toContain('box relay not connected');
+    expect(ORIGIN_STARTING).toContain('starting on Cloudflare');
+  });
+
+  it('keeps a JSON 502 from the API and replaces an nginx failure while the stack boots', () => {
+    // WHY: contractual agreements must stay JSON. A text 502 is nginx waiting
+    // on the API during migrate/seed, which is not an API payload.
+    expect(replaceUpstreamFailure(502, 'application/json; charset=utf-8')).toBe(false);
+    expect(replaceUpstreamFailure(502, 'text/html')).toBe(true);
+    expect(replaceUpstreamFailure(503, null)).toBe(true);
+    expect(replaceUpstreamFailure(200, 'text/html')).toBe(false);
+  });
+});
+
 describe('worker source stays on the shared contract', () => {
   it('imports protocol.js instead of forking the header lists', () => {
     const worker = readFileSync(join(here, 'worker.js'), 'utf8');
     expect(worker).toContain("from './protocol.js'");
     expect(worker).toContain('filterCookieHeader');
     expect(worker).toContain('rewriteResponseHeaders');
+    expect(worker).toContain('originKind');
+    expect(worker).toContain('export class PreviewOrigin');
     expect(worker).toContain("idFromName('box')");
     expect(worker).not.toContain('wrangler deploy');
   });

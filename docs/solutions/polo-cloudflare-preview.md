@@ -3,22 +3,27 @@
 ## Problem
 
 The internal Polo preview is an Access-gated Worker
-(`polo-preview.tony-walteur.workers.dev`). It cannot host the CRM. A box
-process opens an outbound WebSocket; the Worker Durable Object forwards
-browser HTTP to `vite preview :4180` and Fastify `:4020`. Serving `demo`
-or inlining `VITE_API_URL=http://localhost:4020` makes the preview look
-down after Access succeeds.
+(`polo-preview.tony-walteur.workers.dev`). The Worker cannot host the CRM.
+A Cloudflare Container runs Postgres, Redis, the API, and the built SPA, and
+the Worker proxies browser HTTP to it. The container does not sleep when
+idle, and a cron pings `/readyz` so a host restart is followed by a new
+instance. A box WebSocket is only the fallback when that container binding
+is absent. Inlining `VITE_API_URL=http://localhost:4020` makes the preview
+look down after Access succeeds.
 
 ## Pattern
 
 - Worker: verify Access JWT, never forward `CF_*` cookies or the Access
   assertion, rewrite localhost `Location` headers to the Worker origin.
-- Box: checkout `main`, build the SPA with an empty `VITE_API_URL`, set
-  `PUBLIC_BASE_URL` to the Worker origin, run `apps/polo-preview/src/start-box.mjs`.
-- Route `/api`, `/readyz`, `/livez`, `/webhooks` to the API. Everything
-  else stays on `vite preview`.
-- Do not `wrangler deploy` from CI. The live Durable Object namespace and
-  `RELAY_KEY` are the preview.
+- Container: one image (Postgres + Redis + API + SPA) on a Node listener
+  at port 8080. Empty `VITE_API_URL`. `PUBLIC_BASE_URL` is the Worker origin.
+  Entrypoint migrates and seeds. Postgres uses a 32MB shared buffer because
+  the container's `/dev/shm` is 64MB.
+- A cron request every minute renews the container so it does not sleep.
+- Route `/api`, `/readyz`, `/livez`, `/health`, `/metrics`, `/webhooks` to
+  the API. Everything else is the built SPA.
+- Keep migration `v1` (`Relay`) unchanged. Add classes only in a later tag.
+  Do not `wrangler deploy` from CI. `RELAY_KEY` stays a Worker secret.
 
 ## Implementation
 
