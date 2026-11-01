@@ -2,7 +2,7 @@ name: Supply Chain — IaC + dependency scan
 
 # Two scanners close the gap left by the other security workflows (semgrep =
 # app SAST, dependency-review + `pnpm audit` = dep CVEs, gitleaks = secrets):
-#   1. Checkov — infra-as-code misconfig (Dockerfiles, docker-compose, bicep).
+#   1. Checkov — infra-as-code misconfig (Dockerfiles, Azure bicep).
 #   2. Trivy fs — second-opinion dependency CVE + secret + misconfig scan from a
 #      different vuln DB.
 #
@@ -40,11 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Checkov (Dockerfiles, docker-compose, Azure bicep)
+      - name: Checkov (Dockerfiles, Azure bicep)
         uses: bridgecrewio/checkov-action@7b972723c44fb3d256283fac96fae5d7c1894bb7 # v12.3114.0
         with:
           directory: .
-          framework: dockerfile,docker_compose,bicep
+          # Checkov 3.3.x has no `docker_compose` framework (compose files are yaml).
+          framework: dockerfile,bicep
           skip_path: node_modules
           quiet: true
           soft_fail: true # advisory until the baseline is triaged — see header

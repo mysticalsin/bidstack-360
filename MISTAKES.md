@@ -54,6 +54,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-01 INFRA: First main CI run failed on inherited workflow bugs, not MARS/logo
+
+- **What went wrong:** After creating `main` from `polo/consolidated` + MARS + logo plate drop, GitHub reported E2E, Lighthouse, Semgrep, Supply Chain, and then the unit job as failed. None of those failures came from the merged product commits. Unit died because `kam-tools.test.ts` fail-louds when `DATABASE_URL` is unset; the no-DB unit job still ran mcp-server's full suite. E2E shards died on `Playwright does not support chromium on ubuntu26.04-x64` (`ubuntu-latest` is now 26.04). Lighthouse died because `.lighthouserc.js` is CJS in an ESM package. Semgrep died because `semgrep ci` rejects `--severity`/`--error`. Checkov died because `docker_compose` is not a valid framework name in 3.3.8.
+- **Root cause:** These workflows never had a green product run on `polo/consolidated` or `demo` (consolidated only recorded gitleaks; demo only Dependabot Updates). Retargeting them to `main` was the first real execution, so latent CLI/image/runner mismatches surfaced as if they were merge regressions.
+- **Prevention rule:** Before calling a merge-caused regression, compare the same workflow's last green run on the source branch. If there is no last green, treat the failure as inherited/infra. Keep fail-loud DB tests out of the no-DB unit job (same pattern as api `*.integration.test.ts`). Pin Playwright/Chromium jobs to `ubuntu-24.04`. Use `semgrep scan` for local ERROR-only gates. Use only Checkov framework names from the installed CLI. Lighthouse config in an ESM repo must be `.cjs` or ESM.
+- **Files affected:** `.github/workflows/{ci,e2e,lighthouse,semgrep,supply-chain}.yml`, `.lighthouserc.cjs`, `eslint.config.js`.
+
+---
+
 ### 2026-06-28 SECURITY: PII field encryption wrote ciphertext but left lookup/ops paths unsafe
 
 - **What went wrong:** The PII middleware encrypted random-IV email values and populated `emailHash`, but did not rewrite `where.email` equality lookups to the hash column. `User.email` was included despite having no hash column, `Contact.mobilePhone` was listed despite not existing in schema, id-only reads could return `enc:v1:` ciphertext, and KAM consultant PII was missing from backfill/rollback scripts.

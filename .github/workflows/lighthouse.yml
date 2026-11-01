@@ -22,7 +22,7 @@ permissions:
 jobs:
   lighthouse:
     name: Lighthouse CI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       pull-requests: write # needed for PR comment

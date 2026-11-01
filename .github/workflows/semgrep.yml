@@ -46,7 +46,9 @@ jobs:
             p/javascript
             p/dockerfile
         run: |
-          semgrep ci \
+          # `semgrep ci` is the Cloud-backed command and rejects --severity/--error.
+          # Local scan matches the ERROR-only gate described above.
+          semgrep scan \
             --sarif \
             --output=semgrep.sarif \
             --severity=ERROR \

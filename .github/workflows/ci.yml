@@ -23,8 +23,9 @@ jobs:
   # No DB needed; runs on every push and PR.
   unit:
     name: Unit (typecheck + lint + test + build + bundle guard)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Pin 24.04: ubuntu-latest is 26.04 and Playwright has no chromium build for it.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -62,8 +63,17 @@ jobs:
         # from dist/.
         run: pnpm typecheck
 
-      - name: Test (no DB — all packages except api)
-        run: pnpm --filter '!@bidstack/api' -r test
+      - name: Test (no DB — all packages except api and mcp-server)
+        run: pnpm --filter '!@bidstack/api' --filter '!@bidstack/mcp-server' -r test
+
+      # kam-tools.test.ts is fail-loud when Postgres is missing (intentional
+      # "do not silently skip"). It belongs in the integration job below.
+      - name: Test (no DB — mcp-server, DB-dependent suites excluded)
+        # `pnpm test -- --exclude` does not reach Vitest (the extra `--` is swallowed).
+        # `exec vitest` applies --exclude (9 files / 58 tests, kam-tools omitted).
+        run: >-
+          pnpm --filter @bidstack/mcp-server exec vitest run --passWithNoTests
+          --exclude src/tools/kam-tools.test.ts
 
       # api's DB-touching suites now FAIL LOUD (not self-skip) when Postgres is
       # unreachable — makeSkipIfNoDb (src/test-support/skip-if-no-db.ts) throws
@@ -75,7 +85,7 @@ jobs:
       # first glob), plus these plain-named suites that also hit a real DB.
       - name: Test (no DB — api, DB-dependent suites excluded)
         run: >-
-          pnpm --filter @bidstack/api test --
+          pnpm --filter @bidstack/api exec vitest run --passWithNoTests
           --exclude "**/*.integration.test.ts"
           --exclude "src/routes/audit-logs.test.ts"
           --exclude "src/routes/companies.test.ts"
@@ -124,7 +134,7 @@ jobs:
   # scripts/check-secrets.sh on every tracked file.
   secrets-full-scan:
     name: Full-tree secret scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -134,12 +144,13 @@ jobs:
         run: bash scripts/check-secrets.sh --full
 
   # Heavy integration tests against real Postgres + Redis.
-  # Runs on PRs only (skipped on main pushes since main is post-merge).
+  # Runs on PRs and on main (main is needed so the cutover can prove the gate).
   integration:
     name: Integration (Postgres + Redis)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
-    if: github.event_name == 'pull_request'
+    # Run on PRs and on main so the cutover can prove this gate without a PR.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     needs: unit
 
     services:
@@ -204,9 +215,9 @@ jobs:
   # E2E smoke against a built preview + a running API.
   e2e:
     name: E2E smoke (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     needs: integration
 
     services:
