@@ -166,3 +166,12 @@ describe('themeForText', () => {
     expect(themeForText('Opens office in Lisbon')).toBe('expansion');
   });
 });
+
+describe('importance for risk news', () => {
+  it('lifts a fine or lawsuit above the alert line', async () => {
+    const { classifySignalText, importanceScore, ALERT_IMPORTANCE } = await import('./account-signals.js');
+    const c = classifySignalText('DNB Bank fined by regulator over anti-money laundering controls');
+    expect(c.implication).toBe('RISK');
+    expect(importanceScore({ kind: c.kind, implication: c.implication, source: 'gdelt' })).toBeGreaterThanOrEqual(ALERT_IMPORTANCE);
+  });
+});

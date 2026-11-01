@@ -10,6 +10,7 @@ import {
   AccountPulse,
   AccountTimeline,
   categoryForKind,
+  cleanText,
   OFFERING_HOOKS,
   PortfolioMomentum,
   SignalCategory,
@@ -153,8 +154,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           at: e.occurredAt.toISOString(),
           lane: 'theirs',
           category: categoryForKind(e.kind, e.implication as Implication),
-          title: stripSamplePrefix(e.title),
-          summary: e.summary,
+          title: cleanText(stripSamplePrefix(e.title)),
+          summary: cleanText(e.summary),
           source: e.source,
           sourceUrl: e.sourceUrl || null,
           href: null,
@@ -261,7 +262,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       }
       // 2. Announcements (news, press, provider, filings).
       for (const e of events) {
-        const title = stripSamplePrefix(e.title);
+        const title = cleanText(stripSamplePrefix(e.title));
         const theme = themeForText(`${title} ${e.summary}`);
         const cat = categoryForKind(e.kind, e.implication as Implication);
         let it = byTheme.get(theme);
@@ -366,16 +367,22 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
               OR: [{ importance: { gte: 60 } }, { importance: 0, severity: { gte: 3 } }],
             },
             orderBy: [{ importance: 'desc' }, { occurredAt: 'desc' }],
-            take: 8,
+            take: 40,
           })
         : [];
-      const alerts: PortfolioAlert[] = rows.map((e) => {
+      // Rank in memory: legacy rows (importance 0) score from severity.
+      const ranked = rows
+        .map((e) => ({ e, imp: importanceOf(e) }))
+        .sort((a, b) => b.imp - a.imp || b.e.occurredAt.getTime() - a.e.occurredAt.getTime())
+        .slice(0, 8)
+        .map((r) => r.e);
+      const alerts: PortfolioAlert[] = ranked.map((e) => {
         const root = owner.get(e.companyId) ?? e.companyId;
         return {
           id: e.id,
           companyId: root,
           companyName: names.get(root) ?? '',
-          title: stripSamplePrefix(e.title),
+          title: cleanText(stripSamplePrefix(e.title)),
           category: categoryForKind(e.kind, e.implication as Implication),
           importance: importanceOf(e),
           occurredAt: e.occurredAt.toISOString(),
