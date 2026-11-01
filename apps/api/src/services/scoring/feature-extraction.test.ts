@@ -123,6 +123,11 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     // from createdAt (a finite, non-negative number, not NaN).
     expect(valueOf(vector!, 'num_meetings_held')).toBe(0);
     expect(valueOf(vector!, 'num_emails_sent_received')).toBe(0);
+    // No closes and no qualification score are not a 50% rate or a score of 50.
+    expect(valueOf(vector!, 'owner_close_rate_last_90d')).toBe(0);
+    expect(valueOf(vector!, 'owner_close_rate_observed')).toBe(0);
+    expect(valueOf(vector!, 'qualification_score_norm')).toBe(0);
+    expect(valueOf(vector!, 'qualification_score_observed')).toBe(0);
     expect(Number.isFinite(valueOf(vector!, 'days_in_current_stage'))).toBe(true);
   });
 
@@ -160,6 +165,8 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     const removed = await extractOpportunityFeatures('opp-1', 'org-1', deleted as never);
     expect(valueOf(removed!, 'is_won')).toBe(0);
     expect(valueOf(removed!, 'is_lost')).toBe(0);
+    expect(valueOf(removed!, 'owner_close_rate_last_90d')).toBe(0);
+    expect(valueOf(removed!, 'owner_close_rate_observed')).toBe(0);
     const wheres = count.mock.calls.map((call) => (call[0] as { where: unknown }).where);
     expect(wheres[0]).toMatchObject({
       NOT: {
@@ -186,7 +193,7 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
           stage: 'closed_won',
           pipelineStage: { probability: 0, isWon: true, isLost: true, deletedAt: null },
           _count: { contactLinks: 0 },
-          intel: {},
+          intel: { qualificationScore: 80 },
         })),
         count,
       },
@@ -194,6 +201,8 @@ describe('extractOpportunityFeatures — bounded activity aggregation', () => {
     const flagged = await extractOpportunityFeatures('opp-2', 'org-1', both as never);
     expect(valueOf(flagged!, 'is_won')).toBe(0);
     expect(valueOf(flagged!, 'is_lost')).toBe(1);
+    expect(valueOf(flagged!, 'qualification_score_norm')).toBe(0.8);
+    expect(valueOf(flagged!, 'qualification_score_observed')).toBe(1);
 
     const enumWon = {
       activity,

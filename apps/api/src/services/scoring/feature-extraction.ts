@@ -204,7 +204,8 @@ export async function extractOpportunityFeatures(
   const emailsCount = countFor(['email', 'email_opened', 'email_clicked']);
   const lastStageChangeDate = lastStageChange?.occurredAt ?? opp.createdAt;
 
-  let ownerCloseRate = 0.5;
+  let ownerCloseRate = 0;
+  let ownerCloseRateObserved = 0;
   if (opp.ownerId) {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 86_400_000);
     const [won, lost] = await Promise.all([
@@ -236,11 +237,14 @@ export async function extractOpportunityFeatures(
       }),
     ]);
     const total = won + lost;
-    ownerCloseRate = total > 0 ? won / total : 0.5;
+    if (total > 0) {
+      ownerCloseRate = won / total;
+      ownerCloseRateObserved = 1;
+    }
   }
 
   const intel = (opp.intel ?? {}) as Record<string, unknown>;
-  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : 50;
+  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : null;
 
   const names: string[] = [];
   const values: number[] = [];
@@ -258,11 +262,13 @@ export async function extractOpportunityFeatures(
   push('num_emails_sent_received', emailsCount);
   push('last_activity_days_ago', daysSince(lastActivity?.occurredAt ?? null, now));
   push('owner_close_rate_last_90d', ownerCloseRate);
-  push('qualification_score_norm', qualScore / 100);
+  push('qualification_score_norm', qualScore == null ? 0 : qualScore / 100);
   const lost = opp.stage === 'closed_lost' || stage?.isLost === true;
   const won = !lost && (opp.stage === 'closed_won' || stage?.isWon === true);
   push('is_won', won ? 1 : 0);
   push('is_lost', lost ? 1 : 0);
+  push('owner_close_rate_observed', ownerCloseRateObserved);
+  push('qualification_score_observed', qualScore == null ? 0 : 1);
 
   return { names, values };
 }

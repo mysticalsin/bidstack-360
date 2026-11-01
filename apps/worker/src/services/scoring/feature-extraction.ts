@@ -286,7 +286,8 @@ export async function extractOpportunityFeatures(
   const lastStageChangeDate = stageChanges[0]?.occurredAt ?? opp.createdAt;
 
   // Owner win rate last 90d (closed won / total closed)
-  let ownerCloseRate = 0.5; // neutral default
+  let ownerCloseRate = 0;
+  let ownerCloseRateObserved = 0;
   if (opp.ownerId) {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 86_400_000);
     const [won, lost] = await Promise.all([
@@ -322,12 +323,15 @@ export async function extractOpportunityFeatures(
       }),
     ]);
     const total = won + lost;
-    ownerCloseRate = total > 0 ? won / total : 0.5;
+    if (total > 0) {
+      ownerCloseRate = won / total;
+      ownerCloseRateObserved = 1;
+    }
   }
 
-  // Qualification score from intel blob (may be set by W8-4)
+  // A missing qualification score is not a midpoint.
   const intel = (opp.intel ?? {}) as Record<string, unknown>;
-  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : 50;
+  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : null;
 
   // ── Build vector ───────────────────────────────────────────────────────
   const names: string[] = [];
@@ -361,13 +365,15 @@ export async function extractOpportunityFeatures(
   push('owner_close_rate_last_90d', ownerCloseRate);
 
   // Qualification score (0-100 → 0-1)
-  push('qualification_score_norm', qualScore / 100);
+  push('qualification_score_norm', qualScore == null ? 0 : qualScore / 100);
 
   // Is won / is lost (these are present in historical training only)
   const lost = opp.stage === 'closed_lost' || stage?.isLost === true;
   const won = !lost && (opp.stage === 'closed_won' || stage?.isWon === true);
   push('is_won', won ? 1 : 0);
   push('is_lost', lost ? 1 : 0);
+  push('owner_close_rate_observed', ownerCloseRateObserved);
+  push('qualification_score_observed', qualScore == null ? 0 : 1);
 
   return { names, values };
 }
