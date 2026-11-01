@@ -218,6 +218,10 @@ export function CreateOpportunityDialog({
             </Field>
             <Field
               label={t('createOpportunity.probabilityLabel', 'Probability %')}
+              hint={t(
+                'createOpportunity.probabilityHint',
+                'Blank is stored as 0 and adds nothing to weighted pipeline. It is not a measured win chance.',
+              )}
               htmlFor="probability"
               error={fieldErrors.probability?.[0]}
             >
@@ -228,7 +232,7 @@ export function CreateOpportunityDialog({
                 min={0}
                 max={100}
                 step="5"
-                defaultValue="20"
+                placeholder="0"
               />
             </Field>
             <Field

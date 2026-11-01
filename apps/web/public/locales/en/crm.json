@@ -1817,6 +1817,7 @@
     "valueLabel": "Value",
     "valueHint": "Currency not recorded",
     "probabilityLabel": "Probability %",
+    "probabilityHint": "Blank is stored as 0 and adds nothing to weighted pipeline. It is not a measured win chance.",
     "dueDateLabel": "Due date",
     "countryLabel": "Country",
     "cancel": "Cancel",
