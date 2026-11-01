@@ -122,6 +122,45 @@ describe('buildGaps', () => {
     expect(gaps.map((g) => g.kind)).toEqual(expect.arrayContaining(['senior_contacts', 'no_recent_meeting', 'declining_momentum', 'restructuring', 'no_pipeline']));
     expect(gaps.find((g) => g.kind === 'no_pipeline')?.title).toBe('No open pipeline');
     expect(gaps[0]!.severity).toBe('high');
+    expect(gaps.find((g) => g.kind === 'senior_contacts')?.title).toBe('No senior contacts mapped');
+  });
+
+  it('does not treat a full people page as an empty buying group', () => {
+    // WHY: the latest 1,000 contacts can omit a CFO, and the gap must not say none exist.
+    const gaps = buildGaps({
+      people: [person('Bo', 'Analyst')],
+      lastMeetingAt: null,
+      momentum: null,
+      openDeals: 1,
+      riskEvents: [],
+      competitorMentions: [],
+      financialRisks: [],
+      financialStaleFy: null,
+      financialSource: null,
+      peoplePage: { contacts: true, meetings: true },
+      now,
+    });
+    const senior = gaps.find((g) => g.kind === 'senior_contacts');
+    expect(senior?.title).toBe('No senior contacts on the latest page');
+    expect(senior?.severity).toBe('medium');
+  });
+
+  it('does not call a capped meeting page a full year of silence', () => {
+    // WHY: the latest 200 meetings can miss an earlier meeting with the CFO.
+    const gaps = buildGaps({
+      people: [person('Cy', 'Chief Information Officer')],
+      lastMeetingAt: '2026-10-01T00:00:00Z',
+      momentum: null,
+      openDeals: 1,
+      riskEvents: [],
+      competitorMentions: [],
+      financialRisks: [],
+      financialStaleFy: null,
+      financialSource: null,
+      peoplePage: { meetings: true },
+      now,
+    });
+    expect(gaps.find((g) => g.kind === 'senior_contacts')?.title).toBe('1 senior contact, none met in the latest 200 meetings');
   });
 
   it('does not call a full sample an empty account', () => {
@@ -237,6 +276,27 @@ describe('composeBrief', () => {
       solutionsCapped: true,
     };
     expect(composeBrief(f, (v) => String(v), (m) => m)).toContain('latest 5,000 solutions');
+  });
+
+  it('states people counts as a lower bound when a page is full', () => {
+    // WHY: "we know 4 people" was the latest contacts page, read as the buying group.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 0, openMicros: '0', won24m: 0, lost24m: 0 },
+      people: { known: 4, senior: 1, metLast12m: 1, lastMeeting: null },
+      topSignal: null,
+      peoplePage: { contacts: true },
+    };
+    const txt = composeBrief(f, (v) => String(v), (m) => m);
+    expect(txt).toContain('We know at least 4 people there (at least 1 senior), at least 1 met in the last 12 months');
+    expect(txt).toContain('People counts use the latest 1,000 contacts.');
+    expect(txt).not.toContain('No contacts are mapped yet.');
   });
 });
 

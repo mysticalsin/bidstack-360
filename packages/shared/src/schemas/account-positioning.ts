@@ -101,6 +101,12 @@ export const BriefFacts = z.object({
     latest: z.number().int().positive().nullable().optional(),
   }),
   people: z.object({ known: z.number().int(), senior: z.number().int(), metLast12m: z.number().int(), lastMeeting: z.object({ at: Iso, title: z.string() }).nullable() }),
+  /** Set when a people source filled its page, so the counts are a lower bound. */
+  peoplePage: z.object({
+    chart: z.boolean().optional(),
+    contacts: z.boolean().optional(),
+    meetings: z.boolean().optional(),
+  }).optional(),
   topSignal: z.object({ title: z.string(), at: Iso.nullable(), source: z.string(), sample: z.boolean() }).nullable(),
   /** True when subsidiary deals and people are the latest 1,000 direct children. */
   subsidiariesCapped: z.boolean().optional(),
@@ -421,6 +427,8 @@ export interface GapInputs {
   financialSource: string | null;
   /** When set, openDeals is counted inside this latest-N sample. */
   dealSampleLimit?: number | null;
+  /** When a flag is set, people past that page are not in this list. */
+  peoplePage?: { chart?: boolean; contacts?: boolean; meetings?: boolean } | null;
   now: Date;
 }
 
@@ -430,8 +438,16 @@ export function buildGaps(g: GapInputs): AccountGap[] {
   const out: AccountGap[] = [];
   const senior = g.people.filter((p) => SENIOR.has(p.seniority));
   const metSenior = senior.filter((p) => p.met && p.lastMetAt && g.now.getTime() - Date.parse(p.lastMetAt) < 365 * DAY);
-  if (!senior.length) out.push({ kind: 'senior_contacts', severity: 'high', title: 'No senior contacts mapped', detail: 'No C-level or VP is in the org chart or contacts. Map the economic buyer before pitching.', evidence: [] });
-  else if (!metSenior.length) out.push({ kind: 'senior_contacts', severity: 'medium', title: `${senior.length} senior contact${senior.length > 1 ? 's' : ''}, none met in 12 months`, detail: `Known: ${senior.slice(0, 3).map((p) => p.name).join(', ')}. No meeting with them is logged in the last 12 months.`, evidence: [] });
+  const peoplePartial = peoplePageIsPartial(g.peoplePage);
+  if (!senior.length) {
+    out.push(peoplePartial
+      ? { kind: 'senior_contacts', severity: 'medium', title: 'No senior contacts on the latest page', detail: 'This page has no C-level or VP. A senior person past it is not in this count.', evidence: [] }
+      : { kind: 'senior_contacts', severity: 'high', title: 'No senior contacts mapped', detail: 'No C-level or VP is in the org chart or contacts. Map the economic buyer before pitching.', evidence: [] });
+  } else if (!metSenior.length) {
+    out.push(g.peoplePage?.meetings
+      ? { kind: 'senior_contacts', severity: 'medium', title: `${senior.length} senior contact${senior.length > 1 ? 's' : ''}, none met in the latest ${PEOPLE_MEETING_PAGE} meetings`, detail: `Known: ${senior.slice(0, 3).map((p) => p.name).join(', ')}. A meeting past that page is not in this count.`, evidence: [] }
+      : { kind: 'senior_contacts', severity: 'medium', title: `${senior.length} senior contact${senior.length > 1 ? 's' : ''}, none met in 12 months`, detail: `Known: ${senior.slice(0, 3).map((p) => p.name).join(', ')}. No meeting with them is logged in the last 12 months.`, evidence: [] });
+  }
   const days = g.lastMeetingAt ? Math.floor((g.now.getTime() - Date.parse(g.lastMeetingAt)) / DAY) : null;
   if (days === null) out.push({ kind: 'no_recent_meeting', severity: 'medium', title: 'No meetings logged', detail: 'Polo has no meeting with this account on record.', evidence: [] });
   else if (days > 90) out.push({ kind: 'no_recent_meeting', severity: days > 180 ? 'high' : 'medium', title: `Last meeting ${days} days ago`, detail: `Last logged meeting was on ${g.lastMeetingAt!.slice(0, 10)}.`, evidence: [] });
@@ -474,6 +490,30 @@ export function buildGaps(g: GapInputs): AccountGap[] {
 export type MoneyFmt = (value: number, currency: string) => string;
 export type MicrosFmt = (micros: string) => string;
 
+/** Pages used to count people. A full page is a lower bound, not the book. */
+export const PEOPLE_CHART_PAGE = 1000;
+export const PEOPLE_CONTACT_PAGE = 1000;
+export const PEOPLE_MEETING_PAGE = 200;
+
+export type PeoplePageCaps = { chart?: boolean; contacts?: boolean; meetings?: boolean };
+
+const groupedCount = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+export function peoplePageIsPartial(page: PeoplePageCaps | null | undefined): boolean {
+  return Boolean(page?.chart || page?.contacts || page?.meetings);
+}
+
+/** Names only the pages that filled, so a complete book stays silent. */
+export function peoplePageSentence(page: PeoplePageCaps | null | undefined): string | null {
+  const parts = [
+    page?.chart ? `${groupedCount(PEOPLE_CHART_PAGE)} org-chart nodes` : '',
+    page?.contacts ? `${groupedCount(PEOPLE_CONTACT_PAGE)} contacts` : '',
+    page?.meetings ? `${groupedCount(PEOPLE_MEETING_PAGE)} meetings` : '',
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return `People counts use the latest ${parts.join(', ')}.`;
+}
+
 /** One plain-English paragraph built only from the facts given. */
 export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: MicrosFmt): string {
   const s: string[] = [];
@@ -495,10 +535,17 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   const sample = p.latest ? ` among the latest ${p.latest} deals` : '';
   s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${hist}${sample}.` : `We have no open deals${hist}${sample}.`);
   const pe = f.people;
+  const peoplePartial = peoplePageIsPartial(f.peoplePage);
   if (pe.known) {
     const last = pe.lastMeeting ? `, last meeting on ${pe.lastMeeting.at.slice(0, 10)} (${pe.lastMeeting.title})` : ', no meeting logged';
-    s.push(`We know ${pe.known} people there (${pe.senior} senior), ${pe.metLast12m} met in the last 12 months${last}.`);
-  } else s.push('No contacts are mapped yet.');
+    const known = peoplePartial ? `at least ${pe.known}` : String(pe.known);
+    const senior = peoplePartial ? `at least ${pe.senior}` : String(pe.senior);
+    const met = peoplePartial ? `at least ${pe.metLast12m}` : String(pe.metLast12m);
+    s.push(`We know ${known} people there (${senior} senior), ${met} met in the last 12 months${last}.`);
+  } else if (peoplePartial) s.push('No named people on the latest page.');
+  else s.push('No contacts are mapped yet.');
+  const peopleNote = peoplePageSentence(f.peoplePage);
+  if (peopleNote) s.push(peopleNote);
   if (f.topSignal) s.push(`Latest notable signal: ${f.topSignal.title}${f.topSignal.at ? ` (${monthYear(f.topSignal.at)}, ${f.topSignal.source})` : ''}${f.topSignal.sample ? ' [sample]' : ''}.`);
   if (f.subsidiariesCapped) s.push('Subsidiary figures use the latest 1,000 direct subsidiaries.');
   if (f.evidenceCapped) s.push('Initiative evidence is the latest 100 news items and meetings.');
