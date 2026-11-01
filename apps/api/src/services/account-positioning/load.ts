@@ -2,7 +2,7 @@
 // risks, and the key-numbers strip. Read only, built from data already held.
 // Nothing is estimated: a number with no source comes back as null.
 import { prisma } from '@bidstack/db';
-import { recordedOutcome } from '../account-signals/load.js';
+import { pageIsCapped, recordedOutcome } from '../account-signals/load.js';
 import { wonOutcomeWhere } from '../../routes/opportunities.helpers.js';
 import { capDealSample, POSITIONING_DEAL_SAMPLE, sumMicrosAsNumber } from './micros.js';
 import {
@@ -14,9 +14,14 @@ import {
   stripSamplePrefix,
   themeForText,
   tierLabel,
+  PEOPLE_CHART_PAGE,
+  PEOPLE_CONTACT_PAGE,
+  PEOPLE_MEETING_PAGE,
+  peoplePageIsPartial,
   type AccountKeyNumbers,
   type AccountPositioning,
   type BriefFacts,
+  type PeoplePageCaps,
   type FinancialPeriod,
   type FinancialSignalLite,
   type KeyNumber,
@@ -57,15 +62,30 @@ interface Ctx {
 /** Everyone we know at the account, merged by name: org chart, contacts, meeting attendees. */
 async function loadPeople(c: Ctx, ids: string[]) {
   const since = new Date(c.now.getTime() - 730 * DAY);
-  const [nodes, contacts, meetings, acts] = await Promise.all([
-    prisma.orgChartNode.findMany({ where: { orgId: c.orgId, deletedAt: null, chart: { companyId: c.companyId } }, select: { name: true, title: true, seniority: true, contactId: true, kind: true }, take: 500 }),
-    prisma.contact.findMany({ where: { orgId: c.orgId, companyId: { in: ids }, deletedAt: null }, select: { id: true, name: true, role: true }, take: 500 }),
-    prisma.meetingIntel.findMany({
-      where: { AND: [visibleMeetingWhere(c.orgId, c.scope), { companyId: { in: ids }, heldAt: { gte: since, lte: c.now } }] },
-      select: { title: true, heldAt: true, attendees: { select: { name: true, title: true, seniority: true, contactId: true, isInternal: true } } },
-      orderBy: { heldAt: 'desc' },
-      take: 200,
-    }),
+  const chartWhere = { orgId: c.orgId, deletedAt: null, chart: { companyId: c.companyId } };
+  const contactWhere = { orgId: c.orgId, companyId: { in: ids }, deletedAt: null };
+  const meetingWhere = { AND: [visibleMeetingWhere(c.orgId, c.scope), { companyId: { in: ids }, heldAt: { gte: since, lte: c.now } }] };
+  const [chartPage, contactPage, meetingPage, acts] = await Promise.all([
+    (async () => {
+      const rows = await prisma.orgChartNode.findMany({ where: chartWhere, select: { name: true, title: true, seniority: true, contactId: true, kind: true }, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], take: PEOPLE_CHART_PAGE });
+      const capped = rows.length === PEOPLE_CHART_PAGE && pageIsCapped(rows.length, await prisma.orgChartNode.count({ where: chartWhere }), PEOPLE_CHART_PAGE);
+      return { rows, capped };
+    })(),
+    (async () => {
+      const rows = await prisma.contact.findMany({ where: contactWhere, select: { id: true, name: true, role: true }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: PEOPLE_CONTACT_PAGE });
+      const capped = rows.length === PEOPLE_CONTACT_PAGE && pageIsCapped(rows.length, await prisma.contact.count({ where: contactWhere }), PEOPLE_CONTACT_PAGE);
+      return { rows, capped };
+    })(),
+    (async () => {
+      const rows = await prisma.meetingIntel.findMany({
+        where: meetingWhere,
+        select: { title: true, heldAt: true, attendees: { select: { name: true, title: true, seniority: true, contactId: true, isInternal: true } } },
+        orderBy: { heldAt: 'desc' },
+        take: PEOPLE_MEETING_PAGE,
+      });
+      const capped = rows.length === PEOPLE_MEETING_PAGE && pageIsCapped(rows.length, await prisma.meetingIntel.count({ where: meetingWhere }), PEOPLE_MEETING_PAGE);
+      return { rows, capped };
+    })(),
     prisma.activity.findMany({
       where: { orgId: c.orgId, type: 'meeting', deletedAt: null, entityType: 'company', entityId: { in: ids }, OR: [{ startTime: { gte: since, lte: c.now } }, { startTime: null, occurredAt: { gte: since, lte: c.now } }] },
       select: { subject: true, startTime: true, occurredAt: true },
@@ -88,6 +108,14 @@ async function loadPeople(c: Ctx, ids: string[]) {
       cur.lastMetAt = p.lastMetAt;
     }
   };
+  const nodes = chartPage.rows;
+  const contacts = contactPage.rows;
+  const meetings = meetingPage.rows;
+  const peoplePage: PeoplePageCaps = {
+    chart: chartPage.capped || undefined,
+    contacts: contactPage.capped || undefined,
+    meetings: meetingPage.capped || undefined,
+  };
   for (const n of nodes) if (n.kind !== 'vacancy') add({ name: n.name, title: n.title, seniority: n.seniority === 'unknown' ? seniorityFromTitle(n.title) : n.seniority, met: false, lastMetAt: null, source: 'org_chart' });
   for (const ct of contacts) add({ name: ct.name, title: ct.role, seniority: seniorityFromTitle(ct.role), met: false, lastMetAt: null, source: 'contact' });
   const contactName = new Map(contacts.map((ct) => [ct.id, ct.name]));
@@ -102,7 +130,7 @@ async function loadPeople(c: Ctx, ids: string[]) {
     ...meetings.map((m) => ({ at: m.heldAt.toISOString(), title: cleanText(m.title) })),
     ...acts.map((a) => ({ at: (a.startTime ?? a.occurredAt).toISOString(), title: cleanText(a.subject ?? 'Meeting') })),
   ].sort((a, b) => b.at.localeCompare(a.at))[0] ?? null;
-  return { people: [...byKey.values()], lastMeeting };
+  return { people: [...byKey.values()], lastMeeting, peoplePage };
 }
 
 function finLite(fin: Awaited<ReturnType<typeof loadAccountFinancials>>): FinancialSignalLite[] {
@@ -131,7 +159,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const { ids, childrenCapped } = await accountIds(orgId, companyId);
   const live = await companiesWithLiveSignals(orgId, ids);
   const since24 = new Date(now.getTime() - 730 * DAY);
-  const [company, firmo, initiativeLoad, fin, { people, lastMeeting }, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
+  const [company, firmo, initiativeLoad, fin, loadedPeople, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, tier: true, industry: true, countryCode: true, employeeCount: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, provenance: true } }),
     loadInitiatives(orgId, scope, { id: companyId }, now, ids),
@@ -178,6 +206,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       take: 10,
     }),
   ]);
+  const { people, lastMeeting, peoplePage } = loadedPeople;
   const loaded = momentumIn.get(companyId);
   const m = momentumFor(loaded, now);
   const momentum = m.coverage > 0 ? { score: m.score, delta: m.delta, trend: m.trend, sample: loaded?.sample ?? false } : null;
@@ -247,6 +276,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       metLast12m: people.filter((p) => p.met && p.lastMetAt && now.getTime() - Date.parse(p.lastMetAt) < 365 * DAY).length,
       lastMeeting,
     },
+    peoplePage,
     topSignal: top ? { title: cleanText(stripSamplePrefix(top.title)), at: top.occurredAt.toISOString(), source: sourceLabel(top.source), sample: top.sample } : null,
     subsidiariesCapped: childrenCapped,
     evidenceCapped: initiativeLoad.evidenceCapped,
@@ -263,6 +293,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     financialStaleFy: stale && latest ? latest.fiscalYear : null,
     financialSource: finSource,
     dealSampleLimit: dealSample.capped ? POSITIONING_DEAL_SAMPLE : null,
+    peoplePage,
     now,
   });
   return { companyId, plays, brief, gaps, sample: plays.length > 0 && plays.every((p) => p.sample), computedAt: now.toISOString() };
@@ -303,7 +334,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const live = await companiesWithLiveSignals(orgId, ids);
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
-  const [company, firmo, fin, rawPostings, opps, news, momentumIn, { people, lastMeeting }] = await Promise.all([
+  const [company, firmo, fin, rawPostings, opps, news, momentumIn, loadedPeople] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
@@ -329,6 +360,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     loadMomentumInputs(orgId, scope, [companyId], now),
     loadPeople(c, ids),
   ]);
+  const { people, lastMeeting, peoplePage } = loadedPeople;
   const items: KeyNumber[] = [];
   const postings = rawPostings.flatMap((p) => (p.postedAt ? [{ postedAt: p.postedAt, lastSeenAt: p.lastSeenAt }] : []));
   const periods = fyPeriods(fin);
@@ -384,7 +416,18 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   // Senior contact coverage.
   const senior = people.filter((p) => SENIOR.has(p.seniority));
   const metSenior = senior.filter((p) => p.met && p.lastMetAt && now.getTime() - Date.parse(p.lastMetAt) < 365 * DAY);
-  items.push(base({ id: 'senior_coverage', group: 'health', label: 'Senior contacts met', unit: 'count', value: metSenior.length, sub: `of ${senior.length} senior (C-level, VP) known`, source: 'Org chart, contacts and meeting intel', period: 'Met in the last 12 months', anchor: 'who-we-met' }));
+  const peoplePartial = peoplePageIsPartial(peoplePage);
+  items.push(base({
+    id: 'senior_coverage',
+    group: 'health',
+    label: 'Senior contacts met',
+    unit: 'count',
+    value: metSenior.length,
+    sub: peoplePartial ? `at least this many, of at least ${senior.length} senior on the latest page` : `of ${senior.length} senior (C-level, VP) known`,
+    source: 'Org chart, contacts and meeting intel',
+    period: peoplePage.meetings ? `Met among the latest ${PEOPLE_MEETING_PAGE} meetings, last 12 months` : 'Met in the last 12 months',
+    anchor: 'who-we-met',
+  }));
 
   // Last meeting recency.
   if (lastMeeting) {
