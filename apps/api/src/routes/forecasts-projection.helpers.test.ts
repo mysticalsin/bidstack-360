@@ -5,6 +5,7 @@ import {
   aggregateManualCommit,
   aggregateProjection,
   buildProjectionWindow,
+  probabilityForRow,
   quarterLabel,
   quarterPeriodKey,
   quarterStart,
@@ -49,6 +50,23 @@ describe('resolveStageProbability', () => {
   it('prefers the org config over the documented fallback', () => {
     const cfg = new Map<string, number>([['s2_sent', 55]]);
     expect(resolveStageProbability('s2_sent', cfg)).toBe(55);
+  });
+
+  it('uses the linked stage probability, including zero, ahead of the key map', () => {
+    // WHY: the first s1_lead row in the org used to weight every deal with
+    // that key. A deal on a later stage keeps that stage's own probability.
+    const cfg = new Map<string, number>([['s1_lead', 10]]);
+    const deal = (stageProbability: number | null): ProjectionRow => ({
+      period: '2026-Q2',
+      ownerId: null,
+      ownerName: null,
+      stage: 's1_lead',
+      stageProbability,
+      valueMicros: '1000000',
+    });
+    expect(probabilityForRow(deal(70), cfg)).toBe(70);
+    expect(probabilityForRow(deal(0), cfg)).toBe(0);
+    expect(probabilityForRow(deal(null), cfg)).toBe(10);
   });
 
   it('falls back to the documented map when a stage is unconfigured', () => {

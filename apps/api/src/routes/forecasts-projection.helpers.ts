@@ -127,7 +127,18 @@ export interface ProjectionRow {
   ownerId: string | null;
   ownerName: string | null;
   stage: OpportunityStage;
+  /** Live linked stage probability. Null means the deal has no live stage row. */
+  stageProbability?: number | string | null;
   valueMicros: string; // numeric SUM serialized as string by the driver
+}
+
+/** Linked stage probability wins, including 0. A missing link uses the key map. */
+export function probabilityForRow(row: ProjectionRow, stageProbabilities: Map<string, number>): number {
+  if (row.stageProbability != null && row.stageProbability !== '') {
+    const n = Number(row.stageProbability);
+    if (Number.isFinite(n)) return n;
+  }
+  return resolveStageProbability(row.stage, stageProbabilities);
 }
 
 interface OwnerAccumulator {
@@ -177,7 +188,7 @@ export function aggregateProjection(
       owner = emptyOwner(row.ownerId, row.ownerName ?? UNASSIGNED);
       periodOwners.set(ownerKey, owner);
     }
-    applyRow(owner, row, resolveStageProbability(row.stage, stageProbabilities));
+    applyRow(owner, row, probabilityForRow(row, stageProbabilities));
   }
 
   return window.periods.map((period) => buildPeriod(period, owners.get(period)!, manualCommitByPeriod));

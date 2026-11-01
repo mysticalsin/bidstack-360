@@ -135,4 +135,64 @@ describe('forecast projection and flagged stages', () => {
       wonMicros: 2_000_000,
     });
   });
+
+  skipIfNoDb('a linked stage keeps its own probability', async () => {
+    // WHY: the first s1_lead stage in the org weighted every deal with that
+    // key. A deal on a later stage must use that stage's probability, including
+    // when the deal's own stored probability says something else.
+    const owner = await prisma.user.create({
+      data: {
+        orgId,
+        clerkUser: `user_fp_${Date.now()}`,
+        email: `forecast.prob.${Date.now()}@test.local`,
+        name: 'Probability Owner',
+      },
+    });
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Later stage ${Date.now()}` },
+    });
+    const later = await prisma.pipelineStage.create({
+      data: {
+        orgId,
+        pipelineId: pipeline.id,
+        key: 's1_lead',
+        name: 'Later lead',
+        orderIndex: 50,
+        probability: 70,
+      },
+    });
+    const due = new Date();
+    due.setUTCDate(15);
+    due.setUTCHours(0, 0, 0, 0);
+    await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-FP-${Date.now()}`,
+        customer: 'Forecast Co',
+        name: 'On the later stage',
+        stage: 's1_lead',
+        pipelineStageId: later.id,
+        valueMicros: 2_000_000n,
+        probability: 10,
+        ownerId: owner.id,
+        dueDate: due,
+        intel: {},
+      },
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/api/v1/forecasts/projection' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      periods: Array<{
+        byOwner: Array<{ ownerId: string | null; openMicros: number; weightedMicros: number }>;
+      }>;
+    };
+    const row = body.periods
+      .flatMap((period) => period.byOwner)
+      .find((ownerRow) => ownerRow.ownerId === owner.id);
+    expect(row).toMatchObject({
+      openMicros: 2_000_000,
+      weightedMicros: 1_400_000,
+    });
+  });
 });
