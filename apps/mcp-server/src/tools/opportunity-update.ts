@@ -6,6 +6,7 @@ import type { Tool } from './index.js';
 import {
   companyIdForCustomerRename,
   dealOutcome,
+  pipelineStageIdForStageChange,
   recordOpportunityStageMove,
 } from './crm-tools.helpers.js';
 
@@ -37,7 +38,7 @@ const Input = z.object({
 
 export const opportunityUpdate: Tool<typeof Input> = {
   description:
-    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the link. Writes audit_log.',
+    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change links the one live pipeline stage with the new key, or clears that link when none exists. Two matches are refused and the deal stays put. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the link. Writes audit_log.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -73,10 +74,12 @@ export const opportunityUpdate: Tool<typeof Input> = {
       patch.customer !== undefined && patch.customer !== before.customer
         ? await companyIdForCustomerRename(ctx.orgId, patch.customer)
         : undefined;
+    const pipelineStageId = await pipelineStageIdForStageChange(ctx.orgId, before.stage, patch.stage);
     const updated = await prisma.opportunity.update({
       where: { id: before.id },
       data: {
         ...(patch.stage ? { stage: patch.stage as PrismaStage } : {}),
+        ...(pipelineStageId !== undefined ? { pipelineStageId } : {}),
         ...(patch.probability !== undefined ? { probability: patch.probability } : {}),
         ...(patch.value !== undefined
           ? { valueMicros: BigInt(Math.round(patch.value * 1_000_000)) }

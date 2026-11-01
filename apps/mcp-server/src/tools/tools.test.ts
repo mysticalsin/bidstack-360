@@ -363,6 +363,101 @@ describeDb('MCP tools', () => {
     }
   });
 
+  it('a stage change leaves the previous lost flag behind', async () => {
+    // WHY: changing the stored key left the old stage row attached, so a lost
+    // flag still decided the outcome after the deal had moved.
+    const openKeys = [
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
+    ] as const;
+    const free: string[] = [];
+    for (const key of openKeys) {
+      const n = await prisma.pipelineStage.count({ where: { orgId, key, deletedAt: null } });
+      if (n === 0) free.push(key);
+    }
+    expect(free.length).toBeGreaterThanOrEqual(4);
+    const lostKey = free[0]!;
+    const openKey = free[1]!;
+    const bareKey = free[2]!;
+    const ambiguousKey = free[3]!;
+    const token = randomBytes(4).toString('hex');
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId, name: `Move ${token}` },
+    });
+    const other = await prisma.pipeline.create({
+      data: { orgId, name: `Move other ${token}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: lostKey, name: 'Lost', isLost: true },
+    });
+    const open = await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: openKey, name: 'Open', isLost: false },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: pipeline.id, key: ambiguousKey, name: 'A' },
+    });
+    await prisma.pipelineStage.create({
+      data: { orgId, pipelineId: other.id, key: ambiguousKey, name: 'B' },
+    });
+    const opp = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-MV-${token}`,
+        customer: 'Move Co',
+        name: `Stage move ${token}`,
+        stage: lostKey as 's1_lead',
+        pipelineStageId: lost.id,
+        valueMicros: 0n,
+        probability: 0,
+        intel: {},
+      },
+    });
+
+    try {
+      const moved = (await tools['opportunity.update'].handler(
+        { id: opp.id, patch: { stage: openKey } },
+        ctx,
+      )) as { stage: string; outcome: string };
+      expect(moved.stage).toBe(openKey);
+      expect(moved.outcome).toBe('open');
+      const linked = await prisma.opportunity.findFirst({
+        where: { id: opp.id, orgId },
+        select: { pipelineStageId: true, stage: true },
+      });
+      expect(linked?.pipelineStageId).toBe(open.id);
+
+      const cleared = (await tools['crm_update_deal'].handler(
+        { id: opp.id, patch: { stage: bareKey } },
+        ctx,
+      )) as { stage: string; outcome: string };
+      expect(cleared.stage).toBe(bareKey);
+      expect(cleared.outcome).toBe('open');
+      const unlinked = await prisma.opportunity.findFirst({
+        where: { id: opp.id, orgId },
+        select: { pipelineStageId: true },
+      });
+      expect(unlinked?.pipelineStageId).toBeNull();
+
+      await expect(
+        tools['crm_update_deal'].handler({ id: opp.id, patch: { stage: ambiguousKey } }, ctx),
+      ).rejects.toThrow(/more than one pipeline stage/);
+      const stayed = await prisma.opportunity.findFirst({
+        where: { id: opp.id, orgId },
+        select: { stage: true, pipelineStageId: true },
+      });
+      expect(stayed?.stage).toBe(bareKey);
+      expect(stayed?.pipelineStageId).toBeNull();
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { orgId, targetId: opp.id } });
+      await prisma.opportunity.deleteMany({ where: { id: opp.id } });
+      await prisma.pipelineStage.deleteMany({ where: { pipelineId: { in: [pipeline.id, other.id] } } });
+      await prisma.pipeline.deleteMany({ where: { id: { in: [pipeline.id, other.id] } } });
+    }
+  });
+
   it('opportunities.get returns a single opp', async () => {
     const out = (await tools['opportunities.get'].handler({ id: oppId }, ctx)) as { id: string };
     expect(out.id).toBe(oppId);

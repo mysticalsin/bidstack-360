@@ -32,9 +32,24 @@ export async function solePipelineStage(
     take: 2,
   });
   if (rows.length > 1) {
-    throw new Error(`stage "${key}" matches more than one pipeline stage, so the deal was not created`);
+    throw new Error(`stage "${key}" matches more than one pipeline stage`);
   }
   return rows[0] ?? null;
+}
+
+/**
+ * A real stage change. One live row with the new key is the link. No row
+ * clears the previous link so its lost or won flag does not stay on the deal.
+ * The same stage again leaves the link alone. Two rows throw before any write.
+ */
+export async function pipelineStageIdForStageChange(
+  orgId: string,
+  beforeStage: string,
+  nextStage: string | undefined,
+): Promise<string | null | undefined> {
+  if (!nextStage || nextStage === beforeStage) return undefined;
+  const row = await solePipelineStage(orgId, nextStage);
+  return row?.id ?? null;
 }
 
 /** Lost wins when the enum and a live stage flag disagree, or both are set. */

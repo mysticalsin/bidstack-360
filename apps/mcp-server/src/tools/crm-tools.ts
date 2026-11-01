@@ -22,6 +22,7 @@ import {
   requireCompanyLink,
   dealOutcome,
   serializeDeal,
+  pipelineStageIdForStageChange,
   solePipelineStage,
   source,
 } from './crm-tools.helpers.js';
@@ -174,7 +175,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
 
 export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
   description:
-    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the company link. Writes an audit entry.',
+    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change links the one live pipeline stage with the new key, or clears that link when none exists. Two matches are refused and the deal stays put. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the company link. Writes an audit entry.',
   input: DealUpdateInput,
   inputJsonSchema: {
     type: 'object',
@@ -195,10 +196,16 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
       args.patch.customer !== undefined && args.patch.customer !== before.customer
         ? await companyIdForCustomerRename(ctx.orgId, args.patch.customer)
         : undefined;
+    const pipelineStageId = await pipelineStageIdForStageChange(
+      ctx.orgId,
+      before.stage,
+      args.patch.stage,
+    );
     const updated = await prisma.opportunity.update({
       where: { id: before.id },
       data: {
         ...(args.patch.stage !== undefined ? { stage: args.patch.stage as PrismaStage } : {}),
+        ...(pipelineStageId !== undefined ? { pipelineStageId } : {}),
         ...(args.patch.probability !== undefined ? { probability: args.patch.probability } : {}),
         ...(args.patch.value !== undefined
           ? { valueMicros: BigInt(Math.round(args.patch.value * 1_000_000)) }
