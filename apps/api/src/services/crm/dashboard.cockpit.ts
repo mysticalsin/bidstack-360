@@ -694,6 +694,7 @@ export function buildCockpit({
   now = new Date(),
   coveragePages,
   openDealCount,
+  dealCount,
   openRiskCount,
   openComplianceCount,
   openRiskSeverity,
@@ -792,6 +793,8 @@ export function buildCockpit({
   coveragePages?: { contactsCapped?: boolean; dealsCapped?: boolean; tasksCapped?: boolean };
   /** Exact open-deal count when the opportunity page is not the whole book. */
   openDealCount?: number;
+  /** Exact opportunity count when the opportunity page is not the whole book. */
+  dealCount?: number;
   openRiskCount?: number;
   openComplianceCount?: number;
   openRiskSeverity?: { critical: number; high: number; medium: number; low: number };
@@ -994,8 +997,10 @@ export function buildCockpit({
       },
       {
         label: 'Projects',
-        value: companyOpps.length.toString(),
-        detail: 'count of opportunities matched to this account',
+        value: (dealCount ?? companyOpps.length).toString(),
+        detail: dealCount != null
+          ? 'count of opportunities on this account; the list below is the latest page'
+          : 'count of opportunities matched to this account',
         tone: 'blue',
         ...internalSource,
         block: 'internal' as const,

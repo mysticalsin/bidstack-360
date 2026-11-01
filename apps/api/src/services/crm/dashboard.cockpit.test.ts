@@ -256,9 +256,13 @@ describe('applyFieldOverrides', () => {
       risks: [],
       compliance: [],
       openDealCount: 40,
+      dealCount: 140,
       coveragePages: { dealsCapped: true },
     });
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('40');
+    // WHY: Projects used the loaded page, so a full page of 100 read as the whole account.
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('140');
+    expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.detail).toContain('latest page');
     expect(cockpit.health.factors?.find((factor) => factor.key === 'pipeline')?.whatItMeasures).toContain(
       'latest 100 opportunities',
     );
