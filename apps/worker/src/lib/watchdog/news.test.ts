@@ -25,6 +25,8 @@ const subject: NewsSubject = {
   companyId: 'c1',
   companyName: 'Acme Corp',
   domain: 'acme.com',
+  ticker: 'ACME',
+  exchange: 'NYSE',
   irFeedUrl: 'https://acme.com/press.rss',
   linkedinUrl: 'https://www.linkedin.com/company/acme',
   alertUserIds: ['u1'],
@@ -32,14 +34,14 @@ const subject: NewsSubject = {
 
 const GDELT = JSON.stringify({
   articles: [
-    { url: 'https://news.example/a?utm_source=x', title: 'Acme raises $40M Series C led by Atomico', seendate: '20261029T101500Z', domain: 'news.example' },
+    { url: 'https://news.example/a?utm_source=x', title: 'Acme (NYSE: ACME) raises $40M Series C led by Atomico', seendate: '20261029T101500Z', domain: 'news.example' },
     { url: 'https://other.example/b', title: 'Series C: Acme raises $40M, led by Atomico', seendate: '20261029T121500Z', domain: 'other.example' },
     { url: 'https://noise.example/c', title: 'Acmeville wins football cup', seendate: '20261029T121500Z', domain: 'noise.example' },
     { url: 'https://old.example/d', title: 'Acme opens new hub in Lisbon', seendate: '20260901T121500Z', domain: 'old.example' },
   ],
 });
 const RSS = `<?xml version="1.0"?><rss><channel>
-<item><title><![CDATA[Acme launches new mobile banking app - Reuters]]></title><link>https://reuters.example/x</link><pubDate>Thu, 30 Oct 2026 09:00:00 GMT</pubDate><source url="https://reuters.example">Reuters</source><description>&lt;p&gt;Acme unveiled an app.&lt;/p&gt;</description></item>
+<item><title><![CDATA[Acme (NYSE:ACME) launches new mobile banking app - Reuters]]></title><link>https://reuters.example/x</link><pubDate>Thu, 30 Oct 2026 09:00:00 GMT</pubDate><source url="https://reuters.example">Reuters</source><description>&lt;p&gt;Acme unveiled an app.&lt;/p&gt;</description></item>
 </channel></rss>`;
 const ATOM = `<feed><entry><title>Acme appoints new chief data officer</title><link href="https://acme.com/press/cdo"/><updated>2026-10-28T08:00:00Z</updated><summary>Jane Doe joins.</summary></entry></feed>`;
 
@@ -58,7 +60,8 @@ describe('parsers', () => {
   });
   it('parses RSS and Atom', () => {
     const rss = parseFeed(RSS, 'google_news');
-    expect(rss[0]?.title).toBe('Acme launches new mobile banking app - Reuters');
+    expect(rss[0]?.title).toBe('Acme (NYSE:ACME) launches new mobile banking app - Reuters');
+    expect(rss[0]?.publisherUrl).toBe('https://reuters.example');
     expect(rss[0]?.publisher).toBe('Reuters');
     expect(rss[0]?.description).toBe('Acme unveiled an app.');
     const atom = parseFeed(ATOM, 'company_rss');
@@ -115,7 +118,7 @@ describe('fetchAccountNews', () => {
     expect(a.items.length).toBe(6);
     await fetchAccountNews(subject, { fetchImpl, cache, config });
     expect(calls).toHaveLength(3);
-    expect(calls[0]).toContain('%22Acme%20Corp%22');
+    expect(calls[0]).toContain('%22Acme%22');
   });
   it('makes no call when nothing is configured', async () => {
     const fetchImpl = vi.fn() as unknown as NewsFetch;
@@ -167,10 +170,17 @@ describe('runAccountNews', () => {
   it('inserts, then alerts on important items only', async () => {
     const m = memStore();
     const fetchImpl = fakeFetch({ 'api.gdeltproject.org': GDELT, 'news.google.com': RSS });
-    const r = await runAccountNews(subject, { fetchImpl, cache: memoryNewsCache(), config: newsConfigFromEnv({ WATCHDOG_NEWS_SOURCES: 'gdelt,google_news' }), store: m.store, now: NOW });
+    // The second GDELT story has no ticker in its title: its page says so.
+    const pages: Record<string, string> = {
+      'https://other.example/robots.txt': 'User-agent: *\nDisallow: /private',
+      'https://other.example/b': '<html><head><script>var x="NYSE: ACME"</script></head><body><p>Acme Corp (NYSE: ACME) said on Thursday it raised $40M.</p></body></html>',
+    };
+    const bodyFetch = async (url: string) => ({ ok: url in pages, status: url in pages ? 200 : 404, headers: { get: () => 'text/html' }, body: null, text: async () => pages[url] ?? '' });
+    const r = await runAccountNews(subject, { fetchImpl, bodyFetch, sleep: async () => undefined, cache: memoryNewsCache(), config: newsConfigFromEnv({ WATCHDOG_NEWS_SOURCES: 'gdelt,google_news' }), store: m.store, now: NOW });
     expect(r.inserted).toBe(2);
+    expect(r.bodyChecks).toBeGreaterThanOrEqual(1);
     expect(r.alerted).toBe(1);
-    expect(m.notes[0]).toMatch(/^Opportunity at Acme Corp: Acme raises \$40M/);
+    expect(m.notes[0]).toMatch(/^Opportunity at Acme Corp: Acme \(NYSE: ACME\) raises \$40M/);
     expect(m.inserted.every((x) => !/[\u2014]/.test(x.title))).toBe(true);
   });
 
@@ -196,3 +206,39 @@ describe('mapApolloFundingEvents', () => {
 });
 
 void ({} as NewsItem);
+
+describe('v22 identifier rule', () => {
+  const run = (subj: NewsSubject, map: Record<string, string>) =>
+    runAccountNews(subj, { fetchImpl: fakeFetch(map), cache: memoryNewsCache(), config: newsConfigFromEnv({ WATCHDOG_NEWS_SOURCES: 'gdelt,google_news', WATCHDOG_NEWS_VERIFY_BODY: 'false' }), store: { findByDedupeKeys: async () => [], insert: async (r) => r, bump: async () => undefined, notify: async () => undefined }, now: NOW });
+
+  it('fetches nothing for an account without website or ticker', async () => {
+    const calls: string[] = [];
+    const r = await runAccountNews({ ...subject, domain: null, ticker: null }, { fetchImpl: fakeFetch({ 'news.google.com': RSS }, calls), cache: memoryNewsCache(), config: newsConfigFromEnv({ WATCHDOG_NEWS_SOURCES: 'google_news' }), store: { findByDedupeKeys: async () => [], insert: async (x) => x, bump: async () => undefined, notify: async () => undefined }, now: NOW });
+    expect(r.skipped).toBe('no_identifiers');
+    expect(calls).toEqual([]);
+  });
+
+  it('treats a placeholder domain as missing', async () => {
+    const r = await run({ ...subject, domain: 'example.org', ticker: null }, { 'news.google.com': RSS });
+    expect(r.skipped).toBe('no_identifiers');
+  });
+
+  it('drops name-only stories when the body check is off', async () => {
+    const r = await run(subject, { 'api.gdeltproject.org': GDELT });
+    // Only the title with "NYSE: ACME" survives; Acmeville and the name-only copy go.
+    expect(r.kept).toBe(1);
+    expect(r.dropped).toBeGreaterThanOrEqual(2);
+  });
+
+  it('asks Google News for the ticker or domain next to the name', async () => {
+    const calls: string[] = [];
+    await runAccountNews(subject, { fetchImpl: fakeFetch({ 'news.google.com': RSS }, calls), cache: memoryNewsCache(), config: newsConfigFromEnv({ WATCHDOG_NEWS_SOURCES: 'google_news' }), store: { findByDedupeKeys: async () => [], insert: async (x) => x, bump: async () => undefined, notify: async () => undefined }, now: NOW });
+    expect(decodeURIComponent(calls[0]!)).toContain('"Acme" ("ACME" OR "acme.com") when:14d');
+  });
+
+  it('keeps a Google News story whose publisher is the company site', async () => {
+    const own = `<rss><channel><item><title>Acme opens Lisbon hub</title><link>https://news.google.com/rss/articles/x</link><pubDate>Thu, 30 Oct 2026 09:00:00 GMT</pubDate><source url="https://www.acme.com">Acme</source></item></channel></rss>`;
+    const r = await run(subject, { 'news.google.com': own });
+    expect(r.kept).toBe(1);
+  });
+});

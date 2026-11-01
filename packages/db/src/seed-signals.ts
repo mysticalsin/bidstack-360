@@ -54,6 +54,47 @@ export const SAMPLE_SIGNALS: Record<string, SampleSignal[]> = {
 
 const DAY = 86_400_000;
 
+/**
+ * Public identifiers for the demo accounts that are real companies (v22), so
+ * the live news watchdog can verify stories by website or ticker. Fills empty
+ * fields only and never overwrites what a person entered. Private or delisted
+ * companies (MAHLE, Logistec since 2024, Mantu) get the website only.
+ */
+export const PUBLIC_IDENTIFIERS: Record<string, { domain: string; ticker?: string; exchange?: string }> = {
+  Aritzia: { domain: 'aritzia.com', ticker: 'ATZ', exchange: 'TSX' },
+  'CI Financial': { domain: 'ci.com', ticker: 'CIX', exchange: 'TSX' },
+  'DNB Bank': { domain: 'dnb.no', ticker: 'DNB', exchange: 'OSE' },
+  MAPFRE: { domain: 'mapfre.com', ticker: 'MAP', exchange: 'BME' },
+  NOS: { domain: 'nos.pt', ticker: 'NOS', exchange: 'ELI' },
+  MAHLE: { domain: 'mahle.com' },
+  'Logistec Corporation': { domain: 'logistec.com' },
+  'Rush University System for Health': { domain: 'rush.edu' },
+};
+
+export async function seedPublicIdentifiers(prisma: PrismaClient, now: Date = new Date()): Promise<{ domains: number; tickers: number }> {
+  let domains = 0;
+  let tickers = 0;
+  for (const [name, ids] of Object.entries(PUBLIC_IDENTIFIERS)) {
+    const companies = await prisma.company.findMany({ where: { name, deletedAt: null }, select: { id: true, orgId: true, domain: true } });
+    for (const c of companies) {
+      if (!c.domain) {
+        await prisma.company.update({ where: { id: c.id }, data: { domain: ids.domain } });
+        domains++;
+      }
+      if (!ids.ticker) continue;
+      const sub = await prisma.accountWatchSubject.findUnique({ where: { orgId_companyId: { orgId: c.orgId, companyId: c.id } } });
+      if (!sub) {
+        await prisma.accountWatchSubject.create({ data: { orgId: c.orgId, companyId: c.id, ticker: ids.ticker, exchange: ids.exchange ?? null, identifiersConfirmedAt: now } });
+        tickers++;
+      } else if (!sub.ticker) {
+        await prisma.accountWatchSubject.update({ where: { id: sub.id }, data: { ticker: ids.ticker, exchange: sub.exchange ?? ids.exchange ?? null, identifiersConfirmedAt: sub.identifiersConfirmedAt ?? now } });
+        tickers++;
+      }
+    }
+  }
+  return { domains, tickers };
+}
+
 export async function seedSampleSignals(prisma: PrismaClient, opts: { now?: Date; remove?: boolean } = {}): Promise<{ upserted: number; removed: number }> {
   const now = opts.now ?? new Date();
   if (opts.remove) {
@@ -98,9 +139,14 @@ export async function seedSampleSignals(prisma: PrismaClient, opts: { now?: Date
 const isMain = process.argv[1] && /seed-signals\.(ts|js)$/.test(process.argv[1]);
 if (isMain) {
   const prisma = new PrismaClient();
-  seedSampleSignals(prisma, { remove: process.argv.includes('--remove') })
-    .then((r) => {
+  const remove = process.argv.includes('--remove');
+  seedSampleSignals(prisma, { remove })
+    .then(async (r) => {
       process.stdout.write(`sample signals: ${r.upserted} upserted, ${r.removed} removed\n`);
+      if (!remove) {
+        const ids = await seedPublicIdentifiers(prisma);
+        process.stdout.write(`public identifiers: ${ids.domains} domains, ${ids.tickers} tickers set\n`);
+      }
     })
     .catch((err: unknown) => {
       console.error(err instanceof Error ? err.message : String(err));

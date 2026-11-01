@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  momentumVerdict,
   classifySignalText,
   cleanText,
   computeMomentum,
@@ -135,6 +136,14 @@ describe('computeMomentum', () => {
     expect(m.trend).toBe('declining');
     expect(m.drivers[0]?.direction).toBe('down');
     expect(m.verdict.startsWith('Losing momentum')).toBe(true);
+  });
+
+  it('says when the level and the 4-week trend disagree', () => {
+    expect(momentumVerdict('declining', 70, [], 1).startsWith('High level, but down over 4 weeks')).toBe(true);
+    expect(momentumVerdict('declining', 45, [], 1).startsWith('Losing momentum over 4 weeks')).toBe(true);
+    expect(momentumVerdict('gaining', 35, [], 1).startsWith('Low level, but up over 4 weeks')).toBe(true);
+    expect(momentumVerdict('gaining', 80, [], 1).startsWith('Gaining traction over 4 weeks')).toBe(true);
+    expect(momentumVerdict('steady', 70, [], 1).startsWith('Healthy and steady')).toBe(true);
   });
 
   it('stays neutral with no data and says so', () => {
