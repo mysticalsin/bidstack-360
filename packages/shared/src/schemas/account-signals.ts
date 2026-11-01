@@ -878,6 +878,8 @@ export const AccountTimeline = z.object({
   bidsSearchCapped: z.boolean().optional(),
   /** True when the drawn list stopped at 300 marks. */
   marksCapped: z.boolean().optional(),
+  /** True when hiring spikes used the latest 1,000 job posts. */
+  postingsCapped: z.boolean().optional(),
 });
 export type AccountTimeline = z.infer<typeof AccountTimeline>;
 

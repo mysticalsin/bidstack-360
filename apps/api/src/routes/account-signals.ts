@@ -123,7 +123,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetingPage, oppPage, bidPage, eventPage, earnings, postings] = await Promise.all([
+      const [meetingPage, oppPage, bidPage, eventPage, earnings, postingPage] = await Promise.all([
         (async () => {
           const where = { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] };
           const rows = await prisma.meetingIntel.findMany({
@@ -169,7 +169,17 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           return { rows, capped };
         })(),
         prisma.accountEarningsDate.findMany({ where: { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } }, take: 20 }),
-        prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: from } }, select: { postedAt: true }, orderBy: { postedAt: 'desc' }, take: 1000 }),
+        (async () => {
+          const where = { orgId, companyId: { in: ids }, postedAt: { gte: from } };
+          const rows = await prisma.companyJobPosting.findMany({
+            where,
+            select: { postedAt: true },
+            orderBy: { postedAt: 'desc' },
+            take: 1000,
+          });
+          const capped = rows.length === 1000 && pageIsCapped(rows.length, await prisma.companyJobPosting.count({ where }), 1000);
+          return { rows, capped };
+        })(),
       ]);
       const items: TimelineItem[] = [];
       const push = (i: Omit<TimelineItem, 'upcoming'>) => items.push({ ...i, upcoming: new Date(i.at).getTime() > now.getTime() });
@@ -227,6 +237,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       }
       // Hiring spikes: weeks with at least 5 postings and twice the median week.
       const weeks = new Map<number, number>();
+      const postings = postingPage.rows;
       for (const p of postings) if (p.postedAt) weeks.set(Math.floor(p.postedAt.getTime() / (7 * DAY)), (weeks.get(Math.floor(p.postedAt.getTime() / (7 * DAY))) ?? 0) + 1);
       // Median over every week in the window, quiet weeks (0 postings) included.
       const totalWeeks = Math.max(weeks.size, Math.ceil(req.query.days / 7));
@@ -234,7 +245,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const median = counts[Math.floor(counts.length / 2)] ?? 0;
       for (const [w, n] of weeks) {
         if (n >= 5 && n >= median * 2) {
-          push({ id: `hire:${w}`, at: new Date(w * 7 * DAY + 3 * DAY).toISOString(), lane: 'theirs', category: 'hiring', title: `Hiring spike: ${n} roles posted in one week`, summary: `Typical week: ${median}`, source: 'Job postings', sourceUrl: null, href: null, importance: 55, implication: 'OPPORTUNITY', sample: false });
+          push({ id: `hire:${w}`, at: new Date(w * 7 * DAY + 3 * DAY).toISOString(), lane: 'theirs', category: 'hiring', title: `Hiring spike: ${n} roles posted in one week`, summary: postingPage.capped ? `Typical week in the latest 1,000 posts: ${median}` : `Typical week: ${median}`, source: 'Job postings', sourceUrl: null, href: null, importance: 55, implication: 'OPPORTUNITY', sample: false });
         }
       }
       // v22.1: several analyst notes in a week read as one row.
@@ -271,6 +282,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         bidsCapped: bidPage.capped,
         bidsSearchCapped: bidPage.searchCapped,
         marksCapped: pool.length > shown.length,
+        postingsCapped: postingPage.capped,
       };
     },
   );
