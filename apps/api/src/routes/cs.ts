@@ -18,7 +18,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Logger as PinoLogger } from 'pino';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { getLatestHealthScore } from '../services/cs/health-score.service.js';
 import { listRenewalOpportunities } from '../services/cs/renewal.service.js';
 import { recordNpsResponse } from '../services/cs/nps.service.js';
@@ -271,13 +271,24 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
             deletedAt: null,
           },
         }),
-        prisma.healthScore.findMany({
-          where: { orgId },
-          orderBy: { capturedAt: 'desc' },
-          take: 50,
-          distinct: ['accountId'],
-          select: { accountId: true, score: true, trend: true, capturedAt: true },
-        }),
+        prisma.$queryRaw<
+          Array<{
+            accountId: string;
+            score: number;
+            trend: 'IMPROVING' | 'STABLE' | 'DECLINING';
+            capturedAt: Date;
+          }>
+        >(Prisma.sql`
+          SELECT DISTINCT ON (account_id)
+            account_id AS "accountId",
+            score,
+            trend::text AS trend,
+            captured_at AS "capturedAt"
+          FROM health_scores
+          WHERE org_id = ${orgId}::uuid
+          ORDER BY account_id, captured_at DESC
+          LIMIT 50
+        `),
       ]);
 
       const healthy = recentHealthScores.filter((h) => h.score >= 75).length;
