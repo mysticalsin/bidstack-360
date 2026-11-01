@@ -23,21 +23,26 @@ vi.mock('@/hooks/useFormatMoney', () => ({
 vi.mock('framer-motion', async () => {
   const React = await import('react');
   const motionComponent = (tag: ElementType) => {
-    const Component = React.forwardRef<HTMLElement, ComponentProps<'div'> & { children?: ReactNode }>(
-      ({ children, ...props }, ref) => {
-        const { animate, initial, transition, ...domProps } = props as Record<string, unknown>;
-        void animate;
-        void initial;
-        void transition;
-        return React.createElement(tag, { ...domProps, ref }, children);
-      },
-    );
+    const Component = React.forwardRef<
+      HTMLElement,
+      ComponentProps<'div'> & { children?: ReactNode }
+    >(({ children, ...props }, ref) => {
+      const { animate, initial, transition, ...domProps } = props as Record<string, unknown>;
+      void animate;
+      void initial;
+      void transition;
+      return React.createElement(tag, { ...domProps, ref }, children);
+    });
     Component.displayName = `Motion${String(tag)}`;
     return Component;
   };
 
   return {
-    animate: (_motion: unknown, value: number, options?: { onUpdate?: (value: number) => void }) => {
+    animate: (
+      _motion: unknown,
+      value: number,
+      options?: { onUpdate?: (value: number) => void },
+    ) => {
       options?.onUpdate?.(value);
       return { stop: vi.fn() };
     },
@@ -81,7 +86,19 @@ function company(overrides: Partial<CrmCompany> = {}): CrmCompany {
       annualRevenueMicros: 25_000_000_000_000,
       intentTopics: ['cloud migration', 'zero trust'],
       hiringSignals: [],
-      leadershipSignals: [{ id: 'sig-1', kind: 'leadership', label: 'New CIO', detail: null, observedAt: '2026-05-28T12:00:00.000Z', source: 'Apollo', confidence: 0.9, url: null, metadata: {} }],
+      leadershipSignals: [
+        {
+          id: 'sig-1',
+          kind: 'leadership',
+          label: 'New CIO',
+          detail: null,
+          observedAt: '2026-05-28T12:00:00.000Z',
+          source: 'Apollo',
+          confidence: 0.9,
+          url: null,
+          metadata: {},
+        },
+      ],
       revenueSignals: [],
       newsSignals: [],
       summary: 'Active enterprise account.',
@@ -260,10 +277,16 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.queryByText(/9,007,199/)).toBeNull();
   });
 
+  it('keeps the currency basis on the source, not in the revenue figure', () => {
+    // WHY: the figure cell wrapped "currency not recorded" down to "currency not rec".
+    render(<BusinessSnapshotCard cockpit={cockpit()} />);
+    expect(document.body.textContent).toContain('25M unspecified');
+    expect(document.body.textContent).not.toContain('25,000,000 unspecified ·');
+    expect(screen.getByTitle(/currency not recorded; not a euro forecast/)).toBeTruthy();
+  });
+
   it('does not invent a headquarters from the company name', () => {
-    render(
-      <BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: null })} />,
-    );
+    render(<BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank', legalName: null })} />);
     expect(screen.queryByText('Oslo, Norway')).toBeNull();
     expect(screen.queryByText('OSL:DNB')).toBeNull();
     expect(screen.queryByText('DNB Bank')).toBeNull();

@@ -5,16 +5,14 @@ import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  unspecifiedMicrosLabel,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
-import {
-  formatMicrosAmount,
-  type AccountCockpitSnapshot,
-  type CockpitKpi,
-  type SourceAttribution,
-} from '@bidstack/shared';
+import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
 import type { PublicCompanyFacts } from '@bidstack/shared';
@@ -45,6 +43,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
   const headquarters = facts?.headquarters ?? null;
   const sourceCount = c.sourceAttribution.length;
   const notVerified = t('businessSnapshot.value.notVerified', 'Not verified');
+  const revenueLabel = recordedRevenueLabel(c);
   const strategic = c.strategicIntel;
   const latestSource = latestAttribution(c.sourceAttribution);
   const intentSummary = strategic?.intentTopics.length
@@ -148,24 +147,26 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       : []),
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
-      value: facts?.revenueLabel
-        ? facts.revenueLabel
-        : c.annualRevenueMicrosText && /^\d+$/.test(c.annualRevenueMicrosText)
-          ? `${formatMicrosAmount(BigInt(c.annualRevenueMicrosText))} unspecified · ${UNSPECIFIED_CURRENCY_BASIS}`
-          : typeof c.annualRevenueMicros === 'number' &&
-              Number.isSafeInteger(c.annualRevenueMicros) &&
-              c.annualRevenueMicros > 0
-            ? `${formatMicrosAmount(BigInt(c.annualRevenueMicros))} unspecified · ${UNSPECIFIED_CURRENCY_BASIS}`
-            : notVerified,
+      value: facts?.revenueLabel ?? revenueLabel ?? notVerified,
       source: facts?.revenueLabel
         ? publicSource(c.sourceAttribution, t)
-        : cockpitKpiSource(cockpit.kpis, 'annualRevenueMicros', Boolean(c.annualRevenueMicros), {
-            fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
-            missingHint: t(
-              'businessSnapshot.source.missingRevenue',
-              'No revenue source is attached.',
-            ),
-          }),
+        : revenueLabel
+          ? withCurrencyBasis(
+              cockpitKpiSource(cockpit.kpis, 'annualRevenueMicros', true, {
+                fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+                missingHint: t(
+                  'businessSnapshot.source.missingRevenue',
+                  'No revenue source is attached.',
+                ),
+              }),
+            )
+          : cockpitKpiSource(cockpit.kpis, 'annualRevenueMicros', false, {
+              fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
+              missingHint: t(
+                'businessSnapshot.source.missingRevenue',
+                'No revenue source is attached.',
+              ),
+            }),
     },
     {
       label: t('businessSnapshot.row.employees', 'Employees'),
@@ -436,6 +437,22 @@ function attributionSource(
         ? `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)}. Not scored.`
         : `${source.label || fallback.fallbackLabel} fetched ${relativeTime(source.fetchedAt)} at ${Math.round(source.confidence * 100)}% confidence.`,
   };
+}
+
+/** Stored revenue, compact while the unit count fits. A collapsed JSON number adds nothing. */
+function recordedRevenueLabel(company: AccountCockpitSnapshot['company']): string | null {
+  const text = company.annualRevenueMicrosText;
+  if (text && /^\d+$/.test(text)) return unspecifiedMicrosLabel(text);
+  const micros = company.annualRevenueMicros;
+  if (typeof micros === 'number' && Number.isSafeInteger(micros) && micros > 0) {
+    return unspecifiedMicrosLabel(micros);
+  }
+  return null;
+}
+
+function withCurrencyBasis(source: FieldSource): FieldSource {
+  if (source.hint.includes(UNSPECIFIED_CURRENCY_BASIS)) return source;
+  return { ...source, hint: `${UNSPECIFIED_CURRENCY_BASIS}. ${source.hint}` };
 }
 
 function cockpitKpiSource(
