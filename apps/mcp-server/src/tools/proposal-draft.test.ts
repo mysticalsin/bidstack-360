@@ -26,7 +26,7 @@ describe('proposal.draft grounded builder', () => {
           title: 'Core banking transformation reference',
           description: 'Reusable delivery proof point.',
           industry: 'Financial Services',
-          valueEur: 1_200_000,
+          valueMicros: '1200000000000',
           usageCount: 4,
           documentUrl: 'https://example.com/reference',
           tags: ['banking'],
