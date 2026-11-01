@@ -28,7 +28,7 @@ describe('buildOpportunityBrief', () => {
         {
           name: 'Avery Sponsor',
           role: 'CIO',
-          influence: 88,
+          influence: 5,
           sentiment: 'warm',
           aiOptOut: false,
         },
@@ -46,7 +46,9 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('Source-grounded account brief');
     expect(brief).toContain('Payments Modernization');
     expect(brief).toContain('unspecified');
-    expect(brief).toContain('stored stage probability');
+    expect(brief).toContain('stored probability of 62%');
+    expect(brief).toContain('influence 5/5');
+    expect(brief).not.toMatch(/stage proxy|\/100/);
     expect(brief).not.toMatch(/win probability/i);
     expect(brief).not.toMatch(/EUR|€/);
     expect(brief).toContain('Validate margin model');
@@ -85,7 +87,7 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('Opted-out stakeholder (PII withheld)');
     expect(brief).not.toContain('Private Counsel');
     expect(brief).not.toContain('General Counsel');
-    expect(brief).toContain('stored stage probability is below 40, so challenge bid/no-bid before drafting');
+    expect(brief).toContain('stored probability is below 40, so challenge bid/no-bid before drafting');
     expect(brief).not.toMatch(/win probability/i);
   });
 });

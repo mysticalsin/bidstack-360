@@ -62,7 +62,7 @@ function stakeholderLine(contact: BriefContact): string {
   return [
     contact.name,
     contact.role ? `(${contact.role})` : '',
-    contact.influence !== null ? `influence ${contact.influence}/100` : '',
+    contact.influence !== null ? `influence ${contact.influence}/5` : '',
     contact.sentiment ? `sentiment ${contact.sentiment}` : '',
   ]
     .filter(Boolean)
@@ -73,7 +73,7 @@ function riskLine(input: OpportunityBriefInput): string {
   const { opportunity, tasks, contacts } = input;
   const risks: string[] = [];
   if (opportunity.probability < 40) {
-    risks.push('stored stage probability is below 40, so challenge bid/no-bid before drafting');
+    risks.push('stored probability is below 40, so challenge bid/no-bid before drafting');
   }
   if (!opportunity.dueDate) risks.push('no due date is recorded');
   if (tasks.some((task) => task.status === 'blocked')) risks.push('blocked pursuit tasks need escalation');
@@ -117,11 +117,11 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
     `> Source-grounded account brief | Updated: ${opportunity.updatedAt.toISOString()}`,
     '',
     `**Opportunity:** ${opportunity.name} (${opportunity.code})`,
-    `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Stored probability:** ${opportunity.probability}% (stage proxy) | **Due:** ${formatDate(opportunity.dueDate)}`,
+    `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Stored probability:** ${opportunity.probability}% | **Due:** ${formatDate(opportunity.dueDate)}`,
     opportunity.industry ? `**Industry:** ${opportunity.industry}` : '**Industry:** not set',
     '',
     '## Current Read',
-    `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, a stored stage probability of ${opportunity.probability}%, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
+    `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, a stored probability of ${opportunity.probability}%, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
     '',
     '## Stakeholders',
     stakeholders,
