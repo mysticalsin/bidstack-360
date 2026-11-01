@@ -271,6 +271,13 @@ describeDb('MCP tools', () => {
     )) as Array<{ id: string; outcome: string }>;
     expect(listed.find((row) => row.id === lostOpp.id)?.outcome).toBe('lost');
     expect(listed.find((row) => row.id === bothOpp.id)?.outcome).toBe('lost');
+
+    const renamed = (await tools['crm_update_deal'].handler(
+      { id: lostOpp.id, patch: { name: 'Still lost' } },
+      ctx,
+    )) as { stage: string; outcome: string };
+    expect(renamed.stage).toBe('s2_sent');
+    expect(renamed.outcome).toBe('lost');
   });
 
   it('opportunities.get returns a single opp', async () => {
@@ -368,10 +375,11 @@ describeDb('MCP tools', () => {
       },
     });
 
-    await tools['opportunity.update'].handler(
+    const closed = (await tools['opportunity.update'].handler(
       { id: opp.id, patch: { stage: 'closed_lost' } },
       ctx,
-    );
+    )) as { outcome: string };
+    expect(closed.outcome).toBe('lost');
     const moved = await prisma.auditLog.findFirst({
       where: { orgId, targetId: opp.id, action: 'opportunity.stage' },
       orderBy: { at: 'desc' },

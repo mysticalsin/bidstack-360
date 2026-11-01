@@ -20,6 +20,7 @@ import {
   isCompanyUuid,
   normalizeName,
   requireCompanyLink,
+  dealOutcome,
   serializeDeal,
   source,
 } from './crm-tools.helpers.js';
@@ -159,13 +160,17 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
       },
     });
 
-    return { ...serializeDeal(created), companyId: created.companyId };
+    return {
+      ...serializeDeal(created),
+      companyId: created.companyId,
+      outcome: dealOutcome({ stage: created.stage, pipelineStage: null }),
+    };
   },
 };
 
 export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
   description:
-    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. Other fields do not touch the company link. Writes an audit entry.',
+    'Update a CRM deal. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the company link. Writes an audit entry.',
   input: DealUpdateInput,
   inputJsonSchema: {
     type: 'object',
@@ -202,6 +207,7 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
         ...(args.patch.name !== undefined ? { name: args.patch.name } : {}),
         ...(args.patch.industry !== undefined ? { industry: args.patch.industry } : {}),
       },
+      include: { pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } } },
     });
 
     await prisma.auditLog.create({
@@ -215,7 +221,11 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
     });
 
     await recordOpportunityStageMove(ctx.orgId, before, args.patch.stage);
-    return { ...serializeDeal(updated), companyId: updated.companyId };
+    return {
+      ...serializeDeal(updated),
+      companyId: updated.companyId,
+      outcome: dealOutcome(updated),
+    };
   },
 };
 

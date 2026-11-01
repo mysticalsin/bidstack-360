@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { companyIdForCustomerRename, recordOpportunityStageMove } from './crm-tools.helpers.js';
+import {
+  companyIdForCustomerRename,
+  dealOutcome,
+  recordOpportunityStageMove,
+} from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -33,7 +37,7 @@ const Input = z.object({
 
 export const opportunityUpdate: Tool<typeof Input> = {
   description:
-    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. Other fields do not touch the link. Writes audit_log.',
+    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change writes the previous and next stage. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the link. Writes audit_log.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -85,7 +89,10 @@ export const opportunityUpdate: Tool<typeof Input> = {
         ...(patch.name ? { name: patch.name } : {}),
         ...(patch.industry !== undefined ? { industry: patch.industry } : {}),
       },
-      include: { owner: true },
+      include: {
+        owner: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
     });
 
     await prisma.auditLog.create({
@@ -105,6 +112,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
       customer: updated.customer,
       name: updated.name,
       stage: updated.stage,
+      outcome: dealOutcome(updated),
       value: Number(updated.valueMicros) / 1_000_000,
       probability: updated.probability,
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
