@@ -87,8 +87,8 @@ describe('TimelineView', () => {
   ];
   it('draws two lanes with a mark per event, filter chips and an sr summary', () => {
     // WHY: an unordered take of 500 deals hid a close that was not in that slice.
-    wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" dealsCapped meetingsCapped newsCapped />);
-    expect(screen.getByText('Latest 1,000 deals · Latest 200 meetings · Latest 300 news items')).toBeTruthy();
+    wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" dealsCapped meetingsCapped newsCapped bidsCapped marksCapped />);
+    expect(screen.getByText('Latest 1,000 deals · Latest 200 meetings · Latest 300 news items · Latest 100 bids · Latest 300 marks')).toBeTruthy();
     expect(screen.getByText('Our activity')).toBeTruthy();
     expect(screen.getByText('Their news')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /^(Meeting|Funding|Launch),/ })).toHaveLength(3);
