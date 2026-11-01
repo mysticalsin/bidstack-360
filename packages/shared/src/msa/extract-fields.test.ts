@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractMsaFields } from './extract-fields.js';
+import { contractMicros, extractMsaFields } from './extract-fields.js';
 import { SYNTHETIC_NORTHWIND_MSA_TEXT } from './synthetic-msa.js';
 
 describe('extractMsaFields', () => {
@@ -40,6 +40,30 @@ describe('extractMsaFields', () => {
     expect(fields.insurance.found).toBe(true);
     expect(fields.indexation.found).toBe(true);
     expect(Array.isArray(fields.rateCard.value)).toBe(true);
+  });
+
+  it('keeps a cent in the cap and drops a figure that does not fit', () => {
+    // WHY: Math.round(amount * 1e6) cannot hold a cap past the safe integer range.
+    expect(contractMicros('250,000.50')).toBe(250_000_500_000);
+    expect(contractMicros('1.015')).toBe(1_015_000);
+    expect(contractMicros('99999999999.99')).toBeNull();
+    const fields = extractMsaFields(
+      [
+        "Supplier's aggregate liability under this Agreement is capped at 250,000.50 EUR.",
+        'Specialist: 1.015 EUR per hour',
+      ].join('\n'),
+    );
+    expect(fields.liabilityCap.value).toEqual({ amountMicros: 250_000_500_000, currency: 'EUR' });
+    const rates = fields.rateCard.value as Array<{ role: string; rateMicros: number; unit: string }>;
+    expect(rates.find((row) => row.role === 'Specialist')).toEqual({
+      role: 'Specialist',
+      rateMicros: 1_015_000,
+      unit: 'hour',
+    });
+    const huge = extractMsaFields(
+      "Supplier's aggregate liability under this Agreement is capped at 99999999999.99 EUR.",
+    );
+    expect(huge.liabilityCap.found).toBe(false);
   });
 
   it('returns blank not-found fields when the document has no commercial terms', () => {

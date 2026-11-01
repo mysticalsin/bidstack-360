@@ -3,6 +3,7 @@
  * (PDF text layer or DOCX). Missing values stay blank. Nothing is invented.
  */
 import type { MsaCitation, MsaExtractedField, MsaExtractedFields, MsaParty } from '../schemas/msa-intake.js';
+import { unitsTextToMicros } from '../utils/money.js';
 
 export const LOW_CONFIDENCE_BPS = 6500;
 const LABELLED = 8500;
@@ -150,15 +151,22 @@ function cleanParty(raw: string): string {
     .trim();
 }
 
+/** Contract text to integer micros. A figure that does not fit a safe integer is omitted. */
+export function contractMicros(raw: string): number | null {
+  const micros = unitsTextToMicros(raw.replace(/[,\s]/g, ''));
+  if (micros == null || micros <= 0n || micros > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(micros);
+}
+
 function detectLiability(pages: TextPage[]): { amountMicros: number; currency: string; citation: MsaCitation; confidenceBps: number } | null {
   const hit = findInPages(pages, /liability[^.%]{0,120}?(?:capped at|cap(?:ped)? of|not exceed)\s*([€£$])?\s*([\d,.\s]{3,16})\s*(EUR|USD|GBP|CHF)?/i);
   if (!hit) return null;
-  const amount = Number((hit.match[2] ?? '').replace(/[,\s]/g, ''));
-  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const amountMicros = contractMicros(hit.match[2] ?? '');
+  if (amountMicros == null) return null;
   const symbol = hit.match[1];
   const code = (hit.match[3] ?? (symbol === '€' ? 'EUR' : symbol === '£' ? 'GBP' : symbol === '$' ? 'USD' : 'EUR')).toUpperCase();
   return {
-    amountMicros: Math.round(amount * 1_000_000),
+    amountMicros,
     currency: code,
     citation: cite(hit.source, hit.match.index ?? 0, hit.page),
     confidenceBps: LABELLED,
@@ -181,10 +189,10 @@ function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number; 
       );
       if (!m) continue;
       const role = m[1]!.trim().replace(/[:.-]+$/, '');
-      const amount = Number(m[2]!.replace(/[,\s]/g, ''));
+      const rateMicros = contractMicros(m[2] ?? '');
       const unit = unitMap[m[3]!.toLowerCase()] ?? 'day';
-      if (!role || !Number.isFinite(amount) || amount <= 0) continue;
-      lines.push({ role, rateMicros: Math.round(amount * 1_000_000), unit });
+      if (!role || rateMicros == null) continue;
+      lines.push({ role, rateMicros, unit });
     }
   }
   return lines.slice(0, 50);
