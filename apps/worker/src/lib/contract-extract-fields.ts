@@ -4,14 +4,16 @@
 // either way the user reviews/edits before it becomes a ContractAgreement.
 //
 // Pure + side-effect free so it is unit-testable without a DB, queue, or creds.
-import type {
-  ContractExtractionDraft,
-  ContractKind,
-  ContractRateSchedule,
-  RateCardLine,
-  RateCardUnit,
+import {
+  unitsTextToMicros,
+  type ContractExtractionDraft,
+  type ContractKind,
+  type ContractRateSchedule,
+  type RateCardLine,
+  type RateCardUnit,
 } from '@bidstack/shared';
 
+const MAX_RATE_MICROS = 1_000_000_000_000n;
 
 // Minimal country-name → ISO-2 map for the names that commonly appear in MSAs.
 const COUNTRY_TO_ISO: Record<string, string> = {
@@ -110,8 +112,15 @@ function toIsoDate(raw: string): string | null {
 
 function detectDates(text: string): { effectiveDate: string | null; expiryDate: string | null } {
   const dateRe = /(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+\w+\s+\d{4})/;
-  const eff = text.match(new RegExp(`(?:effective|start|commencement)\\s*(?:date)?\\s*[:\\-]?\\s*${dateRe.source}`, 'i'));
-  const exp = text.match(new RegExp(`(?:expiry|expiration|end|termination|until)\\s*(?:date)?\\s*[:\\-]?\\s*${dateRe.source}`, 'i'));
+  const eff = text.match(
+    new RegExp(`(?:effective|start|commencement)\\s*(?:date)?\\s*[:\\-]?\\s*${dateRe.source}`, 'i'),
+  );
+  const exp = text.match(
+    new RegExp(
+      `(?:expiry|expiration|end|termination|until)\\s*(?:date)?\\s*[:\\-]?\\s*${dateRe.source}`,
+      'i',
+    ),
+  );
   return {
     effectiveDate: eff?.[1] ? toIsoDate(eff[1]) : null,
     expiryDate: exp?.[1] ? toIsoDate(exp[1]) : null,
@@ -140,10 +149,10 @@ function detectRateCard(text: string): RateCardLine[] {
     );
     if (!m) continue;
     const role = m[1]!.trim().replace(/[:.-]+$/, '');
-    const amount = Number(m[2]!.replace(/[,\s]/g, ''));
+    const micros = unitsTextToMicros(m[2]!.replace(/\s/g, ''));
     const unit = UNIT_RE[m[3]!.toLowerCase()] ?? 'day';
-    if (!role || !Number.isFinite(amount) || amount <= 0) continue;
-    lines.push({ role, rateMicros: Math.round(amount * 1_000_000), unit });
+    if (!role || micros == null || micros <= 0n || micros > MAX_RATE_MICROS) continue;
+    lines.push({ role, rateMicros: Number(micros), unit });
     if (lines.length >= 200) break;
   }
   return lines;

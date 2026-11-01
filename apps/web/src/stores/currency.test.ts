@@ -417,6 +417,24 @@ describe('useFormatMoney hook integration', () => {
     expect(formatted).toContain('unspecified');
     expect(formatted).not.toMatch(/[$€]/);
   });
+
+  it('does not throw when a recorded amount is too large to round through a float', () => {
+    // WHY: Math.round(units * 1e6) is not a safe integer here, and BigInt() threw.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: fullRates(),
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+    });
+    expect(formatted).toContain('457.18');
+    expect(formatted).not.toContain('457.19');
+  });
 });
 
 function fullRates(): Record<string, number> {

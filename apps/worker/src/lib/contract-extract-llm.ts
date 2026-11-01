@@ -15,7 +15,9 @@
 // number, YYYY-MM-DD dates) and normalise them into the strict wire types
 // (bps, micros, ISO-8601) here, so prompt drift can't push bad values downstream.
 
-import { ContractExtractionDraft } from '@bidstack/shared';
+import { ContractExtractionDraft, unitsToMicros } from '@bidstack/shared';
+
+const MAX_RATE_MICROS = 1_000_000_000_000n;
 import { completeChat, coerceJsonObject, type ResolvedLlm } from './llm-provider.js';
 
 // Bound the prompt so a huge contract can't blow the model's context / our cost.
@@ -91,19 +93,23 @@ function normalizeCountries(v: unknown): string[] {
   return [...out].slice(0, 100);
 }
 
-function normalizeRateCard(v: unknown): Array<{ role: string; rateMicros: number; unit: string; currency?: string | null }> {
+function normalizeRateCard(
+  v: unknown,
+): Array<{ role: string; rateMicros: number; unit: string; currency?: string | null }> {
   if (!Array.isArray(v)) return [];
-  const lines: Array<{ role: string; rateMicros: number; unit: string; currency?: string | null }> = [];
+  const lines: Array<{ role: string; rateMicros: number; unit: string; currency?: string | null }> =
+    [];
   for (const raw of v) {
     if (!raw || typeof raw !== 'object') continue;
     const r = raw as Record<string, unknown>;
     const role = asString(r.role, 120);
-    const rate = asFiniteNumber(r.rate);
-    if (!role || rate === null || rate <= 0) continue;
+    const rate =
+      typeof r.rate === 'string' || typeof r.rate === 'number' ? unitsToMicros(r.rate) : null;
+    if (!role || rate == null || rate <= 0n || rate > MAX_RATE_MICROS) continue;
     const unitRaw = asString(r.unit, 10)?.toLowerCase() ?? 'day';
     const unit = UNIT_VALUES.has(unitRaw) ? unitRaw : 'day';
     const currency = asCurrency(r.currency);
-    lines.push({ role, rateMicros: Math.round(rate * 1_000_000), unit, currency });
+    lines.push({ role, rateMicros: Number(rate), unit, currency });
     if (lines.length >= 200) break;
   }
   return lines;

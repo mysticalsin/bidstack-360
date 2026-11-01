@@ -1,13 +1,75 @@
 import { useEffect } from 'react';
 
+import { formatMicrosAmount, unitsToMicros } from '@bidstack/shared';
+
 import {
   formatUnspecifiedAmount,
   formatUnspecifiedCompact,
+  unitsFromMicros,
 } from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
+
+function formatExactMoney(micros: bigint, currency: string): string {
+  const text = formatMicrosAmount(micros);
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    const symbol = parts.find((part) => part.type === 'currency')?.value ?? currency;
+    const symbolFirst =
+      parts.findIndex((part) => part.type === 'currency') <
+      parts.findIndex((part) => part.type === 'integer');
+    return symbolFirst ? `${symbol}${text}` : `${text} ${symbol}`;
+  } catch {
+    return `${text} ${currency}`;
+  }
+}
+
+function microsBigInt(micros: string | number | bigint): bigint | null {
+  try {
+    if (typeof micros === 'bigint') return micros;
+    if (typeof micros === 'number')
+      return Number.isFinite(micros) ? BigInt(Math.trunc(micros)) : null;
+    return BigInt(micros);
+  } catch {
+    return null;
+  }
+}
+
+/** Format stored micros. An unchanged FX result keeps the integer. A converted amount is not rounded through an unsafe float. */
+export function formatStoredMicros(
+  micros: string | number | bigint,
+  sourceCurrency: string | null | undefined,
+  convert: (amount: number, from: string) => number,
+  displayCurrency: string,
+  options?: { compact?: boolean },
+): string {
+  const asBigInt = microsBigInt(micros);
+  if (asBigInt == null) return formatUnspecifiedCompact(0);
+  const value = unitsFromMicros(asBigInt);
+  const source = sourceCurrency?.trim();
+  if (!source) {
+    return options?.compact === false
+      ? formatUnspecifiedAmount(value)
+      : formatUnspecifiedCompact(value);
+  }
+  const converted = convert(value, source);
+  if (!Number.isFinite(converted) || converted === value) {
+    return options?.compact === false
+      ? formatExactMoney(asBigInt, displayCurrency)
+      : formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
+  }
+  const convertedMicros = unitsToMicros(converted);
+  if (convertedMicros == null) return formatMoney(converted, displayCurrency);
+  return options?.compact === false
+    ? formatExactMoney(convertedMicros, displayCurrency)
+    : formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
+}
 
 /**
  * Hook that returns currency formatting functions with automatic conversion
@@ -34,26 +96,6 @@ export function useFormatMoney() {
       // No source currency means the amount is unspecified. Do not assume EUR.
       sourceCurrency?: string | null,
       options?: { compact?: boolean },
-    ) => {
-      const asBigInt =
-        typeof micros === 'bigint'
-          ? micros
-          : typeof micros === 'number'
-            ? BigInt(Math.trunc(micros))
-            : BigInt(micros);
-      const million = BigInt(1_000_000);
-      const whole = asBigInt / million;
-      const remainder = asBigInt % million;
-      const value = Number(whole) + Number(remainder) / 1_000_000;
-      const source = sourceCurrency?.trim();
-      if (!source) {
-        return options?.compact === false
-          ? formatUnspecifiedAmount(value)
-          : formatUnspecifiedCompact(value);
-      }
-      const converted = convert(value, source);
-      const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
-      return formatMoneyMicros(convertedMicros, currency, options);
-    },
+    ) => formatStoredMicros(micros, sourceCurrency, convert, currency, options),
   };
 }

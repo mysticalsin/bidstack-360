@@ -16,6 +16,7 @@ Rate card
 Senior Consultant     800 / day
 Solution Architect:   €1,100 per day
 Project Manager       95 /hour
+Principal             850.50 / day
 `;
 
 describe('extractContractFields', () => {
@@ -40,6 +41,8 @@ describe('extractContractFields', () => {
     expect(arch?.unit).toBe('day');
     const pm = d.rateCard.find((l) => l.role.startsWith('Project'));
     expect(pm?.unit).toBe('hour');
+    const principal = d.rateCard.find((l) => l.role.startsWith('Principal'));
+    expect(principal?.rateMicros).toBe(850_500_000);
   });
 
   it('warns when nothing is detected and does not invent a confidence score', () => {

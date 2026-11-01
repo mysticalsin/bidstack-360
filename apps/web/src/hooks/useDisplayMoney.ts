@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 
 import { useCurrencyStore } from '@/stores/currency';
-import { formatUnspecifiedAmount, formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
-import { formatMoney, formatMoneyMicros } from '@/lib/format';
+import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
+import { formatMoney } from '@/lib/format';
+import { formatStoredMicros } from '@/hooks/useFormatMoney';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
@@ -33,25 +34,7 @@ export function useDisplayMoneyMicros(
     if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
-  // Convert micros to unit value
-  const asBigInt =
-    typeof micros === 'bigint'
-      ? micros
-      : typeof micros === 'number'
-        ? BigInt(Math.trunc(micros))
-        : BigInt(micros);
-  const million = BigInt(1_000_000);
-  const whole = asBigInt / million;
-  const remainder = asBigInt % million;
-  const value = Number(whole) + Number(remainder) / 1_000_000;
-  const source = sourceCurrency?.trim();
-  if (!source) {
-    return options?.compact === false ? formatUnspecifiedAmount(value) : formatUnspecifiedCompact(value);
-  }
-  const converted = convert(value, source);
-  // Convert back to micros string for formatMoneyMicros
-  const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
-  return formatMoneyMicros(convertedMicros, currency, options);
+  return formatStoredMicros(micros, sourceCurrency, convert, currency, options);
 }
 
 /** Same as useDisplayMoneyMicros but always full precision. */
