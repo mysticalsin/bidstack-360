@@ -45,7 +45,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
   const pageCapped = Boolean(risksCapped || complianceCapped);
   // Register counts are open risks on the loaded deals. Without them, the
   // visible rows are the only book.
-  const severity = severityBucketCounts(risks, openRiskSeverity);
+  const severity = severityBucketCounts(openRisks, openRiskSeverity);
   const buckets = [
     {
       label: 'Critical',

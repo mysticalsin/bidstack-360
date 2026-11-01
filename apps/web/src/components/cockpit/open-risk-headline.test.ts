@@ -25,8 +25,10 @@ describe('open risk headline', () => {
       risks: [
         { status: 'open', severity: 'high' },
         { status: 'mitigated', severity: 'critical' },
+        { status: 'accepted', severity: 'critical' },
       ],
     });
+    // WHY: accepted is a recorded decision. It is not an open critical risk.
     expect(headline.total).toBe(1);
     expect(headline.high).toBe(1);
     expect(headline.spark).toEqual([0, 0, 1, 0]);
