@@ -35,10 +35,20 @@ const pct = (a: number, b: number) => (b === 0 ? null : ((a - b) / Math.abs(b)) 
 const r0 = (n: number) => Math.round(n);
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
+function compactIsExact(amount: number, scale: number, digits: number): boolean {
+  const factor = 10 ** digits;
+  const shown = Math.round((amount / scale) * factor) / factor;
+  return shown * scale === amount;
+}
+
 export function fmtMoney(v: number, ccy: string): string {
+  if (!Number.isFinite(v)) return 'amount not readable';
+  const sign = v < 0 ? '-' : '';
   const a = Math.abs(v);
-  const s = a >= 1e9 ? `${r1(a / 1e9)}bn` : a >= 1e6 ? `${r0(a / 1e6)}m` : `${r0(a / 1e3)}k`;
-  return `${v < 0 ? '-' : ''}${ccy} ${s}`;
+  if (a >= 1e9 && compactIsExact(a, 1e9, 1)) return `${sign}${ccy} ${r1(a / 1e9)}bn`;
+  if (a >= 1e6 && a < 1e9 && compactIsExact(a, 1e6, 0)) return `${sign}${ccy} ${r0(a / 1e6).toLocaleString('en-GB')}m`;
+  if (a >= 1e3 && a < 1e6 && compactIsExact(a, 1e3, 0)) return `${sign}${ccy} ${r0(a / 1e3).toLocaleString('en-GB')}k`;
+  return `${sign}${ccy} ${a.toLocaleString('en-GB')}`;
 }
 
 const fy = (p: ExtractedPeriod) => `FY${p.periodEnd.slice(0, 4)}`;

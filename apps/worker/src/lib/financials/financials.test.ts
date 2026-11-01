@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { runFinancialsScan, syncFinancialsSchedule } from './scan.js';
-import { buildVocab, detectFinancialSignals, findTextCues, repairSplitWords, sentenceAround, type SignalPeriod } from './signals.js';
+import { buildVocab, detectFinancialSignals, findTextCues, fmtMoney, repairSplitWords, sentenceAround, type SignalPeriod } from './signals.js';
 import { entityNameMatches, pacer, pullEdgar, pullEsef, type FinFetch } from './sources.js';
 import { buildPeriods, derived, factsFromCompanyFacts, factsFromXbrlJson, type CompanyFacts, type XbrlJson } from './xbrl.js';
 
@@ -102,6 +102,18 @@ describe('xbrl parsing', () => {
 });
 
 // ── signal rules ──
+
+describe('fmtMoney', () => {
+  it('keeps a filing amount when the compact label would move it', () => {
+    // WHY: Math.round(7.86) printed 8m in the signal a seller reads.
+    expect(fmtMoney(7_860_000, 'EUR')).toBe('EUR 7,860,000');
+    expect(fmtMoney(2_000_000, 'EUR')).toBe('EUR 2m');
+    expect(fmtMoney(1_000, 'EUR')).toBe('EUR 1k');
+    expect(fmtMoney(90_649e6, 'NOK')).toBe('NOK 90,649,000,000');
+    expect(fmtMoney(-156_444e6, 'NOK')).toBe('-NOK 156,444,000,000');
+    expect(fmtMoney(Number.NaN, 'EUR')).toBe('amount not readable');
+  });
+});
 
 describe('signal rules', () => {
   it('capex up 40% with a rising share reads as an expansion program', () => {
