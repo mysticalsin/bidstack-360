@@ -33,6 +33,7 @@ import {
   loadMomentumInputs,
   momentumFor,
   OPP_SELECT,
+  pageIsCapped,
   recordedOutcome,
   sourceStatus,
 } from '../services/account-signals/load.js';
@@ -121,14 +122,24 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetings, opps, bids, events, earnings, postings] = await Promise.all([
+      const [meetings, oppPage, bids, events, earnings, postings] = await Promise.all([
         prisma.meetingIntel.findMany({
           where: { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] },
           select: { id: true, title: true, heldAt: true, summary: true, companyId: true, _count: { select: { attendees: true } } },
           orderBy: { heldAt: 'desc' },
           take: 200,
         }),
-        prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: OPP_SELECT, take: 500 }),
+        (async () => {
+          const where = { orgId, companyId: { in: ids }, deletedAt: null };
+          const rows = await prisma.opportunity.findMany({
+            where,
+            select: OPP_SELECT,
+            orderBy: { updatedAt: 'desc' },
+            take: 1000,
+          });
+          const capped = rows.length === 1000 && pageIsCapped(rows.length, await prisma.opportunity.count({ where }), 1000);
+          return { rows, capped };
+        })(),
         prisma.bidOpportunity.findMany({
           where: { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] },
           select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
@@ -160,6 +171,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           sample: false,
         });
       }
+      const opps = oppPage.rows;
       for (const o of opps) {
         if (o.createdAt >= from) {
           push({ id: `op:${o.id}:open`, at: o.createdAt.toISOString(), lane: 'ours', category: 'deal', title: `Deal opened: ${o.name}`, summary: `Stage ${o.stage.replace(/_/g, ' ')}`, source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: 45, implication: 'NEUTRAL', sample: false });
@@ -225,7 +237,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const tally: Record<string, number> = {};
       for (const i of grouped) tally[i.category] = (tally[i.category] ?? 0) + 1;
       const shown = (wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped).slice(0, 300);
-      return { companyId: company.id, from: from.toISOString(), to: to.toISOString(), items: shown, counts: tally };
+      return { companyId: company.id, from: from.toISOString(), to: to.toISOString(), items: shown, counts: tally, dealsCapped: oppPage.capped };
     },
   );
 
