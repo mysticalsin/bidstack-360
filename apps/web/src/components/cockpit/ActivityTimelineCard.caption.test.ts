@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import en from '../../../public/locales/en/crm.json';
 
-import { ACTIVITY_EMPTY_MESSAGE, activityListCaption } from './ActivityTimelineCard';
+import { ACTIVITY_EMPTY_MESSAGE, ACTIVITY_TITLE, activityListCaption } from './ActivityTimelineCard';
 
 describe('activity list caption', () => {
   it('says when older tasks sit outside the five shown', () => {
@@ -16,5 +16,8 @@ describe('activity list caption', () => {
     expect(ACTIVITY_EMPTY_MESSAGE).toBe('Tasks for this account will appear here.');
     expect(en.activityTimeline.emptyMessage).toBe(ACTIVITY_EMPTY_MESSAGE);
     expect(en.activityTimeline.emptyMessage).not.toMatch(/email|dust/i);
+    expect(ACTIVITY_TITLE).toBe('Recent tasks');
+    expect(en.activityTimeline.title).toBe(ACTIVITY_TITLE);
+    expect(en.activityTimeline.regionLabel).toBe(ACTIVITY_TITLE);
   });
 });
