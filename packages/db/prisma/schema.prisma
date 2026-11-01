@@ -5822,6 +5822,8 @@ enum WatchdogEventKind {
   LAYOFFS
   PARTNERSHIP
 
+  MARKET_COMMENTARY
+
   @@map("watchdog_event_kind")
 }
 

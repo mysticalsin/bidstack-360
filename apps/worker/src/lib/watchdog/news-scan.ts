@@ -45,10 +45,36 @@ export interface NewsScanSummary {
   /** v22: accounts with no website or ticker (no news, UI shows a hint). */
   skippedNoIdentifiers: number;
   dropped: number;
+  /** v22.1: GDELT state for this run (backoff carries across runs in the cache). */
+  gdelt: { state: 'off' | 'backoff' | 'ok' | 'rate_limited' | 'unused'; level: number; until: string | null };
   perAccount: Array<{ companyId: string; name: string; fetched: number; kept: number; inserted: number; dropped: number; skipped?: string }>;
 }
 
 const PACE_MS = 5_000;
+// GDELT asks for at most one call per 5 s per client; stay well under it.
+const GDELT_PACE_MS = 10_000;
+export const GDELT_BACKOFF_KEY = 'gdelt:backoff';
+const HOUR = 3_600_000;
+
+/** After the n-th consecutive rate-limited run, wait 1 h, 2 h, 4 h ... up to 24 h. */
+export function gdeltBackoffMs(level: number): number {
+  return Math.min(24 * HOUR, HOUR * 2 ** Math.max(0, level - 1));
+}
+
+interface GdeltBackoff {
+  level: number;
+  until: number;
+}
+
+async function readBackoff(cache: NewsCache): Promise<GdeltBackoff> {
+  try {
+    const raw = await cache.get(GDELT_BACKOFF_KEY);
+    const v = raw ? (JSON.parse(raw) as Partial<GdeltBackoff>) : {};
+    return { level: Number(v.level) || 0, until: Number(v.until) || 0 };
+  } catch {
+    return { level: 0, until: 0 };
+  }
+}
 const OPEN_STAGES_EXCLUDED = ['closed_won', 'closed_lost'] as const;
 
 export function prismaNewsStore(db: Db): NewsStore {
@@ -124,7 +150,7 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
   const db = deps.db ?? prisma;
   const env = deps.env ?? process.env;
   const config = newsConfigFromEnv(env);
-  const summary: NewsScanSummary = { enabled: config.sources.length > 0, accounts: 0, inserted: 0, merged: 0, alerted: 0, errored: 0, skippedNoIdentifiers: 0, dropped: 0, perAccount: [] };
+  const summary: NewsScanSummary = { enabled: config.sources.length > 0, accounts: 0, inserted: 0, merged: 0, alerted: 0, errored: 0, skippedNoIdentifiers: 0, dropped: 0, gdelt: { state: 'off', level: 0, until: null }, perAccount: [] };
   if (!summary.enabled) return summary;
   const now = deps.now ?? new Date();
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -157,6 +183,13 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
   const bodyFetch = deps.bodyFetch ?? (deps.fetchImpl ? undefined : (fetch as unknown as BodyFetch));
   let paced = false;
   let cfg = config;
+  const backoff = config.sources.includes('gdelt') ? await readBackoff(cache) : { level: 0, until: 0 };
+  summary.gdelt = { state: config.sources.includes('gdelt') ? 'unused' : 'off', level: backoff.level, until: backoff.until ? new Date(backoff.until).toISOString() : null };
+  if (config.sources.includes('gdelt') && backoff.until > now.getTime()) {
+    cfg = { ...cfg, sources: cfg.sources.filter((x) => x !== 'gdelt') };
+    summary.gdelt.state = 'backoff';
+    deps.log?.info({ until: summary.gdelt.until, level: backoff.level }, 'gdelt backing off after rate limits');
+  }
   for (const c of companies) {
     const ws = c.accountWatchSubjects[0];
     // Tickers count only once a person confirmed them (same rule as filings).
@@ -167,7 +200,7 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
       summary.perAccount.push({ companyId: c.id, name: c.name, fetched: 0, kept: 0, inserted: 0, dropped: 0, skipped: 'no_identifiers' });
       continue;
     }
-    if (paced) await sleep(PACE_MS);
+    if (paced) await sleep(cfg.sources.includes('gdelt') ? GDELT_PACE_MS : PACE_MS);
     paced = true;
     const opps = await db.opportunity.findMany({
       where: { orgId: c.orgId, companyId: c.id, deletedAt: null, ownerId: { not: null }, stage: { notIn: [...OPEN_STAGES_EXCLUDED] } },
@@ -192,7 +225,17 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
       summary.dropped += r.dropped;
       summary.perAccount.push({ companyId: c.id, name: c.name, fetched: r.fetched, kept: r.kept, inserted: r.inserted, dropped: r.dropped });
       // GDELT asks for one call per 5 s per client; after a 429 leave it alone for this run.
-      if (r.errors.some((e) => e.startsWith('gdelt rate limited'))) cfg = { ...cfg, sources: cfg.sources.filter((x) => x !== 'gdelt') };
+      if (cfg.sources.includes('gdelt')) {
+        if (r.errors.some((e) => e.startsWith('gdelt rate limited'))) {
+          cfg = { ...cfg, sources: cfg.sources.filter((x) => x !== 'gdelt') };
+          const level = backoff.level + 1;
+          const until = now.getTime() + gdeltBackoffMs(level);
+          summary.gdelt = { state: 'rate_limited', level, until: new Date(until).toISOString() };
+          await cache.set(GDELT_BACKOFF_KEY, JSON.stringify({ level, until }), 7 * 24 * 3600).catch(() => undefined);
+        } else if (!r.errors.some((e) => e.startsWith('gdelt'))) {
+          summary.gdelt.state = 'ok';
+        }
+      }
       summary.inserted += r.inserted;
       summary.merged += r.merged;
       summary.alerted += r.alerted;
@@ -204,6 +247,10 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
       summary.errored++;
       deps.log?.warn({ companyId: c.id, err: err instanceof Error ? err.message : String(err) }, 'watchdog news account failed');
     }
+  }
+  if (summary.gdelt.state === 'ok' && backoff.level > 0) {
+    await cache.set(GDELT_BACKOFF_KEY, JSON.stringify({ level: 0, until: 0 }), 7 * 24 * 3600).catch(() => undefined);
+    summary.gdelt = { state: 'ok', level: 0, until: null };
   }
   deps.log?.info(summary, 'watchdog news scan complete');
   return summary;

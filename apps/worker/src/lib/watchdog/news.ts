@@ -468,7 +468,8 @@ export function newsExternalId(url: string): string {
   return u.length <= 500 ? u : u.slice(0, 500);
 }
 
-const RATIONALE: Partial<Record<WatchEventKind, string>> = {
+export const RATIONALE: Partial<Record<WatchEventKind, string>> = {
+  MARKET_COMMENTARY: 'Stock and analyst chatter: context for the conversation, not a buying signal on its own.',
   FUNDING_ROUND: 'New money usually funds hiring and projects in the next two quarters.',
   PRODUCT_LAUNCH: 'A launch brings scale-up, support and integration work.',
   STRATEGIC_INITIATIVE: 'A named programme needs delivery capacity and a partner.',
