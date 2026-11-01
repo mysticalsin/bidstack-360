@@ -120,7 +120,7 @@ export const leadsCreate: Tool<typeof Input> = {
 };
 
 /** One matching company, or null when the name is only a label. Two matches throw. */
-async function linkedLeadCompany(
+export async function linkedLeadCompany(
   orgId: string,
   companyId: string | undefined,
   companyName: string,

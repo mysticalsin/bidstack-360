@@ -457,6 +457,44 @@ describeDb('MCP tools', () => {
     expect(out.status).toBe('qualified');
   });
 
+  it('leads.update relinks from the company name and clears a name that matches none', async () => {
+    // WHY: renaming the label used to leave the old company id in place,
+    // so Dust still listed the lead under the previous account.
+    const name = `Update Lead ${randomBytes(4).toString('hex')}`;
+    const company = await prisma.company.create({ data: { orgId, name } });
+    const created = (await tools['leads.create'].handler(
+      {
+        firstName: 'Ren',
+        lastName: 'Ame',
+        companyName: name,
+        source: 'website',
+        priority: 'medium',
+        score: 0,
+      },
+      ctx,
+    )) as { id: string; companyId: string | null };
+    expect(created.companyId).toBe(company.id);
+
+    const cleared = (await tools['leads.update'].handler(
+      { id: created.id, patch: { companyName: `Nobody ${randomBytes(4).toString('hex')}` } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(cleared.companyId).toBeNull();
+
+    const restored = (await tools['leads.update'].handler(
+      { id: created.id, patch: { companyName: name } },
+      ctx,
+    )) as { companyId: string | null };
+    expect(restored.companyId).toBe(company.id);
+
+    const scored = (await tools['leads.update'].handler(
+      { id: created.id, patch: { score: 3 } },
+      ctx,
+    )) as { companyId: string | null; score: number };
+    expect(scored.score).toBe(3);
+    expect(scored.companyId).toBe(company.id);
+  });
+
   it('contacts.create creates a contact and writes audit_log', async () => {
     const company = await prisma.company.create({
       data: { orgId, name: 'Acme Inc Tools' },
