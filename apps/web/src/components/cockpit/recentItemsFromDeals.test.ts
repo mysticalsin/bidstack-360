@@ -19,9 +19,25 @@ describe('recentItemsFromDeals', () => {
         id: 'deal-1',
         name: 'DNB Bank — Cloud landing zone',
         customer: 'DNB Bank',
-        value: '2,700,000',
+        value: '2.7M unspecified',
         stage: 'screening',
       },
     ]);
+  });
+
+  it('does not print a collapsed amount when the micros number is no longer exact', () => {
+    // WHY: Number(micros) of this amount is one unit low, so the card would name the wrong figure.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const items = recentItemsFromDeals([
+      {
+        id: 'deal-huge',
+        name: 'Huge',
+        stage: 'proposal',
+        amountMicros: Number(huge),
+        companyName: 'Acme',
+      },
+    ]);
+    expect(items[0]?.value).toBe('Not recorded');
+    expect(items[0]?.value).not.toContain('9,007,199,254,740,992');
   });
 });

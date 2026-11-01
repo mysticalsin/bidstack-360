@@ -10,8 +10,10 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
 import { formatStage } from '@/lib/format';
-import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
-import { formatMicrosAmount } from '@bidstack/shared';
+import {
+  formatUnspecifiedAmount,
+  unspecifiedMicrosLabel,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 export interface RecentOpportunityItem {
@@ -21,6 +23,13 @@ export interface RecentOpportunityItem {
   customer?: string | null;
   value: string;
   stage?: string | null;
+}
+
+/** A recorded deal amount. An unsafe JSON number is already one unit low, so it is not printed. */
+function recentDealAmount(amountMicros: string | number | bigint): string {
+  if (typeof amountMicros === 'number' && !Number.isSafeInteger(amountMicros))
+    return 'Not recorded';
+  return unspecifiedMicrosLabel(amountMicros);
 }
 
 /** Snapshot deals are micros. The card prints major units, once. */
@@ -37,13 +46,7 @@ export function recentItemsFromDeals(
     id: deal.id,
     name: deal.name,
     customer: deal.companyName,
-    value: formatMicrosAmount(
-      typeof deal.amountMicros === 'bigint'
-        ? deal.amountMicros
-        : typeof deal.amountMicros === 'number'
-          ? BigInt(Math.trunc(deal.amountMicros))
-          : BigInt(deal.amountMicros),
-    ),
+    value: recentDealAmount(deal.amountMicros),
     stage: deal.stage,
   }));
 }
@@ -81,10 +84,17 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         }
         caption={
           accountScoped
-            ? t('recentOpportunities.accountCaption', 'Open opportunities linked to {{accountName}}', {
-                accountName,
-              })
-            : t('recentOpportunities.recentCaption', 'Latest portfolio activity across all customers')
+            ? t(
+                'recentOpportunities.accountCaption',
+                'Open opportunities linked to {{accountName}}',
+                {
+                  accountName,
+                },
+              )
+            : t(
+                'recentOpportunities.recentCaption',
+                'Latest portfolio activity across all customers',
+              )
         }
         action={
           <Link
@@ -139,7 +149,9 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
                 <div className="proto-row-right">
                   <span className="proto-row-money">
                     <AnimatedMetric
-                      value={typeof o.value === 'number' ? formatUnspecifiedAmount(o.value) : o.value}
+                      value={
+                        typeof o.value === 'number' ? formatUnspecifiedAmount(o.value) : o.value
+                      }
                     />
                   </span>
                   <Badge tone="purple">{formatStage(o.stage ?? 'unknown')}</Badge>
