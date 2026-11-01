@@ -21,6 +21,7 @@ import { RingChart } from '@/components/charts/ring-chart';
 import { ChartTooltip } from '@/components/charts/tooltip';
 import { XAxis } from '@/components/charts/x-axis';
 import { YAxis } from '@/components/viz/PoloYAxis';
+import { heroTooltipValue } from '@/components/viz/viz-data';
 
 const BRAND = 'var(--brand-primary, #006b4f)';
 const WON = 'var(--success, #177048)';
@@ -31,7 +32,7 @@ const MARGIN = { top: 16, right: 12, bottom: 28, left: 12 };
 type Fmt = (v: number) => string;
 
 /** Hero: cumulative won value as a gradient area that reveals left to right. */
-export function HeroArea({ data, format, aspect = '3.2 / 1' }: { data: Array<{ date: Date; y: number }>; format: Fmt; aspect?: string }) {
+export function HeroArea({ data, format, aspect = '3.2 / 1' }: { data: Array<{ date: Date; y: number; label?: string }>; format: Fmt; aspect?: string }) {
   const reduced = useReducedMotion();
   if (data.length < 2) return null;
   return (
@@ -40,7 +41,18 @@ export function HeroArea({ data, format, aspect = '3.2 / 1' }: { data: Array<{ d
         <Grid horizontal numTicksRows={3} strokeDasharray="0" strokeOpacity={1} stroke="var(--viz-line)" />
         <Area dataKey="y" curve={curveMonotoneX} fill={BRAND} stroke={BRAND} strokeWidth={2} fillOpacity={0.28} />
         <XAxis numTicks={6} />
-        <ChartTooltip rows={(p) => [{ color: BRAND, label: 'Won to date', value: format(Number(p.y ?? 0)) }]} />
+        <ChartTooltip
+          rows={(p) => [
+            {
+              color: BRAND,
+              label: 'Won to date',
+              value: heroTooltipValue(
+                { y: Number(p.y ?? 0), label: typeof p.label === 'string' ? p.label : undefined },
+                format,
+              ),
+            },
+          ]}
+        />
       </AreaChart>
     </div>
   );

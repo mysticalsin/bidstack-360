@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, forecastPoint, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, forecastPoint, heroTooltipValue, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -120,6 +120,11 @@ describe('viz-data', () => {
     ]);
     // WHY: adding the unit numbers made two of these wins one unit short of the real book.
     expect(hugeWon.at(-1)?.yMicros).toBe((9007199254740993n * 2n * 1_000_000n).toString());
+    // WHY: the chart hover formatted the drifted unit number. The micros label wins.
+    expect(heroTooltipValue({ y: 1, label: '9,007,199,254,740,993' }, () => 'wrong')).toBe(
+      '9,007,199,254,740,993',
+    );
+    expect(heroTooltipValue({ y: 12 }, (n) => String(n))).toBe('12');
     expect(cumulativeOpen([storedOpen])).toEqual([0, 10]);
     expect(fmtCompact(7_860_000)).toContain('7.86');
     expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
