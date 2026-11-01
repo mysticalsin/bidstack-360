@@ -29,12 +29,12 @@ export function useDisplayMoneyMicros(
   sourceCurrency?: string | null,
   options?: { compact?: boolean },
 ): string {
-  const { currency, convert, fetchRates } = useCurrencyStore();
+  const { currency, convert, convertMicros, fetchRates } = useCurrencyStore();
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
-  return formatStoredMicros(micros, sourceCurrency, convert, currency, options);
+  return formatStoredMicros(micros, sourceCurrency, convert, currency, options, convertMicros);
 }
 
 /** Same as useDisplayMoneyMicros but always full precision. */

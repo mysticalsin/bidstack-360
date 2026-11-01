@@ -448,6 +448,44 @@ describe('useFormatMoney hook integration', () => {
     expect(formatted).toContain('457.18');
     expect(formatted).not.toContain('457.19');
   });
+
+  it('keeps the stored cent when the rate does not change it', () => {
+    // WHY: a float round trip of this amount is not the original cent.
+    useCurrencyStore.setState({
+      currency: 'EUR',
+      rates: {
+        base: 'EUR',
+        rates: { ...fullRates(), USD: 1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+    });
+    expect(formatted).toContain('8,598,204,328,457.18');
+    expect(formatted).toContain('€');
+    expect(formatted).not.toContain('457.19');
+  });
+
+  it('converts a large recorded amount in integer micros', () => {
+    // WHY: the float product does not fit a safe integer, so the cent was dropped.
+    useCurrencyStore.setState({
+      currency: 'EUR',
+      rates: {
+        base: 'EUR',
+        rates: fullRates(),
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+    });
+    expect(formatted).toContain('7,816,549,389,506.53');
+    expect(formatted).toContain('€');
+    expect(formatted).not.toContain('457.19');
+  });
 });
 
 function fullRates(): Record<string, number> {

@@ -39,6 +39,8 @@ interface CurrencyStore {
   enableAutoDetect: () => Promise<void>;
   fetchRates: () => Promise<void>;
   convert: (amount: number, from: string) => number;
+  /** FX in integer micros. An identity rate returns the stored integer. */
+  convertMicros: (micros: bigint, from: string) => bigint;
 }
 
 let inflightRatesRequest: Promise<void> | null = null;
@@ -50,6 +52,28 @@ function normalizeCurrencyCode(code: string | null | undefined): string {
 
 function isUsableRate(rate: unknown): rate is number {
   return typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
+}
+
+const RATE_SCALE = 1_000_000;
+
+/** Nearest micros after FX. Equal scaled rates keep every digit, including the cent. */
+export function convertMicrosByRates(micros: bigint, fromRate: number, toRate: number): bigint | null {
+  const fromScaled = Math.round(fromRate * RATE_SCALE);
+  const toScaled = Math.round(toRate * RATE_SCALE);
+  if (
+    !Number.isSafeInteger(fromScaled) ||
+    !Number.isSafeInteger(toScaled) ||
+    fromScaled <= 0 ||
+    toScaled <= 0
+  ) {
+    return null;
+  }
+  const from = BigInt(fromScaled);
+  const to = BigInt(toScaled);
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const rounded = (abs * to + from / 2n) / from;
+  return negative ? -rounded : rounded;
 }
 
 const REGION_TO_CURRENCY: Partial<Record<string, CurrencyCode>> = {
@@ -364,6 +388,18 @@ export const useCurrencyStore = create<CurrencyStore>()(
         if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return amount;
         // Convert through the provider base: amount / fromRate * toRate.
         return (amount / fromRate) * toRate;
+      },
+
+      convertMicros: (micros, from) => {
+        const { currency: to, rates } = get();
+        const source = normalizeCurrencyCode(from);
+        if (!rates || !rates.rates || !source) return micros;
+        if (source === to) return micros;
+        const base = normalizeCurrencyCode(rates.base);
+        const fromRate = source === base ? 1 : rates.rates[source];
+        const toRate = to === base ? 1 : rates.rates[to];
+        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return micros;
+        return convertMicrosByRates(micros, fromRate, toRate) ?? micros;
       },
     }),
     {

@@ -35,6 +35,7 @@ export function formatStoredMicros(
   convert: (amount: number, from: string) => number,
   displayCurrency: string,
   options?: { compact?: boolean },
+  convertMicros?: (micros: bigint, from: string) => bigint,
 ): string {
   const asBigInt = microsBigInt(micros);
   if (asBigInt == null) return formatUnspecifiedCompact(0);
@@ -43,6 +44,9 @@ export function formatStoredMicros(
     return options?.compact === false
       ? formatExactUnspecified(asBigInt)
       : unspecifiedMicrosLabel(asBigInt);
+  }
+  if (convertMicros) {
+    return formatMoneyMicros(convertMicros(asBigInt, source).toString(), displayCurrency, options);
   }
   const value = unitsFromMicros(asBigInt);
   const converted = convert(value, source);
@@ -59,7 +63,7 @@ export function formatStoredMicros(
  * based on the user's selected display currency.
  */
 export function useFormatMoney() {
-  const { currency, convert, fetchRates } = useCurrencyStore();
+  const { currency, convert, convertMicros, fetchRates } = useCurrencyStore();
 
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
@@ -79,6 +83,6 @@ export function useFormatMoney() {
       // No source currency means the amount is unspecified. Do not assume EUR.
       sourceCurrency?: string | null,
       options?: { compact?: boolean },
-    ) => formatStoredMicros(micros, sourceCurrency, convert, currency, options),
+    ) => formatStoredMicros(micros, sourceCurrency, convert, currency, options, convertMicros),
   };
 }
