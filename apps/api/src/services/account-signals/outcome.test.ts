@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { closedAtOf, openBookMicros, recordedOutcome, toMomentumOpp, type OppRow } from './load';
+import { capMomentumDeals, closedAtOf, openBookMicros, recordedOutcome, toMomentumOpp, type OppRow } from './load';
 
 const row = (over: Partial<OppRow>): OppRow => ({
   id: 'o1',
@@ -45,6 +45,15 @@ describe('recordedOutcome', () => {
   it('still closes the enum lost and won stages', () => {
     expect(recordedOutcome(row({ stage: 'closed_lost' }))).toBe('lost');
     expect(recordedOutcome(row({ stage: 'closed_won' }))).toBe('won');
+  });
+
+  it('stops the momentum page at 1000 when one more deal exists', () => {
+    // WHY: one query of 1000 deals across several accounts was shown as each account's book.
+    const rows = Array.from({ length: 1001 }, (_, index) => index);
+    const capped = capMomentumDeals(rows);
+    expect(capped.capped).toBe(true);
+    expect(capped.rows).toHaveLength(1000);
+    expect(capMomentumDeals(rows.slice(0, 1000)).capped).toBe(false);
   });
 
   it('leaves a live lost stage out of the open pipeline total', () => {
