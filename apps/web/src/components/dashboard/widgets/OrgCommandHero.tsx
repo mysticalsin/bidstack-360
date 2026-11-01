@@ -64,7 +64,11 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const report = usePipelineReport();
-  const closing = useOpportunities({ dueWithinDays: CLOSING_WINDOW_DAYS, limit: CLOSING_FETCH_LIMIT });
+  const closing = useOpportunities({
+    dueWithinDays: CLOSING_WINDOW_DAYS,
+    excludeClosed: true,
+    limit: CLOSING_FETCH_LIMIT,
+  });
 
   const money = (value: number) => formatUnspecifiedAmount(value);
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);

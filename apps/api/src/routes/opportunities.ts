@@ -43,8 +43,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { pipelineStageId, stage, owner, industry, search, cursor, limit, dueWithinDays, overdue } =
-        req.query;
+      const {
+        pipelineStageId,
+        stage,
+        owner,
+        industry,
+        search,
+        cursor,
+        limit,
+        dueWithinDays,
+        overdue,
+        excludeClosed,
+      } = req.query;
       // M7 access scoping: group-restricted users only see opportunities in
       // their countries (or that they own). See lib/access-scope.ts.
       const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
@@ -77,6 +87,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 ...(industry ? { industry } : {}),
                 ...(owner ? { owner: { email: owner } } : {}),
                 ...(dueDateFilter ? { dueDate: dueDateFilter } : {}),
+                ...(excludeClosed ? excludeClosedOutcome() : {}),
                 ...(search
                   ? {
                       OR: [

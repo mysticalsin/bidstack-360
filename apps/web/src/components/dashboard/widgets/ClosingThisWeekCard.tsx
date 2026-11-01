@@ -6,10 +6,10 @@
  * `dueWithinDays`, see apps/api/src/routes/opportunities.ts) so a lead can
  * spot slippage risk without opening the full pipeline table.
  *
- * Closed deals are excluded client-side (not by the API filter, which is a
- * pure date-window match reused by the "Due ≤ 7d" list chip) — a Closed
- * Won/Lost bid with a stale dueDate inside the window isn't "closing", it's
- * already closed, and showing it here would read as a bug.
+ * The request asks the server to leave decided stages out. A page of lost
+ * deals would otherwise fill the 25-row window and hide an open bid. The
+ * Due ≤ 7d list chip still uses the date window without that flag. The
+ * client filter remains so a stale cached row cannot appear as closing.
  */
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -35,7 +35,11 @@ function isOpenOpp(o: Opportunity): boolean {
 
 export function ClosingThisWeekCard() {
   const { t } = useTranslation('crm');
-  const closing = useOpportunities({ dueWithinDays: CLOSING_WINDOW_DAYS, limit: 25 });
+  const closing = useOpportunities({
+    dueWithinDays: CLOSING_WINDOW_DAYS,
+    excludeClosed: true,
+    limit: 25,
+  });
 
   const items = (closing.data?.items ?? [])
     .filter(isOpenOpp)

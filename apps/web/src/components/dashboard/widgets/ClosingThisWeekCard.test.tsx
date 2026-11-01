@@ -114,7 +114,11 @@ describe('ClosingThisWeekCard', () => {
 
     renderCard();
 
-    expect(useOpportunitiesMock).toHaveBeenCalledWith({ dueWithinDays: 7, limit: 25 });
+    expect(useOpportunitiesMock).toHaveBeenCalledWith({
+      dueWithinDays: 7,
+      excludeClosed: true,
+      limit: 25,
+    });
   });
 
   it('shows the empty-state copy when no opportunities are closing this week', () => {

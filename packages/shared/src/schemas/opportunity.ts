@@ -148,6 +148,9 @@ export const OpportunityFilter = z.object({
   // can be combined by a caller if that's ever useful.
   dueWithinDays: z.coerce.number().int().min(0).max(365).optional(),
   overdue: z.coerce.boolean().optional(),
+  // Closing-this-week asks for open deals only. A date window without this
+  // flag still returns decided deals, which is the Due ≤ 7d list chip.
+  excludeClosed: z.coerce.boolean().optional(),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 

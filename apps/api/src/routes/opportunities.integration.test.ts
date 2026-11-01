@@ -515,6 +515,71 @@ describe('opportunities routes', () => {
     }
   });
 
+  skipIfNoDb('GET /api/opportunities?dueWithinDays=7&excludeClosed=true leaves a lost flag out', async () => {
+    // WHY: the closing strip takes 25 rows. A page of lost deals with due
+    // dates inside the window hid the open bid that was due later in the week.
+    const suffix = randomUUID().slice(0, 8);
+    const in3Days = new Date(Date.now() + 3 * 86_400_000);
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `Due lost ${suffix}` },
+    });
+    const lost = await prisma.pipelineStage.create({
+      data: {
+        orgId: orgId!,
+        pipelineId: pipeline.id,
+        key: 'price_lost',
+        name: 'Price lost',
+        isLost: true,
+      },
+    });
+    const [open, flagged] = await prisma.$transaction([
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-OPEN-${suffix}`,
+          customer: 'Due Window Test',
+          name: 'Still open',
+          stage: 's2_sent',
+          probability: 40,
+          dueDate: in3Days,
+        },
+      }),
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-LOST-${suffix}`,
+          customer: 'Due Window Test',
+          name: 'Flagged lost',
+          stage: 's2_sent',
+          pipelineStageId: lost.id,
+          probability: 40,
+          dueDate: in3Days,
+        },
+      }),
+    ]);
+    try {
+      const openOnly = await server.inject({
+        method: 'GET',
+        url: '/api/opportunities?dueWithinDays=7&excludeClosed=true&limit=100',
+      });
+      expect(openOnly.statusCode).toBe(200);
+      const openIds = openOnly.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id);
+      expect(openIds).toContain(open.id);
+      expect(openIds).not.toContain(flagged.id);
+
+      const dated = await server.inject({
+        method: 'GET',
+        url: '/api/opportunities?dueWithinDays=7&limit=100',
+      });
+      const datedIds = dated.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id);
+      expect(datedIds).toContain(flagged.id);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { id: { in: [open.id, flagged.id] } } });
+      await prisma.pipelineStage.deleteMany({ where: { id: lost.id } });
+      await prisma.pipeline.deleteMany({ where: { id: pipeline.id } });
+    }
+  });
+
   // Cursor pagination must survive ties on the (non-unique) sort column.
   // WHY this matters: dueDate is a Postgres `date`, so several bids routinely
   // share the exact same due date. A bare single-column cursor keyed on `id`
