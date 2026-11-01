@@ -49,8 +49,9 @@ export const MarsEntry = z.object({
   /** ISO date of the Monday of the logged week. */
   weekOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   meetingDate: z.string().datetime(),
-  loggedBy: z.object({ email: z.string().trim().toLowerCase().email().max(320), name: Text(200).min(1), region: OptText(100) }),
-  internalAttendees: z.array(z.object({ email: z.string().trim().toLowerCase().email().max(320), name: Text(200).min(1) })).max(20).default([]),
+  /** Email may be missing in tabular extracts (Power BI, file export) that only carry a name. */
+  loggedBy: z.object({ email: z.string().trim().toLowerCase().email().max(320).nullish(), name: Text(200).min(1), region: OptText(100) }),
+  internalAttendees: z.array(z.object({ email: z.string().trim().toLowerCase().email().max(320).nullish(), name: Text(200).min(1) })).max(20).default([]),
   client: MarsClientCompany,
   contacts: z.array(MarsPerson).max(50).default([]),
   meetingType: MarsMeetingType.default('other'),
@@ -76,6 +77,112 @@ export type MarsWebhookEvent = z.infer<typeof MarsWebhookEvent>;
 export function isMarsEnabled(value: string | undefined | null): boolean {
   return (value ?? '').trim().toLowerCase() === 'true';
 }
+
+// ─── account keys (per account source filter, Power BI and file export) ────
+
+/**
+ * Key comparison for MARS / Power BI account values: trimmed, inner spaces
+ * collapsed, case-insensitive (DAX string equality is case-insensitive too).
+ * Whole value only: "Acme" never matches "Acme Logistics".
+ */
+export function normalizeMarsAccountKey(s: string | null | undefined): string {
+  return (s ?? '').normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+const AccountKey = z.string().trim().min(1).max(200).refine((s) => !/[\u0000-\u001f]/.test(s), 'control characters are not allowed');
+
+/** Admin-confirmed mapping: Polo companyId to the account value(s) used in the MARS dataset. */
+export const MarsAccountKeyMap = z.record(z.string().uuid(), z.array(AccountKey).min(1).max(20)).refine((m) => Object.keys(m).length <= 1000, 'at most 1000 mapped accounts');
+export type MarsAccountKeyMap = z.infer<typeof MarsAccountKeyMap>;
+
+/** Duplicate keys across two accounts would break strict matching; returns the clashing keys. */
+export function marsAccountKeyConflicts(map: MarsAccountKeyMap): string[] {
+  const owner = new Map<string, string>();
+  const clash = new Set<string>();
+  for (const [companyId, keys] of Object.entries(map)) {
+    for (const k of keys) {
+      const n = normalizeMarsAccountKey(k);
+      const prev = owner.get(n);
+      if (prev && prev !== companyId) clash.add(k);
+      else owner.set(n, companyId);
+    }
+  }
+  return [...clash];
+}
+
+/** JSON kept on the MARS MeetingSourceConnection.settings column. */
+export const MarsConnectionSettings = z.object({
+  accountKeys: MarsAccountKeyMap.default({}),
+  /** Per account resume cursor for account scoped sources (Power BI). */
+  cursors: z.record(z.string().uuid(), z.string().max(500)).default({}),
+});
+export type MarsConnectionSettings = z.infer<typeof MarsConnectionSettings>;
+
+export function parseMarsSettings(v: unknown): MarsConnectionSettings {
+  const r = MarsConnectionSettings.safeParse(v ?? {});
+  return r.success ? r.data : { accountKeys: {}, cursors: {} };
+}
+
+// ─── tabular column mapping (Power BI dataset or exported sheet) ───────────
+
+/** A table or column name as it appears in the dataset or sheet header. Escaped before it reaches DAX. */
+const ColumnName = z.string().trim().min(1).max(128).refine((s) => !/[\u0000-\u001f]/.test(s), 'control characters are not allowed');
+
+export const MARS_TABULAR_FIELDS = [
+  'account', 'contactName', 'contactEmail', 'contactTitle', 'company', 'meetingDate', 'internalAttendee', 'notes',
+  'entryId', 'updatedAt', 'loggedByEmail', 'loggedByName', 'topic', 'meetingType', 'contactLinkedin', 'contactDepartment',
+  'contactCountry', 'contactReportsTo', 'accountDomain', 'parentCompany', 'confidential', 'deleted',
+] as const;
+export type MarsTabularField = (typeof MARS_TABULAR_FIELDS)[number];
+
+/**
+ * Logical field to real column name. Required: account, contactName,
+ * meetingDate. Everything else is optional so the map can follow whatever
+ * the real Power BI table or export sheet looks like.
+ */
+export const MarsColumnMap = z.object({
+  table: ColumnName,
+  columns: z.object({
+    account: ColumnName,
+    contactName: ColumnName,
+    meetingDate: ColumnName,
+    contactEmail: ColumnName.optional(),
+    contactTitle: ColumnName.optional(),
+    company: ColumnName.optional(),
+    internalAttendee: ColumnName.optional(),
+    notes: ColumnName.optional(),
+    entryId: ColumnName.optional(),
+    updatedAt: ColumnName.optional(),
+    loggedByEmail: ColumnName.optional(),
+    loggedByName: ColumnName.optional(),
+    topic: ColumnName.optional(),
+    meetingType: ColumnName.optional(),
+    contactLinkedin: ColumnName.optional(),
+    contactDepartment: ColumnName.optional(),
+    contactCountry: ColumnName.optional(),
+    contactReportsTo: ColumnName.optional(),
+    accountDomain: ColumnName.optional(),
+    parentCompany: ColumnName.optional(),
+    confidential: ColumnName.optional(),
+    deleted: ColumnName.optional(),
+  }),
+});
+export type MarsColumnMap = z.infer<typeof MarsColumnMap>;
+
+/** Placeholder names until the Power BI admin sends the real ones (fleet/polo-mars-integration.md). */
+export const DEFAULT_MARS_COLUMN_MAP: MarsColumnMap = {
+  table: 'MARS Meetings',
+  columns: {
+    account: 'Account',
+    contactName: 'Contact Name',
+    contactEmail: 'Contact Email',
+    contactTitle: 'Contact Title',
+    company: 'Company',
+    meetingDate: 'Meeting Date',
+    internalAttendee: 'Internal Attendee',
+    notes: 'Notes',
+  },
+};
 
 // ─── account matching (strict, never substring) ────────────────────────────
 
@@ -152,7 +259,8 @@ export function matchMarsAccount(
     return null;
   };
   if (client.marsAccountId) {
-    const r = decide(accounts.filter((a) => a.marsAccountId && a.marsAccountId === client.marsAccountId), 'mars_id');
+    const key = normalizeMarsAccountKey(client.marsAccountId);
+    const r = decide(accounts.filter((a) => !!a.marsAccountId && normalizeMarsAccountKey(a.marsAccountId) === key), 'mars_id');
     if (r) return r;
   }
   const dom = normalizeDomain(client.domain);

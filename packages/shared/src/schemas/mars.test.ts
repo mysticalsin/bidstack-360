@@ -194,3 +194,41 @@ describe('MarsEntry', () => {
     expect(r.success, JSON.stringify(r.error?.issues)).toBe(true);
   });
 });
+
+describe('MARS account keys and column map (Power BI, file export)', () => {
+  const A = '11111111-1111-4111-8111-111111111111';
+  const B = '22222222-2222-4222-8222-222222222222';
+  it('normalises keys as whole values, never substrings', async () => {
+    const m = await import('./mars.js');
+    expect(m.normalizeMarsAccountKey('  Northwind   ENERGY ')).toBe('northwind energy');
+    expect(m.normalizeMarsAccountKey('Northwind Energy Services')).not.toBe(m.normalizeMarsAccountKey('Northwind Energy'));
+    expect(m.marsAccountKeyConflicts({ [A]: ['Northwind Energy'], [B]: ['northwind  energy', 'Contoso'] })).toEqual(['northwind  energy']);
+    expect(m.marsAccountKeyConflicts({ [A]: ['X', 'x'] })).toEqual([]);
+    expect(m.MarsAccountKeyMap.safeParse({ 'not-a-uuid': ['X'] }).success).toBe(false);
+    expect(m.MarsAccountKeyMap.safeParse({ [A]: ['bad\nkey'] }).success).toBe(false);
+  });
+  it('parses settings defensively', async () => {
+    const m = await import('./mars.js');
+    expect(m.parseMarsSettings(null)).toEqual({ accountKeys: {}, cursors: {} });
+    expect(m.parseMarsSettings({ accountKeys: 'nope' })).toEqual({ accountKeys: {}, cursors: {} });
+    expect(m.parseMarsSettings({ accountKeys: { [A]: ['X'] } })).toEqual({ accountKeys: { [A]: ['X'] }, cursors: {} });
+  });
+  it('matches a confirmed account key case-insensitively, whole value only', async () => {
+    const m = await import('./mars.js');
+    const accounts = [
+      { companyId: A, name: 'Alpha', legalName: null, domain: null, parentId: null, marsAccountId: 'NWE-UK' },
+      { companyId: B, name: 'Beta', legalName: null, domain: null, parentId: null, marsAccountId: 'NWE' },
+    ];
+    expect(m.matchMarsAccount({ name: 'x', marsAccountId: ' nwe-uk ' }, accounts)).toEqual({ companyId: A, method: 'mars_id' });
+    expect(m.matchMarsAccount({ name: 'x', marsAccountId: 'NWE-U' }, accounts)).toMatchObject({ companyId: null, reason: 'no_match' });
+  });
+  it('requires account, contact name and meeting date in a column map', async () => {
+    const m = await import('./mars.js');
+    expect(m.MarsColumnMap.safeParse(m.DEFAULT_MARS_COLUMN_MAP).success).toBe(true);
+    expect(m.MarsColumnMap.safeParse({ table: 'T', columns: { account: 'A', contactName: 'C' } }).success).toBe(false);
+    expect(m.MarsEntry.safeParse({
+      id: 'mt-1', version: 2, updatedAt: '2026-10-20T00:00:00.000Z', weekOf: '2026-10-19', meetingDate: '2026-10-20T00:00:00.000Z',
+      loggedBy: { email: null, name: 'MARS' }, internalAttendees: [{ name: 'Sam Lee', email: null }], client: { name: 'Northwind' },
+    }).success).toBe(true);
+  });
+});

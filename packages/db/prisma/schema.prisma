@@ -5980,6 +5980,8 @@ model MeetingSourceConnection {
   lastSyncAt      DateTime?          @map("last_sync_at") @db.Timestamptz(6)
   /// Opaque resume cursor from a cursor-paged source (MARS). Null = start from lastSyncAt.
   syncCursor      String?            @map("sync_cursor") @db.VarChar(500)
+  /// Source settings (MARS: account key map and per account cursors). Validated by MarsConnectionSettings.
+  settings        Json?
   lastError       String?            @map("last_error")
   itemsReceived   Int                @default(0) @map("items_received")
   createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)

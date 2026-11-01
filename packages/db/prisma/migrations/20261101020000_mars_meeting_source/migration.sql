@@ -4,3 +4,6 @@ ALTER TYPE "meeting_intel_source" ADD VALUE IF NOT EXISTS 'mars';
 
 -- Resume cursor for cursor-paged sources (MARS). Null means start from last_sync_at.
 ALTER TABLE "meeting_source_connections" ADD COLUMN IF NOT EXISTS "sync_cursor" VARCHAR(500);
+
+-- Source settings (MARS: admin-confirmed account key map, per account cursors for Power BI).
+ALTER TABLE "meeting_source_connections" ADD COLUMN IF NOT EXISTS "settings" JSONB;
