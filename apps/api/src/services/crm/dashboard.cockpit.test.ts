@@ -11,6 +11,7 @@ import {
   buildCockpit,
   computeSignalCoverage,
   registerDealsAreCapped,
+  roleHoldersAreCapped,
 } from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
@@ -570,11 +571,25 @@ describe('buildCockpit recorded facts only', () => {
         opportunityId: 'deal-1',
         observedAt: new Date('2026-10-01T00:00:00.000Z'),
       })),
-      coveragePages: { contactsCapped: true },
+      roleHoldersCapped: true,
     });
     expect(cockpit.keyContacts).toHaveLength(5);
     expect(cockpit.championCount).toBe(6);
     expect(cockpit.contactsCapped).toBe(true);
+    const influencePage = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      coveragePages: { contactsCapped: true },
+    });
+    // WHY: a full influence page is not a partial champion count once every
+    // accepted role holder was loaded.
+    expect(influencePage.contactsCapped).toBe(false);
   });
 
   it('keeps an accepted role holder in the key people ahead of louder names', () => {
@@ -979,6 +994,11 @@ describe('buildCockpit recorded facts only', () => {
     expect(registerDealsAreCapped(100, 150)).toBe(false);
     expect(registerDealsAreCapped(1000, 1000)).toBe(false);
     expect(registerDealsAreCapped(1000, 1001)).toBe(true);
+    // WHY: twenty-one role holders used to drop whoever sorted after the first
+    // twenty ids. The probe keeps 1,000, and only a further holder is partial.
+    expect(roleHoldersAreCapped(20, true)).toBe(false);
+    expect(roleHoldersAreCapped(1000, false)).toBe(false);
+    expect(roleHoldersAreCapped(1000, true)).toBe(true);
     const cockpit = buildCockpit({
       company: company(),
       companies: [],
