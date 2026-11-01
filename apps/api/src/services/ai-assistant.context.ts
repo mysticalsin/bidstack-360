@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { Prisma, prisma } from '@bidstack/db';
 
 import { excludeClosedOutcome } from '../routes/opportunities.helpers.js';
 
@@ -133,7 +133,14 @@ export async function buildSentimentContext(orgId: string, dealId: string) {
 export async function buildMeetingContext(orgId: string, calendarEventId: string) {
   const event = await prisma.calendarEvent.findFirst({
     where: { id: calendarEventId, orgId, deletedAt: null },
-    select: { id: true, subject: true, startAt: true, attendees: true, relatedEntityId: true },
+    select: {
+      id: true,
+      subject: true,
+      startAt: true,
+      attendees: true,
+      relatedEntityId: true,
+      relatedEntityType: true,
+    },
   });
   if (!event) {
     throw Object.assign(new Error('Calendar event not found'), { statusCode: 404 });
@@ -168,28 +175,9 @@ export async function buildMeetingContext(orgId: string, calendarEventId: string
     return { name: s.name, role: s.role, company: c.customer };
   });
 
-  // Pull open opportunities for the related entity if present.
-  let openOpps: Array<{ id: string; title: string; stage: string }> = [];
-  if (event.relatedEntityId) {
-    const opps = await prisma.opportunity.findMany({
-      where: {
-        orgId,
-        id: event.relatedEntityId,
-        deletedAt: null,
-        // A live lost or won flag is not an open deal in the brief.
-        ...excludeClosedOutcome(),
-      },
-      select: {
-        id: true,
-        name: true,
-        stage: true,
-        valueMicros: true,
-        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
-      },
-      take: 5,
-    });
-    openOpps = opps.map((o) => ({ id: o.id, title: o.name, stage: String(o.stage) }));
-  }
+  // A deal id lists that deal. A company id lists that company's open deals.
+  // A name is not a link. Lost and won stay out. The list is capped.
+  const { openOpps, openOppsOmitted } = await openDealsForMeeting(orgId, event);
 
   // Recent activity for the resolved contact IDs.
   const contactIds = contacts.map((c) => c.id);
@@ -216,8 +204,62 @@ export async function buildMeetingContext(orgId: string, calendarEventId: string
     },
     safeAttendees,
     openOpps,
+    openOppsOmitted,
     recentInteractions,
     actSummary,
+  };
+}
+
+const MEETING_OPEN_DEAL_CAP = 5;
+
+async function openDealsForMeeting(
+  orgId: string,
+  event: { relatedEntityId: string | null; relatedEntityType: string | null },
+): Promise<{
+  openOpps: Array<{ id: string; title: string; stage: string }>;
+  openOppsOmitted: number;
+}> {
+  const id = event.relatedEntityId;
+  if (!id) return { openOpps: [], openOppsOmitted: 0 };
+  const type = event.relatedEntityType?.trim().toLowerCase() ?? '';
+  const open = { orgId, deletedAt: null, ...excludeClosedOutcome() };
+  const select = { id: true, name: true, stage: true } as const;
+
+  if (type === 'company' || type === 'account') {
+    return listOpenDeals({ ...open, companyId: id });
+  }
+  if (type === 'opportunity' || type === 'deal') {
+    const rows = await prisma.opportunity.findMany({
+      where: { ...open, id },
+      select,
+      take: 1,
+    });
+    return { openOpps: rows.map(meetingDeal), openOppsOmitted: 0 };
+  }
+
+  const byDeal = await prisma.opportunity.findMany({
+    where: { ...open, id },
+    select,
+    take: 1,
+  });
+  if (byDeal.length > 0) return { openOpps: byDeal.map(meetingDeal), openOppsOmitted: 0 };
+  return listOpenDeals({ ...open, companyId: id });
+}
+
+function meetingDeal(row: { id: string; name: string; stage: string }) {
+  return { id: row.id, title: row.name, stage: String(row.stage) };
+}
+
+async function listOpenDeals(where: Prisma.OpportunityWhereInput) {
+  const rows = await prisma.opportunity.findMany({
+    where,
+    select: { id: true, name: true, stage: true },
+    orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+    take: MEETING_OPEN_DEAL_CAP + 1,
+  });
+  return {
+    openOpps: rows.slice(0, MEETING_OPEN_DEAL_CAP).map(meetingDeal),
+    openOppsOmitted: Math.max(0, rows.length - MEETING_OPEN_DEAL_CAP),
   };
 }
 
