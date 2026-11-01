@@ -76,12 +76,20 @@ describe('HTML import', () => {
     clearRbacDecisionCacheForTest();
   });
 
-  it('dry run previews every person with warnings and writes nothing', async () => {
+  it("dry run previews the account's own staff, counts the skipped by reason and writes nothing", async () => {
     const res = await importHtml(c.map!, MAP, { dryRun: true });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body).toMatchObject({ dryRun: true, created: 11, updated: 0, format: 'json', found: 12, skipped: 1, photos: 11 });
-    expect(body.preview).toHaveLength(11);
+    expect(body).toMatchObject({ dryRun: true, created: 8, updated: 0, format: 'json', found: 12, skipped: 4, photos: 8 });
+    expect(body.skippedBy).toEqual([
+      { reason: 'system', count: 1, label: expect.any(String) },
+      { reason: 'external', count: 2, label: expect.any(String) },
+      { reason: 'own_firm', count: 1, label: 'our own firm (Amaris)' },
+    ]);
+    expect(body.preview).toHaveLength(8);
+    expect(body.preview.map((r: { name: string }) => r.name)).not.toEqual(expect.arrayContaining(['Kim Laurent']));
+    const skippedNames = ['Ivan Petrov', 'Jo Tanaka', 'Kim Laurent', 'Service Desk Bot'];
+    expect(body.warnings.filter((w: { name?: string }) => skippedNames.includes(w.name ?? ''))).toEqual([]);
     const bruno = body.preview.find((r: { name: string }) => r.name === 'Bruno Costa');
     expect(bruno).toMatchObject({ manager: 'Ana Silva', email: 'bruno.costa@example.com', phone: '+551155550102', hasPhoto: true, action: 'create' });
     expect(bruno.extras).toEqual(expect.arrayContaining(['location', 'tenure', 'career']));
@@ -94,8 +102,8 @@ describe('HTML import', () => {
   it('commits the tree, crops sprite avatars into stored photos, and keeps contact fields and profile', async () => {
     const res = await importHtml(c.map!, MAP);
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ created: 11, photos: 11 });
-    expect(storage.objects.size).toBe(11);
+    expect(res.json()).toMatchObject({ created: 8, photos: 8 });
+    expect(storage.objects.size).toBe(8);
     for (const o of storage.objects.values()) expect(o.body.subarray(8, 12).toString('latin1')).toBe('WEBP');
     const t = await tree(c.map!);
     const root = t.nodes.find((n) => n.parentId === null)!;
@@ -105,15 +113,15 @@ describe('HTML import', () => {
     expect(dan.photoUrl).toBe(`/api/v1/org-chart/nodes/${dan.id}/photo`);
     expect(dan.profile).toMatchObject({ location: 'Example City, Canada', themes: ['cloud', 'data'] });
     expect(t.nodes.find((n) => n.id === dan.parentId)!.name).toBe('Carla Reyes');
-    expect(t.nodes.some((n) => n.name === 'Service Desk Bot')).toBe(false);
+    for (const n of ['Service Desk Bot', 'Ivan Petrov', 'Jo Tanaka', 'Kim Laurent']) expect(t.nodes.some((x) => x.name === n)).toBe(false);
   });
 
   it('re-import is idempotent: matches by email, LinkedIn or file id, and replaces old photos', async () => {
     const before = await tree(c.map!);
     const res = await importHtml(c.map!, MAP, { chartVersion: before.chart!.version });
-    expect(res.json()).toMatchObject({ created: 0, updated: 11 });
+    expect(res.json()).toMatchObject({ created: 0, updated: 8 });
     const after = await tree(c.map!);
-    expect(after.nodes).toHaveLength(11);
+    expect(after.nodes).toHaveLength(8);
     expect((await importHtml(c.map!, MAP, { chartVersion: before.chart!.version })).statusCode).toBe(409);
   });
 
@@ -135,6 +143,16 @@ describe('HTML import', () => {
     expect(maya.photoUrl).toBe('https://images.example.org/maya.png');
     const omar = t.nodes.find((n) => n.name === 'Omar Haddad')!;
     expect(omar).toMatchObject({ parentId: maya.id, linkedinUrl: null, photoUrl: null });
+  });
+
+  it('skips people whose company is another employer or our own firm, matching the account by name', async () => {
+    const html = `<table><tr><th>Name</th><th>Title</th><th>Company</th></tr>
+      <tr><td>Kai Own</td><td>CEO</td><td>${TAG} Example Inc.</td></tr>
+      <tr><td>Lou Firm</td><td>Engagement lead</td><td>Amaris Consulting</td></tr>
+      <tr><td>Mo Other</td><td>Account manager</td><td>Some Vendor Ltd</td></tr></table>`;
+    const body = (await importHtml(c.table!, html, { dryRun: true })).json();
+    expect(body.preview.map((r: { name: string }) => r.name)).toEqual(['Kai Own']);
+    expect(body.skippedBy.map((s: { reason: string }) => s.reason)).toEqual(['own_firm', 'other_employer']);
   });
 
   it('rejects an HTML file with no people (422) and an unknown manager (all or nothing)', async () => {

@@ -4,19 +4,30 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { cleanText, decodeDataImage, parseOrgChartHtml } from './html-import.js';
+import { cleanText, companyCore, decodeDataImage, parseOrgChartHtml, sameCompany, type StaffContext } from './html-import.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (n: string) => readFileSync(path.join(here, '__fixtures__', n), 'utf8');
 
-describe('parseOrgChartHtml: people-map export (JSON data island + sprite avatars)', () => {
-  const r = parseOrgChartHtml(fixture('people-map.fake.html'));
+const ctx: StaffContext = { accountNames: ['Example Corp', 'example.com'], ownFirmNames: ['Amaris', 'Mantu'] };
 
-  it('finds the people list, skips system accounts and keeps the reporting lines', () => {
+describe('parseOrgChartHtml: people-map export (JSON data island + sprite avatars)', () => {
+  const r = parseOrgChartHtml(fixture('people-map.fake.html'), ctx);
+
+  it("keeps only the account's own staff, counts the rest by reason and keeps the reporting lines", () => {
     expect(r.format).toBe('json');
     expect(r.found).toBe(12);
-    expect(r.skipped).toBe(1);
-    expect(r.people).toHaveLength(11);
+    expect(r.skipped).toBe(4);
+    expect(r.skippedBy).toEqual([
+      { reason: 'system', count: 1, label: expect.stringMatching(/system/) },
+      { reason: 'external', count: 2, label: expect.stringMatching(/external/) },
+      { reason: 'own_firm', count: 1, label: 'our own firm (Amaris)' },
+    ]);
+    expect(r.people).toHaveLength(8);
+    expect(r.people.map((p) => p.name)).not.toEqual(expect.arrayContaining(['Ivan Petrov']));
+    for (const n of ['Ivan Petrov', 'Jo Tanaka', 'Kim Laurent', 'Service Desk Bot']) expect(r.people.some((p) => p.name === n)).toBe(false);
+    // Skipped people never show up as per-row warnings.
+    for (const w of r.warnings) expect(['Ivan Petrov', 'Jo Tanaka', 'Kim Laurent', 'Service Desk Bot']).not.toContain(w.name);
     expect(r.errors).toEqual([]);
     const bruno = r.people.find((p) => p.name === 'Bruno Costa')!;
     expect(bruno.managerRef).toBe('acme_ops-silva-ana');
@@ -53,7 +64,7 @@ describe('parseOrgChartHtml: people-map export (JSON data island + sprite avatar
     });
     expect(ana.profile.career?.[0]).toEqual({ role: 'Chief Executive Officer', org: 'Example Corp', period: '2010 - present' });
     expect(ana.profile.signals?.[0]).toMatchObject({ title: 'Announced a new data platform', url: 'https://example.com/news' });
-    expect(r.people.find((p) => p.name === 'Ivan Petrov')!.profile).toMatchObject({ employer: 'Example Staffing', personKind: 'external' });
+    expect(r.people.find((p) => p.name === 'Bruno Costa')!.profile).toMatchObject({ personKind: 'internal' });
   });
 
   it('never keeps markup, scripts or bidi controls in text', () => {
@@ -81,6 +92,69 @@ describe('parseOrgChartHtml: table export', () => {
     expect(lena!.photo).toBeNull();
     expect(lena!.phone).toBeNull();
     expect(r.warnings.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('parseOrgChartHtml: staff rule (generic, every layout)', () => {
+  const table = (rows: string[][]) =>
+    `<table><tr>${rows[0]!.map((h) => `<th>${h}</th>`).join('')}</tr>${rows.slice(1).map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+  it('keeps people whose company matches the account (name, legal suffix or domain) and skips other employers', () => {
+    const r = parseOrgChartHtml(
+      table([
+        ['Name', 'Title', 'Company'],
+        ['Ann One', 'CEO', 'Example Corp.'],
+        ['Ben Two', 'CFO', 'EXAMPLE CORPORATION'],
+        ['Cy Three', 'CTO', ''],
+        ['Di Four', 'Consultant', 'Other Bank plc'],
+        ['Ed Five', 'Engagement lead', 'Amaris Consulting'],
+      ]),
+      ctx,
+    );
+    expect(r.people.map((p) => p.name)).toEqual(['Ann One', 'Ben Two', 'Cy Three']);
+    expect(r.skippedBy).toEqual([
+      { reason: 'own_firm', count: 1, label: 'our own firm (Amaris)' },
+      { reason: 'other_employer', count: 1, label: expect.stringMatching(/another company/) },
+    ]);
+    expect(r.found).toBe(5);
+  });
+  it('honours flags in the file: a type column or an external yes/no column', () => {
+    const r = parseOrgChartHtml(
+      table([
+        ['Name', 'Title', 'Type', 'External'],
+        ['Ann One', 'CEO', 'Employee', ''],
+        ['Ben Two', 'Developer', 'Contractor', ''],
+        ['Cy Three', 'Analyst', '', 'yes'],
+        ['Meeting Room 4', 'Room', 'Room', ''],
+      ]),
+      ctx,
+    );
+    expect(r.people.map((p) => p.name)).toEqual(['Ann One']);
+    expect(r.skippedBy.map((s) => [s.reason, s.count])).toEqual([['system', 1], ['external', 2]]);
+  });
+  it('moves someone who reports to a skipped person up to the nearest kept manager', () => {
+    const people = [
+      { id: 'a', name: 'Ann One', title: 'CEO', kind: 'internal' },
+      { id: 'v', name: 'Vic Vendor', title: 'Interim Head of IT', kind: 'external', parent: 'a' },
+      { id: 'w', name: 'Wes Agency', title: 'IT Lead', kind: 'vendor', parent: 'v' },
+      { id: 'b', name: 'Ben Two', title: 'IT Manager', kind: 'internal', parent: 'w' },
+    ];
+    const r = parseOrgChartHtml(`<script type="application/json">${JSON.stringify({ people })}</script>`, ctx);
+    expect(r.people.map((p) => p.name)).toEqual(['Ann One', 'Ben Two']);
+    expect(r.people[1]!.managerRef).toBe('a');
+  });
+  it('says so when nobody in the file is client staff', () => {
+    const r = parseOrgChartHtml(table([['Name', 'Company'], ['Ed Five', 'Amaris'], ['Di Four', 'Vendor Ltd']]), ctx);
+    expect(r.people).toEqual([]);
+    expect(r.errors[0]!.message).toMatch(/own staff/);
+    expect(r.skipped).toBe(2);
+  });
+  it('compares company names without legal suffixes, accents or domains', () => {
+    expect(companyCore('The Example Corp., Inc.')).toBe('example');
+    expect(companyCore('https://www.example.com')).toBe('example');
+    expect(sameCompany('Société Générale SA', 'societe generale')).toBe(true);
+    expect(sameCompany('CI Financial Corp', 'CI Financial')).toBe(true);
+    expect(sameCompany('Example Corp', 'Other Bank')).toBe(false);
+    expect(sameCompany('', 'Example')).toBe(false);
   });
 });
 

@@ -20,6 +20,9 @@ export type OrgChartPlacement = z.infer<typeof OrgChartPlacement>;
 // Capped at the API query guard limit (findMany take <= 1000).
 export const ORG_CHART_MAX_NODES = 1000;
 export const ORG_CHART_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+/** Levels that count as senior for coverage gaps (API, account card, full page and Sample agree). */
+export const ORG_CHART_SENIOR_LEVELS: readonly SeniorityLevel[] = ['c_level', 'vp', 'director'];
+export const isOrgChartSenior = (s: SeniorityLevel | string | null | undefined): boolean => !!s && (ORG_CHART_SENIOR_LEVELS as readonly string[]).includes(s);
 export const ORG_CHART_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const OrgChartPhotoType = z.enum(ORG_CHART_PHOTO_TYPES);
 export type OrgChartPhotoType = z.infer<typeof OrgChartPhotoType>;
@@ -280,6 +283,10 @@ export const OrgChartImportPreviewRow = z.object({
 });
 export type OrgChartImportPreviewRow = z.infer<typeof OrgChartImportPreviewRow>;
 
+/** Why an HTML import left a person out: system account, marked external, our own firm, or another employer. */
+export const OrgChartSkipReason = z.enum(['system', 'external', 'own_firm', 'other_employer']);
+export type OrgChartSkipReason = z.infer<typeof OrgChartSkipReason>;
+
 export const OrgChartImportResult = z.object({
   dryRun: z.boolean(),
   created: z.number().int(),
@@ -294,6 +301,8 @@ export const OrgChartImportResult = z.object({
   found: z.number().int().optional(),
   skipped: z.number().int().optional(),
   photos: z.number().int().optional(),
+  /** HTML imports: people left out because they are not the account's own staff, by reason. */
+  skippedBy: z.array(z.object({ reason: OrgChartSkipReason, label: z.string(), count: z.number().int() })).optional(),
   preview: z.array(OrgChartImportPreviewRow).optional(),
 });
 export type OrgChartImportResult = z.infer<typeof OrgChartImportResult>;
@@ -310,7 +319,7 @@ export const OrgChartCoverage = z.object({
   met: z.number().int(),
   nodes: z.array(z.object({ nodeId: z.string().uuid(), met: z.boolean(), meetingCount: z.number().int(), lastMetAt: z.string().nullable() })),
   bySeniority: z.array(z.object({ seniority: SeniorityLevel, total: z.number().int(), met: z.number().int() })),
-  /** c_level / vp / director nodes never met in the window. */
+  /** Senior nodes (ORG_CHART_SENIOR_LEVELS: c_level, vp, director) never met in the window. */
   unmetSenior: z.array(z.string().uuid()),
 });
 export type OrgChartCoverage = z.infer<typeof OrgChartCoverage>;
