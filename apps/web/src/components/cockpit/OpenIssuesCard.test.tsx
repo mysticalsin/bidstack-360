@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OpenIssuesCard } from './OpenIssuesCard';
+import { severityShort } from './_tokens';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -34,5 +35,11 @@ describe('OpenIssuesCard', () => {
     expect(screen.getByText(/not a clearance/).textContent).toContain('not a clearance');
     expect(screen.queryByText('Everything is green here.')).toBeNull();
     expect(screen.queryByText('All clear')).toBeNull();
+  });
+
+  it('does not mark an unranked risk as low', () => {
+    // WHY: a missing severity used to fall through to the low initial.
+    expect(severityShort(null)).toBe('–');
+    expect(severityShort('low')).toBe('L');
   });
 });

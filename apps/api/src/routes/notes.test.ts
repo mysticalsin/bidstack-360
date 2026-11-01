@@ -239,6 +239,7 @@ describe('notes routes (integration)', () => {
       'Tech stack: Azure, Okta, CrowdStrike, Jamf Pro, Salesforce',
       'Compliance: ISO 27001 complete, SOC 2 in progress',
       'Risk: High concern around endpoint migration timing. Owner: Jane',
+      'Risk: Endpoint migration timing is unclear',
       'Action: Send Jamf deployment plan by 2026-06-15',
     ].join('\n');
 
@@ -257,7 +258,7 @@ describe('notes routes (integration)', () => {
       extracted: {
         techStack: Array<{ label: string; items: Array<{ name: string }> }>;
         contacts: unknown[];
-        risks: unknown[];
+        risks: Array<{ title: string; severity: string | null }>;
         compliance: unknown[];
         tasks: unknown[];
       };
@@ -269,6 +270,15 @@ describe('notes routes (integration)', () => {
     expect(vendors).toEqual(expect.arrayContaining(['Azure', 'Okta', 'CrowdStrike', 'Jamf Pro']));
     expect(json.extracted.contacts.length).toBeGreaterThanOrEqual(1);
     expect(json.extracted.risks.length).toBeGreaterThanOrEqual(1);
+    const unranked = json.extracted.risks.find((risk) => /unclear/i.test(risk.title));
+    expect(unranked?.severity).toBeNull();
+    const stored = await prisma.riskRegisterItem.findMany({
+      where: { companyName },
+      select: { title: true, severity: true },
+    });
+    expect(stored.some((row) => /security manager/i.test(row.title))).toBe(false);
+    expect(stored.find((row) => /unclear/i.test(row.title))?.severity).toBe('unspecified');
+    expect(stored.find((row) => /high concern/i.test(row.title))?.severity).toBe('high');
     expect(json.extracted.compliance.length).toBeGreaterThanOrEqual(2);
     expect(json.extracted.tasks.length).toBeGreaterThanOrEqual(1);
     expect(json.created.techStackItems).toBeGreaterThanOrEqual(4);

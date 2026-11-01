@@ -50,4 +50,26 @@ describe('extractMeetingNotes', () => {
     );
     expect(stated.contacts[0]?.roleInDecision).toBe('champion');
   });
+
+  it('does not invent a risk or a severity from a job title', () => {
+    // WHY: "IT Security Manager" and a compliance status used to become
+    // medium risks. A risk line with no rank stays unranked.
+    const extracted = extractMeetingNotes(
+      [
+        'Attendees: Jane Doe - IT Security Manager, jane@example.com',
+        'Compliance: ISO 27001 complete',
+        'Risk: Endpoint migration timing is unclear',
+        'Risk: High concern around the cutover. Owner: Jane',
+      ].join('\n'),
+      'Northwind',
+      source,
+    );
+    const titles = extracted.risks.map((risk) => risk.title);
+    expect(titles.some((title) => /security manager/i.test(title))).toBe(false);
+    expect(titles.some((title) => /iso 27001/i.test(title))).toBe(false);
+    const unranked = extracted.risks.find((risk) => /unclear/i.test(risk.title));
+    const ranked = extracted.risks.find((risk) => /cutover/i.test(risk.title));
+    expect(unranked?.severity).toBeNull();
+    expect(ranked?.severity).toBe('high');
+  });
 });

@@ -60,11 +60,11 @@ export function latestAttributionDate(items: SourceAttributionType[]) {
 // ─── Enum coercers ────────────────────────────────────────────────────────────
 
 export function asRiskSeverity(
-  value: string,
+  value: string | null,
 ): z.infer<typeof AccountCockpitSnapshot>['risks'][number]['severity'] {
   return value === 'critical' || value === 'high' || value === 'medium' || value === 'low'
     ? value
-    : 'medium';
+    : null;
 }
 
 export function asRiskStatus(

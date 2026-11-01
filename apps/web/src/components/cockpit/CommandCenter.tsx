@@ -254,7 +254,8 @@ function riskPenaltyFor(risk: RiskItem): number {
   if (risk.severity === 'critical') return 14;
   if (risk.severity === 'high') return 9;
   if (risk.severity === 'medium') return 4;
-  return 1;
+  if (risk.severity === 'low') return 1;
+  return 0;
 }
 
 function clamp(value: number): number {

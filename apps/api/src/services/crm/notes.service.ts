@@ -96,7 +96,8 @@ export async function persistRisks(
         orgId,
         companyName,
         title: r.title,
-        severity: r.severity,
+        // The column cannot be empty. This token is not a rank.
+        severity: r.severity ?? 'unspecified',
         owner: r.owner,
         mitigation: r.mitigation,
         dueDate: r.dueDate ? new Date(`${r.dueDate}T00:00:00.000Z`) : null,

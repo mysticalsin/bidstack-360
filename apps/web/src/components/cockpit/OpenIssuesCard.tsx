@@ -135,7 +135,9 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {r.dueDate ? t('openIssues.dueSuffix', ' - due {{dueDate}}', { dueDate: r.dueDate }) : ''}
                   </div>
                 </div>
-                <Badge tone={severityTone(r.severity)}>{r.severity}</Badge>
+                <Badge tone={severityTone(r.severity)}>
+                  {r.severity ?? t('openIssues.severityUnspecified', 'Unspecified')}
+                </Badge>
               </motion.li>
             ))}
             {openCompliance.slice(0, 2).map((c, index) => (

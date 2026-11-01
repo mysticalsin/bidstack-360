@@ -48,7 +48,11 @@ export function severityBg(s: RiskItem['severity']): string {
 }
 
 export function severityShort(s: RiskItem['severity']): string {
-  return s === 'critical' ? 'C' : s === 'high' ? 'H' : s === 'medium' ? 'M' : 'L';
+  if (s === 'critical') return 'C';
+  if (s === 'high') return 'H';
+  if (s === 'medium') return 'M';
+  if (s === 'low') return 'L';
+  return '–';
 }
 
 /** Weights in computeSignalCoverage. The account-list health band is a different scale. */

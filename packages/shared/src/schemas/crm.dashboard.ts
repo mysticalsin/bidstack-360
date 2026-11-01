@@ -59,7 +59,7 @@ export type CompanyHealth = z.infer<typeof CompanyHealth>;
 export const RiskItem = z.object({
   id: z.string(),
   title: z.string().min(1),
-  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  severity: z.enum(['low', 'medium', 'high', 'critical']).nullable(),
   owner: z.string().nullable(),
   mitigation: z.string().nullable(),
   dueDate: z.string().date().nullable(),

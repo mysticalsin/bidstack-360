@@ -176,7 +176,7 @@ function extractRisks(bodyMd: string): RiskItem[] {
   const lines = bodyMd
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => /risk|concern|blocker|issue|challenge|delay|security|compliance/i.test(line));
+    .filter((line) => /\b(risk|concern|issue|challenge|delay)\b/i.test(line));
   const seen = new Set<string>();
   const risks: RiskItem[] = [];
 
@@ -293,7 +293,7 @@ function severityFromText(value: string): RiskItem['severity'] {
   if (/critical|urgent|blocker|sev\s*1/i.test(value)) return 'critical';
   if (/high|major|red/i.test(value)) return 'high';
   if (/low|minor|watch/i.test(value)) return 'low';
-  return 'medium';
+  return null;
 }
 
 function complianceStatusFromText(value: string): ComplianceCheck['status'] {
