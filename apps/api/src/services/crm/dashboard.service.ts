@@ -531,6 +531,7 @@ export async function buildDashboardSnapshot(
       tasks: accountTasks,
       risks: riskPage.rows,
       compliance: compliancePage.rows,
+      registerDealIds: registerDeals.ids,
       openRiskCount: riskPage.openCount,
       openComplianceCount: compliancePage.openCount,
       openRiskSeverity: riskPage.openBySeverity,

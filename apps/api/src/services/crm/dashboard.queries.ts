@@ -614,6 +614,7 @@ export async function buildCompanyCockpit(
     tasks,
     risks: riskPage.rows,
     compliance: compliancePage.rows,
+    registerDealIds: registerDeals.ids,
     openRiskCount: riskPage.openCount,
     openComplianceCount: compliancePage.openCount,
     openRiskSeverity: riskPage.openBySeverity,

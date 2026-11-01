@@ -754,6 +754,67 @@ describe('buildCockpit recorded facts only', () => {
     expect(cockpit.compliance.map((check) => check.id)).toEqual(['check-linked']);
     expect(JSON.stringify(cockpit)).not.toContain('SOC 2');
     expect(JSON.stringify(cockpit)).not.toContain('Name match');
+
+    const older = buildCockpit({
+      company: company({ id: 'co-dnb', name: 'DNB' }),
+      companies: [],
+      opportunities: [
+        {
+          id: 'linked-deal',
+          customer: 'DNB Bank ASA',
+          companyId: 'co-dnb',
+          name: 'Treasury',
+          stage: 's2_sent',
+          pipelineStage: null,
+          valueMicros: 1n,
+          probability: 40,
+          dueDate: null,
+          owner: null,
+        },
+      ],
+      contacts: [],
+      tasks: [],
+      risks: [
+        {
+          id: 'older',
+          opportunityId: 'older-deal',
+          title: 'Legacy residency',
+          severity: 'critical',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'open',
+          companyName: 'DNB',
+        },
+        {
+          id: 'stranger',
+          opportunityId: 'other-co-deal',
+          title: 'Not ours',
+          severity: 'high',
+          owner: null,
+          mitigation: null,
+          dueDate: null,
+          status: 'open',
+          companyName: 'Other',
+        },
+      ],
+      compliance: [
+        {
+          id: 'older-check',
+          opportunityId: 'older-deal',
+          label: 'Legacy DPA',
+          status: 'blocked',
+          owner: null,
+          sourceAttribution: [],
+        },
+      ],
+      fieldOverrides: [],
+      registerDealIds: ['linked-deal', 'older-deal'],
+    });
+    // WHY: the register includes deals past the 100 on the card. Filtering
+    // again with the card hid this risk and this blocked check.
+    expect(older.risks.map((risk) => risk.id)).toEqual(['older']);
+    expect(older.compliance.map((check) => check.id)).toEqual(['older-check']);
   });
 
   it('keeps a follow-up stored on the account when it has no deal', () => {
