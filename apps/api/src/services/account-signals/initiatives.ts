@@ -20,11 +20,30 @@ const DAY = 86_400_000;
 const EVIDENCE_PAGE = 100;
 const SOLUTION_PAGE = 1000;
 const SOLUTION_LIMIT = 5000;
-/** Retrieval net for a sold theme that sits past the read ceiling. Classification still uses themeForText. */
-const SOLUTION_PROBES = ['cloud', 'cyber', 'security', 'analytics', 'kubernetes', 'sap', 'compliance', 'layoff', 'acquisition', 'erp'];
+/** Retrieval words per theme. A hit counts only when themeForText returns that theme. */
+const THEME_PROBES: Partial<Record<InitiativeTheme, readonly string[]>> = {
+  cloud: ['cloud', 'kubernetes', 'azure'],
+  cyber: ['cyber', 'security'],
+  data_ai: ['analytics', 'databricks', 'machine learning'],
+  erp_finance: ['erp', 'workday'],
+  regulatory: ['compliance', 'gdpr'],
+  m_and_a: ['acquisition', 'merger'],
+  workforce: ['layoff', 'restructuring'],
+  engineering: ['embedded', 'electrification'],
+  digital_cx: ['ecommerce', 'customer journey'],
+  expansion: ['new market', 'series a'],
+};
 
 export function soldThemesFromSolutions(rows: readonly { name: string; category: string }[]): Set<InitiativeTheme> {
   return new Set(rows.map((row) => themeForText(`${row.category} ${row.name}`)));
+}
+
+/** True when one of these rows is that theme, not merely a substring of the probe. */
+export function themeConfirmedByRows(
+  theme: InitiativeTheme,
+  rows: readonly { name: string; category: string }[],
+): boolean {
+  return rows.some((row) => themeForText(`${row.category} ${row.name}`) === theme);
 }
 
 /** Read bounded pages until a short page, or stop and say the list is capped. */
@@ -128,18 +147,22 @@ export async function loadInitiatives(
   const solutionsCapped = solutions.capped;
   const soldThemes = soldThemesFromSolutions(solutions.rows);
   if (solutionsCapped) {
-    const extra = await prisma.accountSolution.findMany({
-      where: {
-        ...solutionWhere,
-        OR: SOLUTION_PROBES.flatMap((word) => [
-          { name: { contains: word, mode: 'insensitive' as const } },
-          { category: { contains: word, mode: 'insensitive' as const } },
-        ]),
-      },
-      select: { name: true, category: true },
-      take: 100,
-    });
-    for (const theme of soldThemesFromSolutions(extra)) soldThemes.add(theme);
+    const missing = (Object.keys(THEME_PROBES) as InitiativeTheme[]).filter((theme) => !soldThemes.has(theme));
+    await Promise.all(missing.map(async (theme) => {
+      const probes = THEME_PROBES[theme] ?? [];
+      const hits = await prisma.accountSolution.findMany({
+        where: {
+          ...solutionWhere,
+          OR: probes.flatMap((word) => [
+            { name: { contains: word, mode: 'insensitive' as const } },
+            { category: { contains: word, mode: 'insensitive' as const } },
+          ]),
+        },
+        select: { name: true, category: true },
+        take: 20,
+      });
+      if (themeConfirmedByRows(theme, hits)) soldThemes.add(theme);
+    }));
   }
   const byTheme = new Map<InitiativeTheme, Initiative>();
   const confScore = { high: 0.85, medium: 0.6, low: 0.35 } as const;

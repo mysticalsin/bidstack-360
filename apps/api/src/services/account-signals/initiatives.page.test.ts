@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evidencePageCapped, readBoundedPages, soldThemesFromSolutions } from './initiatives';
+import { evidencePageCapped, readBoundedPages, soldThemesFromSolutions, themeConfirmedByRows } from './initiatives';
 
 describe('evidencePageCapped', () => {
   it('names a full news or meeting page only when another row exists', () => {
@@ -30,5 +30,11 @@ describe('evidencePageCapped', () => {
   it('marks cloud sold from a solution the page ceiling would hide', () => {
     // WHY: themeForText on "Cloud practice" is cloud, so a probe that fetches that row must count it as sold.
     expect(soldThemesFromSolutions([{ name: 'Cloud practice', category: 'general' }]).has('cloud')).toBe(true);
+  });
+
+  it('does not treat cloudflare as a cloud sale', () => {
+    // WHY: a contains search for cloud returns cloudflare, which is not the cloud theme.
+    expect(themeConfirmedByRows('cloud', [{ name: 'Cloudflare DNS', category: 'general' }])).toBe(false);
+    expect(themeConfirmedByRows('cloud', [{ name: 'Cloud practice', category: 'general' }])).toBe(true);
   });
 });
