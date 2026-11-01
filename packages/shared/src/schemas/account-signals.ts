@@ -296,6 +296,9 @@ export const ALERT_IMPORTANCE = 70;
 /** 0..100: kind, risk, first-hand source and how many outlets carried it. */
 export function importanceScore(input: { kind: string; implication: Implication; source: string; mentions?: number }): number {
   let s = KIND_BASE[input.kind as WatchEventKind] ?? 30;
+  // Risk news (lawsuit, fine, breach, downgrade) is crucial for a key account,
+  // so it starts at the restructuring level rather than generic news.
+  if (input.kind === 'NEWS_SIGNAL' && input.implication === 'RISK') s = 60;
   if (input.implication === 'RISK') s += 10;
   if (PRIMARY_SOURCES.has(input.source)) s += 10;
   s += Math.min(15, Math.max(0, (input.mentions ?? 1) - 1) * 5);
