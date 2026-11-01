@@ -10,6 +10,7 @@ import {
   applyFieldOverrides,
   buildCockpit,
   computeSignalCoverage,
+  recordedComplianceWhere,
   registerDealsAreCapped,
   roleHolderProbeIds,
   roleHoldersAreCapped,
@@ -997,6 +998,9 @@ describe('buildCockpit recorded facts only', () => {
     expect(registerDealsAreCapped(1000, 1001)).toBe(true);
     // WHY: twenty-one role holders used to drop whoever sorted after the first
     // twenty ids. The probe keeps 1,000, and only a further holder is partial.
+    // WHY: a note that only names a framework stores status unspecified. That
+    // token is not a failed check, so it must not sit in the compliance share.
+    expect(recordedComplianceWhere({ orgId: 'org' }).status).toEqual({ not: 'unspecified' });
     expect(roleHoldersAreCapped(20, true)).toBe(false);
     expect(roleHoldersAreCapped(1000, false)).toBe(false);
     expect(roleHoldersAreCapped(1000, true)).toBe(true);

@@ -246,7 +246,7 @@ export const AccountCockpitSnapshot = z.object({
       low: z.number().int().nonnegative(),
     })
     .optional(),
-  /** Checks marked compliant, and every check, on the loaded deals. */
+  /** Checks marked compliant, and checks with a real status, on the loaded deals. */
   compliantCount: z.number().int().nonnegative().optional(),
   complianceTotal: z.number().int().nonnegative().optional(),
   /** Checks marked blocked on the loaded deals. The six cards are not this. */

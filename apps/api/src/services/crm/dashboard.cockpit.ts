@@ -177,6 +177,16 @@ export function roleHoldersAreCapped(loaded: number, anotherExists: boolean): bo
   return loaded >= ROLE_HOLDER_PROBE && anotherExists;
 }
 
+/** A note that only names a framework stores this token. It is not a status. */
+export const UNSPECIFIED_CHECK_STATUS = 'unspecified';
+
+/** The compliance share counts checks that have a status. */
+export function recordedComplianceWhere<T extends object>(
+  where: T,
+): T & { status: { not: typeof UNSPECIFIED_CHECK_STATUS } } {
+  return { ...where, status: { not: UNSPECIFIED_CHECK_STATUS } };
+}
+
 function observedAtRank(value: string | null): number {
   if (!value) return Number.NEGATIVE_INFINITY;
   const time = Date.parse(value);
