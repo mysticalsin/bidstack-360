@@ -252,6 +252,77 @@ describe('buildCockpit recorded facts only', () => {
     expect(JSON.stringify(cockpit)).not.toContain('SOC 2');
   });
 
+  it('fills a buying role from one accepted fact and ignores a job title', () => {
+    const now = new Date('2026-10-31T00:00:00.000Z');
+    const contact = {
+      id: 'c1',
+      customer: 'Acme',
+      companyId: 'mantu',
+      name: 'Ada',
+      role: 'Chief Information Officer',
+      email: null,
+      phone: null,
+      influence: 5,
+      createdAt: now,
+    };
+    const opportunity = {
+      id: 'deal-1',
+      customer: 'Acme',
+      companyId: 'mantu',
+      name: 'Platform',
+      stage: 'proposal',
+      pipelineStage: null,
+      valueMicros: 0,
+      probability: 0,
+      dueDate: null,
+      owner: null,
+    };
+    const cockpit = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [opportunity],
+      contacts: [contact],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: [
+        {
+          contactId: 'c1',
+          status: 'accepted',
+          linkLabel: 'Buyer',
+          opportunityId: 'deal-1',
+          observedAt: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    expect(cockpit.keyContacts[0]?.title).toBe('Chief Information Officer');
+    expect(cockpit.keyContacts[0]?.roleInDecision).toBe('buyer');
+
+    const titledOnly = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [opportunity],
+      contacts: [contact],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: [
+        {
+          contactId: 'c1',
+          status: 'accepted',
+          linkLabel: 'Economic buyer',
+          opportunityId: 'deal-1',
+          observedAt: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    expect(titledOnly.keyContacts[0]?.roleInDecision).toBeNull();
+  });
+
   it('links a person only through companyId, never a matching customer string', () => {
     // Why: a shared display name used to stamp this account's id onto an
     // unlinked contact, so the cockpit and the people map disagreed.

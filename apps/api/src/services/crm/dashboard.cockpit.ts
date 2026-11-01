@@ -7,15 +7,18 @@
  */
 import { type z } from 'zod';
 
-import type {
-  AccountCockpitSnapshot,
-  AiInsight,
-  BidOpportunity,
-  CompanyHealth,
-  CrmActivity,
-  CrmCompany,
-  CrmDashboardSnapshot,
-  SignalFactor,
+import {
+  recordedDecisionRole,
+  type AccountCockpitSnapshot,
+  type AiInsight,
+  type BidOpportunity,
+  type CompanyHealth,
+  type CrmActivity,
+  type CrmCompany,
+  type CrmDashboardSnapshot,
+  type FactStatus,
+  type PersonFactView,
+  type SignalFactor,
 } from '@bidstack/shared';
 
 import {
@@ -478,6 +481,8 @@ export function buildCockpit({
   fieldOverrides = [],
   winLossAvailable = false,
   performance,
+  buyingRoleFacts = [],
+  now = new Date(),
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
@@ -549,6 +554,15 @@ export function buildCockpit({
     owner: string | null;
     sourceAttribution: unknown;
   }>;
+  /** Accepted or not, the builder keeps only one fresh accepted role. */
+  buyingRoleFacts?: Array<{
+    contactId: string;
+    status: string;
+    linkLabel: string | null;
+    opportunityId: string | null;
+    observedAt: Date | null;
+  }>;
+  now?: Date;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
   const companyOpps = opportunities.filter((opp) => opp.companyId === company.id);
@@ -747,7 +761,16 @@ export function buildCockpit({
       email: contact.email,
       phone: contact.phone,
       influence: contact.influence,
-      roleInDecision: null,
+      // A job title stays in `title`. Only one fresh accepted buying role
+      // on a deal for this account fills the station.
+      roleInDecision: recordedDecisionRole(
+        buyingRoleFacts
+          .filter((fact) => fact.contactId === contact.id)
+          .map(buyingRoleFactView)
+          .filter((fact): fact is PersonFactView => fact !== null),
+        now,
+        accountOpportunityIds,
+      ),
       updatedAt: contact.createdAt.toISOString(),
     })),
     recentActivity: buildActivities(accountTasks).slice(0, 5),
@@ -768,5 +791,26 @@ export function buildCockpitFromCompany(
     ...snapshot.cockpit,
     company,
     keyContacts: snapshot.cockpit.keyContacts.filter((contact) => contact.companyId === company.id),
+  };
+}
+
+const FACT_STATUSES = new Set<FactStatus>(['proposed', 'accepted', 'dismissed', 'needs_review']);
+
+function buyingRoleFactView(fact: {
+  status: string;
+  linkLabel: string | null;
+  opportunityId: string | null;
+  observedAt: Date | null;
+}): PersonFactView | null {
+  if (!FACT_STATUSES.has(fact.status as FactStatus)) return null;
+  return {
+    id: 'buying-role',
+    kind: 'buying_role',
+    status: fact.status as FactStatus,
+    reportsToContactId: null,
+    opportunityId: fact.opportunityId,
+    companyId: null,
+    linkLabel: fact.linkLabel,
+    observedAt: fact.observedAt ? fact.observedAt.toISOString() : null,
   };
 }

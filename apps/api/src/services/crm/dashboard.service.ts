@@ -42,6 +42,7 @@ import {
 } from './dashboard.defaults.js';
 import {
   fetchAccountPerformance,
+  fetchBuyingRoleFacts,
   serializeDeal,
   serializeProviderHealth,
   serializeQueueHealth,
@@ -405,40 +406,43 @@ export async function buildDashboardSnapshot(
       : Promise.resolve([]),
   ]);
   const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
-  const [riskRows, complianceRows] =
+  const contactIds = contacts.map((contact) => contact.id);
+  const [riskRows, complianceRows, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
-      ? [[], []]
-      : await Promise.all([
-          prisma.riskRegisterItem.findMany({
-            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-            select: {
-              id: true,
-              opportunityId: true,
-              title: true,
-              severity: true,
-              owner: true,
-              mitigation: true,
-              dueDate: true,
-              status: true,
-              companyName: true,
-            },
-            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-            take: 50,
-          }),
-          prisma.complianceCheck.findMany({
-            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-            select: {
-              id: true,
-              opportunityId: true,
-              label: true,
-              status: true,
-              owner: true,
-              sourceAttribution: true,
-            },
-            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-            take: 50,
-          }),
-        ]);
+      ? []
+      : prisma.riskRegisterItem.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            title: true,
+            severity: true,
+            owner: true,
+            mitigation: true,
+            dueDate: true,
+            status: true,
+            companyName: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    accountOpportunityIds.length === 0
+      ? []
+      : prisma.complianceCheck.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            label: true,
+            status: true,
+            owner: true,
+            sourceAttribution: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    fetchBuyingRoleFacts(orgId, contactIds, prisma),
+  ]);
 
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
   const snapshotDeals = [
@@ -456,6 +460,7 @@ export async function buildDashboardSnapshot(
       tasks: accountTasks,
       risks: riskRows,
       compliance: complianceRows,
+      buyingRoleFacts,
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
       performance,

@@ -414,40 +414,43 @@ export async function buildCompanyCockpit(
     ]);
 
   const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
-  const [riskRows, complianceRows] =
+  const contactIds = contacts.map((contact) => contact.id);
+  const [riskRows, complianceRows, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
-      ? [[], []]
-      : await Promise.all([
-          prismaClient.riskRegisterItem.findMany({
-            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-            select: {
-              id: true,
-              opportunityId: true,
-              title: true,
-              severity: true,
-              owner: true,
-              mitigation: true,
-              dueDate: true,
-              status: true,
-              companyName: true,
-            },
-            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-            take: 50,
-          }),
-          prismaClient.complianceCheck.findMany({
-            where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
-            select: {
-              id: true,
-              opportunityId: true,
-              label: true,
-              status: true,
-              owner: true,
-              sourceAttribution: true,
-            },
-            orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-            take: 50,
-          }),
-        ]);
+      ? []
+      : prismaClient.riskRegisterItem.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            title: true,
+            severity: true,
+            owner: true,
+            mitigation: true,
+            dueDate: true,
+            status: true,
+            companyName: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    accountOpportunityIds.length === 0
+      ? []
+      : prismaClient.complianceCheck.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            label: true,
+            status: true,
+            owner: true,
+            sourceAttribution: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    fetchBuyingRoleFacts(orgId, contactIds, prismaClient),
+  ]);
 
   return buildCockpit({
     company,
@@ -459,9 +462,25 @@ export async function buildCompanyCockpit(
     tasks,
     risks: riskRows,
     compliance: complianceRows,
+    buyingRoleFacts,
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
     performance,
+  });
+}
+
+export function fetchBuyingRoleFacts(orgId: string, contactIds: string[], prismaClient: PrismaClient) {
+  if (contactIds.length === 0) return Promise.resolve([]);
+  return prismaClient.contactFact.findMany({
+    where: { orgId, deletedAt: null, kind: 'buying_role', contactId: { in: contactIds } },
+    select: {
+      contactId: true,
+      status: true,
+      linkLabel: true,
+      opportunityId: true,
+      observedAt: true,
+    },
+    take: 200,
   });
 }
 
