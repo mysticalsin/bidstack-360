@@ -3394,7 +3394,7 @@
     "heading": "Recent activity",
     "latestUpdates": "Latest updates",
     "empty": "No recent activity",
-    "viewAll": "View all {{count}} activities →"
+    "viewAll": "Latest {{count}} updates →"
   },
   "extractStep": {
     "heading": "Run extraction",

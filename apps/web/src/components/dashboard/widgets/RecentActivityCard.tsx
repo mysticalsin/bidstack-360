@@ -138,7 +138,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
             to="/activities"
             className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
           >
-            {t('recentActivity.viewAll', 'View all {{count}} activities →', { count: activity.length })}
+            {t('recentActivity.viewAll', 'Latest {{count}} updates →', { count: activity.length })}
           </Link>
         </div>
       )}
