@@ -15,6 +15,7 @@ import {
   Graticule,
 } from 'react-simple-maps';
 
+import { unitsFromMicros } from '@/components/dashboard/unspecified-currency';
 import { cn } from '@/lib/cn';
 import { useThemeStore } from '@/stores/theme';
 import { Icon } from '@/components/ui/Icon';
@@ -245,7 +246,7 @@ export const WorldMap = memo(function WorldMap({
   const { t } = useTranslation('crm');
   const theme = useThemeStore((s) => s.theme);
   const formatAmount = (micros: number | string) => {
-    const major = Number(micros) / 1_000_000;
+    const major = unitsFromMicros(micros);
     const compact = new Intl.NumberFormat('en', {
       notation: 'compact',
       maximumFractionDigits: 1,

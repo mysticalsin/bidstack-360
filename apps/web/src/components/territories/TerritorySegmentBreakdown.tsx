@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
-import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { unitsFromMicros, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
 
 export function TerritorySegmentBreakdown({
@@ -24,7 +24,7 @@ export function TerritorySegmentBreakdown({
   isError: boolean;
   errorMessage?: string;
   onRetry: () => void;
-  formatMoneyMicros: (micros: number) => string;
+  formatMoneyMicros: (micros: number | string) => string;
 }) {
   const { t } = useTranslation('crm');
 
@@ -70,7 +70,7 @@ export function TerritorySegmentBreakdown({
   }
 
   // Bar width is proportional to value share of the largest segment.
-  const maxValue = Math.max(...segments.map((s) => s.totalValueMicros), 1);
+  const maxValue = Math.max(...segments.map((s) => unitsFromMicros(s.totalValueMicros)), 1);
   // Cap the visible rows; surface the overflow rather than silently truncating.
   const VISIBLE = 18;
   const shown = segments.slice(0, VISIBLE);
@@ -87,7 +87,10 @@ export function TerritorySegmentBreakdown({
       </p>
       <ul className="space-y-2">
         {shown.map((s) => {
-          const widthPct = Math.max(2, Math.round((s.totalValueMicros / maxValue) * 100));
+          const widthPct = Math.max(
+            2,
+            Math.round((unitsFromMicros(s.totalValueMicros) / maxValue) * 100),
+          );
           return (
             <li
               key={s.key}

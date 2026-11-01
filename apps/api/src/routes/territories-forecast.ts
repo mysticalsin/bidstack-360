@@ -170,7 +170,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
                 countryCode: z.string(),
                 countryCodeA3: z.string(),
                 opportunityCount: z.number().int(),
-                totalValueMicros: z.number(),
+                totalValueMicros: z.string(),
                 avgProbability: z.number(),
                 territories: z.array(z.string()),
                 ownerNames: z.array(z.string()),
@@ -178,7 +178,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
             ),
             totals: z.object({
               totalCountries: z.number().int(),
-              totalValueMicros: z.number(),
+              totalValueMicros: z.string(),
               totalOpportunities: z.number().int(),
               avgProbability: z.number(),
             }),
@@ -258,7 +258,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         countryCode: c.countryCode,
         countryCodeA3: A2_TO_A3[c.countryCode] ?? c.countryCode,
         opportunityCount: c.opportunityCount,
-        totalValueMicros: Number(c.totalValueMicros),
+        totalValueMicros: c.totalValueMicros,
         avgProbability:
           c.opportunityCount > 0
             ? Math.round((c.sumProbability / c.opportunityCount) * 10) / 10
@@ -268,13 +268,9 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       }));
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
-      // Sum the source BigInt strings, not the already-Number()-converted
-      // per-country totals — a float reduce() over Numbers re-introduces the
-      // precision loss sumMicros exists to avoid (same class of bug fixed in
-      // accounts.helpers.ts / forecast.service.ts). This field is denominated
-      // in micros (matches the per-row Number(c.totalValueMicros) above), so
-      // convert once at the boundary — no unit division, unlike microsToUnits.
-      const totalValueMicros = Number(sumMicros(rows.map((r) => BigInt(r.totalValueMicros))));
+      // Sum the source BigInt strings. The wire value stays that integer
+      // string so a large country total is not rounded before the map formats it.
+      const totalValueMicros = sumMicros(rows.map((r) => BigInt(r.totalValueMicros))).toString();
       const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       const avgProbability =
         totalOpportunities > 0
@@ -313,14 +309,14 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
                 key: z.string(),
                 label: z.string(),
                 opportunityCount: z.number().int(),
-                totalValueMicros: z.number(),
+                totalValueMicros: z.string(),
                 avgProbability: z.number(),
                 ownerNames: z.array(z.string()),
               }),
             ),
             totals: z.object({
               totalSegments: z.number().int(),
-              totalValueMicros: z.number(),
+              totalValueMicros: z.string(),
               totalOpportunities: z.number().int(),
               avgProbability: z.number(),
             }),
@@ -400,7 +396,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           key: g.key,
           label: g.key,
           opportunityCount: g.opportunityCount,
-          totalValueMicros: Number(g.totalValueMicros),
+          totalValueMicros: g.totalValueMicros,
           avgProbability:
             g.opportunityCount > 0
               ? Math.round((g.sumProbability / g.opportunityCount) * 10) / 10
@@ -417,7 +413,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           totalSegments: items.length,
           // Sum the source BigInt strings, not the already-Number()-converted
           // per-segment totals — same float-precision fix as /territories/analytics above.
-          totalValueMicros: Number(sumMicros(rows.map((r) => BigInt(r.totalValueMicros)))),
+          totalValueMicros: sumMicros(rows.map((r) => BigInt(r.totalValueMicros))).toString(),
           totalOpportunities,
           avgProbability:
             totalOpportunities > 0

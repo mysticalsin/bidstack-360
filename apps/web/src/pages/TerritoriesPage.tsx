@@ -20,6 +20,7 @@ import { Icon } from '@/components/ui/Icon';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import {
   formatUnspecifiedCompact,
+  unitsFromMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { staggerChild, staggerParent } from '@/lib/motion';
@@ -49,7 +50,8 @@ import {
 
 export function TerritoriesPage() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
+  const formatMoneyMicros = (micros: number | string) =>
+    formatUnspecifiedCompact(unitsFromMicros(micros));
   const territories = useTerritories();
   const rules = useLeadRoutingRules();
   const analytics = useTerritoryAnalytics();

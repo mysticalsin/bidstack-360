@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import {
   formatUnspecifiedCompact,
+  unitsFromMicros,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { useTerritorySegments } from '@/hooks/useTerritories';
@@ -20,7 +21,8 @@ export function OppIndustryBreakdown() {
   const { t } = useTranslation('crm');
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
-  const formatSegment = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
+  const formatSegment = (micros: number | string) =>
+    formatUnspecifiedCompact(unitsFromMicros(micros));
 
   return (
     <Card>
@@ -41,7 +43,7 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatUnspecifiedCompact(totals.totalValueMicros / 1_000_000)}
+              · {formatUnspecifiedCompact(unitsFromMicros(totals.totalValueMicros))}
             </span>
           ) : null}
         </span>

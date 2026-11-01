@@ -118,8 +118,9 @@ describe('territories analytics — money precision', () => {
       // a DELTA against a baseline read rather than an absolute total.
       const before = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
       expect(before.statusCode).toBe(200);
-      const baseline = (before.json() as { totals: { totalValueMicros: number } }).totals
-        .totalValueMicros;
+      const baseline = BigInt(
+        (before.json() as { totals: { totalValueMicros: string } }).totals.totalValueMicros,
+      );
 
       const suffix = randomUUID().slice(0, 8);
       const created = await prisma.opportunity.createMany({
@@ -144,19 +145,31 @@ describe('territories analytics — money precision', () => {
             country: 'FR',
             valueMicros: 987_654_321n,
           },
+          {
+            orgId: orgId!,
+            code: `OP-${suffix}3`,
+            customer: 'Precision Co C',
+            name: 'Precision fixture C',
+            stage: 's1_lead',
+            probability: 30,
+            country: 'DE',
+            valueMicros: 8_598_204_328_457_184_962n,
+          },
         ],
       });
-      expect(created.count).toBe(2);
+      expect(created.count).toBe(3);
 
       try {
         const res = await server.inject({ method: 'GET', url: '/api/territories/analytics' });
         expect(res.statusCode).toBe(200);
-        const body = res.json() as { totals: { totalValueMicros: number } };
+        const body = res.json() as { totals: { totalValueMicros: string } };
         // Exact BigInt sum, independent of the route's own arithmetic.
-        expect(body.totals.totalValueMicros - baseline).toBe(123_456_789 + 987_654_321);
+        expect(BigInt(body.totals.totalValueMicros) - baseline).toBe(
+          123_456_789n + 987_654_321n + 8_598_204_328_457_184_962n,
+        );
       } finally {
         await prisma.opportunity.deleteMany({
-          where: { orgId: orgId!, code: { in: [`OP-${suffix}1`, `OP-${suffix}2`] } },
+          where: { orgId: orgId!, code: { in: [`OP-${suffix}1`, `OP-${suffix}2`, `OP-${suffix}3`] } },
         });
       }
     },
@@ -236,7 +249,7 @@ describe('territories analytics — open stage probability', () => {
         items: Array<{
           countryCode: string;
           opportunityCount: number;
-          totalValueMicros: number;
+          totalValueMicros: string;
           avgProbability: number;
         }>;
       };
@@ -244,12 +257,12 @@ describe('territories analytics — open stage probability', () => {
       const stored = body.items.find((item) => item.countryCode === 'ZY');
       expect(linked).toMatchObject({
         opportunityCount: 1,
-        totalValueMicros: 2_000_000,
+        totalValueMicros: '2000000',
         avgProbability: 70,
       });
       expect(stored).toMatchObject({
         opportunityCount: 1,
-        totalValueMicros: 1_000_000,
+        totalValueMicros: '1000000',
         avgProbability: 40,
       });
     } finally {

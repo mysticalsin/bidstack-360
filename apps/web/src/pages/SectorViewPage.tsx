@@ -19,7 +19,11 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import { formatUnspecifiedCompact, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import {
+  formatUnspecifiedCompact,
+  unitsFromMicros,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
@@ -434,8 +438,10 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
       />
     );
   }
-  const sorted = [...items].sort((a, b) => b.totalValueMicros - a.totalValueMicros);
-  const max = Math.max(1, ...sorted.map((s) => s.totalValueMicros));
+  const sorted = [...items].sort(
+    (a, b) => unitsFromMicros(b.totalValueMicros) - unitsFromMicros(a.totalValueMicros),
+  );
+  const max = Math.max(1, ...sorted.map((s) => unitsFromMicros(s.totalValueMicros)));
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-[var(--fg-tertiary)]">
@@ -452,14 +458,16 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatUnspecifiedCompact(seg.totalValueMicros / 1_000_000),
+                value: formatUnspecifiedCompact(unitsFromMicros(seg.totalValueMicros)),
               })}
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
             <span
               className="block h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-500"
-              style={{ width: `${Math.max(3, Math.round((seg.totalValueMicros / max) * 100))}%` }}
+              style={{
+                width: `${Math.max(3, Math.round((unitsFromMicros(seg.totalValueMicros) / max) * 100))}%`,
+              }}
             />
           </div>
         </div>
