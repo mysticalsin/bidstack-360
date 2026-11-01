@@ -260,6 +260,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
         activeSubscriptions,
         openChurnSignals,
         pendingRenewals,
+        healthBuckets,
         recentHealthScores,
       ] = await Promise.all([
         prisma.subscription.count({ where: { orgId, status: 'ACTIVE', deletedAt: null } }),
@@ -272,6 +273,20 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
           },
         }),
         prisma.$queryRaw<
+          Array<{ healthy: number; atRisk: number; critical: number }>
+        >(Prisma.sql`
+          SELECT
+            COUNT(*) FILTER (WHERE score >= 75)::int AS healthy,
+            COUNT(*) FILTER (WHERE score >= 50 AND score < 75)::int AS "atRisk",
+            COUNT(*) FILTER (WHERE score < 50)::int AS critical
+          FROM (
+            SELECT DISTINCT ON (account_id) score
+            FROM health_scores
+            WHERE org_id = ${orgId}::uuid
+            ORDER BY account_id, captured_at DESC
+          ) latest
+        `),
+        prisma.$queryRaw<
           Array<{
             accountId: string;
             score: number;
@@ -279,21 +294,23 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
             capturedAt: Date;
           }>
         >(Prisma.sql`
-          SELECT DISTINCT ON (account_id)
-            account_id AS "accountId",
-            score,
-            trend::text AS trend,
-            captured_at AS "capturedAt"
-          FROM health_scores
-          WHERE org_id = ${orgId}::uuid
-          ORDER BY account_id, captured_at DESC
-          LIMIT 50
+          SELECT "accountId", score, trend, "capturedAt"
+          FROM (
+            SELECT DISTINCT ON (account_id)
+              account_id AS "accountId",
+              score,
+              trend::text AS trend,
+              captured_at AS "capturedAt"
+            FROM health_scores
+            WHERE org_id = ${orgId}::uuid
+            ORDER BY account_id, captured_at DESC
+          ) latest
+          ORDER BY "capturedAt" DESC
+          LIMIT 10
         `),
       ]);
 
-      const healthy = recentHealthScores.filter((h) => h.score >= 75).length;
-      const atRisk = recentHealthScores.filter((h) => h.score >= 50 && h.score < 75).length;
-      const critical = recentHealthScores.filter((h) => h.score < 50).length;
+      const bucket = healthBuckets[0] ?? { healthy: 0, atRisk: 0, critical: 0 };
       const accountIds = recentHealthScores.map((row) => row.accountId);
       const counts =
         accountIds.length === 0
@@ -304,7 +321,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
               _count: { _all: true },
             });
       const snapshots = new Map(counts.map((row) => [row.accountId, row._count._all]));
-      const latestHealthScores = recentHealthScores.slice(0, 10).map((row) => ({
+      const latestHealthScores = recentHealthScores.map((row) => ({
         ...row,
         // One snapshot has no earlier score. The column default is not a trend.
         trend: (snapshots.get(row.accountId) ?? 0) < 2 ? null : row.trend,
@@ -314,7 +331,11 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
         activeSubscriptions,
         openChurnSignals,
         pendingRenewals,
-        accountsByHealth: { healthy, atRisk, critical },
+        accountsByHealth: {
+          healthy: Number(bucket.healthy),
+          atRisk: Number(bucket.atRisk),
+          critical: Number(bucket.critical),
+        },
         latestHealthScores,
       };
     },

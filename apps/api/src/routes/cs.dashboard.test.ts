@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
@@ -83,5 +85,61 @@ describe('customer-success dashboard health', () => {
     expect(byId.get(dropped.id)).toMatchObject({ score: 40, trend: 'DECLINING' });
     expect(byId.get(firstOnly.id)).toMatchObject({ score: 80, trend: null });
     expect(body.accountsByHealth).toEqual({ healthy: 1, atRisk: 0, critical: 1 });
+  });
+
+  skipIfNoDb('counts a critical account past the first fifty ids', async () => {
+    // WHY: the buckets used the first 50 account ids. A later critical account
+    // disappeared, and the preview was those ids rather than the newest scores.
+    const before = await server.inject({ method: 'GET', url: '/api/v1/cs/dashboard' });
+    expect(before.statusCode).toBe(200);
+    const baseline = before.json() as {
+      accountsByHealth: { healthy: number; atRisk: number; critical: number };
+    };
+    const stamp = Date.now();
+    const scopedId = (prefix: '0' | 'f') => `${prefix}${randomUUID().slice(1)}`;
+    const healthyIds = Array.from({ length: 50 }, () => scopedId('0'));
+    const criticalId = scopedId('f');
+    await prisma.company.createMany({
+      data: [
+        ...healthyIds.map((id, index) => ({
+          id,
+          orgId,
+          name: `Healthy filler ${stamp}-${index}`,
+        })),
+        { id: criticalId, orgId, name: `Critical late ${stamp}` },
+      ],
+    });
+    await prisma.healthScore.createMany({
+      data: [
+        ...healthyIds.map((accountId) => ({
+          orgId,
+          accountId,
+          score: 90,
+          trend: 'STABLE' as const,
+          capturedAt: new Date('2026-01-01T00:00:00.000Z'),
+        })),
+        {
+          orgId,
+          accountId: criticalId,
+          score: 20,
+          trend: 'DECLINING' as const,
+          capturedAt: new Date('2026-12-01T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const after = await server.inject({ method: 'GET', url: '/api/v1/cs/dashboard' });
+    expect(after.statusCode).toBe(200);
+    const body = after.json() as {
+      accountsByHealth: { healthy: number; atRisk: number; critical: number };
+      latestHealthScores: Array<{ accountId: string; score: number }>;
+    };
+    expect(body.accountsByHealth).toEqual({
+      healthy: baseline.accountsByHealth.healthy + 50,
+      atRisk: baseline.accountsByHealth.atRisk,
+      critical: baseline.accountsByHealth.critical + 1,
+    });
+    expect(body.latestHealthScores[0]).toMatchObject({ accountId: criticalId, score: 20 });
+    expect(body.latestHealthScores).toHaveLength(10);
   });
 });
