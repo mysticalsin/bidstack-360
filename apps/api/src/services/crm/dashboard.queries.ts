@@ -522,7 +522,7 @@ export async function buildCompanyCockpit(
     deletedAt: null,
     OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
   };
-  const [dealsCapped, contactsCapped, tasksCapped, openDealCount] = await Promise.all([
+  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders] = await Promise.all([
     opportunities.length < COCKPIT_OPP_PAGE
       ? Promise.resolve(false)
       : prismaClient.opportunity.count({ where: opportunityWhere }).then((total) => total > COCKPIT_OPP_PAGE),
@@ -546,10 +546,12 @@ export async function buildCompanyCockpit(
             },
           });
         })(),
+    includeBuyingRoleContacts(orgId, company.id, contacts, prismaClient),
   ]);
+  const cockpitContacts = [...contacts, ...roleHolders.extra];
 
   const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
-  const contactIds = contacts.map((contact) => contact.id);
+  const contactIds = cockpitContacts.map((contact) => contact.id);
   const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
   const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
@@ -567,7 +569,7 @@ export async function buildCompanyCockpit(
     // resolved company alone rather than re-loading the whole org.
     companies: [company],
     opportunities,
-    contacts,
+    contacts: cockpitContacts,
     tasks,
     risks: riskPage.rows,
     compliance: compliancePage.rows,
@@ -580,12 +582,80 @@ export async function buildCompanyCockpit(
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
     performance,
-    coveragePages: { contactsCapped, dealsCapped, tasksCapped },
+    coveragePages: {
+      contactsCapped: contactsCapped || roleHolders.roleHoldersCapped,
+      dealsCapped,
+      tasksCapped,
+    },
     openDealCount,
   });
 }
 
 export const BUYING_ROLE_PAGE = 200;
+
+const cockpitContactSelect = {
+  id: true,
+  customer: true,
+  companyId: true,
+  name: true,
+  role: true,
+  email: true,
+  phone: true,
+  influence: true,
+  createdAt: true,
+} as const;
+
+/**
+ * The influence page is 20 people. A champion just outside it never reaches
+ * the buying-role read. Pull accepted role holders the page missed, and say
+ * when more than 20 distinct holders exist.
+ */
+export async function includeBuyingRoleContacts(
+  orgId: string,
+  companyId: string,
+  loaded: ReadonlyArray<{ id: string }>,
+  prismaClient: PrismaClient,
+): Promise<{
+  extra: Array<{
+    id: string;
+    customer: string;
+    companyId: string | null;
+    name: string;
+    role: string | null;
+    email: string | null;
+    phone: string | null;
+    influence: number | null;
+    createdAt: Date;
+  }>;
+  roleHoldersCapped: boolean;
+}> {
+  const probe = await prismaClient.contactFact.findMany({
+    where: {
+      orgId,
+      deletedAt: null,
+      kind: 'buying_role' as const,
+      status: 'accepted' as const,
+      opportunity: { orgId, companyId, deletedAt: null },
+    },
+    distinct: ['contactId'],
+    select: { contactId: true },
+    orderBy: { contactId: 'asc' },
+    take: COCKPIT_CONTACT_PAGE + 1,
+  });
+  const roleHoldersCapped = probe.length > COCKPIT_CONTACT_PAGE;
+  const have = new Set(loaded.map((contact) => contact.id));
+  const missing = probe
+    .slice(0, COCKPIT_CONTACT_PAGE)
+    .map((row) => row.contactId)
+    .filter((id) => !have.has(id));
+  if (missing.length === 0) return { extra: [], roleHoldersCapped };
+  const extra = await prismaClient.contact.findMany({
+    where: { orgId, companyId, deletedAt: null, id: { in: missing } },
+    select: cockpitContactSelect,
+    take: missing.length,
+  });
+  return { extra, roleHoldersCapped };
+}
 
 /** Accepted roles only, newest first. A page of suggestions must not hide a champion. */
 export async function fetchBuyingRoleFacts(

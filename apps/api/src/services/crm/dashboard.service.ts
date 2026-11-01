@@ -49,6 +49,7 @@ import {
 import {
   fetchAccountPerformance,
   fetchBuyingRoleFacts,
+  includeBuyingRoleContacts,
   loadAccountCompliance,
   loadAccountRisks,
   serializeDeal,
@@ -454,7 +455,7 @@ export async function buildDashboardSnapshot(
       ...(accountOpportunityWhere ? [{ opportunity: accountOpportunityWhere }] : []),
     ],
   };
-  const [dealsCapped, contactsCapped, tasksCapped, openDealCount] = await Promise.all([
+  const [dealsCapped, contactsCapped, tasksCapped, openDealCount, roleHolders] = await Promise.all([
     !accountOpportunityWhere || accountOpportunities.length < COCKPIT_OPP_PAGE
       ? Promise.resolve(false)
       : prisma.opportunity.count({ where: accountOpportunityWhere }).then((total) => total > COCKPIT_OPP_PAGE),
@@ -480,9 +481,13 @@ export async function buildDashboardSnapshot(
             },
           });
         })(),
+    isCompanyUuid(selectedCompany.id)
+      ? includeBuyingRoleContacts(orgId, selectedCompany.id, contacts, prisma)
+      : Promise.resolve({ extra: [], roleHoldersCapped: false }),
   ]);
+  const cockpitContacts = [...contacts, ...roleHolders.extra];
   const accountOpportunityIds = accountOpportunities.map((opportunity) => opportunity.id);
-  const contactIds = contacts.map((contact) => contact.id);
+  const contactIds = cockpitContacts.map((contact) => contact.id);
   const registerWhere = { orgId, deletedAt: null as null, opportunityId: { in: accountOpportunityIds } };
   const [riskPage, compliancePage, buyingRoleFacts] = await Promise.all([
     accountOpportunityIds.length === 0
@@ -506,7 +511,7 @@ export async function buildDashboardSnapshot(
       company: selectedCompany,
       companies,
       opportunities: accountOpportunities,
-      contacts,
+      contacts: cockpitContacts,
       tasks: accountTasks,
       risks: riskPage.rows,
       compliance: compliancePage.rows,
@@ -519,7 +524,11 @@ export async function buildDashboardSnapshot(
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
       performance,
-      coveragePages: { contactsCapped, dealsCapped, tasksCapped },
+      coveragePages: {
+        contactsCapped: contactsCapped || roleHolders.roleHoldersCapped,
+        dealsCapped,
+        tasksCapped,
+      },
       openDealCount,
     }),
     companies,

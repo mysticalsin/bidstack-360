@@ -592,6 +592,24 @@ export function serializeBidOpportunity(row: {
   };
 }
 
+/**
+ * Role holders take the key-people seats first. Five louder names with no
+ * recorded role must not push the champion off the card. Among holders, and
+ * among everyone else, higher influence still ranks first.
+ */
+export function orderKeyContacts<
+  T extends { id: string; influence: number | null; name: string },
+>(contacts: readonly T[], roleContactIds: ReadonlySet<string>, limit = 5): T[] {
+  const ranked = [...contacts].sort((a, b) => {
+    const influenceDelta = (b.influence ?? -1) - (a.influence ?? -1);
+    if (influenceDelta !== 0) return influenceDelta;
+    return a.name.localeCompare(b.name);
+  });
+  const holders = ranked.filter((contact) => roleContactIds.has(contact.id));
+  const rest = ranked.filter((contact) => !roleContactIds.has(contact.id));
+  return [...holders, ...rest].slice(0, limit);
+}
+
 // ─── Main cockpit builder ─────────────────────────────────────────────────────
 
 export function buildCockpit({
@@ -738,9 +756,12 @@ export function buildCockpit({
       : (company.publicFacts?.revenueLabel ?? 'Not verified'));
   const accountOpportunityIds = new Set(companyOpps.map((opp) => opp.id));
   const roleDealIds = new Set(accountOpportunityIds);
+  const acceptedRoleContactIds = new Set<string>();
   for (const fact of buyingRoleFacts) {
     if (fact.opportunityId) roleDealIds.add(fact.opportunityId);
+    if (fact.status === 'accepted') acceptedRoleContactIds.add(fact.contactId);
   }
+  const keyContactRows = orderKeyContacts(accountContacts, acceptedRoleContactIds);
   const companyRisks = risks.filter(
     (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),
   );
@@ -906,7 +927,7 @@ export function buildCockpit({
       openDeals,
       tasks: accountTasks,
     }, coveragePages),
-    keyContacts: accountContacts.slice(0, 5).map((contact) => ({
+    keyContacts: keyContactRows.map((contact) => ({
       id: contact.id,
       source: 'external_crm',
       companyId: contact.companyId,

@@ -520,6 +520,100 @@ describe('buildCockpit recorded facts only', () => {
     expect(cockpit.keyContacts.map((person) => person.id)).toEqual(['cio', 'ada', 'no-score']);
   });
 
+  it('keeps an accepted role holder in the key people ahead of louder names', () => {
+    // WHY: five seats ordered by influence used to hide the champion when
+    // louder people on the account had no recorded buying role.
+    const now = new Date('2026-10-31T00:00:00.000Z');
+    const base = {
+      customer: 'Acme',
+      companyId: 'mantu',
+      role: null,
+      email: null,
+      phone: null,
+      createdAt: now,
+    };
+    const opportunity = {
+      id: 'deal-1',
+      customer: 'Acme',
+      companyId: 'mantu',
+      name: 'Platform',
+      stage: 'proposal',
+      pipelineStage: null,
+      valueMicros: 0,
+      probability: 0,
+      dueDate: null,
+      owner: null,
+    };
+    const louder = ['Ann', 'Bea', 'Cal', 'Dee', 'Eve'].map((name, index) => ({
+      ...base,
+      id: `loud-${index}`,
+      name,
+      influence: 9 - index,
+    }));
+    const cockpit = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [opportunity],
+      contacts: [...louder, { ...base, id: 'champion', name: 'Fay', influence: 1 }],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: [
+        {
+          contactId: 'champion',
+          status: 'accepted',
+          linkLabel: 'champion',
+          opportunityId: 'deal-1',
+          observedAt: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    expect(cockpit.keyContacts.map((person) => person.id)).toEqual([
+      'champion',
+      'loud-0',
+      'loud-1',
+      'loud-2',
+      'loud-3',
+    ]);
+    expect(cockpit.keyContacts[0]?.roleInDecision).toBe('champion');
+
+    const holders = [6, 5, 4, 3, 2, 1].map((influence) => ({
+      ...base,
+      id: `role-${influence}`,
+      name: `Role ${influence}`,
+      influence,
+    }));
+    const manyRoles = buildCockpit({
+      company: company({ name: 'Acme' }),
+      companies: [],
+      opportunities: [opportunity],
+      contacts: [...holders, { ...base, id: 'loud', name: 'Zoe', influence: 100 }],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+      now,
+      buyingRoleFacts: holders.map((holder) => ({
+        contactId: holder.id,
+        status: 'accepted',
+        linkLabel: 'champion',
+        opportunityId: 'deal-1',
+        observedAt: new Date('2026-10-01T00:00:00.000Z'),
+      })),
+    });
+    // WHY: more than five role holders still compete by influence. A louder
+    // name with no role does not take a seat from them.
+    expect(manyRoles.keyContacts.map((person) => person.id)).toEqual([
+      'role-6',
+      'role-5',
+      'role-4',
+      'role-3',
+      'role-2',
+    ]);
+  });
+
   it('counts a deal and its tasks only when the opportunity companyId matches', () => {
     // Why: a shared customer string used to pull another company's deal and
     // its tasks onto this account, and the activity then wore this account's id.
