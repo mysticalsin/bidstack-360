@@ -573,6 +573,123 @@ describe('opportunities routes', () => {
     }
   });
 
+  skipIfNoDb('GET /api/opportunities?pipelineStageId= leaves a deleted stage id out', async () => {
+    // WHY: the deal read hides a removed stage id, but the column still holds
+    // it. A list filter for that id was still returning the row.
+    const suffix = randomUUID().slice(0, 8);
+    const customer = `Removed stage ${suffix}`;
+    const pipeline = await prisma.pipeline.create({
+      data: { orgId: orgId!, name: `Removed stage ${suffix}` },
+    });
+    const [live, removed] = await prisma.$transaction([
+      prisma.pipelineStage.create({
+        data: {
+          orgId: orgId!,
+          pipelineId: pipeline.id,
+          key: 'live_open',
+          name: 'Live open',
+          probability: 40,
+        },
+      }),
+      prisma.pipelineStage.create({
+        data: {
+          orgId: orgId!,
+          pipelineId: pipeline.id,
+          key: 'removed_open',
+          name: 'Removed open',
+          probability: 20,
+        },
+      }),
+    ]);
+    const [parked, open] = await prisma.$transaction([
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-RM1-${suffix}`,
+          customer,
+          name: 'Still pointing at the removed stage',
+          stage: 's2_sent',
+          pipelineStageId: removed.id,
+          probability: 20,
+        },
+      }),
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-RM2-${suffix}`,
+          customer,
+          name: 'On the live stage',
+          stage: 's2_sent',
+          pipelineStageId: live.id,
+          probability: 40,
+        },
+      }),
+    ]);
+    await prisma.pipelineStage.update({
+      where: { id: removed.id },
+      data: { deletedAt: new Date() },
+    });
+    try {
+      const stored = await prisma.opportunity.findUnique({
+        where: { id: parked.id },
+        select: { pipelineStageId: true },
+      });
+      expect(stored?.pipelineStageId).toBe(removed.id);
+
+      const byRemoved = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities?pipelineStageId=${removed.id}&limit=20`,
+      });
+      expect(byRemoved.statusCode).toBe(200);
+      const removedIds = byRemoved.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id);
+      expect(removedIds).not.toContain(parked.id);
+
+      const removedCount = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities/count?pipelineStageId=${removed.id}`,
+      });
+      expect(removedCount.statusCode).toBe(200);
+      expect(removedCount.json<{ count: number }>().count).toBe(0);
+
+      const removedExport = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities/export?pipelineStageId=${removed.id}`,
+      });
+      expect(removedExport.statusCode).toBe(200);
+      expect(removedExport.body).not.toContain(`OP-RM1-${suffix}`);
+
+      const byLive = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities?pipelineStageId=${live.id}&limit=20`,
+      });
+      expect(byLive.statusCode).toBe(200);
+      const liveIds = byLive.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id);
+      expect(liveIds).toContain(open.id);
+      expect(liveIds).not.toContain(parked.id);
+
+      const liveExport = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities/export?pipelineStageId=${live.id}`,
+      });
+      expect(liveExport.statusCode).toBe(200);
+      expect(liveExport.body).toContain(`OP-RM2-${suffix}`);
+      expect(liveExport.body).not.toContain(`OP-RM1-${suffix}`);
+
+      const listed = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities?search=${encodeURIComponent(customer)}&limit=20`,
+      });
+      expect(listed.statusCode).toBe(200);
+      const rows = listed.json<{ items: Array<{ id: string; pipelineStageId: string | null }> }>().items;
+      expect(rows.find((item) => item.id === parked.id)?.pipelineStageId).toBeNull();
+      expect(rows.find((item) => item.id === open.id)?.pipelineStageId).toBe(live.id);
+    } finally {
+      await prisma.opportunity.deleteMany({ where: { id: { in: [parked.id, open.id] } } });
+      await prisma.pipelineStage.deleteMany({ where: { id: { in: [live.id, removed.id] } } });
+      await prisma.pipeline.deleteMany({ where: { id: pipeline.id } });
+    }
+  });
+
   skipIfNoDb('GET /api/opportunities?dueWithinDays=7&excludeClosed=true leaves a lost flag out', async () => {
     // WHY: the closing strip takes 25 rows. A page of lost deals with due
     // dates inside the window hid the open bid that was due later in the week.

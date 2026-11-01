@@ -21,6 +21,7 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 
 import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
+import { livePipelineStageFilter } from './opportunities.helpers.js';
 
 const BATCH_SIZE = 250;
 
@@ -91,7 +92,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
         {
           orgId,
           deletedAt: null,
-          ...(pipelineStageId ? { pipelineStageId } : {}),
+          ...livePipelineStageFilter(pipelineStageId),
           ...(stage ? { stage: stage as PrismaStage } : {}),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),

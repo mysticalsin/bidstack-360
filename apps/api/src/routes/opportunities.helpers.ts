@@ -144,6 +144,21 @@ export async function loadCompanyNameIndex(
 }
 
 /**
+ * Match a pipeline stage id only while that stage row is still live.
+ * Deleting a stage leaves the id on the deal. The read hides it, so a list
+ * filter for that id must not return the row.
+ */
+export function livePipelineStageFilter(
+  pipelineStageId: string | undefined,
+): Prisma.OpportunityWhereInput {
+  if (!pipelineStageId) return {};
+  return {
+    pipelineStageId,
+    pipelineStage: { is: { deletedAt: null } },
+  };
+}
+
+/**
  * Resolves a free-text customer string to an EXISTING Company id within the org
  * by normalized name. Link-only: returns null when no Company matches — it never
  * creates a Company from free text (that would pollute the account rollups with

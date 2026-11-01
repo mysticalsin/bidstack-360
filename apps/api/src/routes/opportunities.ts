@@ -27,7 +27,12 @@ import {
 } from '../lib/access-scope.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
-import { excludeClosedOutcome, resolveCompanyIdByName, stageMoveDiff } from './opportunities.helpers.js';
+import {
+  excludeClosedOutcome,
+  livePipelineStageFilter,
+  resolveCompanyIdByName,
+  stageMoveDiff,
+} from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
@@ -82,7 +87,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               {
                 orgId: req.auth.orgId,
                 deletedAt: null,
-                ...(pipelineStageId ? { pipelineStageId } : {}),
+                ...livePipelineStageFilter(pipelineStageId),
                 ...(stage ? { stage } : {}),
                 ...(industry ? { industry } : {}),
                 ...(owner ? { owner: { email: owner } } : {}),
@@ -210,7 +215,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               {
                 orgId: req.auth.orgId,
                 deletedAt: null,
-                ...(pipelineStageId ? { pipelineStageId } : {}),
+                ...livePipelineStageFilter(pipelineStageId),
                 ...(excludeClosed ? excludeClosedOutcome() : {}),
               },
               accessScope,
