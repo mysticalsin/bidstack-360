@@ -236,6 +236,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                     compliance={cockpit.compliance}
                     openRiskCount={cockpit.openRiskCount}
                     openComplianceCount={cockpit.openComplianceCount}
+                    openRiskSeverity={cockpit.openRiskSeverity}
                     risksCapped={cockpit.risksCapped}
                     complianceCapped={cockpit.complianceCapped}
                   />

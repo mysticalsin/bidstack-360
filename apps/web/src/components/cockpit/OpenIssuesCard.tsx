@@ -11,12 +11,14 @@ import { springSoft } from '@/lib/motion';
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
 import { severityBg, severityShort, severityTone } from './_tokens';
+import { severityBucketCounts, type OpenRiskSeverityCounts } from './open-risk-headline';
 
 interface Props {
   risks: RiskItem[];
   compliance: ComplianceCheck[];
   openRiskCount?: number;
   openComplianceCount?: number;
+  openRiskSeverity?: OpenRiskSeverityCounts;
   risksCapped?: boolean;
   complianceCapped?: boolean;
 }
@@ -28,6 +30,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
   compliance,
   openRiskCount,
   openComplianceCount,
+  openRiskSeverity,
   risksCapped,
   complianceCapped,
 }: Props) {
@@ -40,31 +43,32 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
   const total = (openRiskCount ?? openRisks.length) + (openComplianceCount ?? openCompliance.length);
   const recorded = risks.length + compliance.length;
   const pageCapped = Boolean(risksCapped || complianceCapped);
-  // Severity buckets are computed against the full risk list (not just open)
-  // so the bar reflects the registry total rather than "what's left today".
+  // Register counts are open risks on the loaded deals. Without them, the
+  // visible rows are the only book.
+  const severity = severityBucketCounts(risks, openRiskSeverity);
   const buckets = [
     {
       label: 'Critical',
       labelText: t('openIssues.severityCritical', 'Critical'),
-      count: risks.filter((risk) => risk.severity === 'critical').length,
+      count: severity.critical,
       tone: 'tomato',
     },
     {
       label: 'High',
       labelText: t('openIssues.severityHigh', 'High'),
-      count: risks.filter((risk) => risk.severity === 'high').length,
+      count: severity.high,
       tone: 'amber',
     },
     {
       label: 'Medium',
       labelText: t('openIssues.severityMedium', 'Medium'),
-      count: risks.filter((risk) => risk.severity === 'medium').length,
+      count: severity.medium,
       tone: 'blue',
     },
     {
       label: 'Low',
       labelText: t('openIssues.severityLow', 'Low'),
-      count: risks.filter((risk) => risk.severity === 'low').length,
+      count: severity.low,
       tone: 'gray',
     },
   ] as const;
