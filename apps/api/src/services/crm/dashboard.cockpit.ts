@@ -327,7 +327,8 @@ export function computeSignalCoverage(
   if (accountOpen != null && accountOpen !== openDeals.length) pipeline.scored = false;
   if (pages?.tasksCapped) engagement.scored = false;
   if (pages?.contactsCapped) {
-    contactFactor.whatItMeasures += ` Scored from the ${COCKPIT_CONTACT_PAGE} highest-influence contacts.`;
+    contactFactor.scored = false;
+    contactFactor.whatItMeasures += ` Not scored. The ${COCKPIT_CONTACT_PAGE} highest-influence contacts are not every stakeholder.`;
   }
   if (pages?.dealsCapped) {
     pipeline.whatItMeasures += pipeline.scored === false

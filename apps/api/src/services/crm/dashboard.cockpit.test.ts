@@ -79,6 +79,7 @@ describe('computeSignalCoverage', () => {
     expect(health.factors?.find((factor) => factor.key === 'contacts')?.recommendedAction).toContain(
       'loaded page',
     );
+    expect(health.factors?.find((factor) => factor.key === 'contacts')?.scored).toBe(false);
     expect(health.factors?.find((factor) => factor.key === 'pipeline')?.whatItMeasures).toContain(
       'latest 100 opportunities',
     );
@@ -122,6 +123,29 @@ describe('computeSignalCoverage', () => {
     expect(engagement?.scored).toBe(false);
     expect(engagement?.recommendedAction).toContain('Older follow-ups are outside this score');
     expect(engagement?.recommendedAction).not.toContain('inside their due dates');
+  });
+
+  it('does not treat the highest-influence page as every stakeholder', () => {
+    // WHY: four well-rated people on the page would otherwise score contact coverage as healthy.
+    const health = computeSignalCoverage(
+      {
+        company: company(),
+        contacts: [
+          { influence: 5, email: 'a@x.com' },
+          { influence: 5, email: 'b@x.com' },
+          { influence: 5, email: 'c@x.com' },
+          { influence: 5, email: 'd@x.com' },
+        ],
+        openDeals: [],
+        tasks: [],
+      },
+      { contactsCapped: true },
+    );
+    const contacts = health.factors?.find((factor) => factor.key === 'contacts');
+    expect(contacts?.score).toBeGreaterThan(0);
+    expect(contacts?.scored).toBe(false);
+    expect(contacts?.whatItMeasures).toContain('Not scored');
+    expect(health.counts.strong ?? 0).toBe(0);
   });
 
   it('rewards a fully covered account with a strong composite', () => {
