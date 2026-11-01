@@ -6,11 +6,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
-import {
-  formatUnspecifiedCompact,
-  recordedMicros,
-  unitsFromMicros,
-} from '@/components/dashboard/unspecified-currency';
+import { recordedMicros, unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { useTableSort } from '@/hooks/useTableSort';
 import { REASON_LABELS } from '@/pages/winLoss/reasonLabels';
 import type { WinLossClosedRow } from '@/pages/winLoss/useWinLossAnalysis';
@@ -104,7 +100,7 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
                   ) : null}
                 </td>
                 <td className="px-4 py-3 text-right align-top tabular-nums text-[var(--fg-secondary)]">
-                  {formatUnspecifiedCompact(unitsFromMicros(row.valueMicros))}
+                  {unspecifiedMicrosLabel(row.valueMicros)}
                 </td>
                 <td className="px-4 py-3 align-top text-xs text-[var(--fg-tertiary)]">
                   {row.ownerName ?? t('winLoss.unowned', 'Unowned')}

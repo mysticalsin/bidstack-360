@@ -133,6 +133,11 @@ export function headlineMicrosLabel(micros: string | number | bigint): string {
   }).format(compactMicrosMagnitude(value));
 }
 
+/** Compact or full amount, with the missing-currency mark. */
+export function unspecifiedMicrosLabel(micros: string | number | bigint): string {
+  return `${headlineMicrosLabel(micros)} unspecified`;
+}
+
 /** Compact from integer micros. Unit counts past the safe range keep their leading digits. */
 export function formatUnspecifiedCompactMicros(micros: string | number | bigint): string {
   return formatUnspecifiedCompact(compactMicrosMagnitude(asMicros(micros)));

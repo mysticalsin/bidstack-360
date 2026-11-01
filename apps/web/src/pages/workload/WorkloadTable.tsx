@@ -21,9 +21,8 @@ import {
 } from '@/components/ui/Table';
 import { useTableSort } from '@/hooks/useTableSort';
 import {
-  formatUnspecifiedCompact,
   recordedMicros,
-  unitsFromMicros,
+  unspecifiedMicrosLabel,
 } from '@/components/dashboard/unspecified-currency';
 import type { WorkloadOwner } from '@/hooks/useWorkload';
 import { capacityLevel, relativeLoad, type CapacityLevel } from './workloadConfig';
@@ -179,7 +178,7 @@ export function WorkloadTable({ owners }: Props) {
                     {owner.openBids}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatUnspecifiedCompact(unitsFromMicros(owner.weightedValueMicros))}
+                    {unspecifiedMicrosLabel(owner.weightedValueMicros)}
                   </TableCell>
                   <TableCell
                     className={`text-right tabular-nums ${owner.overdueTasks > 0 ? 'font-semibold text-[var(--danger)]' : ''}`}

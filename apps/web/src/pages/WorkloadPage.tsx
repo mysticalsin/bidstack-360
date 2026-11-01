@@ -17,8 +17,7 @@ import {
   LoadingSkeleton,
 } from '@/components/ui/StateMessages';
 import {
-  formatUnspecifiedCompact,
-  unitsFromMicros,
+  unspecifiedMicrosLabel,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { useWorkload } from '@/hooks/useWorkload';
@@ -46,7 +45,7 @@ export function WorkloadPage() {
     {
       key: 'weighted',
       label: t('workload.totalWeighted', 'Weighted pipeline'),
-      value: formatUnspecifiedCompact(unitsFromMicros(totals.weightedValueMicros)),
+      value: unspecifiedMicrosLabel(totals.weightedValueMicros),
       alert: false,
     },
     {

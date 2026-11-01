@@ -10,7 +10,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 
-import { unitsFromMicros } from '@/components/dashboard/unspecified-currency';
+import { compareMicros, microsSharePercent } from '@/components/dashboard/unspecified-currency';
 import { cn } from '@/lib/cn';
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
@@ -101,10 +101,8 @@ export function CountryDetailPanel({
 }) {
   const { t } = useTranslation('crm');
   const sharePct =
-    selected && globalTotals && unitsFromMicros(globalTotals.totalValueMicros) > 0
-      ? (unitsFromMicros(selected.totalValueMicros) /
-          unitsFromMicros(globalTotals.totalValueMicros)) *
-        100
+    selected && globalTotals && compareMicros(globalTotals.totalValueMicros, 0) > 0
+      ? microsSharePercent(selected.totalValueMicros, globalTotals.totalValueMicros)
       : 0;
 
   return (
@@ -158,7 +156,7 @@ export function CountryDetailPanel({
             </div>
           </div>
 
-          {globalTotals && unitsFromMicros(globalTotals.totalValueMicros) > 0 && (
+          {globalTotals && compareMicros(globalTotals.totalValueMicros, 0) > 0 && (
             <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 <span className="flex items-center gap-1.5">

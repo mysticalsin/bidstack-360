@@ -20,8 +20,7 @@ import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
 import {
-  formatUnspecifiedCompact,
-  unitsFromMicros,
+  unspecifiedMicrosLabel,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 
@@ -148,7 +147,7 @@ export function OpportunityTab({
                 <Badge tone="gray">{o.stage}</Badge>
               </TableCell>
               <TableCell className="font-medium text-[var(--fg-primary)]">
-                {formatUnspecifiedCompact(unitsFromMicros(o.valueMicros))}
+                {unspecifiedMicrosLabel(o.valueMicros)}
               </TableCell>
               <TableCell>
                 {o.probability === 0

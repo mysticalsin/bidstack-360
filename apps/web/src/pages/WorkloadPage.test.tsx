@@ -152,6 +152,26 @@ describe('WorkloadPage', () => {
     expect(rows[1]?.textContent).toContain('Smaller Desk');
   });
 
+  it('prints the weighted total from micros when the unit count no longer fits', () => {
+    // WHY: compacting the unit number showed 9,007,199,254,740,992. The desk total is one unit higher.
+    const micros = (9007199254740993n * 1_000_000n).toString();
+    hookMocks.owners = [
+      owner({
+        name: 'Huge Desk',
+        email: 'huge@example.com',
+        openBids: 1,
+        weightedValueMicros: micros,
+      }),
+    ];
+
+    renderPage();
+
+    expect(screen.getByTestId('workload-kpi-weighted').textContent).toBe(
+      '9,007,199,254,740,993 unspecified',
+    );
+    expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
+  });
+
   it('shows the bespoke zero state that tells the lead how to light it up', () => {
     hookMocks.owners = [];
 

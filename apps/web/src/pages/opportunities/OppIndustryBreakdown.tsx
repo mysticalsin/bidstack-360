@@ -9,8 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import {
-  formatUnspecifiedCompact,
-  unitsFromMicros,
+  unspecifiedMicrosLabel,
   UNSPECIFIED_CURRENCY_BASIS,
 } from '@/components/dashboard/unspecified-currency';
 import { useTerritorySegments } from '@/hooks/useTerritories';
@@ -40,7 +39,7 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatUnspecifiedCompact(unitsFromMicros(totals.totalValueMicros))}
+              · {unspecifiedMicrosLabel(totals.totalValueMicros)}
             </span>
           ) : null}
         </span>

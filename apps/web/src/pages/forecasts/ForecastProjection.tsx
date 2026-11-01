@@ -22,15 +22,14 @@ import {
   TableScrollArea,
 } from '@/components/ui/Table';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
+import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { formatMicrosAmount, type ForecastProjectionPeriod } from '@bidstack/shared';
 
 type FormatMoney = (micros: number | string) => string;
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number | string) =>
-    `${headlineMicrosLabel(micros)} unspecified`;
+  const formatMoneyMicros = (micros: number | string) => unspecifiedMicrosLabel(micros);
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
