@@ -23,7 +23,7 @@ import type {
 import { buildCompanies } from './company-enrichment.service.js';
 import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
-import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboard.utils.js';
+import { asProviderStatus, normalizeName, record, recordedDealStage } from './dashboard.utils.js';
 import {
   applyOpportunityScope,
   countryVariantsForScope,
@@ -63,7 +63,7 @@ export function serializeDeal(opportunity: {
     companyId: opportunity.companyId ?? null,
     companyName: opportunity.customer,
     name: opportunity.name,
-    stage: mapDealStage(opportunity.pipelineStage?.key ?? opportunity.stage),
+    stage: recordedDealStage(opportunity),
     amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
     currencyCode: recorded && recorded.length === 3 ? recorded : null,
     probability: opportunity.probability,

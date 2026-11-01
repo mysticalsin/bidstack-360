@@ -210,6 +210,29 @@ export function mapDealStage(stage: string): z.infer<typeof CrmDeal>['stage'] {
   }
 }
 
+/**
+ * A lost or won flag closes the deal on the account list. The mapped key
+ * alone turned a custom lost stage into "new", so its value stayed in the
+ * open pipeline. Lost wins when both flags are set.
+ */
+export function recordedDealStage(opportunity: {
+  stage: string;
+  pipelineStage: { key: string; isWon: boolean; isLost: boolean } | null;
+}): z.infer<typeof CrmDeal>['stage'] {
+  const key = opportunity.pipelineStage?.key ?? opportunity.stage;
+  const lost =
+    opportunity.pipelineStage?.isLost === true ||
+    opportunity.stage === 'closed_lost' ||
+    key === 'closed_lost';
+  if (lost) return 'closed_lost';
+  const won =
+    opportunity.pipelineStage?.isWon === true ||
+    opportunity.stage === 'closed_won' ||
+    key === 'closed_won';
+  if (won) return 'closed_won';
+  return mapDealStage(key);
+}
+
 // ─── Technical stack parser ───────────────────────────────────────────────────
 
 export function parseTechnicalStack(

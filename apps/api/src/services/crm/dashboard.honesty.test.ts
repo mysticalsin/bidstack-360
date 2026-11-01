@@ -191,4 +191,52 @@ describe('deal currency is omitted when the opportunity has none', () => {
     expect(deal.companyId).toBe('c0000000-0000-4000-8000-000000000008');
     expect(deal.companyName).toBe('DNB');
   });
+
+  it('keeps a lost stage flag out of the open account pipeline', () => {
+    // Why: a custom stage key mapped to "new". The account list then counted
+    // a lost deal's value as open pipeline.
+    const flagged = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5b',
+      customer: 'Acme',
+      name: 'Price loss',
+      stage: 's3_technical_iteration',
+      pipelineStage: {
+        key: 'price_lost',
+        name: 'Price lost',
+        probability: 0,
+        color: null,
+        isWon: false,
+        isLost: true,
+      },
+      valueMicros: 1_000_000,
+      probability: 40,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(flagged.stage).toBe('closed_lost');
+
+    const enumLost = serializeDeal({
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5c',
+      customer: 'Acme',
+      name: 'Closed on the enum',
+      stage: 'closed_lost',
+      pipelineStage: {
+        key: 's4_negotiation',
+        name: 'S4 Negotiation',
+        probability: 80,
+        color: null,
+        isWon: false,
+        isLost: false,
+      },
+      valueMicros: 1_000_000,
+      probability: 80,
+      dueDate: null,
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(enumLost.stage).toBe('closed_lost');
+  });
 });
