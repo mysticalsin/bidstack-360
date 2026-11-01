@@ -418,6 +418,19 @@ describe('useFormatMoney hook integration', () => {
     expect(formatted).not.toMatch(/[$€]/);
   });
 
+  it('prints an unspecified amount past the safe unit count in full', () => {
+    // WHY: compacting the unit number prints one unit low and drops the currency mark.
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const { result } = renderHook(() => useFormatMoney());
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const formatted = result.current.formatMoneyMicros(huge);
+    expect(formatted).toBe('9,007,199,254,740,993 unspecified');
+    expect(result.current.formatMoneyMicros(huge, null, { compact: false })).toBe(
+      '9,007,199,254,740,993 unspecified',
+    );
+    expect(result.current.formatMoneyMicros(Number(huge))).toBe('0 unspecified');
+  });
+
   it('does not throw when a recorded amount is too large to round through a float', () => {
     // WHY: Math.round(units * 1e6) is not a safe integer here, and BigInt() threw.
     useCurrencyStore.setState({

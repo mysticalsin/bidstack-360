@@ -3,9 +3,11 @@ import { useEffect } from 'react';
 import { unitsToMicros } from '@bidstack/shared';
 
 import {
+  formatExactUnspecified,
   formatUnspecifiedAmount,
   formatUnspecifiedCompact,
   unitsFromMicros,
+  unspecifiedMicrosLabel,
 } from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
@@ -15,8 +17,11 @@ const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 function microsBigInt(micros: string | number | bigint): bigint | null {
   try {
     if (typeof micros === 'bigint') return micros;
-    if (typeof micros === 'number')
-      return Number.isFinite(micros) ? BigInt(Math.trunc(micros)) : null;
+    if (typeof micros === 'number') {
+      // A JSON number past the safe integer is already one unit low.
+      if (!Number.isSafeInteger(micros)) return null;
+      return BigInt(micros);
+    }
     return BigInt(micros);
   } catch {
     return null;
@@ -33,13 +38,13 @@ export function formatStoredMicros(
 ): string {
   const asBigInt = microsBigInt(micros);
   if (asBigInt == null) return formatUnspecifiedCompact(0);
-  const value = unitsFromMicros(asBigInt);
   const source = sourceCurrency?.trim();
   if (!source) {
     return options?.compact === false
-      ? formatUnspecifiedAmount(value)
-      : formatUnspecifiedCompact(value);
+      ? formatExactUnspecified(asBigInt)
+      : unspecifiedMicrosLabel(asBigInt);
   }
+  const value = unitsFromMicros(asBigInt);
   const converted = convert(value, source);
   if (!Number.isFinite(converted) || converted === value) {
     return formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
