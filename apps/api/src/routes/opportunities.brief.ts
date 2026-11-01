@@ -86,9 +86,20 @@ export function estimateBriefTokens(brief: string): number {
   return Math.ceil(brief.length / 4);
 }
 
+/** A configured stage name wins. Otherwise the stored key is shown as words. */
+export function stageWords(name: string | null | undefined, stage: string): string {
+  const configured = name?.trim();
+  if (configured) return configured;
+  return stage
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export function buildOpportunityBrief(input: OpportunityBriefInput): string {
   const { opportunity, tasks, contacts, notes } = input;
-  const stage = opportunity.pipelineStageName ?? opportunity.stage;
+  const stage = stageWords(opportunity.pipelineStageName, opportunity.stage);
   const activeTasks = tasks.filter((task) => task.status !== 'done');
   const latestNote = notes[0];
 
@@ -98,7 +109,7 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
 
   const taskLines = activeTasks.length
     ? activeTasks
-        .map((task) => `- ${task.title} (${task.status}, due ${formatDate(task.dueDate)})`)
+        .map((task) => `- ${task.title} (${stageWords(null, task.status)}, due ${formatDate(task.dueDate)})`)
         .join('\n')
     : '- No open pursuit tasks found. Create owners for proposal, legal, finance, delivery, and submission QA.';
 
@@ -118,7 +129,9 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
     '',
     `**Opportunity:** ${opportunity.name} (${opportunity.code})`,
     `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Stored probability:** ${opportunity.probability}% | **Due:** ${formatDate(opportunity.dueDate)}`,
-    opportunity.industry ? `**Industry:** ${opportunity.industry}` : '**Industry:** not set',
+    opportunity.industry
+      ? `**Industry:** ${stageWords(null, opportunity.industry)}`
+      : '**Industry:** not set',
     '',
     '## Current Read',
     `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, a stored probability of ${opportunity.probability}%, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,

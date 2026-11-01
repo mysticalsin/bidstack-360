@@ -68,7 +68,7 @@ describe('buildOpportunityBrief', () => {
         valueMicros: 400_000_000_000n,
         probability: 35,
         dueDate: null,
-        industry: null,
+        industry: 'financial_services',
         updatedAt: new Date('2026-06-06T12:00:00.000Z'),
       },
       tasks: [],
@@ -88,6 +88,10 @@ describe('buildOpportunityBrief', () => {
     expect(brief).not.toContain('Private Counsel');
     expect(brief).not.toContain('General Counsel');
     expect(brief).toContain('stored probability is below 40, so challenge bid/no-bid before drafting');
+    expect(brief).toContain('S1 Ongoing');
+    expect(brief).not.toContain('s1_ongoing');
+    expect(brief).toContain('Financial Services');
+    expect(brief).not.toContain('financial_services');
     expect(brief).not.toMatch(/win probability/i);
   });
 });

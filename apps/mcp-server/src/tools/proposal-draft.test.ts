@@ -69,6 +69,9 @@ describe('proposal.draft grounded builder', () => {
     expect(result.markdown).toContain('Core banking transformation reference');
     expect(result.markdown).toContain('Confirm legal assumptions');
     expect(result.markdown).toContain('influence 5/5');
+    expect(result.markdown).toContain('S2 Sent');
+    expect(result.markdown).toContain('stored probability is 55%');
+    expect(result.markdown).not.toContain('s2_sent');
     expect(result.markdown).not.toMatch(/\/100|stage probability/);
     expect(result.markdown).not.toMatch(/stub|DUST_API_KEY|ANTHROPIC_API_KEY/i);
     expect(result.citations).toEqual(

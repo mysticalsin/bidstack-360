@@ -32,6 +32,7 @@ export const proposalDraft: Tool<typeof Input> = {
   handler: async (args, ctx) => {
     const opp = await prisma.opportunity.findFirst({
       where: { id: args.oppId, orgId: ctx.orgId, deletedAt: null },
+      include: { pipelineStage: { select: { name: true } } },
     });
     if (!opp) throw new Error('Opportunity not found');
 
@@ -85,7 +86,7 @@ export const proposalDraft: Tool<typeof Input> = {
         code: opp.code,
         customer: opp.customer,
         name: opp.name,
-        stage: opp.stage,
+        stage: opp.pipelineStage?.name?.trim() || opp.stage,
         valueMicros: opp.valueMicros,
         probability: opp.probability,
         dueDate: opp.dueDate,
@@ -188,8 +189,17 @@ function formatStakeholder(contact: DraftContact): string {
     .join(' ');
 }
 
+function stageWords(stage: string): string {
+  return stage
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function sectionBody(input: GroundedDraftInput): string[] {
   const { opportunity, references, tasks, contacts, notes } = input;
+  const stage = stageWords(opportunity.stage);
   const value = formatMoneyMicros(opportunity.valueMicros);
   const due = formatDate(opportunity.dueDate);
   const refLine = references[0]
@@ -202,7 +212,7 @@ function sectionBody(input: GroundedDraftInput): string[] {
 
   if (input.section === 'executive_summary') {
     return [
-      `${opportunity.customer} is evaluating "${opportunity.name}" at the ${opportunity.stage} stage. The current CRM value is ${value}, probability is ${opportunity.probability}%, and the response deadline is ${due}.`,
+      `${opportunity.customer} is evaluating "${opportunity.name}" at the ${stage} stage. The current CRM value is ${value}, stored probability is ${opportunity.probability}%, and the response deadline is ${due}.`,
       `Mantu should lead with a concise business case: reduce delivery risk, accelerate decision-making, and give ${opportunity.customer} a governed implementation path that executives can trust.`,
       `${refLine} ${stakeholderLine}`,
       `Recommended next step: align the proposal narrative to the open pursuit tasks${
@@ -247,7 +257,7 @@ function sectionBody(input: GroundedDraftInput): string[] {
   }
 
   return [
-    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${opportunity.stage}), stored probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
+    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${stage}), stored probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
     opportunity.probability < 40
       ? 'Stored probability is below 40%. Challenge the bid/no-bid decision before major drafting continues.'
       : 'Stored probability is recorded. Test assumptions against legal, finance, delivery, and procurement gates.',
@@ -284,14 +294,14 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
   ];
 
   const evidenceLines = [
-    `- Opportunity: ${input.opportunity.code}, ${input.opportunity.stage}, ${formatMoneyMicros(
+    `- Opportunity: ${input.opportunity.code}, ${stageWords(input.opportunity.stage)}, ${formatMoneyMicros(
       input.opportunity.valueMicros,
     )}, ${input.opportunity.probability}% probability.`,
     input.references.length
       ? `- References: ${input.references.map((reference) => reference.title).join('; ')}.`
       : '- References: none selected yet.',
     input.tasks.length
-      ? `- Pursuit tasks: ${input.tasks.map((task) => `${task.title} (${task.status})`).join('; ')}.`
+      ? `- Pursuit tasks: ${input.tasks.map((task) => `${task.title} (${stageWords(task.status)})`).join('; ')}.`
       : '- Pursuit tasks: none found.',
     input.contacts.length
       ? `- Stakeholders: ${input.contacts.map(formatStakeholder).join('; ')}.`
