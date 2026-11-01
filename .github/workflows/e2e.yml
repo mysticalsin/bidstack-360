@@ -169,6 +169,14 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
+      # Playwright starts the API via tsx; workspace packages resolve types/runtime
+      # from dist/. Without this, shards fail ERR_MODULE_NOT_FOUND @bidstack/db.
+      - name: Build workspace packages
+        run: >
+          pnpm --filter @bidstack/shared --filter @bidstack/dust-client
+          --filter @bidstack/odoo-mcp-client --filter @bidstack/db
+          --filter @bidstack/memos --filter @bidstack/integrations build
+
       - name: Restore dist artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

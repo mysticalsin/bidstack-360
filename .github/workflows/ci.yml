@@ -275,6 +275,12 @@ jobs:
           pnpm db:migrate:deploy
           pnpm db:seed
 
+      - name: Build workspace packages
+        run: >
+          pnpm --filter @bidstack/shared --filter @bidstack/dust-client
+          --filter @bidstack/odoo-mcp-client --filter @bidstack/db
+          --filter @bidstack/memos --filter @bidstack/integrations build
+
       - name: Build web
         run: pnpm --filter @bidstack/web build
 
