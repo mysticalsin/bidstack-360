@@ -119,7 +119,7 @@ export const AccountCard = memo(function AccountCard({
               </dd>
             </div>
             <div>
-              <dt>{t('account.pipeline', 'Pipeline')}</dt>
+              <dt>{t('account.pipeline', 'Weighted pipeline')}</dt>
               <dd>
                 <AnimatedMetric value={formatUnspecifiedAmount(pipelineMicros / 1_000_000)} />
               </dd>
@@ -135,6 +135,15 @@ export const AccountCard = memo(function AccountCard({
               <dd>{company.employeeCount ? company.employeeCount.toLocaleString() : '—'}</dd>
             </div>
           </dl>
+          {row.openDealsMissingProbability > 0 ? (
+            <p className="px-4 pb-2 text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'account.pipelineMissingProbability',
+                '{{count}} open deals have no recorded probability and are not in the weighted pipeline.',
+                { count: row.openDealsMissingProbability },
+              )}
+            </p>
+          ) : null}
 
           <div className="account-card-signal-grid">
             <div className="account-card-confidence">

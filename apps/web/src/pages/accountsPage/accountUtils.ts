@@ -9,6 +9,7 @@ export type AccountSegmentKey = 'all' | 'enriched' | 'with_tech' | 'needs_data' 
 export interface AccountRow {
   company: CrmCompany;
   openDeals: number;
+  openDealsMissingProbability: number;
   pipelineMicros: number;
   totalDeals: number;
   // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
@@ -36,10 +37,14 @@ const COVERAGE_NEXT_ACTIONS: Record<string, string> = {
 export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow {
   const matched = deals.filter((d) => d.companyId === company.id);
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
-  const pipelineMicros = open.reduce(
-    (acc, d) => acc + Math.round(d.amountMicros * ((d.probability ?? 50) / 100)),
-    0,
-  );
+  let openDealsMissingProbability = 0;
+  const pipelineMicros = open.reduce((acc, deal) => {
+    if (deal.probability == null) {
+      openDealsMissingProbability += 1;
+      return acc;
+    }
+    return acc + Math.round(deal.amountMicros * (deal.probability / 100));
+  }, 0);
   // Health proxy: 0 → critical, <250k → needs_attention, <2M → good, ≥2M → strong.
   const health: AccountRow['health'] =
     pipelineMicros === 0
@@ -75,6 +80,7 @@ export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow
   return {
     company,
     openDeals: open.length,
+    openDealsMissingProbability,
     pipelineMicros,
     totalDeals: matched.length,
     health,

@@ -111,6 +111,23 @@ describe('accountUtils', () => {
     expect(row.pipelineMicros).toBe(0);
   });
 
+  it('does not treat a missing probability as 50 percent', () => {
+    // Why: a blank probability used to count as half the amount, so the
+    // weighted pipeline and the proxy band invented a forecast.
+    const row = deriveAccount(company(), [
+      deal({
+        id: 'unweighted',
+        stage: 'proposal',
+        probability: null,
+        amountMicros: 1_000_000_000_000,
+      }),
+    ]);
+    expect(row.openDeals).toBe(1);
+    expect(row.openDealsMissingProbability).toBe(1);
+    expect(row.pipelineMicros).toBe(0);
+    expect(row.health).toBe('critical');
+  });
+
   it('keeps the pipeline band from reading as a measured health score', () => {
     // Why: the list only has weighted pipeline size. Calling that Strong
     // without a proxy mark is the misleading health the safety gate forbids.
