@@ -70,8 +70,16 @@ describe('FinancialHealthSection', () => {
     expect(screen.getByTestId('fh-tile-margin').textContent).toContain('-5.9 pts');
     expect(screen.getByTestId('fh-tile-capex').textContent).toContain('Not filed');
     expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.queryByText('Latest 20 fiscal years.')).toBeNull();
     // tier accounts never show the toggle
     expect(screen.queryByRole('switch')).toBeNull();
+  });
+
+  it('says when the fiscal-year trend is only the latest page', () => {
+    // WHY: a full page of newer quarters used to hide the annual filing, and a long history was shown as complete.
+    state.data = { ...real, periodsCapped: true };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getByText('Latest 20 fiscal years.')).toBeTruthy();
   });
 
   it('early warnings: high confidence first, details on click with snippet and filing link', () => {

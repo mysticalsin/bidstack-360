@@ -21,6 +21,7 @@ import {
   PEOPLE_MEETING_PAGE,
   RISK_EVENT_PAGE,
   SCORED_NEWS_PAGE,
+  NOTABLE_SIGNAL_DAYS,
   openJobsCopy,
   peoplePageIsPartial,
   readCoversWindow,
@@ -205,7 +206,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       return { rows, capped };
     })(),
     prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: new Date(now.getTime() - 180 * DAY), lte: now }, ...hideSampleWhere(live) },
+      where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: new Date(now.getTime() - NOTABLE_SIGNAL_DAYS * DAY), lte: now }, ...hideSampleWhere(live) },
       select: { title: true, occurredAt: true, source: true, sample: true, importance: true, severity: true },
       orderBy: [{ importance: 'desc' }, { occurredAt: 'desc' }],
       take: 1,

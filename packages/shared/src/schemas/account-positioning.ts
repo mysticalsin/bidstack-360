@@ -212,6 +212,7 @@ export interface KnownPerson {
 
 const SEN_WEIGHT: Record<Seniority, number> = { c_level: 3, vp: 2.5, director: 2, manager: 1, ic: 0.5, unknown: 0.5 };
 const DAY = 86_400_000;
+export const NOTABLE_SIGNAL_DAYS = 180;
 
 export const JOB_POST_PAGE = 1000;
 export const SCORED_NEWS_PAGE = 1000;
@@ -616,7 +617,7 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   else s.push('No contacts are mapped yet.');
   const peopleNote = peoplePageSentence(f.peoplePage);
   if (peopleNote) s.push(peopleNote);
-  if (f.topSignal) s.push(`Latest notable signal: ${f.topSignal.title}${f.topSignal.at ? ` (${monthYear(f.topSignal.at)}, ${f.topSignal.source})` : ''}${f.topSignal.sample ? ' [sample]' : ''}.`);
+  if (f.topSignal) s.push(`Highest-importance signal in the last ${NOTABLE_SIGNAL_DAYS} days: ${f.topSignal.title}${f.topSignal.at ? ` (${monthYear(f.topSignal.at)}, ${f.topSignal.source})` : ''}${f.topSignal.sample ? ' [sample]' : ''}.`);
   if (f.subsidiariesCapped) s.push('Subsidiary figures use the latest 1,000 direct subsidiaries.');
   if (f.evidenceCapped) s.push('Initiative evidence is the latest 100 news items and meetings.');
   if (f.solutionsCapped) s.push('Already-sold check used the latest 5,000 solutions.');

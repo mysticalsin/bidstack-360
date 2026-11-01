@@ -144,6 +144,7 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
             ) : (
               <>
                 {d.sample ? <p className="wd-row-meta">Example layout. {d.statusCopy ?? 'Real filed numbers replace it after the next pull.'}</p> : null}
+                {!d.sample && d.periodsCapped ? <p className="wd-row-meta">Latest 20 fiscal years.</p> : null}
                 {!d.sample && d.statusCopy ? <p className="wd-row-meta" role="status">{d.statusCopy}</p> : null}
                 {stale ? (
                   <p className="wd-row-meta fh-stale" data-testid="fh-stale">
