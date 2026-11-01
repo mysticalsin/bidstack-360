@@ -54,6 +54,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-01 PROCESS: Logo plate drop from cursor/polo-logo-bca5 did not meet the main bar
+
+- **What went wrong:** The navy-plate lockup cherry-pick (`1bdb99ab`) landed on main from `cursor/polo-logo-bca5`. Tony then set the baseline as `polo/consolidated` `dbd7e904` + `polo/mars-integration` only; other `cursor/*-bca5` branches default to not merged unless proven safe with full CI green and no v24 regression.
+- **Root cause:** Earlier cutover treated "unique brand files" as automatically mergeable. That is below the conservative bar.
+- **Prevention rule:** Main = `dbd7e904` + MARS. Revert any other old-branch landing that is not proven safe. Do not import `cursor/*-bca5`, `feat/*`, `fix/*`, `qa/*`, `l10n_demo`, or dependabot majors/unreviewed groups.
+- **Files affected:** brand SVGs and `PoloPreSalesLogo.tsx` (reverted in `f01ae377`).
+
+---
+
 ### 2026-11-01 INFRA: First main CI run failed on inherited workflow bugs, not MARS/logo
 
 - **What went wrong:** After creating `main` from `polo/consolidated` + MARS + logo plate drop, GitHub reported E2E, Lighthouse, Semgrep, Supply Chain, and then the unit job as failed. None of those failures came from the merged product commits. Unit died because `kam-tools.test.ts` fail-louds when `DATABASE_URL` is unset; the no-DB unit job still ran mcp-server's full suite. E2E shards died on `Playwright does not support chromium on ubuntu26.04-x64` (`ubuntu-latest` is now 26.04). Lighthouse died because `.lighthouserc.js` is CJS in an ESM package. Semgrep died because `semgrep ci` rejects `--severity`/`--error`. Checkov died because `docker_compose` is not a valid framework name in 3.3.8.
