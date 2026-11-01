@@ -309,6 +309,43 @@ describe('leads routes', () => {
     expect(leadRes.json().convertedToOpportunityId).toBe(body.opportunityId);
   });
 
+  skipIfNoDb('POST /api/leads/:id/convert stores a large amount as integer micros', async () => {
+    // WHY: the convert form used to multiply a unit number by 1e6 and drop the remainder.
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Large',
+        lastName: 'Convert',
+        companyName: `${CONVERT_COMPANY_PREFIX}-large-${randomUUID().slice(0, 8)}`,
+        source: 'event',
+        priority: 'high',
+        score: 50,
+      },
+    });
+    const id = createRes.json().id;
+    createdLeadIds.push(id);
+    const micros = '8598204328457184962';
+    const convert = await server.inject({
+      method: 'POST',
+      url: `/api/leads/${id}/convert`,
+      payload: {
+        opportunityName: 'Large convert',
+        opportunityValueMicros: micros,
+        stage: 's1_lead',
+      },
+    });
+    expect(convert.statusCode).toBe(200);
+    const body = convert.json() as { opportunityId: string; contactId: string };
+    createdOpportunityIds.push(body.opportunityId);
+    createdContactIds.push(body.contactId);
+    const opp = await prisma.opportunity.findUnique({
+      where: { id: body.opportunityId },
+      select: { valueMicros: true },
+    });
+    expect(opp?.valueMicros).toBe(BigInt(micros));
+  });
+
   // Regression for the double-conversion race: the in-transaction status guard
   // (status != converted) must make a second convert a 409 conflict and must NOT
   // create a second opportunity/contact — otherwise pipeline value duplicates and

@@ -60,7 +60,7 @@ export function useConvertLead(id: string) {
   return useMutation({
     mutationFn: (body: {
       opportunityName?: string;
-      opportunityValueMicros?: number;
+      opportunityValueMicros?: string | number;
       pipelineStageId?: string;
       stage?: string;
     }) =>

@@ -127,10 +127,8 @@ export type LeadPatch = z.infer<typeof LeadPatch>;
 
 export const LeadConvertBody = z.object({
   opportunityName: z.string().min(1).max(255).optional(),
-  // Micros scale: 1e12 micros is only €1M — the old bound was copied from a
-  // units-based schema and rejected any real enterprise deal. 9e15 stays
-  // within Number.MAX_SAFE_INTEGER (≈9.007e15) and allows up to €9B.
-  opportunityValueMicros: z.number().min(0).max(9_000_000_000_000_000).optional(),
+  // Integer micros. A string keeps a large amount; a number is only exact while it is a safe integer.
+  opportunityValueMicros: z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]).optional(),
   pipelineStageId: z.string().uuid().optional(),
   // Legacy stage key fallback for callers without pipeline-stage UUIDs
   // (ConvertLeadDialog) — the route resolves it to the org's matching stage.

@@ -22,6 +22,13 @@ import {
 
 import { resolveLeadCompanyId } from './leads.company-link.js';
 
+/** Stored deal micros for a lead conversion. A digit string keeps a large amount. */
+export function convertOpportunityMicros(value: string | number | undefined): bigint {
+  if (value === undefined) return 0n;
+  if (typeof value === 'string') return BigInt(value);
+  return BigInt(Math.trunc(value));
+}
+
 export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
 
   // RBAC: gate every route in this plugin. requirePermission throws 403 when the
@@ -319,7 +326,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           customer: lead.companyName,
           companyId: lead.companyId,
           name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
-          valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
+          valueMicros: convertOpportunityMicros(body.opportunityValueMicros),
           ownerId: lead.ownerId,
           pipelineStageId: body.pipelineStageId,
           stageKey: body.stage,
