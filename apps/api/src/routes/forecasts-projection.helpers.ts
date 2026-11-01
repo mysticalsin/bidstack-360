@@ -144,24 +144,27 @@ export function probabilityForRow(row: ProjectionRow, stageProbabilities: Map<st
 interface OwnerAccumulator {
   ownerId: string | null;
   ownerName: string;
-  openMicros: number;
-  weightedMicros: number;
-  wonMicros: number;
+  openMicros: bigint;
+  weightedMicros: bigint;
+  wonMicros: bigint;
 }
 
 function emptyOwner(ownerId: string | null, ownerName: string): OwnerAccumulator {
-  return { ownerId, ownerName, openMicros: 0, weightedMicros: 0, wonMicros: 0 };
+  return { ownerId, ownerName, openMicros: 0n, weightedMicros: 0n, wonMicros: 0n };
 }
 
 function applyRow(owner: OwnerAccumulator, row: ProjectionRow, probability: number): void {
-  const value = Number(row.valueMicros);
+  const value = BigInt(row.valueMicros);
   if (row.stage === 'closed_won') {
     // Won is a date-anchored actual — never part of open/weighted pipeline.
     owner.wonMicros += value;
     return;
   }
   owner.openMicros += value;
-  owner.weightedMicros += (value * probability) / 100;
+  // Integer percent. A fractional stage probability truncates; it must not throw
+  // and take the forecast response down.
+  const percent = BigInt(Math.trunc(Number.isFinite(probability) ? probability : 0));
+  owner.weightedMicros += (value * percent) / 100n;
 }
 
 /**
@@ -200,22 +203,24 @@ function buildPeriod(
   manualCommitByPeriod: Map<string, number>,
 ): ForecastProjectionPeriod {
   const byOwner: ForecastProjectionOwner[] = [...periodOwners.values()]
+    .sort((a, b) => (a.weightedMicros > b.weightedMicros ? -1 : a.weightedMicros < b.weightedMicros ? 1 : 0))
     .map((o) => ({
       ownerId: o.ownerId,
       ownerName: o.ownerName,
-      openMicros: Math.round(o.openMicros),
-      weightedMicros: Math.round(o.weightedMicros),
-      wonMicros: Math.round(o.wonMicros),
-    }))
-    .sort((a, b) => b.weightedMicros - a.weightedMicros);
+      openMicros: o.openMicros.toString(),
+      weightedMicros: o.weightedMicros.toString(),
+      wonMicros: o.wonMicros.toString(),
+    }));
 
   const manual = manualCommitByPeriod.get(period);
+  const sum = (pick: (owner: OwnerAccumulator) => bigint) =>
+    [...periodOwners.values()].reduce((total, owner) => total + pick(owner), 0n).toString();
   return {
     period,
     label: quarterLabel(period),
-    openMicros: byOwner.reduce((s, o) => s + o.openMicros, 0),
-    weightedMicros: byOwner.reduce((s, o) => s + o.weightedMicros, 0),
-    wonMicros: byOwner.reduce((s, o) => s + o.wonMicros, 0),
+    openMicros: sum((owner) => owner.openMicros),
+    weightedMicros: sum((owner) => owner.weightedMicros),
+    wonMicros: sum((owner) => owner.wonMicros),
     manualCommitMicros: manual ?? null,
     byOwner,
   };

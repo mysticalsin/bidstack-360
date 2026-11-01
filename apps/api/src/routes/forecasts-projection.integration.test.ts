@@ -120,9 +120,9 @@ describe('forecast projection and flagged stages', () => {
       periods: Array<{
         byOwner: Array<{
           ownerId: string | null;
-          openMicros: number;
-          weightedMicros: number;
-          wonMicros: number;
+          openMicros: string;
+          weightedMicros: string;
+          wonMicros: string;
         }>;
       }>;
     };
@@ -130,9 +130,9 @@ describe('forecast projection and flagged stages', () => {
       .flatMap((period) => period.byOwner)
       .find((ownerRow) => ownerRow.ownerId === owner.id);
     expect(row).toMatchObject({
-      openMicros: 1_000_000,
-      weightedMicros: Math.round((1_000_000 * probability) / 100),
-      wonMicros: 2_000_000,
+      openMicros: '1000000',
+      weightedMicros: String(Math.round((1_000_000 * probability) / 100)),
+      wonMicros: '2000000',
     });
   });
 
@@ -184,15 +184,15 @@ describe('forecast projection and flagged stages', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as {
       periods: Array<{
-        byOwner: Array<{ ownerId: string | null; openMicros: number; weightedMicros: number }>;
+        byOwner: Array<{ ownerId: string | null; openMicros: string; weightedMicros: string }>;
       }>;
     };
     const row = body.periods
       .flatMap((period) => period.byOwner)
       .find((ownerRow) => ownerRow.ownerId === owner.id);
     expect(row).toMatchObject({
-      openMicros: 2_000_000,
-      weightedMicros: 1_400_000,
+      openMicros: '2000000',
+      weightedMicros: '1400000',
     });
   });
 });

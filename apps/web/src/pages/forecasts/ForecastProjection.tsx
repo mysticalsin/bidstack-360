@@ -22,20 +22,23 @@ import {
   TableScrollArea,
 } from '@/components/ui/Table';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { formatUnspecifiedCompact } from '@/components/dashboard/unspecified-currency';
+import { formatUnspecifiedCompact, unitsFromMicros } from '@/components/dashboard/unspecified-currency';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
-type FormatMoney = (micros: number) => string;
+type FormatMoney = (micros: number | string) => string;
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number) => formatUnspecifiedCompact(micros / 1_000_000);
+  const formatMoneyMicros = (micros: number | string) =>
+    formatUnspecifiedCompact(unitsFromMicros(micros));
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
   const periods = projection.data?.periods ?? [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
-  const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
+  const hasPipeline = periods.some(
+    (p) => BigInt(p.openMicros) > 0n || BigInt(p.wonMicros) > 0n,
+  );
 
   return (
     <Card>

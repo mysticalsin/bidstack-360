@@ -104,20 +104,20 @@ describe('aggregateProjection', () => {
       new Map(),
     );
     const q2 = result.find((p) => p.period === '2026-Q2')!;
-    expect(q2.openMicros).toBe(1_000_000); // won excluded from open
-    expect(q2.weightedMicros).toBe(400_000); // 1,000,000 × 40%
-    expect(q2.wonMicros).toBe(500_000);
+    expect(q2.openMicros).toBe('1000000'); // won excluded from open
+    expect(q2.weightedMicros).toBe('400000'); // 1,000,000 × 40%
+    expect(q2.wonMicros).toBe('500000');
   });
 
   it('returns every requested period even when empty, in order', () => {
     const result = aggregateProjection([], window, probs, new Map());
     expect(result.map((p) => p.period)).toEqual(['2026-Q2', '2026-Q3', '2026-Q4']);
-    expect(result.every((p) => p.openMicros === 0 && p.byOwner.length === 0)).toBe(true);
+    expect(result.every((p) => p.openMicros === '0' && p.byOwner.length === 0)).toBe(true);
   });
 
   it('skips rows outside the window (null period)', () => {
     const result = aggregateProjection([row({ period: null })], window, probs, new Map());
-    expect(result.every((p) => p.openMicros === 0)).toBe(true);
+    expect(result.every((p) => p.openMicros === '0')).toBe(true);
   });
 
   it('sorts owners by weighted value desc and labels unassigned', () => {
@@ -134,6 +134,24 @@ describe('aggregateProjection', () => {
     expect(q2.byOwner[0]!.ownerName).toBe('Unassigned'); // 800k weighted first
     expect(q2.byOwner[0]!.ownerId).toBeNull();
     expect(q2.byOwner[1]!.ownerName).toBe('Ann');
+  });
+
+  it('keeps a large open amount as the exact micros string', () => {
+    // WHY: Number(micros) rounds 8,598,204,328,457.184962 units to a nearby
+    // float. The projection must return the integer micros the database summed.
+    const micros = '8598204328457184962';
+    const result = aggregateProjection(
+      [row({ stage: 's4_negotiation', valueMicros: micros })],
+      window,
+      probs,
+      new Map(),
+    );
+    const q2 = result.find((p) => p.period === '2026-Q2')!;
+    const floated = BigInt(Math.round(Number(micros))).toString();
+    expect(floated).not.toBe(micros);
+    expect(q2.openMicros).toBe(micros);
+    expect(q2.weightedMicros).toBe('6878563462765747969'); // 80% of the integer micros, truncated
+    expect(q2.byOwner[0]!.openMicros).toBe(micros);
   });
 
   it('overlays the manual commit override per period', () => {
