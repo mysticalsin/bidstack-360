@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, oppStatus, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -52,5 +52,55 @@ describe('viz-data', () => {
 
   it('flags open bids past their due date', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
+  });
+
+  it('keeps a live lost stage out of the open book', () => {
+    // WHY: the chart read the stage name only. A live lost flag on an open
+    // key stayed in the open sum, and both flags still counted as a win.
+    // Deleting the stage row must not drop a closed_lost key.
+    const lostFlag = row({
+      stage: 'S4 Negotiation',
+      value: 80,
+      customer: 'A',
+      dueDate: '2026-05-01T00:00:00.000Z',
+      pipelineStage: { isWon: false, isLost: true },
+    });
+    const both = row({
+      stage: 'closed_won',
+      value: 90,
+      customer: 'B',
+      dueDate: '2026-03-01T00:00:00.000Z',
+      pipelineStage: { isWon: true, isLost: true },
+    });
+    const deletedLost = row({
+      stage: 'closed_lost',
+      value: 70,
+      customer: 'A',
+      pipelineStage: { isWon: true, isLost: false, deletedAt: '2026-02-01T00:00:00.000Z' },
+    });
+    const book = [...rows, lostFlag, both, deletedLost];
+
+    const wonFlag = row({
+      stage: 'S2 Sent',
+      value: 15,
+      pipelineStage: { isWon: true, isLost: false },
+    });
+
+    expect(oppStatus(lostFlag)).toBe('lost');
+    expect(oppStatus(both)).toBe('lost');
+    expect(oppStatus(deletedLost)).toBe('lost');
+    expect(oppStatus(wonFlag)).toBe('won');
+    expect(statusMix(book)).toEqual({ open: 2, won: 2, lost: 4 });
+    expect(stageFunnel(book).map((s) => [s.label, s.value])).toEqual([
+      ['S1 lead', 10],
+      ['S4 negotiation', 400],
+    ]);
+    expect(accountBars(book)).toEqual([
+      { label: 'B', open: 400, won: 300 },
+      { label: 'A', open: 10, won: 200 },
+    ]);
+    expect(cumulativeOpen(book)).toEqual([0, 10, 410]);
+    expect(pastDueOpen([lostFlag], Date.parse('2026-10-31'))).toEqual([]);
+    expect(runningWinRate([both])).toEqual([0]);
   });
 });

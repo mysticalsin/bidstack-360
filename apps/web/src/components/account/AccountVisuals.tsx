@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { ChartCard, SignalShape } from '@/components/viz/ChartCard';
 import { StageBars } from '@/components/viz/charts';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
-import { fmtCompact, OPEN_STAGES, stageFunnel, stageKey, statusMix, type OppRow } from '@/components/viz/viz-data';
+import { fmtCompact, OPEN_STAGES, oppStatus, stageFunnel, stageKey, statusMix, type OppRow } from '@/components/viz/viz-data';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
@@ -71,7 +71,9 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
   const people = usePeopleMap({ companyId });
   const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase());
   const stages = stageFunnel(rows);
-  const stageIds = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
+  const stageIds = OPEN_STAGES.filter((id) =>
+    rows.some((o) => oppStatus(o) === 'open' && stageKey(o.stage) === id),
+  );
   const mix = statusMix(rows);
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
   const { edges } = layoutOrg(ppl);

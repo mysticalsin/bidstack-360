@@ -14,7 +14,7 @@ import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
 import {
-  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
+  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, oppStatus, pastDueOpen, stageFunnel, stageKey, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
@@ -115,7 +115,9 @@ export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdue
  *  bids?"). Each funnel column and each status chip opens the bid drill. */
 export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDrill }) {
   const data = stageFunnel(rows);
-  const ids = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
+  const ids = OPEN_STAGES.filter((id) =>
+    rows.some((o) => oppStatus(o) === 'open' && stageKey(o.stage) === id),
+  );
   const m = statusMix(rows);
   return (
     <ChartCard title="Pipeline" meta={`${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
