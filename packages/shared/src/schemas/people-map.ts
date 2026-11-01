@@ -56,8 +56,36 @@ export const PeopleMap = z.object({
   companyId: z.string().uuid().nullable(),
   opportunityId: z.string().uuid().nullable(),
   people: z.array(PeopleMapPerson),
+  /** True when the list is the first 1,000 people by name. */
+  peopleCapped: z.boolean().optional(),
+  /** True when evidence is the latest 1,000 facts. */
+  factsCapped: z.boolean().optional(),
+  /** True when deal links are the latest 1,000. */
+  dealsCapped: z.boolean().optional(),
+  /** True when a reporting name was not in the loaded page. */
+  namesCapped: z.boolean().optional(),
 });
 export type PeopleMap = z.infer<typeof PeopleMap>;
+
+export const PEOPLE_MAP_PAGE = 1000;
+
+const groupedCount = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+/** Names only the pages that filled, so a complete buying group stays silent. */
+export function peopleMapPageNotes(caps: {
+  peopleCapped?: boolean;
+  factsCapped?: boolean;
+  dealsCapped?: boolean;
+  namesCapped?: boolean;
+} | null | undefined): string[] {
+  const page = groupedCount(PEOPLE_MAP_PAGE);
+  return [
+    caps?.peopleCapped ? `First ${page} people by name.` : '',
+    caps?.factsCapped ? `Evidence is the latest ${page} facts.` : '',
+    caps?.dealsCapped ? `Deal links are the latest ${page}.` : '',
+    caps?.namesCapped ? 'Some reporting names are outside this page.' : '',
+  ].filter((note) => note.length > 0);
+}
 
 export const ContactFactCreate = z.object({
   kind: FactKind,

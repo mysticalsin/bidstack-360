@@ -10,7 +10,7 @@ import {
   useDecidePersonFact,
   usePeopleMap,
 } from '@/hooks/useAccountPeople';
-import type { ConnectionStanding, PeopleMapPerson } from '@bidstack/shared';
+import { peopleMapPageNotes, type ConnectionStanding, type PeopleMapPerson } from '@bidstack/shared';
 
 type DealOption = { id: string; name: string };
 
@@ -52,6 +52,7 @@ export function AccountPeopleSection({
     <div className="space-y-6">
       <PeopleMap
         people={people.data?.people}
+        pageNotes={peopleMapPageNotes(people.data)}
         isLoading={people.isLoading}
         isError={people.isError}
         error={people.error}
@@ -76,6 +77,7 @@ export function AccountPeopleSection({
 
 function PeopleMap({
   people,
+  pageNotes = [],
   isLoading,
   isError,
   error,
@@ -84,6 +86,7 @@ function PeopleMap({
   companyId,
 }: {
   people: PeopleMapPerson[] | undefined;
+  pageNotes?: string[];
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -139,6 +142,11 @@ function PeopleMap({
             'Who is connected, and whether we have accepted evidence. A title on file is not authority.',
           )}
         </p>
+        {pageNotes.map((note) => (
+          <p key={note} className="mt-2 text-sm text-[var(--fg-secondary)]">
+            {note}
+          </p>
+        ))}
         {rows.length > 0 && (
           <>
             <p className="mt-3 text-sm text-[var(--fg-secondary)]">
