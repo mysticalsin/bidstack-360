@@ -62,18 +62,19 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
     return value > max ? value : max;
   }, 1n);
 
-  const title = rowsCapped && f.thisYear && !f.account && !f.stage
+  const accountLabel = f.account ?? (f.companyId ? 'Account' : null);
+  const title = rowsCapped && f.thisYear && !accountLabel && !f.stage
     ? 'Won this year · latest 100 bids'
-    : f.account ?? (f.stage ? stageText(f.stage) : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
+    : accountLabel ?? (f.stage ? stageText(f.stage) : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
   const bidCount = `${shown.length} bid${shown.length === 1 ? '' : 's'}`;
   const caption = rowsCapped
     ? `${bidCount} in the latest 100 updated bids, worth ${totalLabel}. Pick a stage or a bid to go deeper.`
     : `${bidCount} worth ${totalLabel}. Pick a stage or a bid to go deeper.`;
   const trail: DrillCrumb[] = [
     { label: rootLabel, onSelect: onClose },
-    { label: STATUS_LABEL[status], onSelect: f.stage || f.account ? () => onFilterChange({ status, thisYear: f.thisYear }) : undefined },
+    { label: STATUS_LABEL[status], onSelect: f.stage || accountLabel ? () => onFilterChange({ status, thisYear: f.thisYear }) : undefined },
     ...(f.stage ? [{ label: stageText(f.stage) }] : []),
-    ...(f.account ? [{ label: f.account }] : []),
+    ...(accountLabel ? [{ label: accountLabel }] : []),
   ];
 
   return (
@@ -144,8 +145,10 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
                   <tr key={o.id}>
                     <td>
                       <Link to={`/opportunities/${o.id}`}>{o.name ?? o.code ?? 'Untitled bid'}</Link>
-                      {o.customer ? (
-                        <button type="button" className="drill-sub drill-link" onClick={() => onFilterChange({ ...f, account: o.customer })}>{o.customer}</button>
+                      {o.companyId && o.customer ? (
+                        <button type="button" className="drill-sub drill-link" onClick={() => onFilterChange({ ...f, companyId: o.companyId, account: o.customer })}>{o.customer}</button>
+                      ) : o.customer ? (
+                        <span className="drill-sub">{o.customer}</span>
                       ) : null}
                     </td>
                     <td>{stageText(stageKey(o.stage))}</td>

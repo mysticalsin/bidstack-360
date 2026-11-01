@@ -173,24 +173,40 @@ export function cumulativeWon(rows: OppRow[]) {
   });
 }
 
-/** Per-account open vs won value, top N by the micros total. Bar length stays a unit number. */
+/** The customer text that carries the most money on this company. */
+function accountBarLabel(names: ReadonlyMap<string, bigint>): string {
+  let best = '';
+  let bestMicros = -1n;
+  for (const [name, micros] of names) {
+    if (micros > bestMicros || (micros === bestMicros && name.localeCompare(best) < 0)) {
+      best = name;
+      bestMicros = micros;
+    }
+  }
+  return best || 'Linked account';
+}
+
+/** Per-company open vs won value, top N by the micros total. A shared customer name is not one account. */
 export function accountBars(rows: OppRow[], n = 6) {
-  const by = new Map<string, { open: bigint; won: bigint }>();
+  const by = new Map<string, { open: bigint; won: bigint; names: Map<string, bigint> }>();
   for (const o of rows) {
-    if (!o.customer || isLost(o)) continue;
-    const cur = by.get(o.customer) ?? { open: 0n, won: 0n };
+    if (!o.companyId || isLost(o)) continue;
+    const cur = by.get(o.companyId) ?? { open: 0n, won: 0n, names: new Map() };
     const micros = recordedMicros(o.value ?? 0, o.valueMicros);
     if (isWon(o)) cur.won += micros; else cur.open += micros;
-    by.set(o.customer, cur);
+    const name = o.customer?.trim();
+    if (name) cur.names.set(name, (cur.names.get(name) ?? 0n) + micros);
+    by.set(o.companyId, cur);
   }
   return [...by.entries()]
-    .map(([label, v]) => {
+    .map(([companyId, v]) => {
       const open = microsToUnits(v.open);
       const won = microsToUnits(v.won);
       const openMicros = v.open.toString();
       const wonMicros = v.won.toString();
       return {
-        label,
+        companyId,
+        label: accountBarLabel(v.names),
         open,
         won,
         openMicros,
@@ -203,7 +219,7 @@ export function accountBars(rows: OppRow[], n = 6) {
     .sort((a, b) => {
       const aTotal = BigInt(a.openMicros) + BigInt(a.wonMicros);
       const bTotal = BigInt(b.openMicros) + BigInt(b.wonMicros);
-      if (aTotal === bTotal) return a.label.localeCompare(b.label);
+      if (aTotal === bTotal) return a.label.localeCompare(b.label) || a.companyId.localeCompare(b.companyId);
       return aTotal > bTotal ? -1 : 1;
     })
     .slice(0, n);
