@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { OpenIssuesCard, openIssuesCaption } from './OpenIssuesCard';
+import { OpenIssuesCard, issueListNote, openIssuesCaption } from './OpenIssuesCard';
 import { severityShort } from './_tokens';
 
 vi.mock('react-i18next', () => ({
@@ -95,6 +95,17 @@ describe('OpenIssuesCard', () => {
     expect(
       openIssuesCaption({ recorded: 1, openRisks: 1, openChecks: 0, pageCapped: false }).text,
     ).toBe('1 open risk');
+  });
+
+  it('says when the list is shorter than the open counts', () => {
+    // WHY: the caption can name 11 open risks while the list shows four.
+    expect(
+      issueListNote({ shownRisks: 4, shownChecks: 2, openRisks: 11, openChecks: 5 }),
+    ).toBe('Showing 4 of 11 open risks and 2 of 5 open checks.');
+    expect(issueListNote({ shownRisks: 0, shownChecks: 0, openRisks: 3, openChecks: 0 })).toBe(
+      'Showing none of the 3 open risks.',
+    );
+    expect(issueListNote({ shownRisks: 2, shownChecks: 1, openRisks: 2, openChecks: 1 })).toBeNull();
   });
 
   it('does not mark an unranked risk as low', () => {
