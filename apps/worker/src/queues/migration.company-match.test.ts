@@ -4,9 +4,9 @@ import { soleCompanyId } from './migration.js';
 
 describe('soleCompanyId', () => {
   it('does not pick a company when two names match', () => {
-    // WHY: import used the first case-insensitive name. "Acme" and "acme"
-    // are two companies, so a contact or a deal must not be linked to one
-    // of them, and a deal update must not pick one of two matching rows.
+    // WHY: import used the first case-insensitive name or email. Two
+    // companies, two deals, or two people with the same email must not
+    // collapse onto one row.
     expect(soleCompanyId([])).toEqual({ id: null, ambiguous: false });
     expect(soleCompanyId(['only'])).toEqual({ id: 'only', ambiguous: false });
     expect(soleCompanyId(['a', 'b'])).toEqual({ id: null, ambiguous: true });

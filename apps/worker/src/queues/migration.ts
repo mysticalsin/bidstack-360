@@ -217,13 +217,18 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     role: asTrimmed(t['contact.title']),
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const existing = await prisma.contact.findFirst({
+    const rows = await prisma.contact.findMany({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
+      take: 2,
     });
-    if (existing) {
+    const match = soleCompanyId(rows.map((row) => row.id));
+    if (match.ambiguous) {
+      throw new Error(`contact.email matches more than one person: ${email}`);
+    }
+    if (match.id) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.contact.update({ where: { id: existing.id }, data });
+      await prisma.contact.update({ where: { id: match.id }, data });
       return null;
     }
   }
@@ -253,13 +258,18 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
     status: (statusRaw && LEAD_STATUSES.has(statusRaw) ? statusRaw : 'new') as never,
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const existing = await prisma.lead.findFirst({
+    const rows = await prisma.lead.findMany({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
+      take: 2,
     });
-    if (existing) {
+    const match = soleCompanyId(rows.map((row) => row.id));
+    if (match.ambiguous) {
+      throw new Error(`lead.email matches more than one lead: ${email}`);
+    }
+    if (match.id) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.lead.update({ where: { id: existing.id }, data });
+      await prisma.lead.update({ where: { id: match.id }, data });
       return null;
     }
   }
