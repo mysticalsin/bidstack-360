@@ -162,11 +162,14 @@ describe('parseOrgChartHtml: staff rule (generic, every layout)', () => {
     expect(isClientEmployer('Example Staffing', 'jo@examplestaffing.com', acct)).toBe(false);
     expect(isClientEmployer('Example Corporation', null, acct)).toBe(true); // same name after legal suffixes
     expect(isClientEmployer('example.com', null, acct)).toBe(true);
-    // containment is enough once a second account field or the email domain backs it up
+    // a second account field that is a different, shorter word (domain stem, parent) does not back it up
+    expect(isClientEmployer('Example Staffing', null, ['Example Corp', 'example.com', 'Example Holdings'])).toBe(false);
+    expect(isClientEmployer('Example Sparse Staffing', 'sam@staffing.example', ['Example Sparse Co', 'example.org'])).toBe(false);
+    // the email domain does, and a shorter form of the legal name is the same company
     expect(isClientEmployer('Example Staffing', 'jo@example.com', acct)).toBe(true);
     expect(isClientEmployer('Example Staffing', 'jo@uk.example.com', acct)).toBe(true);
     expect(isClientEmployer('Example Staffing', null, ['Example Corp', 'Example Staffing Solutions Ltd'])).toBe(true);
-    expect(isClientEmployer('Example Staffing', null, ['Example Corp', 'example.com', 'Example Holdings'])).toBe(false);
+    expect(isClientEmployer('CI Financial', null, ['CI Financial Services'])).toBe(true);
   });
   it('skips "Example Staffing" people as another employer unless their email is on the account domain', () => {
     const r = parseOrgChartHtml(
