@@ -9,13 +9,25 @@ vi.mock('@/lib/api', async (orig) => {
 import { ApiError, api } from '@/lib/api';
 
 import { isMissingRoute, isOwnApiUrl, listQueryString, msaClient, uploadMsaVersion, validateMsaFile } from './client';
-import { actionLabel, urgency } from './labels';
+import { actionLabel, fmtMoneyMicros, urgency } from './labels';
 import { filterRows, sampleDetail, sampleRows, sampleSummary, sampleTimeline } from './sample';
 
 const NOW = Date.UTC(2026, 9, 31);
 const missing = new ApiError('Route GET:/api/v1/msa not found', 404, { message: 'Route GET:/api/v1/msa not found', error: 'Not Found', statusCode: 404 });
 
 afterEach(() => vi.mocked(api).mockReset());
+
+describe('fmtMoneyMicros', () => {
+  it('keeps a liability cap that compact rounding would move', () => {
+    // WHY: €7.9M is 40,000 short of a 7.86 million cap, and €250.0K drops the 50 cents.
+    expect(fmtMoneyMicros(7_860_000_000_000, 'eur')).toBe('EUR 7.86m');
+    expect(fmtMoneyMicros(250_000_500_000, 'EUR')).toBe('EUR 250,000.50');
+    expect(fmtMoneyMicros(12_015_000_000_000, 'EUR')).toBe('EUR 12,015,000');
+    expect(fmtMoneyMicros(2_000_000_000_000, 'EUR')).toBe('EUR 2m');
+    expect(fmtMoneyMicros(1.5, 'EUR')).toBe('amount not readable');
+    expect(fmtMoneyMicros(2_000_000_000_000, 'eu')).toBe('2m unspecified');
+  });
+});
 
 describe('isMissingRoute', () => {
   it('is true only for the Fastify unknown-route 404', () => {

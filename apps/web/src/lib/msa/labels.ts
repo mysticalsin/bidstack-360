@@ -1,4 +1,5 @@
 // Plain-language labels and tones for the Agreements screens.
+import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import type { BadgeTone } from '@/components/ui/Badge';
 
 import type { MsaKind, MsaStatus } from './types';
@@ -35,7 +36,10 @@ export function fmtBytes(n: number): string {
 }
 
 export function fmtMoneyMicros(amountMicros: number, currency: string): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(amountMicros / 1e6);
+  if (!Number.isSafeInteger(amountMicros)) return 'amount not readable';
+  const amount = headlineMicrosLabel(amountMicros, 'en-GB');
+  const code = currency.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? `${code} ${amount}` : `${amount} unspecified`;
 }
 
 /** Deadline urgency for the expiring-soon strip and the list. */
