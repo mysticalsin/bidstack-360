@@ -68,6 +68,18 @@ export function isUniqueViolation(err: unknown): boolean {
  * source of truth used by the seed, worker, and CRM cockpit). Used by the
  * import path to resolve all rows from a single fetch instead of N+1.
  */
+/** One id per normalized name. A second different id clears the link. */
+export function rememberCompanyName(
+  index: Map<string, string | null>,
+  company: { id: string; name: string },
+): void {
+  const key = normalizeName(company.name);
+  if (!key) return;
+  const prior = index.get(key);
+  if (prior === undefined) index.set(key, company.id);
+  else if (prior !== company.id) index.set(key, null);
+}
+
 export async function loadCompanyNameIndex(
   db: Prisma.TransactionClient,
   orgId: string,
@@ -80,7 +92,7 @@ export async function loadCompanyNameIndex(
   // pagination keeps every query <= PAGE (guard-safe: take <= 1000) while still
   // producing the complete index callers depend on.
   const PAGE = 1000;
-  const index = new Map<string, string>();
+  const index = new Map<string, string | null>();
   let cursor: string | undefined;
   for (;;) {
     const page = await db.company.findMany({
@@ -90,11 +102,7 @@ export async function loadCompanyNameIndex(
       take: PAGE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    for (const c of page) {
-      const key = normalizeName(c.name);
-      // First match wins so re-runs are stable when two names normalize alike.
-      if (key && !index.has(key)) index.set(key, c.id);
-    }
+    for (const c of page) rememberCompanyName(index, c);
     if (page.length < PAGE) break;
     cursor = page[page.length - 1]!.id;
   }

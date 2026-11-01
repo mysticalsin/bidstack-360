@@ -108,7 +108,8 @@ export async function mintOpportunityTx(
       pipelineStageId,
       companyId,
       valueMicros: input.valueMicros ?? BigInt(0),
-      probability: input.probability ?? 20,
+      // Omitted is 0, which adds nothing to weighted pipeline. 20 was an invented chance.
+      probability: input.probability ?? 0,
       ownerId: input.ownerId ?? null,
     },
   });

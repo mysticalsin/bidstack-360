@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { stageMoveDiff } from './opportunities.helpers';
+import { rememberCompanyName, stageMoveDiff } from './opportunities.helpers';
 
 describe('stageMoveDiff', () => {
   it('records a lost move so a patch cannot drop the stage event', () => {
@@ -15,6 +15,17 @@ describe('stageMoveDiff', () => {
       fromPipelineStageId: 'stage-old',
       toPipelineStageId: 'stage-lost',
     });
+  });
+
+  it('does not link a customer name that matches two companies', () => {
+    // WHY: first-match used to attach the deal to whichever company was
+    // loaded first. Two names that normalize the same are not a link.
+    const index = new Map<string, string | null>();
+    rememberCompanyName(index, { id: 'a', name: 'Acme Inc' });
+    rememberCompanyName(index, { id: 'b', name: 'Acme, Inc.' });
+    expect(index.get('acme-inc')).toBeNull();
+    rememberCompanyName(index, { id: 'c', name: 'Only One' });
+    expect(index.get('only-one')).toBe('c');
   });
 
   it('does not emit an event when the stage is unchanged', () => {

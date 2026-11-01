@@ -307,6 +307,12 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           pipelineStageId: body.pipelineStageId,
           stageKey: body.stage,
         });
+        if (opp.companyId) {
+          await tx.contact.update({
+            where: { id: contact.id },
+            data: { companyId: opp.companyId },
+          });
+        }
 
         // 3. Mark lead as converted. The status guard makes this flip the
         // concurrency gate: two simultaneous converts both pass the outside-tx
