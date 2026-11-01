@@ -1,5 +1,5 @@
 // MARS integration routes (feature flag MARS_INTEGRATION_ENABLED, off by
-// default: every route answers 404 while it is off).
+// default: every route answers 404 to a permitted caller while it is off).
 //
 //   GET  /mars/status                  meetings:read   connection status and counts
 //   POST /mars/sync                    meetings:write + Admin   create the org connection if missing, enqueue a pull
@@ -42,7 +42,10 @@ async function audit(req: FastifyRequest, action: string, targetId: string | nul
 
 export const marsRoutes: FastifyPluginAsyncZod = async (server) => {
   const enabled = () => isMarsEnabled(process.env.MARS_INTEGRATION_ENABLED);
-  server.addHook('onRequest', async () => {
+  // preHandler, not onRequest: the global RBAC preHandler runs first, so a
+  // caller without the permission gets 403 either way (route census), and a
+  // permitted caller gets 404 while the flag is off.
+  server.addHook('preHandler', async () => {
     if (!enabled()) throw server.httpErrors.notFound('Not found');
   });
   // Raw body for the webhook HMAC (parser scope = this plugin only).
