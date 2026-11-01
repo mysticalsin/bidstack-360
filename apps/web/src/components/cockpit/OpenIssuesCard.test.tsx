@@ -69,6 +69,24 @@ describe('OpenIssuesCard', () => {
     expect(screen.getByText('3')).toBeTruthy();
   });
 
+  it('does not draw a zero risk mix for open compliance checks', () => {
+    // WHY: the caption counts compliance. Zero risk buckets made those checks
+    // look like an empty risk mix.
+    render(
+      <OpenIssuesCard
+        risks={[]}
+        compliance={[]}
+        openRiskCount={0}
+        openComplianceCount={5}
+        openRiskSeverity={{ critical: 0, high: 0, medium: 0, low: 0 }}
+        complianceCapped
+      />,
+    );
+    expect(screen.getByText('Latest 50 rows. 5 open items on the account.')).toBeTruthy();
+    expect(screen.queryByText('Unranked')).toBeNull();
+    expect(screen.queryByText('Critical')).toBeNull();
+  });
+
   it('does not mark an unranked risk as low', () => {
     // WHY: a missing severity used to fall through to the low initial.
     expect(severityShort(null)).toBe('–');

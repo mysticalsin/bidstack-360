@@ -55,6 +55,8 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
     openRiskCount,
     openRiskSeverity,
   }).unranked;
+  const rankedOpen = severity.critical + severity.high + severity.medium + severity.low;
+  const showRiskMix = recorded > 0 || unranked > 0 || rankedOpen > 0;
   const buckets = [
     {
       label: 'Critical',
@@ -122,7 +124,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
         }
       />
       <div style={{ padding: '8px 18px 14px' }}>
-        {recorded > 0 || (openRiskSeverity != null && (total > 0 || unranked > 0)) ? (
+        {showRiskMix ? (
         <div className="issue-buckets" aria-label={t('openIssues.bucketsLabel', 'Severity buckets')}>
           {buckets.map((bucket, index) => (
             <motion.div
