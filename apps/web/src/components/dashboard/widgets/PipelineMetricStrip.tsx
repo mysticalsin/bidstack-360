@@ -44,9 +44,12 @@ function ShareBars({ values }: { values: readonly number[] }) {
 export function PipelineMetricStrip({
   stages,
   loading = false,
+  weightedMicros,
 }: {
   stages: readonly PipelineStagePoint[] | undefined;
   loading?: boolean;
+  /** Integer micros for the weighted open book. Omitted leaves the open card unchanged. */
+  weightedMicros?: string | null;
 }) {
   const { t } = useTranslation('crm');
   if (loading && !stages) {
@@ -56,6 +59,8 @@ export function PipelineMetricStrip({
 
   const headline = pipelineHeadline(stages);
   const open = openPipelineStages(stages);
+  const weightedLabel =
+    weightedMicros && /^-?\d+$/.test(weightedMicros) ? headlineMicrosLabel(weightedMicros) : null;
   const winRate =
     headline.winRate === null
       ? t('pipeline.winRateNoClosedBids', 'No closed bids')
@@ -67,6 +72,7 @@ export function PipelineMetricStrip({
       detail: t('pipeline.metricOpenDetail', 'Open stages only.'),
       basis: UNSPECIFIED_CURRENCY_BASIS,
       bars: stageBarShares(open),
+      weighted: weightedLabel,
     },
     {
       label: t('pipeline.kpiWonValue', 'Won'),
@@ -74,6 +80,7 @@ export function PipelineMetricStrip({
       detail: `${t('pipeline.metricWonDetail', 'Closed won. Count is the win rate numerator.')} ${UNSPECIFIED_CURRENCY_BASIS}`,
       basis: null,
       bars: [headline.wonValue],
+      weighted: null,
     },
     {
       label: t('pipeline.kpiLostValue', 'Lost'),
@@ -81,6 +88,7 @@ export function PipelineMetricStrip({
       detail: `${t('pipeline.metricLostDetail', 'Closed lost, including a stage marked lost.')} ${UNSPECIFIED_CURRENCY_BASIS}`,
       basis: null,
       bars: [headline.lostValue],
+      weighted: null,
     },
     {
       label: t('pipeline.kpiWinRate', 'Win rate'),
@@ -88,6 +96,7 @@ export function PipelineMetricStrip({
       detail: t('pipeline.metricWinDetail', 'Closed-won count divided by closed deals.'),
       basis: null,
       bars: [headline.winRate === null ? 0 : headline.winRate],
+      weighted: null,
     },
   ];
 
@@ -97,12 +106,17 @@ export function PipelineMetricStrip({
         <article
           key={card.label}
           className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-4"
-          aria-label={`${card.label}. ${card.value}${card.basis ? ' unspecified' : ''}. ${card.detail}${card.basis ? ` ${card.basis}` : ''}`}
+          aria-label={`${card.label}. ${card.value}${card.basis ? ' unspecified' : ''}${card.weighted ? `. ${card.weighted} weighted` : ''}. ${card.detail}${card.basis ? ` ${card.basis}` : ''}`}
         >
           <p className="text-xs text-[var(--fg-tertiary)]">{card.label}</p>
           <p className="mt-2 text-[28px] font-medium leading-none tabular-nums text-[var(--fg-primary)]">
             {card.value}
           </p>
+          {card.weighted ? (
+            <p className="mt-1 text-sm tabular-nums text-[var(--fg-secondary)]">
+              {card.weighted} weighted
+            </p>
+          ) : null}
           <p className="mt-2 text-xs text-[var(--fg-secondary)]">
             <span>{card.detail}</span>
             {card.basis ? (

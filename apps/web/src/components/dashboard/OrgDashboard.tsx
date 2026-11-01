@@ -43,7 +43,11 @@ export const OrgDashboard = memo(function OrgDashboard() {
           t('orgDashboard.errorMessage', 'The workspace summary endpoint did not respond.')
         }
         action={
-          <button type="button" className="btn btn-secondary" onClick={() => void summary.refetch()}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => void summary.refetch()}
+          >
             {t('orgDashboard.retry', 'Retry')}
           </button>
         }
@@ -73,7 +77,11 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
       </header>
 
-      <PipelineMetricStrip stages={pipelineReport.data?.byStage} loading={pipelineReport.isLoading} />
+      <PipelineMetricStrip
+        stages={pipelineReport.data?.byStage}
+        loading={pipelineReport.isLoading}
+        weightedMicros={pipelineReport.data?.weightedPipelineMicros}
+      />
 
       <PipelineByStageMini report={pipelineReport.data} />
 
@@ -82,7 +90,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <ClosingThisWeekCard />
           <TopAccountsCard />
         </div>
-        <aside className="flex min-w-0 flex-col gap-6" aria-label={t('orgDashboard.detailsAriaLabel', 'Workspace details')}>
+        <aside
+          className="flex min-w-0 flex-col gap-6"
+          aria-label={t('orgDashboard.detailsAriaLabel', 'Workspace details')}
+        >
           <AlertCard
             tone="rose"
             icon="tasks"

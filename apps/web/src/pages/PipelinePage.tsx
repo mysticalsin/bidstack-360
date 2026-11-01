@@ -237,7 +237,11 @@ export function PipelinePage() {
       </p>
 
       {!isLoading && data ? (
-        <PipelineMetricStrip stages={report.data?.byStage} loading={report.isLoading} />
+        <PipelineMetricStrip
+          stages={report.data?.byStage}
+          loading={report.isLoading}
+          weightedMicros={report.data?.weightedPipelineMicros}
+        />
       ) : null}
       {!isLoading && data ? (
         <p className="text-xs text-[var(--fg-tertiary)]">

@@ -36,7 +36,7 @@ import {
 } from '../unspecified-currency';
 
 import { closedOutcome } from '@/lib/pipeline-stages';
-import { formatMicrosAmount, microsToUnits, unitsToMicros, type Opportunity } from '@bidstack/shared';
+import { formatMicrosAmount, unitsToMicros, type Opportunity } from '@bidstack/shared';
 
 // Must match ClosingThisWeekCard's filter exactly so React Query serves both
 // widgets from a single fetch (object keys are hashed order-independently).
@@ -325,8 +325,8 @@ function closingSignal(inputs: SignalInputs): HeroSignal {
 
 function weightedAmount(micros: bigint): string {
   const value = micros > 0n ? micros : 0n;
-  if (value / 1_000_000n > BigInt(Number.MAX_SAFE_INTEGER)) return formatMicrosAmount(value);
-  return formatUnspecifiedAmount(microsToUnits(value));
+  // The cent is on the integer. A unit number rounds 200,000.50 to 200,001.
+  return `${formatMicrosAmount(value)} unspecified`;
 }
 
 function weightedSignal({ report, reportPending, t }: SignalInputs): HeroSignal {

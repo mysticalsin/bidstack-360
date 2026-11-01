@@ -128,7 +128,7 @@ describe('OrgCommandHero', () => {
     expect(screen.getByText(/50,000 at stake/)).toBeDefined();
     // Weighted coverage = 200k / 500k = 40% of the gross open value.
     expect(screen.getByText('40% of gross open value')).toBeDefined();
-    expect(screen.getByText('200,000')).toBeDefined();
+    expect(screen.getByText('200,000 unspecified')).toBeDefined();
     // Velocity footer surfaces the report's real numbers, rounded.
     expect(screen.getByText('21 days')).toBeDefined();
     expect(screen.getByText('2 of 12 tasks')).toBeDefined();
@@ -179,8 +179,26 @@ describe('OrgCommandHero', () => {
       },
     });
     render(<OrgCommandHero summary={summary} />);
-    expect(screen.getByText('9,007,199,254,740,993')).toBeDefined();
+    expect(screen.getByText('9,007,199,254,740,993 unspecified')).toBeDefined();
     expect(screen.queryByText('9,007,199,254,740,992')).toBeNull();
+  });
+
+  it('keeps a weighted cent instead of rounding the unit number', () => {
+    // WHY: formatting the unit number turned 200,000.50 into 200,001.
+    mockQueries({
+      reportState: {
+        data: {
+          ...report,
+          weightedPipeline: 200_000.5,
+          weightedPipelineMicros: '200000500000',
+        },
+        isLoading: false,
+        isError: false,
+      },
+    });
+    render(<OrgCommandHero summary={summary} />);
+    expect(screen.getByText('200,000.50 unspecified')).toBeDefined();
+    expect(screen.queryByText('200,001 unspecified')).toBeNull();
   });
 
   it('skeletons the report-backed signals while the pipeline report loads', () => {
