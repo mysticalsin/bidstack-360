@@ -101,6 +101,7 @@
     "db:backup": "bash scripts/backup-postgres.sh",
     "db:restore": "bash scripts/restore-postgres.sh",
     "db:backup:selftest": "bash scripts/backup-restore-selftest.sh",
+    "db:backup:client-test": "bash scripts/postgres-client.test.sh",
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",
     "webhooks:encrypt-secrets": "tsx scripts/encrypt-webhook-secrets.ts --dry-run",

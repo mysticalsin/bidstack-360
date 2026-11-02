@@ -3,6 +3,9 @@
 # database, and compares public-table row counts. Uses only synthetic names.
 set -euo pipefail
 
+# Filter / client-selection checks do not need a live database.
+bash "$(dirname "$0")/postgres-client.test.sh"
+
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL is required" >&2
   exit 1
