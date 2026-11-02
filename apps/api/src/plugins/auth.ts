@@ -39,6 +39,8 @@ export interface AuthContext {
   scopes: string[];
   role: string;
   email?: string;
+  /** API keys only. When true, :write permissions are denied even if scoped. */
+  readOnly?: boolean;
 }
 
 const STUB_CLERK_ORG = 'org_seed_mantu';
@@ -667,6 +669,7 @@ async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {
     userId: `apikey:${apiKey.id}`,
     scopes: apiKey.scopes,
     role: 'api',
+    readOnly: apiKey.readOnly,
   };
 }
 

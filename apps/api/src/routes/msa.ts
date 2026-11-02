@@ -49,7 +49,13 @@ import {
   type MsaTimelineEvent,
 } from '@bidstack/shared';
 
-import { applyCompanyScope, getAccessScope, type AccessScope } from '../lib/access-scope.js';
+import {
+  applyCompanyScope,
+  applyMsaResourceScope,
+  getAccessScope,
+  isApiKeyActor,
+  type AccessScope,
+} from '../lib/access-scope.js';
 import { userHasPermission } from '../lib/rbac-decision-cache.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
@@ -185,6 +191,9 @@ function serializeRow(r: Row): MsaSummaryRow {
 /** Scope predicate on contract_agreements: the linked company must be in scope. */
 export function msaScopeWhere(orgId: string, scope: AccessScope): Prisma.ContractAgreementWhereInput {
   if (scope.unrestricted) return { orgId, deletedAt: null };
+  if (isApiKeyActor(scope.userId)) {
+    return applyMsaResourceScope({ orgId, deletedAt: null }, scope);
+  }
   return {
     orgId,
     deletedAt: null,

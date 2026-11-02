@@ -58,6 +58,10 @@ export function ApiKeysSection() {
     const fd = new FormData(e.currentTarget);
     const name = String(fd.get('name') ?? '').trim();
     const scopes = ALL_SCOPES.filter((s) => fd.get(`scope-${s}`) === 'on');
+    const readOnly = fd.get('readOnly') === 'on';
+    const unrestrictedScope = fd.get('unrestrictedScope') === 'on';
+    const companyIds = parseUuidList(String(fd.get('companyIds') ?? ''));
+    const msaIds = parseUuidList(String(fd.get('msaIds') ?? ''));
     if (!name) {
       setError(t('apiKeys.error.nameRequired', 'Name is required'));
       return;
@@ -66,8 +70,19 @@ export function ApiKeysSection() {
       setError(t('apiKeys.error.scopeRequired', 'Select at least one scope'));
       return;
     }
+    if (companyIds === null || msaIds === null) {
+      setError(t('apiKeys.error.invalidIds', 'Company and MSA scope must be comma-separated UUIDs'));
+      return;
+    }
     try {
-      const created = await create.mutateAsync({ name, scopes });
+      const created = await create.mutateAsync({
+        name,
+        scopes,
+        readOnly,
+        unrestrictedScope,
+        companyIds,
+        msaIds,
+      });
       setRevealed(created);
       setOpen(false);
       toast.success(t('apiKeys.toast.createdTitle', 'API key created'), {
@@ -213,6 +228,69 @@ export function ApiKeysSection() {
                     />
                   </div>
                 </fieldset>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="readOnly"
+                    defaultChecked
+                    className="mt-0.5 accent-[var(--brand-primary)]"
+                  />
+                  <span>
+                    <span className="font-medium text-[var(--fg-primary)]">
+                      {t('apiKeys.field.readOnly', 'Read-only')}
+                    </span>
+                    <span className="ml-2 text-xs text-[var(--fg-tertiary)]">
+                      {t(
+                        'apiKeys.field.readOnlyHelp',
+                        'Blocks every write permission even if a write scope is ticked.',
+                      )}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="unrestrictedScope"
+                    className="mt-0.5 accent-[var(--brand-primary)]"
+                  />
+                  <span>
+                    <span className="font-medium text-[var(--fg-primary)]">
+                      {t('apiKeys.field.unrestricted', 'Org-wide access')}
+                    </span>
+                    <span className="ml-2 text-xs text-[var(--fg-tertiary)]">
+                      {t(
+                        'apiKeys.field.unrestrictedHelp',
+                        'Off by default. Leave off and list companies/MSAs, or the key sees none.',
+                      )}
+                    </span>
+                  </span>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                    {t('apiKeys.field.companyIds', 'Company IDs')}
+                  </span>
+                  <input
+                    name="companyIds"
+                    placeholder={t(
+                      'apiKeys.field.companyIdsPlaceholder',
+                      'Comma-separated UUIDs. Empty means no companies.',
+                    )}
+                    className="dialog-input"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                    {t('apiKeys.field.msaIds', 'MSA IDs')}
+                  </span>
+                  <input
+                    name="msaIds"
+                    placeholder={t(
+                      'apiKeys.field.msaIdsPlaceholder',
+                      'Comma-separated UUIDs. Empty means no MSAs.',
+                    )}
+                    className="dialog-input"
+                  />
+                </label>
                 {error ? (
                   <p
                     role="alert"
@@ -321,6 +399,19 @@ export function ApiKeysSection() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {k.readOnly ? (
+                  <Badge tone="gray">{t('apiKeys.badge.readOnly', 'read-only')}</Badge>
+                ) : null}
+                {k.unrestrictedScope ? (
+                  <Badge tone="amber">{t('apiKeys.badge.orgWide', 'org-wide')}</Badge>
+                ) : (
+                  <Badge tone="gray">
+                    {t('apiKeys.badge.scoped', '{{companies}} companies · {{msas}} MSAs', {
+                      companies: k.companyIds.length,
+                      msas: k.msaIds.length,
+                    })}
+                  </Badge>
+                )}
                 {k.scopes.map((s) => (
                   <Badge key={s} tone={badgeTone(s)}>
                     {s}
@@ -342,6 +433,17 @@ export function ApiKeysSection() {
       )}
     </Card>
   );
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseUuidList(raw: string): string[] | null {
+  const parts = raw
+    .split(/[\s,]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.some((p) => !UUID_RE.test(p))) return null;
+  return [...new Set(parts)];
 }
 
 function ScopeGroup({ title, scopes }: { title: string; scopes: readonly string[] }) {

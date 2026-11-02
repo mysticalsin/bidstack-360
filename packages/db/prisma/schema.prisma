@@ -925,6 +925,13 @@ model ApiKey {
   hashedKey  String    @unique @map("hashed_key")
   prefix     String // first 8 chars, displayed
   scopes     String[]  @default(["read"])
+  // Existing keys are backfilled unrestricted + writable. New keys default
+  // to deny (empty company/MSA lists) and read-only unless the creator
+  // opts in. See docs/enterprise-readiness.md B2.
+  unrestrictedScope Boolean  @default(false) @map("unrestricted_scope")
+  readOnly          Boolean  @default(true) @map("read_only")
+  companyIds        String[] @default([]) @map("company_ids") @db.Uuid
+  msaIds            String[] @default([]) @map("msa_ids") @db.Uuid
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
   expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
