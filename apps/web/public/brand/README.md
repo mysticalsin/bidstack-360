@@ -13,7 +13,7 @@ The standalone SVG files below exist for surfaces that need a plain asset URL
 | --------------------------- | -------------------------- | ------------------------------------------ |
 | Full lockup (mark + word)   | `polo-presales-logo.svg`   | Static/email/OG use; component for in-app  |
 | Mark only (transparent)     | `polo-presales-mark.svg`   | Compact placements, favicons               |
-| App icon (gradient square)  | `/icon.svg`, `/icon-*.png` | Browser tab, PWA, apple-touch              |
+| App icon (navy square)      | `/icon.svg`, `/icon-*.png` | Browser tab, PWA, apple-touch              |
 
 ## Palette
 

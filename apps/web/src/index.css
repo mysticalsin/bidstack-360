@@ -1105,24 +1105,22 @@ select:focus-visible {
 .sb-mark {
   width: 34px;
   height: 34px;
-  /* Three-stop brand gradient (indigo → violet → magenta) matching the mark's
-     own fill, on a squircle badge with a hairline top highlight + soft ambient
-     lift so it reads as a machined chip, not a flat swatch. */
-  background: linear-gradient(140deg, #3f16e8 0%, #7a1fd6 52%, #e4069f 100%);
-  color: #fff;
-  border-radius: 11px;
+  /* Navy plate from the Polo brand (#071422, the lockup field) so the
+     full-color compass pin reads exactly as in the brand assets. A hairline
+     ring and soft lift keep it distinct on both light and dark rails. */
+  background: #071422;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 6px 16px -6px rgba(122, 31, 214, 0.55);
+    inset 0 0 0 1px rgba(126, 212, 227, 0.18),
+    0 4px 12px -6px rgba(7, 20, 34, 0.6);
 }
 .sb-mark svg {
-  width: 22px;
-  height: 22px;
+  width: auto;
+  height: 24px;
 }
 .sb-name {
   font-weight: 700;
