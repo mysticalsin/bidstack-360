@@ -172,7 +172,9 @@ export const MsaListQuery = z.object({
   /** Matches title, reference and counterparty (case-insensitive). Use /msa/search for file text. */
   q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(['expiry', 'updated', 'title']).default('expiry'),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  // 101 is one past the agreements library table, which draws 100. The extra
+  // row is a probe. It is not a page size for other callers (default stays 50).
+  limit: z.coerce.number().int().min(1).max(101).default(50),
   cursor: z.coerce.number().int().min(0).default(0),
 });
 export type MsaListQuery = z.infer<typeof MsaListQuery>;
