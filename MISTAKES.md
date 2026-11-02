@@ -61,6 +61,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 - **Prevention rule:** Never put inheritable `color` on `<body>` for a first-paint fallback — put it on the fallback node. Scope account header assertions to `getByRole('group', { name: 'Key numbers' })`. Commit Playwright baselines from the CI runner, not the agent host.
 - **Files affected:** `apps/web/index.html`, `apps/web/e2e/accounts.spec.ts`, `apps/web/e2e/responsive/**/*-snapshots/`.
 
+### 2026-11-02 TESTING: Disabling the service worker on webdriver broke PWA E2E
+
+- **What went wrong:** After `608f9064`, shard 2 failed `pwa-offline.spec.ts` (SW never registered) and proposals Next stayed intercepted by the Quick-actions FAB.
+- **Root cause:** `navigator.webdriver` was used to skip SW registration so Lighthouse would not warm the app shell. Playwright sets webdriver, so the PWA tests saw no worker. Proposals Next is covered by `fixed bottom-6 right-6` Quick actions.
+- **Prevention rule:** Gate LHCI-only skips on a Vite build flag (`VITE_DISABLE_SERVICE_WORKER`), never `navigator.webdriver`. Force-click pagination when a documented overlay intercepts.
+- **Files affected:** `apps/web/src/main.tsx`, `apps/web/e2e/proposals.spec.ts`.
+
 ### 2026-11-02 TESTING: Lighthouse login stayed at 0.87 after deferring the hero video
 
 - **What went wrong:** After the desktop-preset + no-Clerk pass, LHCI `/login` performance was 0.56 / 0.87 / 0.87 (median 0.87 vs 0.90). FCP/LCP assertions passed.

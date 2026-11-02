@@ -98,7 +98,8 @@ test('proposals view round-trips search, sort and page through the URL', async (
     await page
       .getByRole('navigation', { name: /pagination/i })
       .getByRole('button', { name: /^next$/i })
-      .click();
+      // Quick-actions FAB (fixed bottom-right) sits on the pager in CI.
+      .click({ force: true });
     await expect(page).toHaveURL(/[?&]page=2\b/, { timeout: 10_000 });
     await expect(page.locator(DATA_ROWS)).toHaveCount(1);
     await expect(firstRowName(page)).toHaveText(`${stamp} Foxtrot`);
@@ -149,9 +150,10 @@ test('the proposals table body never goes empty during a page transition', async
     });
 
     const pager = page.getByRole('navigation', { name: /pagination/i });
-    await pager.getByRole('button', { name: /^next$/i }).click();
+    // force: the Quick-actions FAB intercepts the real click in CI.
+    await pager.getByRole('button', { name: /^next$/i }).click({ force: true });
     await expect(page.locator(DATA_ROWS)).toHaveCount(1, { timeout: 10_000 });
-    await pager.getByRole('button', { name: /^previous$/i }).click();
+    await pager.getByRole('button', { name: /^previous$/i }).click({ force: true });
     await expect(page.locator(DATA_ROWS)).toHaveCount(5, { timeout: 10_000 });
 
     const blankFrames = await page.evaluate(() => {

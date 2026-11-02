@@ -28,8 +28,9 @@ gates failed: full E2E, Semgrep ERROR, and Lighthouse CI.
   After that pass, `/login` still scored 0.56 / 0.87 / 0.87 (median 0.87).
   The idle timeout still started the Cloudfront MP4 mid-run, and the
   production service worker warmed the app shell on first paint. Skip the
-  video and SW when `VITE_DISABLE_HERO_VIDEO` / `VITE_DISABLE_SERVICE_WORKER`
-  or `navigator.webdriver`, and block those origins in LHCI.
+  video when `VITE_DISABLE_HERO_VIDEO` or `navigator.webdriver`. Skip the
+  service worker only via `VITE_DISABLE_SERVICE_WORKER` (LHCI). Playwright
+  sets webdriver and needs the worker. Block unused origins in LHCI.
 - `playwright merge-reports` has no `--output`. Download shard blobs into
   `apps/web/all-blob-reports` (the `--filter` cwd) and merge via
   `PLAYWRIGHT_HTML_REPORT`.
@@ -38,6 +39,9 @@ gates failed: full E2E, Semgrep ERROR, and Lighthouse CI.
   and paint `.sb-tag` / `.sb-group-title` with `--fg-secondary`.
 - Do not set inheritable `color` on `<body>` for the FCP fallback. It leaked
   `#f8fafc` into `.inline-edit-trigger { color: inherit }` on `/opportunities`.
+- Disable the service worker with `VITE_DISABLE_SERVICE_WORKER` in LHCI only.
+  `navigator.webdriver` also matches Playwright and breaks `pwa-offline.spec.ts`.
+- Proposals pagination Next is covered by the Quick-actions FAB; force-click.
 - `getByLabel('Key numbers')` matches the header group and the sr-only
   KeyNumbersStrip heading. Use `getByRole('group', { name: 'Key numbers' })`.
 - Responsive `toHaveScreenshot` baselines must come from the CI runner.

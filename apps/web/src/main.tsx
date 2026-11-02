@@ -200,9 +200,9 @@ const warmAppShellCache = async () => {
   await warmViteManifestCache(cache);
 };
 
-const disableServiceWorker =
-  import.meta.env.VITE_DISABLE_SERVICE_WORKER === 'true' ||
-  (typeof navigator !== 'undefined' && navigator.webdriver === true);
+// LHCI only. Do not also key this on navigator.webdriver — Playwright
+// E2E asserts the production service worker (pwa-offline.spec.ts).
+const disableServiceWorker = import.meta.env.VITE_DISABLE_SERVICE_WORKER === 'true';
 
 if ('serviceWorker' in navigator && import.meta.env.PROD && !disableServiceWorker) {
   const registerServiceWorker = () => {
