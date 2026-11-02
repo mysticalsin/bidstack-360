@@ -770,6 +770,26 @@ export const InitiativeEvidence = z.object({
   sample: z.boolean(),
 });
 
+/** Evidence items one initiative card draws. One more row is the probe. */
+export const INITIATIVE_EVIDENCE_DRAWN = 8;
+
+/**
+ * Evidence one initiative may collect before the card cuts the page. A fixed
+ * slice of eight dropped a later item, so that page read as every evidence
+ * item. One row past the page is the probe. It is not shown, and it is not
+ * a total.
+ */
+export function initiativeEvidencePage<T>(
+  rows: readonly T[],
+  drawn = INITIATIVE_EVIDENCE_DRAWN,
+): { items: T[]; pageContinues: boolean } {
+  const pageContinues = rows.length > drawn;
+  return {
+    items: pageContinues ? rows.slice(0, drawn) : [...rows],
+    pageContinues,
+  };
+}
+
 export const Initiative = z.object({
   id: z.string(),
   title: z.string(),
@@ -781,6 +801,11 @@ export const Initiative = z.object({
   firstSeen: Iso.nullable(),
   lastSeen: Iso.nullable(),
   evidence: z.array(InitiativeEvidence),
+  /**
+   * True when this card read one evidence row past the page and dropped it.
+   * `evidence` is that page, not every evidence item.
+   */
+  evidenceContinues: z.boolean().optional(),
   hook: z.object({ offering: z.string(), pitch: z.string(), nextStep: z.string(), alreadySold: z.boolean() }),
   sample: z.boolean(),
 });
