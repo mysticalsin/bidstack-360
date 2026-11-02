@@ -8,6 +8,7 @@ import { ChartCard, SignalShape } from '@/components/viz/ChartCard';
 import { StageBars } from '@/components/viz/charts';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
 import { fmtCompact, OPEN_STAGES, oppStatus, stageFunnel, stageKey, statusMix, type OppRow } from '@/components/viz/viz-data';
+import { accountPeopleMapMeta, accountPeoplePage } from '@/components/people/account-people-caption';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
@@ -75,7 +76,10 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
     rows.some((o) => oppStatus(o) === 'open' && stageKey(o.stage) === id),
   );
   const mix = statusMix(rows);
-  const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
+  // One row past the two hundred this map draws is the probe. It is not a
+  // person on this map, and it is not a total.
+  const peoplePage = accountPeoplePage(people.data?.people ?? []);
+  const ppl: MapPerson[] = peoplePage.people.map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
 
@@ -106,7 +110,7 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
       </ChartCard>
       <ChartCard
         title="Relationship map"
-        meta={ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
+        meta={ppl.length ? accountPeopleMapMeta(ppl.length, peoplePage.pageContinues, edges) : undefined}
         summary={ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'}
         table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
       >

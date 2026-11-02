@@ -12,6 +12,8 @@ import {
 } from '@/hooks/useAccountPeople';
 import type { ConnectionStanding, PeopleMapPerson } from '@bidstack/shared';
 
+import { accountPeopleCaption, accountPeoplePage } from './account-people-caption';
+
 type DealOption = { id: string; name: string };
 
 const STANDING_KEY: Record<ConnectionStanding, string> = {
@@ -47,11 +49,15 @@ export function AccountPeopleSection({
 }) {
   const people = usePeopleMap({ companyId, opportunityId });
   const work = useAccountWork({ companyId, opportunityId });
+  // One row past the two hundred this list draws is the probe. It is not a
+  // person on this account map, and it is not a total.
+  const page = accountPeoplePage(people.data?.people ?? []);
 
   return (
     <div className="space-y-6">
       <PeopleMap
-        people={people.data?.people}
+        people={page.people}
+        pageContinues={page.pageContinues}
         isLoading={people.isLoading}
         isError={people.isError}
         error={people.error}
@@ -62,7 +68,7 @@ export function AccountPeopleSection({
       <CommitmentLists
         companyId={companyId ?? people.data?.companyId ?? undefined}
         opportunityId={opportunityId}
-        people={people.data?.people ?? []}
+        people={page.people}
         deals={deals}
         work={work.data}
         isLoading={work.isLoading}
@@ -76,6 +82,7 @@ export function AccountPeopleSection({
 
 function PeopleMap({
   people,
+  pageContinues,
   isLoading,
   isError,
   error,
@@ -83,7 +90,8 @@ function PeopleMap({
   deals,
   companyId,
 }: {
-  people: PeopleMapPerson[] | undefined;
+  people: PeopleMapPerson[];
+  pageContinues: boolean;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -106,7 +114,7 @@ function PeopleMap({
       />
     );
   }
-  const rows = people ?? [];
+  const rows = people;
   const counts = rows.reduce(
     (acc, person) => {
       acc[person.standing] += 1;
@@ -141,8 +149,10 @@ function PeopleMap({
         </p>
         {rows.length > 0 && (
           <>
-            <p className="mt-3 text-sm text-[var(--fg-secondary)]">
-              {t('peopleMap.coverage', '{{coverage}}. Coverage is a count, not a score.', { coverage })}
+            <p className="mt-3 text-sm text-[var(--fg-secondary)]" data-testid="account-people-caption">
+              {pageContinues
+                ? t('peopleMap.pageCaption', accountPeopleCaption(rows.length, true))
+                : t('peopleMap.coverage', '{{coverage}}. Coverage is a count, not a score.', { coverage })}
             </p>
             <div className="mt-2 flex h-2 gap-1" aria-hidden="true">
               {rows.map((person) => (

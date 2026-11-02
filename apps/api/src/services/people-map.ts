@@ -14,6 +14,8 @@ import {
   type PersonFactView,
 } from '@bidstack/shared';
 
+import { accountPeopleTake } from './account-people-page.js';
+
 const FACT_SELECT = {
   id: true,
   contactId: true,
@@ -168,7 +170,9 @@ export async function peopleMapForCompany(orgId: string, companyId: string, now 
     where: { orgId, companyId, deletedAt: null },
     select: { id: true, name: true, role: true },
     orderBy: { name: 'asc' },
-    take: 200,
+    // One row past the two hundred the account map draws. The extra row is
+    // the probe. It is not a shown person, and it is not a total.
+    take: accountPeopleTake(),
   });
   return finishMap(orgId, people, companyId, null, now);
 }

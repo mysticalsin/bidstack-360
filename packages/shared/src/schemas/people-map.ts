@@ -59,6 +59,12 @@ export const PeopleMap = z.object({
 });
 export type PeopleMap = z.infer<typeof PeopleMap>;
 
+/**
+ * People drawn on one account map. The company query reads one row past this.
+ * That row is not a person on the map, and it is not a total.
+ */
+export const ACCOUNT_PEOPLE_DRAWN = 200;
+
 export const ContactFactCreate = z.object({
   kind: FactKind,
   claim: z.string().min(1).max(2000),
