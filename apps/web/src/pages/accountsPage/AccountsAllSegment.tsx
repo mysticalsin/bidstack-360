@@ -12,6 +12,7 @@ import { useAccountOpenBook } from '@/hooks/useAccountOpenBook';
 import { useChampionCoverage } from '@/hooks/useChampionCoverage';
 import { useNextOpenTask } from '@/hooks/useNextOpenTask';
 import { useOverdueTaskAccounts } from '@/hooks/useOverdueTaskAccounts';
+import { useQuietAccounts } from '@/hooks/useQuietAccounts';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
@@ -23,6 +24,7 @@ import { AccountBookChart } from './AccountBookChart';
 import { ChampionGap } from './ChampionGap';
 import { NextOpenTaskLine } from './NextOpenTaskLine';
 import { OverdueTaskAccountsLine } from './OverdueTaskAccountsLine';
+import { QuietAccountsLine } from './QuietAccountsLine';
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
@@ -221,6 +223,13 @@ export function AccountsAllSegment() {
     viewCompanyIds.length === 0 || overdueTasks.isSuccess
       ? 'ready'
       : overdueTasks.isError
+        ? 'error'
+        : 'loading';
+  const quietAccounts = useQuietAccounts(viewCompanyIds);
+  const quietStatus =
+    viewCompanyIds.length === 0 || quietAccounts.isSuccess
+      ? 'ready'
+      : quietAccounts.isError
         ? 'error'
         : 'loading';
 
@@ -468,6 +477,12 @@ export function AccountsAllSegment() {
           hasAccounts={viewCompanyIds.length > 0}
           accounts={overdueTasks.data?.accounts ?? 0}
           complete={overdueTasks.data?.complete ?? false}
+        />
+        <QuietAccountsLine
+          status={quietStatus}
+          hasAccounts={viewCompanyIds.length > 0}
+          accounts={quietAccounts.data?.accounts ?? 0}
+          complete={quietAccounts.data?.complete ?? false}
         />
       </section>
 

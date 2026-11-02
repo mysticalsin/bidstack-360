@@ -136,6 +136,15 @@ vi.mock('@/hooks/useOverdueTaskAccounts', () => ({
     isPending: true,
   }),
 }));
+vi.mock('@/hooks/useQuietAccounts', () => ({
+  useQuietAccounts: () => ({
+    data: undefined,
+    isSuccess: false,
+    isError: false,
+    isLoading: true,
+    isPending: true,
+  }),
+}));
 vi.mock('@/hooks/useMsaLeverage', () => ({
   useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
 }));
