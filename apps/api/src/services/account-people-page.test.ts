@@ -34,4 +34,15 @@ describe('accountPeopleTake', () => {
     expect(block).toContain('take: accountPeopleTake()');
     expect(block).not.toMatch(/take:\s*200/);
   });
+
+  it('the deal people query uses that probe take', () => {
+    // WHY: the deal map still took two hundred links. A later person never
+    // arrived, and "200 people" treated that page as the whole deal. The
+    // extra row is the probe. No person total is invented.
+    const src = readFileSync(fileURLToPath(new URL('./people-map.ts', import.meta.url)), 'utf8');
+    const start = src.indexOf('export async function peopleMapForOpportunity');
+    const block = src.slice(start, src.indexOf('async function finishMap'));
+    expect(block).toContain('take: accountPeopleTake()');
+    expect(block).not.toMatch(/take:\s*200/);
+  });
 });

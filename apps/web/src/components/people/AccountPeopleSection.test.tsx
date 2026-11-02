@@ -81,4 +81,39 @@ describe('AccountPeopleSection', () => {
     expect(screen.getByRole('heading', { name: 'Bea' })).toBeTruthy();
     expect(screen.queryByText(/not every/i)).toBeNull();
   });
+
+  it('uses the same page on a deal, and coverage only when that page is complete', () => {
+    // WHY: the deal people tab shares this map. A 201st person is not drawn
+    // and must not leave "200 unknown" as everyone on the deal. Two people,
+    // and a full page with no later row, keep coverage counts of the loaded
+    // length. No person total is invented.
+    state.people = Array.from({ length: ACCOUNT_PEOPLE_DRAWN + 1 }, (_, n) =>
+      person(n === ACCOUNT_PEOPLE_DRAWN ? 'Probe Person' : `Person ${n}`),
+    );
+    const { unmount } = render(<AccountPeopleSection opportunityId="opp-1" deals={[]} />);
+    expect(screen.getByTestId('account-people-caption').textContent).toBe(
+      '200 in the latest 200, not every person',
+    );
+    expect(screen.queryByText('Probe Person')).toBeNull();
+    expect(screen.queryByText('200 people')).toBeNull();
+    expect(screen.queryByText(/Coverage is a count/)).toBeNull();
+    unmount();
+
+    state.people = [person('Ada'), person('Bea')];
+    const { unmount: unmountShort } = render(
+      <AccountPeopleSection opportunityId="opp-1" deals={[]} />,
+    );
+    expect(screen.getByTestId('account-people-caption').textContent).toBe(
+      '2 unknown. Coverage is a count, not a score.',
+    );
+    expect(screen.queryByText(/not every/i)).toBeNull();
+    unmountShort();
+
+    state.people = Array.from({ length: ACCOUNT_PEOPLE_DRAWN }, (_, n) => person(`Person ${n}`));
+    render(<AccountPeopleSection opportunityId="opp-1" deals={[]} />);
+    expect(screen.getByTestId('account-people-caption').textContent).toBe(
+      '200 unknown. Coverage is a count, not a score.',
+    );
+    expect(screen.queryByText(/not every/i)).toBeNull();
+  });
 });

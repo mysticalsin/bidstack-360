@@ -5,6 +5,7 @@ import { SankeyChart, SankeyLink, SankeyNode } from '@/components/charts/sankey'
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { accountPeopleCaption, accountPeoplePage } from '@/components/people/account-people-caption';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import type { ConnectionStanding } from '@bidstack/shared';
 
@@ -21,17 +22,24 @@ export function BuyingGroupList({ opportunityId }: { opportunityId: string }) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const people = usePeopleMap({ opportunityId });
-  const rows = people.data?.people ?? [];
+  // One row past the two hundred this list draws is the probe. It is not a
+  // person on this deal map, and it is not a total.
+  const page = accountPeoplePage(people.data?.people ?? []);
+  const rows = page.people;
   const diagram = shapeBuyingGroup(rows);
 
   return (
     <Card>
       <SectionHeader
         title={t('buyingGroup.title', 'Buying group')}
-        caption={t(
-          'buyingGroup.caption',
-          'People already linked to this opportunity. Unknown means no accepted evidence. Needs review means a note we would not attach. Evidenced means a person accepted the link.',
-        )}
+        caption={
+          page.pageContinues
+            ? t('buyingGroup.pageCaption', accountPeopleCaption(rows.length, true))
+            : t(
+                'buyingGroup.caption',
+                'People already linked to this opportunity. Unknown means no accepted evidence. Needs review means a note we would not attach. Evidenced means a person accepted the link.',
+              )
+        }
       />
       {people.isLoading ? <LoadingSkeleton rows={3} /> : null}
       {people.isError ? (

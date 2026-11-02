@@ -188,7 +188,9 @@ export async function peopleMapForOpportunity(orgId: string, opportunityId: stri
     select: {
       contact: { select: { id: true, name: true, role: true } },
     },
-    take: 200,
+    // One row past the two hundred the deal map draws. The extra row is
+    // the probe. It is not a shown person, and it is not a total.
+    take: accountPeopleTake(),
   });
   const people = links.map((link) => link.contact);
   return finishMap(orgId, people, opportunity.companyId, opportunityId, now);
