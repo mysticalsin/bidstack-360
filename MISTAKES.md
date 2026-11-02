@@ -54,6 +54,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-02 TESTING: Full E2E treated viewer as admin and launched WebKit
+
+- **What went wrong:** `rbac.spec.ts` viewer/read-only landed on `/settings?tab=audit-log`. iPhone SE / iPad specs died in 1ms (`webkit` executable missing). Semgrep blocked on Actions interpolation and a root API Dockerfile. Lighthouse reported `NO_FCP` on `/login`.
+- **Root cause:** E2E web artifact omitted `VITE_ENABLE_E2E_ROLE_HEADER`, so RequireAdmin never saw the persona. `devices['iPhone SE']` sets `defaultBrowserType: 'webkit'`. `e2e.yml` interpolated matrix/input into `run:`. Vite preview ready-pattern was the dev-server string.
+- **Prevention rule:** Bake the E2E role header into the CI web build and set it on the Playwright context. Never spread a full Playwright device descriptor into a Chromium project. Put GitHub expressions in `env:`, not the shell script. Match Lighthouse ready-pattern to `vite preview` output (`Local:`).
+- **Files affected:** `apps/web/e2e/fixtures/auth.fixture.ts`, `apps/web/e2e/responsive/device-emulation.ts`, `.github/workflows/e2e.yml`, `.github/workflows/tsdoc-coverage.yml`, `.lighthouserc.cjs`, `apps/api/Dockerfile`.
+
 ### 2026-11-02 PROCESS: Polo CRM line on main broke CI and must not stay
 
 - **What went wrong:** `648d1f0a` merged the polo-integrated CRM line onto last-green `142544da` before preview `#57` and MSA `#56`. Required CI typecheck died (missing `useHasPermission` / `canWrite` / `formatStage`, string micros used as numbers). gitleaks scanned 162 newly first-parent CRM commits and flagged 3 generic-api-key false positives, not live secrets.

@@ -134,7 +134,9 @@ export default defineConfig({
   // must be deterministic. Developers can opt into faster non-gate runs with
   // E2E_WORKERS=2+ when they are not measuring Core Web Vitals.
   workers: workerCount,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  reporter: process.env.CI
+    ? [['list'], ['html', { open: 'never' }], ['blob', { outputDir: 'blob-report' }]]
+    : 'list',
   use: {
     baseURL,
     storageState: useStubAuthStorage

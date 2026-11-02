@@ -21,9 +21,12 @@ export function Hero() {
   const reduce = useReducedMotion();
   const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
+  // Paint immediately. An opacity-0 first frame is why Lighthouse CI reported
+  // NO_FCP on /login: headless Chrome never counted the delayed card as
+  // contentful paint. Reduced-motion users also get the settled layout.
   const enter = reduce
     ? {}
-    : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
+    : { initial: { opacity: 1, y: 0 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.01 } };
 
   return (
     <div className="w-full h-dvh flex items-center justify-center bg-[#0b0d12]">

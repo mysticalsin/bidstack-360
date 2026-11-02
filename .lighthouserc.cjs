@@ -3,8 +3,15 @@ module.exports = {
     collect: {
       url: ['http://localhost:4173/login', 'http://localhost:4173/dashboard'],
       startServerCommand: 'cd apps/web && pnpm preview',
-      startServerReadyPattern: 'ready in',
+      // Vite *preview* prints "Local: http://localhost:4173/", not the
+      // dev-server "ready in" line. Matching the wrong pattern made LHCI
+      // audit before paint and fail with NO_FCP.
+      startServerReadyPattern: 'Local:',
+      startServerReadyTimeout: 60000,
       numberOfRuns: 3,
+      settings: {
+        chromeFlags: '--no-sandbox --headless --disable-dev-shm-usage',
+      },
     },
     assert: {
       assertions: {

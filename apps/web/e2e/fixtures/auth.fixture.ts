@@ -43,6 +43,11 @@ export const test = base.extend<AuthFixtures>({
         },
         { key: STUB_ROLE_KEY, value: role },
       );
+      // Belt and suspenders: the SPA only forwards this header when the web
+      // build inlined VITE_ENABLE_E2E_ROLE_HEADER. Extra headers still reach
+      // the API (via the preview proxy) so RequireAdmin sees the persona even
+      // when a CI artifact was built without that flag.
+      await context.setExtraHTTPHeaders({ 'x-bidstack-e2e-role': role });
       await setRoleOnCurrentPage(page, role);
 
       // In Clerk mode we would apply the saved state file here. Stub mode is
