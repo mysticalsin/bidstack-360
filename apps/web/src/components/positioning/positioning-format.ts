@@ -28,6 +28,11 @@ export function sentimentWord(v: number): string {
 export type MicrosFormatter = (micros: string | number) => string;
 
 export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
+  if (n.unit === 'money_micros' && n.valueMicros && /^\d+$/.test(n.valueMicros)) {
+    return fmtMicros
+      ? fmtMicros(n.valueMicros)
+      : formatMoneyMicros(n.valueMicros, undefined, { compact: true });
+  }
   if (n.value === null) return 'No data';
   switch (n.unit) {
     case 'money':

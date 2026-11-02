@@ -50,6 +50,19 @@ describe('positioning-format', () => {
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');
     expect(formatValue(kn({}))).toBe('No data');
+    // WHY: Number(valueMicros) is one unit low, and Math.round of that number
+    // made the open-pipeline tile print zero instead of the stored cent.
+    const micros = '8598204328457184962';
+    expect(Number(micros).toString()).not.toBe(micros);
+    expect(
+      formatValue(
+        kn({ unit: 'money_micros', value: Number(micros), valueMicros: micros }),
+        (amount) => `kept:${amount}`,
+      ),
+    ).toBe(`kept:${micros}`);
+    expect(formatValue(kn({ unit: 'money_micros', value: Number(micros) }), (amount) => `kept:${amount}`)).toBe(
+      `kept:${Math.round(Number(micros))}`,
+    );
     expect(formatDelta(kn({ delta: 5.23, deltaUnit: 'pct' }))).toBe('+5.2%');
     expect(formatDelta(kn({ delta: -1.1, deltaUnit: 'pts' }))).toBe('-1.1 pts');
     expect(directionOf(kn({ delta: 0 }))).toBe('flat');
@@ -86,6 +99,32 @@ describe('KeyNumbersStrip', () => {
     expect(md.textContent).toContain('-4.0 pts');
     expect(md.getAttribute('data-tone')).toBe('neg');
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
+  });
+
+  it('prints the open pipeline from integer micros when the number has lost the cent', () => {
+    // WHY: the tile formatted Math.round(Number(micros)). Past 2^53 that
+    // number is not a safe integer, so the open pipeline rendered as zero.
+    const micros = '8598204328457184962';
+    state.kn = {
+      companyId: 'c1',
+      computedAt: '2026-11-01T00:00:00Z',
+      items: [
+        kn({
+          id: 'pipeline',
+          group: 'health',
+          label: 'Open pipeline',
+          unit: 'money_micros',
+          value: Number(micros),
+          valueMicros: micros,
+          sub: '1 open deal',
+        }),
+      ],
+    };
+    render(<KeyNumbersStrip companyId="c1" />);
+    const tile = screen.getByTestId('kn-pipeline');
+    expect(tile.textContent).toContain('457.18');
+    expect(tile.textContent).not.toContain('457.19');
+    expect(tile.textContent).not.toMatch(/0 unspecified/);
   });
 });
 

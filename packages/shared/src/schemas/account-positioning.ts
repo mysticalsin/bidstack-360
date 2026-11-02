@@ -126,6 +126,11 @@ export const KeyNumber = z.object({
   label: z.string(),
   /** null = no data; the UI shows the reason instead of a number. */
   value: z.number().nullable(),
+  /**
+   * Exact integer micros for a money_micros value. The number loses cents
+   * once the micros integer passes 2^53.
+   */
+  valueMicros: z.string().regex(/^\d+$/).optional(),
   unit: KeyNumberUnit,
   currency: z.string().nullable(),
   /** Change over the stated period, in deltaUnit. */
