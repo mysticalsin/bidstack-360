@@ -58,8 +58,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 - **What went wrong:** `rbac.spec.ts` viewer/read-only landed on `/settings?tab=audit-log`. iPhone SE / iPad specs died in 1ms (`webkit` executable missing). Semgrep blocked on Actions interpolation and a root API Dockerfile. Lighthouse reported `NO_FCP` on `/login`.
 - **Root cause:** E2E web artifact omitted `VITE_ENABLE_E2E_ROLE_HEADER`, so RequireAdmin never saw the persona. `devices['iPhone SE']` sets `defaultBrowserType: 'webkit'`. `e2e.yml` interpolated matrix/input into `run:`. Vite preview ready-pattern was the dev-server string.
-- **Prevention rule:** Bake the E2E role header into the CI web build and set it on the Playwright context. Never spread a full Playwright device descriptor into a Chromium project. Put GitHub expressions in `env:`, not the shell script. Match Lighthouse ready-pattern to `vite preview` output (`Local:`).
+- **Prevention rule:** Bake the E2E role header into the CI web build and set it on the Playwright context. Never spread a full Playwright device descriptor into a Chromium project. Put GitHub expressions in `env:`, not the shell script. Match Lighthouse ready-pattern to a contiguous `vite preview` token (`localhost`), never `Local:` (ANSI splits it).
 - **Files affected:** `apps/web/e2e/fixtures/auth.fixture.ts`, `apps/web/e2e/responsive/device-emulation.ts`, `.github/workflows/e2e.yml`, `.github/workflows/tsdoc-coverage.yml`, `.lighthouserc.cjs`, `apps/api/Dockerfile`.
+
+### 2026-11-02 TESTING: Lighthouse/E2E still red after the first green-gate pass
+
+- **What went wrong:** LHCI timed out on `/Local:/i` then scored 0.73 / FCP ~4.3s. Full E2E failed axe color-contrast on `.sb-tag` and sidebar section labels, migration copy, proposals `Next` click, and every responsive screenshot.
+- **Root cause:** Vite colourises `Local` separately from `:`. LHCI set a fake Clerk key and the login video used `preload=auto`. Sidebar used translucent `color-mix` + 10.5px tertiary text. Snapshot dirs were gitignored. Merge-reports looked for blobs under `apps/web` while artifacts landed at repo root. Dependency review requires a repo setting we do not control.
+- **Prevention rule:** Ready-pattern must match contiguous server output (`localhost`). Never set `VITE_CLERK_PUBLISHABLE_KEY` in Lighthouse. Do not preload remote hero video. Keep the sidebar opaque and 10.5px rail text on `--fg-secondary`. Commit Playwright `*-snapshots` (negate `*.png` in `.gitignore`). Download blob reports into the Playwright package cwd. If Dependency graph is not `enabled`, warn and keep Trivy/pnpm audit as the CVE gates.
+- **Files affected:** `.lighthouserc.cjs`, `.github/workflows/{lighthouse,e2e,dependency-review}.yml`, `apps/web/src/components/login/Hero.tsx`, `apps/web/src/index.css`, `apps/web/e2e/flows/migration.spec.ts`, `apps/web/e2e/proposals.spec.ts`, `.gitignore`.
 
 ### 2026-11-02 PROCESS: Polo CRM line on main broke CI and must not stay
 

@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -20,6 +20,20 @@ export function Hero() {
   const { signIn } = useSignInAction();
   const reduce = useReducedMotion();
   const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+  const [playVideo, setPlayVideo] = useState(false);
+
+  // Remote MP4 must not contend with first paint. Lighthouse CI + Slow 4G
+  // spent the FCP budget on Cloudfront when preload=auto.
+  useEffect(() => {
+    if (reduce) return;
+    const start = () => setPlayVideo(true);
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(start, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(start, 0);
+    return () => window.clearTimeout(timer);
+  }, [reduce]);
 
   // Paint immediately. An opacity-0 first frame is why Lighthouse CI reported
   // NO_FCP on /login: headless Chrome never counted the delayed card as
@@ -31,16 +45,18 @@ export function Hero() {
   return (
     <div className="w-full h-dvh flex items-center justify-center bg-[#0b0d12]">
       <section className="relative w-full h-full overflow-hidden flex items-center justify-center">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="absolute inset-0 w-full h-full object-cover z-0"
-        >
-          <source src={VIDEO_URL} type="video/mp4" />
-        </video>
+        {playVideo ? (
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="none"
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          >
+            <source src={VIDEO_URL} type="video/mp4" />
+          </video>
+        ) : null}
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/50 via-black/35 to-black/60" />
 
         <motion.div className="relative z-10 w-full max-w-[360px] mx-4 flex flex-col items-center" {...enter}>

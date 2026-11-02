@@ -27,7 +27,7 @@ test.describe('Data migration / import wizard', () => {
 
     const fileInput = page.locator('input[type="file"]');
     await expect(fileInput).toHaveAttribute('accept', /csv/);
-    await expect(page.getByRole('button', { name: /choose a csv file/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /choose a csv/i })).toBeVisible();
   });
 
   test('uploading sample CSV advances to mapping step', async ({ page }) => {
@@ -36,6 +36,6 @@ test.describe('Data migration / import wizard', () => {
     await page.locator('input[type="file"]').setInputFiles(SAMPLE_CSV);
     await expect(page.getByText('Map columns')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('columnheader', { name: 'CSV column' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /import \d+ rows/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /preview \d+ rows/i })).toBeVisible();
   });
 });

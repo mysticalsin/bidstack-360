@@ -113,9 +113,10 @@ apps/web/scripts/_i18n_*
 !scripts/*.mjs
 !apps/polo-preview/**/*.mjs
 
-# Web app screenshot blobs (committed by QA runs, not source)
+# Web app screenshot blobs at the package root (ad-hoc QA dumps)
 apps/web/*.png
-apps/web/e2e/responsive/*-snapshots/
+# Visual-regression baselines must be committed or CI has nothing to compare.
+!apps/web/e2e/**/*-snapshots/*.png
 
 # Scratch / exploratory scripts at repo root
 screenshot-*.cjs

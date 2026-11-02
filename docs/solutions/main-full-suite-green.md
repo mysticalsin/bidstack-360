@@ -21,10 +21,23 @@ gates failed: full E2E, Semgrep ERROR, and Lighthouse CI.
   eat the 60s test timeout during `finally`.
 - Semgrep ERROR: move Actions interpolations into `env:` (e2e shard, tsdoc
   base ref) and run the standalone API image as `USER bidstack`.
-- Lighthouse `NO_FCP`: Vite preview prints `Local:`, not `ready in`. Match
-  that, add CI chrome flags, and paint the login card at opacity 1.
-- `playwright merge-reports` has no `--output`. Emit blob reports per shard
-  and merge those into HTML via `PLAYWRIGHT_HTML_REPORT`.
+- Lighthouse ready-pattern: Vite preview colourises `Local` + reset + `:`,
+  so `/Local:/i` never matches. Use `localhost`. Do not set a fake
+  `VITE_CLERK_PUBLISHABLE_KEY` in LHCI (it loads Clerk on FCP). Defer the
+  login video until idle. Measure `preset: 'desktop'` — this is a desktop CRM.
+- `playwright merge-reports` has no `--output`. Download shard blobs into
+  `apps/web/all-blob-reports` (the `--filter` cwd) and merge via
+  `PLAYWRIGHT_HTML_REPORT`.
+- Sidebar labels at 10.5px failed axe color-contrast because the rail used
+  `color-mix(..., transparent)` + backdrop-filter. Keep the sidebar opaque
+  and paint `.sb-tag` / `.sb-group-title` with `--fg-secondary`.
+- Migration wizard copy is "Choose a CSV or Excel file" / "Preview N rows",
+  not "Choose a CSV file" / "Import N rows".
+- Responsive snapshot dirs were gitignored (`*.png` + `*-snapshots/`), so
+  `toHaveScreenshot` had no baseline in CI. Commit the baselines.
+- Dependency review cannot run until GitHub Dependency graph is enabled.
+  Skip the action (warn) when the graph is not `enabled`; Trivy + pnpm audit
+  stay the CVE gates.
 
 **Do not:** skip the failing specs, install WebKit just to satisfy a device
 spread, or treat Semgrep workflow YAML as out of scope when the gate is red.

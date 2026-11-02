@@ -51,8 +51,8 @@ jobs:
       - name: Build web
         run: pnpm --filter @bidstack/web build
         env:
-          # Stub auth token for preview mode — no real backend needed for LHCI
-          VITE_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          # Leave Clerk unset. A placeholder publishable key flips the login
+          # screen into Clerk mode and pulls clerk.accounts.dev on FCP.
           VITE_AUTH_MODE: stub
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
 

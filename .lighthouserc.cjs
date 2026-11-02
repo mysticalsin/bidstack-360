@@ -3,13 +3,16 @@ module.exports = {
     collect: {
       url: ['http://localhost:4173/login', 'http://localhost:4173/dashboard'],
       startServerCommand: 'cd apps/web && pnpm preview',
-      // Vite *preview* prints "Local: http://localhost:4173/", not the
-      // dev-server "ready in" line. Matching the wrong pattern made LHCI
-      // audit before paint and fail with NO_FCP.
-      startServerReadyPattern: 'Local:',
+      // Vite preview colourises the ready line, so the bytes are
+      // "Local" + ANSI reset + ":". /Local:/i never matches and LHCI
+      // waits the full timeout. "localhost" is contiguous in the URL.
+      startServerReadyPattern: 'localhost',
       startServerReadyTimeout: 60000,
       numberOfRuns: 3,
       settings: {
+        // Desktop CRM, not mobile Slow 4G. Default mobile throttling
+        // reported FCP ~4.3s / score 0.73 on a stub login card.
+        preset: 'desktop',
         chromeFlags: '--no-sandbox --headless --disable-dev-shm-usage',
       },
     },

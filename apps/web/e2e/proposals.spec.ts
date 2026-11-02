@@ -95,7 +95,10 @@ test('proposals view round-trips search, sort and page through the URL', async (
     // (3) Pagination pushes history, so Back walks pages (url-param-audit §6).
     await page.goto(listUrl, { waitUntil: 'load' });
     await expect(firstRowName(page)).toHaveText(`${stamp} Alpha`, { timeout: 20_000 });
-    await page.getByRole('button', { name: 'Next' }).click();
+    await page
+      .getByRole('navigation', { name: /pagination/i })
+      .getByRole('button', { name: /^next$/i })
+      .click();
     await expect(page).toHaveURL(/[?&]page=2\b/, { timeout: 10_000 });
     await expect(page.locator(DATA_ROWS)).toHaveCount(1);
     await expect(firstRowName(page)).toHaveText(`${stamp} Foxtrot`);
@@ -145,9 +148,10 @@ test('the proposals table body never goes empty during a page transition', async
       scope.__blankTimer = window.setInterval(sample, 16);
     });
 
-    await page.getByRole('button', { name: 'Next' }).click();
+    const pager = page.getByRole('navigation', { name: /pagination/i });
+    await pager.getByRole('button', { name: /^next$/i }).click();
     await expect(page.locator(DATA_ROWS)).toHaveCount(1, { timeout: 10_000 });
-    await page.getByRole('button', { name: 'Previous' }).click();
+    await pager.getByRole('button', { name: /^previous$/i }).click();
     await expect(page.locator(DATA_ROWS)).toHaveCount(5, { timeout: 10_000 });
 
     const blankFrames = await page.evaluate(() => {
