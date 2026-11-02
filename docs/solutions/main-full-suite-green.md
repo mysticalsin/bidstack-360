@@ -42,10 +42,12 @@ gates failed: full E2E, Semgrep ERROR, and Lighthouse CI.
 - Disable the service worker with `VITE_DISABLE_SERVICE_WORKER` in LHCI only.
   `navigator.webdriver` also matches Playwright and breaks `pwa-offline.spec.ts`.
 - Proposals pagination Next sat under the Quick-actions FAB (page bottom
-  padding 60px / 48px vs a 76px+ FAB stack). Reserve `--fab-clearance` on
-  `.page` (desktop and mobile), `scroll-padding-bottom` on `html`, and
-  `scroll-margin-bottom` on `[data-slot=pagination]` so a normal click works.
-  Do not force-click past a control users also cannot reach.
+  padding 60px / 48px vs a 76px+ FAB stack). A `min-h-[24rem]` DataTable
+  parks Next at the FAB's height on a short list, so page padding alone
+  cannot lift it. Reserve `--fab-clearance` on paginated `.page` surfaces,
+  `scroll-padding-bottom` on `html`, `scroll-margin-bottom` on the pager,
+  and a FAB-width `padding-right` on `[data-slot=pagination]` so Next stays
+  left of the disc on desktop and mobile. Do not force-click past it.
 - `getByLabel('Key numbers')` matches the header group and the sr-only
   KeyNumbersStrip heading. Use `getByRole('group', { name: 'Key numbers' })`.
 - Responsive `toHaveScreenshot` baselines must come from the CI runner.

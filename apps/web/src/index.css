@@ -2599,10 +2599,18 @@ select:focus-visible {
 }
 /* Playwright click() and keyboard focus scroll the control itself, not the
    page — so page padding alone is not enough. The pager and its buttons keep
-   a FAB-sized scroll margin on every breakpoint. */
+   a FAB-sized scroll margin on every breakpoint.
+   A DataTable with min-h-[24rem] parks Next at the FAB's height on a short
+   list; extra page padding is below the card and cannot lift that button.
+   Reserve the FAB's column on the right so Next stays tappable. */
 [data-slot='pagination'],
 [data-slot='pagination'] button {
   scroll-margin-bottom: var(--fab-clearance);
+}
+[data-slot='pagination'] {
+  padding-right: calc(
+    var(--fab-size) + var(--fab-inset) + env(safe-area-inset-right, 0px)
+  );
 }
 @media (min-width: 768px) and (max-width: 900px) {
   .topbar {
