@@ -40,6 +40,19 @@ const TYPE_FG: Record<string, string> = {
   case: 'var(--tag-rose-fg)',
 };
 
+/** Rows drawn on the org dashboard activity card. One loaded row past this is not shown. */
+export const RECENT_ACTIVITY_VISIBLE = 8;
+
+/**
+ * Activity caption for this card. A longer loaded list is the latest rows,
+ * not every activity. A list that fits keeps "Latest updates". No activity
+ * total is invented.
+ */
+export function recentActivityCaption(count: number, pageContinues: boolean): string {
+  if (!pageContinues) return 'Latest updates';
+  return `${count} in the latest ${RECENT_ACTIVITY_VISIBLE}, not every activity`;
+}
+
 // ─── RecentActivityCard ──────────────────────────────────────────────────────
 
 type ActivityItem = {
@@ -61,8 +74,9 @@ export function activitySubtitle(value: string): string {
 
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
   const { t, i18n } = useTranslation('crm');
-  const visible = activity.slice(0, 8);
-  const hasMore = activity.length > 8;
+  const visible = activity.slice(0, RECENT_ACTIVITY_VISIBLE);
+  // One row past the slice is the probe. It is not a row on this card.
+  const pageContinues = visible.length < activity.length;
 
   return (
     <GlassCard padding="none" hoverable={false}>
@@ -72,9 +86,15 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
               <Icon name="activity" size={13} className="text-[var(--brand-primary)]" />
             </div>
-            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('recentActivity.heading', 'Recent activity')}</h2>
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+              {t('recentActivity.heading', 'Recent activity')}
+            </h2>
           </div>
-          <span className="text-xs text-[var(--fg-tertiary)]">{t('recentActivity.latestUpdates', 'Latest updates')}</span>
+          <span className="text-xs text-[var(--fg-tertiary)]">
+            {pageContinues
+              ? t('recentActivity.pageCaption', recentActivityCaption(visible.length, true))
+              : t('recentActivity.latestUpdates', recentActivityCaption(visible.length, false))}
+          </span>
         </div>
       </div>
       <div className="divide-y divide-[var(--border-subtle)]">
@@ -132,13 +152,13 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
           ))
         )}
       </div>
-      {hasMore && (
+      {pageContinues && (
         <div className="px-5 py-3 border-t border-[var(--border-subtle)]">
           <Link
             to="/activities"
             className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
           >
-            {t('recentActivity.viewAll', 'View all {{count}} activities →', { count: activity.length })}
+            {t('recentActivity.openFeed', 'Open activities')}
           </Link>
         </div>
       )}

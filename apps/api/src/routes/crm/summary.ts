@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 import { microsText } from '../../services/crm/dashboard.cockpit.js';
+import { recentActivitySourceTake } from './recent-activity-source.js';
 
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
@@ -120,7 +121,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         ) AS "openServiceCases"
     `,
       prisma.opportunity.findMany({
-        take: 5,
+        take: recentActivitySourceTake(limit),
         orderBy: { updatedAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -132,7 +133,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         },
       }),
       prisma.lead.findMany({
-        take: 5,
+        take: recentActivitySourceTake(limit),
         orderBy: { updatedAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -144,7 +145,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         },
       }),
       prisma.task.findMany({
-        take: 5,
+        take: recentActivitySourceTake(limit),
         orderBy: { createdAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {
@@ -155,7 +156,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
         },
       }),
       prisma.serviceCase.findMany({
-        take: 5,
+        take: recentActivitySourceTake(limit),
         orderBy: { updatedAt: 'desc' },
         where: { orgId, deletedAt: null },
         select: {

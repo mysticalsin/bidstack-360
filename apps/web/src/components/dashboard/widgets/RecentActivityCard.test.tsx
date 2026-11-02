@@ -84,4 +84,59 @@ describe('RecentActivityCard', () => {
     expect(screen.queryByText('yesterday')).toBeNull();
     vi.useRealTimers();
   });
+
+  it('does not render five of six loaded deals as every recent activity', () => {
+    // WHY: a source take of five dropped Fay and left "Latest updates" on the
+    // five that remained. Six loaded deals are the whole loaded list only when
+    // all six reach this card. Six is under the eight-row page, so the old
+    // wording stays and Fay is on the card.
+    const six = ['Ada', 'Bea', 'Cara', 'Dia', 'Eve', 'Fay'].map((title) => ({
+      type: 'opportunity',
+      title,
+      subtitle: null,
+      date: '2026-11-01T12:00:00.000Z',
+      url: null,
+    }));
+    render(
+      <MemoryRouter>
+        <RecentActivityCard activity={six} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Fay')).toBeTruthy();
+    expect(screen.getByText('Ada')).toBeTruthy();
+    expect(screen.getByText('Latest updates')).toBeTruthy();
+    expect(screen.queryByText(/not every activity/i)).toBeNull();
+    expect(screen.queryByText(/View all/i)).toBeNull();
+  });
+
+  it('does not describe eight activities as every activity when another deal is loaded', () => {
+    // WHY: the card listed eight and "Latest updates" treated that slice as
+    // the recent activity. One more loaded row means those eight are not every
+    // activity. The ninth row is not drawn, and the link does not pretend the
+    // loaded length is a total.
+    const nine = ['Ada', 'Bea', 'Cara', 'Dia', 'Eve', 'Fay', 'Gia', 'Hana', 'Ivy'].map((title) => ({
+      type: 'opportunity',
+      title,
+      subtitle: null,
+      date: '2026-11-01T12:00:00.000Z',
+      url: null,
+    }));
+    render(
+      <MemoryRouter>
+        <RecentActivityCard activity={nine} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('8 in the latest 8, not every activity').textContent).toBe(
+      '8 in the latest 8, not every activity',
+    );
+    expect(screen.queryByText('Latest updates')).toBeNull();
+    expect(screen.queryByText('Ivy')).toBeNull();
+    expect(screen.getByText('Hana')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Open activities' }).getAttribute('href')).toBe(
+      '/activities',
+    );
+    expect(screen.queryByText(/View all/i)).toBeNull();
+  });
 });
