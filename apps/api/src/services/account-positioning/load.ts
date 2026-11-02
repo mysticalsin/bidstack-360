@@ -30,6 +30,7 @@ import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
 import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
+import { sumOpenPipelineMicros } from './open-pipeline-micros.js';
 
 const DAY = 86_400_000;
 
@@ -370,12 +371,34 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   } else items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', goodWhen: 'down', source: 'Meeting intel and logged meetings', period: 'Last 24 months', missing: 'No meeting logged' }));
 
   // Pipeline value and trend: open value now vs reconstructed 90 days ago.
+  // The labeled total stays in integer micros. The sparkline still needs a
+  // number, and that number is not the amount the tile prints.
   const openAt = (t: Date) =>
-    opps.filter((o) => o.createdAt <= t && (OPEN.includes(o.stage) ? true : (o.closedAt ?? o.updatedAt) > t)).reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
-  const nowOpen = opps.filter((o) => OPEN.includes(o.stage)).reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
-  const series = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(nowOpen);
+    sumOpenPipelineMicros(
+      opps.filter((o) => o.createdAt <= t && (OPEN.includes(o.stage) ? true : (o.closedAt ?? o.updatedAt) > t)),
+    );
+  const openRows = opps.filter((o) => OPEN.includes(o.stage));
+  const nowOpenMicros = sumOpenPipelineMicros(openRows);
+  const series = [150, 120, 90, 60, 30]
+    .map((d) => Number(openAt(new Date(now.getTime() - d * DAY))))
+    .concat(Number(nowOpenMicros));
   const ago = series[2]!;
-  items.push(base({ id: 'pipeline', group: 'health', label: 'Open pipeline', unit: 'money_micros', value: nowOpen, delta: pctChange(nowOpen, ago), deltaUnit: 'pct', series, sub: `${opps.filter((o) => OPEN.includes(o.stage)).length} open deals`, source: 'Polo pipeline', period: 'Now, change vs 90 days ago', anchor: 'deals' }));
+  const nowOpen = Number(nowOpenMicros);
+  items.push(base({
+    id: 'pipeline',
+    group: 'health',
+    label: 'Open pipeline',
+    unit: 'money_micros',
+    value: nowOpen,
+    valueMicros: nowOpenMicros.toString(),
+    delta: pctChange(nowOpen, ago),
+    deltaUnit: 'pct',
+    series,
+    sub: `${openRows.length} open deals`,
+    source: 'Polo pipeline',
+    period: 'Now, change vs 90 days ago',
+    anchor: 'deals',
+  }));
 
   // Financial warnings.
   const warnings = fin.sample ? [] : fin.signals.filter((s) => s.implication === 'RISK' && !s.sample);
