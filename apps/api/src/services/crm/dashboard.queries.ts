@@ -774,7 +774,8 @@ const LOST_OPPORTUNITY_SQL = `
   )
 )`;
 
-const OPEN_OPPORTUNITY_SQL = `
+/** Open book. A live won or lost stage is not open. Lost wins when both flags are set. A deleted stage row does not erase closed_won or closed_lost. */
+export const OPEN_OPPORTUNITY_SQL = `
 (
   o.stage NOT IN ('closed_won', 'closed_lost')
   AND NOT EXISTS (

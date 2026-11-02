@@ -30,7 +30,7 @@ import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
 import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
-import { sumOpenPipelineMicros } from './open-pipeline-micros.js';
+import { fetchOpenPipelineBook } from './open-pipeline-book.js';
 
 const DAY = 86_400_000;
 
@@ -285,12 +285,12 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const live = await companiesWithLiveSignals(orgId, ids);
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
-  const [company, firmo, fin, rawPostings, opps, news, momentumIn, { people, lastMeeting }] = await Promise.all([
+  const [company, firmo, fin, rawPostings, pipelineBook, news, momentumIn, { people, lastMeeting }] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
     prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
-    prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: { stage: true, valueMicros: true, createdAt: true, closedAt: true, updatedAt: true }, take: 500 }),
+    fetchOpenPipelineBook(prisma, orgId, ids, now),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, sentiment: { not: null }, occurredAt: { gte: d180, lte: now }, ...hideSampleWhere(live) },
       select: { sentiment: true, occurredAt: true, sample: true, source: true },
@@ -370,31 +370,19 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', value: days, goodWhen: 'down', sub: lastMeeting.title, source: 'Meeting intel and logged meetings', period: `On ${lastMeeting.at.slice(0, 10)}`, anchor: 'who-we-met' }));
   } else items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', goodWhen: 'down', source: 'Meeting intel and logged meetings', period: 'Last 24 months', missing: 'No meeting logged' }));
 
-  // Pipeline value and trend: open value now vs reconstructed 90 days ago.
-  // The labeled total stays in integer micros. The sparkline still needs a
-  // number, and that number is not the amount the tile prints.
-  const openAt = (t: Date) =>
-    sumOpenPipelineMicros(
-      opps.filter((o) => o.createdAt <= t && (OPEN.includes(o.stage) ? true : (o.closedAt ?? o.updatedAt) > t)),
-    );
-  const openRows = opps.filter((o) => OPEN.includes(o.stage));
-  const nowOpenMicros = sumOpenPipelineMicros(openRows);
-  const series = [150, 120, 90, 60, 30]
-    .map((d) => Number(openAt(new Date(now.getTime() - d * DAY))))
-    .concat(Number(nowOpenMicros));
-  const ago = series[2]!;
-  const nowOpen = Number(nowOpenMicros);
+  // Full open book from Postgres. The page cap is not the total, and the
+  // percent is the integer ratio of those micros, not Number() of them.
   items.push(base({
     id: 'pipeline',
     group: 'health',
     label: 'Open pipeline',
     unit: 'money_micros',
-    value: nowOpen,
-    valueMicros: nowOpenMicros.toString(),
-    delta: pctChange(nowOpen, ago),
+    value: pipelineBook.value,
+    valueMicros: pipelineBook.valueMicros,
+    delta: pipelineBook.delta,
     deltaUnit: 'pct',
-    series,
-    sub: `${openRows.length} open deals`,
+    series: pipelineBook.series,
+    sub: `${pipelineBook.openCount} open deals`,
     source: 'Polo pipeline',
     period: 'Now, change vs 90 days ago',
     anchor: 'deals',
