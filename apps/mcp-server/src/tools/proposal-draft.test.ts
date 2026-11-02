@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { capPage } from './crm-tools.helpers.js';
 import { buildGroundedProposalDraft } from './proposal-draft.js';
+
+function completePage<T>(items: T[]) {
+  return { items, limit: 3, truncated: false };
+}
 
 describe('proposal.draft grounded builder', () => {
   it('returns a source-grounded section instead of a setup stub', () => {
@@ -20,7 +25,7 @@ describe('proposal.draft grounded builder', () => {
       section: 'executive_summary',
       sectionTitle: 'Executive Summary',
       tone: 'consultative',
-      references: [
+      references: completePage([
         {
           id: 'ref-1',
           title: 'Core banking transformation reference',
@@ -32,7 +37,7 @@ describe('proposal.draft grounded builder', () => {
           tags: ['banking'],
           scoreBps: 9000,
         },
-      ],
+      ]),
       tasks: [
         {
           id: 'task-1',
@@ -74,6 +79,7 @@ describe('proposal.draft grounded builder', () => {
     expect(result.markdown).not.toContain('s2_sent');
     expect(result.markdown).not.toMatch(/\/100|stage probability/);
     expect(result.markdown).not.toMatch(/stub|DUST_API_KEY|ANTHROPIC_API_KEY/i);
+    expect(result.markdown).not.toContain('not every match');
     expect(result.citations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ docId: 'opp-1', type: 'opportunity' }),
@@ -100,7 +106,7 @@ describe('proposal.draft grounded builder', () => {
       section: 'risks',
       sectionTitle: 'Risks',
       tone: 'executive',
-      references: [],
+      references: completePage([]),
       tasks: [],
       contacts: [
         {
@@ -148,7 +154,7 @@ describe('proposal.draft grounded builder', () => {
       section: 'risks',
       sectionTitle: 'Risks',
       tone: 'concise',
-      references: [],
+      references: completePage([]),
       tasks: [],
       contacts: [],
       notes: [],
@@ -179,7 +185,7 @@ describe('proposal.draft grounded builder', () => {
       section: 'executive_summary',
       sectionTitle: 'Executive Summary',
       tone: 'executive',
-      references: [],
+      references: completePage([]),
       tasks: [],
       contacts: [],
       notes: [],
@@ -214,7 +220,7 @@ describe('proposal.draft grounded builder', () => {
       section: 'executive_summary',
       sectionTitle: 'Executive Summary',
       tone: 'consultative',
-      references: [],
+      references: completePage([]),
       tasks: [],
       contacts: [],
       notes: [],
@@ -225,5 +231,145 @@ describe('proposal.draft grounded builder', () => {
     expect(result.markdown).not.toContain('Archived Lost');
     expect(result.markdown).not.toContain('as lost');
     expect(result.markdown).not.toContain('as won');
+  });
+
+  it('says a truncated reference page is not every match and does not cite the probe row', () => {
+    // WHY: a full page of three proof points used to read as the whole library.
+    // The extra row is only a probe. Draft text and citations stay on items.
+    const probe = {
+      id: 'ref-probe',
+      title: 'Probe reference that is not on the page',
+      description: null,
+      industry: null,
+      valueMicros: null,
+      usageCount: 0,
+      documentUrl: null,
+      tags: [] as string[],
+      scoreBps: 1,
+    };
+    const page = capPage(
+      [
+        {
+          id: 'ref-a',
+          title: 'Alpha proof',
+          description: null,
+          industry: null,
+          valueMicros: null,
+          usageCount: 3,
+          documentUrl: null,
+          tags: [] as string[],
+          scoreBps: 9000,
+        },
+        {
+          id: 'ref-b',
+          title: 'Beta proof',
+          description: null,
+          industry: null,
+          valueMicros: null,
+          usageCount: 2,
+          documentUrl: null,
+          tags: [] as string[],
+          scoreBps: 8000,
+        },
+        {
+          id: 'ref-c',
+          title: 'Gamma proof',
+          description: null,
+          industry: null,
+          valueMicros: null,
+          usageCount: 1,
+          documentUrl: null,
+          tags: [] as string[],
+          scoreBps: 7000,
+        },
+        probe,
+      ],
+      3,
+    );
+    expect(Array.isArray(page)).toBe(false);
+    expect(page).toEqual({
+      items: [
+        expect.objectContaining({ id: 'ref-a' }),
+        expect.objectContaining({ id: 'ref-b' }),
+        expect.objectContaining({ id: 'ref-c' }),
+      ],
+      limit: 3,
+      truncated: true,
+    });
+
+    const result = buildGroundedProposalDraft({
+      opportunity: {
+        id: 'opp-page',
+        code: 'OP-2047',
+        customer: 'Acme Bank',
+        name: 'Payments Modernization',
+        stage: 's2_sent',
+        valueMicros: 2_500_000_000_000n,
+        probability: 55,
+        dueDate: new Date('2026-07-01T00:00:00.000Z'),
+        industry: 'Financial Services',
+        updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+      },
+      section: 'pricing',
+      sectionTitle: 'Pricing',
+      tone: 'consultative',
+      references: page,
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect(result.markdown).toContain(
+      '- References: Alpha proof; Beta proof; Gamma proof. This page is not every match.',
+    );
+    expect(result.markdown).toContain(
+      'Benchmark against "Alpha proof", "Beta proof", "Gamma proof". This page is not every match.',
+    );
+    expect(result.markdown).not.toContain('before final sign-off');
+    expect(result.markdown).not.toContain(probe.title);
+    expect(
+      result.citations
+        .filter((citation) => citation.type === 'reference')
+        .map((citation) => citation.docId),
+    ).toEqual(['ref-a', 'ref-b', 'ref-c']);
+  });
+
+  it('does not draft from a bare reference array', () => {
+    // WHY: a bare array of limit+1 rows hides the probe inside the cited set.
+    expect(() =>
+      buildGroundedProposalDraft({
+        opportunity: {
+          id: 'opp-bare',
+          code: 'OP-2048',
+          customer: 'Acme Bank',
+          name: 'Payments Modernization',
+          stage: 's2_sent',
+          valueMicros: 1n,
+          probability: 55,
+          dueDate: null,
+          industry: null,
+          updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+        },
+        section: 'executive_summary',
+        sectionTitle: 'Executive Summary',
+        tone: 'consultative',
+        references: [
+          {
+            id: 'ref-a',
+            title: 'Alpha proof',
+            description: null,
+            industry: null,
+            valueMicros: null,
+            usageCount: 1,
+            documentUrl: null,
+            tags: [],
+            scoreBps: 1,
+          },
+        ] as never,
+        tasks: [],
+        contacts: [],
+        notes: [],
+      }),
+    ).toThrow(/page of items, not a bare array/);
   });
 });

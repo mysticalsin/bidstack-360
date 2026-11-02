@@ -136,7 +136,7 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
   {
     group: 'legacy',
     name: 'proposal.draft',
-    desc: 'Draft a proposal section using available customer context.',
+    desc: 'Draft a proposal section from customer context. The draft says when the reference page is not every match.',
   },
   {
     group: 'legacy',

@@ -47,7 +47,7 @@ Drafts a proposal section using the customer's intel + Mantu's reference library
 ```json
 { "oppId": "uuid", "section": "executive_summary" | "scope" | "pricing" | "timeline" | "risks", "tone": "consultative" }
 ```
-**Output:** `{ "markdown": "...", "citations": [{ "docId": "...", "title": "..." }] }`
+**Output:** `{ "markdown": "...", "citations": [{ "docId": "...", "title": "..." }] }`. Citations list reference page items only. When that page is truncated, the draft says it is not every match.
 
 ## `spotlight_ref`
 Search the reference library.

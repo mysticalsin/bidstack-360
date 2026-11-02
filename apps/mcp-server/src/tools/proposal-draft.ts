@@ -16,9 +16,12 @@ const Input = z.object({
   tone: Tone.default('consultative'),
 });
 
+/** Proof points loaded for one draft. One extra search row says this is not every match. */
+const REFERENCE_PAGE_LIMIT = 3;
+
 export const proposalDraft: Tool<typeof Input> = {
   description:
-    'Drafts a grounded proposal section from CRM opportunity context, account notes, tasks, contacts, and the Mantu reference library.',
+    'Drafts a grounded proposal section from CRM opportunity context, account notes, tasks, contacts, and the Mantu reference library. Citations use the reference page items only. When that page is truncated, the draft says it is not every match.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -48,10 +51,17 @@ export const proposalDraft: Tool<typeof Input> = {
       searchReferences(
         ctx.orgId,
         [opp.customer, opp.name, opp.industry, sectionTitle].filter(Boolean).join(' - '),
-        { limit: 3 },
+        { limit: REFERENCE_PAGE_LIMIT },
       )
-        .then((result) => result.references.items)
-        .catch(() => []),
+        .then((result) => result.references)
+        .catch(
+          () =>
+            ({
+              items: [],
+              limit: REFERENCE_PAGE_LIMIT,
+              truncated: false,
+            }) satisfies ReferencePage,
+        ),
       prisma.task.findMany({
         where: { orgId: ctx.orgId, oppId: opp.id, deletedAt: null },
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
@@ -165,10 +175,17 @@ interface GroundedDraftInput {
   section: z.infer<typeof Section>;
   sectionTitle: string;
   tone: z.infer<typeof Tone>;
-  references: RankedReference[];
+  /** Ranked proof points. Draft and citations use `items` only. */
+  references: ReferencePage;
   tasks: DraftTask[];
   contacts: DraftContact[];
   notes: DraftNote[];
+}
+
+interface ReferencePage {
+  items: RankedReference[];
+  limit: number;
+  truncated: boolean;
 }
 
 interface DraftCitation {
@@ -240,8 +257,17 @@ function displayStage(opportunity: DraftOpportunity): string {
   return stageWords(opportunity.stage);
 }
 
+function referenceItems(page: ReferencePage): RankedReference[] {
+  if (!page || !Array.isArray(page.items)) {
+    throw new Error('references must be a page of items, not a bare array');
+  }
+  return page.items;
+}
+
 function sectionBody(input: GroundedDraftInput): string[] {
-  const { opportunity, references, tasks, contacts, notes } = input;
+  const { opportunity, tasks, contacts, notes } = input;
+  const references = referenceItems(input.references);
+  const referencesPartial = input.references.truncated;
   const stage = displayStage(opportunity);
   const outcome = draftOutcome(opportunity);
   const value = formatMoneyMicros(opportunity.valueMicros);
@@ -290,7 +316,9 @@ function sectionBody(input: GroundedDraftInput): string[] {
       `Recommended commercial structure: separate discovery, implementation, managed transition, and optional acceleration services so ${opportunity.customer} can approve a controlled core offer while preserving expansion room.`,
       'Tie discounts to clear approval gates, payment terms, scope boundaries, and customer-provided dependencies. Any variance from standard margin should be escalated to finance.',
       references.length
-        ? `Benchmark against ${references.map((r) => `"${r.title}"`).join(', ')} before final sign-off.`
+        ? referencesPartial
+          ? `Benchmark against ${references.map((r) => `"${r.title}"`).join(', ')}. This page is not every match.`
+          : `Benchmark against ${references.map((r) => `"${r.title}"`).join(', ')} before final sign-off.`
         : 'No pricing reference is attached yet; add at least one comparable past win or approved pricing note before submission.',
     ];
   }
@@ -328,13 +356,14 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
   markdown: string;
   citations: DraftCitation[];
 } {
+  const references = referenceItems(input.references);
   const citations: DraftCitation[] = [
     {
       docId: input.opportunity.id,
       title: `${input.opportunity.code} - ${input.opportunity.name}`,
       type: 'opportunity',
     },
-    ...input.references.map((reference) => ({
+    ...references.map((reference) => ({
       docId: reference.id,
       title: reference.title,
       type: 'reference' as const,
@@ -357,8 +386,10 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
         ? 'probability not recorded'
         : `${input.opportunity.probability}% probability`
     }.`,
-    input.references.length
-      ? `- References: ${input.references.map((reference) => reference.title).join('; ')}.`
+    references.length
+      ? `- References: ${references.map((reference) => reference.title).join('; ')}.${
+          input.references.truncated ? ' This page is not every match.' : ''
+        }`
       : '- References: none selected yet.',
     input.tasks.length
       ? `- Pursuit tasks: ${input.tasks.map((task) => `${task.title} (${stageWords(task.status)})`).join('; ')}.`
