@@ -114,12 +114,31 @@ describe('AgreementDetailPage', () => {
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).toBeNull();
     expect(screen.getByRole('link', { name: 'CI Financial' }).getAttribute('href')).toBe(`/accounts/${CI}`);
     expect(screen.getByText('Ontario, Canada')).toBeTruthy();
+    // WHY: the sample cap is 5,000,000. Compact currency used to print €5m.
+    expect(screen.getByText('EUR 5,000,000')).toBeTruthy();
+    expect(screen.queryByText('€5m')).toBeNull();
     expect(within(screen.getByTestId('agreement-versions')).getAllByRole('row')).toHaveLength(1 + 3);
     expect(within(screen.getByTestId('agreement-children')).getAllByRole('link').map((a) => a.textContent)).toEqual([
       'SOW 7 — Legacy app retirement', 'SOW 8 — Security operations uplift', 'Amendment 2 — Rate card 2026',
     ]);
     expect(await screen.findByText('Last day to give notice')).toBeTruthy();
     expect(screen.getByTestId('agreement-viewer-sample')).toBeTruthy();
+  });
+
+  it('prints a stored micros string past 2^53 to the cent', async () => {
+    // WHY: Number() of this cap moves 8,598,204,328,457.18, and compact hid smaller caps.
+    const detail = {
+      ...(sampleDetail(MSA) as MsaDetail),
+      liabilityCap: { amountMicros: '8598204328457184962', currency: 'EUR' },
+    };
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (String(path).endsWith('/timeline')) return { items: [] };
+      if (String(path).endsWith('/leverage')) return { flag: null };
+      return detail;
+    });
+    renderAt(`/agreements/${MSA}`);
+    expect(await screen.findByText('EUR 8,598,204,328,457.18')).toBeTruthy();
+    expect(screen.queryByText('€8.6tn')).toBeNull();
   });
 
   it('shows a not-found state for a missing record', async () => {

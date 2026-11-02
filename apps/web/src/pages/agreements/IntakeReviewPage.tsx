@@ -10,6 +10,7 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 import { useSigningEntities } from '@/hooks/useSigningEntities';
+import { fmtMoneyMicros } from '@/lib/msa/labels';
 
 function cite(field: MsaExtractedField): string {
   if (!field.found) return 'not found';
@@ -24,8 +25,8 @@ function display(field: MsaExtractedField): string {
   if (typeof field.value === 'number') return String(field.value);
   if (typeof field.value === 'string') return field.value;
   if (field.key === 'liabilityCap' && typeof field.value === 'object') {
-    const cap = field.value as { amountMicros?: number; currency?: string };
-    if (cap.amountMicros != null) return `${(cap.amountMicros / 1_000_000).toLocaleString('en-GB')} ${cap.currency ?? ''}`.trim();
+    const cap = field.value as { amountMicros?: number | string; currency?: string };
+    if (cap.amountMicros != null && cap.amountMicros !== '') return fmtMoneyMicros(cap.amountMicros, cap.currency ?? '');
   }
   if (Array.isArray(field.value)) {
     return field.value

@@ -38,6 +38,7 @@ import {
   MsaListResponse,
   MsaPatch,
   MsaSearchQuery,
+  presentLiabilityCap,
   MsaSearchResponse,
   MsaTimelineResponse,
   MsaUploadUrlRequest,
@@ -209,10 +210,11 @@ function msaKeySegment(contractId: string): string {
   return `msa-${contractId}`;
 }
 
-function liabilityFields(cap: { amountMicros: number; currency: string } | null | undefined) {
+function liabilityFields(cap: { amountMicros: number | string; currency: string } | null | undefined) {
   if (cap === undefined) return {};
   if (cap === null) return { liabilityCapMicros: null, liabilityCapCurrency: null };
-  return { liabilityCapMicros: BigInt(cap.amountMicros), liabilityCapCurrency: cap.currency };
+  const micros = typeof cap.amountMicros === 'string' ? BigInt(cap.amountMicros) : BigInt(cap.amountMicros);
+  return { liabilityCapMicros: micros, liabilityCapCurrency: cap.currency };
 }
 
 export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -457,10 +459,7 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
       return {
         ...serializeRow(row),
         governingLaw: extra.governingLaw,
-        liabilityCap:
-          extra.liabilityCapMicros !== null && extra.liabilityCapCurrency
-            ? { amountMicros: Number(extra.liabilityCapMicros), currency: extra.liabilityCapCurrency }
-            : null,
+        liabilityCap: presentLiabilityCap(extra.liabilityCapMicros, extra.liabilityCapCurrency),
         paymentTerms: extra.paymentTerms,
         notes: extra.notes,
         currency: extra.currency,

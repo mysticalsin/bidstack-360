@@ -9,13 +9,38 @@ vi.mock('@/lib/api', async (orig) => {
 import { ApiError, api } from '@/lib/api';
 
 import { isMissingRoute, isOwnApiUrl, listQueryString, msaClient, uploadMsaVersion, validateMsaFile } from './client';
-import { actionLabel, urgency } from './labels';
+import { actionLabel, fmtMoneyMicros, urgency } from './labels';
 import { filterRows, sampleDetail, sampleRows, sampleSummary, sampleTimeline } from './sample';
 
 const NOW = Date.UTC(2026, 9, 31);
 const missing = new ApiError('Route GET:/api/v1/msa not found', 404, { message: 'Route GET:/api/v1/msa not found', error: 'Not Found', statusCode: 404 });
 
 afterEach(() => vi.mocked(api).mockReset());
+
+describe('fmtMoneyMicros', () => {
+  it('shows the stored liability cap to the cent', () => {
+    // WHY: compact currency hid 7,860,000 as €7.9m, 250,000.50 as €250k, and 12,015,000 as €12m.
+    // Number() of a micros string past 2^53 also moves the cent.
+    const old = (micros: number) =>
+      new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'EUR',
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(micros / 1e6);
+    expect(old(7_860_000_000_000)).toBe('€7.9m');
+    expect(old(250_000_500_000)).toBe('€250k');
+    expect(old(12_015_000_000_000)).toBe('€12m');
+    expect(fmtMoneyMicros(7_860_000_000_000, 'eur')).toBe('EUR 7,860,000');
+    expect(fmtMoneyMicros(250_000_500_000, 'EUR')).toBe('EUR 250,000.50');
+    expect(fmtMoneyMicros(12_015_000_000_000, 'EUR')).toBe('EUR 12,015,000');
+    expect(fmtMoneyMicros(12_015_000_000_000, 'EUR')).not.toBe(old(12_015_000_000_000));
+    const exact = '8598204328457184962';
+    expect(fmtMoneyMicros(exact, 'EUR')).toBe('EUR 8,598,204,328,457.18');
+    expect(fmtMoneyMicros(exact, 'EUR')).not.toBe(fmtMoneyMicros(Number(exact), 'EUR'));
+    expect(fmtMoneyMicros(2_000_000_000_000, '')).toBe('2,000,000 unspecified');
+  });
+});
 
 describe('isMissingRoute', () => {
   it('is true only for the Fastify unknown-route 404', () => {

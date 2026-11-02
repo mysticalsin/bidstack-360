@@ -5,6 +5,8 @@
 // API contract: /workspace/fleet/polo-msa-api.md.
 import { z } from 'zod';
 
+import { microsToSafeNumber } from '../utils/money.js';
+
 export const MSA_MAX_BYTES = 25 * 1024 * 1024;
 export const MSA_ALLOWED_CONTENT_TYPES = [
   'application/pdf',
@@ -26,11 +28,35 @@ export const MsaReminderDays = [90, 60, 30] as const;
 const IsoDate = z.string().datetime();
 const Tag = z.string().trim().min(1).max(40);
 
+const liabilityCapAmount = z.union([
+  z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  z.string().regex(/^\d+$/),
+]);
+
 export const MsaLiabilityCap = z.object({
-  amountMicros: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  amountMicros: liabilityCapAmount,
   currency: z.string().length(3).toUpperCase(),
 });
 export type MsaLiabilityCap = z.infer<typeof MsaLiabilityCap>;
+
+/**
+ * Wire form of a stored liability cap. A digit string wins when the integer
+ * does not fit in a safe JS number. An unsafe number is not a stored amount.
+ */
+export function presentLiabilityCap(
+  micros: bigint | number | string | null | undefined,
+  currency: string | null | undefined,
+): MsaLiabilityCap | null {
+  if (currency == null || currency.trim() === '') return null;
+  let value: bigint | null = null;
+  if (typeof micros === 'bigint') value = micros;
+  else if (typeof micros === 'string' && /^\d+$/.test(micros)) value = BigInt(micros);
+  else if (typeof micros === 'number' && Number.isSafeInteger(micros) && micros >= 0) value = BigInt(micros);
+  if (value == null || value < 0n) return null;
+  const text = value.toString();
+  const safe = microsToSafeNumber(text);
+  return { amountMicros: safe ?? text, currency };
+}
 
 export const MsaUserRef = z.object({ id: z.string().uuid(), email: z.string(), name: z.string().nullable() });
 export type MsaUserRef = z.infer<typeof MsaUserRef>;

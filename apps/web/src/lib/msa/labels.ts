@@ -1,4 +1,6 @@
 // Plain-language labels and tones for the Agreements screens.
+import { formatMicrosAmount } from '@bidstack/shared';
+
 import type { BadgeTone } from '@/components/ui/Badge';
 
 import type { MsaKind, MsaStatus } from './types';
@@ -34,8 +36,20 @@ export function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function fmtMoneyMicros(amountMicros: number, currency: string): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(amountMicros / 1e6);
+/** Stored micros, as a digit string or a safe integer. Anything else is not the stored amount. */
+function readStoredMicros(amountMicros: number | string): bigint | null {
+  if (typeof amountMicros === 'string') return /^\d+$/.test(amountMicros) ? BigInt(amountMicros) : null;
+  if (!Number.isSafeInteger(amountMicros) || amountMicros < 0) return null;
+  return BigInt(amountMicros);
+}
+
+/** Exact cent. A digit string wins over a number that can no longer hold the integer. */
+export function fmtMoneyMicros(amountMicros: number | string, currency: string): string {
+  const micros = readStoredMicros(amountMicros);
+  if (micros == null) return 'amount not readable';
+  const text = formatMicrosAmount(micros);
+  const code = currency.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? `${code} ${text}` : `${text} unspecified`;
 }
 
 /** Deadline urgency for the expiring-soon strip and the list. */
