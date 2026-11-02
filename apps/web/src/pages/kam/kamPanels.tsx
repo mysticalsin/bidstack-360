@@ -34,6 +34,8 @@ import {
   useTransitionInitiative,
 } from '@/hooks/useKam';
 
+import { kamInitiativeColumnHeading } from './kam-initiative-caption';
+
 const STAGE_LABEL: Record<InitiativeStageValue, string> = {
   initiative: 'Initiatives',
   lead: 'Leads',
@@ -170,6 +172,10 @@ export function KamInitiativeBoard({ companyId }: { companyId: string }) {
       </Card>
     );
   const items = data?.items ?? [];
+  // nextCursor is the row the list read past this page and dropped. It is
+  // not an initiative total.
+  const pageContinues = Boolean(data?.nextCursor);
+  const latest = items.length;
   return (
     <Card>
       <SectionHeader title="Initiatives" caption="Initiative → Lead → Opportunity → Dropped" />
@@ -185,7 +191,7 @@ export function KamInitiativeBoard({ companyId }: { companyId: string }) {
             return (
               <section key={stage} aria-label={STAGE_LABEL[stage]} className="space-y-2">
                 <h3 className="text-sm text-[var(--fg-secondary)]">
-                  {STAGE_LABEL[stage]} · {col.length}
+                  {kamInitiativeColumnHeading(STAGE_LABEL[stage], col.length, pageContinues, latest)}
                 </h3>
                 {col.map((init) => (
                   <InitiativeCard key={init.id} init={init} companyId={companyId} />
