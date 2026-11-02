@@ -15,6 +15,7 @@ import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
 import { roleListCaption } from './role-list-caption';
+import { stageListCaption } from './stage-list-caption';
 import { tagLibraryCaption } from './tag-library-caption';
 import { USER_OVERVIEW_PAGE, userOverviewCaption } from './user-overview-caption';
 
@@ -97,14 +98,23 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileDataModelTitle', 'Data model'),
-      detail: t(
-        'settingsOverview.tileDataModelDetail',
-        '{{stages}} stages / {{fields}} company fields',
-        {
-          stages: formatCount(pipelineStages.data?.items.length),
-          fields: formatCount(customFields.data?.items.length),
-        },
-      ),
+      detail: pipelineStages.data?.pageContinues
+        ? t(
+            'settingsOverview.tileDataModelDetailPartialStages',
+            '{{stages}} / {{fields}} company fields',
+            {
+              stages: stageListCaption(pipelineStages.data.items.length, true),
+              fields: formatCount(customFields.data?.items.length),
+            },
+          )
+        : t(
+            'settingsOverview.tileDataModelDetail',
+            '{{stages}} stages / {{fields}} company fields',
+            {
+              stages: formatCount(pipelineStages.data?.items.length),
+              fields: formatCount(customFields.data?.items.length),
+            },
+          ),
       tone: pipelineStages.isError || customFields.isError ? 'tomato' : 'blue',
       icon: 'sliders' as const,
       section: 'crm' as const,

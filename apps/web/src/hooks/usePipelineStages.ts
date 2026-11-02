@@ -17,6 +17,8 @@ export interface PipelineStageSettings {
 
 export interface PipelineStageSettingsList {
   items: PipelineStageSettings[];
+  /** True when one stage past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
 }
 
 export function usePipelineStages(options: { enabled?: boolean } = {}) {

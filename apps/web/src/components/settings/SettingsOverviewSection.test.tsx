@@ -48,6 +48,7 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
 
 import { ROLE_LIST_PAGE } from './role-list-caption';
 import { SettingsOverviewSection } from './SettingsOverviewSection';
+import { STAGE_LIST_PAGE } from './stage-list-caption';
 import { USER_OVERVIEW_PAGE } from './user-overview-caption';
 
 function emptyQuery() {
@@ -192,5 +193,55 @@ describe('SettingsOverviewSection', () => {
         `${USER_OVERVIEW_PAGE} in the latest ${USER_OVERVIEW_PAGE}, not every user / ${ROLE_LIST_PAGE} in the latest ${ROLE_LIST_PAGE}, not every role`,
       ),
     ).toBeTruthy();
+  });
+
+  it('says the stage count is not every stage when the stage page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.usePipelineStages.mockReturnValue({
+      data: {
+        items: Array.from({ length: STAGE_LIST_PAGE }, (_, index) => ({ id: String(index) })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useCustomFieldDefinitions.mockReturnValue({
+      data: { items: [{ id: 'field-1' }, { id: 'field-2' }] },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `${STAGE_LIST_PAGE} in the latest ${STAGE_LIST_PAGE}, not every stage / 2 company fields`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(new RegExp(`${STAGE_LIST_PAGE} stages`))).toBeNull();
+  });
+
+  it('keeps the stage count when the stage page is shorter than the probe', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.usePipelineStages.mockReturnValue({
+      data: {
+        items: Array.from({ length: 7 }, (_, index) => ({ id: String(index) })),
+        pageContinues: false,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useCustomFieldDefinitions.mockReturnValue({
+      data: { items: [{ id: 'field-1' }, { id: 'field-2' }] },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('7 stages / 2 company fields')).toBeTruthy();
+    expect(screen.queryByText(/not every stage/i)).toBeNull();
   });
 });
