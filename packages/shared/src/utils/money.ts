@@ -72,7 +72,9 @@ export function unitsToMicros(units: string | number): bigint {
   }
   const negative = raw.startsWith('-');
   const unsigned = negative ? raw.slice(1) : raw;
-  const [wholePart, fracPart = ''] = unsigned.split('.');
+  const dot = unsigned.indexOf('.');
+  const wholePart = dot === -1 ? unsigned : unsigned.slice(0, dot);
+  const fracPart = dot === -1 ? '' : unsigned.slice(dot + 1);
   const micros = BigInt(wholePart) * MICROS_PER_UNIT + BigInt(fracPart.padEnd(6, '0'));
   return negative ? -micros : micros;
 }
