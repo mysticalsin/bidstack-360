@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const authMocks = vi.hoisted(() => ({
   isAdmin: true,
+  canReadAudit: false,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -14,6 +15,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/lib/auth', () => ({
   useIsAdmin: () => authMocks.isAdmin,
+}));
+
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: (key: string) => key === 'audit-log:read' && authMocks.canReadAudit,
 }));
 
 import { SettingsLayout } from './SettingsLayout';
@@ -32,6 +37,7 @@ describe('SettingsLayout', () => {
   afterEach(() => {
     cleanup();
     authMocks.isAdmin = true;
+    authMocks.canReadAudit = false;
   });
 
   it('renders settings sections as addressable links', () => {
@@ -51,6 +57,17 @@ describe('SettingsLayout', () => {
     renderLayout();
 
     expect(screen.queryByRole('link', { name: 'Top accounts' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Audit log' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Appearance & Language' })).toBeTruthy();
+  });
+
+  it('shows the Audit log tab when the user has audit-log:read', () => {
+    authMocks.isAdmin = false;
+    authMocks.canReadAudit = true;
+
+    renderLayout();
+
+    expect(screen.getByRole('link', { name: 'Audit log' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Top accounts' })).toBeNull();
   });
 });

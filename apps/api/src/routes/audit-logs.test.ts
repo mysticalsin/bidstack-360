@@ -231,7 +231,7 @@ describe('GET /api/audit-logs', () => {
       where: {
         orgId: primaryOrgId,
         action: 'audit_log.export.xlsx',
-        diff: { path: ['filters', 'q'], equals: marker },
+        diff: { path: ['filters', 'qPresent'], equals: true },
       },
       orderBy: { id: 'desc' },
     });
@@ -279,7 +279,7 @@ describe('GET /api/audit-logs', () => {
         where: {
           orgId: primaryOrgId,
           action: 'audit_log.export.xlsx',
-          diff: { path: ['filters', 'q'], equals: marker },
+          diff: { path: ['filters', 'qPresent'], equals: true },
         },
         orderBy: { id: 'desc' },
       });

@@ -115,7 +115,35 @@ export const accountFinancialsRoutes: FastifyPluginAsyncZod = async (server) => 
       await syncAccountFinancialsSchedule(orgId, companyId).catch((err: unknown) =>
         req.log.warn({ err: err instanceof Error ? err.message : String(err), companyId }, 'financials schedule sync failed'),
       );
-      return loadAccountFinancials(orgId, companyId, await canToggle(orgId, userId, role));
+      const body = await loadAccountFinancials(orgId, companyId, await canToggle(orgId, userId, role));
+      const actorUserId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        userId,
+      )
+        ? userId
+        : null;
+      await prisma.auditLog
+        .create({
+          data: {
+            orgId,
+            userId: actorUserId,
+            action: 'account.financials.view',
+            targetType: 'company',
+            targetId: companyId,
+            diff: {
+              actorKind: 'user',
+              status: body.status,
+              sample: body.sample,
+              gate: body.gate,
+            },
+          },
+        })
+        .catch((err: unknown) =>
+          req.log.warn(
+            { err: err instanceof Error ? err.message : String(err), companyId },
+            'financials view audit failed',
+          ),
+        );
+      return body;
     },
   );
 

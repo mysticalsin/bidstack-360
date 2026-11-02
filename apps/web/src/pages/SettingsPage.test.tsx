@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authMocks = vi.hoisted(() => ({
   isAdmin: true,
+  canReadAudit: false,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -15,6 +16,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/lib/auth', () => ({
   useIsAdmin: () => authMocks.isAdmin,
+}));
+
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: (key: string) => key === 'audit-log:read' && authMocks.canReadAudit,
 }));
 
 vi.mock('@/components/settings/SettingsLayout', () => ({
@@ -108,6 +113,7 @@ function renderPage(entry: string) {
 describe('SettingsPage routing guard', () => {
   beforeEach(() => {
     authMocks.isAdmin = true;
+    authMocks.canReadAudit = false;
   });
 
   afterEach(() => cleanup());
@@ -141,6 +147,17 @@ describe('SettingsPage routing guard', () => {
     expect(screen.getByTestId('active-tab').textContent).toBe('groups');
     expect(screen.getByText('Access groups panel')).toBeTruthy();
     expect(screen.getByTestId('location').textContent).toBe('/settings?tab=groups');
+  });
+
+  it('opens the Audit log tab for a non-admin with audit-log:read', () => {
+    authMocks.isAdmin = false;
+    authMocks.canReadAudit = true;
+
+    renderPage('/settings?tab=audit-log');
+
+    expect(screen.getByTestId('active-tab').textContent).toBe('audit-log');
+    expect(screen.getByText('Audit log panel')).toBeTruthy();
+    expect(screen.getByTestId('location').textContent).toBe('/settings?tab=audit-log');
   });
 
   it('opens the identity and roles tab for admins', () => {

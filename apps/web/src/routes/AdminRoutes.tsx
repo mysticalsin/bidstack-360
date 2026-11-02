@@ -14,7 +14,7 @@ import {
   PredictiveAdminPage,
   RolesPage,
 } from './lazyPages';
-import { RequireAdmin } from './AuthGuards';
+import { RequireAdmin, RequireAuditLogRead } from './AuthGuards';
 
 export function adminRouteElements() {
   return (
@@ -30,9 +30,9 @@ export function adminRouteElements() {
       <Route
         path="/audit-log"
         element={
-          <RequireAdmin>
+          <RequireAuditLogRead>
             <AuditLogPage />
-          </RequireAdmin>
+          </RequireAuditLogRead>
         }
       />
       <Route
