@@ -14,6 +14,7 @@ import { useUsers } from '@/hooks/useUsers';
 import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
+import { tagLibraryCaption } from './tag-library-caption';
 
 interface Props {
   onNavigate: (section: SettingsSection) => void;
@@ -90,15 +91,25 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileAutomationTitle', 'Automation library'),
-      detail: t(
-        'settingsOverview.tileAutomationDetail',
-        '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
-        {
-          tags: formatCount(tags.data?.items.length),
-          templates: formatCount(templates.data?.items.length),
-          rules: formatCount(leadRot.data?.items.length),
-        },
-      ),
+      detail: tags.data?.pageContinues
+        ? t(
+            'settingsOverview.tileAutomationDetailPartialTags',
+            '{{tags}} / {{templates}} templates / {{rules}} rot rules',
+            {
+              tags: tagLibraryCaption(tags.data.items.length, true),
+              templates: formatCount(templates.data?.items.length),
+              rules: formatCount(leadRot.data?.items.length),
+            },
+          )
+        : t(
+            'settingsOverview.tileAutomationDetail',
+            '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
+            {
+              tags: formatCount(tags.data?.items.length),
+              templates: formatCount(templates.data?.items.length),
+              rules: formatCount(leadRot.data?.items.length),
+            },
+          ),
       tone: tags.isError || templates.isError || leadRot.isError ? 'tomato' : 'purple',
       icon: 'sparkle' as const,
       section: 'crm' as const,
