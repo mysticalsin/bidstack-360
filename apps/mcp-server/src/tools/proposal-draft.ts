@@ -50,7 +50,7 @@ export const proposalDraft: Tool<typeof Input> = {
         [opp.customer, opp.name, opp.industry, sectionTitle].filter(Boolean).join(' - '),
         { limit: 3 },
       )
-        .then((result) => result.references)
+        .then((result) => result.references.items)
         .catch(() => []),
       prisma.task.findMany({
         where: { orgId: ctx.orgId, oppId: opp.id, deletedAt: null },

@@ -138,6 +138,11 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
     name: 'proposal.draft',
     desc: 'Draft a proposal section using available customer context.',
   },
+  {
+    group: 'legacy',
+    name: 'spotlight_ref',
+    desc: 'Search the reference library. references says when the page is not every match.',
+  },
 ];
 
 // ─── Summary shape ─────────────────────────────────────────────────────────────

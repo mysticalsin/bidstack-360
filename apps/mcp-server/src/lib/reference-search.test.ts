@@ -33,6 +33,26 @@ function decision(allowed: boolean) {
   };
 }
 
+function refRow(index: number) {
+  return {
+    id: `ref-${index}`,
+    title: `Reference ${index}`,
+    description: null,
+    industry: null,
+    value_micros: 1n,
+    usage_count: 1,
+    document_url: null,
+    tags: [] as string[],
+    score: 0,
+  };
+}
+
+function sqlLimit(call: unknown[]): number {
+  const value = [...call].reverse().find((part) => typeof part === 'number');
+  if (typeof value !== 'number') throw new Error('keyword limit missing');
+  return value;
+}
+
 describe('reference search SERUM retrieval policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,9 +87,11 @@ describe('reference search SERUM retrieval policy', () => {
     const result = await searchReferences(orgId, 'managed services', { limit: 3 });
 
     expect(result.mode).toBe('keyword');
-    expect(result.references).toHaveLength(1);
-    expect(result.references[0]?.valueMicros).toBe('1000000');
-    expect(result.references[0]).not.toHaveProperty('valueEur');
+    expect(Array.isArray(result.references)).toBe(false);
+    expect(result.references.items).toHaveLength(1);
+    expect(result.references).toMatchObject({ limit: 3, truncated: false });
+    expect(result.references.items[0]?.valueMicros).toBe('1000000');
+    expect(result.references.items[0]).not.toHaveProperty('valueEur');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mocks.checkRetrieval).toHaveBeenCalledWith({
       orgId,
@@ -101,7 +123,7 @@ describe('reference search SERUM retrieval policy', () => {
     ]);
 
     const result = await searchReferences(orgId, 'large delivery', { limit: 1 });
-    const reference = result.references[0];
+    const reference = result.references.items[0];
     expect(reference?.valueMicros).toBe('8598204328457184962');
     expect(JSON.stringify(result)).not.toMatch(/valueEur|EUR|€/);
   });
@@ -118,6 +140,7 @@ describe('reference search SERUM retrieval policy', () => {
     const result = await searchReferences(orgId, 'governed proposal proof', { limit: 4 });
 
     expect(result.mode).toBe('semantic');
+    expect(result.references).toEqual({ items: [], limit: 4, truncated: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mocks.checkRetrieval).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,5 +150,43 @@ describe('reference search SERUM retrieval policy', () => {
         requestedChunks: 4,
       }),
     );
+  });
+});
+
+describe('spotlight reference page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.COHERE_API_KEY;
+    delete process.env.SERUM_CONFIG_ENVIRONMENT;
+  });
+
+  afterEach(() => {
+    delete process.env.COHERE_API_KEY;
+  });
+
+  it('does not return one reference as a bare array, or a full page as the whole set', async () => {
+    // WHY: references were a bare array of the requested page. Dust could treat
+    // that page as every match. One reference is the whole set. The extra row
+    // sets truncated.
+    mocks.queryRaw.mockImplementation(async () => [refRow(0)]);
+
+    const one = await searchReferences(orgId, 'payments', { limit: 8 });
+    expect(Array.isArray(one.references)).toBe(false);
+    expect(one.references).toEqual({
+      items: [expect.objectContaining({ id: 'ref-0', title: 'Reference 0' })],
+      limit: 8,
+      truncated: false,
+    });
+
+    mocks.queryRaw.mockImplementation(async (...args: unknown[]) => {
+      const take = sqlLimit(args);
+      return Array.from({ length: take }, (_, index) => refRow(index));
+    });
+
+    const page = await searchReferences(orgId, 'payments', { limit: 8 });
+    expect(sqlLimit(mocks.queryRaw.mock.calls.at(-1) ?? [])).toBe(9);
+    expect(Array.isArray(page.references)).toBe(false);
+    expect(page.references.items).toHaveLength(8);
+    expect(page.references).toMatchObject({ limit: 8, truncated: true });
   });
 });

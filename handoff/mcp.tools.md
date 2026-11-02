@@ -49,6 +49,12 @@ Drafts a proposal section using the customer's intel + Mantu's reference library
 ```
 **Output:** `{ "markdown": "...", "citations": [{ "docId": "...", "title": "..." }] }`
 
+## `spotlight_ref`
+Search the reference library.
+
+**Input:** `{ "query": "payments modernization", "limit": 8 }`
+**Output:** `{ mode, references }` where `references` is `{ items, limit, truncated }`. `truncated` is true when more references match than `items`.
+
 ---
 
 ## Authorization

@@ -13,6 +13,8 @@ import {
   checkSerumRetrievalRuntimePolicy,
 } from '@bidstack/db/serum-runtime-policy';
 
+import { capPage } from '../tools/crm-tools.helpers.js';
+
 const COHERE_MODEL = 'embed-multilingual-v3.0';
 const EMBED_DIM = 1024;
 
@@ -39,7 +41,12 @@ export interface RankedReference {
 
 export interface ReferenceSearchResult {
   mode: 'semantic' | 'keyword';
-  references: RankedReference[];
+  /** Page of matches. `truncated` means more references match than `items`. */
+  references: {
+    items: RankedReference[];
+    limit: number;
+    truncated: boolean;
+  };
   // True when the caller's `limit` exceeded the semantic retrieval chunk cap, so
   // the semantic search still ran but was capped at SEMANTIC_RETRIEVAL_CHUNK_CAP
   // chunks. Distinguishes a deliberate cap (still semantic) from a keyword
@@ -182,7 +189,7 @@ export async function searchReferences(
         AND r.deleted_at IS NULL
         AND (r.title ILIKE ${kw} OR r.description ILIKE ${kw})
       ORDER BY r.usage_count DESC, r.created_at DESC
-      LIMIT ${limit}
+      LIMIT ${limit + 1}
     `;
   }
 
@@ -195,23 +202,25 @@ export async function searchReferences(
     const want = new Set(opts.tags.map((t) => t.toLowerCase()));
     results = results.filter((r) => r.tags.some((t) => want.has(t.toLowerCase())));
   }
-  results = results.slice(0, effectiveLimit);
 
   return {
     mode: vector ? 'semantic' : 'keyword',
     // Only meaningful when semantic mode actually ran; a keyword fallback was
     // not capped, it was denied/unconfigured.
     ...(vector && cappedToPolicyMax ? { cappedToPolicyMax: true } : {}),
-    references: results.map((r) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description,
-      industry: r.industry,
-      valueMicros: r.value_micros === null ? null : BigInt(r.value_micros).toString(),
-      usageCount: r.usage_count,
-      documentUrl: r.document_url,
-      tags: r.tags,
-      scoreBps: Math.round(Math.max(0, Math.min(1, r.score)) * 10000),
-    })),
+    references: capPage(
+      results.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        industry: r.industry,
+        valueMicros: r.value_micros === null ? null : BigInt(r.value_micros).toString(),
+        usageCount: r.usage_count,
+        documentUrl: r.document_url,
+        tags: r.tags,
+        scoreBps: Math.round(Math.max(0, Math.min(1, r.score)) * 10000),
+      })),
+      effectiveLimit,
+    ),
   };
 }
