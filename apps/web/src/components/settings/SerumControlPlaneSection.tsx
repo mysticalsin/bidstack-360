@@ -386,15 +386,30 @@ const SERUM_CONFIG_SECTIONS: SerumConfigSection[] = [
     i18nKey: 'observability',
     label: 'Observability',
     summary: 'Provider, queue, cost, latency, and error signals for operators.',
-    detail: (snapshot, t) =>
-      t(
+    detail: (snapshot, t) => {
+      const providerDetail = snapshot.signalHealth.find(
+        (signal) => signal.id === 'provider-heartbeats',
+      )?.detail;
+      // The status read already says when the drawn rows are not every provider.
+      if (providerDetail?.includes('not every provider')) {
+        return t(
+          'crm.serum.section.observability.detailProvidersPartial',
+          '{{queueCount}} queue health rows. {{detail}}',
+          {
+            queueCount: snapshot.queueHealth.length,
+            detail: providerDetail,
+          },
+        );
+      }
+      return t(
         'crm.serum.section.observability.detail',
         '{{queueCount}} queue health rows and {{providerCount}} provider health rows available.',
         {
           queueCount: snapshot.queueHealth.length,
           providerCount: snapshot.providerHealth.length,
         },
-      ),
+      );
+    },
     status: (snapshot) => (snapshot.summary.failedJobs > 0 ? 'attention' : 'ready'),
     defaultConfig: {
       enabled: true,

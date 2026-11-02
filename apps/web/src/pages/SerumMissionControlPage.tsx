@@ -64,6 +64,11 @@ export function SerumMissionControlPage() {
     return <SerumErrorState error={status.error} onRetry={() => void status.refetch()} />;
   }
 
+  const providerHeartbeat = snapshot.signalHealth.find(
+    (signal) => signal.id === 'provider-heartbeats',
+  );
+  const providerHeartbeatPartial = providerHeartbeat?.detail.includes('not every provider') ?? false;
+
   return (
     <div className="space-y-6 pb-8">
       <header className="overflow-hidden rounded-3xl border border-[var(--serum-border)] bg-[var(--serum-surface)] p-6 shadow-[var(--serum-shadow-md)] backdrop-blur-xl lg:p-8">
@@ -255,6 +260,9 @@ export function SerumMissionControlPage() {
               }
             />
           </div>
+          {providerHeartbeatPartial ? (
+            <p className="mt-2 text-sm leading-6 text-[var(--fg-secondary)]">{providerHeartbeat?.detail}</p>
+          ) : null}
           <div className="mt-4 space-y-3">
             {snapshot.providerHealth.length > 0 ? (
               snapshot.providerHealth.map((provider) => (
