@@ -109,6 +109,8 @@ export const envSchema = z.object({
     .positive()
     .default(50 * 1024 * 1024),
   STORAGE_SCAN_REQUIRED: z.enum(['true', 'false']).default('false'),
+  CLAMAV_HOST: z.string().min(1).optional().or(z.literal('')),
+  CLAMAV_PORT: z.string().optional().or(z.literal('')),
 
   TRUSTED_PROXIES: z.string().optional().or(z.literal('')),
   // Azure Front Door profile id; when set, requests without a matching

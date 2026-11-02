@@ -286,11 +286,21 @@ class S3Storage implements StorageAdapter {
       Key: key,
       ContentType: contentType,
       ContentLength: bytes,
+      // D4: request SSE-S3 so the object is encrypted at rest even when
+      // the bucket default is unset. The client MUST echo the signed
+      // x-amz-server-side-encryption header on the PUT.
+      ServerSideEncryption: 'AES256',
     });
     const url: string = await asSdk(this.signer).getSignedUrl(this.client, cmd, {
       expiresIn: 900,
     });
-    return { url, headers: { 'Content-Type': contentType } };
+    return {
+      url,
+      headers: {
+        'Content-Type': contentType,
+        'x-amz-server-side-encryption': 'AES256',
+      },
+    };
   }
 
   async getDownload(
@@ -316,6 +326,7 @@ class S3Storage implements StorageAdapter {
       Body: body,
       ContentType: contentType,
       ContentLength: body.length,
+      ServerSideEncryption: 'AES256',
     });
     await asSdk(this.client).send(cmd);
     return { bytes: body.length };

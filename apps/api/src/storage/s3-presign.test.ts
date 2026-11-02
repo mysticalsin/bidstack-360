@@ -26,7 +26,10 @@ describe('S3 presigned upload', () => {
     });
 
     const signed = new URL(url).searchParams.get('X-Amz-SignedHeaders') ?? '';
-    expect(signed.split(';')).toEqual(expect.arrayContaining(['content-length', 'host']));
+    expect(signed.split(';')).toEqual(
+      expect.arrayContaining(['content-length', 'host', 'x-amz-server-side-encryption']),
+    );
     expect(headers['Content-Type']).toBe('application/pdf');
+    expect(headers['x-amz-server-side-encryption']).toBe('AES256');
   });
 });
