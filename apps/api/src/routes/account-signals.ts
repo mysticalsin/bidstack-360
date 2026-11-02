@@ -30,7 +30,6 @@ import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import { closedAtOf, groupMap, loadMomentumInputs, momentumFor, OPP_SELECT, sourceStatus } from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
 import { loadInitiatives } from '../services/account-signals/initiatives.js';
-import { linkedTimelineBids, type TimelineBidLink } from '../services/account-signals/timeline-bids.js';
 import { loadKeyNumbers, loadPositioning } from '../services/account-positioning/load.js';
 
 const DAY = 86_400_000;
@@ -38,13 +37,7 @@ const params = z.object({ companyId: z.string().uuid() });
 
 const importanceOf = (e: { importance: number; severity: number }) => e.importance || Math.min(100, e.severity * 20);
 
-interface TimelineBidRow extends TimelineBidLink {
-  title: string;
-  status: string;
-  dueDate: Date | null;
-  importedAt: Date;
-  url: string | null;
-}
+const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
 
 export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
   async function readable(req: { auth: { orgId: string; userId: string } }, companyId: string) {
@@ -108,7 +101,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetings, opps, events, earnings, postings] = await Promise.all([
+      const [meetings, opps, bids, events, earnings, postings] = await Promise.all([
         prisma.meetingIntel.findMany({
           where: { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] },
           select: { id: true, title: true, heldAt: true, summary: true, companyId: true, _count: { select: { attendees: true } } },
@@ -116,6 +109,11 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 200,
         }),
         prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: OPP_SELECT, take: 500 }),
+        prisma.bidOpportunity.findMany({
+          where: { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] },
+          select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
+          take: 100,
+        }),
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
           orderBy: { occurredAt: 'desc' },
@@ -152,12 +150,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           push({ id: `op:${o.id}:close`, at: closed.toISOString(), lane: 'ours', category: 'deal', title: `${won ? 'Won' : 'Lost'}: ${o.name}`, summary: won ? 'Closed won' : 'Closed lost', source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: won ? 70 : 60, implication: won ? 'OPPORTUNITY' : 'RISK', sample: false });
         }
       }
-      // A public bid has no company id. A name match is not a link.
-      // linkedTimelineBids keeps a row only when companyId is this account
-      // or opportunityId is already one of this account's deals.
-      const accountOpportunityIds = new Set(opps.map((row) => row.id));
-      const bids: TimelineBidRow[] = [];
-      for (const b of linkedTimelineBids(company.id, bids, accountOpportunityIds)) {
+      for (const b of bids) {
         push({ id: `bid:${b.id}`, at: (b.dueDate ?? b.importedAt).toISOString(), lane: 'ours', category: 'bid', title: `Bid: ${b.title}`, summary: b.dueDate ? `Due ${b.dueDate.toISOString().slice(0, 10)}, ${b.status}` : b.status, source: 'Bids', sourceUrl: b.url, href: '/bid-matrix', importance: 50, implication: 'NEUTRAL', sample: false });
       }
       for (const e of events) {
