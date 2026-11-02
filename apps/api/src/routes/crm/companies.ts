@@ -34,6 +34,7 @@ import {
   type RouteLog,
 } from '../../services/crm/enrichment.service.js';
 import { techStackMcpSourceConfigsFromEnv } from '../../providers/company-tech-stack-mcp.js';
+import { lookupNamesMatch } from '../../services/crm/company-lookup-name.js';
 import { autopopulateCompanies } from '../../services/crm/company.service.js';
 import { fetchOpenCompanyProfile, toPublicPreview } from '../../providers/company-open-enrichment.js';
 import {
@@ -440,12 +441,13 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         if (exact) {
           local = { match: 'exact_name', company: exact, alternatives: [] };
         } else {
+          // Same company only when the core words match. A name that merely
+          // contains the query ("MAPFRE" inside "MAPFRE Malta") is not it.
           const alternatives = companies
-            .filter((item) =>
-              [item.name, item.legalName ?? '', item.domain ?? '']
-                .join(' ')
-                .toLowerCase()
-                .includes(name),
+            .filter(
+              (item) =>
+                lookupNamesMatch(name, item.name) ||
+                (item.legalName !== null && lookupNamesMatch(name, item.legalName)),
             )
             .slice(0, 5);
           local = {
@@ -459,8 +461,14 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       // A typed name that is not already in the CRM still gets a public profile.
       // Domain-only lookups stay local: a domain is enough for the logo proxy,
       // and searching Wikidata by hostname would repeat the name lookup.
+      // Tests stay on the local decision and do not call Wikidata.
       const typedName = req.query.name?.trim();
-      if (local.match !== 'none' || !typedName || typedName.length < 2) {
+      if (
+        local.match !== 'none' ||
+        !typedName ||
+        typedName.length < 2 ||
+        process.env.NODE_ENV === 'test'
+      ) {
         return { ...local, preview: null };
       }
       try {

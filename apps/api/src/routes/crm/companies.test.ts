@@ -134,15 +134,18 @@ describe('crm companies routes', () => {
     expect(body.alternatives).toEqual([]);
   });
 
-  skipIfNoDb('GET /api/crm/companies/lookup returns fuzzy match when no exact match', async () => {
+  skipIfNoDb('GET /api/crm/companies/lookup does not link Mantu from a shorter string', async () => {
+    // WHY: "Mant" used to come back as Mantu because the shorter string sat
+    // inside the longer name. That is a different account.
     const res = await server.inject({
       method: 'GET',
       url: '/api/crm/companies/lookup?name=Mant',
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.match).toBe('fuzzy_name');
-    expect(body.company).not.toBeNull();
+    expect(body.match).not.toBe('fuzzy_name');
+    expect(body.company?.name ?? null).not.toBe('Mantu');
+    expect(body.alternatives).toEqual([]);
   });
 
   skipIfNoDb('GET /api/crm/companies/:id returns 404 for unknown company', async () => {
