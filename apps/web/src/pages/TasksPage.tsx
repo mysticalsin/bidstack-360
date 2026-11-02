@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
+import { isOpenTaskDueToday, isOpenTaskPastDue } from '@/components/task/task-list-due';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
@@ -16,7 +17,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
-import { daysUntil, formatDate } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useTaskOrder } from '@/stores/taskOrder';
 import { Select } from '@/components/ui/Select';
@@ -80,16 +81,13 @@ export function TasksPage() {
 
   const filteredItems = useMemo(() => {
     const all = data?.items ?? [];
+    // Today and Overdue share one UTC calendar day. Elapsed milliseconds
+    // would put a task due today into Overdue after 12:00 UTC.
+    const now = new Date();
     return all.filter((t) => {
       if (filter === 'all') return true;
-      if (filter === 'today') {
-        const d = daysUntil(t.dueDate);
-        return d !== null && d === 0 && t.status !== 'done';
-      }
-      if (filter === 'overdue') {
-        const d = daysUntil(t.dueDate);
-        return d !== null && d < 0 && t.status !== 'done';
-      }
+      if (filter === 'today') return isOpenTaskDueToday(t, now);
+      if (filter === 'overdue') return isOpenTaskPastDue(t, now);
       // Concrete statuses are already narrowed server-side; this is a no-op
       // guard for the loaded page.
       return t.status === filter;

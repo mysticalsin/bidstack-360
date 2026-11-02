@@ -12,10 +12,11 @@ import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
-import { daysUntil, formatDate } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 
 import type { Task } from '@bidstack/shared';
 
+import { taskDueCalendarDays } from './task-list-due';
 import { STATUS_CYCLE } from './taskConstants';
 
 // Each row is memoized so toggling one task's status doesn't re-render the
@@ -44,7 +45,7 @@ export const TaskRow = memo(function TaskRow({
 }) {
   const { t } = useTranslation('crm');
   const update = useUpdateTask();
-  const d = daysUntil(task.dueDate);
+  const d = taskDueCalendarDays(task.dueDate);
   const overdue = d !== null && d < 0;
   const readOnlyHint = t('taskRow.readOnlyHint', 'You need task write access to edit this task.');
 
