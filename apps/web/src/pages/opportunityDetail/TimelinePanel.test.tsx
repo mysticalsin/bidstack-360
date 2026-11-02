@@ -67,6 +67,9 @@ describe('TimelinePanel — merged deal narrative', () => {
     renderPanel();
 
     expect(await screen.findByText('Intro call with CTO')).toBeTruthy();
+    // A page shorter than the take keeps the event count. It does not say
+    // the list is incomplete.
+    expect(screen.getByText('2 events')).toBeTruthy();
     expect(screen.getByText('Jane Doe')).toBeTruthy();
     // Kind label is humanized and shown alongside the entry.
     expect(screen.getByText('call')).toBeTruthy();
