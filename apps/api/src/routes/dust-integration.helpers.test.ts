@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { Opportunity } from '@bidstack/db';
+
+// helpers.ts reads `config` at import time. The unit job has no DATABASE_URL
+// (env validation throws). This suite only checks markdown money formatting.
+vi.mock('../env.js', () => ({
+  config: { API_RATE_LIMIT_MAX: 120 },
+  getEnv: () => ({ API_RATE_LIMIT_MAX: 120 }),
+}));
 
 import { serializeOpportunityToMarkdown } from './dust-integration.helpers.js';
 
