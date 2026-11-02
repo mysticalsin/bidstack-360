@@ -14,8 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
+import { activityWhen } from '@/lib/activity-when';
 import { springSoft } from '@/lib/motion';
-import { relativeTime } from '@/lib/format';
 
 // ─── Type → presentation maps (private) ──────────────────────────────────────
 
@@ -60,7 +60,7 @@ export function activitySubtitle(value: string): string {
 }
 
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
-  const { t } = useTranslation('crm');
+  const { t, i18n } = useTranslation('crm');
   const visible = activity.slice(0, 8);
   const hasMore = activity.length > 8;
 
@@ -126,7 +126,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
                 </div>
               </div>
               <time className="shrink-0 text-xs text-[var(--fg-tertiary)]" dateTime={a.date}>
-                {relativeTime(a.date)}
+                {activityWhen(a.date, Date.now(), i18n.language)}
               </time>
             </motion.div>
           ))

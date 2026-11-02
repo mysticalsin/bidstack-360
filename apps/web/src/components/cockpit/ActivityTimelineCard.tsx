@@ -13,8 +13,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
+import { activityWhen } from '@/lib/activity-when';
 import { springSoft } from '@/lib/motion';
-import { relativeTime } from '@/lib/format';
 
 import type { AccountCockpitSnapshot, CrmActivity } from '@bidstack/shared';
 
@@ -51,7 +51,7 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
   limit = 8,
 }: Props) {
   const reduced = useReducedMotion();
-  const { t } = useTranslation('crm');
+  const { t, i18n } = useTranslation('crm');
 
   // Sort newest first; the API isn't always strictly ordered when activities
   // come from multiple sources (tasks + sync events + dust runs).
@@ -126,7 +126,7 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
                 ) : null}
                 <div className="mt-1 text-[11px] text-[var(--fg-tertiary)]">
                   {activity.actorName ? `${activity.actorName} · ` : ''}
-                  {relativeTime(activity.occurredAt)}
+                  {activityWhen(activity.occurredAt, Date.now(), i18n.language)}
                 </div>
               </div>
             </motion.li>
