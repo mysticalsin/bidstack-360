@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useAccountOpenBook } from '@/hooks/useAccountOpenBook';
+import { useChampionCoverage } from '@/hooks/useChampionCoverage';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
@@ -17,6 +18,7 @@ import { formatMicrosAmount } from '@bidstack/shared';
 import { springSoft } from '@/lib/motion';
 
 import { AccountBookChart } from './AccountBookChart';
+import { ChampionGap } from './ChampionGap';
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
@@ -191,6 +193,13 @@ export function AccountsAllSegment() {
   const openBook = useAccountOpenBook(viewCompanyIds);
   const openBookStatus =
     viewCompanyIds.length === 0 || openBook.isSuccess ? 'ready' : openBook.isError ? 'error' : 'loading';
+  const championCoverage = useChampionCoverage(viewCompanyIds);
+  const championStatus =
+    viewCompanyIds.length === 0 || championCoverage.isSuccess
+      ? 'ready'
+      : championCoverage.isError
+        ? 'error'
+        : 'loading';
 
   const topMissingFields = useMemo(() => {
     const counts = new Map<string, number>();
@@ -419,6 +428,11 @@ export function AccountsAllSegment() {
           </p>
         </div>
         <AccountBookChart stages={openBook.data?.stages ?? []} status={openBookStatus} />
+        <ChampionGap
+          status={championStatus}
+          accounts={championCoverage.data?.accounts ?? viewCompanyIds.length}
+          missing={championCoverage.data?.missing ?? 0}
+        />
       </section>
 
       <motion.div

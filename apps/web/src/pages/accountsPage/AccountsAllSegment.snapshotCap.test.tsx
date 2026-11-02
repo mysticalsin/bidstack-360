@@ -109,6 +109,15 @@ vi.mock('@/hooks/useAccountOpenBook', () => ({
     isPending: false,
   }),
 }));
+vi.mock('@/hooks/useChampionCoverage', () => ({
+  useChampionCoverage: () => ({
+    data: undefined,
+    isSuccess: false,
+    isError: false,
+    isLoading: true,
+    isPending: true,
+  }),
+}));
 vi.mock('@/hooks/useMsaLeverage', () => ({
   useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
 }));

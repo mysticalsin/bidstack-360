@@ -6,6 +6,7 @@ import { CrmDashboardSnapshot, ReleaseScore } from '@bidstack/shared';
 
 import { isExpectedClientAbortError } from '../../lib/http-client-abort.js';
 import { fetchAccountOpenBook } from '../../services/crm/account-open-book.js';
+import { fetchChampionCoverage } from '../../services/crm/champion-coverage.js';
 import { buildDashboardSnapshot, normalizeName } from '../../services/crm/dashboard.service.js';
 import { getReleaseScore } from '../../services/crm/dashboard.queries.js';
 import { getAccessScope, scopeCacheTag, type AccessScope } from '../../lib/access-scope.js';
@@ -167,6 +168,38 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
           req.log.error(
             { err, orgId: req.auth.orgId, companies: req.body.companyIds.length },
             'Error in /crm/accounts/open-book route',
+          );
+        }
+        throw err;
+      }
+    },
+  );
+
+  server.post(
+    '/crm/accounts/champion-coverage',
+    {
+      config: { permission: 'companies:read' },
+      schema: {
+        body: z.object({
+          companyIds: z.array(z.string().trim().min(1).max(512)).max(2000),
+        }),
+        response: {
+          200: z.object({
+            accounts: z.number().int().nonnegative(),
+            missing: z.number().int().nonnegative(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      try {
+        const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+        return await fetchChampionCoverage(prisma, req.auth.orgId, req.body.companyIds, scope);
+      } catch (err) {
+        if (!shouldSuppressRouteErrorLog(err, req.raw)) {
+          req.log.error(
+            { err, orgId: req.auth.orgId, companies: req.body.companyIds.length },
+            'Error in /crm/accounts/champion-coverage route',
           );
         }
         throw err;
