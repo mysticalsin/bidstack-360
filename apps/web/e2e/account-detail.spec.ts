@@ -74,6 +74,11 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
   await gotoAndWait(`/accounts/${accountId}`);
 
   await expectAccountCockpitReady(page, company.name);
+  await expect(page.getByRole('heading', { name: 'Public financials watchdog' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('heading', { name: 'Previous projects with us' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Related history' })).toBeVisible();
   if (company.domain) {
     await expect(page.getByText(company.domain, { exact: false }).first()).toBeVisible();
   }

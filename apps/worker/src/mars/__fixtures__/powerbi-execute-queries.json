@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "tables": [
+        {
+          "rows": [
+            {
+              "[mars_entryId]": "mt-E1",
+              "[mars_account]": "Northwind Energy",
+              "[mars_contactName]": "Jane Doe",
+              "[mars_contactEmail]": "jane@northwind-energy.example",
+              "[mars_contactTitle]": "Director",
+              "[mars_company]": "Northwind Energy plc",
+              "[mars_meetingDate]": "2026-10-11T00:00:00",
+              "[mars_updatedAt]": "2026-10-11T12:00:00",
+              "[mars_internalAttendee]": "Alex Turner <kam.uk@polo.example>",
+              "[mars_notes]": "QBR notes"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

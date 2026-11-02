@@ -41,6 +41,43 @@ test('agents page is reachable from product routes', async ({ page, gotoAndWait 
   await expect(page.getByRole('heading', { level: 2, name: 'Agents', exact: true })).toBeVisible();
 });
 
+test('account view shows public financials, previous projects and related history', async ({
+  page,
+  gotoAndWait,
+}) => {
+  const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4010';
+  const created = await page.request.post(`${API_URL}/api/v1/companies`, {
+    data: {
+      name: `New General ${Date.now()}`,
+      legalName: null,
+      domain: null,
+      industry: null,
+      employeeCount: null,
+      countryCode: null,
+      address: null,
+      billingEmail: null,
+      taxId: null,
+      logoUrl: null,
+      website: null,
+      tier: 'standard',
+    },
+  });
+  expect(created.ok(), 'creating a new General account must succeed').toBeTruthy();
+  const company = (await created.json()) as { id: string; name: string };
+  await gotoAndWait(`/accounts/${company.id}`);
+  await expect(page.getByRole('heading', { level: 1, name: company.name })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('heading', { name: 'Public financials watchdog' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('fh-empty')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Previous projects with us' })).toBeVisible();
+  await expect(page.getByText('No closed projects yet')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Related history' })).toBeVisible();
+  await expect(page.getByText('No related history yet')).toBeVisible();
+});
+
 test('enterprise readiness surfaces are reachable in demo mode', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/dashboard');
   await expect(page.getByRole('status').filter({ hasText: /DEMO MODE/i })).toBeVisible({

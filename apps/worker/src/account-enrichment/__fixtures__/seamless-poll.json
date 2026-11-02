@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "requestId": "req-1",
+      "status": "done",
+      "company": {
+        "id": "sm-1",
+        "annualRevenue": 125000000,
+        "staffCount": 1200,
+        "industries": ["Software"],
+        "location": { "city": "Paris", "country": "France" },
+        "topTechnologies": ["Salesforce"]
+      }
+    }
+  ]
+}

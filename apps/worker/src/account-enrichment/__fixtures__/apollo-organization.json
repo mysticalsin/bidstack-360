@@ -1,0 +1,15 @@
+{
+  "organization": {
+    "id": "ap-1",
+    "name": "Acme",
+    "annual_revenue": 125000000,
+    "estimated_num_employees": 1200,
+    "industry": "information technology & services",
+    "industries": ["information technology & services", "computer software"],
+    "city": "Paris",
+    "state": "Ile-de-France",
+    "country": "France",
+    "linkedin_url": "https://www.linkedin.com/company/acme",
+    "technology_names": ["Snowflake", "Salesforce"]
+  }
+}

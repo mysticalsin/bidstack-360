@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<rss><channel>
+<item>
+  <title><![CDATA[Acme Corp (NYSE:ACME) launches new mobile banking app - Reuters]]></title>
+  <link>https://reuters.example/acme-app</link>
+  <pubDate>Thu, 30 Oct 2026 09:00:00 GMT</pubDate>
+  <source url="https://reuters.example">Reuters</source>
+  <description><![CDATA[Acme Corp unveiled an app.]]></description>
+</item>
+</channel></rss>

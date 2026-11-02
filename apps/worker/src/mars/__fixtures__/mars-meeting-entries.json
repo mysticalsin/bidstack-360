@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "id": "mt-E1",
+      "client": { "marsAccountId": "Northwind Energy", "name": "Northwind Energy plc" },
+      "contacts": [{ "fullName": "Jane Doe", "jobTitle": "Director" }],
+      "loggedBy": { "email": "kam.uk@polo.example", "name": "Alex Turner" },
+      "meetingDate": "2026-10-11T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": "c1",
+  "hasMore": false
+}
