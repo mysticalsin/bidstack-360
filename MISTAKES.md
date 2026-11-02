@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-02 INFRA: PG17 pg_restore failed a successful PG16 restore on `transaction_timeout`
+
+- **What went wrong:** A restore drill with pg_dump 17 against Postgres 16 restored all 179 tables, then `scripts/restore-postgres.sh` exited non-zero because `pg_restore` applied `SET transaction_timeout = 0`.
+- **Root cause:** PG17 clients emit that GUC; PG16 does not recognize it. `set -e` plus raw `pg_restore` treated the harmless SET as a failed restore.
+- **Prevention rule:** Prefer a client matching `SHOW server_version` major. If the only client is newer, ignore **only** stderr that mentions `transaction_timeout`. Any other error stays fatal. Cover the filter with a test that has no live database.
+- **Files affected:** `scripts/restore-postgres.sh`, `scripts/lib/postgres-client.sh`, `scripts/postgres-client.test.sh`.
+
+---
+
 ### 2026-07-07 BUG: `rowsFromUnknown` envelope-unwrap recursed into `undefined` forever
 
 - **What went wrong:** Writing `sillage-signals.ts`'s envelope-unwrap helper (`rowsFromUnknown`, adapted from the same pattern already in `company-seamless-enrichment.ts`), a malformed vendor payload with none of the checked envelope keys (`signals`/`data`/`results`/`items`) caused `rowsFromUnknown(root[key])` to be called with `root[key] === undefined` on every iteration. Since `record(undefined)` returns `{}`, the recursive call re-enters with the exact same `undefined` argument every time — infinite recursion, RangeError: Maximum call stack size exceeded. Caught by the "coerces malformed REST JSON" test: the stack overflow was silently swallowed by the caller's outer try/catch and surfaced as a wrong result (`source: null` instead of `'rest'`) rather than a crash, which made it non-obvious from the stack trace alone.

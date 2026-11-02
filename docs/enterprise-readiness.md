@@ -87,9 +87,9 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 
 | ID | Pri | Status | Gap |
 |----|-----|--------|-----|
-| F1 | **P0** | **Fixed (scripted)** | `pnpm db:backup` → `pg_dump -Fc` with retention. `pnpm db:restore` requires an explicit `POLO_RESTORE_DATABASE_URL`. `pnpm db:backup:selftest` dumps/restores a synthetic DB and checks row counts. |
-| F2 | **P0** | **Owner** | Choose the backup destination (`POLO_BACKUP_DIR` or a managed snapshot) and a restore drill on the **real** volume. Repo scripts do not ship offsite storage. |
-| F3 | P1 | Open | PITR / WAL, backup-failure alerting, object-storage recovery. |
+| F1 | **P0** | **Fixed (scripted)** | `pnpm db:backup` → `pg_dump -Fc` with retention. Prefers a client matching the server major; restore ignores only the PG17 `transaction_timeout` SET on PG16. `pnpm db:restore` requires an explicit `POLO_RESTORE_DATABASE_URL`. `pnpm db:backup:selftest` dumps/restores a synthetic DB and checks row counts. |
+| F2 | **P0** | **Configured (off until env)** | Offsite is Cloudflare R2 via the S3 API (`POLO_BACKUP_S3_ENDPOINT`, bucket `polo-backups`, 14-day retention). Upload is skipped unless endpoint + R2 access keys are set. |
+| F3 | P1 | Partial | Backup failure exits non-zero and runs `POLO_BACKUP_ALERT_HOOK` when set. PITR / WAL still open. |
 
 ### (g) Secrets
 
@@ -137,7 +137,7 @@ v24 cockpit, MARS sync, and MSA intake (HEMA leverage flags) are unchanged.
 1. **Allowed users and roles** — set `POLO_ALLOWED_USERS` (and keep Cloudflare Access `ALLOWED_EMAILS` in sync). Example: `tony@mantu.com:Admin,colleague@amaris.com:Account Executive`.
 2. **Auth path** — Cloudflare Access (`CF_ACCESS_AUTH=true`, `VITE_AUTH_MODE=cf-access`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`) **or** Clerk. Not both. Not stub.
 3. **Empty real org id** — `POLO_REAL_ORG_CLERK` (default `org_polo_real`) and `pnpm db:seed:prod -- --clerk-org … --name "Mantu Sales"`.
-4. **Backup destination** — `POLO_BACKUP_DIR` or a managed Postgres snapshot. Run `pnpm db:backup:selftest` once, then a real restore drill.
+4. **Backup destination** — local `POLO_BACKUP_DIR` plus Cloudflare R2 (`POLO_BACKUP_S3_ENDPOINT`, `POLO_BACKUP_S3_ACCESS_KEY_ID`, `POLO_BACKUP_S3_SECRET_ACCESS_KEY`, bucket `polo-backups`, 14-day retention). Run `pnpm db:backup:selftest` once, then a real restore drill. Offsite stays disabled until those env vars are set.
 5. **Encryption keys** — 64-hex `INTEGRATION_TOKEN_KEY` and `PII_ENCRYPTION_MASTER_KEY`; `PII_FIELD_ENCRYPTION=true`; S3/R2 SSE for contract blobs (`STORAGE_DRIVER=s3`).
 6. **LLM** — leave `MSA_LLM_EXTRACT_ENABLED=false` and `DOCUMENT_LLM_EXTRACT_ENABLED=false` unless legal has approved sending MSA/account-file text to a third party.
 7. **Redeploy the preview Worker** so it injects `Cf-Access-Authenticated-User-Email`. This repo does not deploy to Cloudflare.
