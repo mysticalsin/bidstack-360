@@ -80,7 +80,7 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 | E1 | **P0** | **Fixed** | Fixture seed now also refuses `POLO_DATA_MODE=real`. Real tenant = `pnpm db:migrate:deploy` + `pnpm db:seed:prod -- --clerk-org <id> --name "…"`. |
 | E2 | — | Already shipped | `pnpm db:purge:demo` removes seed/demo/test orgs. |
 | E3 | **P1** | **Fixed** | Import now has server-side preview (money / currency / ISO dates / required fields), XLSX parse, and a **financials** entity writing `AccountFinancialPeriod` (`source=manual_import`). Confirm still required before write. |
-| E4 | P1 | Open | Opportunity money on the API wire still uses JS `Number` units (precision risk above ~$9M). Storage remains micros. |
+| E4 | P1 | **Fixed** | Opportunity create/patch/import and list/detail use `unitsToMicros` / `microsToUnits`. Storage stays micros. |
 | E5 | P2 | Open | No per-row “this is demo” marker inside a mixed org. Do not mix. |
 
 ### (f) Backups and restore

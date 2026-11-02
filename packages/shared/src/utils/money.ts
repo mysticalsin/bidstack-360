@@ -53,3 +53,35 @@ export function sumMicros(values: ReadonlyArray<bigint | number | null | undefin
   }
   return total;
 }
+
+const UNITS_RE = /^-?(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+
+/**
+ * Converts a unit amount (dollars, euros, …) to integer micros.
+ *
+ * WHY a string parse: `BigInt(Math.round(units * 1_000_000))` multiplies in
+ * IEEE-754 first. Past ~$9.007B the product is not a safe integer, so the
+ * stored micros are already wrong. `toFixed(6)` (number input) or a decimal
+ * string (exact input) is split into whole + fraction, then combined with
+ * BigInt — the same whole/remainder split as `microsToUnits`, inverted.
+ */
+export function unitsToMicros(units: string | number): bigint {
+  const raw = typeof units === 'number' ? unitsToFixedMicrosString(units) : units.trim();
+  if (!UNITS_RE.test(raw)) {
+    throw new Error('Invalid money units');
+  }
+  const negative = raw.startsWith('-');
+  const unsigned = negative ? raw.slice(1) : raw;
+  const dot = unsigned.indexOf('.');
+  const wholePart = dot === -1 ? unsigned : unsigned.slice(0, dot);
+  const fracPart = dot === -1 ? '' : unsigned.slice(dot + 1);
+  const micros = BigInt(wholePart) * MICROS_PER_UNIT + BigInt(fracPart.padEnd(6, '0'));
+  return negative ? -micros : micros;
+}
+
+function unitsToFixedMicrosString(units: number): string {
+  if (!Number.isFinite(units)) {
+    throw new Error('Invalid money units');
+  }
+  return units.toFixed(6);
+}
