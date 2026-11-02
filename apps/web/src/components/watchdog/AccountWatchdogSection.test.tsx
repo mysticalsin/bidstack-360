@@ -249,4 +249,36 @@ describe('AccountWatchdogSection', () => {
     expect(screen.queryByText('Signal 51')).toBeNull();
     expect(screen.getByText('Signal 50')).toBeTruthy();
   });
+
+  it('does not describe fifty projects as every project when a later one was loaded', () => {
+    // WHY: the track record took fifty closed bids. A fifty-first project never
+    // arrived, and "51 won" / "Show 51 projects" treated that page as the whole
+    // book. The extra row is the probe and is not drawn. No project total is
+    // invented. Two projects keep "1 won, 1 lost" and "Show 2 projects".
+    state.data = {
+      ...base,
+      pastProjects: Array.from({ length: 51 }, (_, n) => ({
+        id: `p${n + 1}`,
+        name: `Project ${n + 1}`,
+        outcome: n === 50 ? 'lost' as const : 'won' as const,
+        valueMicros: '1000000',
+        closedAt: `2026-01-${String((n % 28) + 1).padStart(2, '0')}T00:00:00Z`,
+      })),
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByText('50 in the latest 50, not every project').textContent).toBe(
+      '50 in the latest 50, not every project',
+    );
+    expect(screen.queryByText('50 won, 1 lost')).toBeNull();
+    expect(screen.queryByText(/Show 51 projects/)).toBeNull();
+    expect(screen.queryByText(/Show 50 projects/)).toBeNull();
+    expect(screen.queryByText(/Show all/i)).toBeNull();
+    expect(screen.queryByText(/View all/i)).toBeNull();
+    expect(screen.queryByText('Project 51')).toBeNull();
+    expect(screen.queryByText(/total value/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show these projects' }));
+    expect(screen.getByText('Project 1')).toBeTruthy();
+    expect(screen.getByText('Project 50')).toBeTruthy();
+    expect(screen.queryByText('Project 51')).toBeNull();
+  });
 });

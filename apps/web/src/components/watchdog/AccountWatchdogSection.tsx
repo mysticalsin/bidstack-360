@@ -26,6 +26,11 @@ import { mergeEnrichmentSignals } from '@/lib/enrichment/aggregate';
 import { daysUntil } from '@/lib/format';
 
 import { ACCOUNT_WATCH_EVENTS_DRAWN, accountWatchSignalCaption } from './account-watch-signal-caption';
+import {
+  ACCOUNT_WATCH_PROJECTS_DRAWN,
+  accountWatchProjectSummary,
+  accountWatchProjectToggle,
+} from './account-watch-project-caption';
 
 const PILL: Record<WatchImplication, string> = {
   OPPORTUNITY: 'Opportunity',
@@ -274,13 +279,19 @@ const amount = (micros: bigint) => formatUnspecifiedAmount(Number(micros / 1_000
 function TrackRecord({ data }: { data: AccountWatchdog }) {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const projectsId = useId();
-  const won = data.pastProjects.filter((p) => p.outcome === 'won');
-  const lost = data.pastProjects.length - won.length;
-  const total = data.pastProjects.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
+  // One row past the fifty this list draws is the probe. It is not a project
+  // on this track record, and it is not a total.
+  const projectsContinue = data.pastProjects.length > ACCOUNT_WATCH_PROJECTS_DRAWN;
+  const projects = projectsContinue
+    ? data.pastProjects.slice(0, ACCOUNT_WATCH_PROJECTS_DRAWN)
+    : data.pastProjects;
+  const won = projects.filter((p) => p.outcome === 'won');
+  const lost = projects.length - won.length;
+  const total = projects.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonValue = won.reduce((s, p) => s + BigInt(p.valueMicros), 0n);
   const wonShare = total > 0n ? Number((wonValue * 1000n) / total) / 10 : 0;
   const byYear = new Map<string, { won: number; lost: number }>();
-  for (const p of data.pastProjects) {
+  for (const p of projects) {
     const y = String(new Date(p.closedAt).getUTCFullYear());
     const cur = byYear.get(y) ?? { won: 0, lost: 0 };
     const v = Number(BigInt(p.valueMicros) / 1_000_000n);
@@ -292,19 +303,25 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
   return (
     <section className="wd-surface" aria-labelledby="wd-track-h">
       <h2 id="wd-track-h" className="wd-h">Track record</h2>
-      {data.pastProjects.length === 0 ? (
+      {projects.length === 0 ? (
         <p className="wd-empty"><span>No closed projects yet</span>Won and lost bids appear here.</p>
       ) : (
         <div className="wd-track-grid">
         <div className="wd-summary">
           <p className="wd-summary-line">
-            <span className="wd-summary-big">{won.length} won, {lost} lost</span>
-            <span className="wd-row-meta" title={UNSPECIFIED_CURRENCY_BASIS}>{amount(total)} total value</span>
+            <span className="wd-summary-big">{accountWatchProjectSummary(won.length, lost, projectsContinue)}</span>
+            {projectsContinue ? null : (
+              <span className="wd-row-meta" title={UNSPECIFIED_CURRENCY_BASIS}>{amount(total)} total value</span>
+            )}
           </p>
           <div
             className="wd-bar"
             role="img"
-            aria-label={`Won ${Math.round(wonShare)}% of closed value`}
+            aria-label={
+              projectsContinue
+                ? `Won share of the latest ${ACCOUNT_WATCH_PROJECTS_DRAWN} projects, not every project`
+                : `Won ${Math.round(wonShare)}% of closed value`
+            }
           >
             <i style={{ '--w': `${wonShare}%` } as React.CSSProperties} />
           </div>
@@ -315,7 +332,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
             aria-controls={projectsId}
             onClick={() => setProjectsOpen((v) => !v)}
           >
-            {projectsOpen ? 'Hide projects' : `Show ${data.pastProjects.length} projects`}
+            {accountWatchProjectToggle(projects.length, projectsOpen, projectsContinue)}
           </button>
         </div>
           <figure
@@ -330,7 +347,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
             </ul>
           </figure>
           <ul id={projectsId} className="wd-list wd-projects" hidden={!projectsOpen}>
-            {data.pastProjects.map((p) => (
+            {projects.map((p) => (
               <li key={p.id} className="wd-row wd-row-static">
                 <span className="wd-row-main">
                   <span className="wd-row-title">{p.name}</span>

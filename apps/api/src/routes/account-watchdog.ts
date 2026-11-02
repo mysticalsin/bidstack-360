@@ -12,6 +12,7 @@ import { canReadAccount } from '../lib/account-access.js';
 import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from '../services/account-signals/live-signals.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { ACCOUNT_WATCH_EVENTS_DRAWN, accountWatchEventTake } from './account-watch-events.js';
+import { ACCOUNT_WATCH_PROJECTS_DRAWN, accountWatchProjectTake } from './account-watch-projects.js';
 import { watchdogFeedAlertTake } from './watchdog-feed-alerts.js';
 
 const Implication = z.enum(['OPPORTUNITY', 'RISK', 'NEUTRAL']);
@@ -295,7 +296,9 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           where: { orgId, companyId, stage: { in: ['closed_won', 'closed_lost'] } },
           select: { id: true, name: true, stage: true, valueMicros: true, updatedAt: true, closedAt: true },
           orderBy: [{ closedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
-          take: 50,
+          // One row past the fifty the track record draws. The extra row is
+          // the probe. It is not a shown project, and it is not a total.
+          take: accountWatchProjectTake(),
         }),
       ]);
 
@@ -316,7 +319,8 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           title: e.title,
           detail: `${e.source} · ${e.implication.toLowerCase()}`,
         })),
-        ...pastProjects.map((p) => ({
+        // The probe is the row past the list. It is not a history item.
+        ...pastProjects.slice(0, ACCOUNT_WATCH_PROJECTS_DRAWN).map((p) => ({
           id: `op:${p.id}`,
           at: p.closedAt,
           type: 'opportunity' as const,
