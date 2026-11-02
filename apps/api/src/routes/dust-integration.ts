@@ -206,14 +206,25 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: server.requirePermission('integrations:read'),
-      schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            items: z.array(ApiKeySummary),
+            pageContinues: z.boolean(),
+          }),
+        },
+      },
     },
     async (req) => {
-      const keys = await prisma.apiKey.findMany({
+      // One row past the page is the probe. It is dropped and is not a key total.
+      const API_KEY_LIST_PAGE = 500;
+      const loaded = await prisma.apiKey.findMany({
         where: { orgId: req.auth.orgId, revokedAt: null, deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        take: 500,
+        take: API_KEY_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > API_KEY_LIST_PAGE;
+      const keys = pageContinues ? loaded.slice(0, API_KEY_LIST_PAGE) : loaded;
       return {
         items: keys.map((k) => ({
           id: k.id,
@@ -223,6 +234,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
           lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
           createdAt: k.createdAt.toISOString(),
         })),
+        pageContinues,
       };
     },
   );

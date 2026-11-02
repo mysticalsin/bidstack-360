@@ -14,6 +14,7 @@ import { useUsersPage } from '@/hooks/useUsers';
 import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
+import { apiKeyListCaption } from './api-key-list-caption';
 import { customFieldListCaption } from './custom-field-list-caption';
 import { roleListCaption } from './role-list-caption';
 import { stageListCaption } from './stage-list-caption';
@@ -172,9 +173,13 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileDeveloperTitle', 'Developer access'),
-      detail: t('settingsOverview.tileDeveloperDetail', '{{value}} API keys', {
-        value: formatCount(apiKeys.data?.items.length),
-      }),
+      detail: apiKeys.data?.pageContinues
+        ? t('settingsOverview.tileDeveloperDetailPartial', '{{drawn}}', {
+            drawn: apiKeyListCaption(apiKeys.data.items.length, true),
+          })
+        : t('settingsOverview.tileDeveloperDetail', '{{value}} API keys', {
+            value: formatCount(apiKeys.data?.items.length),
+          }),
       tone: apiKeys.isError ? 'tomato' : 'teal',
       icon: 'zap' as const,
       section: 'developer' as const,

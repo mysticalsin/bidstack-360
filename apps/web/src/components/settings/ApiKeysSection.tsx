@@ -22,6 +22,7 @@ import {
   type ApiKeyScope,
 } from '@/hooks/useApiKeys';
 import { formatDate, relativeTime } from '@/lib/format';
+import { apiKeyListCaption } from './api-key-list-caption';
 
 const MCP_SCOPES = ['mcp', 'read', 'write'] as const satisfies readonly ApiKeyScope[];
 const REST_READ_SCOPES = PERMISSION_KEYS.filter((scope) => scope.endsWith(':read'));
@@ -134,10 +135,17 @@ export function ApiKeysSection() {
     <Card>
       <SectionHeader
         title={t('apiKeys.title', 'API keys')}
-        caption={t(
-          'apiKeys.caption',
-          'Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest.',
-        )}
+        caption={
+          list.data?.pageContinues
+            ? `${t(
+                'apiKeys.caption',
+                'Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest.',
+              )} ${apiKeyListCaption(list.data.items.length, true)}`
+            : t(
+                'apiKeys.caption',
+                'Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest.',
+              )
+        }
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

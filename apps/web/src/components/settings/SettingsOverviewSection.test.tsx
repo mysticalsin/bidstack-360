@@ -46,6 +46,7 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
   useWebhookSubscriptions: hookMocks.useWebhookSubscriptions,
 }));
 
+import { API_KEY_LIST_PAGE } from './api-key-list-caption';
 import { CUSTOM_FIELD_LIST_PAGE } from './custom-field-list-caption';
 import { ROLE_LIST_PAGE } from './role-list-caption';
 import { SettingsOverviewSection } from './SettingsOverviewSection';
@@ -379,5 +380,40 @@ describe('SettingsOverviewSection', () => {
 
     expect(screen.getByText('1 active / 1 failing')).toBeTruthy();
     expect(screen.queryByText(/not every webhook/i)).toBeNull();
+  });
+
+  it('says the key count is not every key when the key page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useApiKeys.mockReturnValue({
+      data: {
+        items: Array.from({ length: API_KEY_LIST_PAGE }, (_, index) => ({ id: String(index) })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(`${API_KEY_LIST_PAGE} in the latest ${API_KEY_LIST_PAGE}, not every key`),
+    ).toBeTruthy();
+    expect(screen.queryByText(`${API_KEY_LIST_PAGE} API keys`)).toBeNull();
+  });
+
+  it('keeps the API key count when the key page is shorter than the probe', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useApiKeys.mockReturnValue({
+      data: { items: [{ id: 'key-1' }, { id: 'key-2' }], pageContinues: false },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('2 API keys')).toBeTruthy();
+    expect(screen.queryByText(/not every key/i)).toBeNull();
   });
 });
