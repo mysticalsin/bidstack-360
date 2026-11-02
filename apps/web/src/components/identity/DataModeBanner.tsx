@@ -13,7 +13,8 @@ export function DataModeBanner() {
     return (
       <div
         role="status"
-        className="border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2 text-xs text-[var(--fg-secondary)]"
+        data-testid="data-mode-banner"
+        className="border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2 text-xs text-[var(--fg-secondary)] break-words"
       >
         {t(
           'dataModeBanner.real',
@@ -29,10 +30,11 @@ export function DataModeBanner() {
   return (
     <div
       role="status"
-      className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-950 dark:text-amber-100"
+      data-testid="data-mode-banner"
+      className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-950 dark:text-amber-100 break-words"
     >
       <strong className="font-semibold">{t('dataModeBanner.demoTitle', 'DEMO MODE')}</strong>
-      {' — '}
+      {': '}
       {t(
         'dataModeBanner.demo',
         'Fixture and synthetic data only. Do not load real accounts, revenue, or signed MSAs until POLO_DATA_MODE=real and Cloudflare Access identity are configured.',

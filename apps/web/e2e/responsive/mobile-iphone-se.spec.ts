@@ -6,32 +6,11 @@
  * targets on this device affect a significant portion of mobile users.
  * Screenshots captured here form the visual-regression baseline.
  */
-import { test, expect, devices, type Page } from '@playwright/test';
+import { test, expect, devices } from '@playwright/test';
 import { cleanupVisualRegressionArtifacts } from '../fixtures/test-data-cleanup.js';
+import { chromiumDeviceUse, stabilizeResponsiveScreenshot } from './device-emulation.js';
 
 const IPHONE_SE = devices['iPhone SE'];
-
-const STABLE_DYNAMIC_TEXT_CSS = `
-  [data-testid="opportunity-updated-at"] {
-    color: transparent !important;
-    display: inline-block !important;
-    font-size: 0 !important;
-    line-height: 1rem !important;
-    overflow: hidden !important;
-    vertical-align: baseline !important;
-    width: 4.75rem !important;
-  }
-
-  [data-testid="opportunity-updated-at"]::after {
-    color: var(--fg-tertiary) !important;
-    content: "recently";
-    font-size: 0.75rem !important;
-  }
-`;
-
-async function stabilizeDynamicScreenshotText(page: Page) {
-  await page.addStyleTag({ content: STABLE_DYNAMIC_TEXT_CSS });
-}
 
 const KEY_ROUTES = [
   { name: 'dashboard', path: '/dashboard' },
@@ -42,10 +21,7 @@ const KEY_ROUTES = [
   { name: 'settings', path: '/settings' },
 ] as const;
 
-test.use({
-  ...IPHONE_SE,
-  // Touch events enabled by default for iPhone SE emulation
-});
+test.use(chromiumDeviceUse(IPHONE_SE));
 
 for (const route of KEY_ROUTES) {
   test(`${route.name}: renders without horizontal overflow on iPhone SE`, async ({ page }) => {
@@ -78,7 +54,7 @@ for (const route of KEY_ROUTES) {
     }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
-    await stabilizeDynamicScreenshotText(page);
+    await stabilizeResponsiveScreenshot(page);
     await page.waitForTimeout(500); // Let animations settle
 
     // Capture baseline; compare on subsequent runs with --update-snapshots to refresh.

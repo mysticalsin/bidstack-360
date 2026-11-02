@@ -26,6 +26,7 @@ export function CursorPager({
 
   return (
     <nav
+      data-slot="pagination"
       className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] px-4 py-3"
       aria-label={t('ui.pager.aria_label', '{{label}} pagination', { label: resolvedLabel })}
     >

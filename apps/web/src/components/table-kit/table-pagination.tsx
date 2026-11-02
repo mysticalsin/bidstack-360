@@ -44,7 +44,10 @@ export function TablePagination({
   const rangeEnd = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+    <div
+      data-slot="pagination"
+      className="flex shrink-0 flex-wrap items-center justify-between gap-3"
+    >
       {/* aria-live so a page change announces the new range to screen readers —
           the row swap itself is silent. */}
       <span

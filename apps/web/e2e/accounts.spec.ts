@@ -102,7 +102,7 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
   //     move and the key numbers. (The org-level command-center hero is not
   //     repeated on the account page since 443847be.)
   await expect(
-    page.getByLabel('Key numbers'),
+    page.getByRole('group', { name: 'Key numbers' }),
     'account header must show its key numbers',
   ).toBeVisible();
 

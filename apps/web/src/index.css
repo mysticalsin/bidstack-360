@@ -125,6 +125,16 @@
   --brand-hover: #005a42;
   --brand-muted: #e3f2ec;
 
+  /* Quick-actions FAB is 52px, pinned with Tailwind bottom-6 / right-6.
+     Lists, pagers, and scroll-into-view targets must stay above that disc
+     (plus a 16px gap and the iOS home-indicator inset) or Next is untappable.
+     Keep --fab-size in lockstep with `FAB` in LiquidQuickActions.tsx. */
+  --fab-size: 52px;
+  --fab-inset: 1.5rem;
+  --fab-clearance: calc(
+    var(--fab-size) + var(--fab-inset) + 16px + env(safe-area-inset-bottom, 0px)
+  );
+
   /* Legacy token aliases — AuditLog & older components */
   --text-primary: #171717; /* = --fg-primary */
   --text-secondary: #5c5c5c; /* = --fg-secondary */
@@ -483,6 +493,7 @@ body {
   transition:
     background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  scroll-padding-bottom: var(--fab-clearance);
 }
 
 /* Display headings get tighter tracking still — matches SF Pro Display's
@@ -818,7 +829,7 @@ select:focus-visible {
 
 /* ---------- Sidebar ---------- */
 .sidebar {
-  background: var(--surface-card);
+  background: var(--surface-sidebar);
   border-right: 0.5px solid var(--border-default);
   padding: 14px 10px 24px;
   position: sticky;
@@ -887,7 +898,7 @@ select:focus-visible {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--fg-tertiary);
+  color: var(--fg-secondary);
   padding: 4px 12px 6px;
   opacity: 1;
   max-width: 200px;
@@ -1122,7 +1133,9 @@ select:focus-visible {
 }
 .sb-tag {
   font-size: 10.5px;
-  color: var(--fg-tertiary);
+  /* Secondary, not tertiary: 10.5px on the rail must clear 4.5:1 even when
+     a parent uses color-mix / backdrop-filter (axe samples the pre-composite). */
+  color: var(--fg-secondary);
   margin-top: 2px;
 }
 
@@ -1360,7 +1373,7 @@ select:focus-visible {
   color: white;
 }
 [data-theme='dark'] .sb-group-title {
-  color: var(--fg-muted);
+  color: var(--fg-secondary);
   letter-spacing: 0.1em;
 }
 
@@ -2315,15 +2328,15 @@ select:focus-visible {
   }
 }
 
-/* ---------- Frosted glass sidebar (upgrade) ---------- */
+/* Sidebar stays opaque. A translucent color-mix + backdrop-filter made
+   10.5px rail labels fail WCAG 1.4.3 (axe composites the tint, not the
+   page behind it). Frost the topbar only. */
 @supports (backdrop-filter: blur(20px)) {
   .sidebar {
-    background: color-mix(in srgb, var(--surface-card) 85%, transparent);
-    backdrop-filter: blur(24px) saturate(1.3);
-    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    background: var(--surface-sidebar);
   }
   [data-theme='dark'] .sidebar {
-    background: color-mix(in srgb, var(--surface-card) 72%, transparent);
+    background: var(--surface-sidebar);
   }
 }
 
@@ -2571,12 +2584,33 @@ select:focus-visible {
   position: relative;
   z-index: 1;
 }
+/* A pager at the end of a list sat under Quick actions: 60px / 48px page
+   padding is shorter than the 76px+ FAB stack. Only pages that actually
+   paginate grow the bottom safe area, including the mobile breakpoint. */
+.app-shell .page:has([data-slot='pagination']) {
+  padding-bottom: var(--fab-clearance);
+}
 /* Escape hatch for surfaces that genuinely own the whole viewport — a kanban
    board that scrolls sideways, a calendar grid, a canvas. The page opts in by
    rendering a `.page-bleed` element as its direct child; no prop plumbing
    through the shell, and the constraint stays the default. */
 .app-shell .page:has(> .page-bleed) {
   max-width: none;
+}
+/* Playwright click() and keyboard focus scroll the control itself, not the
+   page — so page padding alone is not enough. The pager and its buttons keep
+   a FAB-sized scroll margin on every breakpoint.
+   A DataTable with min-h-[24rem] parks Next at the FAB's height on a short
+   list; extra page padding is below the card and cannot lift that button.
+   Reserve the FAB's column on the right so Next stays tappable. */
+[data-slot='pagination'],
+[data-slot='pagination'] button {
+  scroll-margin-bottom: var(--fab-clearance);
+}
+[data-slot='pagination'] {
+  padding-right: calc(
+    var(--fab-size) + var(--fab-inset) + env(safe-area-inset-right, 0px)
+  );
 }
 @media (min-width: 768px) and (max-width: 900px) {
   .topbar {
@@ -2604,6 +2638,9 @@ select:focus-visible {
   .app-shell .page {
     gap: 16px;
     padding: 16px 14px 48px;
+  }
+  .app-shell .page:has([data-slot='pagination']) {
+    padding-bottom: var(--fab-clearance);
   }
   .sidebar {
     display: none;

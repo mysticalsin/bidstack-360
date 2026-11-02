@@ -1,7 +1,13 @@
+import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Hero } from '@/components/login';
-import { CfAccessSignIn } from '@/components/login/CfAccessSignIn';
-import { DemoSignIn } from '@/components/login/DemoSignIn';
+
+const CfAccessSignIn = lazy(() =>
+  import('@/components/login/CfAccessSignIn').then((m) => ({ default: m.CfAccessSignIn })),
+);
+const DemoSignIn = lazy(() =>
+  import('@/components/login/DemoSignIn').then((m) => ({ default: m.DemoSignIn })),
+);
 
 /**
  * Polo PreSales glassmorphism login page.
@@ -22,7 +28,17 @@ export function LoginPage() {
       aria-label={t('login.pageAriaLabel', 'Sign in')}
       data-theme="light"
     >
-      {isCfAccess ? <CfAccessSignIn /> : isDemo ? <DemoSignIn /> : <Hero />}
+      {isCfAccess ? (
+        <Suspense fallback={null}>
+          <CfAccessSignIn />
+        </Suspense>
+      ) : isDemo ? (
+        <Suspense fallback={null}>
+          <DemoSignIn />
+        </Suspense>
+      ) : (
+        <Hero />
+      )}
     </main>
   );
 }
