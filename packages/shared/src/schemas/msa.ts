@@ -295,7 +295,16 @@ export type MsaTimelineResponse = z.infer<typeof MsaTimelineResponse>;
 
 export const MsaAccountSummary = z.object({
   companyId: z.string().uuid(),
+  /**
+   * Agreements counted on this card. When `agreementsContinue` is true, this
+   * is the page, not every agreement on the account. No book total.
+   */
   total: z.number().int(),
+  /**
+   * True when the query read one agreement past the page and dropped it.
+   * The counts are that page, not every agreement.
+   */
+  agreementsContinue: z.boolean().optional(),
   byStatus: z.record(z.number().int()),
   childCounts: z.object({ sow: z.number().int(), amendment: z.number().int(), addendum: z.number().int() }),
   primary: MsaSummaryRow.nullable(),
