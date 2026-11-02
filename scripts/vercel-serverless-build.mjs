@@ -44,11 +44,14 @@ if (!skipBuild) {
   }
 
   // 2. SPA. VITE_API_URL is forced empty so the browser calls /api on its own
-  // origin; a project-level VITE_API_URL (the old split-origin demo) must not leak in.
+  // origin; project-level VITE_* values from the old split-origin demo must not leak in.
   run(pnpm, ['--filter', '@bidstack/web', 'exec', 'vite', 'build'], {
     NODE_ENV: 'production',
     VITE_AUTH_MODE: 'demo',
     VITE_API_URL: '',
+    // Demo sign-in only: a project-level Clerk key would make Settings and the
+    // login navbar act as if Clerk were active.
+    VITE_CLERK_PUBLISHABLE_KEY: '',
     NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=6144',
   });
 }
