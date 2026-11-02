@@ -80,6 +80,39 @@ describe('StageColumn', () => {
     expect(screen.getByLabelText('S1 Lead column with 2 opportunities')).toBeTruthy();
   });
 
+  it('says the column is not every bid when the board page continues', () => {
+    // WHY: a later bid was loaded and dropped. The two cards here are not
+    // the stage, and an empty column is not zero bids in that stage.
+    render(
+      <MemoryRouter>
+        <StageColumn
+          stageId="s1_lead"
+          stageName="S1 Lead"
+          stageColor={null}
+          items={[opp('a', 100_000), opp('b', 25_000)]}
+          totalMicros="125000000000"
+          pageContinues
+          latest={50}
+          isHoverTarget={false}
+          draggingId={null}
+          focusedId={null}
+          onDragOver={vi.fn()}
+          onDragLeave={vi.fn()}
+          onDrop={vi.fn()}
+          onCardDragStart={vi.fn()}
+          onCardDragEnd={vi.fn()}
+          onCardFocus={vi.fn()}
+          onCardBlur={vi.fn()}
+          onCardKey={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText('S1 Lead column, 2 in the latest 50, not every bid')).toBeTruthy();
+    expect(screen.getByText(/2 in the latest 50, not every bid/)).toBeTruthy();
+    expect(screen.queryByLabelText('S1 Lead column with 2 opportunities')).toBeNull();
+  });
+
   it('prints a column past the safe unit count in full', () => {
     // WHY: compacting the collapsed unit number prints one unit low.
     const huge = (9007199254740993n * 1_000_000n).toString();

@@ -12,6 +12,7 @@ import { springSnap } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
 
 import { PipelineCard } from './PipelineCard';
+import { pipelineColumnCaption } from './pipeline-board-caption';
 
 interface StageColumnProps {
   stageId: string;
@@ -21,6 +22,10 @@ interface StageColumnProps {
   items: Opportunity[];
   /** Sum of the cards in this column, as integer micros. */
   totalMicros: string;
+  /** The board query read one bid past this page and dropped it. */
+  pageContinues?: boolean;
+  /** Bids drawn on the board page, before this column's split. */
+  latest?: number;
   isHoverTarget: boolean;
   draggingId: string | null;
   focusedId: string | null;
@@ -42,6 +47,8 @@ export const StageColumn = memo(function StageColumn({
   stageColor: _stageColor,
   items,
   totalMicros,
+  pageContinues = false,
+  latest = items.length,
   isHoverTarget,
   draggingId,
   focusedId,
@@ -55,13 +62,15 @@ export const StageColumn = memo(function StageColumn({
   onCardBlur,
   onCardKey,
 }: StageColumnProps) {
+  const countLabel = pipelineColumnCaption(items.length, pageContinues, latest);
+  const ariaLabel = pageContinues
+    ? `${stageName} column, ${countLabel}`
+    : items.length === 1
+      ? `${stageName} column with 1 opportunity`
+      : `${stageName} column with ${countLabel} opportunities`;
   return (
     <section
-      aria-label={
-        items.length === 1
-          ? `${stageName} column with 1 opportunity`
-          : `${stageName} column with ${items.length} opportunities`
-      }
+      aria-label={ariaLabel}
       data-testid="pipeline-column"
       data-stage-id={stageId}
       data-stage-name={stageName}
@@ -72,7 +81,7 @@ export const StageColumn = memo(function StageColumn({
           <Badge tone={stageTone(stageName)}>{stageName}</Badge>
         </div>
         <span className="text-[10px] text-[var(--fg-tertiary)] tabular-nums">
-          {items.length}
+          {countLabel}
           {' · '}
           {unspecifiedMicrosLabel(totalMicros)}
         </span>

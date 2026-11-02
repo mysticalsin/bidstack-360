@@ -242,3 +242,52 @@ describe('PipelinePage — opportunities:write gating', () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 });
+
+describe('PipelinePage page caption', () => {
+  beforeEach(() => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.mocked(usePipelineStages).mockReturnValue({
+      data: { items: [STAGE_1, STAGE_2].map((s, i) => ({ ...s, key: s.id, orderIndex: i, forecastCategory: '', updatedAt: '' })) },
+      isLoading: false,
+    } as unknown as ReturnType<typeof usePipelineStages>);
+    vi.mocked(useStageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useStageMutation>);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('keeps the stage count when the loaded page is the whole book', () => {
+    vi.mocked(useOpportunities).mockReturnValue({
+      data: { items: [OPPORTUNITY], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunities>);
+
+    renderPage();
+
+    expect(screen.getByLabelText('Qualification column with 1 opportunity')).toBeTruthy();
+    expect(screen.queryByText(/not every bid/i)).toBeNull();
+  });
+
+  it('says the drawn cards are not every bid when another page exists', () => {
+    vi.mocked(useOpportunities).mockReturnValue({
+      data: { items: [OPPORTUNITY], nextCursor: 'more-bids' },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunities>);
+
+    renderPage();
+
+    expect(
+      screen.getByLabelText('Qualification column, 1 in the latest 1, not every bid'),
+    ).toBeTruthy();
+    expect(screen.getAllByText('1 in the latest 1, not every bid').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Qualification column with 1 opportunity')).toBeNull();
+  });
+});
