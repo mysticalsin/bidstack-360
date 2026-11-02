@@ -98,7 +98,7 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 | G1 | — | Already shipped | Server secrets via env; Vite only inlines `VITE_*` publishable values. gitleaks in CI. |
 | G2 | — | Already shipped | MSA LLM off by default; intake does not egress contract text. |
 | G3 | P0 | Owner | Generate and store `INTEGRATION_TOKEN_KEY`, `PII_ENCRYPTION_MASTER_KEY`, `BIDSTACK_JOB_SIGNING_SECRET` **before** real data. Rotating them orphans ciphertext. |
-| G4 | P1 | Open | `pnpm audit --audit-level high` is non-blocking in unit CI. |
+| G4 | P1 | **Fixed** | Unit CI fails on `pnpm audit --audit-level high`. |
 
 ### (h) Errors, rate limits, CSP, vulns
 

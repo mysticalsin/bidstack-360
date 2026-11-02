@@ -43,12 +43,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit dependencies (high+)
-        # Pre-existing high backlog on polo/consolidated (brace-expansion,
-        # js-yaml, happy-dom, transitive vite/follow-redirects). Keep the
-        # report; do not fail the unit job on it during the main cutover.
-        # Dedicated bump PR required to make this a hard gate again.
+        # G4: high/critical advisories fail the unit job. Do not restore
+        # continue-on-error to paper over a new advisory.
         run: pnpm audit --audit-level high
-        continue-on-error: true
 
       - name: Generate Prisma client
         # Required before typecheck — apps import from the generated client.
