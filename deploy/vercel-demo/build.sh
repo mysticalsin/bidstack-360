@@ -24,6 +24,7 @@ git checkout -q FETCH_HEAD
 echo "[demo-build] installing"
 # The image ships an old pnpm on PATH; use the one installed here explicitly.
 npm install -g pnpm@10.27.0 --silent
+export PATH="$(npm prefix -g)/bin:$PATH"
 PNPM_BIN="$(npm prefix -g)/bin/pnpm"
 "$PNPM_BIN" --version
 "$PNPM_BIN" install --frozen-lockfile
