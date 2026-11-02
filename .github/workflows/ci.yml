@@ -229,6 +229,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
       - name: Build workspace packages
         run: >
           pnpm --filter @bidstack/shared --filter @bidstack/dust-client
@@ -237,7 +240,6 @@ jobs:
 
       - name: Migrate + seed
         run: |
-          pnpm db:generate
           pnpm db:migrate:deploy
           pnpm db:seed
 
@@ -307,6 +309,9 @@ jobs:
       - name: Install Playwright Chromium (with deps)
         run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
 
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
       - name: Build workspace packages
         run: >
           pnpm --filter @bidstack/shared --filter @bidstack/dust-client
@@ -315,7 +320,6 @@ jobs:
 
       - name: Migrate + seed
         run: |
-          pnpm db:generate
           pnpm db:migrate:deploy
           pnpm db:seed
 
