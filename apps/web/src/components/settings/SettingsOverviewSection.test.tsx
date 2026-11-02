@@ -46,6 +46,7 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
   useWebhookSubscriptions: hookMocks.useWebhookSubscriptions,
 }));
 
+import { CUSTOM_FIELD_LIST_PAGE } from './custom-field-list-caption';
 import { ROLE_LIST_PAGE } from './role-list-caption';
 import { SettingsOverviewSection } from './SettingsOverviewSection';
 import { STAGE_LIST_PAGE } from './stage-list-caption';
@@ -243,5 +244,92 @@ describe('SettingsOverviewSection', () => {
 
     expect(screen.getByText('7 stages / 2 company fields')).toBeTruthy();
     expect(screen.queryByText(/not every stage/i)).toBeNull();
+  });
+
+  it('says the field count is not every field when the field page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.usePipelineStages.mockReturnValue({
+      data: {
+        items: Array.from({ length: 7 }, (_, index) => ({ id: String(index) })),
+        pageContinues: false,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useCustomFieldDefinitions.mockReturnValue({
+      data: {
+        items: Array.from({ length: CUSTOM_FIELD_LIST_PAGE }, (_, index) => ({
+          id: String(index),
+        })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `7 stages / ${CUSTOM_FIELD_LIST_PAGE} in the latest ${CUSTOM_FIELD_LIST_PAGE}, not every field`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(new RegExp(`${CUSTOM_FIELD_LIST_PAGE} company fields`))).toBeNull();
+  });
+
+  it('keeps the field count when the field page is shorter than the probe', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.usePipelineStages.mockReturnValue({
+      data: {
+        items: Array.from({ length: 7 }, (_, index) => ({ id: String(index) })),
+        pageContinues: false,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useCustomFieldDefinitions.mockReturnValue({
+      data: { items: [{ id: 'field-1' }, { id: 'field-2' }], pageContinues: false },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('7 stages / 2 company fields')).toBeTruthy();
+    expect(screen.queryByText(/not every field/i)).toBeNull();
+  });
+
+  it('says neither count is the whole set when stage and field pages continue', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.usePipelineStages.mockReturnValue({
+      data: {
+        items: Array.from({ length: STAGE_LIST_PAGE }, (_, index) => ({ id: String(index) })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useCustomFieldDefinitions.mockReturnValue({
+      data: {
+        items: Array.from({ length: CUSTOM_FIELD_LIST_PAGE }, (_, index) => ({
+          id: String(index),
+        })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `${STAGE_LIST_PAGE} in the latest ${STAGE_LIST_PAGE}, not every stage / ${CUSTOM_FIELD_LIST_PAGE} in the latest ${CUSTOM_FIELD_LIST_PAGE}, not every field`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/company fields/i)).toBeNull();
   });
 });

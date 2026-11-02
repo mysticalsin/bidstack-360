@@ -14,6 +14,7 @@ import { useUsersPage } from '@/hooks/useUsers';
 import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
+import { customFieldListCaption } from './custom-field-list-caption';
 import { roleListCaption } from './role-list-caption';
 import { stageListCaption } from './stage-list-caption';
 import { tagLibraryCaption } from './tag-library-caption';
@@ -98,23 +99,42 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileDataModelTitle', 'Data model'),
-      detail: pipelineStages.data?.pageContinues
-        ? t(
-            'settingsOverview.tileDataModelDetailPartialStages',
-            '{{stages}} / {{fields}} company fields',
-            {
-              stages: stageListCaption(pipelineStages.data.items.length, true),
-              fields: formatCount(customFields.data?.items.length),
-            },
-          )
-        : t(
-            'settingsOverview.tileDataModelDetail',
-            '{{stages}} stages / {{fields}} company fields',
-            {
-              stages: formatCount(pipelineStages.data?.items.length),
-              fields: formatCount(customFields.data?.items.length),
-            },
-          ),
+      detail:
+        pipelineStages.data?.pageContinues && customFields.data?.pageContinues
+          ? t(
+              'settingsOverview.tileDataModelDetailPartialStagesAndFields',
+              '{{stages}} / {{fields}}',
+              {
+                stages: stageListCaption(pipelineStages.data.items.length, true),
+                fields: customFieldListCaption(customFields.data.items.length, true),
+              },
+            )
+          : pipelineStages.data?.pageContinues
+            ? t(
+                'settingsOverview.tileDataModelDetailPartialStages',
+                '{{stages}} / {{fields}} company fields',
+                {
+                  stages: stageListCaption(pipelineStages.data.items.length, true),
+                  fields: formatCount(customFields.data?.items.length),
+                },
+              )
+            : customFields.data?.pageContinues
+              ? t(
+                  'settingsOverview.tileDataModelDetailPartialFields',
+                  '{{stages}} stages / {{fields}}',
+                  {
+                    stages: formatCount(pipelineStages.data?.items.length),
+                    fields: customFieldListCaption(customFields.data.items.length, true),
+                  },
+                )
+              : t(
+                  'settingsOverview.tileDataModelDetail',
+                  '{{stages}} stages / {{fields}} company fields',
+                  {
+                    stages: formatCount(pipelineStages.data?.items.length),
+                    fields: formatCount(customFields.data?.items.length),
+                  },
+                ),
       tone: pipelineStages.isError || customFields.isError ? 'tomato' : 'blue',
       icon: 'sliders' as const,
       section: 'crm' as const,
