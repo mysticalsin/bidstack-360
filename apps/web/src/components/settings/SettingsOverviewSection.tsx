@@ -10,11 +10,12 @@ import { useLeadRotConfig } from '@/hooks/useLeadRot';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useRoles } from '@/hooks/useRoles';
 import { useTags } from '@/hooks/useTags';
-import { useUsers } from '@/hooks/useUsers';
+import { useUsersPage } from '@/hooks/useUsers';
 import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
 import { tagLibraryCaption } from './tag-library-caption';
+import { USER_OVERVIEW_PAGE, userOverviewCaption } from './user-overview-caption';
 
 interface Props {
   onNavigate: (section: SettingsSection) => void;
@@ -34,7 +35,7 @@ interface OverviewTileModel {
 export function SettingsOverviewSection({ onNavigate }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
-  const users = useUsers({ enabled: isAdmin });
+  const users = useUsersPage({ limit: USER_OVERVIEW_PAGE, enabled: isAdmin });
   const roles = useRoles({ enabled: isAdmin });
   const tags = useTags(undefined, { enabled: isAdmin });
   const templates = useEmailTemplates({ enabled: isAdmin });
@@ -50,10 +51,15 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
         ? t('settingsOverview.tileWorkspaceTitle', 'Workspace governance')
         : t('settingsOverview.tilePersonalTitle', 'Personal settings'),
       detail: isAdmin
-        ? t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
-            users: formatCount(users.data?.length),
-            roles: formatCount(roles.data?.length),
-          })
+        ? users.data?.nextCursor
+          ? t('settingsOverview.tileWorkspaceDetailPartialUsers', '{{users}} / {{roles}} roles', {
+              users: userOverviewCaption(users.data?.items.length ?? 0, true),
+              roles: formatCount(roles.data?.length),
+            })
+          : t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
+              users: formatCount(users.data?.items.length),
+              roles: formatCount(roles.data?.length),
+            })
         : t(
             'settingsOverview.tilePersonalDetail',
             'Profile, security, notifications, appearance, and language',

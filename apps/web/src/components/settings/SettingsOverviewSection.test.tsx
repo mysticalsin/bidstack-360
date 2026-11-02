@@ -6,7 +6,7 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 const hookMocks = vi.hoisted(() => ({
-  useUsers: vi.fn(),
+  useUsersPage: vi.fn(),
   useRoles: vi.fn(),
   useTags: vi.fn(),
   useEmailTemplates: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('@/lib/auth', () => ({
   useIsAdmin: () => authMocks.isAdmin,
 }));
 
-vi.mock('@/hooks/useUsers', () => ({ useUsers: hookMocks.useUsers }));
+vi.mock('@/hooks/useUsers', () => ({ useUsersPage: hookMocks.useUsersPage }));
 vi.mock('@/hooks/useRoles', () => ({ useRoles: hookMocks.useRoles }));
 vi.mock('@/hooks/useTags', () => ({ useTags: hookMocks.useTags }));
 vi.mock('@/hooks/useEmailTemplates', () => ({
@@ -47,6 +47,7 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
 }));
 
 import { SettingsOverviewSection } from './SettingsOverviewSection';
+import { USER_OVERVIEW_PAGE } from './user-overview-caption';
 
 function emptyQuery() {
   return { data: undefined, isError: false, isLoading: false };
@@ -66,7 +67,10 @@ describe('SettingsOverviewSection', () => {
 
     expect(screen.getByText('Personal settings')).toBeTruthy();
     expect(screen.queryByText('Developer access')).toBeNull();
-    expect(hookMocks.useUsers).toHaveBeenCalledWith({ enabled: false });
+    expect(hookMocks.useUsersPage).toHaveBeenCalledWith({
+      limit: USER_OVERVIEW_PAGE,
+      enabled: false,
+    });
     expect(hookMocks.useRoles).toHaveBeenCalledWith({ enabled: false });
     expect(hookMocks.useTags).toHaveBeenCalledWith(undefined, { enabled: false });
     expect(hookMocks.useEmailTemplates).toHaveBeenCalledWith({ enabled: false });
@@ -77,5 +81,54 @@ describe('SettingsOverviewSection', () => {
     expect(hookMocks.usePipelineStages).toHaveBeenCalledWith({ enabled: false });
     expect(hookMocks.useApiKeys).toHaveBeenCalledWith({ enabled: false });
     expect(hookMocks.useWebhookSubscriptions).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it('says the workspace user count is not every user when the roster page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useUsersPage.mockReturnValue({
+      data: {
+        items: Array.from({ length: USER_OVERVIEW_PAGE }, (_, index) => ({ id: String(index) })),
+        nextCursor: '00000000-0000-4000-8000-000000000001',
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useRoles.mockReturnValue({
+      data: [{ id: 'role-1' }, { id: 'role-2' }],
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `${USER_OVERVIEW_PAGE} in the latest ${USER_OVERVIEW_PAGE}, not every user / 2 roles`,
+      ),
+    ).toBeTruthy();
+  });
+
+  it('keeps the user count when the roster page is shorter than the probe', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useUsersPage.mockReturnValue({
+      data: {
+        items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+        nextCursor: null,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useRoles.mockReturnValue({
+      data: [{ id: 'role-1' }, { id: 'role-2' }],
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('3 users / 2 roles')).toBeTruthy();
+    expect(screen.queryByText(/not every user/i)).toBeNull();
   });
 });
