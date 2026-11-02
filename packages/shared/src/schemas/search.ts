@@ -36,5 +36,41 @@ export const SearchResponse = z.object({
    * This is not a result total.
    */
   pageContinues: z.boolean(),
+  /**
+   * Types whose drawn rows are not every match of that type. A type is
+   * listed when its probe row was dropped, or the merged page cut a loaded
+   * row of that type. Not a match total.
+   */
+  continuedTypes: z.array(SearchResultType),
 });
 export type SearchResponse = z.infer<typeof SearchResponse>;
+
+/**
+ * Ranked rows after each type has already dropped its probe row.
+ * `probedTypes` are the types whose extra row existed. A merged page that
+ * cuts a loaded row adds that type. The cut row is not returned, and neither
+ * list is a match total.
+ */
+export function searchPageSlice<T extends { type: string }>(
+  ranked: readonly T[],
+  totalCap: number,
+  probedTypes: readonly string[],
+): { items: T[]; pageContinues: boolean; continuedTypes: string[] } {
+  const continued = new Set(probedTypes);
+  const cut = ranked.length > totalCap;
+  const items = cut ? ranked.slice(0, totalCap) : [...ranked];
+  if (cut) {
+    const drawn = new Map<string, number>();
+    for (const item of items) drawn.set(item.type, (drawn.get(item.type) ?? 0) + 1);
+    const loaded = new Map<string, number>();
+    for (const item of ranked) loaded.set(item.type, (loaded.get(item.type) ?? 0) + 1);
+    for (const [type, count] of loaded) {
+      if ((drawn.get(type) ?? 0) < count) continued.add(type);
+    }
+  }
+  return {
+    items,
+    pageContinues: cut || continued.size > 0,
+    continuedTypes: [...continued],
+  };
+}

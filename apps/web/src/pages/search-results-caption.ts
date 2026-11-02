@@ -28,3 +28,12 @@ export function searchResultsCaption(
   }
   return count === 1 ? `${count} result` : `${count} results`;
 }
+
+/**
+ * Count on a search tab. A continued type drew these rows, not every match
+ * of that type. A shorter type keeps the loaded count. No match total.
+ */
+export function searchTabBadge(count: number, typeContinues: boolean): string {
+  if (typeContinues) return `${count} in the latest ${count}, not every match`;
+  return String(count);
+}

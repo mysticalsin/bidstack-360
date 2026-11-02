@@ -9,7 +9,7 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { cn } from '@/lib/cn';
 
-import { searchResultsCaption } from './search-results-caption';
+import { searchResultsCaption, searchTabBadge } from './search-results-caption';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -67,6 +67,7 @@ export function SearchPage() {
     return data.items.filter((i) => i.type === activeTab);
   }, [data, activeTab]);
   const pageContinues = Boolean(data?.pageContinues);
+  const continuedTypes = new Set(data?.continuedTypes ?? []);
   const resultCaption = searchResultsCaption(
     filtered.length,
     pageContinues,
@@ -146,7 +147,10 @@ export function SearchPage() {
                         activeTab === tab.key ? 'text-white/80' : 'text-[var(--fg-tertiary)]',
                       )}
                     >
-                      {counts[tab.key]}
+                      {searchTabBadge(
+                        counts[tab.key] ?? 0,
+                        tab.key === 'all' ? pageContinues : continuedTypes.has(tab.key),
+                      )}
                     </span>
                   ) : null}
                 </button>

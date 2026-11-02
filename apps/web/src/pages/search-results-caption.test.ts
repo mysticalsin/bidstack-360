@@ -3,7 +3,9 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { searchResultsCaption, searchResultsPage } from './search-results-caption';
+import { searchPageSlice } from '@bidstack/shared';
+
+import { searchResultsCaption, searchResultsPage, searchTabBadge } from './search-results-caption';
 
 /**
  * How many rows a search query returns before the extra row is dropped.
@@ -23,9 +25,11 @@ function typeQueryTake(apiSrc: string, drawn: number): number {
 }
 
 /** Merged page size, plus the extra ranked row when the route keeps it. */
-function pageQueryTake(apiSrc: string): number {
+function pageQueryTake(apiSrc: string, schemaSrc: string): number {
   const cap = Number(/const totalCap = (\d+)/.exec(apiSrc)?.[1] ?? 30);
-  const asks = /ranked\.length > totalCap/.test(apiSrc);
+  const asks =
+    /ranked\.length > totalCap/.test(apiSrc) ||
+    (/searchPageSlice\(/.test(apiSrc) && /ranked\.length > totalCap/.test(schemaSrc));
   return asks ? cap + 1 : cap;
 }
 
@@ -79,11 +83,11 @@ describe('search results page', () => {
     expect(loaded.some((row) => row.id === 'probe-result')).toBe(true);
     expect(drawnPage.pageContinues).toBe(true);
 
-    const cap = pageQueryTake(apiSrc) - 1;
+    const cap = pageQueryTake(apiSrc, schemaSrc) - 1;
     const merged = Array.from({ length: cap + 1 }, (_, n) => ({
       id: n === cap ? 'probe-merged' : `merged-${n}`,
     }));
-    const mergedLoaded = merged.slice(0, pageQueryTake(apiSrc));
+    const mergedLoaded = merged.slice(0, pageQueryTake(apiSrc, schemaSrc));
     const mergedPage = searchResultsPage(mergedLoaded, cap);
     const mergedCaption = searchResultsCaption(
       mergedPage.items.length,
@@ -112,5 +116,120 @@ describe('search results page', () => {
       `3 in the latest ${drawn}, not every result`,
     );
     expect(searchResultsCaption(3, true, drawn)).not.toBe('3 results');
+  });
+
+  it('does not call a type badge every match when that type’s extra row was cut off', () => {
+    // WHY: tab badges printed how many loaded rows were of that type. Cutting
+    // the next row of a type, or cutting a loaded row of that type off the
+    // merged page, left the badge as if that length were every match. The
+    // extra row is not a total. A shorter type keeps the number.
+    const pageSrc = readFileSync(path.resolve(process.cwd(), 'src/pages/SearchPage.tsx'), 'utf8');
+    const hookSrc = readFileSync(
+      path.resolve(process.cwd(), 'src/hooks/useGlobalSearch.ts'),
+      'utf8',
+    );
+    const apiSrc = readFileSync(
+      path.resolve(process.cwd(), '../../apps/api/src/routes/search.ts'),
+      'utf8',
+    );
+    const schemaSrc = readFileSync(
+      path.resolve(process.cwd(), '../../packages/shared/src/schemas/search.ts'),
+      'utf8',
+    );
+    const page = pageSrc.slice(pageSrc.indexOf('export function SearchPage'));
+    const drawn = Number(/limit=(\d+)/.exec(hookSrc)?.[1] ?? 16);
+    expect(page).toMatch(
+      /searchTabBadge\(\s*counts\[tab\.key\] \?\? 0,\s*tab\.key === 'all' \? pageContinues : continuedTypes\.has\(tab\.key\),?\s*\)/,
+    );
+    expect(page).toContain('new Set(data?.continuedTypes ?? [])');
+    expect(page).not.toMatch(/\{counts\[tab\.key\]\}/);
+    expect(hookSrc).toContain('continuedTypes?: string[]');
+    expect(schemaSrc).toMatch(/continuedTypes:\s*z\.array\(SearchResultType\)/);
+    expect(apiSrc).toContain('searchPageSlice(');
+    expect(apiSrc).toMatch(/probedTypes\.push\(type\)/);
+    expect(apiSrc).toMatch(/items\.length > perTypeLimit/);
+
+    const opportunities = Array.from({ length: drawn + 1 }, (_, n) => ({
+      type: 'opportunity' as const,
+      id: n === drawn ? 'probe-opportunity' : `opp-${n}`,
+    }));
+    const loaded = opportunities.slice(0, typeQueryTake(apiSrc, drawn));
+    const opportunityPage = searchResultsPage(loaded, drawn);
+    expect(opportunityPage.pageContinues).toBe(true);
+    expect(opportunityPage.items.some((row) => row.id === 'probe-opportunity')).toBe(false);
+    expect(loaded.some((row) => row.id === 'probe-opportunity')).toBe(true);
+
+    const leads = [
+      { type: 'lead' as const, id: 'lead-1' },
+      { type: 'lead' as const, id: 'lead-2' },
+    ];
+    const slice = searchPageSlice(
+      [...opportunityPage.items, ...leads],
+      30,
+      opportunityPage.pageContinues ? ['opportunity'] : [],
+    );
+    const opportunityCount = slice.items.filter((row) => row.type === 'opportunity').length;
+    const leadCount = slice.items.filter((row) => row.type === 'lead').length;
+    const opportunityBadge = searchTabBadge(
+      opportunityCount,
+      slice.continuedTypes.includes('opportunity'),
+    );
+    const leadBadge = searchTabBadge(leadCount, slice.continuedTypes.includes('lead'));
+    expect(opportunityBadge).toBe(`${drawn} in the latest ${drawn}, not every match`);
+    expect(opportunityBadge).not.toBe(String(drawn));
+    expect(opportunityBadge).not.toMatch(/\b17\b/);
+    expect(slice.continuedTypes).not.toContain('lead');
+    expect(leadBadge).toBe('2');
+    expect(leadBadge).not.toMatch(/not every/i);
+    const allBadge = searchTabBadge(slice.items.length, slice.pageContinues);
+    expect(allBadge).toBe(
+      `${slice.items.length} in the latest ${slice.items.length}, not every match`,
+    );
+    expect(allBadge).not.toBe(String(slice.items.length));
+
+    const cap = Number(/const totalCap = (\d+)/.exec(apiSrc)?.[1] ?? 30);
+    const typePage = Math.floor(cap / 2) + 1;
+    const tasks = Array.from({ length: typePage }, (_, n) => ({
+      type: 'task' as const,
+      id: `task-${n}`,
+    }));
+    const merged = searchPageSlice(
+      [
+        ...Array.from({ length: typePage }, (_, n) => ({
+          type: 'company' as const,
+          id: `company-${n}`,
+        })),
+        ...tasks,
+      ],
+      cap,
+      [],
+    );
+    const taskCount = merged.items.filter((row) => row.type === 'task').length;
+    const companyCount = merged.items.filter((row) => row.type === 'company').length;
+    const taskBadge = searchTabBadge(taskCount, merged.continuedTypes.includes('task'));
+    const companyBadge = searchTabBadge(companyCount, merged.continuedTypes.includes('company'));
+    expect(merged.pageContinues).toBe(true);
+    expect(merged.continuedTypes).toContain('task');
+    expect(merged.continuedTypes).not.toContain('company');
+    expect(taskCount).toBeLessThan(tasks.length);
+    expect(taskBadge).toBe(`${taskCount} in the latest ${taskCount}, not every match`);
+    expect(taskBadge).not.toBe(String(tasks.length));
+    expect(taskBadge).not.toBe(String(taskCount));
+    expect(companyBadge).toBe(String(companyCount));
+    expect(companyBadge).not.toMatch(/not every/i);
+
+    const short = searchPageSlice(
+      [
+        { type: 'note', id: 'note-1' },
+        { type: 'note', id: 'note-2' },
+      ],
+      cap,
+      [],
+    );
+    expect(short.pageContinues).toBe(false);
+    expect(short.continuedTypes).toEqual([]);
+    expect(searchTabBadge(short.items.length, short.pageContinues)).toBe('2');
+    expect(searchTabBadge(2, short.continuedTypes.includes('note'))).toBe('2');
+    expect(searchTabBadge(1, false)).toBe('1');
   });
 });

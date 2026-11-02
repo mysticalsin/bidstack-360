@@ -14,6 +14,8 @@ export interface SearchResponse {
   items: SearchResult[];
   /** True when this page is not every match. Not a result total. */
   pageContinues?: boolean;
+  /** Types whose drawn rows are not every match of that type. Not a total. */
+  continuedTypes?: string[];
   total: number;
   query: string;
 }
