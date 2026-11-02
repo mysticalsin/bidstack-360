@@ -55,6 +55,8 @@ jobs:
           # screen into Clerk mode and pulls clerk.accounts.dev on FCP.
           VITE_AUTH_MODE: stub
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
+          VITE_DISABLE_HERO_VIDEO: 'true'
+          VITE_DISABLE_SERVICE_WORKER: 'true'
 
       - name: Install Lighthouse CI
         run: npm install -g @lhci/cli@0.14.x

@@ -25,12 +25,22 @@ gates failed: full E2E, Semgrep ERROR, and Lighthouse CI.
   so `/Local:/i` never matches. Use `localhost`. Do not set a fake
   `VITE_CLERK_PUBLISHABLE_KEY` in LHCI (it loads Clerk on FCP). Defer the
   login video until idle. Measure `preset: 'desktop'` — this is a desktop CRM.
+  After that pass, `/login` still scored 0.56 / 0.87 / 0.87 (median 0.87).
+  The idle timeout still started the Cloudfront MP4 mid-run, and the
+  production service worker warmed the app shell on first paint. Skip the
+  video and SW when `VITE_DISABLE_HERO_VIDEO` / `VITE_DISABLE_SERVICE_WORKER`
+  or `navigator.webdriver`, and block those origins in LHCI.
 - `playwright merge-reports` has no `--output`. Download shard blobs into
   `apps/web/all-blob-reports` (the `--filter` cwd) and merge via
   `PLAYWRIGHT_HTML_REPORT`.
 - Sidebar labels at 10.5px failed axe color-contrast because the rail used
   `color-mix(..., transparent)` + backdrop-filter. Keep the sidebar opaque
   and paint `.sb-tag` / `.sb-group-title` with `--fg-secondary`.
+- Do not set inheritable `color` on `<body>` for the FCP fallback. It leaked
+  `#f8fafc` into `.inline-edit-trigger { color: inherit }` on `/opportunities`.
+- `getByLabel('Key numbers')` matches the header group and the sr-only
+  KeyNumbersStrip heading. Use `getByRole('group', { name: 'Key numbers' })`.
+- Responsive `toHaveScreenshot` baselines must come from the CI runner.
 - Migration wizard copy is "Choose a CSV or Excel file" / "Preview N rows",
   not "Choose a CSV file" / "Import N rows".
 - Responsive snapshot dirs were gitignored (`*.png` + `*-snapshots/`), so

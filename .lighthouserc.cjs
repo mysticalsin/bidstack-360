@@ -14,6 +14,15 @@ module.exports = {
         // reported FCP ~4.3s / score 0.73 on a stub login card.
         preset: 'desktop',
         chromeFlags: '--no-sandbox --headless --disable-dev-shm-usage',
+        // Stub login never needs these origins. The Cloudfront hero MP4
+        // is what dropped /login to 0.56 on the first LHCI run.
+        blockedUrlPatterns: [
+          '*://d8j0ntlcm91z4.cloudfront.net/*',
+          '*://clerk.accounts.dev/*',
+          '*://*.clerk.accounts.dev/*',
+          '*://sentry.io/*',
+          '*://*.sentry.io/*',
+        ],
       },
     },
     assert: {

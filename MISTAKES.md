@@ -54,6 +54,20 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-02 TESTING: Body FCP color leaked into opportunity inline-edit cells
+
+- **What went wrong:** `/opportunities` axe color-contrast failed at 1.04 (`#f8fafc` on `#ffffff`) on `.inline-edit-trigger`. `accounts.spec` hit a strict-mode duplicate for `Key numbers`. Responsive screenshots taken on the agent host missed CI fonts.
+- **Root cause:** The FCP fallback set `style="color:#f8fafc"` on `<body>`, which beats `body { color: var(--fg-primary) }`. `.inline-edit-trigger { color: inherit }` then painted near-white numbers on white table cells. `getByLabel('Key numbers')` matched both the header group and the sr-only `KeyNumbersStrip` heading.
+- **Prevention rule:** Never put inheritable `color` on `<body>` for a first-paint fallback — put it on the fallback node. Scope account header assertions to `getByRole('group', { name: 'Key numbers' })`. Commit Playwright baselines from the CI runner, not the agent host.
+- **Files affected:** `apps/web/index.html`, `apps/web/e2e/accounts.spec.ts`, `apps/web/e2e/responsive/**/*-snapshots/`.
+
+### 2026-11-02 TESTING: Lighthouse login stayed at 0.87 after deferring the hero video
+
+- **What went wrong:** After the desktop-preset + no-Clerk pass, LHCI `/login` performance was 0.56 / 0.87 / 0.87 (median 0.87 vs 0.90). FCP/LCP assertions passed.
+- **Root cause:** `requestIdleCallback({ timeout: 1500 })` still started the Cloudfront MP4 during the LH window, and the production service worker warmed the app-shell cache on first paint. The first run paid both costs (0.56); later runs stayed at 0.87.
+- **Prevention rule:** Never start the remote hero video under Lighthouse or `navigator.webdriver`. Bake `VITE_DISABLE_HERO_VIDEO` and `VITE_DISABLE_SERVICE_WORKER` into the LHCI web build, and block the video/Clerk/Sentry origins in `.lighthouserc.cjs`.
+- **Files affected:** `apps/web/src/components/login/Hero.tsx`, `apps/web/src/main.tsx`, `apps/web/src/pages/LoginPage.tsx`, `.lighthouserc.cjs`, `.github/workflows/lighthouse.yml`.
+
 ### 2026-11-02 TESTING: Full E2E treated viewer as admin and launched WebKit
 
 - **What went wrong:** `rbac.spec.ts` viewer/read-only landed on `/settings?tab=audit-log`. iPhone SE / iPad specs died in 1ms (`webkit` executable missing). Semgrep blocked on Actions interpolation and a root API Dockerfile. Lighthouse reported `NO_FCP` on `/login`.

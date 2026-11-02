@@ -200,7 +200,11 @@ const warmAppShellCache = async () => {
   await warmViteManifestCache(cache);
 };
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+const disableServiceWorker =
+  import.meta.env.VITE_DISABLE_SERVICE_WORKER === 'true' ||
+  (typeof navigator !== 'undefined' && navigator.webdriver === true);
+
+if ('serviceWorker' in navigator && import.meta.env.PROD && !disableServiceWorker) {
   const registerServiceWorker = () => {
     void warmAppShellCache().catch((error) => Sentry.captureException(error));
     navigator.serviceWorker

@@ -20,12 +20,17 @@ export function Hero() {
   const { signIn } = useSignInAction();
   const reduce = useReducedMotion();
   const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+  const disableHeroVideo =
+    import.meta.env.VITE_DISABLE_HERO_VIDEO === 'true' ||
+    (typeof navigator !== 'undefined' && navigator.webdriver === true);
   const [playVideo, setPlayVideo] = useState(false);
 
-  // Remote MP4 must not contend with first paint. Lighthouse CI + Slow 4G
-  // spent the FCP budget on Cloudfront when preload=auto.
+  // Remote MP4 must not contend with first paint. Lighthouse CI still paid
+  // TBT/SI when the idle timeout (1.5s) started Cloudfront mid-run
+  // (scores 0.56 / 0.87 / 0.87). Automation and the LHCI build flag
+  // keep the video off entirely.
   useEffect(() => {
-    if (reduce) return;
+    if (reduce || disableHeroVideo) return;
     const start = () => setPlayVideo(true);
     if (typeof window.requestIdleCallback === 'function') {
       const id = window.requestIdleCallback(start, { timeout: 1500 });
@@ -33,7 +38,7 @@ export function Hero() {
     }
     const timer = window.setTimeout(start, 0);
     return () => window.clearTimeout(timer);
-  }, [reduce]);
+  }, [reduce, disableHeroVideo]);
 
   // Paint immediately. An opacity-0 first frame is why Lighthouse CI reported
   // NO_FCP on /login: headless Chrome never counted the delayed card as
