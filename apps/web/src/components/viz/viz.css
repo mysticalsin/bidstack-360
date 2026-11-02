@@ -119,7 +119,7 @@
   border-color: color-mix(in srgb, var(--brand-primary) 18%, var(--border-default)); }
 .dash-hero-figs { display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-end; }
 .dash-hero-num { font-size: 48px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--viz-ink); font-variant-numeric: tabular-nums; }
-.dash-hero-num--won { font-size: 24px; color: var(--viz-pos); }
+.dash-hero-num--won { font-size: 24px; color: var(--viz-pos); overflow-wrap: anywhere; }
 .dash-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 .dash-needs-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .dash-needs-list li { animation: viz-arrive 420ms var(--viz-ease) both; animation-delay: calc(var(--i, 0) * 40ms); }

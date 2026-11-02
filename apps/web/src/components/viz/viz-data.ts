@@ -1,5 +1,8 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { formatMicrosAmount, microsToUnits } from '@bidstack/shared';
+
+import { recordedMicros } from '@/components/dashboard/unspecified-currency';
 import { closedOutcome, LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -32,6 +35,8 @@ export interface OppRow {
   name?: string | null;
   code?: string | null;
   owner?: string | null;
+  /** Integer micros. Wins over `value` when the unit number has collapsed. */
+  valueMicros?: string | null;
   /** Live stage flags. A deleted row must not close the deal by itself. */
   pipelineStage?: { isWon?: boolean; isLost?: boolean; deletedAt?: string | Date | null } | null;
 }
@@ -106,15 +111,21 @@ export function wonByQuarter(rows: OppRow[]) {
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
 /** Cumulative won value by close month for the year of the latest close. */
 export function cumulativeWon(rows: OppRow[]) {
-  const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: o.value ?? 0 })).filter((r): r is { at: string; v: number } => Boolean(r.at));
+  const won = rows
+    .filter(isWon)
+    .map((o) => ({ at: closeDate(o), micros: recordedMicros(o.value ?? 0, o.valueMicros) }))
+    .filter((r): r is { at: string; micros: bigint } => Boolean(r.at));
   if (!won.length) return [];
   const year = Math.max(...won.map((r) => new Date(r.at).getUTCFullYear()));
   const lastMonth = Math.max(...won.filter((r) => new Date(r.at).getUTCFullYear() === year).map((r) => new Date(r.at).getUTCMonth()));
-  let run = 0;
+  let run = 0n;
   return Array.from({ length: lastMonth + 1 }, (_, m) => {
-    run += won.filter((r) => { const d = new Date(r.at); return d.getUTCFullYear() === year && d.getUTCMonth() === m; }).reduce((n, r) => n + r.v, 0);
+    for (const r of won) {
+      const d = new Date(r.at);
+      if (d.getUTCFullYear() === year && d.getUTCMonth() === m) run += r.micros;
+    }
     const date = new Date(year, m, 1); // local midnight, for axis display only
-    return { x: monFmt.format(date), date, y: run };
+    return { x: monFmt.format(date), date, y: microsToUnits(run), yMicros: run.toString() };
   });
 }
 
@@ -157,6 +168,18 @@ export function cumulativeOpen(rows: OppRow[]) {
 const compact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
 /** Currency-free compact amount (opportunity rows carry no currency). */
 export const fmtCompact = (v: number) => compact.format(v);
+
+/**
+ * Won-to-date text for the hero and the chart tooltip.
+ * The micros string wins. Compact is only the fallback when no micros text was stored.
+ */
+export function wonToDateLabel(
+  point: { y?: number | null; yMicros?: string | null },
+  compactLabel: (v: number) => string = fmtCompact,
+): string {
+  if (point.yMicros && /^\d+$/.test(point.yMicros)) return formatMicrosAmount(BigInt(point.yMicros));
+  return compactLabel(point.y ?? 0);
+}
 
 export type OppStatus = 'open' | 'won' | 'lost';
 export function oppStatus(o: OppRow): OppStatus {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, oppStatus, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
-  stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, oppStatus, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  stageText, statusMix, winRateByQuarter, wonByQuarter, wonToDateLabel, type OppRow,
 } from './viz-data';
 
 const row = (o: Partial<OppRow>): OppRow => ({ id: Math.random().toString(36), stage: 's1_lead', value: 100, dueDate: null, customer: 'A', ...o });
@@ -44,6 +44,27 @@ describe('viz-data', () => {
     expect(won.map((p) => [p.x, p.y])).toEqual([['Jan', 0], ['Feb', 200], ['Mar', 200], ['Apr', 500]]);
     expect(cumulativeOpen(rows)).toEqual([0, 10, 410]);
     expect(runningWinRate(rows)).toEqual([100, 100, 67]);
+  });
+
+  it('reads won this year from the micros text when the unit number is zero', () => {
+    // WHY: the hero and the won-chart tooltip summed `value` and compact-formatted it.
+    // value 0 hid 8,598,204,328,457.18, and 12,015,000 became a 12m label.
+    const exact = '8598204328457184962';
+    const hidden = '12015000000000';
+    const won = cumulativeWon([
+      row({ stage: 'closed_won', value: 0, valueMicros: exact, dueDate: '2026-02-03T00:00:00.000Z' }),
+      row({ stage: 'closed_won', value: 12_015_000, valueMicros: hidden, dueDate: '2026-04-04T00:00:00.000Z' }),
+    ]);
+    const feb = won.find((p) => p.x === 'Feb');
+    const apr = won.at(-1);
+    expect(feb?.yMicros).toBe(exact);
+    expect(wonToDateLabel(feb ?? { y: 0 })).toBe('8,598,204,328,457.18');
+    expect(wonToDateLabel(feb ?? { y: 0 })).not.toBe(fmtCompact(0));
+    expect(wonToDateLabel(feb ?? { y: 0 })).not.toBe('8.6tn');
+    expect(apr?.yMicros).toBe((BigInt(exact) + BigInt(hidden)).toString());
+    expect(wonToDateLabel({ y: 12_015_000, yMicros: hidden })).toBe('12,015,000');
+    expect(wonToDateLabel({ y: 12_015_000, yMicros: hidden })).not.toBe(fmtCompact(12_015_000));
+    expect(fmtCompact(12_015_000)).toBe('12m');
   });
 
   it('ranks accounts by won + open and ignores lost value', () => {

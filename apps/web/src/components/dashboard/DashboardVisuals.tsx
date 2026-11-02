@@ -15,7 +15,7 @@ import { PulseOrb } from '@/components/viz/PulseOrb';
 import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
 import {
   accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, oppStatus, pastDueOpen, stageFunnel, stageKey, statusMix,
-  winRateByQuarter, wonByQuarter, type OppRow,
+  winRateByQuarter, wonByQuarter, wonToDateLabel, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
 
@@ -36,14 +36,14 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
   const trend = cumulativeWon(rows);
-  const wonTotal = trend.at(-1)?.y ?? 0;
+  const wonText = wonToDateLabel(trend.at(-1) ?? { y: 0 });
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
-      table={{ columns: ['Month', 'Won to date'], rows: trend.map((p) => [p.x, fmtCompact(p.y)]) }}
+      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${wonText}.`}
+      table={{ columns: ['Month', 'Won to date'], rows: trend.map((p) => [p.x, wonToDateLabel(p)]) }}
       className="dash-hero"
       interactive={Boolean(onDrill)}
     >
@@ -52,8 +52,8 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
           <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
           <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
         </HeroFig>
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
-          <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
+        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${wonText}: show the won bids`}>
+          <span className="dash-hero-num dash-hero-num--won">{wonText}</span>
           <div className="viz-meta">Won this year</div>
         </HeroFig>
         {pulse ? (
