@@ -41,7 +41,16 @@ export function AgreementsSummaryCard({ companyId, companyName }: { companyId: s
             </p>
           ) : null}
           <div className="agr-card-nums">
-            <Link to={`${base}&view=active`}><span className="v">{s.byStatus.active ?? 0}</span><span className="l">{accountAgreementCaption(s.total, s.agreementsContinue === true)}</span></Link>
+            <Link to={`${base}&view=active`}>
+              {s.agreementsContinue === true ? (
+                <span className="l">{accountAgreementCaption(s.total, true)}</span>
+              ) : (
+                <>
+                  <span className="v">{s.byStatus.active ?? 0}</span>
+                  <span className="l">{accountAgreementCaption(s.total, false)}</span>
+                </>
+              )}
+            </Link>
             {s.nextExpiry ? (
               <Link to={`/agreements/${s.nextExpiry.id}`}>
                 <span className="v agr-days" data-u={urgency(s.nextExpiry.days)} style={{ fontSize: 24 }}>{s.nextExpiry.days}d</span>
