@@ -11,6 +11,7 @@ import { categoryForKind, collapseMarketNotes, enrichmentWatchRows, importanceSc
 import { canReadAccount } from '../lib/account-access.js';
 import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from '../services/account-signals/live-signals.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
+import { watchdogFeedAlertTake } from './watchdog-feed-alerts.js';
 
 const Implication = z.enum(['OPPORTUNITY', 'RISK', 'NEUTRAL']);
 
@@ -190,7 +191,9 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId: { in: ids }, status: 'NEW', ...hide },
           orderBy: [{ importance: 'desc' }, { severity: 'desc' }, { occurredAt: 'desc' }],
-          take: 5,
+          // One row past the five the dashboard pulse draws. The sixth is the
+          // probe. It is not a shown signal, and it is not a total.
+          take: watchdogFeedAlertTake(),
         }),
         prisma.accountWatchEvent.count({ where: { orgId, companyId: { in: ids }, status: 'NEW', ...hide } }),
         prisma.accountWatchEvent.findMany({

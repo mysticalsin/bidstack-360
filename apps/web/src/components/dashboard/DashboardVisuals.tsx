@@ -19,10 +19,12 @@ import {
   winRateByQuarter, wonByQuarter, wonToDateLabel, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
+import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
+
+import { WATCHDOG_FEED_ALERTS_DRAWN, watchdogAlertCaption } from './watchdog-alert-caption';
 
 /** Opens the bid drill-down sheet with a starting filter. */
 export type OnDrill = (f: OppDrillFilter) => void;
-import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
@@ -31,11 +33,13 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
 }) {
   const fresh = feed?.newAlertCount ?? 0;
-  const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
+  const loadedAlerts = feed?.alerts ?? [];
+  const drawnAlerts = loadedAlerts.slice(0, WATCHDOG_FEED_ALERTS_DRAWN);
+  // One row past the slice is the probe. It is not a signal on this pulse.
+  const alertsContinue = drawnAlerts.length < loadedAlerts.length;
+  const risks = drawnAlerts.filter((a) => a.implication === 'RISK').length;
   const pulse = feed ? (risks > 0 ? 'alert' : fresh > 0 ? 'watch' : 'calm') : null;
-  const pulseText = !feed ? '' : fresh > 0
-    ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
-    : 'Watchdog: all quiet';
+  const pulseText = !feed ? '' : watchdogAlertCaption(fresh, risks, alertsContinue);
   const trend = cumulativeWon(rows);
   const wonText = wonToDateLabel(trend.at(-1) ?? { y: 0 });
   return (
