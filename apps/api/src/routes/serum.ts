@@ -55,6 +55,10 @@ import {
   listOrgAgentProviderCredentials,
 } from '../lib/agent-provider-credentials.js';
 import { resolveOrgDustCredentials } from '../lib/dust-credentials.js';
+import {
+  PROVIDER_HEARTBEAT_PAGE,
+  providerHeartbeatDetail,
+} from './serum-provider-heartbeat.js';
 
 type ScalarSignal = number | bigint | string | Date | null | undefined;
 type SignalTableAvailability = {
@@ -974,6 +978,8 @@ function signalHealthStatus(rows: SerumSignalStatus[], empty: SerumSignalStatus 
 function buildSignalHealth(args: {
   tables: SignalTableAvailability;
   providerRows: ProviderHealthRow[];
+  /** True when one provider past the drawn page was loaded and dropped. */
+  providerHealthContinues: boolean;
   queueRows: QueueHealthRow[];
   providerConfigured: boolean;
   dustConfigured: boolean;
@@ -1018,7 +1024,7 @@ function buildSignalHealth(args: {
       detail: !args.tables.provider_health
         ? 'provider_health table is not available in this database.'
         : args.providerRows.length > 0
-          ? `${args.providerRows.length} provider heartbeat row${args.providerRows.length === 1 ? '' : 's'} returned.`
+          ? providerHeartbeatDetail(args.providerRows.length, args.providerHealthContinues)
           : 'provider_health table is available, but no provider heartbeat rows are recorded for this org.',
     },
     {
@@ -1291,7 +1297,7 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
                 FROM provider_health
                 WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL
                 ORDER BY last_checked_at DESC
-                LIMIT 8
+                LIMIT ${PROVIDER_HEARTBEAT_PAGE + 1}
               `,
               [],
             )
@@ -1311,6 +1317,11 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
       const openApprovals = toInt(coreSignals.open_approvals);
       const modelCallsToday = toInt(coreSignals.model_calls_today);
       const modelTokensToday = toInt(coreSignals.model_tokens_today);
+      // One row past the page is the probe. It is dropped and is not a provider total.
+      const providerHealthContinues = providerRows.length > PROVIDER_HEARTBEAT_PAGE;
+      const drawnProviderRows = providerHealthContinues
+        ? providerRows.slice(0, PROVIDER_HEARTBEAT_PAGE)
+        : providerRows;
       const queueFailed = queueRows.reduce((sum, row) => sum + row.failed, 0);
       const failedJobs = queueFailed + failedDocuments + failedLoops;
       const providerConfigured = Boolean(activeProvider) || providerCredentials.length > 0;
@@ -1319,7 +1330,8 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
       const enabled = env.SERUM_ENABLED === 'true';
       const signalHealth = buildSignalHealth({
         tables: signalTables,
-        providerRows,
+        providerRows: drawnProviderRows,
+        providerHealthContinues,
         queueRows,
         providerConfigured,
         dustConfigured,
@@ -1442,7 +1454,7 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       ];
 
-      const providerHealth: SerumProviderHealth[] = providerRows.map((row) => ({
+      const providerHealth: SerumProviderHealth[] = drawnProviderRows.map((row) => ({
         provider: row.provider,
         status: providerStatus(row.status),
         latencyMs: row.latency_ms,
