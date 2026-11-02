@@ -15,6 +15,10 @@ import {
   unspecifiedMicrosLabel,
 } from '@/components/dashboard/unspecified-currency';
 import { springSoft } from '@/lib/motion';
+import {
+  COCKPIT_OPPORTUNITY_PAGE_LIMIT,
+  recentOpportunityCaption,
+} from '@/pages/cockpit-opportunities';
 
 export interface RecentOpportunityItem {
   id: string;
@@ -70,9 +74,17 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
 }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
-  const visibleItems = items ?? opps?.data?.items ?? [];
+  const loadedItems = items ?? opps?.data?.items ?? [];
+  // One row past the slice is the probe. It is not a row on this card.
+  const visibleItems = loadedItems.slice(0, COCKPIT_OPPORTUNITY_PAGE_LIMIT);
+  const pageContinues = visibleItems.length < loadedItems.length;
   const loading = items ? false : (opps?.isLoading ?? false);
   const accountScoped = Boolean(accountName);
+  const completeCaption = accountScoped
+    ? t('recentOpportunities.accountCaption', 'Open opportunities linked to {{accountName}}', {
+        accountName,
+      })
+    : t('recentOpportunities.recentCaption', 'Latest portfolio activity across all customers');
   return (
     <Card
       role="region"
@@ -89,18 +101,12 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
             : t('recentOpportunities.recentTitle', 'Recent opportunities')
         }
         caption={
-          accountScoped
+          pageContinues
             ? t(
-                'recentOpportunities.accountCaption',
-                'Open opportunities linked to {{accountName}}',
-                {
-                  accountName,
-                },
+                'recentOpportunities.pageCaption',
+                recentOpportunityCaption(visibleItems.length, true, completeCaption),
               )
-            : t(
-                'recentOpportunities.recentCaption',
-                'Latest portfolio activity across all customers',
-              )
+            : completeCaption
         }
         action={
           <Link
@@ -141,7 +147,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         />
       ) : (
         <ul className="proto-list-flat">
-          {visibleItems.slice(0, 5).map((o, index) => (
+          {visibleItems.map((o, index) => (
             <motion.li
               key={o.id}
               className="proto-row"

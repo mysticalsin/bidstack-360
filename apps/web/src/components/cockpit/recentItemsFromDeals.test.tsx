@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
 import { RecentOpportunitiesCard, recentItemsFromDeals } from './RecentOpportunitiesCard';
@@ -15,6 +15,22 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+afterEach(() => {
+  cleanup();
+});
+
+const OPEN_CAPTION = 'Open opportunities linked to CI Financial';
+
+function openItem(name: string) {
+  return {
+    id: name,
+    name,
+    customer: 'CI Financial',
+    value: 'Not recorded',
+    stage: 'proposal',
+  };
+}
+
 describe('RecentOpportunitiesCard', () => {
   it('links to the open deals for that account', () => {
     // WHY: "Open pipeline" used to land on a search that still listed closed bids.
@@ -26,6 +42,48 @@ describe('RecentOpportunitiesCard', () => {
     expect(screen.getByRole('link', { name: /Open pipeline/ }).getAttribute('href')).toBe(
       '/opportunities?search=CI%20Financial&excludeClosed=true',
     );
+  });
+
+  it('does not describe five opportunities as every open opportunity when another is loaded', () => {
+    // WHY: the card listed five and the caption treated that slice as the open
+    // opportunities on the account. One more loaded row means those five are
+    // not every opportunity. Five that match the loaded set keep the old wording.
+    const six = ['Ada', 'Bea', 'Cara', 'Dia', 'Eve', 'Fay'].map(openItem);
+    const { unmount } = render(
+      <MemoryRouter>
+        <RecentOpportunitiesCard accountName="CI Financial" items={six} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('5 in the latest 5, not every opportunity').textContent).toBe(
+      '5 in the latest 5, not every opportunity',
+    );
+    expect(screen.queryByText(OPEN_CAPTION)).toBeNull();
+    expect(screen.queryByText('Fay')).toBeNull();
+    expect(screen.getByText('Eve')).toBeTruthy();
+    unmount();
+
+    render(
+      <MemoryRouter>
+        <RecentOpportunitiesCard accountName="CI Financial" items={six.slice(0, 5)} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(OPEN_CAPTION)).toBeTruthy();
+    expect(screen.getByText('Eve')).toBeTruthy();
+    expect(screen.queryByText(/not every opportunity/i)).toBeNull();
+  });
+
+  it('keeps the old wording when the loaded list is shorter than the slice', () => {
+    // WHY: two loaded rows are the whole loaded set. The caption must not
+    // claim a hidden opportunity that was not loaded.
+    render(
+      <MemoryRouter>
+        <RecentOpportunitiesCard accountName="CI Financial" items={['Ada', 'Bea'].map(openItem)} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(OPEN_CAPTION)).toBeTruthy();
+    expect(screen.getByText('Ada')).toBeTruthy();
+    expect(screen.getByText('Bea')).toBeTruthy();
+    expect(screen.queryByText(/not every opportunity/i)).toBeNull();
   });
 });
 
