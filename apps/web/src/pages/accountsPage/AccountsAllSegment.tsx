@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAccountOpenBook } from '@/hooks/useAccountOpenBook';
 import { useChampionCoverage } from '@/hooks/useChampionCoverage';
 import { useNextOpenTask } from '@/hooks/useNextOpenTask';
+import { useOverdueTaskAccounts } from '@/hooks/useOverdueTaskAccounts';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
@@ -21,6 +22,7 @@ import { springSoft } from '@/lib/motion';
 import { AccountBookChart } from './AccountBookChart';
 import { ChampionGap } from './ChampionGap';
 import { NextOpenTaskLine } from './NextOpenTaskLine';
+import { OverdueTaskAccountsLine } from './OverdueTaskAccountsLine';
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
@@ -214,6 +216,13 @@ export function AccountsAllSegment() {
     ? (rows.find((row) => row.company.id.toLowerCase() === nextTask.companyId.toLowerCase())?.company.name ??
       null)
     : null;
+  const overdueTasks = useOverdueTaskAccounts(viewCompanyIds);
+  const overdueStatus =
+    viewCompanyIds.length === 0 || overdueTasks.isSuccess
+      ? 'ready'
+      : overdueTasks.isError
+        ? 'error'
+        : 'loading';
 
   const topMissingFields = useMemo(() => {
     const counts = new Map<string, number>();
@@ -453,6 +462,12 @@ export function AccountsAllSegment() {
           task={nextTask}
           companyName={nextTaskCompanyName}
           complete={nextOpenTask.data?.complete ?? false}
+        />
+        <OverdueTaskAccountsLine
+          status={overdueStatus}
+          hasAccounts={viewCompanyIds.length > 0}
+          accounts={overdueTasks.data?.accounts ?? 0}
+          complete={overdueTasks.data?.complete ?? false}
         />
       </section>
 

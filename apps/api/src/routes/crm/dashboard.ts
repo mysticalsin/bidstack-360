@@ -8,6 +8,7 @@ import { isExpectedClientAbortError } from '../../lib/http-client-abort.js';
 import { fetchAccountOpenBook } from '../../services/crm/account-open-book.js';
 import { fetchChampionCoverage } from '../../services/crm/champion-coverage.js';
 import { fetchNextOpenTask } from '../../services/crm/next-open-task.js';
+import { fetchOverdueOpenTaskAccounts } from '../../services/crm/overdue-open-tasks.js';
 import { buildDashboardSnapshot, normalizeName } from '../../services/crm/dashboard.service.js';
 import { getReleaseScore } from '../../services/crm/dashboard.queries.js';
 import { getAccessScope, scopeCacheTag, type AccessScope } from '../../lib/access-scope.js';
@@ -263,4 +264,41 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
       throw err;
     }
   });
+
+  server.post(
+    '/crm/accounts/overdue-task-accounts',
+    {
+      config: { permission: 'companies:read' },
+      schema: {
+        body: z.object({
+          companyIds: z.array(z.string().trim().min(1).max(512)).max(2000),
+        }),
+        response: {
+          200: z.object({
+            accounts: z.number().int().nonnegative(),
+            complete: z.boolean(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      try {
+        const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+        return await fetchOverdueOpenTaskAccounts(
+          prisma,
+          req.auth.orgId,
+          req.body.companyIds,
+          scope,
+        );
+      } catch (err) {
+        if (!shouldSuppressRouteErrorLog(err, req.raw)) {
+          req.log.error(
+            { err, orgId: req.auth.orgId, companies: req.body.companyIds.length },
+            'Error in /crm/accounts/overdue-task-accounts route',
+          );
+        }
+        throw err;
+      }
+    },
+  );
 };
