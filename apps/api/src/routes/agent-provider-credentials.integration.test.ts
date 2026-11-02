@@ -104,6 +104,7 @@ describe('agent provider routes', () => {
         prefix: rawKey.slice(0, 8),
         hashedKey: createHash('sha256').update(rawKey).digest('hex'),
         scopes: ['read', 'write'],
+        readOnly: false,
       },
     });
 

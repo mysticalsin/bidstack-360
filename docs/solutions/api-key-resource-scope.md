@@ -15,3 +15,7 @@ unrestricted. New vendor/CI keys inherited org-wide company and MSA access.
   scope is present.
 
 **Do not:** treat empty company/MSA lists as org-wide. That was the hole.
+
+**Tests:** Prisma inserts inherit `readOnly=true`. A write-scoped key used to
+assert a later gate (human actor, admin role, missing exact scope) must set
+`readOnly: false` or the new flag 403s first.

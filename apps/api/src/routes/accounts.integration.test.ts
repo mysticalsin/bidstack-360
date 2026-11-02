@@ -240,6 +240,7 @@ describe('top accounts curation', () => {
           hashedKey: createHash('sha256').update(rawKey).digest('hex'),
           prefix: rawKey.slice(0, 8),
           scopes: ['read', 'write'],
+          readOnly: false,
         },
       });
       try {

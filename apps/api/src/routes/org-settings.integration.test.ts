@@ -154,6 +154,7 @@ describe('org locale settings', () => {
         hashedKey: createHash('sha256').update(rawKey).digest('hex'),
         prefix: rawKey.slice(0, 8),
         scopes: ['settings:read', 'settings:write'],
+        readOnly: false,
       },
     });
     try {
