@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AccountWatchdog } from '@/hooks/useAccountWatchdog';
 
-import { agoLabel, meetingQueryString, parseAttendees, type MeetingIntelDetail } from './client';
+import { agoLabel, fmtMeetingDate, meetingQueryString, parseAttendees, type MeetingIntelDetail } from './client';
 import { collectPeople } from './people';
 import { mergeMeetingSignals } from './watchdog';
 
@@ -25,6 +25,41 @@ describe('meeting intel helpers', () => {
     expect(agoLabel('2026-10-30T10:00:00Z', now)).toBe('yesterday');
     expect(agoLabel('2026-10-21T12:00:00Z', now)).toBe('10 days ago');
     expect(agoLabel('2026-06-01T12:00:00Z', now)).toBe('5 months ago');
+  });
+  it('keeps a meeting dated today from reading as past at both clock edges', () => {
+    // WHY: the meeting chip says "today" or prints the day. Elapsed
+    // milliseconds mark 2026-11-01 as yesterday at 22:00Z, and mark a
+    // meeting four hours earlier as today once the UTC day has rolled.
+    // America/Sao_Paulo is still 1 Nov at 02:00Z, which must not be the
+    // printed day.
+    const evening = Date.parse('2026-11-01T22:00:00Z');
+    const afterLocalMidnight = Date.parse('2026-11-02T02:00:00Z');
+
+    expect(agoLabel('2026-11-01T08:00:00.000Z', evening)).toBe('today');
+    expect(agoLabel('2026-11-01', evening)).toBe('today');
+    expect(agoLabel('2026-10-31T23:00:00.000Z', evening)).toBe('yesterday');
+
+    expect(agoLabel('2026-11-02T00:00:00.000Z', afterLocalMidnight)).toBe('today');
+    expect(agoLabel('2026-11-02', afterLocalMidnight)).toBe('today');
+    expect(agoLabel('2026-11-01T22:00:00.000Z', afterLocalMidnight)).toBe('yesterday');
+
+    const onTheUtcDay = '2026-11-02T02:00:00.000Z';
+    const utcLabel = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(onTheUtcDay));
+    const saoPauloLabel = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'America/Sao_Paulo',
+    }).format(new Date(onTheUtcDay));
+    expect(utcLabel).toBe('2 Nov 2026');
+    expect(saoPauloLabel).toBe('1 Nov 2026');
+    expect(fmtMeetingDate(onTheUtcDay)).toBe(utcLabel);
+    expect(fmtMeetingDate('2026-11-01T22:00:00.000Z')).toBe('1 Nov 2026');
   });
   it('builds a query string without empty values', () => {
     expect(meetingQueryString({ groupId: 'g', q: '', seniority: 'vp' })).toMatch(/^\?/);

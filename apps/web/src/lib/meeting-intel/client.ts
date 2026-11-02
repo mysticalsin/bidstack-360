@@ -82,10 +82,31 @@ export function parseAttendees(text: string): MeetingCreate['attendees'] {
 
 export const lines = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 30);
 
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const DAY_MS = 86_400_000;
+
+/**
+ * UTC calendar day for the meeting the user sees. Elapsed milliseconds
+ * marked a meeting held today as yesterday after 12:00 UTC. A formatter
+ * with no zone follows America/Sao_Paulo, so 02:00Z still printed as the
+ * day before. The rest of the bid clock uses the UTC calendar day.
+ */
+const dateFmt = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** The meeting's UTC calendar day, as "2 Nov 2026". */
 export const fmtMeetingDate = (iso: string) => dateFmt.format(new Date(iso));
+
+/** "today", "yesterday", then days. Today is the same UTC calendar day. */
 export function agoLabel(iso: string, now = Date.now()): string {
-  const d = Math.round((now - new Date(iso).getTime()) / 86_400_000);
+  const held = new Date(iso);
+  const at = new Date(now);
+  const heldDay = Date.UTC(held.getUTCFullYear(), held.getUTCMonth(), held.getUTCDate());
+  const today = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  const d = (today - heldDay) / DAY_MS;
   if (d <= 0) return 'today';
   if (d === 1) return 'yesterday';
   if (d < 60) return `${d} days ago`;
