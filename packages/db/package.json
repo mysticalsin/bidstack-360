@@ -19,7 +19,7 @@
     "generate": "node scripts/pre-generate.js && prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "seed": "tsx src/seed.ts",
+    "seed": "pnpm --filter @bidstack/shared build && tsx src/seed.ts",
     "seed:demo": "tsx src/seed-demo.ts",
     "seed:signals": "tsx src/seed-signals.ts",
     "seed:prod": "tsx src/seed-prod.ts",
@@ -34,7 +34,7 @@
   },
   "prisma": {
     "schema": "prisma/schema.prisma",
-    "seed": "tsx src/seed.ts"
+    "seed": "pnpm --filter @bidstack/shared build && tsx src/seed.ts"
   },
   "dependencies": {
     "@bidstack/shared": "workspace:*",

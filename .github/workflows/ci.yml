@@ -229,17 +229,17 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Migrate + seed
-        run: |
-          pnpm db:generate
-          pnpm db:migrate:deploy
-          pnpm db:seed
-
       - name: Build workspace packages
         run: >
           pnpm --filter @bidstack/shared --filter @bidstack/dust-client
           --filter @bidstack/odoo-mcp-client --filter @bidstack/db
           --filter @bidstack/memos --filter @bidstack/integrations build
+
+      - name: Migrate + seed
+        run: |
+          pnpm db:generate
+          pnpm db:migrate:deploy
+          pnpm db:seed
 
       - name: API integration tests
         run: pnpm --filter @bidstack/api test
@@ -307,17 +307,17 @@ jobs:
       - name: Install Playwright Chromium (with deps)
         run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
 
-      - name: Migrate + seed
-        run: |
-          pnpm db:generate
-          pnpm db:migrate:deploy
-          pnpm db:seed
-
       - name: Build workspace packages
         run: >
           pnpm --filter @bidstack/shared --filter @bidstack/dust-client
           --filter @bidstack/odoo-mcp-client --filter @bidstack/db
           --filter @bidstack/memos --filter @bidstack/integrations build
+
+      - name: Migrate + seed
+        run: |
+          pnpm db:generate
+          pnpm db:migrate:deploy
+          pnpm db:seed
 
       - name: Build web
         run: pnpm --filter @bidstack/web build

@@ -79,6 +79,12 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
+      - name: Build workspace packages
+        run: >
+          pnpm --filter @bidstack/shared --filter @bidstack/dust-client
+          --filter @bidstack/odoo-mcp-client --filter @bidstack/db
+          --filter @bidstack/memos --filter @bidstack/integrations build
+
       - name: Migrate database
         run: pnpm db:migrate:deploy
 
