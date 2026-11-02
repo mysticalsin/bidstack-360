@@ -45,9 +45,12 @@ export function ApprovalGate() {
 
   const allChecked = REVIEW_STEPS.every((s) => checked[s]);
   const isAwaitingApproval = stage === 'awaiting_approval';
+  const attestation = reviewNotes.trim();
 
-  // WHY: canApprove requires all conditions; UI makes each blocking reason explicit
-  const canApprove = isAwaitingApproval && allChecked && canApprovePermission && !!proposalId;
+  // WHY: canApprove requires all conditions; UI makes each blocking reason explicit.
+  // An empty note used to be stored as an approval.
+  const canApprove =
+    isAwaitingApproval && allChecked && canApprovePermission && !!proposalId && attestation.length > 0;
 
   const approveMutation = useMutation({
     mutationFn: (payload: ApprovePayload) =>
@@ -82,7 +85,7 @@ export function ApprovalGate() {
 
   const handleApprove = () => {
     if (!canApprove) return;
-    approveMutation.mutate({ notes: reviewNotes });
+    approveMutation.mutate({ notes: attestation });
   };
 
   return (
@@ -194,6 +197,11 @@ export function ApprovalGate() {
               )
             : !allChecked
               ? t('approval.checklistIncomplete')
+              : attestation.length === 0
+                ? t(
+                    'approval.attestationRequired',
+                    'Write an attestation that approves this proposal.',
+                  )
               : !isAwaitingApproval
                 ? t('approval.waitingForStage')
                 : undefined

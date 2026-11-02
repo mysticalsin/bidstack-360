@@ -247,6 +247,40 @@ describe('ApprovalGate — Approve button', () => {
     }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
+
+  it('stays disabled until the note attests the approval', () => {
+    // WHY: an empty note used to be posted and stored as an approval.
+    vi.mocked(useCapabilities).mockReturnValue({
+      data: { permissions: ['proposals:approve'] },
+    } as any);
+    vi.mocked(useRfpPipelineStore).mockImplementation((selector) =>
+      selector(makePipelineState({ stage: 'awaiting_approval' })),
+    );
+    vi.mocked(useRfpDraft).mockReturnValue({
+      query: { data: { proposalId: 'prop-1', sections: [] } },
+    } as any);
+
+    renderGate();
+    for (let i = 0; i < 5; i += 1) {
+      const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+      fireEvent.click(boxes[i]!);
+    }
+    const btn = screen.getByRole('button', {
+      name: /approval\.(approve|approved|approving)/i,
+    }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('approval.notesLabel'), {
+      target: { value: 'I approve this proposal' },
+    });
+    expect(
+      (
+        screen.getByRole('button', {
+          name: /approval\.(approve|approved|approving)/i,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

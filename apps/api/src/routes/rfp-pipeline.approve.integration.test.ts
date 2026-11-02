@@ -227,7 +227,7 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     const res = await ctx.server.inject({
       method: 'POST',
       url: `/api/v1/proposals/${proposal.id}/rfp-approve`,
-      payload: {},
+      payload: { notes: 'I approve this proposal' },
       headers: approverHeaders,
     });
     expect(res.statusCode).toBe(200);
@@ -243,7 +243,7 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     const res = await ctx.server.inject({
       method: 'POST',
       url: `/api/v1/proposals/${proposal.id}/rfp-approve`,
-      payload: {},
+      payload: { notes: 'I approve this proposal' },
       headers: approverHeaders,
     });
     expect(res.statusCode).toBe(200);
@@ -285,7 +285,7 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     const res = await ctx.server.inject({
       method: 'POST',
       url: `/api/v1/proposals/${proposal.id}/rfp-approve`,
-      payload: {},
+      payload: { notes: 'I approve this proposal' },
       headers: approverHeaders,
     });
     expect(res.statusCode).toBe(200);

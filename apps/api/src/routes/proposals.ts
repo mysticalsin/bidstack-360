@@ -20,6 +20,7 @@ import {
   immutableProposalMessage,
   proposalApprovalRoutes,
   proposalIsImmutable,
+  visibleStatusesForProposals,
 } from './proposals.approval.js';
 import { DEFAULT_SECTIONS, opportunityDraftLines, serializeProposal } from './proposals.helpers.js';
 
@@ -63,7 +64,14 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         }),
         prisma.proposal.count({ where }),
       ]);
-      return { items: items.map(serializeProposal), total };
+      const visible = await visibleStatusesForProposals(req.auth.orgId, items);
+      return {
+        items: items.map((row) => ({
+          ...serializeProposal(row),
+          status: (visible.get(row.id) ?? row.status) as z.infer<typeof Proposal>['status'],
+        })),
+        total,
+      };
     },
   );
 
@@ -89,8 +97,10 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { sections: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } } },
       });
       if (!row) return reply.notFound('Proposal not found');
+      const visible = await visibleStatusesForProposals(req.auth.orgId, [row]);
       return {
         ...serializeProposal(row),
+        status: (visible.get(row.id) ?? row.status) as z.infer<typeof Proposal>['status'],
         sections: row.sections.map((s) => ({
           id: s.id,
           proposalId: s.proposalId,

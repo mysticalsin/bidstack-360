@@ -25,6 +25,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import { logAiInvocation } from '../lib/ai-audit.js';
+import { attestationMatchesDecision } from './proposal-approval-evidence.js';
 import {
   RfpOrchestrateLoopPolicyError,
   enqueueRfpOrchestrate,
@@ -437,6 +438,25 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       const approvedAt = new Date();
 
       await prisma.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ approved_at: Date | null }>>`
+          SELECT approved_at
+          FROM proposals
+          WHERE id = ${proposal.id}::uuid
+            AND org_id = ${orgId}::uuid
+            AND deleted_at IS NULL
+          FOR UPDATE
+        `;
+        if (!locked[0] || locked[0].approved_at !== null) {
+          throw server.httpErrors.conflict('Proposal has already been approved');
+        }
+        // Notes are the attestation on this gate. An empty body, or a note that
+        // rejects the proposal, must not be stored as an approval.
+        if (!attestationMatchesDecision(req.body.notes, 'approve')) {
+          throw server.httpErrors.badRequest(
+            'The attestation does not match the approve decision.',
+          );
+        }
+
         // Atomic approval guard: updateMany with approvedAt IS NULL means a
         // concurrent double-approval loses the race (the second write sees
         // count 0) without a separate row lock.
@@ -494,6 +514,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
               orchestrationState: 'approved',
               blockersChecked: liveBlockers,
               notes: req.body.notes ?? null,
+              attestation: req.body.notes ?? null,
+              decision: 'approve',
             },
           },
         });
