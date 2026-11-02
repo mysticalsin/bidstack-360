@@ -189,8 +189,9 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
       const { companyId } = req.params;
       await assertCompanyVisible(server, req, companyId);
       // One row past the page is the probe. It is dropped and is not a task
-      // total. Counts below are this page.
-      const KAM_TODO_PAGE = 1000;
+      // total. Counts below are this page. 999 keeps take+1 inside the
+      // query-guard cap (take > 1000 is rejected as unbounded).
+      const KAM_TODO_PAGE = 999;
       const loaded = await prisma.task.findMany({
         where: { orgId: req.auth.orgId, accountId: companyId, deletedAt: null },
         include: { initiative: { select: { id: true, title: true, stage: true } } },

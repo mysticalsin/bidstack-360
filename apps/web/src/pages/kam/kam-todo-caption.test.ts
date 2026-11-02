@@ -12,7 +12,7 @@ import { KAM_TODO_PAGE, kamTodoCaption, kamTodoEmptyMessage } from './kam-todo-c
 function todoListProbes(apiSrc: string): boolean {
   const route = apiSrc.slice(apiSrc.indexOf("'/kam/accounts/:companyId/todos'"));
   return (
-    /const KAM_TODO_PAGE = 1000/.test(route) &&
+    /const KAM_TODO_PAGE = 999/.test(route) &&
     /take:\s*KAM_TODO_PAGE\s*\+\s*1/.test(route) &&
     /const pageContinues = loaded\.length > KAM_TODO_PAGE/.test(route) &&
     /pageContinues \? loaded\.slice\(0, KAM_TODO_PAGE\)/.test(route) &&
@@ -23,7 +23,7 @@ function todoListProbes(apiSrc: string): boolean {
 
 describe('key-account to-do caption', () => {
   it('does not call the loaded page every task when a later task was loaded', () => {
-    // WHY: the to-do fetched take:1000 and printed that slice as
+    // WHY: the to-do fetched take:999 and printed that slice as
     // "N open · M done". Those counts are the page. One more loaded row
     // means the drawn tasks are not every task. The extra row is dropped.
     // A shorter page keeps "N open · M done". No task total is invented.

@@ -110,6 +110,11 @@ export const accountFinancialsRoutes: FastifyPluginAsyncZod = async (server) => 
       if (!company) throw server.httpErrors.notFound('Account not found');
       const access = await canReadAccount({ orgId, userId, companyId, accountName: company.name });
       if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+      // Opening Strategic / Top (or an opted-in General) queues the public-filings
+      // pull; General stays paused. Best effort: a schedule miss must not hide the read model.
+      await syncAccountFinancialsSchedule(orgId, companyId).catch((err: unknown) =>
+        req.log.warn({ err: err instanceof Error ? err.message : String(err), companyId }, 'financials schedule sync failed'),
+      );
       return loadAccountFinancials(orgId, companyId, await canToggle(orgId, userId, role));
     },
   );

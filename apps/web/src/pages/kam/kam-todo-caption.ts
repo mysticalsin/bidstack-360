@@ -1,5 +1,5 @@
 /** Tasks the account to-do draws. The list reads one past this page. */
-export const KAM_TODO_PAGE = 1000;
+export const KAM_TODO_PAGE = 999;
 
 /**
  * Caption on the key-account to-do. The route reads one task past this page
