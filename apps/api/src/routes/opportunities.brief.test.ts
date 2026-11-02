@@ -1,6 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
+import {
+  buildOpportunityBrief,
+  estimateBriefTokens,
+  opportunityNotePage,
+} from './opportunities.brief.js';
+
+describe('opportunity note page', () => {
+  it('drops the note past the page', () => {
+    // WHY: the brief quoted five notes and stopped. The sixth row only says
+    // another note exists. It is not a note to print, and it is not a total.
+    const rows = [1, 2, 3, 4, 5, 6].map((n) => ({ title: `Note ${n}` }));
+    const page = opportunityNotePage(rows);
+    expect(page.pageContinues).toBe(true);
+    expect(page.notes.map((note) => note.title)).toEqual([
+      'Note 1',
+      'Note 2',
+      'Note 3',
+      'Note 4',
+      'Note 5',
+    ]);
+    expect(page.notes.map((note) => note.title)).not.toContain('Note 6');
+
+    const short = opportunityNotePage(rows.slice(0, 2));
+    expect(short.pageContinues).toBe(false);
+    expect(short.notes).toHaveLength(2);
+
+    const exact = opportunityNotePage(rows.slice(0, 5));
+    expect(exact.pageContinues).toBe(false);
+    expect(exact.notes).toHaveLength(5);
+  });
+});
 
 describe('buildOpportunityBrief', () => {
   it('builds a source-grounded opportunity brief without stub copy', () => {

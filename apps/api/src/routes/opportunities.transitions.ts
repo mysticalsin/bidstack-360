@@ -23,7 +23,12 @@ import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { createNotification } from '../services/notification.service.js';
-import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
+import {
+  OPPORTUNITY_NOTE_PAGE_LIMIT,
+  buildOpportunityBrief,
+  estimateBriefTokens,
+  opportunityNotePage,
+} from './opportunities.brief.js';
 
 /** Task.type marker for the Stage-10 debrief, so it can be found and deduped. */
 const LESSONS_LEARNED_TASK_TYPE = 'lessons_learned';
@@ -440,6 +445,9 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
             brief: z.string(),
             model: z.string(),
             tokens: z.number().int(),
+            // Notes quoted in the brief. notesPageContinues means one note sat past the page.
+            noteCount: z.number().int().min(0),
+            notesPageContinues: z.boolean(),
           }),
         },
       },
@@ -455,7 +463,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
 
       // A matching customer string is not a link. People and notes enter the
       // brief only through the opportunity's company id.
-      const [tasks, contacts, notes] = await Promise.all([
+      const [tasks, contacts, noteRows] = await Promise.all([
         prisma.task.findMany({
           where: { orgId: req.auth.orgId, oppId: opp.id, deletedAt: null },
           orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
@@ -480,11 +488,13 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           ? prisma.note.findMany({
               where: { orgId: req.auth.orgId, deletedAt: null, companyId: opp.companyId },
               orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-              take: 5,
+              // One extra row sets notesPageContinues. It is not quoted in the brief.
+              take: OPPORTUNITY_NOTE_PAGE_LIMIT + 1,
               select: { title: true, bodyMd: true, pinned: true, updatedAt: true },
             })
           : Promise.resolve([]),
       ]);
+      const { notes, pageContinues } = opportunityNotePage(noteRows);
 
       const brief = buildOpportunityBrief({
         opportunity: {
@@ -505,7 +515,13 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
         notes,
       });
 
-      return { brief, model: 'crm-grounded-v1', tokens: estimateBriefTokens(brief) };
+      return {
+        brief,
+        model: 'crm-grounded-v1',
+        tokens: estimateBriefTokens(brief),
+        noteCount: notes.length,
+        notesPageContinues: pageContinues,
+      };
     },
   );
 };

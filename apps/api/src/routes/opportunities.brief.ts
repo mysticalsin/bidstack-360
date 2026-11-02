@@ -49,6 +49,27 @@ export interface OpportunityBriefInput {
   notes: BriefNote[];
 }
 
+/**
+ * Account notes quoted on one opportunity brief. One extra row is not a note in the brief.
+ * Keep equal to `OPPORTUNITY_NOTE_PAGE_LIMIT` in apps/web/src/pages/opportunity-notes.ts.
+ */
+export const OPPORTUNITY_NOTE_PAGE_LIMIT = 5;
+
+/**
+ * The route reads one note past the page. That row only says the page continues.
+ * A shorter read is every note linked to the company.
+ */
+export function opportunityNotePage<T>(rows: readonly T[]): {
+  notes: T[];
+  pageContinues: boolean;
+} {
+  const pageContinues = rows.length > OPPORTUNITY_NOTE_PAGE_LIMIT;
+  return {
+    notes: pageContinues ? rows.slice(0, OPPORTUNITY_NOTE_PAGE_LIMIT) : [...rows],
+    pageContinues,
+  };
+}
+
 function formatMoneyMicros(valueMicros: bigint | number): string {
   return `${formatMicrosAmount(valueMicros)} unspecified`;
 }

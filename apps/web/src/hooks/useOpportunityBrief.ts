@@ -10,6 +10,10 @@ export interface BriefResponse {
   brief: string;
   model: string;
   tokens: number;
+  /** Notes quoted in `brief`. Not a total. */
+  noteCount: number;
+  /** True when the route read one note past the page and dropped it. */
+  notesPageContinues: boolean;
 }
 
 export function useOpportunityBrief(opportunityId: string | undefined) {

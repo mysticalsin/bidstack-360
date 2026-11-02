@@ -9,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { useOpportunityBrief } from '@/hooks/useOpportunityBrief';
+import { useOpportunityBrief, type BriefResponse } from '@/hooks/useOpportunityBrief';
+import { opportunityNoteCaption } from '@/pages/opportunity-notes';
 import AITextLoading from '@/components/kokonutui/ai-text-loading';
 import { BorderTrail } from '@/components/motion-primitives/border-trail';
 
@@ -23,6 +24,12 @@ interface Props {
 export function BriefingDialog({ opportunityId, opportunityLabel, open, onOpenChange }: Props) {
   const { t } = useTranslation('crm');
   const brief = useOpportunityBrief(opportunityId);
+  const textFor = (data: BriefResponse) => {
+    const caption = opportunityNoteCaption(data.noteCount, data.notesPageContinues);
+    // An empty caption is the old brief. Do not ask i18n to translate a blank.
+    const line = caption ? t('briefing.notePageCaption', caption) : '';
+    return line ? `${line}\n\n${data.brief}` : data.brief;
+  };
 
   // Auto-trigger generation on open, then drop the state when the dialog
   // closes so re-opening it always fetches fresh — briefs are time-sensitive
@@ -73,7 +80,7 @@ export function BriefingDialog({ opportunityId, opportunityLabel, open, onOpenCh
                 className="whitespace-pre-wrap rounded-md bg-[var(--surface-sunken)] p-4 text-xs text-[var(--fg-primary)] font-mono leading-relaxed"
                 aria-label={t('briefing.contentAriaLabel', 'Brief content')}
               >
-                {brief.data.brief}
+                {textFor(brief.data)}
               </pre>
               <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--fg-tertiary)]">
                 <span>
@@ -86,7 +93,7 @@ export function BriefingDialog({ opportunityId, opportunityLabel, open, onOpenCh
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => void navigator.clipboard.writeText(brief.data!.brief)}
+                    onClick={() => void navigator.clipboard.writeText(textFor(brief.data!))}
                   >
                     {t('briefing.copy', 'Copy')}
                   </Button>
