@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Hero } from '@/components/login';
+import { CfAccessSignIn } from '@/components/login/CfAccessSignIn';
 import { DemoSignIn } from '@/components/login/DemoSignIn';
 
 /**
@@ -14,13 +15,14 @@ import { DemoSignIn } from '@/components/login/DemoSignIn';
 export function LoginPage() {
   const { t } = useTranslation('auth');
   const isDemo = import.meta.env.VITE_AUTH_MODE === 'demo';
+  const isCfAccess = import.meta.env.VITE_AUTH_MODE === 'cf-access';
   return (
     <main
       className="login-page relative z-[100] overflow-hidden"
       aria-label={t('login.pageAriaLabel', 'Sign in')}
       data-theme="light"
     >
-      {isDemo ? <DemoSignIn /> : <Hero />}
+      {isCfAccess ? <CfAccessSignIn /> : isDemo ? <DemoSignIn /> : <Hero />}
     </main>
   );
 }

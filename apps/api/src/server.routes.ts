@@ -52,6 +52,7 @@ import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
 // Team workload / capacity view (per-owner open-bid + task aggregates)
 import { analyticsWorkloadRoutes } from './routes/analytics-workload.js';
 import { configFeaturesRoutes } from './routes/config-features.js';
+import { identityRoutes } from './routes/identity.js';
 import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
 import { sectorViewRoutes } from './routes/sector-view.js';
@@ -174,6 +175,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsWorkloadRoutes, { prefix: '/api/v1' });
   await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
+  await server.register(identityRoutes, { prefix: '/api/v1' });
   await server.register(serumRoutes, { prefix: '/api/v1' });
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
   await server.register(sectorViewRoutes, { prefix: '/api/v1' });

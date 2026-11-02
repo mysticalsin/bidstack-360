@@ -65,6 +65,9 @@ vi.mock('@/components/settings/IntegrationsSection', () => ({
 vi.mock('@/components/settings/WebhooksSection', () => ({
   WebhooksSection: () => <div>Webhooks panel</div>,
 }));
+vi.mock('@/components/settings/IdentitySection', () => ({
+  IdentitySection: () => <div>Identity panel</div>,
+}));
 vi.mock('@/components/settings/AuditLogSection', () => ({
   AuditLogSection: () => <div>Audit log panel</div>,
 }));
@@ -138,5 +141,13 @@ describe('SettingsPage routing guard', () => {
     expect(screen.getByTestId('active-tab').textContent).toBe('groups');
     expect(screen.getByText('Access groups panel')).toBeTruthy();
     expect(screen.getByTestId('location').textContent).toBe('/settings?tab=groups');
+  });
+
+  it('opens the identity and roles tab for admins', () => {
+    renderPage('/settings?tab=identity');
+
+    expect(screen.getByTestId('active-tab').textContent).toBe('identity');
+    expect(screen.getByText('Identity panel')).toBeTruthy();
+    expect(screen.getByTestId('location').textContent).toBe('/settings?tab=identity');
   });
 });

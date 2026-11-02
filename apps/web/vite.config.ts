@@ -19,6 +19,7 @@ export default defineConfig(({ command, mode }) => {
     // Clerk key. Otherwise require stub+flag (local/test) or a real Clerk key.
     const keylessOk =
       authMode === 'demo' ||
+      authMode === 'cf-access' ||
       (authMode === 'stub' && process.env.BIDSTACK_ALLOW_STUB_AUTH === 'true');
     if (!keylessOk) {
       throw new Error(
