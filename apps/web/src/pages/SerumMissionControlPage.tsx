@@ -68,6 +68,10 @@ export function SerumMissionControlPage() {
     (signal) => signal.id === 'provider-heartbeats',
   );
   const providerHeartbeatPartial = providerHeartbeat?.detail.includes('not every provider') ?? false;
+  const queueHeartbeat = snapshot.signalHealth.find(
+    (signal) => signal.id === 'queue-heartbeats',
+  );
+  const queueHeartbeatPartial = queueHeartbeat?.detail.includes('not every queue') ?? false;
 
   return (
     <div className="space-y-6 pb-8">
@@ -308,6 +312,9 @@ export function SerumMissionControlPage() {
               }
             />
           </div>
+          {queueHeartbeatPartial ? (
+            <p className="mt-2 text-sm leading-6 text-[var(--fg-secondary)]">{queueHeartbeat?.detail}</p>
+          ) : null}
           <div className="mt-4 space-y-3">
             {snapshot.queueHealth.length > 0 ? (
               snapshot.queueHealth.map((queue) => (

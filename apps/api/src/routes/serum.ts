@@ -59,6 +59,10 @@ import {
   PROVIDER_HEARTBEAT_PAGE,
   providerHeartbeatDetail,
 } from './serum-provider-heartbeat.js';
+import {
+  QUEUE_HEARTBEAT_PAGE,
+  queueHeartbeatDetail,
+} from './serum-queue-heartbeat.js';
 
 type ScalarSignal = number | bigint | string | Date | null | undefined;
 type SignalTableAvailability = {
@@ -981,6 +985,8 @@ function buildSignalHealth(args: {
   /** True when one provider past the drawn page was loaded and dropped. */
   providerHealthContinues: boolean;
   queueRows: QueueHealthRow[];
+  /** True when one queue past the drawn page was loaded and dropped. */
+  queueHealthContinues: boolean;
   providerConfigured: boolean;
   dustConfigured: boolean;
   mcpConfigured: boolean;
@@ -1034,7 +1040,7 @@ function buildSignalHealth(args: {
       detail: !args.tables.queue_health
         ? 'queue_health table is not available in this database.'
         : args.queueRows.length > 0
-          ? `${args.queueRows.length} queue heartbeat row${args.queueRows.length === 1 ? '' : 's'} returned.`
+          ? queueHeartbeatDetail(args.queueRows.length, args.queueHealthContinues)
           : 'queue_health table is available, but no queue heartbeat rows are recorded for this org.',
     },
     {
@@ -1283,7 +1289,7 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
                 FROM queue_health
                 WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL
                 ORDER BY last_checked_at DESC
-                LIMIT 10
+                LIMIT ${QUEUE_HEARTBEAT_PAGE + 1}
               `,
               [],
             )
@@ -1322,7 +1328,12 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
       const drawnProviderRows = providerHealthContinues
         ? providerRows.slice(0, PROVIDER_HEARTBEAT_PAGE)
         : providerRows;
-      const queueFailed = queueRows.reduce((sum, row) => sum + row.failed, 0);
+      // One row past the page is the probe. It is dropped and is not a queue total.
+      const queueHealthContinues = queueRows.length > QUEUE_HEARTBEAT_PAGE;
+      const drawnQueueRows = queueHealthContinues
+        ? queueRows.slice(0, QUEUE_HEARTBEAT_PAGE)
+        : queueRows;
+      const queueFailed = drawnQueueRows.reduce((sum, row) => sum + row.failed, 0);
       const failedJobs = queueFailed + failedDocuments + failedLoops;
       const providerConfigured = Boolean(activeProvider) || providerCredentials.length > 0;
       const dustConfigured = Boolean(dustCredentials);
@@ -1332,7 +1343,8 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         tables: signalTables,
         providerRows: drawnProviderRows,
         providerHealthContinues,
-        queueRows,
+        queueRows: drawnQueueRows,
+        queueHealthContinues,
         providerConfigured,
         dustConfigured,
         mcpConfigured,
@@ -1462,7 +1474,7 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         message: row.message,
       }));
 
-      const queueHealth: SerumQueueHealth[] = queueRows.map((row) => ({
+      const queueHealth: SerumQueueHealth[] = drawnQueueRows.map((row) => ({
         queueName: row.queue_name,
         status: queueStatus(row),
         waiting: row.waiting,

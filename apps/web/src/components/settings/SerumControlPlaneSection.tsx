@@ -390,8 +390,31 @@ const SERUM_CONFIG_SECTIONS: SerumConfigSection[] = [
       const providerDetail = snapshot.signalHealth.find(
         (signal) => signal.id === 'provider-heartbeats',
       )?.detail;
+      const queueDetail = snapshot.signalHealth.find(
+        (signal) => signal.id === 'queue-heartbeats',
+      )?.detail;
+      const providerPartial = providerDetail?.includes('not every provider') ?? false;
+      const queuePartial = queueDetail?.includes('not every queue') ?? false;
+      // The status read already says when the drawn rows are not every queue.
+      if (queuePartial && providerPartial) {
+        return t(
+          'crm.serum.section.observability.detailQueuesAndProvidersPartial',
+          '{{queueDetail}} {{providerDetail}}',
+          { queueDetail, providerDetail },
+        );
+      }
+      if (queuePartial) {
+        return t(
+          'crm.serum.section.observability.detailQueuesPartial',
+          '{{detail}} {{providerCount}} provider health rows available.',
+          {
+            detail: queueDetail,
+            providerCount: snapshot.providerHealth.length,
+          },
+        );
+      }
       // The status read already says when the drawn rows are not every provider.
-      if (providerDetail?.includes('not every provider')) {
+      if (providerPartial) {
         return t(
           'crm.serum.section.observability.detailProvidersPartial',
           '{{queueCount}} queue health rows. {{detail}}',
