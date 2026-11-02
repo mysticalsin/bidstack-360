@@ -100,6 +100,15 @@ const dashboardState: { current: unknown } = { current: null };
 vi.mock('@/hooks/useCrmDashboard', () => ({
   useCrmDashboard: () => dashboardState.current,
 }));
+vi.mock('@/hooks/useAccountOpenBook', () => ({
+  useAccountOpenBook: () => ({
+    data: { stages: [] },
+    isSuccess: true,
+    isError: false,
+    isLoading: false,
+    isPending: false,
+  }),
+}));
 vi.mock('@/hooks/useMsaLeverage', () => ({
   useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
 }));

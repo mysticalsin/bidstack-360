@@ -1,23 +1,22 @@
 import { titleCase } from './accountUtils';
 
 /**
- * The accounts list reads /crm/dashboard deals (take 100). That array is a
- * page, not the org's book. The caption has to say so whenever the series
- * is drawn from it.
+ * Stage totals from the scoped open-book query. That query is the recorded
+ * book for the accounts in this view, not the dashboard deal page.
  */
-export const ACCOUNT_BOOK_PAGE_CAPTION =
-  'Open stages on the loaded deals in this view. Won and lost stay off these bars. This is a page of deals, not the full book.';
+export const ACCOUNT_BOOK_CAPTION =
+  'Open stages in the recorded open book for accounts in this view. Won and lost stay off these bars.';
 
 /** Same open set as the account list: won and lost are outcomes, other stages stay. */
 const CLOSED_STAGES = new Set(['closed_won', 'closed_lost']);
 
 const STAGE_ORDER = ['new', 'screening', 'meeting', 'proposal', 'customer', 'unspecified'];
 
-export interface AccountBookDeal {
-  companyId: string | null;
+export interface AccountBookStageInput {
   stage: string;
   stageName?: string | null;
-  amountMicros: string;
+  count: number;
+  valueSumMicros: string;
 }
 
 export interface AccountBookStage {
@@ -32,30 +31,30 @@ function microsOf(value: string): bigint {
   return /^\d+$/.test(value) ? BigInt(value) : 0n;
 }
 
-function seriesLabel(deal: AccountBookDeal): string {
-  const named = deal.stageName?.trim();
-  return named && named.length > 0 ? named : titleCase(deal.stage);
+function countOf(value: number): number {
+  return Number.isSafeInteger(value) && value > 0 ? value : 0;
+}
+
+function seriesLabel(stage: string, stageName: string | null | undefined): string {
+  const named = stageName?.trim();
+  return named && named.length > 0 ? named : titleCase(stage);
 }
 
 /**
  * Open stages for the accounts currently in view.
- * A lost or won stage stays out even when its display name still looks open.
- * Deals for companies outside the view are not part of this page.
+ * Amounts are integer micros. A lost or won stage stays out even when its
+ * display name still looks open.
  */
-export function openAccountBookStages(
-  deals: readonly AccountBookDeal[],
-  companyIds: ReadonlySet<string>,
-): AccountBookStage[] {
+export function openAccountBookStages(rows: readonly AccountBookStageInput[]): AccountBookStage[] {
   const grouped = new Map<string, { stage: string; label: string; count: number; amount: bigint }>();
 
-  for (const deal of deals) {
-    if (!deal.companyId || !companyIds.has(deal.companyId)) continue;
-    if (CLOSED_STAGES.has(deal.stage)) continue;
-    const label = seriesLabel(deal);
-    const key = `${deal.stage}\u0000${label}`;
-    const current = grouped.get(key) ?? { stage: deal.stage, label, count: 0, amount: 0n };
-    current.count += 1;
-    current.amount += microsOf(deal.amountMicros);
+  for (const row of rows) {
+    if (CLOSED_STAGES.has(row.stage)) continue;
+    const label = seriesLabel(row.stage, row.stageName);
+    const key = `${row.stage}\u0000${label}`;
+    const current = grouped.get(key) ?? { stage: row.stage, label, count: 0, amount: 0n };
+    current.count += countOf(row.count);
+    current.amount += microsOf(row.valueSumMicros);
     grouped.set(key, current);
   }
 

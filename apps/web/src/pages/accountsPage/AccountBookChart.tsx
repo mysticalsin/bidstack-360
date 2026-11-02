@@ -7,20 +7,39 @@ import { BarYAxis } from '@/components/charts/bar-y-axis';
 import { formatUnspecifiedCompactMicros } from '@/components/dashboard/unspecified-currency';
 import { stageBarShares } from '@/components/dashboard/widgets/pipeline-headline';
 
-import { ACCOUNT_BOOK_PAGE_CAPTION, openAccountBookStages, type AccountBookDeal } from './accountBookSeries';
+import {
+  ACCOUNT_BOOK_CAPTION,
+  openAccountBookStages,
+  type AccountBookStageInput,
+} from './accountBookSeries';
 
-/** Open stages on the loaded account page. Closed outcomes stay off the bars. */
+/** Open stages in the recorded book for the accounts in this view. */
 export function AccountBookChart({
-  deals,
-  companyIds,
+  stages,
+  status,
 }: {
-  deals: readonly AccountBookDeal[];
-  companyIds: ReadonlySet<string>;
+  stages: readonly AccountBookStageInput[];
+  status: 'loading' | 'error' | 'ready';
 }) {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
-  const open = openAccountBookStages(deals, companyIds);
-  const caption = t('accounts.book.pageCaption', ACCOUNT_BOOK_PAGE_CAPTION);
+  if (status === 'loading') {
+    return (
+      <p className="text-xs text-[var(--fg-secondary)]" data-testid="account-book-status">
+        {t('accounts.book.loading', 'Loading the recorded open book for this view.')}
+      </p>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <p className="text-xs text-[var(--fg-secondary)]" role="alert" data-testid="account-book-status">
+        {t('accounts.book.error', "The recorded open book didn't load.")}
+      </p>
+    );
+  }
+
+  const open = openAccountBookStages(stages);
+  const caption = t('accounts.book.caption', ACCOUNT_BOOK_CAPTION);
   const shares = stageBarShares(open);
   const rows = open.map((stage, index) => ({
     stage: stage.label,
@@ -37,7 +56,7 @@ export function AccountBookChart({
       </p>
       {rows.length === 0 ? (
         <p className="text-sm text-[var(--fg-secondary)]">
-          {t('accounts.book.empty', 'No open deals on the loaded page in this view.')}
+          {t('accounts.book.empty', 'No open deals in the recorded open book for this view.')}
         </p>
       ) : (
         <div

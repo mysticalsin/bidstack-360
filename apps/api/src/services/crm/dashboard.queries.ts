@@ -790,7 +790,7 @@ export const OPEN_OPPORTUNITY_SQL = `
  * Same country / territory / owner predicate as applyOpportunityScope.
  * Empty country lists stay owner-only, matching the Prisma scope.
  */
-function opportunityVisibilitySql(scope?: AccessScope): { join: Prisma.Sql; where: Prisma.Sql } {
+export function opportunityVisibilitySql(scope?: AccessScope): { join: Prisma.Sql; where: Prisma.Sql } {
   if (!scope || scope.unrestricted) return { join: Prisma.empty, where: Prisma.empty };
   const variants = countryVariantsForScope(scope);
   const countrySql =

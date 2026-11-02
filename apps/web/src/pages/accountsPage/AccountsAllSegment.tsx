@@ -8,6 +8,7 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { useAccountOpenBook } from '@/hooks/useAccountOpenBook';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
@@ -182,7 +183,14 @@ export function AccountsAllSegment() {
     return [...options].sort();
   }, [allRows]);
 
-  const viewCompanyIds = useMemo(() => new Set(rows.map((row) => row.company.id)), [rows]);
+  const viewCompanyIds = useMemo(
+    () => [...new Set(rows.map((row) => row.company.id).filter((id) => id.trim().length > 0))].sort(),
+    [rows],
+  );
+  // Bars use the scoped open-book aggregate. dashboard.data.deals is capped at 100.
+  const openBook = useAccountOpenBook(viewCompanyIds);
+  const openBookStatus =
+    viewCompanyIds.length === 0 || openBook.isSuccess ? 'ready' : openBook.isError ? 'error' : 'loading';
 
   const topMissingFields = useMemo(() => {
     const counts = new Map<string, number>();
@@ -410,7 +418,7 @@ export function AccountsAllSegment() {
               : t('accounts.experience.complete', 'No coverage gaps in the current view.')}
           </p>
         </div>
-        <AccountBookChart deals={dashboard.data.deals} companyIds={viewCompanyIds} />
+        <AccountBookChart stages={openBook.data?.stages ?? []} status={openBookStatus} />
       </section>
 
       <motion.div
