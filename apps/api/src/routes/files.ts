@@ -32,6 +32,7 @@ import {
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
+import { isRealDataMode } from '../lib/polo-mode.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
@@ -274,9 +275,12 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       // Best-effort + fail-open — a queue/Redis hiccup must never fail the upload.
       // Skipped under NODE_ENV=test so the integration suite keeps asserting
       // explicit extraction control; dev/prod opt in by default.
+      const blockedByRealMode =
+        isRealDataMode() && process.env.DOCUMENT_LLM_EXTRACT_ENABLED !== 'true';
       if (
         accountId &&
         process.env.NODE_ENV !== 'test' &&
+        !blockedByRealMode &&
         isExtractableForIntel(req.body.contentType)
       ) {
         try {
@@ -383,6 +387,17 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         userId: req.auth.userId,
         accountId: row.accountId,
         companyId: row.companyId,
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId.startsWith('apikey:') ? null : req.auth.userId,
+          action: 'file.download',
+          targetType: 'file',
+          targetId: row.id,
+          diff: { name: row.name, contentType: row.contentType },
+        },
       });
 
       const storage = await getStorage();

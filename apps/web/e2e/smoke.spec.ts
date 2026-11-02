@@ -41,6 +41,29 @@ test('agents page is reachable from product routes', async ({ page, gotoAndWait 
   await expect(page.getByRole('heading', { level: 2, name: 'Agents', exact: true })).toBeVisible();
 });
 
+test('enterprise readiness surfaces are reachable in demo mode', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/dashboard');
+  await expect(page.getByRole('status').filter({ hasText: /DEMO MODE/i })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await gotoAndWait('/settings?tab=identity');
+  await expect(page.getByRole('heading', { name: /Login identity/i })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
+
+  await gotoAndWait('/settings?tab=audit-log');
+  await expect(page.getByRole('heading', { name: /Audit log/i }).first()).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await gotoAndWait('/settings?tab=data-import');
+  await expect(page.getByText(/Choose a CSV/i)).toBeVisible({
+    timeout: 10_000,
+  });
+});
+
 test('dark mode toggle persists across reload', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/settings');
   const toggle = page.getByRole('button', { name: /theme|dark|light/i }).first();

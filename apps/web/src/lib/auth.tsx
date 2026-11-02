@@ -31,7 +31,7 @@ import {
 } from 'react';
 
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
+import { api, setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
 
 const ORG_ADMIN_PERMISSION = 'settings:write';
 import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
@@ -456,6 +456,80 @@ class ClerkErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
   }
 }
 
+interface MeIdentity {
+  id: string;
+  email: string | null;
+  name: string | null;
+  role: string;
+}
+
+function CfAccessAuthProvider({ children }: { children: ReactNode }) {
+  const [loaded, setLoaded] = useState(false);
+  const [me, setMe] = useState<MeIdentity | null>(null);
+
+  useState(() => {
+    setApiTokenProvider(null);
+    return null;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const body = await api<MeIdentity>('/api/v1/me');
+        if (!cancelled) setMe(body);
+      } catch {
+        if (!cancelled) setMe(null);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (me) writeSessionMarker(`cf-access:${me.id}`);
+  }, [me]);
+
+  const signIn = useCallback((cb?: () => void) => {
+    cb?.();
+  }, []);
+  const signOut = useCallback((cb?: () => void) => {
+    writeSessionMarker(null);
+    setMe(null);
+    cb?.();
+  }, []);
+
+  const fullName = me?.name ?? null;
+  const [firstName, ...rest] = (fullName ?? '').split(' ');
+  const user: AuthUser | null = me
+    ? {
+        id: me.id,
+        firstName: firstName || null,
+        lastName: rest.join(' ') || null,
+        fullName,
+        primaryEmailAddress: me.email ? { emailAddress: me.email } : null,
+      }
+    : null;
+
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoaded: loaded,
+        isSignedIn: Boolean(me),
+        user,
+        role: me?.role ?? null,
+        signIn,
+        signOut,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
 export function AuthProvider({
   publishableKey,
   children,
@@ -468,6 +542,9 @@ export function AuthProvider({
   // Public demo deployment: no Clerk, no stub — a per-visitor passwordless door.
   if (authMode === 'demo') {
     return <DemoAuthProvider>{children}</DemoAuthProvider>;
+  }
+  if (authMode === 'cf-access') {
+    return <CfAccessAuthProvider>{children}</CfAccessAuthProvider>;
   }
   const forceClerkAuth = authMode === 'clerk';
   if (!hasKey) {

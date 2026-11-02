@@ -7,6 +7,7 @@ import { ProfileSection } from '@/components/settings/ProfileSection';
 import { AppearanceSection } from '@/components/settings/AppearanceSection';
 import { NotificationPrefsSection } from '@/components/settings/NotificationPrefsSection';
 import { SecuritySection } from '@/components/settings/SecuritySection';
+import { IdentitySection } from '@/components/settings/IdentitySection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { CrmConfigurationSection } from '@/components/settings/CrmConfigurationSection';
 import { DataImportSection } from '@/components/settings/DataImportSection';
@@ -36,6 +37,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   notifications: ['sectionNotifications', 'Notifications'],
   security: ['sectionSecurity', 'Profile & Security'],
   workspace: ['sectionWorkspace', 'Workspace'],
+  identity: ['sectionIdentity', 'Identity & roles'],
   crm: ['sectionCrm', 'Data configuration'],
   'data-import': ['sectionDataImport', 'Data import'],
   'top-accounts': ['sectionTopAccounts', 'Top accounts'],
@@ -57,6 +59,7 @@ const SETTINGS_SECTIONS = new Set<SettingsSection>(
 
 const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'serum',
+  'identity',
   'crm',
   'data-import',
   'top-accounts',
@@ -116,6 +119,7 @@ export function SettingsPage() {
       </div>
     ),
     workspace: <WorkspaceSection />,
+    identity: <IdentitySection />,
     crm: <CrmConfigurationSection />,
     'data-import': <DataImportSection />,
     'top-accounts': <TopAccountsSection />,

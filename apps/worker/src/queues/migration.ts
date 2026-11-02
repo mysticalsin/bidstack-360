@@ -35,7 +35,7 @@ import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
 
 // ─── Entity normalization ──────────────────────────────────────────────────
 
-type TargetEntity = 'company' | 'contact' | 'lead' | 'opportunity';
+type TargetEntity = 'company' | 'contact' | 'lead' | 'opportunity' | 'financial';
 
 const ENTITY_ALIASES: Record<string, TargetEntity> = {
   account: 'company',
@@ -50,6 +50,8 @@ const ENTITY_ALIASES: Record<string, TargetEntity> = {
   opportunities: 'opportunity',
   deal: 'opportunity',
   deals: 'opportunity',
+  financial: 'financial',
+  financials: 'financial',
 };
 
 export function normalizeEntity(entityType: string): TargetEntity | null {
@@ -335,6 +337,81 @@ async function writeOpportunity(
   return null;
 }
 
+async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
+  const companyName = asTrimmed(t['financial.companyName']);
+  if (!companyName) throw new Error('financial.companyName is required');
+  const periodEndRaw = asTrimmed(t['financial.periodEnd']);
+  const periodEnd = asDate(periodEndRaw);
+  if (!periodEnd) throw new Error('financial.periodEnd must be an ISO date');
+  const currency = (asTrimmed(t['financial.currency']) ?? 'EUR').toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error('financial.currency must be a 3-letter code');
+  const periodType = (asTrimmed(t['financial.periodType']) ?? 'FY').toUpperCase();
+  if (periodType !== 'FY' && periodType !== 'Q') throw new Error('financial.periodType must be FY or Q');
+  const fiscalYear = asInt(t['financial.fiscalYear']) ?? periodEnd.getUTCFullYear();
+  const company = await prisma.company.findFirst({
+    where: { orgId: ctx.orgId, name: { equals: companyName, mode: 'insensitive' }, deletedAt: null },
+    select: { id: true },
+  });
+  if (!company) throw new Error(`No account named "${companyName}" — import accounts first`);
+
+  const metric = (key: string, concept: string) => {
+    const units = asMicros(t[key]);
+    if (units === null) return undefined;
+    return { value: Number(units) / 1_000_000, concept };
+  };
+  const metrics: Record<string, { value: number; concept: string }> = {};
+  const revenue = metric('financial.revenue', 'manual.revenue');
+  const operatingIncome = metric('financial.operatingIncome', 'manual.operatingIncome');
+  const netIncome = metric('financial.netIncome', 'manual.netIncome');
+  if (revenue) metrics.revenue = revenue;
+  if (operatingIncome) metrics.operatingIncome = operatingIncome;
+  if (netIncome) metrics.netIncome = netIncome;
+  if (!metrics.revenue) throw new Error('financial.revenue is required');
+
+  const existing = await prisma.accountFinancialPeriod.findFirst({
+    where: {
+      orgId: ctx.orgId,
+      companyId: company.id,
+      source: 'manual_import',
+      periodType,
+      periodEnd,
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    if (ctx.dedupStrategy === 'skip') return null;
+    await prisma.accountFinancialPeriod.update({
+      where: { id: existing.id },
+      data: {
+        currency,
+        fiscalYear,
+        periodStart: asDate(t['financial.periodStart']),
+        metrics,
+        sourceUrl: 'manual-import',
+      },
+    });
+    return ctx.dedupStrategy === 'duplicate' ? existing.id : null;
+  }
+
+  const created = await prisma.accountFinancialPeriod.create({
+    data: {
+      orgId: ctx.orgId,
+      companyId: company.id,
+      source: 'manual_import',
+      entityId: company.id,
+      periodType,
+      fiscalYear,
+      periodStart: asDate(t['financial.periodStart']),
+      periodEnd,
+      currency,
+      sourceUrl: 'manual-import',
+      metrics,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 const WRITERS: Record<
   TargetEntity,
   (ctx: WriteCtx, t: Record<string, unknown>) => Promise<string | null>
@@ -343,6 +420,7 @@ const WRITERS: Record<
   contact: writeContact,
   lead: writeLead,
   opportunity: writeOpportunity,
+  financial: writeFinancial,
 };
 
 // ─── HubSpot page fetch ────────────────────────────────────────────────────

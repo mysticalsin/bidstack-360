@@ -132,7 +132,9 @@ export default {
     if (req.headers.get('upgrade') === 'websocket') {
       return new Response('WebSockets are not relayed in the preview', { status: 501 });
     }
-    return env.RELAY.get(env.RELAY.idFromName('box')).fetch(req);
+    const headers = new Headers(req.headers);
+    if (who.email) headers.set('cf-access-authenticated-user-email', String(who.email));
+    return env.RELAY.get(env.RELAY.idFromName('box')).fetch(new Request(req, { headers }));
   },
 };
 

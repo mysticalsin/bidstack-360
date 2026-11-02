@@ -12,6 +12,7 @@
 //
 // HubSpot OAuth + import → migrations-hubspot.routes.ts
 
+import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -29,7 +30,28 @@ import {
   MIGRATION,
 } from '@bidstack/shared';
 
+import { previewImportRows } from '../lib/import-preview.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
+
+const ImportPreviewResponse = z.object({
+  entityType: z.string(),
+  rowCount: z.number().int(),
+  validCount: z.number().int(),
+  invalidCount: z.number().int(),
+  issues: z.array(
+    z.object({
+      row: z.number().int(),
+      field: z.string().nullable(),
+      message: z.string(),
+    }),
+  ),
+  sample: z.array(z.record(z.string())),
+});
+
+const ParsedSpreadsheetResponse = z.object({
+  headers: z.array(z.string()),
+  rows: z.array(z.record(z.string())),
+});
 
 export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   // RBAC: CSV import / mapping / cancel / undo mutate tenant data in bulk —
@@ -197,6 +219,49 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  server.post(
+    '/migrations/preview-csv',
+    {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: {
+        body: z.object({
+          entityType: z.string().min(1),
+          rows: z.array(z.record(z.string())).min(1).max(10_000),
+          mappings: z.record(z.string().nullable()),
+        }),
+        response: { 200: ImportPreviewResponse },
+      },
+    },
+    async (req) => {
+      return previewImportRows(req.body);
+    },
+  );
+
+  server.post(
+    '/migrations/parse-spreadsheet',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        body: z.object({
+          filename: z.string().min(1).max(255),
+          contentBase64: z.string().min(1).max(15_000_000),
+        }),
+        response: { 200: ParsedSpreadsheetResponse },
+      },
+    },
+    async (req) => {
+      const name = req.body.filename.toLowerCase();
+      if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv')) {
+        throw server.httpErrors.badRequest('Only CSV and Excel (.xlsx) files are accepted');
+      }
+      const buf = Buffer.from(req.body.contentBase64, 'base64');
+      if (buf.length > 8 * 1024 * 1024) {
+        throw server.httpErrors.payloadTooLarge('Spreadsheet must be 8 MB or smaller');
+      }
+      return parseSpreadsheetBuffer(buf, name);
+    },
+  );
+
   // ─── Save mappings ─────────────────────────────────────────────────────
 
   server.post(
@@ -328,6 +393,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const contactIds = idsByEntity['contact'] ?? [];
       const companyIds = idsByEntity['company'] ?? [];
       const leadIds = idsByEntity['lead'] ?? [];
+      const financialIds = idsByEntity['financial'] ?? [];
 
       // Children first (FK order): opportunities/contacts reference companies.
       // Skip the delete entirely when there are no audit-tracked ids — Prisma
@@ -361,7 +427,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
               : { source: sourceTag }),
           },
         });
-        const deleted = companies.count + leads.count + contacts.count + opportunities.count;
+        const financials = financialIds.length
+          ? await tx.accountFinancialPeriod.deleteMany({
+              where: { orgId, id: { in: financialIds } },
+            })
+          : { count: 0 };
+        const deleted =
+          companies.count + leads.count + contacts.count + opportunities.count + financials.count;
 
         await tx.migrationJob.update({
           where: { id: req.params.id },
@@ -415,3 +487,41 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 };
+
+function parseSpreadsheetBuffer(
+  buf: Buffer,
+  filename: string,
+): { headers: string[]; rows: Record<string, string>[] } {
+  if (filename.endsWith('.csv')) {
+    const text = buf.toString('utf8');
+    const lines = text.split(/\r?\n/).filter((line) => line.length > 0);
+    const headers = (lines[0] ?? '').split(',').map((h) => h.trim());
+    const rows = lines.slice(1).map((line) => {
+      const cells = line.split(',');
+      const row: Record<string, string> = {};
+      headers.forEach((header, i) => {
+        row[header] = (cells[i] ?? '').trim();
+      });
+      return row;
+    });
+    return { headers, rows: rows.slice(0, 10_000) };
+  }
+
+  const workbook = XLSX.read(buf, { type: 'buffer', cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+  if (!sheet) return { headers: [], rows: [] };
+  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: '',
+    raw: false,
+  });
+  const headers = records[0] ? Object.keys(records[0]) : [];
+  const rows = records.slice(0, 10_000).map((record) => {
+    const row: Record<string, string> = {};
+    for (const header of headers) {
+      row[header] = String(record[header] ?? '').trim();
+    }
+    return row;
+  });
+  return { headers, rows };
+}

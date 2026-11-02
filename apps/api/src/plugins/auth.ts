@@ -16,7 +16,9 @@ import { prisma } from '@bidstack/db';
 
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
 import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
+import { assertPoloAuthBoot, isCfAccessAuthEnabled, isRealDataMode } from '../lib/polo-mode.js';
 import { writeAuthAudit } from './auth-audit.js';
+import { verifyCfAccessAuth } from './cf-access-auth.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
 import { isDemoMode, resolveDemoAuth } from './demo-auth.js';
 
@@ -672,31 +674,24 @@ const plugin: FastifyPluginAsync = fp(
   async (server) => {
     const hasClerkKey = !!process.env.CLERK_SECRET_KEY;
     const demoMode = isDemoMode();
-    // Stub auth is allowed in dev and test only — production must provide a key.
-    // Do NOT default to 'development' — if NODE_ENV is unset, allowStub is false.
-    const allowStub = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    const cfAccess = isCfAccessAuthEnabled();
+    const realMode = isRealDataMode();
 
-    // DEMO_MODE arms a PUBLIC passwordless door — it must never co-exist with real
-    // Clerk auth. Refuse to boot if both are configured.
-    if (demoMode && hasClerkKey) {
-      server.log.error(
-        'AUTH CONFIG ERROR: DEMO_MODE=true and CLERK_SECRET_KEY are mutually exclusive.',
-      );
-      throw new Error('DEMO_MODE cannot run with CLERK_SECRET_KEY set');
-    }
-
-    // Real auth is required unless we're in dev/test stub mode or the explicit
-    // public demo mode.
-    if (!hasClerkKey && !allowStub && !demoMode) {
-      server.log.error(
-        'AUTH CONFIG ERROR: CLERK_SECRET_KEY is missing and NODE_ENV is not development/test. Refusing to start.',
-      );
-      throw new Error('CLERK_SECRET_KEY required in production');
+    try {
+      assertPoloAuthBoot(process.env);
+    } catch (err) {
+      server.log.error({ err }, 'AUTH CONFIG ERROR');
+      throw err;
     }
 
     if (demoMode) {
       server.log.warn(
         'AUTH DEMO MODE — public passwordless sign-in is ENABLED. This is NOT real authentication; use only for the public demo deployment.',
+      );
+    } else if (cfAccess) {
+      server.log.info(
+        { dataMode: realMode ? 'real' : 'demo' },
+        'Cloudflare Access identity mapping enabled',
       );
     } else if (!hasClerkKey) {
       server.log.warn(
@@ -719,6 +714,8 @@ const plugin: FastifyPluginAsync = fp(
 
       if (hasClerkKey) {
         req.auth = await verifyClerkAuth(req);
+      } else if (cfAccess) {
+        req.auth = await verifyCfAccessAuth(req);
       } else if (demoMode) {
         req.auth = await resolveDemoAuth(req);
       } else {

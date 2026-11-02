@@ -57,6 +57,36 @@ export function useMigrationJob(id: string | null) {
   });
 }
 
+export interface ImportPreviewResult {
+  entityType: string;
+  rowCount: number;
+  validCount: number;
+  invalidCount: number;
+  issues: Array<{ row: number; field: string | null; message: string }>;
+  sample: Record<string, string>[];
+}
+
+export function usePreviewCsvImport() {
+  return useMutation({
+    mutationFn: (input: {
+      entityType: string;
+      rows: Record<string, string>[];
+      mappings: Record<string, string | null>;
+    }) =>
+      api<ImportPreviewResult>('/api/migrations/preview-csv', { method: 'POST', body: input }),
+  });
+}
+
+export function useParseSpreadsheet() {
+  return useMutation({
+    mutationFn: (input: { filename: string; contentBase64: string }) =>
+      api<{ headers: string[]; rows: Record<string, string>[] }>('/api/migrations/parse-spreadsheet', {
+        method: 'POST',
+        body: input,
+      }),
+  });
+}
+
 export function useStartCsvImport() {
   const qc = useQueryClient();
   return useMutation({

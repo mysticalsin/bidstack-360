@@ -40,6 +40,9 @@ describe('SettingsLayout', () => {
     const link = screen.getByRole('link', { name: 'Top accounts' });
     expect(link.getAttribute('href')).toBe('/settings?tab=top-accounts');
     expect(link.getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Identity & roles' }).getAttribute('href')).toBe(
+      '/settings?tab=identity',
+    );
   });
 
   it('hides admin links from non-admin users', () => {
