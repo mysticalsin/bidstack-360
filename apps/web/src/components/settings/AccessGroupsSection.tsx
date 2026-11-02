@@ -19,6 +19,8 @@ import {
 import { useUsers } from '@/hooks/useUsers';
 import type { UserGroup } from '@bidstack/shared';
 
+import { accessGroupListCaption } from './access-group-list-caption';
+
 /**
  * M7 — Settings → Access groups (admin).
  * Groups mirror the source systems' (ABC, Opportunity Management) group
@@ -29,7 +31,9 @@ import type { UserGroup } from '@bidstack/shared';
  */
 export function AccessGroupsSection() {
   const { t } = useTranslation('settings');
-  const { data: groups, isLoading, isError, refetch } = useUserGroups();
+  const { data, isLoading, isError, refetch } = useUserGroups();
+  const groups = data?.items ?? [];
+  const pageContinues = Boolean(data?.pageContinues);
   const create = useCreateUserGroup();
   const del = useDeleteUserGroup();
 
@@ -129,7 +133,14 @@ export function AccessGroupsSection() {
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('accessGroups.listHeading', 'Groups')}{' '}
-            <span className="font-normal text-[var(--fg-tertiary)]">({groups?.length ?? 0})</span>
+            <span className="font-normal text-[var(--fg-tertiary)]">
+              {pageContinues
+                ? `(${t(
+                    'accessGroups.listCountPartial',
+                    accessGroupListCaption(groups.length, true),
+                  )})`
+                : `(${groups.length})`}
+            </span>
           </h3>
         </div>
         {isLoading ? (

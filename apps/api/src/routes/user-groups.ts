@@ -81,13 +81,20 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { response: { 200: UserGroupList } },
     },
     async (req) => {
-      const groups = await prisma.userGroup.findMany({
+      // One row past the page is the probe. It is dropped and is not a group total.
+      const ACCESS_GROUP_LIST_PAGE = 100;
+      const loaded = await prisma.userGroup.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         include: GROUP_INCLUDE,
         orderBy: { name: 'asc' },
-        take: 100,
+        take: ACCESS_GROUP_LIST_PAGE + 1,
       });
-      return { items: groups.map(serializeGroup) };
+      const pageContinues = loaded.length > ACCESS_GROUP_LIST_PAGE;
+      const groups = pageContinues ? loaded.slice(0, ACCESS_GROUP_LIST_PAGE) : loaded;
+      return {
+        items: groups.map(serializeGroup),
+        pageContinues,
+      };
     },
   );
 
