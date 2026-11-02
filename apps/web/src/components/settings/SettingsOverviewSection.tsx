@@ -14,6 +14,7 @@ import { useUsersPage } from '@/hooks/useUsers';
 import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
+import { roleListCaption } from './role-list-caption';
 import { tagLibraryCaption } from './tag-library-caption';
 import { USER_OVERVIEW_PAGE, userOverviewCaption } from './user-overview-caption';
 
@@ -51,15 +52,29 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
         ? t('settingsOverview.tileWorkspaceTitle', 'Workspace governance')
         : t('settingsOverview.tilePersonalTitle', 'Personal settings'),
       detail: isAdmin
-        ? users.data?.nextCursor
-          ? t('settingsOverview.tileWorkspaceDetailPartialUsers', '{{users}} / {{roles}} roles', {
-              users: userOverviewCaption(users.data?.items.length ?? 0, true),
-              roles: formatCount(roles.data?.length),
+        ? users.data?.nextCursor && roles.data?.pageContinues
+          ? t('settingsOverview.tileWorkspaceDetailPartialUsersAndRoles', '{{users}} / {{roles}}', {
+              users: userOverviewCaption(users.data.items.length, true),
+              roles: roleListCaption(roles.data.items.length, true),
             })
-          : t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
-              users: formatCount(users.data?.items.length),
-              roles: formatCount(roles.data?.length),
-            })
+          : users.data?.nextCursor
+            ? t('settingsOverview.tileWorkspaceDetailPartialUsers', '{{users}} / {{roles}} roles', {
+                users: userOverviewCaption(users.data?.items.length ?? 0, true),
+                roles: formatCount(roles.data?.items.length),
+              })
+            : roles.data?.pageContinues
+              ? t(
+                  'settingsOverview.tileWorkspaceDetailPartialRoles',
+                  '{{users}} users / {{roles}}',
+                  {
+                    users: formatCount(users.data?.items.length),
+                    roles: roleListCaption(roles.data.items.length, true),
+                  },
+                )
+              : t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
+                  users: formatCount(users.data?.items.length),
+                  roles: formatCount(roles.data?.items.length),
+                })
         : t(
             'settingsOverview.tilePersonalDetail',
             'Profile, security, notifications, appearance, and language',

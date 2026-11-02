@@ -46,6 +46,7 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
   useWebhookSubscriptions: hookMocks.useWebhookSubscriptions,
 }));
 
+import { ROLE_LIST_PAGE } from './role-list-caption';
 import { SettingsOverviewSection } from './SettingsOverviewSection';
 import { USER_OVERVIEW_PAGE } from './user-overview-caption';
 
@@ -95,7 +96,7 @@ describe('SettingsOverviewSection', () => {
       isLoading: false,
     });
     hookMocks.useRoles.mockReturnValue({
-      data: [{ id: 'role-1' }, { id: 'role-2' }],
+      data: { items: [{ id: 'role-1' }, { id: 'role-2' }], pageContinues: false },
       isError: false,
       isLoading: false,
     });
@@ -107,6 +108,7 @@ describe('SettingsOverviewSection', () => {
         `${USER_OVERVIEW_PAGE} in the latest ${USER_OVERVIEW_PAGE}, not every user / 2 roles`,
       ),
     ).toBeTruthy();
+    expect(screen.queryByText(/not every role/i)).toBeNull();
   });
 
   it('keeps the user count when the roster page is shorter than the probe', () => {
@@ -121,7 +123,7 @@ describe('SettingsOverviewSection', () => {
       isLoading: false,
     });
     hookMocks.useRoles.mockReturnValue({
-      data: [{ id: 'role-1' }, { id: 'role-2' }],
+      data: { items: [{ id: 'role-1' }, { id: 'role-2' }], pageContinues: false },
       isError: false,
       isLoading: false,
     });
@@ -130,5 +132,65 @@ describe('SettingsOverviewSection', () => {
 
     expect(screen.getByText('3 users / 2 roles')).toBeTruthy();
     expect(screen.queryByText(/not every user/i)).toBeNull();
+    expect(screen.queryByText(/not every role/i)).toBeNull();
+  });
+
+  it('says the role count is not every role when the role page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useUsersPage.mockReturnValue({
+      data: {
+        items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+        nextCursor: null,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useRoles.mockReturnValue({
+      data: {
+        items: Array.from({ length: ROLE_LIST_PAGE }, (_, index) => ({ id: String(index) })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `3 users / ${ROLE_LIST_PAGE} in the latest ${ROLE_LIST_PAGE}, not every role`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(new RegExp(`${ROLE_LIST_PAGE} roles`))).toBeNull();
+  });
+
+  it('says neither count is the whole set when both pages continue', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useUsersPage.mockReturnValue({
+      data: {
+        items: Array.from({ length: USER_OVERVIEW_PAGE }, (_, index) => ({ id: String(index) })),
+        nextCursor: '00000000-0000-4000-8000-000000000001',
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useRoles.mockReturnValue({
+      data: {
+        items: Array.from({ length: ROLE_LIST_PAGE }, (_, index) => ({ id: String(index) })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `${USER_OVERVIEW_PAGE} in the latest ${USER_OVERVIEW_PAGE}, not every user / ${ROLE_LIST_PAGE} in the latest ${ROLE_LIST_PAGE}, not every role`,
+      ),
+    ).toBeTruthy();
   });
 });
