@@ -47,17 +47,18 @@ export function nameTokens(name: string): string[] {
 }
 
 /**
- * The filer behind a CIK or LEI must be the account, not a namesake: every
- * core word of one name has to appear in the other ("DNB Bank" = "DNB BANK
- * ASA", but "Rush University System for Health" is not "RUSH ENTERPRISES").
+ * The filer behind a CIK or LEI must be this account, not a namesake.
+ * Legal suffixes drop out ("DNB Bank" = "DNB BANK ASA"). A name that only
+ * contains the other ("MAPFRE" inside "MAPFRE MALTA") is a different company
+ * and does not attach the filing.
  */
 export function entityNameMatches(accountName: string, entityName: string): boolean {
   const a = nameTokens(accountName);
   const e = nameTokens(entityName);
-  if (!a.length || !e.length) return false;
-  const es = new Set(e);
-  const as = new Set(a);
-  return a.every((t) => es.has(t)) || e.every((t) => as.has(t));
+  if (a.length === 0 || a.length !== e.length) return false;
+  const left = [...a].sort();
+  const right = [...e].sort();
+  return left.every((token, index) => token === right[index]);
 }
 
 export const padCik = (cik: string | number) => String(cik).replace(/\D/g, '').padStart(10, '0');

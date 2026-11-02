@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { runFinancialsScan, syncFinancialsSchedule } from './scan.js';
@@ -184,7 +186,33 @@ describe('identifier mapping and homonyms', () => {
     expect(entityNameMatches('NOS', 'NOS, SGPS, S.A.')).toBe(true);
     expect(entityNameMatches('CI Financial', 'CI Financial Corp.')).toBe(true);
     expect(entityNameMatches('Rush University System for Health', 'RUSH ENTERPRISES INC')).toBe(false);
-    expect(entityNameMatches('MAPFRE', 'MAPFRE MALTA P.L.C.')).toBe(true); // name alone is ambiguous...
+  });
+
+  it('does not attach a filer because its name contains the account name', () => {
+    // WHY: the filings gate treated one name as the other when every core
+    // word of the shorter name appeared in the longer one. MAPFRE Malta's
+    // statements then landed on MAPFRE, and MAPFRE's statements landed on
+    // MAPFRE Malta. A shared word is not this account.
+    expect(entityNameMatches('MAPFRE', 'MAPFRE MALTA P.L.C.')).toBe(false);
+    expect(entityNameMatches('MAPFRE MALTA', 'MAPFRE S.A.')).toBe(false);
+    expect(entityNameMatches('Acme', 'Acme Staffing')).toBe(false);
+    expect(entityNameMatches('Acme Staffing', 'Acme Corp')).toBe(false);
+    expect(entityNameMatches('Acme', 'Acme')).toBe(true);
+    expect(entityNameMatches('', 'Acme')).toBe(false);
+  });
+
+  it('does not match filings by a name that contains the account name', () => {
+    const src = readFileSync(new URL('./sources.ts', import.meta.url), 'utf8');
+    const start = src.indexOf('export function entityNameMatches');
+    const end = src.indexOf('export const padCik', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const body = src.slice(start, end);
+    // Subset containment (`account tokens ⊆ filer` or the reverse) is the
+    // query that attached a longer name. Equal core words are the match.
+    expect(body).not.toContain('.has(');
+    expect(body).not.toContain('e.every');
+    expect(body).not.toContain('.includes(');
   });
 
   it('...so pulls go by the LEI set on the account, never by name search', async () => {
@@ -321,5 +349,17 @@ describe('tier gating', () => {
     expect(s.pulled[0]).toMatchObject({ status: 'mismatch', periods: 0 });
     expect(f.periods).toHaveLength(0);
     expect(f.profiles[0]).toMatchObject({ status: 'mismatch' });
+  });
+
+  it('does not store a filer whose name only contains the account name', async () => {
+    // WHY: the account filings tile reads whatever this scan stored. A CIK
+    // whose filer name merely contains the account name is another company.
+    const cs: Row[] = [{ id: 'mapfre', orgId: 'o', name: 'MAPFRE', tier: 'key', topAccountRank: null, trackFinancials: false, deletedAt: null }];
+    const f = fakeDb(cs, [{ companyId: 'mapfre', secCik: '0000000001', lei: null }]);
+    const fetchImpl: FinFetch = async () => ({ ok: true, status: 200, json: async () => ({ ...companyFacts, entityName: 'MAPFRE MALTA P.L.C.' }) });
+    const s = await runFinancialsScan({ db: f.db, now, fetchImpl, env: { SEC_USER_AGENT: 'Polo test (ops@example.test)' }, sleep: async () => {} });
+    expect(s.pulled[0]).toMatchObject({ status: 'mismatch', periods: 0 });
+    expect(f.periods).toHaveLength(0);
+    expect(f.events).toHaveLength(0);
   });
 });
