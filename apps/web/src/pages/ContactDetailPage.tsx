@@ -16,13 +16,14 @@ import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNote
 import { formatDate } from '@/lib/format';
 import { storedProbabilityLabel } from '@/lib/stored-probability';
 import { contactOpportunityCaption, dealsForContact } from './contact-deals';
+import { CONTACT_TASK_PAGE_LIMIT, contactTaskCaption, contactTaskEmpty } from './contact-tasks';
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const contact = useContact(id);
   const allOpps = useOpportunities({ limit: 100 });
-  const allTasks = useTasks();
+  const allTasks = useTasks({ limit: CONTACT_TASK_PAGE_LIMIT });
   const allNotes = useNotes(contact.data?.companyId ?? undefined);
 
   if (contact.isLoading) return <DetailPageSkeleton columns={3} cards={3} />;
@@ -57,6 +58,7 @@ export function ContactDetailPage() {
   const c = contact.data;
   const relatedOpps = dealsForContact(allOpps.data?.items ?? [], c.companyId);
   const oppPageContinues = Boolean(allOpps.data?.nextCursor);
+  const taskPageContinues = Boolean(allTasks.data?.nextCursor);
   const relatedTasks =
     allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
   const relatedNotes = c.companyId ? (allNotes.data?.items ?? []) : [];
@@ -210,13 +212,15 @@ export function ContactDetailPage() {
         <Card>
           <SectionHeader
             title={t('contactDetail.tasksTitle', 'Tasks')}
-            caption={t('contactDetail.relatedCount', '{{count}} related', {
-              count: relatedTasks.length,
-            })}
+            caption={t(
+              'contactDetail.taskCaption',
+              contactTaskCaption(relatedTasks.length, taskPageContinues),
+              { count: relatedTasks.length },
+            )}
           />
           {relatedTasks.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
-              {t('contactDetail.noTasks', 'No related tasks.')}
+              {t('contactDetail.taskEmpty', contactTaskEmpty(taskPageContinues))}
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
