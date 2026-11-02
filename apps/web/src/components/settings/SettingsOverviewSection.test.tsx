@@ -51,6 +51,7 @@ import { ROLE_LIST_PAGE } from './role-list-caption';
 import { SettingsOverviewSection } from './SettingsOverviewSection';
 import { STAGE_LIST_PAGE } from './stage-list-caption';
 import { USER_OVERVIEW_PAGE } from './user-overview-caption';
+import { WEBHOOK_LIST_PAGE } from './webhook-list-caption';
 
 function emptyQuery() {
   return { data: undefined, isError: false, isLoading: false };
@@ -331,5 +332,52 @@ describe('SettingsOverviewSection', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/company fields/i)).toBeNull();
+  });
+
+  it('says the webhook count is not every webhook when the webhook page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useWebhookSubscriptions.mockReturnValue({
+      data: {
+        items: Array.from({ length: WEBHOOK_LIST_PAGE }, (_, index) => ({
+          id: String(index),
+          active: true,
+          failureCount: 0,
+        })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `${WEBHOOK_LIST_PAGE} active / 0 failing. ${WEBHOOK_LIST_PAGE} in the latest ${WEBHOOK_LIST_PAGE}, not every webhook`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(`${WEBHOOK_LIST_PAGE} active / 0 failing`)).toBeNull();
+  });
+
+  it('keeps the webhook counts when the webhook page is shorter than the probe', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useWebhookSubscriptions.mockReturnValue({
+      data: {
+        items: [
+          { id: 'wh-1', active: true, failureCount: 0 },
+          { id: 'wh-2', active: false, failureCount: 2 },
+        ],
+        pageContinues: false,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('1 active / 1 failing')).toBeTruthy();
+    expect(screen.queryByText(/not every webhook/i)).toBeNull();
   });
 });

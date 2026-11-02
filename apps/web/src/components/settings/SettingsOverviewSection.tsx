@@ -19,6 +19,7 @@ import { roleListCaption } from './role-list-caption';
 import { stageListCaption } from './stage-list-caption';
 import { tagLibraryCaption } from './tag-library-caption';
 import { USER_OVERVIEW_PAGE, userOverviewCaption } from './user-overview-caption';
+import { webhookListCaption } from './webhook-list-caption';
 
 interface Props {
   onNavigate: (section: SettingsSection) => void;
@@ -47,6 +48,9 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
   const pipelineStages = usePipelineStages({ enabled: isAdmin });
   const apiKeys = useApiKeys({ enabled: isAdmin });
   const webhooks = useWebhookSubscriptions({ enabled: isAdmin });
+  const webhookItems = webhooks.data?.items ?? [];
+  const webhookActive = webhookItems.filter((webhook) => webhook.active).length;
+  const webhookFailing = webhookItems.filter((webhook) => webhook.failureCount > 0).length;
 
   const tiles: OverviewTileModel[] = [
     {
@@ -178,10 +182,21 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileWebhookTitle', 'Webhook delivery'),
-      detail: t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
-        active: formatCount((webhooks.data ?? []).filter((w) => w.active).length),
-        failing: formatCount((webhooks.data ?? []).filter((w) => w.failureCount > 0).length),
-      }),
+      detail:
+        webhooks.data && webhooks.data.pageContinues
+          ? t(
+              'settingsOverview.tileWebhookDetailPartial',
+              '{{active}} active / {{failing}} failing. {{drawn}}',
+              {
+                active: formatCount(webhookActive),
+                failing: formatCount(webhookFailing),
+                drawn: webhookListCaption(webhooks.data.items.length, true),
+              },
+            )
+          : t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
+              active: formatCount(webhookActive),
+              failing: formatCount(webhookFailing),
+            }),
       tone: webhooks.isError ? 'tomato' : 'purple',
       icon: 'webhook' as const,
       section: 'webhooks' as const,

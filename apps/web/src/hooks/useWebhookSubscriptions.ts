@@ -16,6 +16,12 @@ export interface WebhookCreatedSub extends WebhookSub {
   signingSecret: string;
 }
 
+export interface WebhookSubscriptionList {
+  items: WebhookSub[];
+  /** True when one subscription past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+}
+
 export interface WebhookDeliveryRecord {
   id: string;
   event: string;
@@ -30,7 +36,8 @@ export interface WebhookDeliveryRecord {
 export function useWebhookSubscriptions(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['webhook-subscriptions'],
-    queryFn: ({ signal }) => api<WebhookSub[]>('/api/v1/webhook-subscriptions', { signal }),
+    queryFn: ({ signal }) =>
+      api<WebhookSubscriptionList>('/api/v1/webhook-subscriptions', { signal }),
     enabled: options?.enabled ?? true,
   });
 }

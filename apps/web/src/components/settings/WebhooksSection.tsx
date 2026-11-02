@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
 import { useIsAdmin } from '@/lib/auth';
+import { webhookListCaption } from './webhook-list-caption';
 
 interface CreatedSecret {
   url: string;
@@ -38,7 +39,9 @@ export function WebhooksSection() {
   const [createdSecret, setCreatedSecret] = useState<CreatedSecret | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const metrics = useMemo(() => buildWebhookMetrics(subs.data ?? []), [subs.data]);
+  const metrics = useMemo(() => buildWebhookMetrics(subs.data?.items ?? []), [subs.data]);
+  const drawnCaption =
+    subs.data && subs.data.pageContinues ? webhookListCaption(subs.data.items.length, true) : null;
 
   if (!isAdmin) {
     return <AdminOnlyNotice />;
@@ -54,7 +57,10 @@ export function WebhooksSection() {
               {t('webhooks.controlPlaneBadge', 'Admin webhook control plane')}
             </div>
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
-              {t('webhooks.heroTitle', 'Deliver trusted platform events to every downstream system.')}
+              {t(
+                'webhooks.heroTitle',
+                'Deliver trusted platform events to every downstream system.',
+              )}
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
               {t(
@@ -85,7 +91,7 @@ export function WebhooksSection() {
 
           <div className="grid grid-cols-2 gap-3">
             <MetricCard
-              label={t('webhooks.metricTotal', 'Total')}
+              label={drawnCaption ?? t('webhooks.metricTotal', 'Total')}
               value={metrics.total}
               icon="webhook"
               tone="blue"
@@ -155,6 +161,9 @@ export function WebhooksSection() {
             <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
               {t('webhooks.subscriptionsTitle', 'Webhook subscriptions')}
             </h2>
+            {drawnCaption ? (
+              <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{drawnCaption}</p>
+            ) : null}
             <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
               {metrics.lastActivity
                 ? t('webhooks.lastActivity', 'Last activity {{time}}', {
@@ -189,7 +198,7 @@ export function WebhooksSection() {
               }
             />
           </div>
-        ) : !subs.data || subs.data.length === 0 ? (
+        ) : !subs.data || subs.data.items.length === 0 ? (
           <div className="p-5">
             <EmptyState
               title={t('webhooks.emptyTitle', 'No subscriptions yet')}
@@ -207,7 +216,7 @@ export function WebhooksSection() {
           </div>
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
-            {subs.data.map((sub) => (
+            {subs.data.items.map((sub) => (
               <SubscriptionRow
                 key={sub.id}
                 subscription={sub}
@@ -283,7 +292,9 @@ function MetricCard({
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-[var(--fg-secondary)]">{label}</span>
+        <span className="min-w-0 text-xs font-medium leading-4 text-[var(--fg-secondary)]">
+          {label}
+        </span>
         <span className="text-[var(--brand-primary)]">
           <Icon name={icon} size={15} />
         </span>
@@ -362,7 +373,10 @@ function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
               toast.success(t('webhooks.toastSecretCopied', 'Signing secret copied'));
             } catch {
               toast.error(t('webhooks.toastCopyFailed', 'Copy failed'), {
-                description: t('webhooks.copyFailedDescription', 'Clipboard access was not available.'),
+                description: t(
+                  'webhooks.copyFailedDescription',
+                  'Clipboard access was not available.',
+                ),
               });
             }
           }}
@@ -444,7 +458,8 @@ function SubscriptionRow({
       }
     } catch (err) {
       toast.error(t('webhooks.toastPingError', 'Ping error'), {
-        description: err instanceof Error ? err.message : t('webhooks.unknownError', 'Unknown error'),
+        description:
+          err instanceof Error ? err.message : t('webhooks.unknownError', 'Unknown error'),
       });
     }
   };

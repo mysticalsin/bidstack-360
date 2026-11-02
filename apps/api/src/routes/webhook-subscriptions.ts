@@ -69,9 +69,7 @@ function webhookSubscriptionAuditData(args: {
   orgId: string;
   userId: string;
   action:
-    | 'webhook_subscription.create'
-    | 'webhook_subscription.update'
-    | 'webhook_subscription.delete';
+    'webhook_subscription.create' | 'webhook_subscription.update' | 'webhook_subscription.delete';
   subscriptionId: string;
   diff?: Prisma.InputJsonValue;
 }): Prisma.AuditLogCreateInput {
@@ -91,14 +89,21 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     {
       preHandler: server.requirePermission('webhooks:read'),
       schema: {
-        response: { 200: z.array(WebhookSub) },
+        response: {
+          200: z.object({
+            items: z.array(WebhookSub),
+            pageContinues: z.boolean(),
+          }),
+        },
       },
     },
     async (req) => {
-      const rows = await prisma.webhookSubscription.findMany({
+      // One row past the page is the probe. It is dropped and is not a webhook total.
+      const WEBHOOK_LIST_PAGE = 500;
+      const loaded = await prisma.webhookSubscription.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        take: 500,
+        take: WEBHOOK_LIST_PAGE + 1,
         select: {
           id: true,
           url: true,
@@ -110,16 +115,21 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
           createdAt: true,
         },
       });
-      return rows.map((s) => ({
-        id: s.id,
-        url: s.url,
-        events: s.events,
-        active: s.active,
-        failureCount: s.failureCount,
-        lastDeliveryAt: s.lastDeliveryAt?.toISOString() ?? null,
-        lastFailureAt: s.lastFailureAt?.toISOString() ?? null,
-        createdAt: s.createdAt.toISOString(),
-      }));
+      const pageContinues = loaded.length > WEBHOOK_LIST_PAGE;
+      const rows = pageContinues ? loaded.slice(0, WEBHOOK_LIST_PAGE) : loaded;
+      return {
+        pageContinues,
+        items: rows.map((s) => ({
+          id: s.id,
+          url: s.url,
+          events: s.events,
+          active: s.active,
+          failureCount: s.failureCount,
+          lastDeliveryAt: s.lastDeliveryAt?.toISOString() ?? null,
+          lastFailureAt: s.lastFailureAt?.toISOString() ?? null,
+          createdAt: s.createdAt.toISOString(),
+        })),
+      };
     },
   );
 
