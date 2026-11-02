@@ -15,8 +15,9 @@ import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { formatMicrosAmount } from '@bidstack/shared';
 import { springSoft } from '@/lib/motion';
 
+import { AccountBookChart } from './AccountBookChart';
 import { AccountCard } from './AccountCard';
-import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
+import { FilterRow, FilterSelect, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
   deriveAccount,
@@ -181,19 +182,7 @@ export function AccountsAllSegment() {
     return [...options].sort();
   }, [allRows]);
 
-  const healthDistribution = useMemo(
-    () => [
-      { key: 'strong', label: t('accounts.health.strong', 'Strong, proxy'), count: rows.filter((row) => row.health === 'strong').length },
-      { key: 'good', label: t('accounts.health.good', 'Good, proxy'), count: rows.filter((row) => row.health === 'good').length },
-      {
-        key: 'needs_attention',
-        label: t('accounts.health.watch', 'Watch, proxy'),
-        count: rows.filter((row) => row.health === 'needs_attention').length,
-      },
-      { key: 'critical', label: t('accounts.health.risk', 'At risk, proxy'), count: rows.filter((row) => row.health === 'critical').length },
-    ],
-    [rows, t],
-  );
+  const viewCompanyIds = useMemo(() => new Set(rows.map((row) => row.company.id)), [rows]);
 
   const topMissingFields = useMemo(() => {
     const counts = new Map<string, number>();
@@ -405,41 +394,24 @@ export function AccountsAllSegment() {
         />
       </section>
 
-      <InsightPanel
-        ariaLabel={t('accounts.experience.regionLabel', 'Portfolio cockpit')}
-        eyebrow={t('accounts.experience.eyebrow', 'Portfolio cockpit')}
-        heading={t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}
-        sub={
-          topMissingFields.length > 0
-            ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
-                gaps: topMissingFields.map(([name, count]) => `${name} (${count})`).join(', '),
-              })
-            : t('accounts.experience.complete', 'No coverage gaps in the current view.')
-        }
-      >
-        <p className="mb-3 text-xs text-[var(--fg-secondary)]">
-          {t(
-            'accounts.health.basis',
-            'Bands follow weighted pipeline size on accounts in this view, not a measured health score.',
-          )}
-        </p>
-        <div className="account-health-bars">
-          {healthDistribution.map((item) => {
-            const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
-            return (
-              <div key={item.key} className={`account-health-bar account-health-${item.key}`}>
-                <div>
-                  <span>{item.label}</span>
-                  <strong>{item.count}</strong>
-                </div>
-                <span aria-hidden>
-                  <i style={{ width }} />
-                </span>
-              </div>
-            );
-          })}
+      <section aria-label={t('accounts.experience.regionLabel', 'Portfolio cockpit')} className="grid gap-2">
+        <div>
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t('accounts.experience.eyebrow', 'Portfolio cockpit')}
+          </p>
+          <h2 className="mt-2 text-lg font-medium text-[var(--fg-primary)]">
+            {t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}
+          </h2>
+          <p className="mt-2 text-sm text-[var(--fg-secondary)]">
+            {topMissingFields.length > 0
+              ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
+                  gaps: topMissingFields.map(([name, count]) => `${name} (${count})`).join(', '),
+                })
+              : t('accounts.experience.complete', 'No coverage gaps in the current view.')}
+          </p>
         </div>
-      </InsightPanel>
+        <AccountBookChart deals={dashboard.data.deals} companyIds={viewCompanyIds} />
+      </section>
 
       <motion.div
         className="space-y-3"
