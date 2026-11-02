@@ -79,7 +79,7 @@ function daysBetween(a: Date, b: Date): number {
 }
 
 function daysSince(d: Date | null | undefined, now = new Date()): number {
-  if (!d) return 0;
+  if (!d) return 999;
   return daysBetween(d, now);
 }
 
@@ -112,9 +112,9 @@ function companySizeBucket(size: string | null | undefined): number {
 /**
  * Email domain → rough age proxy bucket.
  * WHY bucketed not exact: we don't do live WHOIS lookups; instead we map
- * well-known domain roots to an age class. An unknown domain is not a medium age.
- *   0 = not recognized
+ * well-known domain roots to an age class. Unknown → 2 (neutral).
  *   1 = very new (<3y) — disposable/startup signals
+ *   2 = medium  (3-15y)
  *   3 = established (>15y) — enterprise signals
  */
 const ESTABLISHED_DOMAINS = new Set([
@@ -125,11 +125,11 @@ const ESTABLISHED_DOMAINS = new Set([
 const NEW_DOMAIN_TLDS = ['.io', '.ai', '.xyz', '.app', '.dev'];
 
 function emailDomainAgeBucket(email: string | null | undefined): number {
-  if (!email) return 0;
+  if (!email) return 2;
   const domain = email.split('@')[1]?.toLowerCase() ?? '';
   if (ESTABLISHED_DOMAINS.has(domain)) return 3;
   if (NEW_DOMAIN_TLDS.some((tld) => domain.endsWith(tld))) return 1;
-  return 0;
+  return 2;
 }
 
 // ─── Lead feature extraction ──────────────────────────────────────────────
@@ -229,7 +229,6 @@ export async function extractLeadFeatures(
     const val = (intel[field] as string | undefined) ?? 'unknown';
     push(`bant_${field}`, bantMap[val] ?? 0);
   }
-  push('activity_recency_observed', lastActivityDate ? 1 : 0);
 
   return { names, values };
 }
@@ -258,7 +257,7 @@ export async function extractOpportunityFeatures(
       updatedAt: true,
       ownerId: true,
       pipelineStage: {
-        select: { name: true, probability: true, isWon: true, isLost: true, deletedAt: true },
+        select: { name: true, probability: true, isWon: true, isLost: true },
       },
       _count: { select: { contactLinks: true } },
       intel: true,
@@ -287,8 +286,7 @@ export async function extractOpportunityFeatures(
   const lastStageChangeDate = stageChanges[0]?.occurredAt ?? opp.createdAt;
 
   // Owner win rate last 90d (closed won / total closed)
-  let ownerCloseRate = 0;
-  let ownerCloseRateObserved = 0;
+  let ownerCloseRate = 0.5; // neutral default
   if (opp.ownerId) {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 86_400_000);
     const [won, lost] = await Promise.all([
@@ -298,16 +296,7 @@ export async function extractOpportunityFeatures(
           ownerId: opp.ownerId,
           deletedAt: null,
           updatedAt: { gte: ninetyDaysAgo },
-          NOT: {
-            OR: [
-              { stage: 'closed_lost' },
-              { pipelineStage: { is: { deletedAt: null, isLost: true } } },
-            ],
-          },
-          OR: [
-            { stage: 'closed_won' },
-            { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
-          ],
+          pipelineStage: { isWon: true },
         },
       }),
       db.opportunity.count({
@@ -316,23 +305,17 @@ export async function extractOpportunityFeatures(
           ownerId: opp.ownerId,
           deletedAt: null,
           updatedAt: { gte: ninetyDaysAgo },
-          OR: [
-            { stage: 'closed_lost' },
-            { pipelineStage: { is: { deletedAt: null, isLost: true } } },
-          ],
+          pipelineStage: { isLost: true },
         },
       }),
     ]);
     const total = won + lost;
-    if (total > 0) {
-      ownerCloseRate = won / total;
-      ownerCloseRateObserved = 1;
-    }
+    ownerCloseRate = total > 0 ? won / total : 0.5;
   }
 
-  // A missing qualification score is not a midpoint.
+  // Qualification score from intel blob (may be set by W8-4)
   const intel = (opp.intel ?? {}) as Record<string, unknown>;
-  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : null;
+  const qualScore = typeof intel.qualificationScore === 'number' ? intel.qualificationScore : 50;
 
   // ── Build vector ───────────────────────────────────────────────────────
   const names: string[] = [];
@@ -348,13 +331,12 @@ export async function extractOpportunityFeatures(
   push('log_value_micros', valueMicros > 0 ? Math.log10(valueMicros) : 0);
 
   // Stage probability from pipeline (if set)
-  const stage = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
-  push('stage_probability', Number(stage?.probability ?? opp.probability) / 100);
+  push('stage_probability', Number(opp.pipelineStage?.probability ?? opp.probability) / 100);
 
   // Time-based features
   push('days_in_current_stage', daysBetween(lastStageChangeDate, now));
   push('total_age_days', daysBetween(opp.createdAt, now));
-  push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 0);
+  push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 365);
 
   // Relationship features
   push('num_contacts_on_account', opp._count.contactLinks);
@@ -366,17 +348,11 @@ export async function extractOpportunityFeatures(
   push('owner_close_rate_last_90d', ownerCloseRate);
 
   // Qualification score (0-100 → 0-1)
-  push('qualification_score_norm', qualScore == null ? 0 : qualScore / 100);
+  push('qualification_score_norm', qualScore / 100);
 
   // Is won / is lost (these are present in historical training only)
-  const lost = opp.stage === 'closed_lost' || stage?.isLost === true;
-  const won = !lost && (opp.stage === 'closed_won' || stage?.isWon === true);
-  push('is_won', won ? 1 : 0);
-  push('is_lost', lost ? 1 : 0);
-  push('owner_close_rate_observed', ownerCloseRateObserved);
-  push('qualification_score_observed', qualScore == null ? 0 : 1);
-  push('days_to_expected_close_observed', opp.dueDate ? 1 : 0);
-  push('last_activity_observed', lastActivity?.occurredAt ? 1 : 0);
+  push('is_won', opp.pipelineStage?.isWon ? 1 : 0);
+  push('is_lost', opp.pipelineStage?.isLost ? 1 : 0);
 
   return { names, values };
 }

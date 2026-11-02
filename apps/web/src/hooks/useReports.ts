@@ -2,13 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export interface PipelineReport {
-  byStage: { stage: string; count: number; valueSum: number; valueSumMicros?: string }[];
+  byStage: { stage: string; count: number; valueSum: number }[];
   totalOpen: number;
   totalValueOpen: number;
-  totalValueOpenMicros?: string;
   weightedPipeline: number;
-  weightedPipelineMicros?: string;
-  velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
+  velocity: { avgDaysOpen: number; closedThisQuarter: number };
 }
 
 export interface LeadReport {
@@ -16,8 +14,8 @@ export interface LeadReport {
   bySource: { source: string; count: number }[];
   total: number;
   converted: number;
-  conversionRate: number | null;
-  avgScore: number | null;
+  conversionRate: number;
+  avgScore: number;
 }
 
 export interface ServiceDeskReport {

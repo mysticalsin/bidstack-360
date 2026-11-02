@@ -119,7 +119,10 @@ paths = [
   '''(^|/)apps/api/src/security/penetration\.test\.ts$''',
   '''(^|/)apps/api/src/plugins/auth\.test\.ts$''',
   '''(^|/)apps/api/src/routes/webhooks\.integration\.test\.ts$''',
+  '''(^|/)apps/api/src/routes/data-provider-credentials\.integration\.test\.ts$''',
   '''(^|/)packages/db/src/pii-field-encryption\.integration\.test\.ts$''',
+  '''(^|/)apps/web/src/components/bid/BidGovernancePanel\.tsx$''',
+  '''(^|/)apps/web/src/pages/bidNoBid/BidClassificationPanel\.tsx$''',
   '''\.md$''',
 ]
 # Common documentation strings that look like keys but aren't.
@@ -127,4 +130,6 @@ regexes = [
   '''EXAMPLE-KEY-DO-NOT-USE''',
   '''your[-_]?api[-_]?key[-_]?here''',
   '''xxxxxxxxxxxxxxxxxxxx''',
+  # 32-byte hex AES test fixture used by integration suites (not a live secret).
+  '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef''',
 ]

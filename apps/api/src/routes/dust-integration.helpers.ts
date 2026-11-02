@@ -4,13 +4,12 @@
 
 import { type z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Opportunity } from '@bidstack/db';
 
 import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.js';
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
-import { formatMicrosAmount, presentOpportunityIntel } from '@bidstack/shared';
 import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 import {
   type DustStatusPayload,
@@ -120,7 +119,6 @@ async function buildDustStatus(
       where: {
         orgId,
         source: 'dust.poll',
-        eventType: 'poll.completed',
         receivedAt: { gte: since },
       },
     }),
@@ -136,7 +134,7 @@ async function buildDustStatus(
       orderBy: { receivedAt: 'desc' },
     }),
     prisma.syncEvent.findFirst({
-      where: { orgId, source: 'dust.poll', eventType: 'poll.completed', status: 'processed' },
+      where: { orgId, source: 'dust.poll', status: 'processed' },
       orderBy: { receivedAt: 'desc' },
     }),
     listDustAgents(orgId, log),
@@ -146,7 +144,6 @@ async function buildDustStatus(
 
   return {
     workspace: creds?.workspaceId ?? 'Not configured',
-    // tick.stub is a local "not configured" heartbeat. It is not a Dust pull.
     lastSyncAt: lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
     // This handler does not probe Dust. A next-sync timestamp would advertise
     // a live schedule, including the local stub tick.
@@ -320,7 +317,6 @@ export function buildIntegrationSetupGuide() {
       configured: Boolean(envString('DUST_API_KEY') && workspaceId),
       workspaceId,
       dataSourceConfigured: Boolean(envString('DUST_DATA_SOURCE_ID')),
-      spaceConfigured: Boolean(envString('DUST_SPACE_ID')),
       webhookReceiverUrl: receiverUrl,
     },
     mcp: {
@@ -362,21 +358,13 @@ export function buildIntegrationSetupGuide() {
 
 // Opportunity serialization
 
-export function serializeOpportunityToMarkdown(opp: {
-  name: string;
-  code: string;
-  customer: string;
-  stage: string;
-  valueMicros: bigint | number | unknown;
-  probability: number;
-  dueDate: Date | null;
-  industry: string | null;
-  intel: unknown;
-}): string {
+export function serializeOpportunityToMarkdown(opp: Opportunity): string {
   const value =
-    typeof opp.valueMicros === 'bigint' || typeof opp.valueMicros === 'number'
-      ? formatMicrosAmount(opp.valueMicros)
-      : String(opp.valueMicros);
+    typeof opp.valueMicros === 'bigint'
+      ? (Number(opp.valueMicros) / 1_000_000).toString()
+      : typeof opp.valueMicros === 'number'
+        ? (opp.valueMicros / 1_000_000).toString()
+        : String(opp.valueMicros);
 
   return [
     `# ${opp.name}`,
@@ -384,15 +372,15 @@ export function serializeOpportunityToMarkdown(opp: {
     `- **Code:** ${opp.code}`,
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
-    `- **Value (currency not recorded):** ${value}`,
-    `- **Stored probability:** ${opp.probability === 0 ? 'not recorded' : `${opp.probability}%`}`,
+    `- **Value (EUR):** ${value}`,
+    `- **Probability:** ${opp.probability}%`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
     ``,
     `## Intel`,
     ``,
     '```json',
-    JSON.stringify(presentOpportunityIntel(opp.intel), null, 2),
+    JSON.stringify(opp.intel, null, 2),
     '```',
   ].join('\n');
 }

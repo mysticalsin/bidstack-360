@@ -79,12 +79,12 @@ export function resolveStageProbability(
 /** Manual "commit" forecast row as read from the DB (pre-currency-filter). */
 export interface ManualCommitRow {
   period: string;
-  amountMicros: number | bigint | string;
+  amountMicros: number | bigint;
   currency: string;
 }
 
 export interface ManualCommitAggregation {
-  byPeriod: Map<string, bigint>;
+  byPeriod: Map<string, number>;
   /** Rows excluded because their currency didn't match the reporting currency. */
   excludedCount: number;
 }
@@ -96,29 +96,18 @@ export interface ManualCommitAggregation {
  * silently misstate the number — so non-matching rows are excluded and
  * counted for the caller to log (exclusion should never be silent).
  */
-/** EUR here is the old form default, not a chosen euro amount. */
-export function isUnspecifiedForecastCurrency(currency: string): boolean {
-  return currency === 'XXX' || currency === 'EUR';
-}
-
 export function aggregateManualCommit(
   rows: ManualCommitRow[],
   reportingCurrency: string,
 ): ManualCommitAggregation {
-  const matches = (currency: string) =>
-    reportingCurrency === 'XXX'
-      ? isUnspecifiedForecastCurrency(currency)
-      : currency === reportingCurrency;
-  const byPeriod = new Map<string, bigint>();
+  const byPeriod = new Map<string, number>();
   let excludedCount = 0;
   for (const row of rows) {
-    if (!matches(row.currency)) {
+    if (row.currency !== reportingCurrency) {
       excludedCount += 1;
       continue;
     }
-    const amount =
-      typeof row.amountMicros === 'bigint' ? row.amountMicros : BigInt(row.amountMicros);
-    byPeriod.set(row.period, (byPeriod.get(row.period) ?? 0n) + amount);
+    byPeriod.set(row.period, (byPeriod.get(row.period) ?? 0) + Number(row.amountMicros));
   }
   return { byPeriod, excludedCount };
 }
@@ -129,44 +118,30 @@ export interface ProjectionRow {
   ownerId: string | null;
   ownerName: string | null;
   stage: OpportunityStage;
-  /** Live linked stage probability. Null means the deal has no live stage row. */
-  stageProbability?: number | string | null;
   valueMicros: string; // numeric SUM serialized as string by the driver
-}
-
-/** Linked stage probability wins, including 0. A missing link uses the key map. */
-export function probabilityForRow(row: ProjectionRow, stageProbabilities: Map<string, number>): number {
-  if (row.stageProbability != null && row.stageProbability !== '') {
-    const n = Number(row.stageProbability);
-    if (Number.isFinite(n)) return n;
-  }
-  return resolveStageProbability(row.stage, stageProbabilities);
 }
 
 interface OwnerAccumulator {
   ownerId: string | null;
   ownerName: string;
-  openMicros: bigint;
-  weightedMicros: bigint;
-  wonMicros: bigint;
+  openMicros: number;
+  weightedMicros: number;
+  wonMicros: number;
 }
 
 function emptyOwner(ownerId: string | null, ownerName: string): OwnerAccumulator {
-  return { ownerId, ownerName, openMicros: 0n, weightedMicros: 0n, wonMicros: 0n };
+  return { ownerId, ownerName, openMicros: 0, weightedMicros: 0, wonMicros: 0 };
 }
 
 function applyRow(owner: OwnerAccumulator, row: ProjectionRow, probability: number): void {
-  const value = BigInt(row.valueMicros);
+  const value = Number(row.valueMicros);
   if (row.stage === 'closed_won') {
     // Won is a date-anchored actual — never part of open/weighted pipeline.
     owner.wonMicros += value;
     return;
   }
   owner.openMicros += value;
-  // Integer percent. A fractional stage probability truncates; it must not throw
-  // and take the forecast response down.
-  const percent = BigInt(Math.trunc(Number.isFinite(probability) ? probability : 0));
-  owner.weightedMicros += (value * percent) / 100n;
+  owner.weightedMicros += (value * probability) / 100;
 }
 
 /**
@@ -178,7 +153,7 @@ export function aggregateProjection(
   rows: ProjectionRow[],
   window: ProjectionWindow,
   stageProbabilities: Map<string, number>,
-  manualCommitByPeriod: Map<string, bigint>,
+  manualCommitByPeriod: Map<string, number>,
 ): ForecastProjectionPeriod[] {
   const owners = new Map<string, Map<string, OwnerAccumulator>>();
   for (const period of window.periods) owners.set(period, new Map());
@@ -193,7 +168,7 @@ export function aggregateProjection(
       owner = emptyOwner(row.ownerId, row.ownerName ?? UNASSIGNED);
       periodOwners.set(ownerKey, owner);
     }
-    applyRow(owner, row, probabilityForRow(row, stageProbabilities));
+    applyRow(owner, row, resolveStageProbability(row.stage, stageProbabilities));
   }
 
   return window.periods.map((period) => buildPeriod(period, owners.get(period)!, manualCommitByPeriod));
@@ -202,28 +177,26 @@ export function aggregateProjection(
 function buildPeriod(
   period: string,
   periodOwners: Map<string, OwnerAccumulator>,
-  manualCommitByPeriod: Map<string, bigint>,
+  manualCommitByPeriod: Map<string, number>,
 ): ForecastProjectionPeriod {
   const byOwner: ForecastProjectionOwner[] = [...periodOwners.values()]
-    .sort((a, b) => (a.weightedMicros > b.weightedMicros ? -1 : a.weightedMicros < b.weightedMicros ? 1 : 0))
     .map((o) => ({
       ownerId: o.ownerId,
       ownerName: o.ownerName,
-      openMicros: o.openMicros.toString(),
-      weightedMicros: o.weightedMicros.toString(),
-      wonMicros: o.wonMicros.toString(),
-    }));
+      openMicros: Math.round(o.openMicros),
+      weightedMicros: Math.round(o.weightedMicros),
+      wonMicros: Math.round(o.wonMicros),
+    }))
+    .sort((a, b) => b.weightedMicros - a.weightedMicros);
 
   const manual = manualCommitByPeriod.get(period);
-  const sum = (pick: (owner: OwnerAccumulator) => bigint) =>
-    [...periodOwners.values()].reduce((total, owner) => total + pick(owner), 0n).toString();
   return {
     period,
     label: quarterLabel(period),
-    openMicros: sum((owner) => owner.openMicros),
-    weightedMicros: sum((owner) => owner.weightedMicros),
-    wonMicros: sum((owner) => owner.wonMicros),
-    manualCommitMicros: manual != null ? manual.toString() : null,
+    openMicros: byOwner.reduce((s, o) => s + o.openMicros, 0),
+    weightedMicros: byOwner.reduce((s, o) => s + o.weightedMicros, 0),
+    wonMicros: byOwner.reduce((s, o) => s + o.wonMicros, 0),
+    manualCommitMicros: manual ?? null,
     byOwner,
   };
 }

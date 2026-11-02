@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { DialogContent } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { unitsTextToMicros, type Forecast } from '@bidstack/shared';
+import type { Forecast } from '@bidstack/shared';
 
 import { CATEGORIES, CATEGORY_LABELS } from './forecastsConfig';
 
@@ -20,7 +20,7 @@ interface NewForecastDialogProps {
   onSubmit: (body: {
     period: string;
     ownerId: string;
-    amounts: Record<Forecast['category'], string>;
+    amounts: Record<Forecast['category'], number>;
   }) => void;
   isPending: boolean;
 }
@@ -47,10 +47,7 @@ export function NewForecastDialogContent({
     // gating Save here turns a silent 400 into a clear "pick an owner first".
     ownerId.trim().length > 0 &&
     !isPending &&
-    Object.values(amounts).some((v) => {
-      const micros = unitsTextToMicros(v);
-      return micros != null && micros > 0n;
-    });
+    Object.values(amounts).some((v) => v.trim().length > 0 && Number(v) > 0);
 
   return (
     <DialogContent
@@ -79,8 +76,8 @@ export function NewForecastDialogContent({
             <Input
               key={cat}
               label={CATEGORY_LABELS[cat]}
-              type="text"
-              inputMode="decimal"
+              type="number"
+              min={0}
               placeholder="0"
               value={amounts[cat]}
               onChange={(e) => setAmounts((prev) => ({ ...prev, [cat]: e.target.value }))}
@@ -98,10 +95,10 @@ export function NewForecastDialogContent({
                 period: period.trim(),
                 ownerId,
                 amounts: {
-                  pipeline: unitsTextToMicros(amounts.pipeline || '0')?.toString() ?? '0',
-                  best_case: unitsTextToMicros(amounts.best_case || '0')?.toString() ?? '0',
-                  commit: unitsTextToMicros(amounts.commit || '0')?.toString() ?? '0',
-                  closed: unitsTextToMicros(amounts.closed || '0')?.toString() ?? '0',
+                  pipeline: Math.round(Number(amounts.pipeline || 0) * 1_000_000),
+                  best_case: Math.round(Number(amounts.best_case || 0) * 1_000_000),
+                  commit: Math.round(Number(amounts.commit || 0) * 1_000_000),
+                  closed: Math.round(Number(amounts.closed || 0) * 1_000_000),
                 },
               })
             }

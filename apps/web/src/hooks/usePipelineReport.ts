@@ -3,13 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 interface PipelineReport {
-  byStage: { stage: string; count: number; valueSum: number; valueSumMicros?: string }[];
+  byStage: { stage: string; count: number; valueSum: number }[];
   totalOpen: number;
   totalValueOpen: number;
-  totalValueOpenMicros?: string;
   weightedPipeline: number;
-  weightedPipelineMicros?: string;
-  velocity: { avgDaysOpen: number | null; closedThisQuarter: number };
+  velocity: { avgDaysOpen: number; closedThisQuarter: number };
 }
 
 export function usePipelineReport() {

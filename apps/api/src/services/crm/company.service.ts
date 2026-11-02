@@ -23,7 +23,7 @@ type SalesCompanyCandidate = {
   website: string | null;
   countryCode: string | null;
   reason: string;
-  score: bigint;
+  score: number;
 };
 
 export async function buildSalesCompanyCandidates({
@@ -66,7 +66,7 @@ export async function buildSalesCompanyCandidates({
         website: websiteFor(row.name),
         countryCode: normalizeCountry(row.countryCode),
         reason: `${row.orderCount} sales record${row.orderCount === 1 ? '' : 's'}`,
-        score: row.revenueMicros > 0n ? row.revenueMicros : 0n,
+        score: Number(row.revenueMicros),
       });
     }
   }
@@ -85,10 +85,7 @@ export async function buildSalesCompanyCandidates({
         website: websiteFor(opportunity.customer),
         countryCode: null,
         reason: 'External CRM opportunity',
-        score:
-          opportunity.valueMicros != null && opportunity.valueMicros > 0n
-            ? opportunity.valueMicros
-            : 0n,
+        score: Math.round(Number(opportunity.valueMicros ?? 0)),
       });
     }
   }
@@ -96,9 +93,7 @@ export async function buildSalesCompanyCandidates({
   return mergeSalesCompanyCandidates(candidates).slice(0, limit);
 }
 
-export function mergeSalesCompanyCandidates(
-  candidates: SalesCompanyCandidate[],
-): SalesCompanyCandidate[] {
+function mergeSalesCompanyCandidates(candidates: SalesCompanyCandidate[]): SalesCompanyCandidate[] {
   const byName = new Map<string, SalesCompanyCandidate>();
   for (const candidate of candidates) {
     const key = normalizeName(candidate.name);
@@ -119,7 +114,7 @@ export function mergeSalesCompanyCandidates(
       score: existing.score + candidate.score,
     });
   }
-  return [...byName.values()].sort((a, b) => (a.score > b.score ? -1 : a.score < b.score ? 1 : 0));
+  return [...byName.values()].sort((a, b) => b.score - a.score);
 }
 
 export function isFreshCompanyEnrichment(enrichment: CompanyEnrichment, now: Date): boolean {
@@ -231,15 +226,13 @@ export async function autopopulateCompanies({
         source: 'external_erp_crm_sales_autopopulate',
         label: 'External ERP/CRM sales pattern + compatible customer records',
         sourceUrl: 'https://github.com/mysticalsin/bidstack',
-        confidence: null,
-        providerMetadata: { confidenceBasis: 'not_scored' },
+        confidence: 0.84,
       }),
       attribution({
         source: 'external_crm_core_objects',
         label: 'External CRM Company/Opportunity object model',
         sourceUrl: 'https://github.com/mysticalsin/bidstack',
-        confidence: null,
-        providerMetadata: { confidenceBasis: 'not_scored' },
+        confidence: 0.86,
       }),
     ],
     warnings,

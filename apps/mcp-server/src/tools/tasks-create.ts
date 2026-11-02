@@ -41,7 +41,6 @@ export const tasksCreate: Tool<typeof Input> = {
       data: {
         orgId: ctx.orgId,
         oppId: opp.id,
-        accountId: opp.companyId,
         title: args.title,
         dueDate: args.dueDate ? new Date(args.dueDate) : null,
         assigneeId: assignee?.id ?? null,

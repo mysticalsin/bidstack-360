@@ -18,10 +18,8 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Icon } from '@/components/ui/Icon';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import {
-  unspecifiedMicrosLabel,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { useHasPermission } from '@/hooks/useCapabilities';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import {
@@ -49,7 +47,7 @@ import {
 
 export function TerritoriesPage() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number | string) => unspecifiedMicrosLabel(micros);
+  const { formatMoneyMicros } = useFormatMoney();
   const territories = useTerritories();
   const rules = useLeadRoutingRules();
   const analytics = useTerritoryAnalytics();
@@ -232,35 +230,22 @@ export function TerritoriesPage() {
         >
           <KpiTile
             label={t('territories.kpiTotalPipeline', 'Total Pipeline')}
-            value={formatMoneyMicros(totals.totalValueMicros)}
-            detail={t('territories.kpiPipelineBasis', UNSPECIFIED_CURRENCY_BASIS)}
+            value={formatMoneyMicros(totals.totalValueMicros, 'EUR')}
             tone="blue"
           />
           <KpiTile
             label={t('territories.kpiCountriesActive', 'Countries Active')}
             value={String(totals.totalCountries)}
-            detail={t(
-              'territories.kpiCountriesBasis',
-              'countries with at least one open opportunity',
-            )}
             tone="jade"
           />
           <KpiTile
             label={t('territories.kpiOpportunities', 'Opportunities')}
             value={String(totals.totalOpportunities)}
-            detail={t(
-              'territories.kpiOpportunitiesBasis',
-              'open opportunities in this view',
-            )}
             tone="amber"
           />
           <KpiTile
             label={t('territories.kpiAvgProbability', 'Avg Probability')}
             value={`${totals.avgProbability}%`}
-            detail={t(
-              'territories.kpiProbabilityBasis',
-              'open deals only. A live stage supplies the number. A deal with no live stage uses its stored probability.',
-            )}
             tone="purple"
           />
         </motion.section>
@@ -369,6 +354,7 @@ export function TerritoriesPage() {
               isError={segments.isError}
               errorMessage={segments.error?.message}
               onRetry={() => void segments.refetch()}
+              formatMoneyMicros={formatMoneyMicros}
             />
           )}
         </Card>

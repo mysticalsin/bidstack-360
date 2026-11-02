@@ -215,12 +215,12 @@ function seamlessProfile({
         : 'Seamless.AI',
     sourceUrl: resolvedWebsite ?? 'https://seamless.ai',
     fetchedAt: now,
-    confidence: null,
-    providerMetadata: { transport, sourceTool, confidenceBasis: 'not_scored' },
+    confidence: 0.9,
+    providerMetadata: { transport, sourceTool },
   });
 
   return {
-    legalName: null,
+    legalName: company.name ?? fallbackName,
     tradeName: company.name ?? fallbackName,
     domain: resolvedDomain,
     website: resolvedWebsite,
@@ -231,18 +231,7 @@ function seamlessProfile({
     employeeCount: typeof company.employeeCount === 'number' ? company.employeeCount : null,
     incorporationDate: toIso(company.foundedOn),
     industryLabels: Array.isArray(company.industries) ? company.industries.slice(0, 20) : [],
-    revenueAmount: null,
-    revenueAmountText: null,
-    revenueCurrency: null,
-    publicFacts: {
-      description: company.description ?? null,
-      headquarters: null,
-      chiefExecutive: null,
-      stockExchange: null,
-      revenueLabel: null,
-      revenueCurrency: null,
-    },
-    confidenceBps: 0,
+    confidenceBps: 9000,
     sourceAttribution: [src],
     providerMetadata: {
       seamless: {

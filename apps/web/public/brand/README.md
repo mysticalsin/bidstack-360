@@ -3,9 +3,7 @@
 The canonical logo is delivered as **inline SVG** by the React `PoloPreSalesLogo`
 component (`apps/web/src/components/brand/PoloPreSalesLogo.tsx`). It is a
 compass-pin (teal/silver ring, gold four-point star) stacked above the word
-"Polo". The artwork is transparent: there is no navy, black, or other
-background plate, so it sits on the surface behind it. The accessible name
-stays "Polo PreSales".
+"Polo" on a dark navy field. The accessible name stays "Polo PreSales".
 Because it is vector, it stays crisp at every size and adapts via the `tone`
 prop (`default` is the full-color lockup; `mono` / `inverse` use `currentColor`).
 The standalone SVG files below exist for surfaces that need a plain asset URL
@@ -24,17 +22,14 @@ CSS variables — the live UI accent is driven by `--brand-primary` (see below).
 
 | Color | Hex       | Role                                      |
 | ----- | --------- | ----------------------------------------- |
+| Navy  | `#071422` | Lockup field and star center              |
 | Teal  | `#14B8D2` | Pin ring, lower left                      |
-| Silver| `#F8FBFE` | Pin ring, upper right                     |
+| Silver| `#F8FBFE` | Pin ring, upper right, and "Polo"        |
 | Gold  | `#E0A44A` | Four-point compass star                   |
-| Ink   | `#163844` | "Polo" on the transparent lockup          |
 
-The pin gradient runs silver (upper right) to teal (lower left). The star
-center is a hole, not a filled dot, so the surface shows through. "Polo" is a
-dark ink (cool teal into a warm edge) so the word reads on light surfaces
-without a plate. `mono` and `inverse` ignore these fills and use one
-`currentColor`. The live UI accent is still driven by `--brand-primary` in
-`apps/web/src/index.css` and is separate from this mark.
+The pin gradient runs silver (upper right) to teal (lower left). "Polo" is a
+silver word with a warm edge on the right. The live UI accent is still driven
+by `--brand-primary` in `apps/web/src/index.css` and is separate from this mark.
 
 ## Regenerating raster derivatives
 

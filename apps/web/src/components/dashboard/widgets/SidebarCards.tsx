@@ -6,13 +6,14 @@
  * only, and both render a fixed icon-link grid. A shared file avoids two tiny
  * single-component files while keeping OrgDashboard clean.
  */
+import { type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 
-import { type KpiTone, TONE_FG } from './dashboard-types';
+import { type KpiTone, TONE_FG, TONE_GLOW } from './dashboard-types';
 
 // ─── QuickActionsCard ────────────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ export function QuickActionsCard() {
   const { t } = useTranslation('crm');
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="px-1 pb-2 pt-1 text-xs font-medium text-[var(--fg-tertiary)]">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
         {t('sidebarCards.quickActionsHeading', 'Quick actions')}
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -36,6 +37,7 @@ export function QuickActionsCard() {
             key={action.href}
             to={action.href}
             className="quick-action-btn"
+            style={{ '--action-glow': TONE_GLOW[action.tone] } as CSSProperties}
           >
             <Icon name={action.icon} size={14} style={{ color: TONE_FG[action.tone] }} />
             <span>{t(`sidebarCards.action.${action.id}`, action.label)}</span>
@@ -59,7 +61,7 @@ export function QuickLinksCard() {
   const { t } = useTranslation('crm');
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="px-1 pb-2 pt-1 text-xs font-medium text-[var(--fg-tertiary)]">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
         {t('sidebarCards.quickLinksHeading', 'Quick links')}
       </div>
       <div className="grid grid-cols-2 gap-1">

@@ -1,14 +1,13 @@
 import { useReducedMotion } from 'framer-motion';
 
 import { FunnelChart } from '@/components/charts/funnel-chart';
+import { CHART_COLORS } from '@/components/charts/chartTokens';
 import { useInsightOpportunities } from '@/hooks/useInsightsData';
 
 import { InsightFrame } from './InsightFrame';
 import {
   formatInsightAmount,
   insightErrorText,
-  insightSeriesColor,
-  leadStageIndex,
   pipelineIsEmpty,
   shapePipelineByStage,
 } from './shapeInsights';
@@ -54,7 +53,7 @@ export function PipelineStageChart() {
                 label: stage.label,
                 value: stage.count,
                 displayValue: `${stage.count} · ${formatInsightAmount(stage.amount, visual.currency)}`,
-                color: insightSeriesColor(index, leadStageIndex(visual.stages)),
+                color: stage.color ?? CHART_COLORS[index % CHART_COLORS.length],
               }))}
               orientation="vertical"
               edges="straight"

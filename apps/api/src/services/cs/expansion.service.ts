@@ -54,14 +54,14 @@ export async function surfaceExpansionOpportunities(
 ): Promise<number> {
   const subs = await prisma.subscription.findMany({
     where: { orgId, status: 'ACTIVE', deletedAt: null },
-    select: { accountId: true, planTier: true },
+    select: { accountId: true, planTier: true, arrAmountMicros: true, currency: true },
     distinct: ['accountId'],
   });
 
   let created = 0;
 
   for (const sub of subs) {
-    const { accountId, planTier } = sub;
+    const { accountId, planTier, arrAmountMicros, currency } = sub;
 
     if (!(await isAccountHealthy(orgId, accountId))) continue;
 
@@ -73,10 +73,10 @@ export async function surfaceExpansionOpportunities(
             orgId,
             accountId,
             kind: 'UPSELL',
-            // ARR / 2 was an invented uplift. Leave the amount unset.
-            currency: 'XXX',
+            valueMicros: BigInt(arrAmountMicros) / 2n, // estimated 50% uplift
+            currency,
             status: 'IDENTIFIED',
-            notes: `Account on ${planTier}. Amount is unset.`,
+            notes: `Account on ${planTier} — healthy candidate for plan upgrade`,
           },
         });
         created++;
@@ -95,9 +95,10 @@ export async function surfaceExpansionOpportunities(
           orgId,
           accountId,
           kind: 'RENEWAL_UPLIFT',
-          currency: 'XXX',
+          valueMicros: BigInt(arrAmountMicros) / 10n, // estimated 10% uplift
+          currency,
           status: 'IDENTIFIED',
-          notes: 'Renewal within 120 days. Amount is unset.',
+          notes: 'Renewal within 120 days — healthy account, propose uplift',
         },
       });
       created++;

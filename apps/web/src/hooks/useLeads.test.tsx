@@ -30,7 +30,6 @@ const lead: LeadDetail = {
   email: 'ada@example.com',
   phone: null,
   companyName: 'Analytical Engines',
-  companyId: null,
   title: 'CTO',
   source: 'website',
   status: 'new',

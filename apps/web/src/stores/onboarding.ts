@@ -27,8 +27,6 @@ interface OnboardingState {
 
   // Quickstart checklist
   completedChecklist: ChecklistItem[];
-  // Off until this person turns it on. The nav item is not a default.
-  quickStartVisible: boolean;
 
   // Sample data banner
   hasSampleData: boolean;
@@ -46,7 +44,6 @@ interface OnboardingState {
   dismissTour: () => void;
   completeTourStep: (index: number) => void;
   markChecklistItem: (item: ChecklistItem) => void;
-  setQuickStartVisible: (visible: boolean) => void;
   setHasSampleData: (has: boolean) => void;
   hydrate: (userId: string) => void;
 }
@@ -68,10 +65,7 @@ function readPersisted(userId: string): Partial<OnboardingState> | null {
 
 function writePersisted(
   userId: string,
-  state: Pick<
-    OnboardingState,
-    'completedSteps' | 'dismissed' | 'tourSeen' | 'completedChecklist' | 'quickStartVisible'
-  >,
+  state: Pick<OnboardingState, 'completedSteps' | 'dismissed' | 'tourSeen' | 'completedChecklist'>,
 ): void {
   if (typeof window === 'undefined') return;
   try {
@@ -83,20 +77,6 @@ function writePersisted(
 
 const TOTAL_STEPS = 6;
 
-function persistOnboarding(state: OnboardingState): void {
-  if (typeof localStorage === 'undefined') return;
-  const key = Object.keys(localStorage).find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
-  if (!key) return;
-  const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
-  writePersisted(uid, {
-    completedSteps: state.completedSteps,
-    dismissed: state.dismissed,
-    tourSeen: state.tourSeen,
-    completedChecklist: state.completedChecklist,
-    quickStartVisible: state.quickStartVisible,
-  });
-}
-
 export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   tourActive: false,
   currentStepIndex: 0,
@@ -104,7 +84,6 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   dismissed: false,
   tourSeen: false,
   completedChecklist: [],
-  quickStartVisible: false,
   hasSampleData: false,
   templatePickerOpen: false,
 
@@ -138,7 +117,20 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       set({ currentStepIndex: next, completedSteps: newCompleted });
     }
 
-    persistOnboarding(get());
+    // Persist
+    const s = get();
+    // userId is stored in the hydrated key — we re-read from storage to get it
+    const allKeys = Object.keys(localStorage ?? {});
+    const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
+    if (key) {
+      const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
+      writePersisted(uid, {
+        completedSteps: s.completedSteps,
+        dismissed: s.dismissed,
+        tourSeen: s.tourSeen,
+        completedChecklist: s.completedChecklist,
+      });
+    }
   },
 
   back() {
@@ -154,7 +146,18 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   dismissTour() {
     set({ tourActive: false, dismissed: true, tourSeen: true });
-    persistOnboarding(get());
+    const s = get();
+    const allKeys = Object.keys(localStorage ?? {});
+    const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
+    if (key) {
+      const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
+      writePersisted(uid, {
+        completedSteps: s.completedSteps,
+        dismissed: true,
+        tourSeen: true,
+        completedChecklist: s.completedChecklist,
+      });
+    }
   },
 
   completeTourStep(index: number) {
@@ -169,13 +172,19 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     if (!completedChecklist.includes(item)) {
       const next = [...completedChecklist, item];
       set({ completedChecklist: next });
-      persistOnboarding(get());
+      const allKeys = Object.keys(localStorage ?? {});
+      const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
+      if (key) {
+        const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
+        const s = get();
+        writePersisted(uid, {
+          completedSteps: s.completedSteps,
+          dismissed: s.dismissed,
+          tourSeen: s.tourSeen,
+          completedChecklist: next,
+        });
+      }
     }
-  },
-
-  setQuickStartVisible(visible: boolean) {
-    set({ quickStartVisible: visible });
-    persistOnboarding(get());
   },
 
   setHasSampleData(has: boolean) {
@@ -184,15 +193,14 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hydrate(userId: string) {
     const persisted = readPersisted(userId);
-    set({
-      completedSteps: persisted?.completedSteps ?? [],
-      dismissed: persisted?.dismissed ?? false,
-      tourSeen: persisted?.tourSeen ?? false,
-      completedChecklist: persisted?.completedChecklist ?? [],
-      // Missing means hidden. Older saved sessions did not store this flag.
-      quickStartVisible: persisted?.quickStartVisible ?? false,
-      tourActive: false,
-    });
+    if (persisted) {
+      set({
+        completedSteps: persisted.completedSteps ?? [],
+        dismissed: persisted.dismissed ?? false,
+        tourSeen: persisted.tourSeen ?? false,
+        completedChecklist: persisted.completedChecklist ?? [],
+      });
+    }
     // Tours are opt-in from Quick Start/topbar. Auto-starting on route load
     // blocks primary CRM actions behind a full-screen backdrop.
   },

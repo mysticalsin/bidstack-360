@@ -13,7 +13,6 @@ import {
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
-import { invalidateDashboardSnapshotCache } from './crm/dashboard.js';
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
@@ -179,8 +178,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           parentId: body.parentId,
           orgId: req.auth.orgId,
           source: 'manual',
-          // The column cannot be null. 0 means not scored. A typed name is not a 100% match.
-          confidence: 0,
+          confidence: 1,
         },
       });
       await prisma.auditLog.create({
@@ -281,10 +279,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
       // v23: a tier change starts or stops the financials schedule right away.
-      if (patch.tier !== undefined && patch.tier !== null) {
-        await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
-      }
-      if (patch.legalName !== undefined) invalidateDashboardSnapshotCache(req.auth.orgId);
+      if (patch.tier !== undefined && patch.tier !== null) await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
 
       const changedFields: string[] = [];
       const changes: Record<string, unknown> = {};

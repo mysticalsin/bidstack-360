@@ -33,19 +33,8 @@ export function buildIntegrationSummary(
     Boolean(guide?.webhooks.subscriptionsUrl),
   ];
   const attentionEvents = events.filter((event) => event.status === 'error').length;
-  const publicMcp = Boolean(guide?.mcp.configured && !guide.mcp.localOnly);
-  const dustKey = Boolean(guide?.dust.configured);
-  // The Dust status API only reports stub or configured_unverified. A public
-  // URL plus a key is still not a live health check, so this screen never
-  // says Ready or invents a latency.
-  let postureLabel = 'Unverified / not connected';
-  let postureTone: BadgeTone = 'amber';
-  if (dustKey && publicMcp && attentionEvents > 0) {
-    postureLabel = 'Review events';
-    postureTone = 'tomato';
-  } else if (dustKey && publicMcp) {
-    postureLabel = 'Configured, unverified';
-  }
+  const needsSetup =
+    !guide || !guide.mcp.configured || !guide.dust.configured || !guide.dust.dataSourceConfigured;
 
   return {
     readyPaths: pathStates.filter(Boolean).length,
@@ -55,8 +44,8 @@ export function buildIntegrationSummary(
     attentionEvents,
     activeMcpTools: MCP_TOOLS.filter((tool) => tool.group === 'crm').length,
     latestSyncLabel: dust?.lastSyncAt ? relativeTime(dust.lastSyncAt) : 'Not synced',
-    postureLabel,
-    postureTone,
+    postureLabel: needsSetup ? 'Needs setup' : attentionEvents > 0 ? 'Review events' : 'Ready',
+    postureTone: needsSetup ? 'amber' : attentionEvents > 0 ? 'tomato' : 'jade',
   };
 }
 

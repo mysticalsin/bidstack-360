@@ -90,13 +90,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!opportunity) throw server.httpErrors.notFound('Opportunity not found');
 
       // Per-org upload rate limit.
-      const quota = await checkRfpUploadRateLimit(orgId);
-      if (!quota.allowed && quota.reason === 'unavailable') {
-        throw server.httpErrors.serviceUnavailable(
-          'RFP upload quota could not be checked, so the upload was refused.',
-        );
-      }
-      if (!quota.allowed) {
+      const withinLimit = await checkRfpUploadRateLimit(orgId);
+      if (!withinLimit) {
         throw server.httpErrors.tooManyRequests(
           `RFP upload limit: ${RFP_UPLOAD_RATE_LIMIT_MAX} uploads per hour per organisation`,
         );
@@ -346,8 +341,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/proposals/:proposalId/rfp-approve',
     {
-      config: { permission: 'proposals:approve' },
-      preHandler: server.requirePermission('proposals:approve'),
+      config: { permission: 'proposals:write' },
+      preHandler: server.requirePermission('proposals:write'),
       schema: {
         params: ApproveParams,
         body: ApproveBody,
@@ -532,8 +527,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/bid-workspaces/:workspaceId/rfp/:orchestrationId/approve-drafting',
     {
-      config: { permission: 'proposals:approve' },
-      preHandler: server.requirePermission('proposals:approve'),
+      config: { permission: 'proposals:write' },
+      preHandler: server.requirePermission('proposals:write'),
       schema: {
         params: ResumeDraftingParams,
         response: { 200: ResumeDraftingResponse },

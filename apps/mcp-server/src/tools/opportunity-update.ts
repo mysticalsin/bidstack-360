@@ -3,16 +3,6 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import {
-  companyIdForCustomerRename,
-  dealOutcome,
-  dealValueMicros,
-  dealValueUnits,
-  pipelineStageIdForStageChange,
-  recordedProbability,
-  recordOpportunityStageMove,
-  valueToMicros,
-} from './crm-tools.helpers.js';
 
 const Stage = z.enum([
   's1_lead',
@@ -28,7 +18,7 @@ const STAGE_OPTIONS = [...Stage.options];
 const Patch = z.object({
   stage: Stage.optional(),
   probability: z.number().int().min(0).max(100).optional(),
-  value: z.union([z.number().nonnegative(), z.string().min(1)]).optional(),
+  value: z.number().nonnegative().optional(),
   dueDate: z.string().date().nullable().optional(),
   customer: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
@@ -42,7 +32,7 @@ const Input = z.object({
 
 export const opportunityUpdate: Tool<typeof Input> = {
   description:
-    'Patch an opportunity. Changing customer relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. A stage change links the one live pipeline stage with the new key, or clears that link when none exists. Two matches are refused and the deal stays put. Repeating the current stage does not. The result outcome is open, won, or lost from the stored key and any live stage flag. Other fields do not touch the link. Writes audit_log.',
+    'Patch an opportunity. Common use: agent updates stage, probability, or value. Writes audit_log.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -57,16 +47,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
             enum: STAGE_OPTIONS,
           },
           probability: { type: 'integer', minimum: 0, maximum: 100 },
-          value: {
-            anyOf: [
-              { type: 'number', minimum: 0 },
-              {
-                type: 'string',
-                minLength: 1,
-                description: 'Unit amount as text, up to 6 decimal places. Use this when the amount is large.',
-              },
-            ],
-          },
+          value: { type: 'number', minimum: 0 },
           dueDate: { type: ['string', 'null'], format: 'date' },
           customer: { type: 'string', minLength: 1 },
           name: { type: 'string', minLength: 1 },
@@ -83,30 +64,22 @@ export const opportunityUpdate: Tool<typeof Input> = {
     if (!before) throw new Error('Opportunity not found');
 
     const { patch } = args;
-    const companyId =
-      patch.customer !== undefined && patch.customer !== before.customer
-        ? await companyIdForCustomerRename(ctx.orgId, patch.customer)
-        : undefined;
-    const pipelineStageId = await pipelineStageIdForStageChange(ctx.orgId, before.stage, patch.stage);
     const updated = await prisma.opportunity.update({
       where: { id: before.id },
       data: {
         ...(patch.stage ? { stage: patch.stage as PrismaStage } : {}),
-        ...(pipelineStageId !== undefined ? { pipelineStageId } : {}),
         ...(patch.probability !== undefined ? { probability: patch.probability } : {}),
-        ...(patch.value !== undefined ? { valueMicros: valueToMicros(patch.value) } : {}),
+        ...(patch.value !== undefined
+          ? { valueMicros: BigInt(Math.round(patch.value * 1_000_000)) }
+          : {}),
         ...(patch.dueDate !== undefined
           ? { dueDate: patch.dueDate ? new Date(patch.dueDate) : null }
           : {}),
         ...(patch.customer ? { customer: patch.customer } : {}),
-        ...(companyId !== undefined ? { companyId } : {}),
         ...(patch.name ? { name: patch.name } : {}),
         ...(patch.industry !== undefined ? { industry: patch.industry } : {}),
       },
-      include: {
-        owner: true,
-        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
-      },
+      include: { owner: true },
     });
 
     await prisma.auditLog.create({
@@ -118,7 +91,6 @@ export const opportunityUpdate: Tool<typeof Input> = {
         diff: patch,
       },
     });
-    await recordOpportunityStageMove(ctx.orgId, before, patch.stage);
 
     return {
       id: updated.id,
@@ -126,14 +98,11 @@ export const opportunityUpdate: Tool<typeof Input> = {
       customer: updated.customer,
       name: updated.name,
       stage: updated.stage,
-      outcome: dealOutcome(updated),
-      value: dealValueUnits(updated.valueMicros),
-      valueMicros: dealValueMicros(updated.valueMicros),
-      probability: recordedProbability(updated.probability),
+      value: Number(updated.valueMicros) / 1_000_000,
+      probability: updated.probability,
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: updated.owner?.email ?? null,
       industry: updated.industry,
-      companyId: updated.companyId,
       updatedAt: updated.updatedAt.toISOString(),
     };
   },

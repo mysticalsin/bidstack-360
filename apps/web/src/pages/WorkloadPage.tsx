@@ -3,7 +3,7 @@
  * section). One glance answers: whose desk is over capacity, who can take the
  * next RFP, which bids are ownerless, and where the week's deadlines land.
  * Data comes from GET /analytics/workload (per-owner aggregates over existing
- * opportunities + tasks). Amounts are micros with no stored currency.
+ * opportunities + tasks); money arrives in micros and is formatted here.
  */
 import { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -16,10 +16,7 @@ import {
   ErrorState,
   LoadingSkeleton,
 } from '@/components/ui/StateMessages';
-import {
-  unspecifiedMicrosLabel,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useWorkload } from '@/hooks/useWorkload';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
@@ -29,6 +26,7 @@ import { WorkloadTable } from './workload/WorkloadTable';
 export function WorkloadPage() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
   const workload = useWorkload();
 
   const owners = useMemo(() => workload.data?.owners ?? [], [workload.data]);
@@ -45,7 +43,7 @@ export function WorkloadPage() {
     {
       key: 'weighted',
       label: t('workload.totalWeighted', 'Weighted pipeline'),
-      value: unspecifiedMicrosLabel(totals.weightedValueMicros),
+      value: formatMoneyMicros(totals.weightedValueMicros.toString()),
       alert: false,
     },
     {
@@ -102,17 +100,8 @@ export function WorkloadPage() {
             >
               {tile.value}
             </div>
-            {tile.key === 'weighted' ? (
-              <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
-                {t(
-                  'workload.weightedBasis',
-                  'Weighted open pipeline across these desks. {{basis}}',
-                  { basis: UNSPECIFIED_CURRENCY_BASIS },
-                )}
-              </p>
-            ) : null}
           </div>
-      ))}
+        ))}
       </motion.div>
 
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
@@ -143,7 +132,7 @@ export function WorkloadPage() {
             }
           />
         ) : (
-          <WorkloadTable owners={owners} />
+          <WorkloadTable owners={owners} formatMoneyMicros={formatMoneyMicros} />
         )}
       </motion.div>
     </motion.div>

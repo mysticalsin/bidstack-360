@@ -15,8 +15,6 @@ export interface BarYAxisProps {
   showAllLabels?: boolean;
   /** Maximum number of labels to show. Default: 20 */
   maxLabels?: number;
-  /** Max label width in pixels. Default: 70, which fits the account lane names. */
-  labelWidth?: number;
 }
 
 interface BarYAxisLabelProps {
@@ -31,8 +29,7 @@ function BarYAxisLabel({
   y,
   bandHeight,
   isHovered,
-  labelWidth,
-}: BarYAxisLabelProps & { labelWidth: number }) {
+}: BarYAxisLabelProps) {
   return (
     <div
       className="absolute right-0 flex items-center justify-end pr-2"
@@ -53,7 +50,7 @@ function BarYAxisLabel({
           opacity: 0.7,
           color: "var(--chart-label, var(--color-zinc-500))",
         }}
-        style={{ maxWidth: labelWidth }}
+        style={{ maxWidth: 70 }}
         transition={{ duration: 0.15 }}
       >
         {label}
@@ -80,7 +77,6 @@ export function BarYAxis(props: BarYAxisProps) {
 const BarYAxisInner = memo(function BarYAxisInner({
   showAllLabels = true,
   maxLabels = 20,
-  labelWidth = 70,
   container,
 }: BarYAxisProps & { container: HTMLDivElement }) {
   const { margin, barScale, bandWidth, barXAccessor, data, hoveredBarIndex } =
@@ -132,7 +128,6 @@ const BarYAxisInner = memo(function BarYAxisInner({
           isHovered={hoveredBarIndex === item.index}
           key={`${item.label}-${item.y}`}
           label={item.label}
-          labelWidth={labelWidth}
           y={item.y}
         />
       ))}

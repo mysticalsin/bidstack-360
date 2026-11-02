@@ -1,16 +1,8 @@
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { presentOpportunityIntel } from '@bidstack/shared';
 
 import type { Tool } from './index.js';
-import {
-  dealOutcome,
-  dealValueMicros,
-  dealValueUnits,
-  liveStageName,
-  recordedProbability,
-} from './crm-tools.helpers.js';
 
 const Input = z
   .object({
@@ -24,7 +16,7 @@ const Input = z
 
 export const opportunitiesGet: Tool<typeof Input> = {
   description:
-    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health.',
+    'Fetch one opportunity with full intel payload (financials, triggers, decision unit, competitors, news, hiring, win prediction).',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -43,7 +35,6 @@ export const opportunitiesGet: Tool<typeof Input> = {
       },
       include: {
         owner: true,
-        pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
         tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
         documents: { orderBy: { createdAt: 'desc' }, take: 50 },
       },
@@ -53,22 +44,14 @@ export const opportunitiesGet: Tool<typeof Input> = {
       id: opp.id,
       code: opp.code,
       customer: opp.customer,
-      companyId: opp.companyId,
       name: opp.name,
       stage: opp.stage,
-      stageName: liveStageName(opp.stage, opp.pipelineStage),
-      outcome: dealOutcome(opp),
-      value: dealValueUnits(opp.valueMicros),
-      valueMicros: dealValueMicros(opp.valueMicros),
-      currency: null,
-      currencyBasis: 'unspecified' as const,
-      health: 'not_account_health' as const,
-      healthNote: 'Probability is win likelihood for this opportunity, not account health.',
-      probability: recordedProbability(opp.probability),
+      value: Number(opp.valueMicros) / 1_000_000,
+      probability: opp.probability,
       dueDate: opp.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: opp.owner?.email ?? null,
       industry: opp.industry,
-      intel: presentOpportunityIntel(opp.intel),
+      intel: opp.intel,
       tasks: opp.tasks.map((t) => ({
         id: t.id,
         title: t.title,

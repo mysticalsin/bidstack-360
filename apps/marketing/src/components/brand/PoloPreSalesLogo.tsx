@@ -20,8 +20,8 @@ const STAR_PATH = 'M 160 60 L 171 99 L 208 110 L 171 121 L 160 160 L 149 121 L 1
 const POLO_WORD_PATH =
   'M 339 252L 233 252L 233 0L 62 0L 62 702L 339 702Q 423 702 481 673Q 539 644 568 593Q 597 542 597 476Q 597 415 569 364.5Q 541 314 483 283Q 425 252 339 252ZM 423 476Q 423 518 399 541Q 375 564 326 564L 233 564L 233 388L 326 388Q 375 388 399 411Q 423 434 423 476ZM 708 279Q 708 365 746 430.5Q 784 496 850 531Q 916 566 998 566Q 1080 566 1146 531Q 1212 496 1250 430.5Q 1288 365 1288 279Q 1288 193 1249.5 127.5Q 1211 62 1144.5 27Q 1078 -8 996 -8Q 914 -8 848.5 27Q 783 62 745.5 127Q 708 192 708 279ZM 1114 279Q 1114 346 1080.5 382Q 1047 418 998 418Q 948 418 915 382.5Q 882 347 882 279Q 882 212 914.5 176Q 947 140 996 140Q 1045 140 1079.5 176Q 1114 212 1114 279ZM 1606 740L 1606 0L 1435 0L 1435 740ZM 1752 279Q 1752 365 1790 430.5Q 1828 496 1894 531Q 1960 566 2042 566Q 2124 566 2190 531Q 2256 496 2294 430.5Q 2332 365 2332 279Q 2332 193 2293.5 127.5Q 2255 62 2188.5 27Q 2122 -8 2040 -8Q 1958 -8 1892.5 27Q 1827 62 1789.5 127Q 1752 192 1752 279ZM 2158 279Q 2158 346 2124.5 382Q 2091 418 2042 418Q 1992 418 1959 382.5Q 1926 347 1926 279Q 1926 212 1958.5 176Q 1991 140 2040 140Q 2089 140 2123.5 176Q 2158 212 2158 279Z';
 
-const VIEW_W = 320;
-const VIEW_H = 408;
+const PLATE_W = 320;
+const PLATE_H = 408;
 const STAR_CX = 160;
 const STAR_CY = 110;
 const STAR_R = 6;
@@ -50,14 +50,14 @@ export function PoloPreSalesLogo({
   const starFill = colored ? `url(#${starId})` : 'currentColor';
   const wordFill = colored ? `url(#${wordId})` : 'currentColor';
   const subtitleFill =
-    tone === 'inverse' ? 'rgba(255,255,255,0.7)' : tone === 'mono' ? 'currentColor' : '#3E5560';
+    tone === 'inverse' ? 'rgba(255,255,255,0.7)' : tone === 'mono' ? 'currentColor' : '#D5E4EA';
   const starHole = `M ${STAR_CX} ${STAR_CY - STAR_R} A ${STAR_R} ${STAR_R} 0 1 0 ${STAR_CX} ${STAR_CY + STAR_R} A ${STAR_R} ${STAR_R} 0 1 0 ${STAR_CX} ${STAR_CY - STAR_R} Z`;
-  const fullHeight = showSubtitle ? VIEW_H + 36 : VIEW_H;
+  const fullHeight = showSubtitle ? PLATE_H + 36 : PLATE_H;
   const toneClass = tone === 'inverse' ? 'text-white' : '';
 
   return (
     <svg
-      viewBox={variant === 'mark' ? '56 12 208 292' : `0 0 ${VIEW_W} ${fullHeight}`}
+      viewBox={variant === 'mark' ? '56 12 208 292' : `0 0 ${PLATE_W} ${fullHeight}`}
       role={title ? 'img' : undefined}
       aria-labelledby={titleId}
       aria-hidden={title ? undefined : true}
@@ -81,22 +81,26 @@ export function PoloPreSalesLogo({
           </linearGradient>
           {variant === 'full' ? (
             <linearGradient id={wordId} x1="0" y1="0" x2="1" y2="0.15" gradientUnits="objectBoundingBox">
-              <stop offset="0" stopColor="#163844" />
-              <stop offset="0.55" stopColor="#1C4654" />
-              <stop offset="1" stopColor="#3A3832" />
+              <stop offset="0" stopColor="#F2F7F8" />
+              <stop offset="0.55" stopColor="#F7F8F9" />
+              <stop offset="1" stopColor="#F3EEE6" />
             </linearGradient>
           ) : null}
         </defs>
       ) : null}
+      {colored && variant === 'full' ? (
+        <rect width={PLATE_W} height={fullHeight} rx="34" fill="#071422" />
+      ) : null}
       <path d={PIN_PATH} fill={pinFill} fillRule="evenodd" />
-      <path d={`${STAR_PATH}${starHole}`} fill={starFill} fillRule="evenodd" />
+      <path d={colored ? STAR_PATH : `${STAR_PATH}${starHole}`} fill={starFill} fillRule="evenodd" />
+      {colored ? <circle cx={STAR_CX} cy={STAR_CY} r={STAR_R} fill="#071422" /> : null}
       {variant === 'full' ? (
         <>
           <path d={POLO_WORD_PATH} fill={wordFill} transform={WORD_TRANSFORM} />
           {showSubtitle ? (
             <text
               x="160"
-              y={VIEW_H + 22}
+              y={PLATE_H + 22}
               textAnchor="middle"
               fontSize="13"
               fontWeight="600"

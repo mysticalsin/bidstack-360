@@ -57,6 +57,19 @@ import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
 import { enqueueMsaTextExtract } from '../queues/msa-text-extract.js';
 import { issueMsaDownloadToken, MSA_DOWNLOAD_TTL_SECONDS, openMsaDownloadToken } from '../msa/download-token.js';
 
+const MsaParties = MsaDetail.shape.parties;
+const MsaFieldCitations = MsaDetail.shape.fieldCitations;
+
+function parseMsaParties(value: unknown): z.infer<typeof MsaParties> {
+  const parsed = MsaParties.safeParse(value);
+  return parsed.success ? parsed.data : [];
+}
+
+function parseMsaFieldCitations(value: unknown): z.infer<typeof MsaFieldCitations> {
+  const parsed = MsaFieldCitations.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
+
 const DAY_MS = 86_400_000;
 const USER_SELECT = { id: true, email: true, name: true } as const;
 const VERSION_SELECT = {
@@ -485,11 +498,8 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         indexation: extra.indexation,
         scopeOfServices: extra.scopeOfServices,
         affiliatesClause: extra.affiliatesClause,
-        parties: Array.isArray(extra.parties) ? extra.parties : [],
-        fieldCitations:
-          extra.fieldCitations && typeof extra.fieldCitations === 'object' && !Array.isArray(extra.fieldCitations)
-            ? extra.fieldCitations
-            : {},
+        parties: parseMsaParties(extra.parties),
+        fieldCitations: parseMsaFieldCitations(extra.fieldCitations),
       };
     },
   );

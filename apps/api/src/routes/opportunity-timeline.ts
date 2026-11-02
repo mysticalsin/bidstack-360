@@ -6,22 +6,6 @@ import { prisma } from '@bidstack/db';
 // Chatter Activity rows carry their human label in subject (calls/emails/
 // meetings) or description (notes). Fall back to a per-type synthesis so a
 // bare stage_change/field_edit row still reads as a sentence, never as "".
-function stageWords(value: unknown): string {
-  if (typeof value !== 'string' || value.trim().length === 0) return 'unknown';
-  return value
-    .trim()
-    .split('_')
-    .map((part) => (part.length === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
-    .join(' ');
-}
-
-/** Stage audits store fromStage/toStage. Older rows and chatter may use from/to. */
-function movedText(diff: Record<string, unknown> | null | undefined): string {
-  const from = stageWords(diff?.fromStage ?? diff?.from);
-  const to = stageWords(diff?.toStage ?? diff?.to);
-  return `Moved from ${from} to ${to}`;
-}
-
 function activityText(row: {
   type: string;
   subject: string | null;
@@ -33,7 +17,13 @@ function activityText(row: {
     return row.description.slice(0, 120) + (row.description.length > 120 ? '…' : '');
   }
   const body = row.body as Record<string, unknown> | null;
-  if (row.type === 'stage_change') return movedText(body);
+  if (
+    row.type === 'stage_change' &&
+    typeof body?.from === 'string' &&
+    typeof body?.to === 'string'
+  ) {
+    return `Moved from ${body.from} to ${body.to}`;
+  }
   return row.type.replace(/_/g, ' ');
 }
 
@@ -132,7 +122,9 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           const changed = diff ? Object.keys(diff).join(', ') : 'fields';
           text = `Updated ${changed}`;
         } else if (action === 'opportunity.stage') {
-          text = movedText(diff);
+          const from = (diff?.from as string) ?? 'unknown';
+          const to = (diff?.to as string) ?? 'unknown';
+          text = `Moved from ${from} to ${to}`;
         } else if (action === 'opportunity.delete') {
           text = 'Deleted opportunity';
         } else {

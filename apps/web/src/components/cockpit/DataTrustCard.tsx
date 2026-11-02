@@ -21,12 +21,9 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
   const company = cockpit.company;
   const sources = company.sourceAttribution.slice(0, 4);
   const sourceCount = company.sourceAttribution.length;
-  const scoredSources = company.sourceAttribution.filter(
-    (source) => typeof source.confidence === 'number',
-  );
-  const averageConfidence = scoredSources.length
-    ? scoredSources.reduce((acc, source) => acc + (source.confidence ?? 0), 0) / scoredSources.length
-    : null;
+  const averageConfidence = sourceCount
+    ? company.sourceAttribution.reduce((acc, source) => acc + source.confidence, 0) / sourceCount
+    : company.confidence;
   const latestFetch = latestFetchedAt(company.sourceAttribution) ?? company.updatedAt;
 
   const checks: Array<{ label: string; value: string; tone: BadgeTone }> = [
@@ -61,13 +58,7 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
         <div className="data-trust-score">
           <span>{t('dataTrust.attributionConfidence', 'Attribution confidence')}</span>
           <strong>
-            <AnimatedMetric
-              value={
-                averageConfidence === null
-                  ? t('dataTrust.notScored', 'Not scored')
-                  : `${Math.round(averageConfidence * 100)}%`
-              }
-            />
+            <AnimatedMetric value={`${Math.round(averageConfidence * 100)}%`} />
           </strong>
           <small>
             {t('dataTrust.attributedSources', '{{count}} attributed sources', {
@@ -123,7 +114,6 @@ function SourceReceipt({
   index: number;
   reducedMotion: boolean;
 }) {
-  const { t } = useTranslation('crm');
   const content = (
     <>
       <div>
@@ -131,19 +121,9 @@ function SourceReceipt({
         <span>{relativeTime(source.fetchedAt)}</span>
       </div>
       <Badge
-        tone={
-          source.confidence == null
-            ? 'gray'
-            : source.confidence >= 0.9
-              ? 'jade'
-              : source.confidence >= 0.72
-                ? 'blue'
-                : 'amber'
-        }
+        tone={source.confidence >= 0.9 ? 'jade' : source.confidence >= 0.72 ? 'blue' : 'amber'}
       >
-        {source.confidence == null
-          ? t('dataTrust.notScored', 'Not scored')
-          : `${Math.round(source.confidence * 100)}%`}
+        {Math.round(source.confidence * 100)}%
       </Badge>
     </>
   );

@@ -7,7 +7,6 @@ import {
 } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { requireCompanyLink } from './crm-tools.helpers.js';
 
 const Input = z.object({
   status: z
@@ -17,14 +16,12 @@ const Input = z.object({
   source: z
     .enum(['website', 'referral', 'event', 'cold_outreach', 'partner', 'social', 'other'])
     .optional(),
-  companyId: z.string().uuid().optional(),
   search: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(50),
 });
 
 export const leadsList: Tool<typeof Input> = {
-  description:
-    'List leads. companyId returns leads linked to that company. search matches name, email, or company name and is not a company link. score 0 has scoreBasis not_scored; a positive score is stored.',
+  description: 'List leads matching filters (status/priority/source/search).',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -38,24 +35,16 @@ export const leadsList: Tool<typeof Input> = {
         type: 'string',
         enum: ['website', 'referral', 'event', 'cold_outreach', 'partner', 'social', 'other'],
       },
-      companyId: { type: 'string', format: 'uuid' },
-      search: {
-        type: 'string',
-        description: 'Text match on name, email, or company name. Not a company link.',
-      },
+      search: { type: 'string' },
       limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
     },
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
-    if (args.companyId) {
-      await requireCompanyLink(ctx.orgId, { companyId: args.companyId });
-    }
     const items = await prisma.lead.findMany({
       where: {
         orgId: ctx.orgId,
         deletedAt: null, // skip soft-deleted (Review)
-        ...(args.companyId ? { companyId: args.companyId } : {}),
         ...(args.status ? { status: args.status as PrismaLeadStatus } : {}),
         ...(args.priority ? { priority: args.priority as PrismaLeadPriority } : {}),
         ...(args.source ? { source: args.source } : {}),
@@ -81,12 +70,10 @@ export const leadsList: Tool<typeof Input> = {
       email: l.email,
       phone: l.phone,
       companyName: l.companyName,
-      companyId: l.companyId,
       title: l.title,
       source: l.source,
       status: l.status,
       score: l.score,
-      scoreBasis: l.score > 0 ? ('stored' as const) : ('not_scored' as const),
       priority: l.priority,
       owner: l.owner?.email ?? null,
       convertedToOpportunityId: l.convertedToOpportunityId,

@@ -21,17 +21,8 @@ import {
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
-import {
-  unspecifiedMicrosLabel,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
-
-function RecordedFact({ value, unknownLabel }: { value: string | null; unknownLabel: string }) {
-  if (!value) {
-    return <span className="text-[var(--fg-tertiary)]">{unknownLabel}</span>;
-  }
-  return <span className="text-[var(--fg-primary)]">{value}</span>;
-}
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatStage } from '@/lib/format';
 
 export function ContactTab({
   contacts,
@@ -67,22 +58,13 @@ export function ContactTab({
           {contacts.map((c) => (
             <TableRow key={c.id}>
               <TableCell className="font-medium text-[var(--fg-primary)]">
-                <Link
-                  to={`/contacts/${c.id}`}
-                  className="inline-flex min-h-11 items-center hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                >
+                <Link to={`/contacts/${c.id}`} className="hover:text-[var(--brand-primary)]">
                   {c.name}
                 </Link>
               </TableCell>
-              <TableCell>
-                <RecordedFact value={c.role} unknownLabel={t('companyTabs.contacts.unknown', 'Unknown')} />
-              </TableCell>
-              <TableCell>
-                <RecordedFact value={c.email} unknownLabel={t('companyTabs.contacts.unknown', 'Unknown')} />
-              </TableCell>
-              <TableCell>
-                <RecordedFact value={c.phone} unknownLabel={t('companyTabs.contacts.unknown', 'Unknown')} />
-              </TableCell>
+              <TableCell>{c.role ?? '—'}</TableCell>
+              <TableCell>{c.email ?? '—'}</TableCell>
+              <TableCell>{c.phone ?? '—'}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -104,6 +86,11 @@ export function OpportunityTab({
     dueDate: string | null;
   }>;
 }) {
+  // WHY useFormatMoney instead of bare formatMoneyMicros('CAD'): the hook
+  // converts from the org base currency (CAD) to the user's selected display
+  // currency and respects the currency store, so the value column stays
+  // consistent with every other money figure in the app.
+  const { formatMoneyMicros } = useFormatMoney();
   const { t } = useTranslation('crm');
   if (opportunities.length === 0)
     return (
@@ -123,17 +110,8 @@ export function OpportunityTab({
             <TableHead>{t('companyTabs.opportunities.colCode', 'Code')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colName', 'Name')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colStage', 'Stage')}</TableHead>
-            <TableHead>
-              {t('companyTabs.opportunities.colValue', 'Value · {{basis}}', {
-                basis: UNSPECIFIED_CURRENCY_BASIS,
-              })}
-            </TableHead>
-            <TableHead>
-              {t(
-                'companyTabs.opportunities.colProbability',
-                'Stored probability, not a measured win rate',
-              )}
-            </TableHead>
+            <TableHead>{t('companyTabs.opportunities.colValue', 'Value')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colProbability', 'Probability')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -155,15 +133,9 @@ export function OpportunityTab({
                 <Badge tone="gray">{formatStage(o.stage)}</Badge>
               </TableCell>
               <TableCell className="font-medium text-[var(--fg-primary)]">
-                {unspecifiedMicrosLabel(o.valueMicros)}
+                {formatMoneyMicros(o.valueMicros)}
               </TableCell>
-              <TableCell>
-                {o.probability === 0
-                  ? t('opportunities.probabilityUnrecorded', 'Not recorded')
-                  : t('companyTabs.opportunities.probabilityValue', '{{percent}}% stored', {
-                      percent: o.probability,
-                    })}
-              </TableCell>
+              <TableCell>{o.probability}%</TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -15,7 +15,10 @@ import {
   KpiSidebar,
   OpenIssuesCard,
   PageHead,
+  PipelineByStageCard,
   RecentOpportunitiesCard,
+  RevenueEvolutionCard,
+  WinLossCard,
   TechStackCard,
   FundingEligibilityCard,
   UpsellFilesCard,
@@ -49,13 +52,14 @@ import {
   WinLossReasonsCard,
   type ClosedOpp,
 } from '@/components/account-intel/WinLossReasonsCard';
-import { recentItemsFromDeals } from '@/components/cockpit/RecentOpportunitiesCard';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
+import { useOpportunities } from '@/hooks/useOpportunities';
+import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -89,6 +93,8 @@ export function DashboardPage() {
 function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
+  const report = usePipelineReport();
+  const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
   // any early returns below. The visit-tracker reads the resolved company
@@ -198,19 +204,15 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  // A matching customer name is not a link. The snapshot deals for this
-  // account are the rows whose companyId points here.
-  const companyDeals = snapshot.deals.filter((deal) => deal.companyId === cockpit.company.id);
+  const accountOpps = opps.data?.items.filter(
+    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+  );
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
-  const closedOpps: ClosedOpp[] = companyDeals
-    .filter((deal) => deal.stage === 'closed_won' || deal.stage === 'closed_lost')
-    .map((deal) => ({
-      id: deal.id,
-      name: deal.name,
-      outcome: deal.stage === 'closed_won' ? 'won' : 'lost',
-    }));
+  const closedOpps: ClosedOpp[] = (accountOpps ?? [])
+    .filter((o) => o.stage === 'closed_won' || o.stage === 'closed_lost')
+    .map((o) => ({ id: o.id, name: o.name, outcome: o.stage === 'closed_won' ? 'won' : 'lost' }));
 
   // Everything below the watchdog: customise menu, KPI strip and the long
   // cockpit grid. On the account page it folds behind "Account details".
@@ -224,19 +226,16 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       <KpiRow cockpit={cockpit} />
       {!isAccountView && <CommandCenter cockpit={cockpit} />}
 
+      <div className="mt-1 flex flex-col gap-1">
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('dashboard.portfolioIntelTitle', 'Portfolio sales intelligence')}
+        </h2>
+        <p className="text-xs text-[var(--fg-tertiary)]">
+          {t('dashboard.portfolioIntelSubtitle', 'Pipeline, risks, contacts, and records for this account.')}
+        </p>
+      </div>
       <section className="cockpit-grid" aria-label={t('dashboard.accountCockpitAria', 'Account cockpit')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          {(show('businessSnapshot') || show('openIssues')) && (
-            <Reveal delay={0.04}>
-              <div className="dash-row-3">
-                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
-                {show('openIssues') && (
-                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
-                )}
-              </div>
-            </Reveal>
-          )}
-
           {show('techStack') && (
             <Reveal>
               <TechStackCard cockpit={cockpit} />
@@ -249,11 +248,24 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
             </Reveal>
           )}
 
+          {(show('businessSnapshot') || show('openIssues') || show('pipelineStage')) && (
+            <Reveal delay={0.04}>
+              <div className="dash-row-3">
+                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
+                {show('openIssues') && (
+                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
+                )}
+                {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
+              </div>
+            </Reveal>
+          )}
+
           {show('recentOpportunities') && (
             <Reveal delay={0.12}>
               <RecentOpportunitiesCard
+                opps={opps}
                 accountName={cockpit.company.name}
-                items={recentItemsFromDeals(companyDeals)}
+                items={accountOpps}
               />
             </Reveal>
           )}
@@ -296,6 +308,21 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
 
         <aside className="cockpit-side" aria-label={t('dashboard.cockpitDetailsAria', 'Cockpit details')}>
+          {show('healthScore') && (
+            <Reveal>
+              <HealthScoreCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('revenueEvolution') && (
+            <Reveal delay={0.02}>
+              <RevenueEvolutionCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('winLoss') && (
+            <Reveal delay={0.03}>
+              <WinLossCard cockpit={cockpit} />
+            </Reveal>
+          )}
           {show('winLossReasons') && (
             <Reveal delay={0.03}>
               <WinLossReasonsCard closedOpps={closedOpps} />
@@ -312,7 +339,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                 snapshot={snapshot}
                 overdueCount={overdueCount}
                 tasksLoading={tasks.isLoading}
-                account
               />
             </Reveal>
           )}
@@ -343,11 +369,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('accountIntel') && accountId && (
             <Reveal delay={0.28}>
               <AccountIntelPanel accountId={accountId} />
-            </Reveal>
-          )}
-          {show('healthScore') && (
-            <Reveal delay={0.3}>
-              <HealthScoreCard cockpit={cockpit} />
             </Reveal>
           )}
         </aside>

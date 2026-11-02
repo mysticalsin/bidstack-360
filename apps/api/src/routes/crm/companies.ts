@@ -5,7 +5,6 @@ import { prisma } from '@bidstack/db';
 import {
   AccountCockpitSnapshot,
   CompanyAutopopulateResponse,
-  CompanyLookupResponse,
   CrmCompany,
   TechnicalStackCategory,
   TechnicalStackRefreshResponse,
@@ -34,7 +33,6 @@ import {
 } from '../../services/crm/enrichment.service.js';
 import { techStackMcpSourceConfigsFromEnv } from '../../providers/company-tech-stack-mcp.js';
 import { autopopulateCompanies } from '../../services/crm/company.service.js';
-import { fetchOpenCompanyProfile, toPublicPreview } from '../../providers/company-open-enrichment.js';
 import {
   TECHNICAL_STACK_FIELD_KEY,
   acceptTechnicalStackSuggestion,
@@ -61,6 +59,12 @@ const CompanyLookupQuery = z.object({
   uei: z.string().trim().optional(),
   lei: z.string().trim().optional(),
   registryId: z.string().trim().optional(),
+});
+
+const CompanyLookupResponse = z.object({
+  match: z.enum(['exact_domain', 'registry_id', 'exact_name', 'fuzzy_name', 'none']),
+  company: CrmCompany.nullable(),
+  alternatives: z.array(CrmCompany),
 });
 
 const EnrichCompanyBody = z.object({
@@ -415,68 +419,44 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         .map(normalizeRegistryValue);
       const name = req.query.name?.trim().toLowerCase();
 
-      let local: {
-        match: 'exact_domain' | 'registry_id' | 'exact_name' | 'fuzzy_name' | 'none';
-        company: (typeof companies)[number] | null;
-        alternatives: typeof companies;
-      } = { match: 'none', company: null, alternatives: [] };
-
       if (domain) {
         const company = companies.find((item) => normalizeDomain(item.domain) === domain);
-        if (company) local = { match: 'exact_domain', company, alternatives: [] };
+        if (company) return { match: 'exact_domain' as const, company, alternatives: [] };
       }
 
-      if (local.match === 'none' && registryNeedles.length) {
+      if (registryNeedles.length) {
         const company = companies.find((item) =>
           Object.values(item.registryIds).some((value) =>
             registryNeedles.includes(normalizeRegistryValue(value)),
           ),
         );
-        if (company) local = { match: 'registry_id', company, alternatives: [] };
+        if (company) return { match: 'registry_id' as const, company, alternatives: [] };
       }
 
-      if (local.match === 'none' && name) {
+      if (name) {
         const exact = companies.find(
           (item) =>
             item.name.toLowerCase() === name ||
             (item.legalName !== null && item.legalName.toLowerCase() === name),
         );
-        if (exact) {
-          local = { match: 'exact_name', company: exact, alternatives: [] };
-        } else {
-          const alternatives = companies
-            .filter((item) =>
-              [item.name, item.legalName ?? '', item.domain ?? '']
-                .join(' ')
-                .toLowerCase()
-                .includes(name),
-            )
-            .slice(0, 5);
-          local = {
-            match: alternatives.length ? 'fuzzy_name' : 'none',
-            company: alternatives[0] ?? null,
-            alternatives: alternatives.slice(1),
-          };
-        }
+        if (exact) return { match: 'exact_name' as const, company: exact, alternatives: [] };
+
+        const alternatives = companies
+          .filter((item) =>
+            [item.name, item.legalName ?? '', item.domain ?? '']
+              .join(' ')
+              .toLowerCase()
+              .includes(name),
+          )
+          .slice(0, 5);
+        return {
+          match: alternatives.length ? ('fuzzy_name' as const) : ('none' as const),
+          company: alternatives[0] ?? null,
+          alternatives: alternatives.slice(1),
+        };
       }
 
-      // A typed name that is not already in the CRM still gets a public profile.
-      // Domain-only lookups stay local: a domain is enough for the logo proxy,
-      // and searching Wikidata by hostname would repeat the name lookup.
-      const typedName = req.query.name?.trim();
-      if (local.match !== 'none' || !typedName || typedName.length < 2) {
-        return { ...local, preview: null };
-      }
-      try {
-        const profile = await fetchOpenCompanyProfile({
-          name: typedName,
-          domain,
-        });
-        return { ...local, preview: toPublicPreview(profile) };
-      } catch (err) {
-        req.log.warn({ err }, 'public company preview failed');
-        return { ...local, preview: null };
-      }
+      return { match: 'none' as const, company: null, alternatives: [] };
     },
   );
 
@@ -566,8 +546,9 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     z.object({ fieldKey: z.literal('employeeCount'), value: z.number().int().positive().max(10_000_000) }),
     z.object({
       fieldKey: z.literal('annualRevenueMicros'),
-      // Integer micros. A string keeps a large amount; a number is only exact while safe.
-      value: z.union([z.string().regex(/^\d+$/), z.number().int().positive()]),
+      // Micros (int × 1e6); bounded to the same €9e15 float8-exact ceiling
+      // the analytics engine documents.
+      value: z.number().int().positive().max(9e15),
     }),
   ]);
   const FieldOverrideResponse = z.object({

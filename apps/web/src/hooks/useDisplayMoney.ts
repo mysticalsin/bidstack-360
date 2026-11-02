@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
 
 import { useCurrencyStore } from '@/stores/currency';
-import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
-import { formatConvertedMicros, formatMoney } from '@/lib/format';
-import { formatStoredMicros } from '@/hooks/useFormatMoney';
+import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
@@ -11,37 +9,49 @@ const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
  * Convert and format a money amount for the user's selected display currency.
  * Uses live exchange rates fetched from open.er-api.com.
  */
-export function useDisplayMoney(value: number, sourceCurrency?: string | null): string {
-  const { currency, convertAmountMicros, fetchRates } = useCurrencyStore();
+export function useDisplayMoney(value: number, sourceCurrency = 'EUR'): string {
+  const { currency, convert, fetchRates } = useCurrencyStore();
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
-  const source = sourceCurrency?.trim();
-  if (!source) return formatUnspecifiedAmount(value);
-  const converted = convertAmountMicros(value, source);
-  if (converted == null) return formatMoney(value, currency);
-  return formatConvertedMicros(converted, currency);
+  const converted = convert(value, sourceCurrency);
+  return formatMoney(converted, currency);
 }
 
 /** Convert and format micros (string/number/bigint) for the display currency. */
 export function useDisplayMoneyMicros(
   micros: string | number | bigint,
-  sourceCurrency?: string | null,
+  // Micros are EUR-denominated at rest — keep in sync with useDisplayMoney.
+  sourceCurrency = 'EUR',
   options?: { compact?: boolean },
 ): string {
-  const { currency, convert, convertMicros, fetchRates } = useCurrencyStore();
+  const { currency, convert, fetchRates } = useCurrencyStore();
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
-  return formatStoredMicros(micros, sourceCurrency, convert, currency, options, convertMicros);
+  // Convert micros to unit value
+  const asBigInt =
+    typeof micros === 'bigint'
+      ? micros
+      : typeof micros === 'number'
+        ? BigInt(Math.trunc(micros))
+        : BigInt(micros);
+  const million = BigInt(1_000_000);
+  const whole = asBigInt / million;
+  const remainder = asBigInt % million;
+  const value = Number(whole) + Number(remainder) / 1_000_000;
+  const converted = convert(value, sourceCurrency);
+  // Convert back to micros string for formatMoneyMicros
+  const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
+  return formatMoneyMicros(convertedMicros, currency, options);
 }
 
 /** Same as useDisplayMoneyMicros but always full precision. */
 export function useDisplayMoneyMicrosFull(
   micros: string | number | bigint,
-  sourceCurrency?: string | null,
+  sourceCurrency = 'EUR',
 ): string {
   return useDisplayMoneyMicros(micros, sourceCurrency, { compact: false });
 }

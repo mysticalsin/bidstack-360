@@ -6,7 +6,6 @@
 // exponential backoff before giving up.
 
 import { prisma } from '@bidstack/db';
-import { formatMicrosAmount, presentOpportunityIntel } from '@bidstack/shared';
 import pino from 'pino';
 
 import { getOrgDust } from './dust-credentials.js';
@@ -61,9 +60,11 @@ function serializeOpportunityToMarkdown(opp: {
   intel: unknown;
 }): string {
   const value =
-    typeof opp.valueMicros === 'bigint' || typeof opp.valueMicros === 'number'
-      ? formatMicrosAmount(opp.valueMicros)
-      : String(opp.valueMicros);
+    typeof opp.valueMicros === 'bigint'
+      ? (Number(opp.valueMicros) / 1_000_000).toString()
+      : typeof opp.valueMicros === 'number'
+        ? (opp.valueMicros / 1_000_000).toString()
+        : String(opp.valueMicros);
 
   return [
     `# ${opp.name}`,
@@ -71,15 +72,15 @@ function serializeOpportunityToMarkdown(opp: {
     `- **Code:** ${opp.code}`,
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
-    `- **Value (currency not recorded):** ${value}`,
-    `- **Stored probability:** ${opp.probability === 0 ? 'not recorded' : `${opp.probability}%`}`,
+    `- **Value (EUR):** ${value}`,
+    `- **Probability:** ${opp.probability}%`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
     ``,
     `## Intel`,
     ``,
     '```json',
-    JSON.stringify(presentOpportunityIntel(opp.intel), null, 2),
+    JSON.stringify(opp.intel, null, 2),
     '```',
   ].join('\n');
 }
@@ -88,7 +89,7 @@ function serializeOpportunityToMarkdown(opp: {
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushOpportunityToDust(oppId: string, orgId: string): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log);
-  if (!dust || !creds?.dataSourceId || !creds.spaceId) return; // space + data source required
+  if (!dust || !creds?.dataSourceId) return; // a data source is required to push documents
 
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: oppId, orgId } });
@@ -125,7 +126,7 @@ export async function pushOpportunityToDust(oppId: string, orgId: string): Promi
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushLeadToDust(leadId: string, orgId: string): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log);
-  if (!dust || !creds?.dataSourceId || !creds.spaceId) return; // space + data source required
+  if (!dust || !creds?.dataSourceId) return; // a data source is required to push documents
 
   try {
     const lead = await prisma.lead.findUnique({ where: { id: leadId, orgId } });

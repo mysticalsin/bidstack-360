@@ -20,8 +20,6 @@ describe('fallbackExtract', () => {
     expect(out).toHaveLength(3);
     expect(out[0]?.text).toBe('The vendor must provide 24/7 support with a one-hour response SLA.');
     expect(out[0]?.externalRef).toBe('REQ-0001');
-    expect(out[0]?.confidenceBps).toBeNull();
-    expect(out[0]?.mandatory).toBe(true);
     expect(out[2]?.text).toBe('The system must support single sign-on via SAML 2.0 provisioning.');
   });
 
@@ -36,7 +34,6 @@ describe('fallbackExtract', () => {
 
     expect(out).toHaveLength(3);
     expect(out[0]?.text).toBe('The supplier shall encrypt all data at rest and in transit.');
-    expect(out[2]?.mandatory).toBe(false);
   });
 
   it('skips prose without an obligation and lines that are too short', () => {

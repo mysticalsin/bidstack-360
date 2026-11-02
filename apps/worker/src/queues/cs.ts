@@ -98,8 +98,8 @@ async function startHealthScoreWorker(
 
         for (const { accountId } of accounts) {
           try {
-            const score = await computeAndPersistHealthScore(orgId, accountId, log);
-            if (score != null) total++;
+            await computeAndPersistHealthScore(orgId, accountId, log);
+            total++;
           } catch (err) {
             log.warn({ err, orgId, accountId }, 'cs.health: score compute failed, continuing');
           }

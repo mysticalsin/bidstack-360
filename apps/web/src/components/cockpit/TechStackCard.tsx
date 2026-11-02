@@ -17,6 +17,7 @@ import { TechLogo } from '@/components/company/TechLogo';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { toast } from '@/components/ui/Toast';
 import {
   useAcceptTechnicalStackSuggestion,
@@ -123,10 +124,6 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
       : cockpit.technicalStack;
   const suggestions = technicalStack.data?.suggestions ?? EMPTY_STACK_SUGGESTIONS;
   const [isEditing, setIsEditing] = useState(false);
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const [transcriptText, setTranscriptText] = useState('');
-  const [transcriptHits, setTranscriptHits] = useState<Array<{ name: string; category: string }>>([]);
-  const [transcriptRead, setTranscriptRead] = useState(false);
   const [draft, setDraft] = useState<TechnicalStackCategory[]>([]);
   const [newCategory, setNewCategory] = useState(AUTO_CATEGORY);
   const [newVendor, setNewVendor] = useState('');
@@ -175,30 +172,6 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
     setIsEditing(false);
   };
 
-  const addTranscriptHits = async (hits: Array<{ name: string; category: string }>) => {
-    if (hits.length === 0) return;
-    const next = hits.reduce(
-      (current, hit) =>
-        addManualItem(current, hit.category, hit.name, {
-          source: 'manual:transcript',
-          confidence: 0.7,
-        }),
-      cloneStack(stack),
-    );
-    try {
-      await saveStack.mutateAsync(cleanStack(next));
-      toast.success(t('techStack.toastTranscriptAdded', 'Technologies added from the transcript'));
-      setTranscriptOpen(false);
-      setTranscriptText('');
-      setTranscriptHits([]);
-      setTranscriptRead(false);
-    } catch (err) {
-      toast.error(t('techStack.toastSaveFailed', 'Could not save technical stack'), {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    }
-  };
-
   const saveDraft = async () => {
     try {
       await saveStack.mutateAsync(cleanStack(draft));
@@ -238,7 +211,7 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
         caption={
           technicalStack.isFetching
             ? t('techStack.captionSyncing', 'Syncing stack intelligence')
-            : t('techStack.caption', 'Products recorded on this account')
+            : t('techStack.caption', 'From discovery & verification')
         }
         action={
           isEditing ? (
@@ -263,49 +236,48 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
             </div>
           ) : (
             <div className="tech-stack-actions">
-              <button
-                type="button"
-                className="tech-source-pull-button secondary"
-                aria-label={t('techStack.editAria', 'Edit technical stack')}
-                onClick={startEditing}
-              >
-                {t('techStack.editStack', 'Edit')}
-              </button>
-              <button
-                type="button"
-                className="tech-source-pull-button secondary"
-                aria-expanded={transcriptOpen}
-                aria-label={t('techStack.importTranscriptAria', 'Import a transcript')}
-                onClick={() => setTranscriptOpen((open) => !open)}
-              >
-                {t('techStack.importTranscript', 'Import transcript')}
-              </button>
+              <Tooltip content={t('techStack.pullSourcesTooltip', 'Pull stack sources')}>
+                <button
+                  type="button"
+                  className="tech-source-pull-button"
+                  disabled={refreshStack.isPending}
+                  aria-label={t(
+                    'techStack.pullSourcesAria',
+                    'Pull technical stack from Apollo MCP/API, Seamless MCP/API, Tech Intel MCPs, and open data',
+                  )}
+                  onClick={() => void pullSources()}
+                >
+                  <Icon
+                    name={refreshStack.isPending ? 'loader' : 'refresh'}
+                    size={15}
+                    className={refreshStack.isPending ? 'tech-spin' : undefined}
+                    ariaHidden
+                  />
+                  <span>
+                    {refreshStack.isPending
+                      ? t('techStack.checkingSources', 'Checking')
+                      : t('techStack.checkSources', 'Pull sources')}
+                  </span>
+                </button>
+              </Tooltip>
+              <Tooltip content={t('techStack.editTooltip', 'Edit stack')}>
+                <button
+                  type="button"
+                  className="tech-source-pull-button secondary"
+                  aria-label={t('techStack.editAria', 'Edit technical stack')}
+                  onClick={startEditing}
+                >
+                  <Icon name="plus" size={15} ariaHidden />
+                  <span>{t('techStack.addStack', 'Add stack')}</span>
+                </button>
+              </Tooltip>
             </div>
           )
         }
       />
       <div className="tech-stack-body">
-        {transcriptOpen && !isEditing ? (
-          <TranscriptImport
-            text={transcriptText}
-            hits={transcriptHits}
-            read={transcriptRead}
-            saving={saveStack.isPending}
-            onTextChange={(value) => {
-              setTranscriptText(value);
-              setTranscriptRead(false);
-              setTranscriptHits([]);
-            }}
-            onRead={() => {
-              setTranscriptHits(technologiesInTranscript(transcriptText));
-              setTranscriptRead(true);
-            }}
-            onAdd={() => void addTranscriptHits(transcriptHits)}
-          />
-        ) : null}
+        <TechStackSourceRail sources={sourceSummary} />
         {isEditing ? (
-          <>
-          <TechStackSourceRail sources={sourceSummary} />
           <TechStackEditor
             draft={draft}
             suggestions={suggestions}
@@ -319,11 +291,16 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
             onNewCategoryChange={setNewCategory}
             onNewVendorChange={setNewVendor}
           />
-          </>
         ) : visibleStack.length > 0 || suggestions.length > 0 ? (
           <>
             {visibleStack.length > 0 ? (
               <>
+                <TechStackAddLaunchpad
+                  pendingSuggestions={suggestions.length}
+                  pullingSources={refreshStack.isPending}
+                  onPullSources={pullSources}
+                  onStartEditing={startEditing}
+                />
                 {visibleStack.map((cat) => (
                   <ReadOnlyStackCategory
                     key={cat.label}
@@ -333,9 +310,11 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
                 ))}
               </>
             ) : (
-              <p className="px-1 text-sm text-[var(--fg-secondary)]">
-                {t('techStack.emptyOverview', 'No technologies recorded on this account.')}
-              </p>
+              <TechStackEmptyPrompt
+                pullingSources={refreshStack.isPending}
+                onPullSources={pullSources}
+                onStartEditing={startEditing}
+              />
             )}
             {stack.length > 3 ? (
               <button
@@ -378,9 +357,11 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
             />
           </>
         ) : (
-          <p className="px-1 text-sm text-[var(--fg-secondary)]">
-            {t('techStack.emptyOverview', 'No technologies recorded on this account.')}
-          </p>
+          <TechStackEmptyPrompt
+            pullingSources={refreshStack.isPending}
+            onPullSources={pullSources}
+            onStartEditing={startEditing}
+          />
         )}
       </div>
     </Card>
@@ -413,7 +394,7 @@ type AcceptedSourceSummaryItem = {
 };
 
 type ProviderReviewSummaryItem = ProviderReviewBreakdownItem & {
-  averageConfidence: number | null;
+  averageConfidence: number;
   topVendor: string;
 };
 
@@ -452,94 +433,204 @@ function TechStackSourceRail({ sources }: { sources: SourceRailItem[] }) {
   );
 }
 
-function TranscriptImport({
-  text,
-  hits,
-  read,
-  saving,
-  onTextChange,
-  onRead,
-  onAdd,
+function TechStackEmptyPrompt({
+  pullingSources,
+  onPullSources,
+  onStartEditing,
 }: {
-  text: string;
-  hits: Array<{ name: string; category: string }>;
-  read: boolean;
-  saving: boolean;
-  onTextChange: (value: string) => void;
-  onRead: () => void;
-  onAdd: () => void;
+  pullingSources: boolean;
+  onPullSources: () => Promise<void>;
+  onStartEditing: () => void;
 }) {
   const { t } = useTranslation('crm');
+  const sourceLanes = [
+    {
+      id: 'apollo',
+      label: 'Apollo',
+      detail: t('techStack.emptyApolloLane', 'MCP/API'),
+    },
+    {
+      id: 'seamless',
+      label: 'Seamless.AI',
+      detail: t('techStack.emptySeamlessLane', 'MCP/API'),
+    },
+    {
+      id: 'tech_intel',
+      label: 'Tech Intel',
+      detail: t('techStack.emptyTechIntelLane', 'Configured MCPs'),
+    },
+    {
+      id: 'open_data',
+      label: 'Open data',
+      detail: t('techStack.emptyOpenDataLane', 'Public proof'),
+    },
+    {
+      id: 'other',
+      label: 'Other sources',
+      detail: t('techStack.emptyOtherLane', 'Attributed signals'),
+    },
+  ];
+
   return (
-    <form
-      className="mb-3 space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onRead();
-      }}
+    <div
+      className="tech-stack-empty-prompt"
+      aria-label={t('techStack.emptyPromptAria', 'Technical stack start options')}
     >
-      <label className="block text-sm text-[var(--fg-secondary)]" htmlFor="tech-transcript">
-        {t('techStack.transcriptLabel', 'Paste a transcript. Known products in it are added to this stack.')}
-      </label>
-      <textarea
-        id="tech-transcript"
-        value={text}
-        onChange={(event) => onTextChange(event.target.value)}
-        rows={4}
-        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)]"
-        aria-label={t('techStack.transcriptAria', 'Technology transcript')}
-        placeholder={t(
-          'techStack.transcriptPlaceholder',
-          'They run Salesforce and Snowflake, with Okta for access.',
-        )}
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="btn btn-secondary min-h-11">
-          {t('techStack.readTranscript', 'Read transcript')}
-        </button>
-        {hits.length > 0 ? (
-          <button type="button" className="btn btn-primary min-h-11" disabled={saving} onClick={onAdd}>
-            {t('techStack.addTranscriptHits', 'Add {{count}} to the stack', { count: hits.length })}
-          </button>
-        ) : null}
+      <div className="tech-stack-empty-main">
+        <Icon name="sparkle" size={17} ariaHidden />
+        <div>
+          <span>{t('techStack.emptyPromptTitle', 'Build the stack from evidence')}</span>
+          <small>
+            {t(
+              'techStack.emptyPromptBody',
+              'Pull provider intelligence first, then stage only the technologies your team trusts.',
+            )}
+          </small>
+        </div>
       </div>
-      {hits.length > 0 ? (
-        <ul className="flex flex-wrap gap-2" aria-label={t('techStack.transcriptHits', 'Technologies found')}>
-          {hits.map((hit) => (
-            <li
-              key={hit.name}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] px-2 py-1 text-sm"
-            >
-              <TechLogo name={hit.name} size={16} />
-              {hit.name}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {read && hits.length === 0 ? (
-        <p className="text-sm text-[var(--fg-secondary)]">
-          {t('techStack.transcriptNone', 'No known technologies in that transcript.')}
-        </p>
-      ) : null}
-    </form>
+      <div
+        className="tech-stack-empty-lanes"
+        aria-label={t('techStack.emptySourceLanesAria', 'Technical stack source lanes')}
+      >
+        {sourceLanes.map((lane) => (
+          <span key={lane.id} data-lane={lane.id}>
+            <strong>{lane.label}</strong>
+            <small>{lane.detail}</small>
+          </span>
+        ))}
+      </div>
+      <div className="tech-stack-empty-actions">
+        <button
+          type="button"
+          className="tech-source-pull-button full"
+          disabled={pullingSources}
+          aria-label={t(
+            'techStack.emptyPullSourcesAria',
+            'Pull source technologies into empty technical stack',
+          )}
+          onClick={() => void onPullSources()}
+        >
+          <Icon
+            name={pullingSources ? 'loader' : 'refresh'}
+            size={15}
+            className={pullingSources ? 'tech-spin' : undefined}
+            ariaHidden
+          />
+          <span>
+            {pullingSources
+              ? t('techStack.checkingSources', 'Checking')
+              : t('techStack.pullSourcesShort', 'Pull sources')}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="tech-source-pull-button secondary full"
+          aria-label={t('techStack.emptyAddManualAria', 'Add technical stack manually')}
+          onClick={onStartEditing}
+        >
+          <Icon name="plus" size={15} ariaHidden />
+          <span>{t('techStack.addStack', 'Add stack')}</span>
+        </button>
+      </div>
+    </div>
   );
 }
 
-export function technologiesInTranscript(text: string): Array<{ name: string; category: string }> {
-  const found: Array<{ name: string; category: string }> = [];
-  let remaining = text;
-  const catalog = [...QUICK_TECH_CATALOG].sort((a, b) => b.name.length - a.name.length);
-  for (const item of catalog) {
-    const pattern = new RegExp(`(^|[^A-Za-z0-9])${escapeRegExp(item.name)}([^A-Za-z0-9]|$)`, 'i');
-    if (!pattern.test(remaining)) continue;
-    found.push(item);
-    remaining = remaining.replace(new RegExp(escapeRegExp(item.name), 'ig'), ' ');
-  }
-  return found;
-}
+function TechStackAddLaunchpad({
+  pendingSuggestions,
+  pullingSources,
+  onPullSources,
+  onStartEditing,
+}: {
+  pendingSuggestions: number;
+  pullingSources: boolean;
+  onPullSources: () => Promise<void>;
+  onStartEditing: () => void;
+}) {
+  const { t } = useTranslation('crm');
+  const hasSuggestions = pendingSuggestions > 0;
+  const lanes = [
+    { id: 'apollo', label: 'Apollo', detail: 'MCP/API' },
+    { id: 'seamless', label: 'Seamless.AI', detail: 'MCP/API' },
+    { id: 'tech_intel', label: 'Tech Intel', detail: 'MCPs' },
+    { id: 'other', label: 'Other sources', detail: 'Attributed' },
+  ];
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (
+    <div
+      className="tech-stack-add-launchpad"
+      aria-label={t('techStack.addLaunchpadAria', 'Source-backed stack add launchpad')}
+    >
+      <div className="tech-stack-add-launchpad-main">
+        <Icon name={hasSuggestions ? 'check' : 'search'} size={16} ariaHidden />
+        <div>
+          <span>
+            {hasSuggestions
+              ? t('techStack.addLaunchpadReadyTitle', 'Review source-detected stack')
+              : t('techStack.addLaunchpadTitle', 'Add from verified sources')}
+          </span>
+          <small>
+            {hasSuggestions
+              ? t(
+                  'techStack.addLaunchpadReadyBody',
+                  '{{count}} Apollo, Seamless, Tech Intel, or attributed source suggestions are ready.',
+                  { count: pendingSuggestions },
+                )
+              : t(
+                  'techStack.addLaunchpadBody',
+                  'Pull Apollo, Seamless.AI, configured Tech Intel MCPs, and attributed sources before staging manual truth.',
+                )}
+          </small>
+        </div>
+      </div>
+      <div
+        className="tech-stack-add-launchpad-lanes"
+        aria-label={t('techStack.addLaunchpadSourcesAria', 'Stack source pull coverage')}
+      >
+        {lanes.map((lane) => (
+          <span key={lane.id} data-lane={lane.id}>
+            <strong>{lane.label}</strong>
+            <small>{lane.detail}</small>
+          </span>
+        ))}
+      </div>
+      <div className="tech-stack-add-launchpad-actions">
+        <button
+          type="button"
+          className="tech-source-pull-button"
+          disabled={pullingSources}
+          aria-label={t(
+            'techStack.addLaunchpadPullAria',
+            'Pull and review technical stack sources from Apollo, Seamless, Tech Intel MCPs, and attributed sources',
+          )}
+          onClick={() => void onPullSources()}
+        >
+          <Icon
+            name={pullingSources ? 'loader' : 'refresh'}
+            size={15}
+            className={pullingSources ? 'tech-spin' : undefined}
+            ariaHidden
+          />
+          <span>
+            {pullingSources
+              ? t('techStack.checkingSources', 'Checking')
+              : hasSuggestions
+                ? t('techStack.reviewSourcesShort', 'Review sources')
+                : t('techStack.pullAndReview', 'Pull and review')}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="tech-source-pull-button secondary"
+          aria-label={t('techStack.addLaunchpadManualAria', 'Add technical stack manually')}
+          onClick={onStartEditing}
+        >
+          <Icon name="plus" size={15} ariaHidden />
+          <span>{t('techStack.manualAddShort', 'Manual add')}</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ReadOnlyStackCategory({
@@ -565,9 +656,12 @@ function ReadOnlyStackCategory({
           >
             <TechLogo name={item.name} size={14} />
             <span className="tech-pill-name">{item.name}</span>
-            <span className="sr-only">
-              {confidencePhrase(item.name, item.source, item.confidence)}
-            </span>
+            <SourceBadge
+              label={sourceLabelForTechItem(item)}
+              state={sourceStateForTechItem(item)}
+              hint={`${item.name} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
+              className="tech-pill-source"
+            />
           </motion.span>
         ))}
       </div>
@@ -1057,7 +1151,7 @@ function TechStackEditor({
                     <TechLogo name={suggestion.item.name} size={13} />
                     <span>{suggestion.item.name}</span>
                     <small>{sourceLabelForTechItem(suggestion.item)}</small>
-                    <strong>{confidencePercentLabel(suggestion.item.confidence, suggestion.item.source)}</strong>
+                    <strong>{Math.round(suggestion.item.confidence * 100)}%</strong>
                   </button>
                 ))}
               </div>
@@ -1278,12 +1372,8 @@ function TechStackEditor({
                     <strong>{summary.count}</strong>
                     <small>{summary.label}</small>
                   </span>
-                  <span>
-                    {summary.averageConfidence == null
-                      ? 'Not scored'
-                      : `${summary.averageConfidence}% avg`}
-                  </span>
-                  {summary.topVendor ? <small>Top {summary.topVendor}</small> : null}
+                  <span>{summary.averageConfidence}% avg</span>
+                  <small>Top {summary.topVendor}</small>
                 </button>
               ))}
             </div>
@@ -1337,7 +1427,7 @@ function TechStackEditor({
                     <span className="tech-editor-source-name">{suggestion.item.name}</span>
                     <small>{suggestion.label}</small>
                     <strong className="tech-editor-source-confidence">
-                      {confidencePercentLabel(suggestion.item.confidence, suggestion.item.source)}
+                      {Math.round(suggestion.item.confidence * 100)}%
                     </strong>
                     <span className="tech-editor-source-transport">
                       {sourceTransportLabelForTechItem(suggestion.item, providerTransportById)}
@@ -1345,7 +1435,7 @@ function TechStackEditor({
                     <SourceBadge
                       label={sourceLabelForTechItem(suggestion.item)}
                       state={sourceStateForTechItem(suggestion.item)}
-                      hint={confidencePhrase(suggestion.item.name, suggestion.item.source, suggestion.item.confidence)}
+                      hint={`${suggestion.item.name} source: ${suggestion.item.source}. Confidence ${Math.round(suggestion.item.confidence * 100)}%.`}
                       className="tech-editor-source"
                     />
                   </button>
@@ -1466,7 +1556,7 @@ function TechStackEditor({
                     <SourceBadge
                       label={sourceLabelForTechItem(item)}
                       state={sourceStateForTechItem(item)}
-                      hint={confidencePhrase(item.name || 'Vendor', item.source, item.confidence)}
+                      hint={`${item.name || 'Vendor'} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
                       className="tech-editor-source"
                     />
                     <button
@@ -1528,29 +1618,19 @@ function TechStackSourceFirstAssist({
   const queuedProviderCount = providerRows.filter((provider) => provider.status === 'queued').length;
   const reviewCountById = new Map(reviewBreakdown.map((item) => [item.id, item.count]));
   const sourceMatchLabel = bestSourceMatch ? sourceLabelForTechItem(bestSourceMatch.item) : null;
-  const sourceMatchConfidence =
-    bestSourceMatch?.item.confidence == null
-      ? null
-      : Math.round(bestSourceMatch.item.confidence * 100);
+  const sourceMatchConfidence = bestSourceMatch
+    ? Math.round(bestSourceMatch.item.confidence * 100)
+    : 0;
   const subtitle = bestSourceMatch
-    ? sourceMatchConfidence == null
-      ? t(
-          'techStack.sourceFirstBestMatchUnscored',
-          '{{vendor}} matches {{source}}. Not scored.',
-          {
-            vendor: bestSourceMatch.item.name,
-            source: sourceMatchLabel,
-          },
-        )
-      : t(
-          'techStack.sourceFirstBestMatchSubtitle',
-          '{{vendor}} matches {{source}} evidence at {{confidence}}%.',
-          {
-            vendor: bestSourceMatch.item.name,
-            source: sourceMatchLabel,
-            confidence: sourceMatchConfidence,
-          },
-        )
+    ? t(
+        'techStack.sourceFirstBestMatchSubtitle',
+        '{{vendor}} matches {{source}} evidence at {{confidence}}%.',
+        {
+          vendor: bestSourceMatch.item.name,
+          source: sourceMatchLabel,
+          confidence: sourceMatchConfidence,
+        },
+      )
     : pullingSources
       ? t(
           'techStack.sourceFirstCheckingSubtitle',
@@ -2071,17 +2151,11 @@ function TrustedSourceRibbon({
   if (suggestions.length === 0) return null;
 
   const providerSummary = buildProviderReviewSummaries(suggestions);
-  const scoredConfidences = suggestions
-    .map((suggestion) => suggestion.item.confidence)
-    .filter((confidence): confidence is number => confidence != null);
-  const averageConfidence =
-    scoredConfidences.length === 0
-      ? null
-      : Math.round(
-          (scoredConfidences.reduce((total, confidence) => total + confidence, 0) /
-            scoredConfidences.length) *
-            100,
-        );
+  const averageConfidence = Math.round(
+    suggestions.reduce((total, suggestion) => total + suggestion.item.confidence, 0) /
+      suggestions.length *
+      100,
+  );
 
   return (
     <div
@@ -2109,7 +2183,7 @@ function TrustedSourceRibbon({
         aria-label={t('techStack.trustedSourceBreakdownAria', 'Trusted source breakdown')}
       >
         <span>
-          <strong>{averageConfidence == null ? 'Not scored' : `${averageConfidence}%`}</strong>
+          <strong>{averageConfidence}%</strong>
           {t('techStack.trustedSourceAverage', ' avg')}
         </span>
         {providerSummary.map((item) => (
@@ -2360,7 +2434,7 @@ function ProviderSuggestions({
             <SourceBadge
               label={sourceLabelForTechItem(suggestion.item)}
               state={sourceStateForTechItem(suggestion.item)}
-              hint={confidencePhrase(suggestion.item.name, suggestion.item.source, suggestion.item.confidence)}
+              hint={`${suggestion.item.name} source: ${suggestion.item.source}. Confidence ${Math.round(suggestion.item.confidence * 100)}%.`}
             />
           </div>
           <div className="tech-suggestion-actions">
@@ -2737,7 +2811,7 @@ function compareSourceSuggestions(
   left: TechnicalStackSuggestion,
   right: TechnicalStackSuggestion,
 ): number {
-  const confidenceDelta = (right.item.confidence ?? -1) - (left.item.confidence ?? -1);
+  const confidenceDelta = right.item.confidence - left.item.confidence;
   if (Math.abs(confidenceDelta) > 0.001) return confidenceDelta;
   return providerRank(left.item.source) - providerRank(right.item.source);
 }
@@ -2768,13 +2842,12 @@ function buildProviderReviewSummaries(
 ): ProviderReviewSummaryItem[] {
   const buckets: Record<
     ProviderReviewBreakdownItem['id'],
-    { label: string; count: number; scoredCount: number; confidenceTotal: number; topVendor: string; topConfidence: number }
+    { label: string; count: number; confidenceTotal: number; topVendor: string; topConfidence: number }
   > = {
-    apollo: { label: 'Apollo', count: 0, scoredCount: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
+    apollo: { label: 'Apollo', count: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
     seamless: {
       label: 'Seamless',
       count: 0,
-      scoredCount: 0,
       confidenceTotal: 0,
       topVendor: '',
       topConfidence: -1,
@@ -2782,7 +2855,6 @@ function buildProviderReviewSummaries(
     tech_intel: {
       label: 'Tech Intel',
       count: 0,
-      scoredCount: 0,
       confidenceTotal: 0,
       topVendor: '',
       topConfidence: -1,
@@ -2790,25 +2862,21 @@ function buildProviderReviewSummaries(
     open_data: {
       label: 'Open data',
       count: 0,
-      scoredCount: 0,
       confidenceTotal: 0,
       topVendor: '',
       topConfidence: -1,
     },
-    other: { label: 'Other', count: 0, scoredCount: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
+    other: { label: 'Other', count: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
   };
 
   for (const suggestion of suggestions) {
     const providerId = providerIdForTechSource(suggestion.item.source);
     const bucket = buckets[providerId];
     bucket.count += 1;
-    if (suggestion.item.confidence != null) {
-      bucket.scoredCount += 1;
-      bucket.confidenceTotal += suggestion.item.confidence;
-      if (suggestion.item.confidence > bucket.topConfidence) {
-        bucket.topConfidence = suggestion.item.confidence;
-        bucket.topVendor = suggestion.item.name;
-      }
+    bucket.confidenceTotal += suggestion.item.confidence;
+    if (suggestion.item.confidence > bucket.topConfidence) {
+      bucket.topConfidence = suggestion.item.confidence;
+      bucket.topVendor = suggestion.item.name;
     }
   }
 
@@ -2818,9 +2886,7 @@ function buildProviderReviewSummaries(
       label: bucket.label,
       count: bucket.count,
       averageConfidence:
-        bucket.scoredCount > 0
-          ? Math.round((bucket.confidenceTotal / bucket.scoredCount) * 100)
-          : null,
+        bucket.count > 0 ? Math.round((bucket.confidenceTotal / bucket.count) * 100) : 0,
       topVendor: bucket.topVendor,
     }))
     .filter((item) => item.count > 0);
@@ -2836,7 +2902,7 @@ function providerIdForTechSource(source: string): ProviderReviewBreakdownItem['i
 }
 
 function isTrustedSourceSuggestion(suggestion: TechnicalStackSuggestion): boolean {
-  return (suggestion.item.confidence ?? -1) >= TRUSTED_SOURCE_CONFIDENCE;
+  return suggestion.item.confidence >= TRUSTED_SOURCE_CONFIDENCE;
 }
 
 function buildIntakeReviewItems(
@@ -3419,26 +3485,9 @@ function providerRowsFromReviewBreakdown(
   return providerRows;
 }
 
-function recordedByUser(source: string): boolean {
-  return source.toLowerCase().includes('manual');
-}
-
-function confidencePercentLabel(confidence: number | null, source?: string): string {
-  if (source && recordedByUser(source)) return 'Recorded by you';
-  if (confidence == null) return 'Not scored';
-  return `${Math.round(confidence * 100)}%`;
-}
-
-function confidencePhrase(name: string, source: string, confidence: number | null): string {
-  if (recordedByUser(source)) return `${name} source: ${source}. Recorded by you.`;
-  if (confidence == null) return `${name} source: ${source}. Not scored.`;
-  return `${name} source: ${source}. Confidence ${Math.round(confidence * 100)}%.`;
-}
-
 function sourceStateForTechItem(item: TechnicalStackItemType): CockpitSourceState {
   const source = item.source.toLowerCase();
   if (source.includes('manual')) return 'verified';
-  if (item.confidence == null) return 'crm';
   if (source.includes('apollo')) return item.confidence >= 0.72 ? 'apollo_fresh' : 'apollo_stale';
   if (item.confidence >= 0.86) return 'verified';
   if (item.confidence <= 0.5) return 'missing';

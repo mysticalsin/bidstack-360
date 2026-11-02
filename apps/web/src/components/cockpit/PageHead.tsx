@@ -281,12 +281,6 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   if (c.industry) rows.push([t('pageHead.briefIndustry', 'Industry'), c.industry]);
   if (c.employeeCount)
     rows.push([t('pageHead.briefHeadcount', 'Headcount'), c.employeeCount.toLocaleString()]);
-  if (c.publicFacts?.headquarters)
-    rows.push([t('pageHead.briefHeadquarters', 'Headquarters'), c.publicFacts.headquarters]);
-  if (c.publicFacts?.revenueLabel)
-    rows.push([t('pageHead.briefRevenue', 'Revenue'), c.publicFacts.revenueLabel]);
-  if (c.publicFacts?.chiefExecutive)
-    rows.push([t('pageHead.briefChiefExecutive', 'Chief executive'), c.publicFacts.chiefExecutive]);
   if (c.domain) rows.push([t('pageHead.briefDomain', 'Domain'), c.domain]);
   if (c.legalName && c.legalName !== c.name)
     rows.push([t('pageHead.briefLegalName', 'Legal name'), c.legalName]);
@@ -325,11 +319,9 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
         </dl>
       ) : null}
       <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {recordedConfidencePercent(c.confidence) === null
-          ? t('pageHead.confidenceNotScored', 'Confidence not scored')
-          : t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
-              percent: recordedConfidencePercent(c.confidence),
-            })}
+        {t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
+          percent: Math.round(c.confidence * 100),
+        })}
       </div>
     </div>
   );

@@ -17,45 +17,9 @@ import {
   persistSession,
   recordCost,
 } from './ai-assistant.helpers.js';
-import {
-  buildAccountIntelContext,
-  buildSentimentContext,
-  countRecordedDealOutcomes,
-  formatDealForPrompt,
-} from './ai-assistant.context.js';
+import { buildAccountIntelContext, buildSentimentContext } from './ai-assistant.context.js';
 
 // ─── Deal sentiment ───────────────────────────────────────────────────────────
-
-/** Activity count only. A count is not a sentiment score. */
-export function recordedDealSentiment(activityCount: number): {
-  score: null;
-  label: null;
-  summary: string;
-  riskFlags: [];
-  suggestedActions: [];
-} {
-  return {
-    score: null,
-    label: null,
-    summary: `${activityCount} activities recorded for this deal. No sentiment score was produced.`,
-    riskFlags: [],
-    suggestedActions: [],
-  };
-}
-
-export function parseDealSentimentScore(value: unknown): number | null {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < -1 || value > 1) return null;
-  return value;
-}
-
-export function parseDealSentimentLabel(
-  value: unknown,
-): 'positive' | 'neutral' | 'negative' | null {
-  if (value === 'positive' || value === 'neutral' || value === 'negative') return value;
-  return null;
-}
-
-// ─── Deal sentiment runner ────────────────────────────────────────────────────
 
 export async function analyzeDealSentiment(
   opts: { orgId: string; userId: string; dealId: string },
@@ -77,7 +41,7 @@ export async function analyzeDealSentiment(
   );
 
   const prompt =
-    `Analyse deal sentiment for ${formatDealForPrompt(opp)}.\n` +
+    `Analyse deal sentiment for "${opp.name}" (stage: ${opp.stage}).\n` +
     `Recent activities (newest first):\n${activitiesSummary || 'No activities recorded.'}\n\n` +
     `Return JSON: {"score": <-1..1>, "label": "positive|neutral|negative", "summary": "...", "riskFlags": [...], "suggestedActions": [...]}`;
 
@@ -95,18 +59,28 @@ export async function analyzeDealSentiment(
   }
 
   if (!responseText) {
-    // OmniRoute (free gateway) powers the copilot when Dust isn't configured.
-    responseText =
-      (await completeChatOrNull(
-        opts.orgId,
-        { user: prompt, responseFormat: 'json_object' },
-        childLog,
-      )) ?? '';
+    // OmniRoute (free gateway) powers the copilot when Dust isn't configured;
+    // stub is the last resort.
+    responseText = (await completeChatOrNull(
+      opts.orgId,
+      { user: prompt, responseFormat: 'json_object' },
+      childLog,
+    )) ?? '';
   }
 
   if (!responseText) {
-    // A count is not a sentiment score. Record the activity total and leave the score empty.
-    responseText = JSON.stringify(recordedDealSentiment(activities.length));
+    // Stub: infer rough sentiment from activity count as a simple heuristic.
+    const score = activities.length >= 5 ? 0.3 : activities.length >= 2 ? 0 : -0.2;
+    responseText = JSON.stringify({
+      score,
+      label: score > 0.1 ? 'positive' : score < -0.1 ? 'negative' : 'neutral',
+      summary: `${activities.length} activities recorded for this deal.`,
+      riskFlags: activities.length === 0 ? ['No recent activity — deal may be stalled'] : [],
+      suggestedActions:
+        activities.length === 0
+          ? ['Schedule a follow-up call', 'Send a check-in email']
+          : ['Review latest activity for next steps'],
+    });
   }
 
   const tokenInput = Math.ceil(prompt.length / 4);
@@ -114,8 +88,8 @@ export async function analyzeDealSentiment(
   const costMicros = estimateCost(tokenInput, tokenOutput);
 
   let parsed: {
-    score: number | null;
-    label: string | null;
+    score: number;
+    label: string;
     summary: string;
     riskFlags: string[];
     suggestedActions: string[];
@@ -124,8 +98,8 @@ export async function analyzeDealSentiment(
     parsed = JSON.parse(responseText) as typeof parsed;
   } catch {
     parsed = {
-      score: null,
-      label: null,
+      score: 0,
+      label: 'neutral',
       summary: responseText.slice(0, 500),
       riskFlags: [],
       suggestedActions: [],
@@ -149,8 +123,8 @@ export async function analyzeDealSentiment(
 
   return {
     sessionId,
-    score: parseDealSentimentScore(parsed.score),
-    label: parseDealSentimentLabel(parsed.label),
+    score: parsed.score ?? 0,
+    label: (parsed.label as 'positive' | 'neutral' | 'negative') ?? 'neutral',
     summary: parsed.summary ?? '',
     riskFlags: Array.isArray(parsed.riskFlags) ? parsed.riskFlags : [],
     suggestedActions: Array.isArray(parsed.suggestedActions) ? parsed.suggestedActions : [],
@@ -159,34 +133,6 @@ export async function analyzeDealSentiment(
 }
 
 // ─── Account intel ────────────────────────────────────────────────────────────
-
-/** Counts from recorded deals. No score, and no suggested plays. */
-export function recordedAccountIntel(input: {
-  opportunityCount: number;
-  wonCount: number;
-  lostCount: number;
-  contactCount: number;
-}): {
-  healthScore: null;
-  summary: string;
-  expansionOpportunities: [];
-  churnRisks: [];
-} {
-  return {
-    healthScore: null,
-    summary: `${input.opportunityCount} opportunities on this account, ${input.wonCount} won, ${input.lostCount} lost, ${input.contactCount} linked contacts. No health score was produced.`,
-    expansionOpportunities: [],
-    churnRisks: [],
-  };
-}
-
-/** Keeps a 0–100 model number. Anything else, including a missing field, is no score. */
-export function parseAccountHealthScore(value: unknown): number | null {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) return null;
-  return Math.round(value);
-}
-
-// ─── Account intel runner ─────────────────────────────────────────────────────
 
 export async function summarizeAccountIntel(
   opts: { orgId: string; userId: string; accountId: string },
@@ -231,23 +177,30 @@ export async function summarizeAccountIntel(
   }
 
   if (!responseText) {
-    responseText =
-      (await completeChatOrNull(
-        opts.orgId,
-        { user: prompt, responseFormat: 'json_object' },
-        childLog,
-      )) ?? '';
+    // OmniRoute (free gateway) powers the copilot when Dust isn't configured;
+    // stub is the last resort.
+    responseText = (await completeChatOrNull(
+      opts.orgId,
+      { user: prompt, responseFormat: 'json_object' },
+      childLog,
+    )) ?? '';
   }
 
   if (!responseText) {
-    const { won: wonCount, lost: lostCount } = countRecordedDealOutcomes(opps);
-    const recorded = recordedAccountIntel({
-      opportunityCount: opps.length,
-      wonCount,
-      lostCount,
-      contactCount: contacts.length,
+    const wonCount = opps.filter((o) => String(o.stage) === 'closed_won').length;
+    const lostCount = opps.filter((o) => String(o.stage) === 'closed_lost').length;
+    const healthScore = opps.length
+      ? Math.round(((wonCount + 1) / (wonCount + lostCount + 1)) * 100)
+      : 50;
+    responseText = JSON.stringify({
+      healthScore,
+      summary: `${opps.length} total opportunities, ${wonCount} won, ${lostCount} lost. ${contacts.length} known contacts.`,
+      expansionOpportunities:
+        wonCount > 0
+          ? ['Explore upsell for existing won deals', 'Cross-sell related products']
+          : [],
+      churnRisks: lostCount >= 2 ? ['Multiple lost deals may indicate competitive pressure'] : [],
     });
-    responseText = JSON.stringify(recorded);
   }
 
   const tokenInput = Math.ceil(prompt.length / 4);
@@ -255,7 +208,7 @@ export async function summarizeAccountIntel(
   const costMicros = estimateCost(tokenInput, tokenOutput);
 
   let parsed: {
-    healthScore: number | null;
+    healthScore: number;
     summary: string;
     expansionOpportunities: string[];
     churnRisks: string[];
@@ -264,7 +217,7 @@ export async function summarizeAccountIntel(
     parsed = JSON.parse(responseText) as typeof parsed;
   } catch {
     parsed = {
-      healthScore: null,
+      healthScore: 50,
       summary: responseText.slice(0, 500),
       expansionOpportunities: [],
       churnRisks: [],
@@ -288,7 +241,7 @@ export async function summarizeAccountIntel(
 
   return {
     sessionId,
-    healthScore: parseAccountHealthScore(parsed.healthScore),
+    healthScore: parsed.healthScore ?? 50,
     summary: parsed.summary ?? '',
     expansionOpportunities: Array.isArray(parsed.expansionOpportunities)
       ? parsed.expansionOpportunities

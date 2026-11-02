@@ -8,14 +8,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { OpportunityStage, unitsTextToMicros } from '@bidstack/shared';
+import { OpportunityStage } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 
 interface ConvertForm {
   opportunityName?: string;
-  opportunityValueMicros?: string;
+  opportunityValueMicros: number;
   stage: OpportunityStage;
 }
 
@@ -31,12 +31,11 @@ export function ConvertLeadDialog({
   onConvert: (form: ConvertForm) => void;
 }) {
   const { t } = useTranslation('crm');
-  const [form, setForm] = useState<ConvertForm>({
+  const [form, setForm] = useState<Required<ConvertForm>>({
     opportunityName: '',
+    opportunityValueMicros: 0,
     stage: 's1_ongoing',
   });
-  const [valueText, setValueText] = useState('');
-  const [valueError, setValueError] = useState<string | null>(null);
 
   return (
     <Card className="border border-[var(--brand-primary)]/30">
@@ -71,26 +70,19 @@ export function ConvertLeadDialog({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
-              {t('convertLead.valueLabel', 'Value')}
-              <span className="mt-0.5 block font-normal normal-case tracking-normal text-[var(--fg-tertiary)]">
-                {t('convertLead.valueHint', 'Currency not recorded')}
-              </span>
+              {t('convertLead.valueLabel', 'Value (EUR)')}
             </label>
             <input
-              type="text"
-              inputMode="decimal"
-              value={valueText}
-              onChange={(e) => {
-                setValueText(e.target.value);
-                setValueError(null);
-              }}
+              type="number"
+              value={form.opportunityValueMicros / 1_000_000}
+              onChange={(e) =>
+                setForm((s) => ({
+                  ...s,
+                  opportunityValueMicros: Math.round(Number(e.target.value) * 1_000_000),
+                }))
+              }
               className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
             />
-            {valueError ? (
-              <p className="mt-1 text-xs text-[var(--danger)]" role="alert">
-                {valueError}
-              </p>
-            ) : null}
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
@@ -118,23 +110,14 @@ export function ConvertLeadDialog({
         </div>
         <div className="mt-4 flex items-center gap-2">
           <Button
-            onClick={() => {
-              const trimmed = valueText.trim();
-              const micros = trimmed ? unitsTextToMicros(trimmed) : 0n;
-              if (trimmed && micros == null) {
-                setValueError(
-                  t('convertLead.valueInvalid', 'Enter an amount with up to 6 decimal places.'),
-                );
-                return;
-              }
+            onClick={() =>
               // Empty name must be OMITTED — the API schema requires min(1)
               // when present, so sending '' fails the whole conversion.
               onConvert({
                 ...form,
-                opportunityName: form.opportunityName?.trim() || undefined,
-                opportunityValueMicros: (micros ?? 0n).toString(),
-              });
-            }}
+                opportunityName: form.opportunityName.trim() || undefined,
+              })
+            }
             disabled={isPending}
           >
             {isPending

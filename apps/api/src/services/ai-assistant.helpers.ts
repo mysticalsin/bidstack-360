@@ -88,9 +88,8 @@ export interface EmailDraftResult {
 
 export interface DealSentimentResult {
   sessionId: string;
-  /** -1 to 1 when a model returned one. Null when no score was produced. */
-  score: number | null;
-  label: 'positive' | 'neutral' | 'negative' | null;
+  score: number; // -1 to 1
+  label: 'positive' | 'neutral' | 'negative';
   summary: string;
   riskFlags: string[];
   suggestedActions: string[];
@@ -119,8 +118,7 @@ export interface ContactEnrichResult {
 
 export interface AccountIntelResult {
   sessionId: string;
-  /** A model score from 0 to 100. Null when no score was returned. */
-  healthScore: number | null;
+  healthScore: number; // 0–100
   summary: string;
   expansionOpportunities: string[];
   churnRisks: string[];
@@ -178,7 +176,7 @@ export async function checkDailyCap(
       return {
         allowed: false,
         retryAfterSeconds: Math.ceil(msUntilMidnight / 1000),
-        reason: `Daily AI cost cap of $${usdFromMicros(capMicros)} reached.`,
+        reason: `Daily AI cost cap of $${Number(capMicros) / 1_000_000} reached.`,
       };
     }
   } catch (err) {
@@ -368,12 +366,6 @@ export async function completeChatOrNull(
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────
-
-function usdFromMicros(micros: bigint): string {
-  const whole = micros / 1_000_000n;
-  const frac = (micros % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
-  return frac ? `${whole.toString()}.${frac}` : whole.toString();
-}
 
 export function estimateCost(inputTokens: number, outputTokens: number): bigint {
   return (

@@ -45,8 +45,6 @@ export const IntegrationSetupGuide = z.object({
     configured: z.boolean(),
     workspaceId: z.string().nullable(),
     dataSourceConfigured: z.boolean(),
-    /** True when DUST_SPACE_ID is set. Document upserts need the space sId. */
-    spaceConfigured: z.boolean(),
     webhookReceiverUrl: z.string(),
   }),
   mcp: z.object({

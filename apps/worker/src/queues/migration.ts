@@ -28,7 +28,7 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma, Prisma } from '@bidstack/db';
-import { MIGRATION, MigrationJobPayload, unitsTextToMicros, type MigrationJobError } from '@bidstack/shared';
+import { MIGRATION, MigrationJobPayload, type MigrationJobError } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
 import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
@@ -75,13 +75,11 @@ export function asInt(v: unknown): number | null {
 export function asMicros(v: unknown): bigint | null {
   const s = asTrimmed(v);
   // Require a digit so a non-numeric cell ("n/a", "TBD") is SKIPPED, not
-  // silently coerced to 0.
+  // silently coerced to €0 (Number('') === 0 would otherwise do that).
   if (!s || !/\d/.test(s)) return null;
-  const cleaned = s.replace(/[^0-9.-]/g, '');
-  const negative = cleaned.startsWith('-');
-  const parsed = unitsTextToMicros(negative ? cleaned.slice(1) : cleaned);
-  if (parsed == null) return null;
-  return negative ? -parsed : parsed;
+  const n = Number(s.replace(/[^0-9.-]/g, ''));
+  if (!Number.isFinite(n)) return null;
+  return BigInt(Math.round(n * 1_000_000));
 }
 
 function asDate(v: unknown): Date | null {
@@ -100,22 +98,6 @@ const LEAD_STATUSES = new Set([
   'converted',
 ]);
 
-/** Blank stays new. An unknown label is not stored as new. */
-export function mapLeadStatus(v: unknown): string {
-  const raw = asTrimmed(v);
-  const s = raw?.toLowerCase().replace(/[\s-]+/g, '_');
-  if (!s) return 'new';
-  if (LEAD_STATUSES.has(s)) return s;
-  if (s.includes('disqualif') || s.includes('unqualif') || s === 'junk' || s === 'rejected') {
-    return 'disqualified';
-  }
-  if (s.includes('convert')) return 'converted';
-  if (s.includes('qualif')) return 'qualified';
-  if (s.includes('nurtur')) return 'nurture';
-  if (s.includes('contact')) return 'contacted';
-  throw new Error(`lead.status "${raw}" is not a known status, so it was not imported`);
-}
-
 const OPP_STAGES = new Set([
   's1_lead',
   's1_ongoing',
@@ -132,24 +114,12 @@ export function mapStage(v: unknown): string {
   if (!s) return 's1_lead';
   if (OPP_STAGES.has(s)) return s;
   if (s.includes('won')) return 'closed_won';
-  if (s.includes('lost')) return 'closed_lost';
-  // An unspecified close is not a lead and not a loss. The import records
-  // the row as an error so the original label is not replaced by s1_lead.
-  if (s.includes('closed')) {
-    throw new Error(
-      `opportunity.stage "${asTrimmed(v)}" is closed without won or lost, so it was not imported`,
-    );
-  }
+  if (s.includes('lost') || s.includes('closed')) return 'closed_lost';
   if (s.includes('negoti') || s.includes('contract')) return 's4_negotiation';
-  if (s.includes('proposal') || /(^|_)sent($|_)/.test(s) || s.includes('quote')) return 's2_sent';
+  if (s.includes('proposal') || s.includes('sent') || s.includes('quote')) return 's2_sent';
   if (s.includes('demo') || s.includes('technical') || s.includes('evaluation'))
     return 's3_technical_iteration';
-  if (s === 'lead' || s.includes('prospect') || s.includes('qualif') || s.includes('ongoing')) {
-    return 's1_lead';
-  }
-  throw new Error(
-    `opportunity.stage "${asTrimmed(v)}" is not a known stage, so it was not imported`,
-  );
+  return 's1_lead';
 }
 
 /** Map a source row through the column mappings into { targetField: rawValue }. */
@@ -179,21 +149,6 @@ interface WriteCtx {
   dedupStrategy: 'skip' | 'update' | 'duplicate';
 }
 
-/** One insensitive name match may be used. Two matches must not pick a winner. */
-export function soleCompanyId(ids: readonly string[]): { id: string | null; ambiguous: boolean } {
-  if (ids.length > 1) return { id: null, ambiguous: true };
-  return { id: ids[0] ?? null, ambiguous: false };
-}
-
-async function companiesNamed(orgId: string, name: string): Promise<string[]> {
-  const rows = await prisma.company.findMany({
-    where: { orgId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
-    select: { id: true },
-    take: 2,
-  });
-  return rows.map((row) => row.id);
-}
-
 async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
   const name = asTrimmed(t['company.name']);
   if (!name) throw new Error('company.name is required');
@@ -206,18 +161,18 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     countryCode: asTrimmed(t['company.countryCode'])?.slice(0, 2).toUpperCase() ?? null,
   };
   if (ctx.dedupStrategy !== 'duplicate') {
-    const match = soleCompanyId(await companiesNamed(ctx.orgId, name));
-    if (match.ambiguous) {
-      throw new Error(`company.name matches more than one company: ${name}`);
-    }
-    if (match.id) {
+    const existing = await prisma.company.findFirst({
+      where: { orgId: ctx.orgId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
+      select: { id: true },
+    });
+    if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.company.update({ where: { id: match.id }, data });
+      await prisma.company.update({ where: { id: existing.id }, data });
       return null; // updated, not created — undo must not delete pre-existing rows
     }
   }
   const created = await prisma.company.create({
-    data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 0 },
+    data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 1 },
     select: { id: true },
   });
   return created.id;
@@ -230,28 +185,32 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
   if (!name) throw new Error('contact first/last name is required');
   const customer = asTrimmed(t['contact.companyName']) ?? '';
   const email = asTrimmed(t['contact.email']);
-  const company = customer ? soleCompanyId(await companiesNamed(ctx.orgId, customer)) : null;
+  const company = customer
+    ? await prisma.company.findFirst({
+        where: {
+          orgId: ctx.orgId,
+          name: { equals: customer, mode: 'insensitive' },
+          deletedAt: null,
+        },
+        select: { id: true },
+      })
+    : null;
   const data = {
     name,
     customer,
-    companyId: company?.ambiguous ? null : (company?.id ?? null),
+    companyId: company?.id ?? null,
     email,
     phone: asTrimmed(t['contact.phone']) ?? asTrimmed(t['contact.mobile']),
     role: asTrimmed(t['contact.title']),
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const rows = await prisma.contact.findMany({
+    const existing = await prisma.contact.findFirst({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
-      take: 2,
     });
-    const match = soleCompanyId(rows.map((row) => row.id));
-    if (match.ambiguous) {
-      throw new Error(`contact.email matches more than one person: ${email}`);
-    }
-    if (match.id) {
+    if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.contact.update({ where: { id: match.id }, data });
+      await prisma.contact.update({ where: { id: existing.id }, data });
       return null;
     }
   }
@@ -269,6 +228,7 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
   const companyName = asTrimmed(t['lead.company']) ?? asTrimmed(t['lead.companyName']) ?? '';
   if (!companyName) throw new Error('lead company is required');
   const email = asTrimmed(t['lead.email']);
+  const statusRaw = asTrimmed(t['lead.status'])?.toLowerCase();
   const data = {
     firstName,
     lastName,
@@ -277,21 +237,16 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
     companyName,
     title: asTrimmed(t['lead.title']),
     notes: asTrimmed(t['lead.notes']),
-    status: mapLeadStatus(t['lead.status']) as never,
+    status: (statusRaw && LEAD_STATUSES.has(statusRaw) ? statusRaw : 'new') as never,
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const rows = await prisma.lead.findMany({
+    const existing = await prisma.lead.findFirst({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
-      take: 2,
     });
-    const match = soleCompanyId(rows.map((row) => row.id));
-    if (match.ambiguous) {
-      throw new Error(`lead.email matches more than one lead: ${email}`);
-    }
-    if (match.id) {
+    if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.lead.update({ where: { id: match.id }, data });
+      await prisma.lead.update({ where: { id: existing.id }, data });
       return null;
     }
   }
@@ -327,11 +282,10 @@ async function writeOpportunity(
 ): Promise<string | null> {
   const name = asTrimmed(t['opportunity.name']);
   if (!name) throw new Error('opportunity.name is required');
-  const providedCustomer =
-    asTrimmed(t['opportunity.companyName']) ?? asTrimmed(t['opportunity.customer']);
-  const customer = providedCustomer ?? 'Unknown';
+  const customer =
+    asTrimmed(t['opportunity.companyName']) ?? asTrimmed(t['opportunity.customer']) ?? 'Unknown';
   if (ctx.dedupStrategy !== 'duplicate') {
-    const rows = await prisma.opportunity.findMany({
+    const existing = await prisma.opportunity.findFirst({
       where: {
         orgId: ctx.orgId,
         name: { equals: name, mode: 'insensitive' },
@@ -339,16 +293,11 @@ async function writeOpportunity(
         deletedAt: null,
       },
       select: { id: true },
-      take: 2,
     });
-    const match = soleCompanyId(rows.map((row) => row.id));
-    if (match.ambiguous) {
-      throw new Error(`opportunity.name matches more than one deal: ${name}`);
-    }
-    if (match.id) {
+    if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
       await prisma.opportunity.update({
-        where: { id: match.id },
+        where: { id: existing.id },
         data: {
           valueMicros: asMicros(t['opportunity.valueMicros']) ?? undefined,
           probability: asInt(t['opportunity.probability']) ?? undefined,
@@ -358,12 +307,8 @@ async function writeOpportunity(
       return null;
     }
   }
-  const company = providedCustomer
-    ? soleCompanyId(await companiesNamed(ctx.orgId, providedCustomer))
-    : null;
   // Bounded retry on (orgId, code) unique collisions — same pattern as the
   // API's create route.
-  const stage = mapStage(t['opportunity.stage']);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const created = await prisma.$transaction(async (tx) => {
@@ -374,8 +319,7 @@ async function writeOpportunity(
             code,
             name,
             customer,
-            companyId: company?.ambiguous ? null : (company?.id ?? null),
-            stage: stage as never,
+            stage: mapStage(t['opportunity.stage']) as never,
             valueMicros: asMicros(t['opportunity.valueMicros']) ?? 0n,
             probability: asInt(t['opportunity.probability']) ?? 0,
             dueDate: asDate(t['opportunity.closeDate']),

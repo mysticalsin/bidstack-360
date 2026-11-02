@@ -54,6 +54,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-02 PROCESS: Polo CRM line on main broke CI and must not stay
+
+- **What went wrong:** `648d1f0a` merged the polo-integrated CRM line onto last-green `142544da` before preview `#57` and MSA `#56`. Required CI typecheck died (missing `useHasPermission` / `canWrite` / `formatStage`, string micros used as numbers). gitleaks scanned 162 newly first-parent CRM commits and flagged 3 generic-api-key false positives, not live secrets.
+- **Root cause:** Main's bar is `dbd7e904` + MARS + later MSA/preview only. The CRM merge is the infection Tony barred. gitleaks-action walks first-parent of the push, so a 535-file CRM merge re-scans old UI keys and a test AES fixture.
+- **Prevention rule:** Do not merge `cursor/polo-integrated-bca5` onto main. Keep v24 + MSA + preview. gitleaks hits in UI field keys (`marginBelow25`) and the repeating-hex `TEST_TOKEN_KEY` fixture are not secrets — allowlist the path, never rewrite history. Report path + commit if a real secret lands.
+- **Files affected:** CRM-only tree reverted to `142544da`; MSA/preview kept. `.gitleaks.toml` allowlists the three false-positive paths.
+
+---
+
 ### 2026-11-01 INFRA: CI "E2E smoke" ran the full Playwright suite
 
 - **What went wrong:** The main CI job named "E2E smoke" ran `pnpm --filter @bidstack/web e2e` (`playwright test`). That launches chromium + firefox + webkit and every spec. The job only installs Chromium, so Firefox/WebKit died in 1ms. Chromium also failed inherited v24 RBAC/mobile/baseline specs. Chromium `smoke.spec.ts` itself was 6/6 green.
