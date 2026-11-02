@@ -94,18 +94,20 @@ export function winRateByQuarter(rows: OppRow[]) {
     });
 }
 
-/** Won value per close quarter (actuals), oldest first. */
+/** Won value per close quarter (actuals), oldest first. The micros string wins. */
 export function wonByQuarter(rows: OppRow[]) {
-  const by = new Map<string, { v: number; t: number }>();
+  const by = new Map<string, { micros: bigint; t: number }>();
   for (const o of rows.filter(isWon)) {
     const at = closeDate(o);
     if (!at) continue;
     const q = quarterOf(at);
-    const cur = by.get(q) ?? { v: 0, t: new Date(at).getTime() };
-    cur.v += o.value ?? 0;
+    const cur = by.get(q) ?? { micros: 0n, t: new Date(at).getTime() };
+    cur.micros += recordedMicros(o.value ?? 0, o.valueMicros);
     by.set(q, cur);
   }
-  return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: v.v }));
+  return [...by.entries()]
+    .sort((a, b) => a[1].t - b[1].t)
+    .map(([label, v]) => ({ label, won: microsToUnits(v.micros), wonMicros: v.micros.toString() }));
 }
 
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });

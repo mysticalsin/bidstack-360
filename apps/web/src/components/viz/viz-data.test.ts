@@ -36,7 +36,17 @@ describe('viz-data', () => {
       { x: 'Q2 2026', won: 1, lost: 0, rate: 100 },
       { x: 'Q4 2026', won: 0, lost: 1, rate: 0 },
     ]);
-    expect(wonByQuarter(rows)).toEqual([{ label: 'Q1 2026', won: 200 }, { label: 'Q2 2026', won: 300 }]);
+    expect(wonByQuarter(rows)).toEqual([
+      { label: 'Q1 2026', won: 200, wonMicros: '200000000' },
+      { label: 'Q2 2026', won: 300, wonMicros: '300000000' },
+    ]);
+    // WHY: the forecast card added `value` and then compact-formatted it.
+    // value 0 hid 7,860,000.50, which the compact label calls 7.9m.
+    const cents = '7860000500000';
+    expect(wonByQuarter([
+      row({ stage: 'closed_won', value: 0, valueMicros: cents, dueDate: '2026-02-03T00:00:00.000Z' }),
+    ])).toEqual([{ label: 'Q1 2026', won: 7_860_000.5, wonMicros: cents }]);
+    expect(fmtCompact(7_860_000.5)).toBe('7.9m');
   });
 
   it('accumulates won value by month and open value by due date', () => {

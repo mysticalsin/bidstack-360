@@ -2,6 +2,7 @@
 // rows (opportunities, pipeline report, forecast projection, watchdog feed).
 import '@/components/drill/drill.css';
 
+import { formatMicrosAmount, microsToUnits } from '@bidstack/shared';
 import { Link } from 'react-router-dom';
 
 import { useId, useState } from 'react';
@@ -146,23 +147,57 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
   );
 }
 
+/** A forecast field is integer micros. The digit string wins over a JS number. */
+function readForecastMicros(value: string | number | null | undefined): bigint {
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+  return 0n;
+}
+
+function forecastPoint(label: string, won: bigint, weighted: bigint, open: bigint) {
+  return {
+    label,
+    won: microsToUnits(won),
+    weighted: microsToUnits(weighted),
+    open: microsToUnits(open),
+    wonText: formatMicrosAmount(won),
+    weightedText: formatMicrosAmount(weighted),
+    openText: formatMicrosAmount(open),
+  };
+}
+
 export function ForecastCard({ rows, projection, headingLevel }: {
   rows: OppRow[];
   headingLevel?: 2 | 3;
-  projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
+  projection?: {
+    periods: Array<{
+      label: string;
+      weightedMicros: string | number;
+      wonMicros: string | number;
+      openMicros: string | number;
+      manualCommitMicros: string | number | null;
+    }>;
+  };
 }) {
-  const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
+  const actuals = wonByQuarter(rows).map((q) => forecastPoint(q.label, BigInt(q.wonMicros), 0n, 0n));
   const future = (projection?.periods ?? [])
-    .filter((p) => p.openMicros > 0 || p.weightedMicros > 0)
-    .map((p) => ({ label: p.label, won: p.wonMicros / 1e6, weighted: p.weightedMicros / 1e6, open: p.openMicros / 1e6 }));
+    .map((p) => ({
+      label: p.label,
+      won: readForecastMicros(p.wonMicros),
+      weighted: readForecastMicros(p.weightedMicros),
+      open: readForecastMicros(p.openMicros),
+    }))
+    .filter((p) => p.open > 0n || p.weighted > 0n)
+    .map((p) => forecastPoint(p.label, p.won, p.weighted, p.open));
   const seen = new Set(future.map((f) => f.label));
   const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
-  const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
-  const target = commits.length ? commits[0]! / 1e6 : null;
+  const target = (projection?.periods ?? [])
+    .map((p) => readForecastMicros(p.manualCommitMicros))
+    .find((micros) => micros > 0n);
   return (
-    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
-      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
+    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${formatMicrosAmount(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
+      summary={data.map((d) => `${d.label}: won ${d.wonText}${d.weightedText !== '0' ? `, weighted ${d.weightedText}` : ''}`).join('; ')}
+      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, d.wonText, d.weightedText, d.openText]) }}>
       <QuarterBars data={data} format={fmtCompact} />
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'var(--success, #177048)' }} />Won</li>

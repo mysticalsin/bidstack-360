@@ -76,7 +76,10 @@ export function WinRateLine({ data }: { data: Array<{ x: string; date: Date; rat
 }
 
 /** Won actuals and weighted forecast per quarter. */
-export function QuarterBars({ data, format }: { data: Array<{ label: string; won: number; weighted: number }>; format: Fmt }) {
+export function QuarterBars({ data, format }: {
+  data: Array<{ label: string; won: number; weighted: number; wonText?: string; weightedText?: string }>;
+  format: Fmt;
+}) {
   const reduced = useReducedMotion();
   if (!data.length) return null;
   return (
@@ -88,8 +91,16 @@ export function QuarterBars({ data, format }: { data: Array<{ label: string; won
         <Bar dataKey="weighted" fill={`color-mix(in srgb, ${BRAND} 45%, transparent)`} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />
         <BarXAxis />
         <ChartTooltip rows={(p) => [
-          { color: WON, label: 'Won', value: format(Number(p.won ?? 0)) },
-          { color: BRAND, label: 'Weighted forecast', value: format(Number(p.weighted ?? 0)) },
+          {
+            color: WON,
+            label: 'Won',
+            value: typeof p.wonText === 'string' ? p.wonText : format(Number(p.won ?? 0)),
+          },
+          {
+            color: BRAND,
+            label: 'Weighted forecast',
+            value: typeof p.weightedText === 'string' ? p.weightedText : format(Number(p.weighted ?? 0)),
+          },
         ]} />
       </BarChart>
     </div>
