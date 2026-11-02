@@ -6,7 +6,7 @@
  * accept that verified email from localhost. If a JWT is present we re-verify
  * it against the team JWKS so a non-loopback deploy cannot spoof the header.
  */
-import { createHash, createPublicKey, createVerify } from 'node:crypto';
+import { createHash, createPublicKey, createVerify, type JsonWebKey } from 'node:crypto';
 
 import type { FastifyRequest } from 'fastify';
 

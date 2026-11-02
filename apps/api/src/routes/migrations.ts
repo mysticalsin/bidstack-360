@@ -509,8 +509,9 @@ function parseSpreadsheetBuffer(
 
   const workbook = XLSX.read(buf, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
-  if (!sheetName) return { headers: [], rows: [] };
-  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], {
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+  if (!sheet) return { headers: [], rows: [] };
+  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: '',
     raw: false,
   });
