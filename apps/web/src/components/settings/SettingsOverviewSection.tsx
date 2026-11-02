@@ -16,6 +16,7 @@ import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
 import { apiKeyListCaption } from './api-key-list-caption';
 import { customFieldListCaption } from './custom-field-list-caption';
+import { emailTemplateListCaption } from './email-template-list-caption';
 import { roleListCaption } from './role-list-caption';
 import { stageListCaption } from './stage-list-caption';
 import { tagLibraryCaption } from './tag-library-caption';
@@ -147,25 +148,46 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileAutomationTitle', 'Automation library'),
-      detail: tags.data?.pageContinues
-        ? t(
-            'settingsOverview.tileAutomationDetailPartialTags',
-            '{{tags}} / {{templates}} templates / {{rules}} rot rules',
-            {
-              tags: tagLibraryCaption(tags.data.items.length, true),
-              templates: formatCount(templates.data?.items.length),
-              rules: formatCount(leadRot.data?.items.length),
-            },
-          )
-        : t(
-            'settingsOverview.tileAutomationDetail',
-            '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
-            {
-              tags: formatCount(tags.data?.items.length),
-              templates: formatCount(templates.data?.items.length),
-              rules: formatCount(leadRot.data?.items.length),
-            },
-          ),
+      detail:
+        tags.data?.pageContinues && templates.data?.pageContinues
+          ? t(
+              'settingsOverview.tileAutomationDetailPartialTagsAndTemplates',
+              '{{tags}} / {{templates}} / {{rules}} rot rules',
+              {
+                tags: tagLibraryCaption(tags.data.items.length, true),
+                templates: emailTemplateListCaption(templates.data.items.length, true),
+                rules: formatCount(leadRot.data?.items.length),
+              },
+            )
+          : tags.data?.pageContinues
+            ? t(
+                'settingsOverview.tileAutomationDetailPartialTags',
+                '{{tags}} / {{templates}} templates / {{rules}} rot rules',
+                {
+                  tags: tagLibraryCaption(tags.data.items.length, true),
+                  templates: formatCount(templates.data?.items.length),
+                  rules: formatCount(leadRot.data?.items.length),
+                },
+              )
+            : templates.data?.pageContinues
+              ? t(
+                  'settingsOverview.tileAutomationDetailPartialTemplates',
+                  '{{tags}} tags / {{templates}} / {{rules}} rot rules',
+                  {
+                    tags: formatCount(tags.data?.items.length),
+                    templates: emailTemplateListCaption(templates.data.items.length, true),
+                    rules: formatCount(leadRot.data?.items.length),
+                  },
+                )
+              : t(
+                  'settingsOverview.tileAutomationDetail',
+                  '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
+                  {
+                    tags: formatCount(tags.data?.items.length),
+                    templates: formatCount(templates.data?.items.length),
+                    rules: formatCount(leadRot.data?.items.length),
+                  },
+                ),
       tone: tags.isError || templates.isError || leadRot.isError ? 'tomato' : 'purple',
       icon: 'sparkle' as const,
       section: 'crm' as const,

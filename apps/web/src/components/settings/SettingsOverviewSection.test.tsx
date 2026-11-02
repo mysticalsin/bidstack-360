@@ -48,9 +48,11 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
 
 import { API_KEY_LIST_PAGE } from './api-key-list-caption';
 import { CUSTOM_FIELD_LIST_PAGE } from './custom-field-list-caption';
+import { EMAIL_TEMPLATE_LIST_PAGE } from './email-template-list-caption';
 import { ROLE_LIST_PAGE } from './role-list-caption';
 import { SettingsOverviewSection } from './SettingsOverviewSection';
 import { STAGE_LIST_PAGE } from './stage-list-caption';
+import { TAG_LIBRARY_PAGE } from './tag-library-caption';
 import { USER_OVERVIEW_PAGE } from './user-overview-caption';
 import { WEBHOOK_LIST_PAGE } from './webhook-list-caption';
 
@@ -400,6 +402,102 @@ describe('SettingsOverviewSection', () => {
       screen.getByText(`${API_KEY_LIST_PAGE} in the latest ${API_KEY_LIST_PAGE}, not every key`),
     ).toBeTruthy();
     expect(screen.queryByText(`${API_KEY_LIST_PAGE} API keys`)).toBeNull();
+  });
+
+  it('says the template count is not every template when the template page continues', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useTags.mockReturnValue({
+      data: { items: [{ id: 'tag-1' }, { id: 'tag-2' }], pageContinues: false },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useEmailTemplates.mockReturnValue({
+      data: {
+        items: Array.from({ length: EMAIL_TEMPLATE_LIST_PAGE }, (_, index) => ({
+          id: String(index),
+        })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useLeadRotConfig.mockReturnValue({
+      data: { items: [{ id: 'rule-1' }] },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `2 tags / ${EMAIL_TEMPLATE_LIST_PAGE} in the latest ${EMAIL_TEMPLATE_LIST_PAGE}, not every template / 1 rot rules`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(new RegExp(`${EMAIL_TEMPLATE_LIST_PAGE} templates`))).toBeNull();
+  });
+
+  it('keeps the template count when the template page is shorter than the probe', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useTags.mockReturnValue({
+      data: { items: [{ id: 'tag-1' }, { id: 'tag-2' }], pageContinues: false },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useEmailTemplates.mockReturnValue({
+      data: { items: [{ id: 'tpl-1' }, { id: 'tpl-2' }, { id: 'tpl-3' }], pageContinues: false },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useLeadRotConfig.mockReturnValue({
+      data: { items: [{ id: 'rule-1' }] },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('2 tags / 3 templates / 1 rot rules')).toBeTruthy();
+    expect(screen.queryByText(/not every template/i)).toBeNull();
+  });
+
+  it('says neither library count is the whole set when tag and template pages continue', () => {
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useTags.mockReturnValue({
+      data: {
+        items: Array.from({ length: TAG_LIBRARY_PAGE }, (_, index) => ({ id: String(index) })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useEmailTemplates.mockReturnValue({
+      data: {
+        items: Array.from({ length: EMAIL_TEMPLATE_LIST_PAGE }, (_, index) => ({
+          id: String(index),
+        })),
+        pageContinues: true,
+      },
+      isError: false,
+      isLoading: false,
+    });
+    hookMocks.useLeadRotConfig.mockReturnValue({
+      data: { items: [{ id: 'rule-1' }] },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        `${TAG_LIBRARY_PAGE} in the latest ${TAG_LIBRARY_PAGE}, not every tag / ${EMAIL_TEMPLATE_LIST_PAGE} in the latest ${EMAIL_TEMPLATE_LIST_PAGE}, not every template / 1 rot rules`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/templates \/ 1 rot rules/i)).toBeNull();
   });
 
   it('keeps the API key count when the key page is shorter than the probe', () => {

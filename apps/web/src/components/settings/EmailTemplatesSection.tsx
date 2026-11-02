@@ -15,6 +15,8 @@ import {
 } from '@/hooks/useEmailTemplates';
 import { PLACEHOLDER_CATALOG, type EmailTemplate } from '@bidstack/shared';
 
+import { emailTemplateListCaption } from './email-template-list-caption';
+
 /**
  * Sprint 1 — Krayin import.
  * EmailTemplate Settings section. Two-pane layout: list on the left, editor
@@ -128,7 +130,11 @@ export function EmailTemplatesSection() {
       <Card>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-            {t('emailTemplates.listHeading', 'Templates')}
+            {data?.pageContinues
+              ? t('emailTemplates.listHeadingPartial', 'Templates · {{drawn}}', {
+                  drawn: emailTemplateListCaption(templates.length, true),
+                })
+              : t('emailTemplates.listHeading', 'Templates')}
           </h3>
           <Button
             size="sm"
