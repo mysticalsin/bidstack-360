@@ -126,6 +126,9 @@ export const CompanyDetail = Company.extend({
       createdAt: z.string().datetime(),
     }),
   ),
+  // True when company detail read one note past COMPANY_NOTE_PAGE_LIMIT.
+  // The notes array is that page, not every note on the company.
+  notesTruncated: z.boolean(),
   // Stored on the enrichment profile or a manual override. No currency column.
   annualRevenueMicros: z.number().nullable(),
   annualRevenueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
@@ -134,3 +137,6 @@ export const CompanyDetail = Company.extend({
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type CompanyDetail = z.infer<typeof CompanyDetail>;
+
+/** Notes embedded on company detail. One extra row sets `notesTruncated`. */
+export const COMPANY_NOTE_PAGE_LIMIT = 20;

@@ -51,6 +51,7 @@ function baseCompany(): CompanyDetail {
     opportunities: [],
     openCases: [],
     notes: [],
+    notesTruncated: false,
     parent: null,
     children: [],
   };

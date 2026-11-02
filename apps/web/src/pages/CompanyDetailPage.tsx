@@ -17,6 +17,7 @@ import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
 import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
+import { companyNoteTabLabel } from './company-notes';
 
 type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 type View = 'overview' | 'details';
@@ -193,7 +194,10 @@ export function CompanyDetailPage() {
                 },
                 {
                   key: 'notes',
-                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
+                  label: t(
+                    'companyDetail.tab.notesCaption',
+                    companyNoteTabLabel(c.notes.length, c.notesTruncated),
+                  ),
                 },
                 { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
               ] as { key: TabKey; label: string }[]

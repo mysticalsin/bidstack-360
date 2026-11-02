@@ -1,5 +1,10 @@
 import { prisma } from '@bidstack/db';
-import { microsToSafeNumber, type Company, type CompanyDetail } from '@bidstack/shared';
+import {
+  COMPANY_NOTE_PAGE_LIMIT,
+  microsToSafeNumber,
+  type Company,
+  type CompanyDetail,
+} from '@bidstack/shared';
 import { type z } from 'zod';
 
 import { normalizeName } from '../services/crm/dashboard.utils.js';
@@ -136,6 +141,9 @@ export async function serializeCompanyDetail(
   const storedMicros = enrichment?.annualRevenueMicros ?? null;
   const chosen = overrideMicros ?? storedMicros;
   const annualRevenueMicros = microsToSafeNumber(chosen);
+  // The route reads one row past the page. That probe is not a note to show.
+  const notesTruncated = c.notes.length > COMPANY_NOTE_PAGE_LIMIT;
+  const noteRows = notesTruncated ? c.notes.slice(0, COMPANY_NOTE_PAGE_LIMIT) : c.notes;
 
   return {
     ...serializeCompany(c),
@@ -148,12 +156,13 @@ export async function serializeCompanyDetail(
       dueDate: x.dueDate?.toISOString() ?? null,
     })),
     openCases: c.serviceCases.map((x) => ({ ...x })),
-    notes: c.notes.map((x) => ({
+    notes: noteRows.map((x) => ({
       id: x.id,
       title: x.title,
       authorName: x.author?.name ?? null,
       createdAt: x.createdAt.toISOString(),
     })),
+    notesTruncated,
     parent: c.parent ?? null,
     children: c.children ?? [],
     customFieldValues,

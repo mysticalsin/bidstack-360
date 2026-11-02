@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
 import {
+  COMPANY_NOTE_PAGE_LIMIT,
   Company,
   CompanyCreate,
   CompanyDetail,
@@ -134,7 +135,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
             where: { deletedAt: null },
             select: { id: true, title: true, author: { select: { name: true } }, createdAt: true },
             orderBy: { createdAt: 'desc' },
-            take: 20,
+            // One extra row sets notesTruncated. It is not part of the page.
+            take: COMPANY_NOTE_PAGE_LIMIT + 1,
           },
         },
       });
