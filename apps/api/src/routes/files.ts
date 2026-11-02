@@ -20,12 +20,15 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
+  FILE_ATTACHMENTS_DRAWN,
   FILE_MAX_BYTES,
   FileAttachment,
   FileFinalizeRequest,
   FileListResponse,
   FileUploadUrlRequest,
   FileUploadUrlResponse,
+  fileAttachmentPage,
+  fileAttachmentTake,
   isExtractableForIntel,
 } from '@bidstack/shared';
 
@@ -356,7 +359,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         querystring: z.object({
           accountId: z.string().min(1).max(255),
           companyId: z.string().uuid().optional(),
-          limit: z.coerce.number().int().min(1).max(200).default(100),
+          limit: z.coerce.number().int().min(1).max(200).default(FILE_ATTACHMENTS_DRAWN),
         }),
         response: { 200: FileListResponse },
       },
@@ -371,7 +374,9 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       const accountId = normalizeAccountId(req.query.accountId);
       const linkedCompanyId =
         req.query.companyId ?? (ACCOUNT_UUID.test(accountId) ? accountId : undefined);
-      const items = await prisma.fileAttachment.findMany({
+      // One row past the page the list draws. The extra row is the probe.
+      // It is not a shown file, and it is not a total.
+      const loaded = await prisma.fileAttachment.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
@@ -383,9 +388,10 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { uploader: { select: { email: true } } },
         orderBy: { createdAt: 'desc' },
-        take: req.query.limit,
+        take: fileAttachmentTake(req.query.limit),
       });
-      return { items: items.map(serialize) };
+      const page = fileAttachmentPage(loaded, req.query.limit);
+      return { items: page.items.map(serialize), itemsContinue: page.pageContinues };
     },
   );
 

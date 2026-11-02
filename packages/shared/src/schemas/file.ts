@@ -174,7 +174,36 @@ export const FileFinalizeRequest = z.object({
 });
 export type FileFinalizeRequest = z.infer<typeof FileFinalizeRequest>;
 
+/** Attachments the account files list draws. One more row is the probe. */
+export const FILE_ATTACHMENTS_DRAWN = 100;
+
+/**
+ * Attachments one files query may return. A fixed take of the page dropped
+ * a later file, so that page read as every attachment. One row past the
+ * page is the probe. It is not shown, and it is not a total.
+ */
+export function fileAttachmentTake(limit = FILE_ATTACHMENTS_DRAWN): number {
+  return limit + 1;
+}
+
+/** Attachments to draw. The extra row only says another file exists. */
+export function fileAttachmentPage<T>(
+  rows: readonly T[],
+  drawn = FILE_ATTACHMENTS_DRAWN,
+): { items: T[]; pageContinues: boolean } {
+  const pageContinues = rows.length > drawn;
+  return {
+    items: pageContinues ? rows.slice(0, drawn) : [...rows],
+    pageContinues,
+  };
+}
+
 export const FileListResponse = z.object({
   items: z.array(FileAttachment),
+  /**
+   * True when the query read one attachment past the page and dropped it.
+   * `items` is that page, not every attachment. No attachment total.
+   */
+  itemsContinue: z.boolean().optional(),
 });
 export type FileListResponse = z.infer<typeof FileListResponse>;
