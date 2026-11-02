@@ -1,10 +1,45 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { capPage } from './crm-tools.helpers.js';
-import { buildGroundedProposalDraft } from './proposal-draft.js';
+import { buildGroundedProposalDraft, proposalDraft } from './proposal-draft.js';
+
+const { findFirst, taskFindMany, contactFindMany, noteFindMany, searchReferences } = vi.hoisted(
+  () => ({
+    findFirst: vi.fn(),
+    taskFindMany: vi.fn(),
+    contactFindMany: vi.fn(),
+    noteFindMany: vi.fn(),
+    searchReferences: vi.fn(),
+  }),
+);
+
+vi.mock('@bidstack/db', () => ({
+  prisma: {
+    opportunity: { findFirst },
+    task: { findMany: taskFindMany },
+    contact: { findMany: contactFindMany },
+    note: { findMany: noteFindMany },
+  },
+}));
+
+vi.mock('../lib/reference-search.js', () => ({
+  searchReferences,
+}));
 
 function completePage<T>(items: T[]) {
   return { items, limit: 3, truncated: false };
+}
+
+function taskPage<T>(items: T[], truncated = false) {
+  return { items, limit: 5, truncated };
+}
+
+function contactPage<T>(items: T[], truncated = false) {
+  return { items, limit: 5, truncated };
+}
+
+function notePage<T>(items: T[], truncated = false) {
+  return { items, limit: 3, truncated };
 }
 
 describe('proposal.draft grounded builder', () => {
@@ -38,15 +73,15 @@ describe('proposal.draft grounded builder', () => {
           scoreBps: 9000,
         },
       ]),
-      tasks: [
+      tasks: taskPage([
         {
           id: 'task-1',
           title: 'Confirm legal assumptions',
           status: 'open',
           dueDate: new Date('2026-06-10T00:00:00.000Z'),
         },
-      ],
-      contacts: [
+      ]),
+      contacts: contactPage([
         {
           id: 'contact-1',
           name: 'Pat Sponsor',
@@ -55,8 +90,8 @@ describe('proposal.draft grounded builder', () => {
           sentiment: 'warm',
           aiOptOut: false,
         },
-      ],
-      notes: [
+      ]),
+      notes: notePage([
         {
           id: 'note-1',
           title: 'Discovery call',
@@ -64,7 +99,7 @@ describe('proposal.draft grounded builder', () => {
           pinned: true,
           updatedAt: new Date('2026-06-05T12:00:00.000Z'),
         },
-      ],
+      ]),
     });
 
     expect(result.markdown).toContain('Source-grounded MCP draft');
@@ -107,8 +142,8 @@ describe('proposal.draft grounded builder', () => {
       sectionTitle: 'Risks',
       tone: 'executive',
       references: completePage([]),
-      tasks: [],
-      contacts: [
+      tasks: taskPage([]),
+      contacts: contactPage([
         {
           id: 'contact-private',
           name: 'Private Person',
@@ -117,8 +152,8 @@ describe('proposal.draft grounded builder', () => {
           sentiment: 'neutral',
           aiOptOut: true,
         },
-      ],
-      notes: [],
+      ]),
+      notes: notePage([]),
     });
 
     expect(result.markdown).toContain('Stored probability is below 40%');
@@ -155,12 +190,14 @@ describe('proposal.draft grounded builder', () => {
       sectionTitle: 'Risks',
       tone: 'concise',
       references: completePage([]),
-      tasks: [],
-      contacts: [],
-      notes: [],
+      tasks: taskPage([]),
+      contacts: contactPage([]),
+      notes: notePage([]),
     });
 
-    expect(result.markdown).toContain('No probability is recorded. Do not treat that as a measured chance below 40%');
+    expect(result.markdown).toContain(
+      'No probability is recorded. Do not treat that as a measured chance below 40%',
+    );
     expect(result.markdown).not.toContain('Stored probability is below 40%');
     expect(result.markdown).not.toMatch(/0% probability|stored probability is 0%/i);
     expect(result.markdown).toContain('probability not recorded');
@@ -186,9 +223,9 @@ describe('proposal.draft grounded builder', () => {
       sectionTitle: 'Executive Summary',
       tone: 'executive',
       references: completePage([]),
-      tasks: [],
-      contacts: [],
-      notes: [],
+      tasks: taskPage([]),
+      contacts: contactPage([]),
+      notes: notePage([]),
     });
 
     expect(result.markdown).toContain('recorded "Cloud Exit" as lost');
@@ -221,9 +258,9 @@ describe('proposal.draft grounded builder', () => {
       sectionTitle: 'Executive Summary',
       tone: 'consultative',
       references: completePage([]),
-      tasks: [],
-      contacts: [],
-      notes: [],
+      tasks: taskPage([]),
+      contacts: contactPage([]),
+      notes: notePage([]),
     });
 
     expect(result.markdown).toContain('is evaluating');
@@ -314,9 +351,9 @@ describe('proposal.draft grounded builder', () => {
       sectionTitle: 'Pricing',
       tone: 'consultative',
       references: page,
-      tasks: [],
-      contacts: [],
-      notes: [],
+      tasks: taskPage([]),
+      contacts: contactPage([]),
+      notes: notePage([]),
     });
 
     expect(result.markdown).toContain(
@@ -366,10 +403,298 @@ describe('proposal.draft grounded builder', () => {
             scoreBps: 1,
           },
         ] as never,
-        tasks: [],
-        contacts: [],
-        notes: [],
+        tasks: taskPage([]),
+        contacts: contactPage([]),
+        notes: notePage([]),
       }),
     ).toThrow(/page of items, not a bare array/);
+  });
+
+  it('says a truncated task, contact, or note page is not the whole set and does not cite the probe', () => {
+    // WHY: take 5, take 5, and take 3 used to read as every pursuit task, contact,
+    // and note. The extra row is only a probe. A full page and a shorter list
+    // keep the old sentence.
+    const taskProbe = {
+      id: 'task-6',
+      title: 'Probe task that is not on the page',
+      status: 'open',
+      dueDate: null,
+    };
+    const contactProbe = {
+      id: 'contact-6',
+      name: 'Probe Contact',
+      role: 'Buyer',
+      influence: 1,
+      sentiment: 'cold',
+      aiOptOut: false,
+    };
+    const noteProbe = {
+      id: 'note-4',
+      title: 'Probe note that is not on the page',
+      bodyMd: 'Do not cite this note.',
+      pinned: false,
+      updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    const openTask = (n: number) => ({
+      id: `task-${n}`,
+      title: `Task ${n}`,
+      status: 'open',
+      dueDate: null as Date | null,
+    });
+    const buyer = (n: number) => ({
+      id: `contact-${n}`,
+      name: `Contact ${n}`,
+      role: 'Buyer',
+      influence: 5,
+      sentiment: 'warm',
+      aiOptOut: false,
+    });
+    const accountNote = (n: number) => ({
+      id: `note-${n}`,
+      title: `Note ${n}`,
+      bodyMd: `Body ${n}`,
+      pinned: n === 1,
+      updatedAt: new Date('2026-06-05T12:00:00.000Z'),
+    });
+    const tasks = capPage([...[1, 2, 3, 4, 5].map(openTask), taskProbe], 5);
+    const contacts = capPage([...[1, 2, 3, 4, 5].map(buyer), contactProbe], 5);
+    const notes = capPage([...[1, 2, 3].map(accountNote), noteProbe], 3);
+    expect(tasks).toEqual({
+      items: [1, 2, 3, 4, 5].map((n) => expect.objectContaining({ id: `task-${n}` })),
+      limit: 5,
+      truncated: true,
+    });
+    expect(contacts).toMatchObject({ limit: 5, truncated: true });
+    expect(contacts.items).toHaveLength(5);
+    expect(notes).toMatchObject({ limit: 3, truncated: true });
+    expect(notes.items).toHaveLength(3);
+
+    const opportunity = {
+      id: 'opp-pursuit',
+      code: 'OP-2049',
+      customer: 'Acme Bank',
+      name: 'Payments Modernization',
+      stage: 's2_sent',
+      valueMicros: 2_500_000_000_000n,
+      probability: 55,
+      dueDate: new Date('2026-07-01T00:00:00.000Z'),
+      industry: 'Financial Services',
+      updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+    };
+    const result = buildGroundedProposalDraft({
+      opportunity,
+      section: 'scope',
+      sectionTitle: 'Scope',
+      tone: 'consultative',
+      references: completePage([]),
+      tasks,
+      contacts,
+      notes,
+    });
+    const taskSentence =
+      '- Pursuit tasks: Task 1 (Open); Task 2 (Open); Task 3 (Open); Task 4 (Open); Task 5 (Open).';
+    const contactSentence =
+      '- Stakeholders: Contact 1 (Buyer) influence 5/5 sentiment warm; Contact 2 (Buyer) influence 5/5 sentiment warm; Contact 3 (Buyer) influence 5/5 sentiment warm; Contact 4 (Buyer) influence 5/5 sentiment warm; Contact 5 (Buyer) influence 5/5 sentiment warm.';
+    const noteSentence = 'Recent account note to account for: "Note 1" - Body 1';
+
+    expect(result.markdown).toContain(`${taskSentence} This page is not every task.`);
+    expect(result.markdown).toContain(`${contactSentence} This page is not every contact.`);
+    expect(result.markdown).toContain(`${noteSentence}. This page is not every note.`);
+    expect(result.markdown).not.toContain(taskProbe.title);
+    expect(result.markdown).not.toContain(contactProbe.name);
+    expect(result.markdown).not.toContain(noteProbe.title);
+    expect(
+      result.citations
+        .filter((citation) => citation.type === 'task')
+        .map((citation) => citation.docId),
+    ).toEqual(['task-1', 'task-2', 'task-3', 'task-4', 'task-5']);
+    expect(
+      result.citations
+        .filter((citation) => citation.type === 'contact')
+        .map((citation) => citation.docId),
+    ).toEqual(['contact-1', 'contact-2', 'contact-3', 'contact-4', 'contact-5']);
+    expect(
+      result.citations
+        .filter((citation) => citation.type === 'note')
+        .map((citation) => citation.docId),
+    ).toEqual(['note-1', 'note-2', 'note-3']);
+
+    const timeline = buildGroundedProposalDraft({
+      opportunity,
+      section: 'timeline',
+      sectionTitle: 'Timeline',
+      tone: 'consultative',
+      references: completePage([]),
+      tasks,
+      contacts,
+      notes,
+    });
+    expect(timeline.markdown).toContain(
+      'Current open work items that should appear in the timeline: Task 1; Task 2; Task 3; Task 4; Task 5. This page is not every task.',
+    );
+    expect(timeline.markdown).not.toContain(taskProbe.title);
+
+    const full = buildGroundedProposalDraft({
+      opportunity,
+      section: 'scope',
+      sectionTitle: 'Scope',
+      tone: 'consultative',
+      references: completePage([]),
+      tasks: capPage([1, 2, 3, 4, 5].map(openTask), 5),
+      contacts: capPage([1, 2, 3, 4, 5].map(buyer), 5),
+      notes: capPage([1, 2, 3].map(accountNote), 3),
+    });
+    expect(full.markdown).toContain(taskSentence);
+    expect(full.markdown).toContain(contactSentence);
+    expect(full.markdown).toContain(noteSentence);
+    expect(full.markdown).not.toContain('not every task');
+    expect(full.markdown).not.toContain('not every contact');
+    expect(full.markdown).not.toContain('not every note');
+
+    const short = buildGroundedProposalDraft({
+      opportunity,
+      section: 'scope',
+      sectionTitle: 'Scope',
+      tone: 'consultative',
+      references: completePage([]),
+      tasks: capPage([openTask(1)], 5),
+      contacts: capPage([buyer(1)], 5),
+      notes: capPage([accountNote(1)], 3),
+    });
+    expect(short.markdown).toContain('- Pursuit tasks: Task 1 (Open).');
+    expect(short.markdown).toContain(
+      '- Stakeholders: Contact 1 (Buyer) influence 5/5 sentiment warm.',
+    );
+    expect(short.markdown).toContain(noteSentence);
+    expect(short.markdown).not.toContain('not every task');
+    expect(short.markdown).not.toContain('not every contact');
+    expect(short.markdown).not.toContain('not every note');
+  });
+});
+
+describe('proposal.draft pursuit queries', () => {
+  const ctx = { orgId: 'org-1', keyId: 'key-1', scopes: ['read'] } as never;
+  const oppId = '11111111-1111-4111-8111-111111111111';
+
+  beforeEach(() => {
+    findFirst.mockReset();
+    taskFindMany.mockReset();
+    contactFindMany.mockReset();
+    noteFindMany.mockReset();
+    searchReferences.mockReset();
+    searchReferences.mockResolvedValue({
+      references: { items: [], limit: 3, truncated: false },
+    });
+    findFirst.mockResolvedValue({
+      id: oppId,
+      code: 'OP-3001',
+      customer: 'Acme Bank',
+      name: 'Payments Modernization',
+      stage: 's2_sent',
+      pipelineStage: null,
+      valueMicros: 1n,
+      probability: 55,
+      dueDate: new Date('2026-07-01T00:00:00.000Z'),
+      industry: 'Financial Services',
+      updatedAt: new Date('2026-06-06T12:00:00.000Z'),
+      companyId: 'company-1',
+    });
+  });
+
+  it('loads limit+1 and keeps the probe off a partial page', async () => {
+    // WHY: the draft query must see one row past the page. That row sets
+    // truncated and is not a citation. Fewer rows keep the old sentence.
+    const tasks = [
+      ...[1, 2, 3, 4, 5].map((n) => ({
+        id: `task-${n}`,
+        title: `Task ${n}`,
+        status: 'open',
+        dueDate: null,
+      })),
+      {
+        id: 'task-6',
+        title: 'Probe task that is not on the page',
+        status: 'open',
+        dueDate: null,
+      },
+    ];
+    const contacts = [
+      ...[1, 2, 3, 4, 5].map((n) => ({
+        id: `contact-${n}`,
+        name: `Contact ${n}`,
+        role: 'Buyer',
+        influence: 5,
+        sentiment: 'warm',
+        aiOptOut: false,
+      })),
+      {
+        id: 'contact-6',
+        name: 'Probe Contact',
+        role: 'Buyer',
+        influence: 1,
+        sentiment: 'cold',
+        aiOptOut: false,
+      },
+    ];
+    const notes = [
+      ...[1, 2, 3].map((n) => ({
+        id: `note-${n}`,
+        title: `Note ${n}`,
+        bodyMd: `Body ${n}`,
+        pinned: n === 1,
+        updatedAt: new Date('2026-06-05T12:00:00.000Z'),
+      })),
+      {
+        id: 'note-4',
+        title: 'Probe note that is not on the page',
+        bodyMd: 'Do not cite this note.',
+        pinned: false,
+        updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+      },
+    ];
+    taskFindMany.mockImplementation(async (args: { take?: number }) =>
+      tasks.slice(0, args.take ?? tasks.length),
+    );
+    contactFindMany.mockImplementation(async (args: { take?: number }) =>
+      contacts.slice(0, args.take ?? contacts.length),
+    );
+    noteFindMany.mockImplementation(async (args: { take?: number }) =>
+      notes.slice(0, args.take ?? notes.length),
+    );
+
+    const out = (await proposalDraft.handler(
+      { oppId, section: 'scope', tone: 'consultative' },
+      ctx,
+    )) as { markdown: string; citations: Array<{ docId: string; type: string }> };
+
+    expect(taskFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 6 }));
+    expect(contactFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 6 }));
+    expect(noteFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 4 }));
+    expect(out.markdown).toContain('This page is not every task.');
+    expect(out.markdown).toContain('This page is not every contact.');
+    expect(out.markdown).toContain('This page is not every note.');
+    expect(out.markdown).not.toContain('Probe task that is not on the page');
+    expect(out.markdown).not.toContain('Probe Contact');
+    expect(out.markdown).not.toContain('Probe note that is not on the page');
+    expect(out.citations.map((citation) => citation.docId)).not.toContain('task-6');
+    expect(out.citations.map((citation) => citation.docId)).not.toContain('contact-6');
+    expect(out.citations.map((citation) => citation.docId)).not.toContain('note-4');
+
+    taskFindMany.mockResolvedValue([tasks[0]]);
+    contactFindMany.mockResolvedValue([contacts[0]]);
+    noteFindMany.mockResolvedValue([notes[0]]);
+    const short = (await proposalDraft.handler(
+      { oppId, section: 'scope', tone: 'consultative' },
+      ctx,
+    )) as { markdown: string };
+    expect(taskFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 6 }));
+    expect(short.markdown).toContain('- Pursuit tasks: Task 1 (Open).');
+    expect(short.markdown).toContain(
+      '- Stakeholders: Contact 1 (Buyer) influence 5/5 sentiment warm.',
+    );
+    expect(short.markdown).toContain('Recent account note to account for: "Note 1" - Body 1');
+    expect(short.markdown).not.toContain('not every task');
+    expect(short.markdown).not.toContain('not every contact');
+    expect(short.markdown).not.toContain('not every note');
   });
 });

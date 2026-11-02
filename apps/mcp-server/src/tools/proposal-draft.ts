@@ -5,6 +5,7 @@ import { formatMicrosAmount } from '@bidstack/shared';
 
 import { searchReferences, type RankedReference } from '../lib/reference-search.js';
 
+import { capPage } from './crm-tools.helpers.js';
 import type { Tool } from './index.js';
 
 const Section = z.enum(['executive_summary', 'scope', 'pricing', 'timeline', 'risks']);
@@ -18,10 +19,16 @@ const Input = z.object({
 
 /** Proof points loaded for one draft. One extra search row says this is not every match. */
 const REFERENCE_PAGE_LIMIT = 3;
+/** Pursuit tasks loaded for one draft. One extra row says this is not every task. */
+const TASK_PAGE_LIMIT = 5;
+/** Account contacts loaded for one draft. One extra row says this is not every contact. */
+const CONTACT_PAGE_LIMIT = 5;
+/** Account notes loaded for one draft. One extra row says this is not every note. */
+const NOTE_PAGE_LIMIT = 3;
 
 export const proposalDraft: Tool<typeof Input> = {
   description:
-    'Drafts a grounded proposal section from CRM opportunity context, account notes, tasks, contacts, and the Mantu reference library. Citations use the reference page items only. When that page is truncated, the draft says it is not every match.',
+    'Drafts a grounded proposal section from CRM opportunity context, account notes, tasks, contacts, and the Mantu reference library. Citations use the reference page items only. When that page is truncated, the draft says it is not every match. Task, contact, and note citations use page items only. When one of those pages is truncated, the draft says it is not every task, contact, or note.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -47,7 +54,7 @@ export const proposalDraft: Tool<typeof Input> = {
       .map((w) => w[0]?.toUpperCase() + w.slice(1))
       .join(' ');
 
-    const [references, tasks, contacts, notes] = await Promise.all([
+    const [references, taskRows, contactRows, noteRows] = await Promise.all([
       searchReferences(
         ctx.orgId,
         [opp.customer, opp.name, opp.industry, sectionTitle].filter(Boolean).join(' - '),
@@ -65,14 +72,14 @@ export const proposalDraft: Tool<typeof Input> = {
       prisma.task.findMany({
         where: { orgId: ctx.orgId, oppId: opp.id, deletedAt: null },
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
-        take: 5,
+        take: TASK_PAGE_LIMIT + 1,
         select: { id: true, title: true, status: true, dueDate: true },
       }),
       opp.companyId
         ? prisma.contact.findMany({
             where: { orgId: ctx.orgId, deletedAt: null, companyId: opp.companyId },
             orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
-            take: 5,
+            take: CONTACT_PAGE_LIMIT + 1,
             select: {
               id: true,
               name: true,
@@ -87,7 +94,7 @@ export const proposalDraft: Tool<typeof Input> = {
         ? prisma.note.findMany({
             where: { orgId: ctx.orgId, deletedAt: null, companyId: opp.companyId },
             orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-            take: 3,
+            take: NOTE_PAGE_LIMIT + 1,
             select: { id: true, title: true, bodyMd: true, pinned: true, updatedAt: true },
           })
         : Promise.resolve([]),
@@ -115,9 +122,9 @@ export const proposalDraft: Tool<typeof Input> = {
       sectionTitle,
       tone: args.tone,
       references,
-      tasks,
-      contacts,
-      notes,
+      tasks: capPage(taskRows, TASK_PAGE_LIMIT),
+      contacts: capPage(contactRows, CONTACT_PAGE_LIMIT),
+      notes: capPage(noteRows, NOTE_PAGE_LIMIT),
     });
   },
 };
@@ -177,9 +184,18 @@ interface GroundedDraftInput {
   tone: z.infer<typeof Tone>;
   /** Ranked proof points. Draft and citations use `items` only. */
   references: ReferencePage;
-  tasks: DraftTask[];
-  contacts: DraftContact[];
-  notes: DraftNote[];
+  /** Pursuit tasks. Draft and citations use `items` only. */
+  tasks: DraftPage<DraftTask>;
+  /** Account contacts. Draft and citations use `items` only. */
+  contacts: DraftPage<DraftContact>;
+  /** Account notes. Draft and citations use `items` only. */
+  notes: DraftPage<DraftNote>;
+}
+
+interface DraftPage<T> {
+  items: T[];
+  limit: number;
+  truncated: boolean;
 }
 
 interface ReferencePage {
@@ -204,7 +220,10 @@ function formatDate(value: Date | null): string {
 }
 
 function summarizeNote(note: DraftNote): string {
-  const compact = note.bodyMd.replace(/[#*_`>[\]()]/g, '').replace(/\s+/g, ' ').trim();
+  const compact = note.bodyMd
+    .replace(/[#*_`>[\]()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return compact.length > 180 ? `${compact.slice(0, 177)}...` : compact;
 }
 
@@ -264,10 +283,23 @@ function referenceItems(page: ReferencePage): RankedReference[] {
   return page.items;
 }
 
+function pageItems<T>(page: DraftPage<T>, name: string): T[] {
+  if (!page || !Array.isArray(page.items)) {
+    throw new Error(`${name} must be a page of items, not a bare array`);
+  }
+  return page.items;
+}
+
 function sectionBody(input: GroundedDraftInput): string[] {
-  const { opportunity, tasks, contacts, notes } = input;
+  const { opportunity } = input;
   const references = referenceItems(input.references);
   const referencesPartial = input.references.truncated;
+  const tasks = pageItems(input.tasks, 'tasks');
+  const contacts = pageItems(input.contacts, 'contacts');
+  const notes = pageItems(input.notes, 'notes');
+  const tasksPartial = input.tasks.truncated;
+  const contactsPartial = input.contacts.truncated;
+  const notesPartial = input.notes.truncated;
   const stage = displayStage(opportunity);
   const outcome = draftOutcome(opportunity);
   const value = formatMoneyMicros(opportunity.valueMicros);
@@ -277,7 +309,9 @@ function sectionBody(input: GroundedDraftInput): string[] {
     : 'No reusable reference has been selected yet, so the team should validate proof points before submission.';
   const activeTasks = tasks.filter((task) => task.status !== 'done');
   const stakeholderLine = contacts.length
-    ? `Known stakeholder context: ${contacts.map(formatStakeholder).join('; ')}.`
+    ? `Known stakeholder context: ${contacts.map(formatStakeholder).join('; ')}.${
+        contactsPartial ? ' This page is not every contact.' : ''
+      }`
     : 'Stakeholder mapping is incomplete and should be confirmed before final submission.';
 
   if (input.section === 'executive_summary') {
@@ -303,7 +337,9 @@ function sectionBody(input: GroundedDraftInput): string[] {
       'Include a kickoff workstream to confirm requirements, success metrics, dependencies, and decision owners. Follow with solution design, delivery execution, change enablement, and executive reporting.',
       `${refLine} ${
         notes[0]
-          ? `Recent account note to account for: "${notes[0].title}" - ${summarizeNote(notes[0])}`
+          ? `Recent account note to account for: "${notes[0].title}" - ${summarizeNote(notes[0])}${
+              notesPartial ? '. This page is not every note.' : ''
+            }`
           : 'No recent account note was found, so assumptions should be explicitly listed.'
       }`,
       'Out of scope until validated: final pricing, third-party commitments, and any customer-side dependency not owned by the bid team.',
@@ -328,7 +364,9 @@ function sectionBody(input: GroundedDraftInput): string[] {
       `Anchor the response plan to the ${due} deadline and show a low-risk sequence from mobilization through executive acceptance.`,
       'Proposed phases: week 0 kickoff and access readiness; weeks 1-2 discovery and validation; weeks 3-5 solution design and implementation planning; weeks 6+ delivery execution with weekly steering and risk review.',
       activeTasks.length
-        ? `Current open work items that should appear in the timeline: ${activeTasks.map((task) => task.title).join('; ')}.`
+        ? `Current open work items that should appear in the timeline: ${activeTasks.map((task) => task.title).join('; ')}.${
+            tasksPartial ? ' This page is not every task.' : ''
+          }`
         : 'No open pursuit tasks were found; create owners for compliance, pricing, legal, and delivery before the timeline is considered complete.',
       'Include an explicit dependency table for customer decisions, data access, security review, and procurement approval.',
     ];
@@ -347,8 +385,12 @@ function sectionBody(input: GroundedDraftInput): string[] {
             : 'Stored probability is recorded. Test assumptions against legal, finance, delivery, and procurement gates.',
     `${stakeholderLine} ${refLine}`,
     activeTasks.some((task) => task.status === 'blocked')
-      ? 'At least one task is blocked; unblock it or mark the proposal risk as high.'
-      : 'No blocked task was found in the sampled pursuit tasks.',
+      ? `At least one task is blocked; unblock it or mark the proposal risk as high.${
+          tasksPartial ? ' This page is not every task.' : ''
+        }`
+      : `No blocked task was found in the sampled pursuit tasks.${
+          tasksPartial ? ' This page is not every task.' : ''
+        }`,
   ];
 }
 
@@ -357,6 +399,9 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
   citations: DraftCitation[];
 } {
   const references = referenceItems(input.references);
+  const tasks = pageItems(input.tasks, 'tasks');
+  const contacts = pageItems(input.contacts, 'contacts');
+  const notes = pageItems(input.notes, 'notes');
   const citations: DraftCitation[] = [
     {
       docId: input.opportunity.id,
@@ -369,13 +414,13 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
       type: 'reference' as const,
       ...(reference.documentUrl ? { sourceUrl: reference.documentUrl } : {}),
     })),
-    ...input.tasks.map((task) => ({ docId: task.id, title: task.title, type: 'task' as const })),
-    ...input.contacts.map((contact) => ({
+    ...tasks.map((task) => ({ docId: task.id, title: task.title, type: 'task' as const })),
+    ...contacts.map((contact) => ({
       docId: contact.id,
       title: contact.aiOptOut ? 'Opted-out stakeholder' : contact.name,
       type: 'contact' as const,
     })),
-    ...input.notes.map((note) => ({ docId: note.id, title: note.title, type: 'note' as const })),
+    ...notes.map((note) => ({ docId: note.id, title: note.title, type: 'note' as const })),
   ];
 
   const evidenceLines = [
@@ -391,11 +436,15 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
           input.references.truncated ? ' This page is not every match.' : ''
         }`
       : '- References: none selected yet.',
-    input.tasks.length
-      ? `- Pursuit tasks: ${input.tasks.map((task) => `${task.title} (${stageWords(task.status)})`).join('; ')}.`
+    tasks.length
+      ? `- Pursuit tasks: ${tasks.map((task) => `${task.title} (${stageWords(task.status)})`).join('; ')}.${
+          input.tasks.truncated ? ' This page is not every task.' : ''
+        }`
       : '- Pursuit tasks: none found.',
-    input.contacts.length
-      ? `- Stakeholders: ${input.contacts.map(formatStakeholder).join('; ')}.`
+    contacts.length
+      ? `- Stakeholders: ${contacts.map(formatStakeholder).join('; ')}.${
+          input.contacts.truncated ? ' This page is not every contact.' : ''
+        }`
       : '- Stakeholders: none found.',
   ];
 
