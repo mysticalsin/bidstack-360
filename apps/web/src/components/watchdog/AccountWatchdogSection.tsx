@@ -1,5 +1,5 @@
-// Account page: watchdog feed (2/3) beside upcoming results (1/3), then one
-// "Track record" surface (won/lost summary, expandable projects). v21: the
+// Account page: watchdog feed (2/3) beside upcoming results (1/3), then
+// previous projects with us and related history (meetings, MSAs, signals). v21: the
 // feed is ordered by importance (Latest on toggle), each row carries its
 // category, outlet count and a Sample badge; the signal strip and the track
 // record timeline moved into the Signals timeline above. Direction: Tony 13:12 BRT + /workspace/fleet/polo-DESIGN.md.
@@ -286,7 +286,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
 
   return (
     <section className="wd-surface" aria-labelledby="wd-track-h">
-      <h2 id="wd-track-h" className="wd-h">Track record</h2>
+      <h2 id="wd-track-h" className="wd-h">Previous projects with us</h2>
       {data.pastProjects.length === 0 ? (
         <p className="wd-empty"><span>No closed projects yet</span>Won and lost bids appear here.</p>
       ) : (
@@ -345,6 +345,58 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
   );
 }
 
+const HISTORY_TYPE: Record<AccountWatchdog['history'][number]['type'], string> = {
+  filing: 'Filing',
+  opportunity: 'Project',
+  meeting: 'Meeting',
+  msa: 'MSA',
+  signal: 'Signal',
+};
+
+function RelatedHistory({ data }: { data: AccountWatchdog }) {
+  const [all, setAll] = useState(false);
+  const listId = useId();
+  const shown = all ? data.history : data.history.slice(0, 8);
+  return (
+    <section className="wd-surface" aria-labelledby="wd-hist-h" data-testid="related-history">
+      <header className="wd-head">
+        <h2 id="wd-hist-h" className="wd-h">Related history</h2>
+      </header>
+      {data.history.length === 0 ? (
+        <p className="wd-empty">
+          <span>No related history yet</span>Meetings, MSAs and signals appear here.
+        </p>
+      ) : (
+        <>
+          <ul className="wd-list" id={listId}>
+            {shown.map((h) => (
+              <li key={h.id} className="wd-row wd-row-static">
+                <span className="wd-row-main">
+                  <span className="wd-row-title">{h.title}</span>
+                  <span className="wd-row-meta">
+                    {HISTORY_TYPE[h.type]} · <time dateTime={h.at}>{dateFmt.format(new Date(h.at))}</time>
+                    {h.detail ? ` · ${h.detail}` : ''}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <ShowMore total={data.history.length} shown={8} open={all} onToggle={() => setAll((v) => !v)} noun="items" controls={listId} />
+        </>
+      )}
+    </section>
+  );
+}
+
+const emptyWatchdog = (companyId: string): AccountWatchdog => ({
+  companyId,
+  monitoring: { enabled: false, identifiers: [], lastCheckedAt: null, lastError: null },
+  events: [],
+  earnings: [],
+  pastProjects: [],
+  history: [],
+});
+
 export function AccountWatchdogSection({ companyId }: { companyId: string }) {
   const raw = useAccountWatchdog(companyId);
   // Task 5: cross-region meeting flags (GET /meeting-intel/flags?format=watchdog)
@@ -356,6 +408,7 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
     [raw.data, meetings.data, enrichment.data, companyId],
   );
   const q = { ...raw, data };
+  const shown = q.data ?? emptyWatchdog(companyId);
   const checked = q.data?.monitoring.lastCheckedAt;
   const fresh = q.data?.events.filter((e) => e.status === 'NEW').length ?? 0;
   return (
@@ -385,16 +438,19 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
               ) : null}
               <Signals data={q.data} />
             </>
-          ) : null}
+          ) : (
+            <Signals data={shown} />
+          )}
         </section>
         <section className="wd-surface" aria-labelledby="wd-cal-h">
           <header className="wd-head">
             <h2 id="wd-cal-h" className="wd-h">Upcoming results</h2>
           </header>
-          {q.isLoading ? <div className="wd-skel" /> : q.data ? <Results data={q.data} /> : null}
+          {q.isLoading ? <div className="wd-skel" /> : <Results data={shown} />}
         </section>
       </div>
-      {q.data ? <TrackRecord data={q.data} /> : null}
+      <TrackRecord data={shown} />
+      <RelatedHistory data={shown} />
     </div>
   );
 }

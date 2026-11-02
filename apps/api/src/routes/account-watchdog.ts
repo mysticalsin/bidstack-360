@@ -57,10 +57,18 @@ const PastProject = z.object({
 const HistoryItem = z.object({
   id: z.string(),
   at: z.string(),
-  type: z.enum(['filing', 'opportunity']),
+  type: z.enum(['filing', 'opportunity', 'meeting', 'msa', 'signal']),
   title: z.string(),
   detail: z.string(),
 });
+
+const FILING_SOURCES = new Set(['sec_edgar', 'companies_house', 'amf', 'ir_feed', 'financials']);
+const FILING_KINDS = new Set(['FILING', 'INSOLVENCY', 'ANNUAL_REPORT', 'EARNINGS_RELEASE']);
+
+function historyTypeForEvent(source: string, kind: string): 'filing' | 'signal' {
+  if (FILING_SOURCES.has(source) || FILING_KINDS.has(kind)) return 'filing';
+  return 'signal';
+}
 
 export const AccountWatchdogResponse = z.object({
   companyId: z.string(),
@@ -273,7 +281,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         req.log.warn({ err: err instanceof Error ? err.message : String(err), companyId }, 'enrichment watch sync failed'),
       );
       const now = new Date();
-      const [subject, events, earnings, closed] = await Promise.all([
+      const [subject, events, earnings, closed, meetings, agreements] = await Promise.all([
         prisma.accountWatchSubject.findFirst({ where: { orgId, companyId } }),
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId, status: { not: 'DISMISSED' }, ...hideSampleWhere(await companiesWithLiveSignals(orgId, [companyId])) },
@@ -291,6 +299,18 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           orderBy: [{ closedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
           take: 50,
         }),
+        prisma.meetingIntel.findMany({
+          where: { orgId, companyId, deletedAt: null },
+          select: { id: true, title: true, heldAt: true, summary: true },
+          orderBy: { heldAt: 'desc' },
+          take: 50,
+        }),
+        prisma.contractAgreement.findMany({
+          where: { orgId, companyId, deletedAt: null },
+          select: { id: true, title: true, reference: true, kind: true, status: true, effectiveDate: true, createdAt: true },
+          orderBy: { updatedAt: 'desc' },
+          take: 50,
+        }),
       ]);
 
       const pastProjects = closed.map((o) => ({
@@ -305,7 +325,7 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         ...events.map((e) => ({
           id: `ev:${e.id}`,
           at: e.occurredAt.toISOString(),
-          type: 'filing' as const,
+          type: historyTypeForEvent(e.source, e.kind),
           title: e.title,
           detail: `${e.source} · ${e.implication.toLowerCase()}`,
         })),
@@ -315,6 +335,20 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
           type: 'opportunity' as const,
           title: p.name,
           detail: p.outcome === 'won' ? 'Closed won' : 'Closed lost',
+        })),
+        ...meetings.map((m) => ({
+          id: `mt:${m.id}`,
+          at: m.heldAt.toISOString(),
+          type: 'meeting' as const,
+          title: m.title,
+          detail: m.summary?.trim() || 'Meeting',
+        })),
+        ...agreements.map((a) => ({
+          id: `msa:${a.id}`,
+          at: (a.effectiveDate ?? a.createdAt).toISOString(),
+          type: 'msa' as const,
+          title: a.title?.trim() || a.reference,
+          detail: `${a.kind} · ${a.status}`,
         })),
       ]
         .sort((a, b) => b.at.localeCompare(a.at))

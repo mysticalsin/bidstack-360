@@ -1,4 +1,4 @@
-// v23: compact "Financial health" for the account page. Four sparklines
+// v23: compact "Public financials watchdog" for the account page. Four sparklines
 // (revenue, margin, capex, cash) from filed annual statements, each number
 // with its period and source, then the top early-warning cards. Strategic and
 // Top accounts are pulled automatically; General accounts show why not and,
@@ -117,7 +117,7 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
       <section className="wd-surface" aria-labelledby="fh-h">
         <header className="wd-head">
           <h2 id="fh-h" className="wd-h">
-            Financial health {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
           </h2>
           {d ? (
             <span className="wd-row-meta">
