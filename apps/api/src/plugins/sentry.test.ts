@@ -202,7 +202,6 @@ describe('scrubPii', () => {
 
     expect(req.url).toBe('/api/search?email=%5BREDACTED%5D&q=%5BREDACTED_EMAIL%5D');
     expect(req.headers).toEqual({
-      authorization: '[REDACTED]',
       'x-request-id': 'req-1',
     });
 
