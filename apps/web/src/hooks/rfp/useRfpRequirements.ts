@@ -13,7 +13,10 @@ export interface Requirement {
 
 interface RequirementsResult {
   items: Requirement[];
+  /** Length of `items`. Not a count of every requirement on the deal. */
   total: number;
+  /** True when the route read one requirement past the page and dropped it. */
+  requirementsContinue?: boolean;
 }
 
 export function useRfpRequirements(bidWorkspaceId: string | null) {

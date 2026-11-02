@@ -167,6 +167,30 @@ export const Requirement = z.object({
 });
 export type Requirement = z.infer<typeof Requirement>;
 
+/** Requirements the extracted-requirements list draws. One more row is the probe. */
+export const EXTRACTED_REQUIREMENTS_DRAWN = 500;
+
+/**
+ * Requirements one review query may return. A fixed take of the page dropped
+ * a later requirement, so that page read as every extracted requirement. One
+ * row past the page is the probe. It is not shown, and it is not a total.
+ */
+export function extractedRequirementTake(drawn = EXTRACTED_REQUIREMENTS_DRAWN): number {
+  return drawn + 1;
+}
+
+/** Requirements to draw. The extra row only says another requirement exists. */
+export function extractedRequirementPage<T>(
+  rows: readonly T[],
+  drawn = EXTRACTED_REQUIREMENTS_DRAWN,
+): { items: T[]; pageContinues: boolean } {
+  const pageContinues = rows.length > drawn;
+  return {
+    items: pageContinues ? rows.slice(0, drawn) : [...rows],
+    pageContinues,
+  };
+}
+
 export const ComplianceMatrixRow = z.object({
   id: z.string().uuid(),
   orgId: z.string().uuid(),
