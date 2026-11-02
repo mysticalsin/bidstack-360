@@ -22,9 +22,12 @@ git fetch -q --depth 1 origin "$SHA"
 git checkout -q FETCH_HEAD
 
 echo "[demo-build] installing"
+# The image ships an old pnpm on PATH; use the one installed here explicitly.
 npm install -g pnpm@10.27.0 --silent
-pnpm install --frozen-lockfile
+PNPM_BIN="$(npm prefix -g)/bin/pnpm"
+"$PNPM_BIN" --version
+"$PNPM_BIN" install --frozen-lockfile
 npm install --prefix /tmp/polo-nft --no-save --silent @vercel/nft@0.29
 
 echo "[demo-build] building"
-VERCEL_OUTPUT_DIR="$HERE/.vercel/output" NFT_PATH=/tmp/polo-nft node scripts/vercel-serverless-build.mjs
+PNPM_BIN="$PNPM_BIN" VERCEL_OUTPUT_DIR="$HERE/.vercel/output" NFT_PATH=/tmp/polo-nft node scripts/vercel-serverless-build.mjs
