@@ -14,6 +14,8 @@ import { compareMicros, microsSharePercent } from '@/components/dashboard/unspec
 import { cn } from '@/lib/cn';
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
+import { TERRITORY_LIST_PAGE, territoryListCaption } from './territory-list-caption';
+
 export function KpiTile({
   label,
   value,
@@ -258,6 +260,7 @@ export function TerritoryListPanel({
   onDelete,
   selectedCountryCode,
   canWrite,
+  pageContinues = false,
 }: {
   items: Territory[];
   isLoading: boolean;
@@ -268,6 +271,8 @@ export function TerritoryListPanel({
   onDelete: (t: Territory) => void;
   selectedCountryCode?: string | null;
   canWrite: boolean;
+  /** True when the list read one territory past this page and dropped it. */
+  pageContinues?: boolean;
 }) {
   const { t } = useTranslation('crm');
   return (
@@ -278,7 +283,12 @@ export function TerritoryListPanel({
           {t('territoryPanels.territories', 'Territories')}
         </h2>
         <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
-          {t('territoryPanels.countTotal', '{{count}} total', { count: items.length })}
+          {pageContinues
+            ? t(
+                'territoryPanels.countPartial',
+                territoryListCaption(items.length, true, TERRITORY_LIST_PAGE),
+              )
+            : t('territoryPanels.countTotal', '{{count}} total', { count: items.length })}
         </span>
       </div>
       {isError ? (

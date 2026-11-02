@@ -32,7 +32,7 @@ export interface TerritoryAnalytics {
 }
 
 export function useTerritories() {
-  return useQuery<{ items: Territory[] }>({
+  return useQuery<{ items: Territory[]; pageContinues: boolean }>({
     queryKey: ['territories'],
     queryFn: ({ signal }) => api('/api/territories', { signal }),
   });

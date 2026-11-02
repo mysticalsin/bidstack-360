@@ -80,6 +80,8 @@ export function TerritoriesPage() {
   const deleteRule = useDeleteLeadRoutingRule();
 
   const tItems = territories.data?.items ?? [];
+  // pageContinues is the territory the list read past this page and dropped.
+  const pageContinues = Boolean(territories.data?.pageContinues);
   const rItems = rules.data?.items ?? [];
   const aItems = analytics.data?.items ?? [];
   const totals = analytics.data?.totals;
@@ -388,6 +390,7 @@ export function TerritoriesPage() {
         />
         <TerritoryListPanel
           items={tItems}
+          pageContinues={pageContinues}
           isLoading={territories.isLoading}
           isError={territories.isError}
           errorMessage={territories.error?.message}
