@@ -25,6 +25,8 @@ import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
 import { mergeEnrichmentSignals } from '@/lib/enrichment/aggregate';
 import { daysUntil } from '@/lib/format';
 
+import { ACCOUNT_WATCH_EVENTS_DRAWN, accountWatchSignalCaption } from './account-watch-signal-caption';
+
 const PILL: Record<WatchImplication, string> = {
   OPPORTUNITY: 'Opportunity',
   NEUTRAL: 'Watch',
@@ -58,13 +60,16 @@ function Pill({ kind, children }: { kind: string; children: React.ReactNode }) {
   );
 }
 
-function ShowMore({ total, shown, open, onToggle, noun, controls }: {
+function ShowMore({ total, shown, open, onToggle, noun, controls, pageContinues }: {
   total: number; shown: number; open: boolean; onToggle: () => void; noun: string; controls: string;
+  pageContinues?: boolean;
 }) {
   if (total <= shown) return null;
+  // A longer loaded list is not a total. "Show all N" would print that length.
+  const more = pageContinues ? 'Show the rest of these signals' : `Show all ${total} ${noun}`;
   return (
     <button type="button" className="wd-more" aria-expanded={open} aria-controls={controls} onClick={onToggle}>
-      {open ? 'Show fewer' : `Show all ${total} ${noun}`}
+      {open ? 'Show fewer' : more}
     </button>
   );
 }
@@ -148,7 +153,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
   );
 }
 
-function Signals({ data }: { data: AccountWatchdog }) {
+function Signals({ data, pageContinues }: { data: AccountWatchdog; pageContinues: boolean }) {
   const [all, setAll] = useState(false);
   const [order, setOrder] = useState<'important' | 'latest'>('important');
   const listId = useId();
@@ -206,8 +211,8 @@ function Signals({ data }: { data: AccountWatchdog }) {
     <>
       <div className="wd-toolbar">
         <span className="wd-row-meta">
-          {data.events.length} {data.events.length === 1 ? 'signal' : 'signals'}
-          {important ? `, ${important} important` : ''}
+          {accountWatchSignalCaption(pageContinues ? ACCOUNT_WATCH_EVENTS_DRAWN : data.events.length, pageContinues)}
+          {!pageContinues && important ? `, ${important} important` : ''}
         </span>
         <div className="wd-seg" role="group" aria-label="Order signals">
           <button type="button" aria-pressed={order === 'important'} onClick={() => setOrder('important')}>Most important</button>
@@ -219,7 +224,7 @@ function Signals({ data }: { data: AccountWatchdog }) {
           <SignalRow key={e.id} e={e} i={i} onDismiss={canDismiss && isStored(e) ? dismiss : undefined} />
         ))}
       </ul>
-      <ShowMore total={data.events.length} shown={TOP_SIGNALS} open={all} onToggle={() => setAll((v) => !v)} noun="signals" controls={listId} />
+      <ShowMore total={data.events.length} shown={TOP_SIGNALS} open={all} onToggle={() => setAll((v) => !v)} noun="signals" controls={listId} pageContinues={pageContinues} />
       {undoBar}
       {newsHint}
     </>
@@ -351,13 +356,21 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
   // join this account's signals as OPPORTUNITY rows. Optional: no access = none.
   const meetings = useMeetingWatchdogFeed(Boolean(raw.data));
   const enrichment = useCompanyEnrichment(raw.data ? companyId : undefined);
+  // One row past the fifty this list draws is the probe. Drop it before
+  // meeting and hiring rows join, so it is not a shown signal.
+  const eventsContinue = (raw.data?.events.length ?? 0) > ACCOUNT_WATCH_EVENTS_DRAWN;
+  const trimmed = useMemo(() => {
+    if (!raw.data || !eventsContinue) return raw.data;
+    return { ...raw.data, events: raw.data.events.slice(0, ACCOUNT_WATCH_EVENTS_DRAWN) };
+  }, [raw.data, eventsContinue]);
   const data = useMemo(
-    () => (raw.data ? mergeEnrichmentSignals(mergeMeetingSignals(raw.data, meetings.data?.items, companyId), enrichment.data) : undefined),
-    [raw.data, meetings.data, enrichment.data, companyId],
+    () => (trimmed ? mergeEnrichmentSignals(mergeMeetingSignals(trimmed, meetings.data?.items, companyId), enrichment.data) : undefined),
+    [trimmed, meetings.data, enrichment.data, companyId],
   );
   const q = { ...raw, data };
   const checked = q.data?.monitoring.lastCheckedAt;
   const fresh = q.data?.events.filter((e) => e.status === 'NEW').length ?? 0;
+  const statusLabel = eventsContinue ? null : fresh > 0 ? `${fresh} new` : 'Up to date';
   return (
     <div className="wd" data-testid="account-watchdog">
       <div className="wd-grid">
@@ -366,8 +379,7 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
             <h2 id="wd-feed-h" className="wd-h">Watchdog</h2>
             {q.data ? (
               <span className="wd-row-meta">
-                {fresh > 0 ? `${fresh} new` : 'Up to date'}
-                {checked ? ` · checked ${shortFmt.format(new Date(checked))}` : ''}
+                {[statusLabel, checked ? `checked ${shortFmt.format(new Date(checked))}` : null].filter(Boolean).join(' · ')}
               </span>
             ) : null}
           </header>
@@ -383,7 +395,7 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
               {q.data.monitoring.lastError ? (
                 <p className="wd-row-meta" role="status">Last check failed. Showing the last good data.</p>
               ) : null}
-              <Signals data={q.data} />
+              <Signals data={q.data} pageContinues={eventsContinue} />
             </>
           ) : null}
         </section>

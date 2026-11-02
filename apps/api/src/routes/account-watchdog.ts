@@ -11,6 +11,7 @@ import { categoryForKind, collapseMarketNotes, enrichmentWatchRows, importanceSc
 import { canReadAccount } from '../lib/account-access.js';
 import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from '../services/account-signals/live-signals.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
+import { ACCOUNT_WATCH_EVENTS_DRAWN, accountWatchEventTake } from './account-watch-events.js';
 import { watchdogFeedAlertTake } from './watchdog-feed-alerts.js';
 
 const Implication = z.enum(['OPPORTUNITY', 'RISK', 'NEUTRAL']);
@@ -281,7 +282,9 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId, status: { not: 'DISMISSED' }, ...hideSampleWhere(await companiesWithLiveSignals(orgId, [companyId])) },
           orderBy: { occurredAt: 'desc' },
-          take: 50,
+          // One row past the fifty the account list draws. The extra row is
+          // the probe. It is not a shown signal, and it is not a total.
+          take: accountWatchEventTake(),
         }),
         prisma.accountEarningsDate.findMany({
           where: { orgId, companyId, expectedAt: { gte: now } },
@@ -305,7 +308,8 @@ export const accountWatchdogRoutes: FastifyPluginAsyncZod = async (server) => {
       }));
 
       const history = [
-        ...events.map((e) => ({
+        // The probe is the row past the list. It is not a history item.
+        ...events.slice(0, ACCOUNT_WATCH_EVENTS_DRAWN).map((e) => ({
           id: `ev:${e.id}`,
           at: e.occurredAt.toISOString(),
           type: 'filing' as const,

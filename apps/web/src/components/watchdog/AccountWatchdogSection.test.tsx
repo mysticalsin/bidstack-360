@@ -194,4 +194,59 @@ describe('AccountWatchdogSection', () => {
     expect(screen.queryByRole('button', { name: /^Dismiss signal/ })).toBeNull();
     perms.write = true;
   });
+
+  it('does not describe five of six signals as every signal', () => {
+    // WHY: a take of five would hide Fay and the count would call those five
+    // every signal. Six that fit stay "6 signals", and Fay is on the list.
+    // The line does not pretend the loaded length is a total.
+    mi.data = undefined;
+    enr.data = undefined;
+    const titles = ['Ada', 'Bea', 'Cara', 'Dia', 'Eve', 'Fay'];
+    state.data = {
+      ...base,
+      events: titles.map((title, n) => ({ ...ev(n + 1), id: `six-${n}`, title, displayTitle: title, severity: 1 })),
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByText('6 signals')).toBeTruthy();
+    expect(screen.getByText('6 new')).toBeTruthy();
+    expect(screen.queryByText('5 signals')).toBeNull();
+    expect(screen.queryByText('Show all 5 signals')).toBeNull();
+    expect(screen.queryByText(/not every signal/i)).toBeNull();
+    expect(screen.queryByText(/View all/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 6 signals' }));
+    expect(screen.getByText('Fay')).toBeTruthy();
+    expect(screen.getByText('Ada')).toBeTruthy();
+  });
+
+  it('does not describe fifty signals as every signal when a later one was loaded', () => {
+    // WHY: the list took fifty. A fifty-first signal never arrived, and
+    // "51 signals" / "Show all 51" treated the page as the whole set. The
+    // extra row is the probe and is not drawn. No signal total is invented.
+    mi.data = undefined;
+    enr.data = undefined;
+    state.data = {
+      ...base,
+      events: Array.from({ length: 51 }, (_, n) => ({
+        ...ev(n + 1),
+        id: `page-${n}`,
+        title: `Signal ${n + 1}`,
+        displayTitle: `Signal ${n + 1}`,
+        severity: 1,
+      })),
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByText('50 in the latest 50, not every signal').textContent).toBe(
+      '50 in the latest 50, not every signal',
+    );
+    expect(screen.queryByText(/51 signals/)).toBeNull();
+    expect(screen.queryByText(/50 signals/)).toBeNull();
+    expect(screen.queryByText(/Show all/i)).toBeNull();
+    expect(screen.queryByText(/View all/i)).toBeNull();
+    expect(screen.queryByText('Signal 51')).toBeNull();
+    expect(screen.queryByText(/^\d+ new$/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show the rest of these signals' }));
+    expect(screen.getAllByRole('button', { name: /Signal \d+/ })).toHaveLength(50);
+    expect(screen.queryByText('Signal 51')).toBeNull();
+    expect(screen.getByText('Signal 50')).toBeTruthy();
+  });
 });
