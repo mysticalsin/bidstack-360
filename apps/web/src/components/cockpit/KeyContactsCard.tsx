@@ -6,8 +6,9 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { springSoft } from '@/lib/motion';
+import { keyContactCaption } from '@/pages/key-contacts';
 
-import type { AccountCockpitSnapshot } from '@bidstack/shared';
+import { KEY_CONTACT_PAGE_LIMIT, type AccountCockpitSnapshot } from '@bidstack/shared';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -16,18 +17,23 @@ interface Props {
 export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
-  if (cockpit.keyContacts.length === 0) return null;
+  const shown = cockpit.keyContacts.slice(0, KEY_CONTACT_PAGE_LIMIT);
+  // contactCount already said this page is short, or a sixth name is in the list.
+  const pageContinues =
+    cockpit.keyContactsTruncated === true || shown.length < cockpit.keyContacts.length;
+  if (shown.length === 0) return null;
   return (
     <Card>
       <SectionHeader
         title={t('keyContacts.title', 'Key contacts')}
-        caption={t(
-          'keyContacts.caption',
-          'Up to 5 people linked to this account, highest recorded influence first.',
-        )}
+        caption={
+          pageContinues
+            ? t('keyContacts.pageCaption', keyContactCaption(shown.length, true))
+            : t('keyContacts.caption', keyContactCaption(shown.length, false))
+        }
       />
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {cockpit.keyContacts.slice(0, 5).map((person, index) => (
+        {shown.map((person, index) => (
           <motion.li
             key={person.id}
             className="key-contact-row"

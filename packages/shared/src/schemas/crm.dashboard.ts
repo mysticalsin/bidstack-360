@@ -233,6 +233,10 @@ export const AccountCockpitSnapshot = z.object({
   technicalStack: z.array(TechnicalStackCategory),
   health: CompanyHealth,
   keyContacts: z.array(CrmPerson),
+  // True when contactCount is larger than this page, or when that total is
+  // absent and one linked contact past KEY_CONTACT_PAGE_LIMIT was dropped.
+  // keyContacts is that page, not every linked contact.
+  keyContactsTruncated: z.boolean().optional(),
   recentActivity: z.array(CrmActivity),
   // True when the cockpit read one activity past ACCOUNT_ACTIVITY_PAGE_LIMIT
   // and dropped it. recentActivity is that page, not every activity.
@@ -245,6 +249,9 @@ export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
 
 /** Activities shown on one account cockpit. One extra row sets recentActivityTruncated. */
 export const ACCOUNT_ACTIVITY_PAGE_LIMIT = 5;
+
+/** Key contacts shown on one account cockpit. contactCount, or one extra row, sets keyContactsTruncated. */
+export const KEY_CONTACT_PAGE_LIMIT = 5;
 
 export const CrmDashboardSnapshot = z.object({
   generatedAt: z.string().datetime(),

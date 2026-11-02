@@ -10,6 +10,7 @@ import { type z } from 'zod';
 import {
   recordedDecisionRole,
   ACCOUNT_ACTIVITY_PAGE_LIMIT,
+  KEY_CONTACT_PAGE_LIMIT,
   type AccountCockpitSnapshot,
   type AiInsight,
   type BidOpportunity,
@@ -483,6 +484,22 @@ export function accountActivityPage<T>(rows: readonly T[]): {
   };
 }
 
+/**
+ * One key-contact page. `contactCount` is the account total when the book
+ * already counted it. A missing total is not invented: one row past the page
+ * is the only other signal that these names are not every linked contact.
+ */
+export function keyContactPage<T>(
+  rows: readonly T[],
+  contactCount?: number,
+): { items: T[]; pageContinues: boolean } {
+  const items =
+    rows.length > KEY_CONTACT_PAGE_LIMIT ? rows.slice(0, KEY_CONTACT_PAGE_LIMIT) : [...rows];
+  const pageContinues =
+    contactCount != null ? contactCount > items.length : rows.length > KEY_CONTACT_PAGE_LIMIT;
+  return { items, pageContinues };
+}
+
 export function buildActivities(
   tasks: Array<{
     id: string;
@@ -879,6 +896,8 @@ export function buildCockpit({
   const openCount = performance?.book?.openCount ?? openDeals.length;
   // One row past the page is the probe. It is not an activity to show.
   const activity = accountActivityPage(buildActivities(accountTasks));
+  // contactCount is the book total. Without it, one name past the page is the probe.
+  const contactsPage = keyContactPage(accountContacts, performance?.book?.contactCount);
 
   return {
     company,
@@ -980,7 +999,7 @@ export function buildCockpit({
           }
         : undefined,
     ),
-    keyContacts: accountContacts.slice(0, 5).map((contact) => ({
+    keyContacts: contactsPage.items.map((contact) => ({
       id: contact.id,
       source: 'external_crm',
       companyId: contact.companyId,
@@ -1001,6 +1020,7 @@ export function buildCockpit({
       ),
       updatedAt: contact.createdAt.toISOString(),
     })),
+    keyContactsTruncated: contactsPage.pageContinues,
     recentActivity: activity.items,
     recentActivityTruncated: activity.pageContinues,
     risks: visibleRisks.map(serializeRisk),

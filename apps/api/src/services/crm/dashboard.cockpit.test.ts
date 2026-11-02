@@ -11,6 +11,7 @@ import {
   applyFieldOverrides,
   buildCockpit,
   computeSignalCoverage,
+  keyContactPage,
 } from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
@@ -1147,5 +1148,110 @@ describe('account activity page', () => {
     });
     expect(short.recentActivityTruncated).toBe(false);
     expect(short.recentActivity).toHaveLength(2);
+  });
+});
+
+describe('key contact page', () => {
+  it('keeps a page that matches contactCount and marks a shorter page', () => {
+    // WHY: the cockpit showed five names and the caption treated that page as
+    // the people on the account. contactCount is already on the book. A
+    // missing total is not invented; one name past the page is enough.
+    const rows = ['Ada', 'Bea', 'Cara', 'Dia', 'Eve', 'Fay'].map((name) => ({ name }));
+    const shortTotal = keyContactPage(rows.slice(0, 5), 5);
+    expect(shortTotal.pageContinues).toBe(false);
+    expect(shortTotal.items).toHaveLength(5);
+
+    const largerTotal = keyContactPage(rows, 6);
+    expect(largerTotal.pageContinues).toBe(true);
+    expect(largerTotal.items.map((row) => row.name)).toEqual(['Ada', 'Bea', 'Cara', 'Dia', 'Eve']);
+    expect(largerTotal.items.map((row) => row.name)).not.toContain('Fay');
+
+    const probe = keyContactPage(rows);
+    expect(probe.pageContinues).toBe(true);
+    expect(probe.items).toHaveLength(5);
+
+    const exactProbe = keyContactPage(rows.slice(0, 5));
+    expect(exactProbe.pageContinues).toBe(false);
+    expect(exactProbe.items).toHaveLength(5);
+
+    const matchedShort = keyContactPage(rows.slice(0, 2), 2);
+    expect(matchedShort.pageContinues).toBe(false);
+    expect(matchedShort.items).toHaveLength(2);
+
+    const shortOfTotal = keyContactPage(rows.slice(0, 2), 10);
+    expect(shortOfTotal.pageContinues).toBe(true);
+    expect(shortOfTotal.items).toHaveLength(2);
+    expect(shortOfTotal.items.map((row) => row.name)).toEqual(['Ada', 'Bea']);
+  });
+
+  it('does not hand the cockpit a sixth contact when the book has more', () => {
+    // WHY: the key-contact caption counts keyContacts. A sixth person must not
+    // land in that array, or the old "up to 5" line would describe a page as
+    // every linked contact. contactCount is the total. Without it, the sixth
+    // row only says another contact exists.
+    const contact = {
+      customer: 'Mantu',
+      companyId: 'mantu',
+      role: null,
+      email: null,
+      phone: null,
+      influence: 1,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    };
+    const contacts = ['Ada', 'Bea', 'Cara', 'Dia', 'Eve', 'Fay'].map((name) => ({
+      ...contact,
+      id: name,
+      name,
+    }));
+    const book = {
+      winLoss: {
+        wonCount: 0,
+        lostCount: 0,
+        wonValueMicros: '0',
+        lostValueMicros: '0',
+        winRate: null,
+      },
+      revenueEvolution: [],
+    };
+    const base = {
+      company: company(),
+      companies: [],
+      opportunities: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    };
+    const larger = buildCockpit({
+      ...base,
+      contacts,
+      performance: {
+        ...book,
+        book: { projectCount: 0, openCount: 0, contactCount: 6, taskCount: 0 },
+      },
+    });
+    expect(larger.keyContactsTruncated).toBe(true);
+    expect(larger.keyContacts).toHaveLength(5);
+    expect(larger.keyContacts.map((person) => person.name)).not.toContain('Fay');
+
+    const matched = buildCockpit({
+      ...base,
+      contacts: contacts.slice(0, 5),
+      performance: {
+        ...book,
+        book: { projectCount: 0, openCount: 0, contactCount: 5, taskCount: 0 },
+      },
+    });
+    expect(matched.keyContactsTruncated).toBe(false);
+    expect(matched.keyContacts).toHaveLength(5);
+
+    const probed = buildCockpit({ ...base, contacts });
+    expect(probed.keyContactsTruncated).toBe(true);
+    expect(probed.keyContacts).toHaveLength(5);
+    expect(probed.keyContacts.map((person) => person.name)).not.toContain('Fay');
+
+    const short = buildCockpit({ ...base, contacts: contacts.slice(0, 2) });
+    expect(short.keyContactsTruncated).toBe(false);
+    expect(short.keyContacts).toHaveLength(2);
   });
 });
