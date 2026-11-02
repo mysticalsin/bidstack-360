@@ -522,13 +522,26 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           format: z.enum(['flags', 'watchdog']).default('flags'),
           limit: z.coerce.number().int().min(1).max(100).default(50),
         }),
-        response: { 200: z.object({ items: z.array(CrossRegionFlagOut) }).or(z.object({ items: z.array(MeetingIntelWatchdogItem) })) },
+        response: {
+          200: z
+            .object({
+              items: z.array(CrossRegionFlagOut),
+              /**
+               * True when the query read one flag past `limit` and dropped it.
+               * `items` is that page, not every flag.
+               */
+              flagsContinue: z.boolean().optional(),
+            })
+            .or(z.object({ items: z.array(MeetingIntelWatchdogItem) })),
+        },
       },
     },
     async (req) => {
       const orgId = req.auth.orgId;
       const scope = await getAccessScope(orgId, req.auth.userId);
-      const flags = await prisma.meetingCrossRegionFlag.findMany({
+      // One row past the page the flags tab draws. The extra row is the probe.
+      // It is not shown, and it is not a total.
+      const loadedFlags = await prisma.meetingCrossRegionFlag.findMany({
         where: {
           orgId,
           recipientUserId: req.auth.userId,
@@ -541,8 +554,10 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         },
         orderBy: { createdAt: 'desc' },
-        take: req.query.limit,
+        take: req.query.limit + 1,
       });
+      const flagsContinue = loadedFlags.length > req.query.limit;
+      const flags = flagsContinue ? loadedFlags.slice(0, req.query.limit) : loadedFlags;
       const companyIds = [...new Set(flags.flatMap((f) => [f.companyId, f.parentCompanyId, f.ownedCompanyId]))];
       const visible = await companiesInScope(orgId, scope, companyIds);
       const names = new Map(
@@ -599,7 +614,7 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           })),
         };
       }
-      return { items: out };
+      return { items: out, flagsContinue };
     },
   );
 

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useDismissFlag, useMeetingFlags } from '@/hooks/useMeetingIntel';
 
+import { shownMeetingFlags } from './meeting-flag-caption';
 import { MeetingsTabs } from './MeetingsTabs';
 
 type Status = 'open' | 'dismissed';
@@ -20,7 +21,8 @@ export default function MeetingFlagsPage() {
   const [status, setStatus] = useState<Status>('open');
   const flags = useMeetingFlags(flagId ? 'all' : status);
   const dismiss = useDismissFlag();
-  const items = (flags.data?.items ?? []).filter((f) => (flagId ? true : f.status === status));
+  const page = shownMeetingFlags(flags.data?.items ?? [], flags.data?.flagsContinue);
+  const items = page.items.filter((f) => (flagId ? true : f.status === status));
   const ordered = flagId ? [...items].sort((a, b) => Number(b.id === flagId) - Number(a.id === flagId)) : items;
 
   useEffect(() => {
