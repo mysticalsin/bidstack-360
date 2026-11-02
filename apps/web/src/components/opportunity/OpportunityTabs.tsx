@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
+import { OPPORTUNITY_TASK_PAGE_LIMIT, opportunityTaskCaption } from '@/pages/opportunity-tasks';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
@@ -214,9 +215,11 @@ function DecisionUnitPanel({
 
 function TasksPanel({ oppId }: { oppId: string }) {
   const { t: translate } = useTranslation('crm');
-  const all = useTasks();
+  // This deal's page. The route reads one row past the limit and drops it.
+  const all = useTasks({ oppId, limit: OPPORTUNITY_TASK_PAGE_LIMIT });
   if (all.isLoading) return <LoadingSkeleton />;
   const tasks = all.data?.items.filter((t) => t.oppId === oppId) ?? [];
+  const pageContinues = Boolean(all.data?.nextCursor);
   if (tasks.length === 0)
     return (
       <EmptyState
@@ -231,9 +234,10 @@ function TasksPanel({ oppId }: { oppId: string }) {
     <Card>
       <SectionHeader
         title={translate('opportunityTabs.tasksTitle', 'Tasks')}
-        caption={translate('opportunityTabs.tasksActiveCount', '{{count}} active', {
-          count: tasks.length,
-        })}
+        caption={translate(
+          'opportunityTabs.tasksPageCaption',
+          opportunityTaskCaption(tasks.length, pageContinues),
+        )}
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {tasks.map((t: Task) => (

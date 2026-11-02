@@ -28,6 +28,8 @@ vi.mock('@/components/signatures/SendForSignatureModal', () => ({
     open ? <div data-testid="signature-modal" data-document-id={documentId ?? ''} /> : null,
 }));
 
+import { api } from '@/lib/api';
+
 import { OpportunityTabs } from './OpportunityTabs';
 
 function renderPanel(documents: Array<{ id: string; name: string; kind: string; bytes: number | null }>) {
@@ -56,6 +58,94 @@ describe('OpportunityTabs decision unit', () => {
     );
     expect(await screen.findByText(/Link a contact to this opportunity/)).toBeTruthy();
     expect(screen.queryByText(/Dust/)).toBeNull();
+  });
+});
+
+describe('OpportunityTabs tasks caption', () => {
+  afterEach(() => {
+    cleanup();
+    vi.mocked(api).mockReset();
+    vi.mocked(api).mockResolvedValue({ items: [] });
+  });
+
+  it('does not describe a full task page as every task', async () => {
+    // WHY: the Tasks tab counted a 50-row page as every follow-up on the deal.
+    // nextCursor means the route already read one row past the page and dropped it.
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (String(path).startsWith('/api/tasks')) {
+        return Promise.resolve({
+          items: Array.from({ length: 50 }, (_, index) => ({
+            id: `task-${index}`,
+            oppId: 'opp-1',
+            title: `Follow-up ${index}`,
+            dueDate: '2026-11-02',
+            status: 'open',
+            assignee: null,
+            createdAt: '2026-11-01T00:00:00.000Z',
+          })),
+          nextCursor: 'task-49',
+        });
+      }
+      return Promise.resolve({ items: [] });
+    });
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OpportunityTabs oppId="opp-1" customer="Acme" documents={[]} />
+      </QueryClientProvider>,
+    );
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Tasks' }));
+
+    expect(await screen.findByText('50 in the latest 50, not every task')).toBeTruthy();
+    expect(screen.queryByText('50 active')).toBeNull();
+    expect(
+      vi.mocked(api).mock.calls.some(
+        (call) => String(call[0]).includes('oppId=opp-1') && String(call[0]).includes('limit=50'),
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps the old task caption when the page does not continue', async () => {
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (String(path).startsWith('/api/tasks')) {
+        return Promise.resolve({
+          items: [
+            {
+              id: 'task-1',
+              oppId: 'opp-1',
+              title: 'Send the draft',
+              dueDate: '2026-11-02',
+              status: 'open',
+              assignee: null,
+              createdAt: '2026-11-01T00:00:00.000Z',
+            },
+            {
+              id: 'task-2',
+              oppId: 'opp-1',
+              title: 'Book the review',
+              dueDate: '2026-11-03',
+              status: 'open',
+              assignee: null,
+              createdAt: '2026-11-01T00:00:00.000Z',
+            },
+          ],
+          nextCursor: null,
+        });
+      }
+      return Promise.resolve({ items: [] });
+    });
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OpportunityTabs oppId="opp-1" customer="Acme" documents={[]} />
+      </QueryClientProvider>,
+    );
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Tasks' }));
+
+    expect(await screen.findByText('2 active')).toBeTruthy();
+    expect(screen.queryByText(/not every task/i)).toBeNull();
   });
 });
 
