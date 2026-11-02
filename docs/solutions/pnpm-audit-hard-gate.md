@@ -9,3 +9,7 @@ merge.
 
 **Do not:** restore `continue-on-error` to hide a new advisory. Remediate
 or override the package, then keep the gate red until it is clean.
+
+**Allowlist:** only for advisories with no patched release on the line we
+run. Dated entries live in `docs/solutions/pnpm-audit-allowlist.md` and
+`package.json` → `pnpm.auditConfig.ignoreGhsas`.
