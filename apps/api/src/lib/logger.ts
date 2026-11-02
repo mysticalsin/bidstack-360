@@ -75,6 +75,89 @@ export function scrubLogMethodArgs(args: Parameters<pino.LogFn>): Parameters<pin
   ) as Parameters<pino.LogFn>;
 }
 
+/**
+ * Request headers that may appear in logs. Everything else is dropped.
+ *
+ * WHY an allowlist: platforms in front of the API (Vercel, Cloudflare,
+ * Azure Front Door) inject their own credential headers, for example
+ * x-vercel-oidc-token, x-vercel-proxy-signature, the signed `forwarded`
+ * header and cf-access-jwt-assertion. A denylist misses each new one, so
+ * only headers that are useful for debugging and never carry secrets are
+ * kept. Client IP headers are dropped too (remoteAddress is enough).
+ */
+export const LOGGED_REQUEST_HEADERS: ReadonlySet<string> = new Set([
+  'accept',
+  'accept-encoding',
+  'accept-language',
+  'content-length',
+  'content-type',
+  'host',
+  'origin',
+  'user-agent',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+  'x-request-id',
+  'x-vercel-id',
+]);
+
+/** Header names that must never be logged, even if a caller logs them directly. */
+export const SENSITIVE_HEADER_NAMES: readonly string[] = [
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'x-auth-token',
+  'x-access-token',
+  'x-csrf-token',
+  'x-xsrf-token',
+  'x-clerk-session',
+  'x-bidstack-sentry-smoke-token',
+  'x-twilio-signature',
+  'x-hub-signature',
+  'x-hub-signature-256',
+  'stripe-signature',
+  'cf-access-jwt-assertion',
+  'cf-access-client-id',
+  'cf-access-client-secret',
+  'cf-authorization',
+  'x-vercel-oidc-token',
+  'x-vercel-proxy-signature',
+  'x-vercel-proxy-signature-ts',
+  'x-vercel-protection-bypass',
+  'x-vercel-firewall-bypass',
+  'x-vercel-sc-headers',
+  'x-relay-key',
+  'forwarded',
+];
+
+const SENSITIVE_HEADER_PATTERN = /(auth|token|secret|signature|cookie|session|api-?key|password|jwt|bypass)/i;
+
+/** Pino redact paths for credential headers on req/res objects (remove: true). */
+export const SENSITIVE_HEADER_REDACT_PATHS: string[] = SENSITIVE_HEADER_NAMES.flatMap((name) => [
+  `req.headers["${name}"]`,
+  `res.headers["${name}"]`,
+  `request.headers["${name}"]`,
+  `headers["${name}"]`,
+  `err.config.headers["${name}"]`,
+]).concat(['err.config.headers.Authorization']);
+
+/**
+ * Reduce a request's headers to the safe allowlist. A header on the
+ * allowlist is still dropped if its name looks like it carries a credential.
+ */
+export function safeLogHeaders(headers: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!headers || typeof headers !== 'object') return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [rawName, value] of Object.entries(headers)) {
+    const name = rawName.toLowerCase();
+    if (!LOGGED_REQUEST_HEADERS.has(name)) continue;
+    if (SENSITIVE_HEADER_PATTERN.test(name)) continue;
+    out[name] = value;
+  }
+  return out;
+}
+
 export const privacyLogSerializers: pino.LoggerOptions['serializers'] = {
   req(req: {
     id?: string;
@@ -88,7 +171,7 @@ export const privacyLogSerializers: pino.LoggerOptions['serializers'] = {
       id: req.id,
       method: req.method,
       url: req.url ? scrubUrl(req.url) : undefined,
-      headers: req.headers,
+      headers: safeLogHeaders(req.headers),
       remoteAddress: req.remoteAddress,
       remotePort: req.remotePort,
     });
@@ -128,10 +211,7 @@ export function createLogger(options: LoggerOptions = {}): pino.Logger {
     // These paths cover the most common sources of credential leakage.
     redact: {
       paths: [
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'req.headers["x-api-key"]',
-        'req.headers["x-twilio-signature"]',
+        ...SENSITIVE_HEADER_REDACT_PATHS,
         '*.password',
         '*.secret',
         '*.token',
@@ -143,8 +223,6 @@ export function createLogger(options: LoggerOptions = {}): pino.Logger {
         '*.access_token',
         '*.refreshToken',
         '*.refresh_token',
-        'err.config.headers.Authorization',
-        'err.config.headers.authorization',
       ],
       remove: true,
     },

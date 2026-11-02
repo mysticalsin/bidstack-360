@@ -22,7 +22,7 @@ import { redisCachePlugin } from './plugins/redis-cache.js';
 import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
-import { privacyLogHooks, privacyLogSerializers } from './lib/logger.js';
+import { privacyLogHooks, privacyLogSerializers, SENSITIVE_HEADER_REDACT_PATHS } from './lib/logger.js';
 import { registerFrontDoorGuard } from './lib/front-door-guard.js';
 import { parseTrustProxy } from './lib/trust-proxy.js';
 // Wave 7 — Real-time collaboration
@@ -64,20 +64,13 @@ export async function buildServer(): Promise<FastifyInstance> {
       // URL-scrubbing layer (see packages/odoo-mcp-client/src/index.ts).
       redact: {
         paths: [
-          'req.headers.authorization',
-          'req.headers.cookie',
-          'req.headers["x-bidstack-sentry-smoke-token"]',
-          'req.headers["x-api-key"]',
-          'req.headers["x-clerk-session"]',
-          'res.headers["set-cookie"]',
+          ...SENSITIVE_HEADER_REDACT_PATHS,
           '*.bearerToken',
           '*.bearer_token',
           '*.apiKey',
           '*.api_key',
           '*.password',
           '*.secret',
-          'err.config.headers.Authorization',
-          'err.config.headers.authorization',
         ],
         remove: true,
       },
