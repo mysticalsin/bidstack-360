@@ -214,6 +214,30 @@ export const ComplianceMatrixRow = z.object({
 });
 export type ComplianceMatrixRow = z.infer<typeof ComplianceMatrixRow>;
 
+/** Compliance rows the matrix draws. One more row is the probe. */
+export const COMPLIANCE_MATRIX_DRAWN = 500;
+
+/**
+ * Rows one compliance query may return. A fixed take of the page dropped
+ * a later row, so that page read as every compliance row. One row past the
+ * page is the probe. It is not shown, and it is not a total.
+ */
+export function complianceMatrixTake(drawn = COMPLIANCE_MATRIX_DRAWN): number {
+  return drawn + 1;
+}
+
+/** Rows to draw. The extra row only says another compliance row exists. */
+export function complianceMatrixPage<T>(
+  rows: readonly T[],
+  drawn = COMPLIANCE_MATRIX_DRAWN,
+): { items: T[]; pageContinues: boolean } {
+  const pageContinues = rows.length > drawn;
+  return {
+    items: pageContinues ? rows.slice(0, drawn) : [...rows],
+    pageContinues,
+  };
+}
+
 export const ReviewIssue = z.object({
   id: z.string().uuid(),
   orgId: z.string().uuid(),

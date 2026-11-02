@@ -19,9 +19,12 @@ export interface ComplianceRow {
 
 interface ComplianceResult {
   items: ComplianceRow[];
+  /** Length of `items`. Not a count of every compliance row. */
   total: number;
   compliantCount: number;
   pendingCount: number;
+  /** True when the route read one row past the page and dropped it. */
+  matrixContinues?: boolean;
 }
 
 export function useRfpCompliance(bidWorkspaceId: string | null) {

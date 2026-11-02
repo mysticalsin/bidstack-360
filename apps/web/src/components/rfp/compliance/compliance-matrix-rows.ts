@@ -1,6 +1,7 @@
 // The matrix's row pipeline: filter → sort → page. Pure functions, no React —
-// the whole matrix arrives in one response (the API takes 500 rows,
-// bid-workspace.ts:141), so every view the URL describes is computed here.
+// the drawn page arrives in one response (the compliance route loads one
+// row past that page and drops it), so every view the URL describes is
+// computed here. A later row means this page is not every compliance row.
 //
 // Kept out of the component for two reasons: the component is already carrying
 // a table, a toolbar and a fact fan-out, and these rules (especially where
@@ -90,9 +91,7 @@ export function pageOfRows(
 }
 
 /** Facet options for `section`, derived from the data — there is no taxonomy table. */
-export function sectionOptions(
-  rows: readonly ComplianceRow[],
-): { value: string; label: string }[] {
+export function sectionOptions(rows: readonly ComplianceRow[]): { value: string; label: string }[] {
   const seen = new Set<string>();
   for (const row of rows) {
     if (row.section) seen.add(row.section);
@@ -109,9 +108,7 @@ export function humaniseSection(value: string): string {
 }
 
 /** How many rows sit behind each tab/facet segment, for the toolbar counts. */
-export function statusCounts(
-  rows: readonly ComplianceRow[],
-): Record<string, number> {
+export function statusCounts(rows: readonly ComplianceRow[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const row of rows) counts[row.status] = (counts[row.status] ?? 0) + 1;
   return counts;
