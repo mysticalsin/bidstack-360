@@ -18,7 +18,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { RFP_CREW, CREW_STAGES, crewMemberByKey } from '@bidstack/shared';
+import {
+  RFP_CREW,
+  CREW_STAGES,
+  crewMemberByKey,
+  extractedRequirementPage,
+  extractedRequirementTake,
+} from '@bidstack/shared';
 
 import { WorkspaceParams, ensureOpportunity } from './bid-workspace.helpers.js';
 
@@ -197,7 +203,13 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
                 pageRef: z.number().int().nullable(),
               }),
             ),
+            // Length of `items`. Not a count of every requirement on the deal.
             total: z.number().int(),
+            /**
+             * True when the query read one requirement past the page and dropped
+             * it. `items` is that page, not every extracted requirement.
+             */
+            requirementsContinue: z.boolean().optional(),
           }),
         },
       },
@@ -206,9 +218,9 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
       if (!opportunity) return reply.notFound('Opportunity not found');
 
-      // take: bound the scan (dev query-guard rejects unbounded findMany); an RFP
-      // realistically has far fewer than 500 requirements.
-      const rows = await prisma.requirement.findMany({
+      // One row past the page the list draws. The extra row is the probe.
+      // It is not a shown requirement, and it is not a total.
+      const loaded = await prisma.requirement.findMany({
         where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
         select: {
           id: true,
@@ -218,9 +230,10 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
           confidenceBps: true,
         },
         orderBy: { createdAt: 'asc' },
-        take: 500,
+        take: extractedRequirementTake(),
       });
-      const items = rows.map((r) => ({
+      const page = extractedRequirementPage(loaded);
+      const items = page.items.map((r) => ({
         id: r.id,
         text: r.text,
         category: r.requirementType,
@@ -230,7 +243,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
         // extraction captures one (RequirementRow renders a null pageRef fine).
         pageRef: null,
       }));
-      return { items, total: items.length };
+      return { items, total: items.length, requirementsContinue: page.pageContinues };
     },
   );
 

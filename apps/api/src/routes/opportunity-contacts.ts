@@ -6,6 +6,8 @@ import {
   OpportunityContact,
   OpportunityContactCreate,
   OpportunityContactPatch,
+  opportunityContactPage,
+  opportunityContactTake,
 } from '@bidstack/shared';
 
 function serialize(oc: {
@@ -62,19 +64,34 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       config: { permission: 'opportunities:read' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        response: { 200: z.object({ items: z.array(OpportunityContact) }) },
+        response: {
+          200: z.object({
+            items: z.array(OpportunityContact),
+            /**
+             * True when the query read one row past the page and dropped it.
+             * `items` is that page, not every linked contact. No contact total.
+             */
+            contactsContinue: z.boolean().optional(),
+          }),
+        },
       },
     },
     async (req) => {
-      const items = await prisma.opportunityContact.findMany({
+      // One row past the contacts the deal list draws. The extra row is the
+      // probe. It is not a shown contact, and it is not a total.
+      const loaded = await prisma.opportunityContact.findMany({
         where: { opportunityId: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
           contact: { select: { id: true, name: true, email: true, phone: true, role: true } },
         },
-        orderBy: { isPrimary: 'desc' },
-        take: 500,
+        orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
+        take: opportunityContactTake(),
       });
-      return { items: items.map(serialize) };
+      const page = opportunityContactPage(loaded);
+      return {
+        items: page.items.map(serialize),
+        contactsContinue: page.pageContinues,
+      };
     },
   );
 

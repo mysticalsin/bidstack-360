@@ -176,5 +176,10 @@ export type FileFinalizeRequest = z.infer<typeof FileFinalizeRequest>;
 
 export const FileListResponse = z.object({
   items: z.array(FileAttachment),
+  /**
+   * True when the query read one file past the page and dropped it.
+   * `items` is that page, not every attachment. No attachment total.
+   */
+  itemsContinue: z.boolean().optional(),
 });
 export type FileListResponse = z.infer<typeof FileListResponse>;

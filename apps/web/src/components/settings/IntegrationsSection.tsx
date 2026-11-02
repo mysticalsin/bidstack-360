@@ -32,6 +32,13 @@ import { WebhookEventsCard } from '@/pages/integrations/WebhookEventsCard';
 import { buildIntegrationSummary } from '@/pages/integrations/integration-helpers';
 import { MCP_TOOLS } from '@/pages/integrations/types';
 import type { DustStatus, IntegrationSetupGuide, WebhookEvent } from '@/pages/integrations/types';
+
+/** Events the list draws, plus whether one event past the page was dropped. */
+type WebhookEventPage = {
+  items: WebhookEvent[];
+  /** True when one event past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+};
 import { IntegrationActivityPanel } from './IntegrationActivityPanel';
 
 export function IntegrationsSection() {
@@ -54,9 +61,9 @@ export function IntegrationsSection() {
   });
   const events = useQuery({
     queryKey: ['webhooks'],
-    queryFn: ({ signal }) =>
-      api<{ items: WebhookEvent[] }>('/api/integrations/webhooks', { signal }),
+    queryFn: ({ signal }) => api<WebhookEventPage>('/api/integrations/webhooks', { signal }),
   });
+  const eventsContinue = Boolean(events.data?.pageContinues);
   const connectors = useConnectorCatalog();
   const isError = setupGuide.isError || status.isError || events.isError;
   const summary = useMemo(
@@ -70,6 +77,7 @@ export function IntegrationsSection() {
         activeTab={activeTab}
         isLoading={setupGuide.isLoading || status.isLoading || events.isLoading}
         summary={summary}
+        eventsContinue={eventsContinue}
         onCreateApiKey={() => setActiveTab('developer')}
         onAddWebhook={() => setActiveTab('developer')}
       />
@@ -134,7 +142,11 @@ export function IntegrationsSection() {
           <ConnectionTester guide={setupGuide.data} isLoading={setupGuide.isLoading} />
           <ProviderHealthSection />
           <DataSourceCredentialsCard />
-          <WebhookEventsCard events={events.data?.items ?? []} isLoading={events.isLoading} />
+          <WebhookEventsCard
+            events={events.data?.items ?? []}
+            isLoading={events.isLoading}
+            pageContinues={eventsContinue}
+          />
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6 outline-none">
@@ -204,7 +216,7 @@ export function IntegrationsSection() {
             <p className="mx-5 mb-5 text-sm leading-6 text-[var(--fg-secondary)]">
               {t(
                 'integrations.mcpRegistration',
-                'Dust cloud registers External MCP at a public HTTPS URL ending in /mcp, with a bearer API key scoped mcp and read, over streamable HTTP. localhost is not reachable by Dust cloud. This screen does not report a live connection until that URL and a Dust API key exist.',
+                'In Dust, open Spaces, Tools, Add Tool, Add MCP Server. Paste a public HTTPS URL that ends in /mcp. Choose Bearer token (Authorization: Bearer), not Automatic OAuth — Polo has no Dust OAuth callback. Use a Polo API key scoped mcp and read. localhost cannot be registered with Dust cloud. This screen stays unverified until that public URL and a Dust API key exist.',
               )}
             </p>
             {status.data?.lastError ? (
@@ -288,8 +300,6 @@ function ApolloAccountIntelCard({
     'APOLLO_MCP_URL=https://...',
     'APOLLO_MCP_BEARER_TOKEN=...',
     'APOLLO_API_KEY=...',
-    'APOLLO_API_ENABLE_PEOPLE_SEARCH=true',
-    'APOLLO_API_ENABLE_PEOPLE_ENRICHMENT=false',
   ].join('\n');
 
   return (
@@ -298,7 +308,7 @@ function ApolloAccountIntelCard({
         title={t('integrations.apolloTitle', 'Apollo account intelligence')}
         caption={t(
           'integrations.apolloCaption',
-          'Feeds account cockpit fields: industry, employees, revenue, intent, hiring movement, leadership changes, technologies, and last sync freshness.',
+          'Feeds account cockpit fields: industry, employees, revenue, open jobs, intent, hiring movement, technologies, and last sync freshness.',
         )}
         action={
           <div className="flex items-center gap-2">
@@ -328,7 +338,7 @@ function ApolloAccountIntelCard({
           <p className="text-sm text-[var(--fg-secondary)]">
             {t(
               'integrations.apolloDescription',
-              'Connect Apollo MCP first for company search and get-company. Keep REST People Search on for C-level discovery; it is no-credit and does not return email or phone fields. Keep People Enrichment off unless an admin intentionally accepts credit usage.',
+              'Connect Apollo for company search and get-company. Polo stores company revenue and the open-job count. It does not request phone numbers or contact leads.',
             )}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -337,16 +347,16 @@ function ApolloAccountIntelCard({
                 t('integrations.featureAccountFieldsLabel', 'Account fields'),
                 t(
                   'integrations.featureAccountFieldsValue',
-                  'Industry, employees, revenue, tech stack',
+                  'Industry, employees, revenue, open jobs',
                 ),
               ],
               [
                 t('integrations.featureSignalsLabel', 'Signals'),
-                t('integrations.featureSignalsValue', 'Intent topics, hiring, C-level movement'),
+                t('integrations.featureSignalsValue', 'Intent topics and hiring'),
               ],
               [
                 t('integrations.featureSafetyLabel', 'Safety'),
-                t('integrations.featureSafetyValue', 'Emails and phones stripped before storage'),
+                t('integrations.featureSafetyValue', 'Phone numbers and contact leads are not stored'),
               ],
               [
                 t('integrations.featureFreshnessLabel', 'Freshness'),
@@ -357,7 +367,7 @@ function ApolloAccountIntelCard({
                 key={label}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2"
               >
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                <div className="text-xs font-medium text-[var(--fg-tertiary)]">
                   {label}
                 </div>
                 <div className="mt-1 text-sm font-medium text-[var(--fg-primary)]">{value}</div>
@@ -373,7 +383,7 @@ function ApolloAccountIntelCard({
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              <div className="text-xs font-medium text-[var(--fg-tertiary)]">
                 {t('integrations.mcpApiEnvironment', 'MCP/API environment')}
               </div>
               <p className="mt-1 text-xs text-[var(--fg-secondary)]">

@@ -8,7 +8,7 @@ import type {
   OpportunityContactPatch,
 } from '@bidstack/shared';
 
-type Payload = { items: OpportunityContact[] };
+type Payload = { items: OpportunityContact[]; contactsContinue?: boolean };
 
 export function useOpportunityContacts(opportunityId: string | undefined) {
   return useQuery({

@@ -499,15 +499,26 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           agg.set(key, e);
         }
       }
-      const items = [...agg.values()]
-        .sort((a, b) => b.mentions - a.mentions || b.last.getTime() - a.last.getTime())
-        .slice(0, req.query.limit)
-        .map((e) => ({ challenge: e.challenge, mentions: e.mentions, regions: [...e.regions].sort(), lastMentionedAt: e.last.toISOString(), meetingIds: e.ids }));
+      const ranked = [...agg.values()].sort(
+        (a, b) => b.mentions - a.mentions || b.last.getTime() - a.last.getTime(),
+      );
+      // One row past the page the card calls every challenge. The extra row
+      // is the probe. It is not shown, and it is not a total.
+      const loaded = ranked.slice(0, req.query.limit + 1);
+      const challengesContinue = loaded.length > req.query.limit;
+      const page = challengesContinue ? loaded.slice(0, req.query.limit) : loaded;
+      const items = page.map((e) => ({
+        challenge: e.challenge,
+        mentions: e.mentions,
+        regions: [...e.regions].sort(),
+        lastMentionedAt: e.last.toISOString(),
+        meetingIds: e.ids,
+      }));
       await audit(req, 'meeting_intel.challenges.view', req.params.groupId, {
         returned: items.length,
         ...(base.admin ? { access: 'admin_override' } : {}),
       });
-      return { groupId: req.params.groupId, items };
+      return { groupId: req.params.groupId, items, challengesContinue };
     },
   );
 
@@ -522,13 +533,26 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           format: z.enum(['flags', 'watchdog']).default('flags'),
           limit: z.coerce.number().int().min(1).max(100).default(50),
         }),
-        response: { 200: z.object({ items: z.array(CrossRegionFlagOut) }).or(z.object({ items: z.array(MeetingIntelWatchdogItem) })) },
+        response: {
+          200: z
+            .object({
+              items: z.array(CrossRegionFlagOut),
+              /**
+               * True when the query read one flag past `limit` and dropped it.
+               * `items` is that page, not every flag.
+               */
+              flagsContinue: z.boolean().optional(),
+            })
+            .or(z.object({ items: z.array(MeetingIntelWatchdogItem) })),
+        },
       },
     },
     async (req) => {
       const orgId = req.auth.orgId;
       const scope = await getAccessScope(orgId, req.auth.userId);
-      const flags = await prisma.meetingCrossRegionFlag.findMany({
+      // One row past the page the flags tab draws. The extra row is the probe.
+      // It is not shown, and it is not a total.
+      const loadedFlags = await prisma.meetingCrossRegionFlag.findMany({
         where: {
           orgId,
           recipientUserId: req.auth.userId,
@@ -541,8 +565,10 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         },
         orderBy: { createdAt: 'desc' },
-        take: req.query.limit,
+        take: req.query.limit + 1,
       });
+      const flagsContinue = loadedFlags.length > req.query.limit;
+      const flags = flagsContinue ? loadedFlags.slice(0, req.query.limit) : loadedFlags;
       const companyIds = [...new Set(flags.flatMap((f) => [f.companyId, f.parentCompanyId, f.ownedCompanyId]))];
       const visible = await companiesInScope(orgId, scope, companyIds);
       const names = new Map(
@@ -599,7 +625,7 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           })),
         };
       }
-      return { items: out };
+      return { items: out, flagsContinue };
     },
   );
 

@@ -15,6 +15,7 @@ import { LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useIsAdmin } from '@/lib/auth';
+import { roleListCaption } from './role-list-caption';
 
 export function RolesSection() {
   const { t } = useTranslation('settings');
@@ -32,7 +33,7 @@ export function RolesSection() {
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
 
   const allPermissions = permissions.data ?? [];
-  const allRoles = roles.data ?? [];
+  const allRoles = roles.data?.items ?? [];
 
   const resetForm = () => {
     setName('');
@@ -114,7 +115,11 @@ export function RolesSection() {
     <Card>
       <SectionHeader
         title={t('roles.sectionTitle', 'Roles & Permissions')}
-        caption={t('roles.sectionCaption', 'Manage workspace roles and what each role can do.')}
+        caption={
+          roles.data?.pageContinues
+            ? `${t('roles.sectionCaption', 'Manage workspace roles and what each role can do.')} ${roleListCaption(allRoles.length, true)}`
+            : t('roles.sectionCaption', 'Manage workspace roles and what each role can do.')
+        }
       />
       <div className="p-5 space-y-4">
         {roles.isLoading || permissions.isLoading ? (

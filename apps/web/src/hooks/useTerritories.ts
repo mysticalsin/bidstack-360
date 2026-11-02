@@ -15,7 +15,7 @@ export interface TerritoryAnalyticsItem {
   countryCode: string;
   countryCodeA3: string;
   opportunityCount: number;
-  totalValueMicros: number;
+  totalValueMicros: string | number;
   avgProbability: number;
   territories: string[];
   ownerNames: string[];
@@ -25,14 +25,14 @@ export interface TerritoryAnalytics {
   items: TerritoryAnalyticsItem[];
   totals: {
     totalCountries: number;
-    totalValueMicros: number;
+    totalValueMicros: string | number;
     totalOpportunities: number;
     avgProbability: number;
   };
 }
 
 export function useTerritories() {
-  return useQuery<{ items: Territory[] }>({
+  return useQuery<{ items: Territory[]; pageContinues: boolean }>({
     queryKey: ['territories'],
     queryFn: ({ signal }) => api('/api/territories', { signal }),
   });
@@ -74,7 +74,7 @@ export function useDeleteTerritory() {
 }
 
 export function useLeadRoutingRules() {
-  return useQuery<{ items: LeadRoutingRule[] }>({
+  return useQuery<{ items: LeadRoutingRule[]; pageContinues: boolean }>({
     queryKey: ['lead-routing-rules'],
     queryFn: ({ signal }) => api('/api/lead-routing-rules', { signal }),
   });
@@ -124,7 +124,7 @@ export interface TerritorySegment {
   key: string;
   label: string;
   opportunityCount: number;
-  totalValueMicros: number;
+  totalValueMicros: string | number;
   avgProbability: number;
   ownerNames: string[];
 }
@@ -134,7 +134,7 @@ export interface TerritorySegments {
   items: TerritorySegment[];
   totals: {
     totalSegments: number;
-    totalValueMicros: number;
+    totalValueMicros: string | number;
     totalOpportunities: number;
     avgProbability: number;
   };

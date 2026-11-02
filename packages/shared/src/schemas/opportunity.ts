@@ -190,6 +190,11 @@ export const OpportunityFull = Opportunity.extend({
       createdAt: z.string().datetime(),
     }),
   ),
+  /**
+   * True when the query read one file past the page and dropped it.
+   * `documents` is that page, not every file. No file total.
+   */
+  documentsContinue: z.boolean().optional(),
   timeline: z.array(z.record(z.unknown())).default([]),
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });

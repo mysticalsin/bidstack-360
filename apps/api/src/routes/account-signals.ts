@@ -20,6 +20,8 @@ import {
   type PortfolioAlert,
   type TimelineItem,
   collapseMarketNotes,
+  timelineEventPage,
+  timelineEventTake,
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
@@ -28,6 +30,7 @@ import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import { closedAtOf, groupMap, loadMomentumInputs, momentumFor, OPP_SELECT, sourceStatus } from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
 import { loadInitiatives } from '../services/account-signals/initiatives.js';
+import { linkedTimelineBids, type TimelineBidLink } from '../services/account-signals/timeline-bids.js';
 import { loadKeyNumbers, loadPositioning } from '../services/account-positioning/load.js';
 
 const DAY = 86_400_000;
@@ -35,7 +38,13 @@ const params = z.object({ companyId: z.string().uuid() });
 
 const importanceOf = (e: { importance: number; severity: number }) => e.importance || Math.min(100, e.severity * 20);
 
-const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
+interface TimelineBidRow extends TimelineBidLink {
+  title: string;
+  status: string;
+  dueDate: Date | null;
+  importedAt: Date;
+  url: string | null;
+}
 
 export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
   async function readable(req: { auth: { orgId: string; userId: string } }, companyId: string) {
@@ -99,7 +108,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
-      const [meetings, opps, bids, events, earnings, postings] = await Promise.all([
+      const [meetings, opps, events, earnings, postings] = await Promise.all([
         prisma.meetingIntel.findMany({
           where: { AND: [visibleMeetingWhere(orgId, scope), { companyId: { in: ids }, heldAt: { gte: from, lte: to } }] },
           select: { id: true, title: true, heldAt: true, summary: true, companyId: true, _count: { select: { attendees: true } } },
@@ -107,15 +116,10 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 200,
         }),
         prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: OPP_SELECT, take: 500 }),
-        prisma.bidOpportunity.findMany({
-          where: { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] },
-          select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
-          take: 100,
-        }),
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
           orderBy: { occurredAt: 'desc' },
-          take: 300,
+          take: timelineEventTake(),
         }),
         prisma.accountEarningsDate.findMany({ where: { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } }, take: 20 }),
         prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: from } }, select: { postedAt: true }, orderBy: { postedAt: 'desc' }, take: 1000 }),
@@ -148,7 +152,12 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           push({ id: `op:${o.id}:close`, at: closed.toISOString(), lane: 'ours', category: 'deal', title: `${won ? 'Won' : 'Lost'}: ${o.name}`, summary: won ? 'Closed won' : 'Closed lost', source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: won ? 70 : 60, implication: won ? 'OPPORTUNITY' : 'RISK', sample: false });
         }
       }
-      for (const b of bids) {
+      // A public bid has no company id. A name match is not a link.
+      // linkedTimelineBids keeps a row only when companyId is this account
+      // or opportunityId is already one of this account's deals.
+      const accountOpportunityIds = new Set(opps.map((row) => row.id));
+      const bids: TimelineBidRow[] = [];
+      for (const b of linkedTimelineBids(company.id, bids, accountOpportunityIds)) {
         push({ id: `bid:${b.id}`, at: (b.dueDate ?? b.importedAt).toISOString(), lane: 'ours', category: 'bid', title: `Bid: ${b.title}`, summary: b.dueDate ? `Due ${b.dueDate.toISOString().slice(0, 10)}, ${b.status}` : b.status, source: 'Bids', sourceUrl: b.url, href: '/bid-matrix', importance: 50, implication: 'NEUTRAL', sample: false });
       }
       for (const e of events) {
@@ -202,8 +211,18 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       );
       const tally: Record<string, number> = {};
       for (const i of grouped) tally[i.category] = (tally[i.category] ?? 0) + 1;
-      const shown = (wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped).slice(0, 300);
-      return { companyId: company.id, from: from.toISOString(), to: to.toISOString(), items: shown, counts: tally };
+      // One event past the page the timeline draws. The extra row is the probe.
+      // It is not shown, and it is not a total.
+      const filtered = wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped;
+      const page = timelineEventPage(filtered);
+      return {
+        companyId: company.id,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        items: page.items,
+        counts: tally,
+        timelineContinues: page.pageContinues,
+      };
     },
   );
 
@@ -249,7 +268,9 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const scope = await getAccessScope(orgId, userId);
       const now = new Date();
-      const roots = await prisma.company.findMany({
+      // One row past the page the list calls every account. The extra row is
+      // the probe. It is not shown, and it is not a total.
+      const loadedRoots = await prisma.company.findMany({
         where: applyCompanyScope(
           {
             orgId,
@@ -267,8 +288,10 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         ),
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
-        take: req.query.limit,
+        take: req.query.limit + 1,
       });
+      const accountsContinue = loadedRoots.length > req.query.limit;
+      const roots = accountsContinue ? loadedRoots.slice(0, req.query.limit) : loadedRoots;
       const loaded = await loadMomentumInputs(orgId, scope, roots.map((r) => r.id), now);
       const accounts = roots
         .map((r) => {
@@ -333,7 +356,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const counts = { gaining: 0, steady: 0, declining: 0 };
       for (const a of accounts) counts[a.trend]++;
-      return { accounts, counts, alerts, computedAt: now.toISOString() };
+      return { accounts, counts, alerts, accountsContinue, computedAt: now.toISOString() };
     },
   );
 };

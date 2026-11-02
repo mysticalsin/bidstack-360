@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/Table';
 import type { Forecast } from '@bidstack/shared';
 
+import { FORECAST_LIST_PAGE, forecastGroupCaption } from './forecast-list-caption';
 import { CATEGORIES, CATEGORY_LABELS, type ForecastRow } from './forecastsConfig';
 
 interface EditingCell {
@@ -51,6 +52,8 @@ interface ForecastListProps {
   canWrite: boolean;
   /** Shown as the `title` on disabled controls when `canWrite` is false. */
   readOnlyHint: string;
+  /** True when the list read one forecast past this page and dropped it. */
+  pageContinues?: boolean;
 }
 
 export function ForecastList({
@@ -65,6 +68,7 @@ export function ForecastList({
   formatMoneyMicros,
   canWrite,
   readOnlyHint,
+  pageContinues = false,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
@@ -102,9 +106,16 @@ export function ForecastList({
     <Card>
       <SectionHeader
         title={t('forecastList.sectionTitle', 'Forecast Details')}
-        caption={t('forecastList.sectionCaption', '{{count}} forecast groups', {
-          count: rows.length,
-        })}
+        caption={
+          pageContinues
+            ? t(
+                'forecastList.sectionCaptionPartial',
+                forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
+              )
+            : t('forecastList.sectionCaption', '{{count}} forecast groups', {
+                count: rows.length,
+              })
+        }
       />
 
       {isError ? (

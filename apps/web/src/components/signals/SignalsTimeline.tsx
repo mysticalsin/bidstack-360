@@ -16,6 +16,7 @@ import { TransitionPanel } from '@/components/motion-primitives/transition-panel
 import { useAccountTimeline } from '@/hooks/useAccountSignals';
 
 import { CATEGORY_LABEL, CATEGORY_TONE, noDash, OUR_FILTERS, sourceLabel, THEIR_FILTERS } from './category';
+import { shownTimelineEvents, timelineEventCaption, timelineEventMoreLabel } from './timeline-event-caption';
 
 const MOBILE_TOP = 8;
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -81,33 +82,49 @@ function Detail({ item }: { item: TimelineItem }) {
   );
 }
 
-export function TimelineView({ items, from, to }: { items: TimelineItem[]; from: string; to: string }) {
+export function TimelineView({
+  items,
+  from,
+  to,
+  pageContinues = false,
+}: {
+  items: TimelineItem[];
+  from: string;
+  to: string;
+  pageContinues?: boolean;
+}) {
+  const page = useMemo(
+    () => shownTimelineEvents(items, pageContinues),
+    [items, pageContinues],
+  );
+  const drawn = page.items;
+  const continues = page.pageContinues;
   const narrow = useNarrow();
   const id = useId();
   const present = useMemo(() => {
     const c = new Map<SignalCategory, number>();
-    for (const i of items) c.set(i.category, (c.get(i.category) ?? 0) + 1);
+    for (const i of drawn) c.set(i.category, (c.get(i.category) ?? 0) + 1);
     return c;
-  }, [items]);
+  }, [drawn]);
   const [off, setOff] = useState<Set<SignalCategory>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [listAll, setListAll] = useState(false);
   const [hover, setHover] = useState<{ id: string; left: number; lane: string } | null>(null);
-  const visible = items.filter((i) => !off.has(i.category));
+  const visible = drawn.filter((i) => !off.has(i.category));
   const chips = [...OUR_FILTERS, ...THEIR_FILTERS].filter((c) => present.has(c));
   const start = new Date(from);
   // Upcoming events (results dates) extend the axis, but at most 120 days.
   const horizon = new Date(to).getTime() + 120 * 86_400_000;
-  const latest = items.reduce((m, i) => Math.max(m, Math.min(horizon, new Date(i.at).getTime())), new Date(to).getTime());
+  const latest = drawn.reduce((m, i) => Math.max(m, Math.min(horizon, new Date(i.at).getTime())), new Date(to).getTime());
   const end = new Date(latest);
   const x = scaleTime().domain([start, end]).range([0, 100]);
   const ticks = x.ticks(narrow ? 4 : 8);
   const todayLeft = x(new Date());
-  const sel = items.find((i) => i.id === selected) ?? null;
+  const sel = drawn.find((i) => i.id === selected) ?? null;
   const onAxis = visible.filter((i) => new Date(i.at) <= end);
   const ours = layout(onAxis.filter((i) => i.lane === 'ours'), x);
   const theirs = layout(onAxis.filter((i) => i.lane === 'theirs'), x);
-  const counts = { ours: items.filter((i) => i.lane === 'ours').length, theirs: items.filter((i) => i.lane === 'theirs').length };
+  const counts = { ours: drawn.filter((i) => i.lane === 'ours').length, theirs: drawn.filter((i) => i.lane === 'theirs').length };
   const toggle = (c: SignalCategory) =>
     setOff((prev) => {
       const next = new Set(prev);
@@ -115,9 +132,9 @@ export function TimelineView({ items, from, to }: { items: TimelineItem[]; from:
       else next.add(c);
       return next;
     });
-  const hovered = hover ? items.find((i) => i.id === hover.id) : null;
+  const hovered = hover ? drawn.find((i) => i.id === hover.id) : null;
 
-  if (!items.length) {
+  if (!drawn.length) {
     return (
       <p className="sg-empty">
         <span>Nothing on the timeline yet</span>
@@ -126,7 +143,8 @@ export function TimelineView({ items, from, to }: { items: TimelineItem[]; from:
     );
   }
 
-  const summary = `${counts.ours} of our activities and ${counts.theirs} of their events between ${monthYearFmt.format(start)} and ${monthYearFmt.format(end)}. ${[...present.entries()].map(([c, n]) => `${n} ${CATEGORY_LABEL[c].toLowerCase()}`).join(', ')}.`;
+  const complete = `${counts.ours} of our activities and ${counts.theirs} of their events between ${monthYearFmt.format(start)} and ${monthYearFmt.format(end)}. ${[...present.entries()].map(([c, n]) => `${n} ${CATEGORY_LABEL[c].toLowerCase()}`).join(', ')}.`;
+  const summary = timelineEventCaption(drawn.length, continues, complete);
 
   return (
     <>
@@ -167,7 +185,7 @@ export function TimelineView({ items, from, to }: { items: TimelineItem[]; from:
         </ol>
         {visible.length > MOBILE_TOP ? (
           <button type="button" className="sg-link" aria-expanded={listAll} aria-controls={`${id}-list`} onClick={() => setListAll((v) => !v)}>
-            {listAll ? 'Show fewer' : `Show all ${visible.length} events`}
+            {listAll ? 'Show fewer' : timelineEventMoreLabel(visible.length, continues)}
           </button>
         ) : null}
         </>
@@ -271,7 +289,12 @@ export function SignalsTimeline({ companyId }: { companyId: string }) {
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
       ) : (
-        <TimelineView items={q.data.items} from={q.data.from} to={q.data.to} />
+        <TimelineView
+          items={q.data.items}
+          from={q.data.from}
+          to={q.data.to}
+          pageContinues={q.data.timelineContinues === true}
+        />
       )}
     </section>
   );

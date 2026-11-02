@@ -153,6 +153,11 @@ export const AccountFinancials = z.object({
   lastPulledAt: z.string().nullable(),
   nextPullAt: z.string().nullable(),
   periods: z.array(FinancialPeriod),
+  /**
+   * True when the query read one filing past the page and dropped it.
+   * `periods` is that page, not every filing. No filing total.
+   */
+  periodsContinue: z.boolean().optional(),
   signals: z.array(FinancialSignal),
   /** True when the section shows the built-in example instead of filings. */
   sample: z.boolean(),

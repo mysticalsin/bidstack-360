@@ -351,12 +351,17 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await scopeOf(req);
       await loadVisibleCompany(req, req.params.companyId, scope);
-      const rows = await prisma.contractAgreement.findMany({
+      // One row past the page the card calls every agreement. The extra row
+      // is the probe. It is not counted, and it is not a total.
+      const ACCOUNT_AGREEMENT_SUMMARY_LIMIT = 500;
+      const loaded = await prisma.contractAgreement.findMany({
         where: { AND: [msaScopeWhere(req.auth.orgId, scope), { companyId: req.params.companyId }] },
         select: ROW_SELECT,
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
-        take: 500,
+        take: ACCOUNT_AGREEMENT_SUMMARY_LIMIT + 1,
       });
+      const agreementsContinue = loaded.length > ACCOUNT_AGREEMENT_SUMMARY_LIMIT;
+      const rows = agreementsContinue ? loaded.slice(0, ACCOUNT_AGREEMENT_SUMMARY_LIMIT) : loaded;
       const byStatus: Record<string, number> = {};
       const childCounts = { sow: 0, amendment: 0, addendum: 0 };
       for (const r of rows) {
@@ -387,6 +392,7 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
       return {
         companyId: req.params.companyId,
         total: rows.length,
+        agreementsContinue,
         byStatus,
         childCounts,
         primary: primary ? serializeRow(primary) : null,

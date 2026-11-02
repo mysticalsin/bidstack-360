@@ -2,7 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, Prisma } from '@bidstack/db';
-import { SearchResponse, type PermissionKey } from '@bidstack/shared';
+import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/shared';
 
 import { countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
@@ -99,13 +99,24 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
       // Zod already rejects an all-whitespace q (trim + min 1), so this only
       // fires on a degenerate token set. Guard anyway: an empty token list would
       // make the token-AND clauses match-all (the whole org), never that.
-      if (tokens.length === 0) return { items: [] };
+      if (tokens.length === 0) return { items: [], pageContinues: false, continuedTypes: [] };
       type SearchItem = z.infer<typeof SearchResponse>['items'][number];
       // Carry a recency timestamp alongside each item so equally-relevant matches
       // are tie-broken by "most recently touched" instead of arbitrary type order.
       type Scored = { item: SearchItem; recency: number };
       const buckets: Scored[][] = [];
+      // One row past the per-type limit is a probe. It is not a result, and it
+      // is not a total. A shorter type keeps every row it loaded. The type is
+      // remembered so its badge does not treat the kept rows as every match.
+      const probedTypes: Array<SearchItem['type']> = [];
       const addResults = (items: Scored[]) => {
+        if (items.length > perTypeLimit) {
+          const kept = items.slice(0, perTypeLimit);
+          const type = kept[0]?.item.type;
+          if (type) probedTypes.push(type);
+          buckets.push(kept);
+          return;
+        }
         buckets.push(items);
       };
 
@@ -152,7 +163,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 AND (${tokenConds})
                 AND (${scopeCond})
               ORDER BY updated_at DESC
-              LIMIT ${perTypeLimit}
+              LIMIT ${perTypeLimit + 1}
             `;
             addResults(
               opps.map((o) => ({
@@ -193,7 +204,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 ]) as Prisma.LeadWhereInput['AND'],
               },
               orderBy: { statusChangedAt: 'desc' },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               leads.map((l) => ({
@@ -231,7 +242,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   'role',
                 ]) as Prisma.ContactWhereInput['AND'],
               },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               contacts.map((c) => ({
@@ -269,7 +280,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   'legalName',
                 ]) as Prisma.CompanyEnrichmentWhereInput['AND'],
               },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               companies.map((c) => ({
@@ -302,7 +313,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 deletedAt: null,
                 AND: tokenAndClauses(tokens, ['title']) as Prisma.TaskWhereInput['AND'],
               },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               tasks.map((t) => ({
@@ -333,7 +344,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   'bodyMd',
                 ]) as Prisma.NoteWhereInput['AND'],
               },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               notes.map((n) => ({
@@ -365,7 +376,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 AND: tokenAndClauses(tokens, ['name']) as Prisma.ProposalWhereInput['AND'],
               },
               orderBy: { updatedAt: 'desc' },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               proposals.map((p) => ({
@@ -397,7 +408,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 ]) as Prisma.RequirementWhereInput['AND'],
               },
               orderBy: { updatedAt: 'desc' },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               requirements.map((r) => ({
@@ -437,7 +448,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 ]) as Prisma.ReferenceWhereInput['AND'],
               },
               orderBy: { createdAt: 'desc' },
-              take: perTypeLimit,
+              take: perTypeLimit + 1,
             });
             addResults(
               references.map((r) => ({
@@ -463,14 +474,21 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
       // All per-type queries run concurrently.
       await Promise.all(queries);
 
-      // Rank by relevance, then by recency for ties, then keep the best globally.
-      const results = buckets
+      // Rank by relevance, then by recency for ties. Rows past totalCap were
+      // loaded and are not drawn. That is the page probe, not a result total.
+      const ranked = buckets
         .flat()
         .sort((a, b) => b.item.score - a.item.score || b.recency - a.recency)
-        .slice(0, totalCap)
-        .map((s) => s.item);
+        .map((row) => row.item);
+      const page = searchPageSlice(ranked, totalCap, probedTypes);
 
-      return { items: results };
+      return {
+        items: page.items,
+        pageContinues: page.pageContinues,
+        continuedTypes: page.continuedTypes.filter((type): type is ValidType =>
+          (VALID_TYPES as readonly string[]).includes(type),
+        ),
+      };
     },
   );
 };

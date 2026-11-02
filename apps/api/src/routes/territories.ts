@@ -36,16 +36,29 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/territories',
     {
-      schema: { response: { 200: z.object({ items: z.array(Territory) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            items: z.array(Territory),
+            /** True when one territory past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
+          }),
+        },
+      },
     },
     async (req) => {
-      const rows = await prisma.territory.findMany({
+      // One row past the page is the probe. It is dropped and is not a territory total.
+      const TERRITORY_LIST_PAGE = 500;
+      const loaded = await prisma.territory.findMany({
         where: { orgId: req.auth.orgId, active: true },
         include: { owner: { select: { name: true } } },
         orderBy: { name: 'asc' },
-        take: 500,
+        take: TERRITORY_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > TERRITORY_LIST_PAGE;
+      const rows = pageContinues ? loaded.slice(0, TERRITORY_LIST_PAGE) : loaded;
       return {
+        pageContinues,
         items: rows.map((r) => ({
           id: r.id,
           orgId: r.orgId,

@@ -10,10 +10,18 @@ import { useLeadRotConfig } from '@/hooks/useLeadRot';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useRoles } from '@/hooks/useRoles';
 import { useTags } from '@/hooks/useTags';
-import { useUsers } from '@/hooks/useUsers';
+import { useUsersPage } from '@/hooks/useUsers';
 import { useWebhookSubscriptions } from '@/hooks/useWebhookSubscriptions';
 import { useIsAdmin } from '@/lib/auth';
 import type { SettingsSection } from './SettingsLayout';
+import { apiKeyListCaption } from './api-key-list-caption';
+import { customFieldListCaption } from './custom-field-list-caption';
+import { emailTemplateListCaption } from './email-template-list-caption';
+import { roleListCaption } from './role-list-caption';
+import { stageListCaption } from './stage-list-caption';
+import { tagLibraryCaption } from './tag-library-caption';
+import { USER_OVERVIEW_PAGE, userOverviewCaption } from './user-overview-caption';
+import { webhookListCaption } from './webhook-list-caption';
 
 interface Props {
   onNavigate: (section: SettingsSection) => void;
@@ -33,7 +41,7 @@ interface OverviewTileModel {
 export function SettingsOverviewSection({ onNavigate }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
-  const users = useUsers({ enabled: isAdmin });
+  const users = useUsersPage({ limit: USER_OVERVIEW_PAGE, enabled: isAdmin });
   const roles = useRoles({ enabled: isAdmin });
   const tags = useTags(undefined, { enabled: isAdmin });
   const templates = useEmailTemplates({ enabled: isAdmin });
@@ -42,6 +50,9 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
   const pipelineStages = usePipelineStages({ enabled: isAdmin });
   const apiKeys = useApiKeys({ enabled: isAdmin });
   const webhooks = useWebhookSubscriptions({ enabled: isAdmin });
+  const webhookItems = webhooks.data?.items ?? [];
+  const webhookActive = webhookItems.filter((webhook) => webhook.active).length;
+  const webhookFailing = webhookItems.filter((webhook) => webhook.failureCount > 0).length;
 
   const tiles: OverviewTileModel[] = [
     {
@@ -49,10 +60,29 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
         ? t('settingsOverview.tileWorkspaceTitle', 'Workspace governance')
         : t('settingsOverview.tilePersonalTitle', 'Personal settings'),
       detail: isAdmin
-        ? t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
-            users: formatCount(users.data?.length),
-            roles: formatCount(roles.data?.length),
-          })
+        ? users.data?.nextCursor && roles.data?.pageContinues
+          ? t('settingsOverview.tileWorkspaceDetailPartialUsersAndRoles', '{{users}} / {{roles}}', {
+              users: userOverviewCaption(users.data.items.length, true),
+              roles: roleListCaption(roles.data.items.length, true),
+            })
+          : users.data?.nextCursor
+            ? t('settingsOverview.tileWorkspaceDetailPartialUsers', '{{users}} / {{roles}} roles', {
+                users: userOverviewCaption(users.data?.items.length ?? 0, true),
+                roles: formatCount(roles.data?.items.length),
+              })
+            : roles.data?.pageContinues
+              ? t(
+                  'settingsOverview.tileWorkspaceDetailPartialRoles',
+                  '{{users}} users / {{roles}}',
+                  {
+                    users: formatCount(users.data?.items.length),
+                    roles: roleListCaption(roles.data.items.length, true),
+                  },
+                )
+              : t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
+                  users: formatCount(users.data?.items.length),
+                  roles: formatCount(roles.data?.items.length),
+                })
         : t(
             'settingsOverview.tilePersonalDetail',
             'Profile, security, notifications, appearance, and language',
@@ -75,14 +105,42 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileDataModelTitle', 'Data model'),
-      detail: t(
-        'settingsOverview.tileDataModelDetail',
-        '{{stages}} stages / {{fields}} company fields',
-        {
-          stages: formatCount(pipelineStages.data?.items.length),
-          fields: formatCount(customFields.data?.items.length),
-        },
-      ),
+      detail:
+        pipelineStages.data?.pageContinues && customFields.data?.pageContinues
+          ? t(
+              'settingsOverview.tileDataModelDetailPartialStagesAndFields',
+              '{{stages}} / {{fields}}',
+              {
+                stages: stageListCaption(pipelineStages.data.items.length, true),
+                fields: customFieldListCaption(customFields.data.items.length, true),
+              },
+            )
+          : pipelineStages.data?.pageContinues
+            ? t(
+                'settingsOverview.tileDataModelDetailPartialStages',
+                '{{stages}} / {{fields}} company fields',
+                {
+                  stages: stageListCaption(pipelineStages.data.items.length, true),
+                  fields: formatCount(customFields.data?.items.length),
+                },
+              )
+            : customFields.data?.pageContinues
+              ? t(
+                  'settingsOverview.tileDataModelDetailPartialFields',
+                  '{{stages}} stages / {{fields}}',
+                  {
+                    stages: formatCount(pipelineStages.data?.items.length),
+                    fields: customFieldListCaption(customFields.data.items.length, true),
+                  },
+                )
+              : t(
+                  'settingsOverview.tileDataModelDetail',
+                  '{{stages}} stages / {{fields}} company fields',
+                  {
+                    stages: formatCount(pipelineStages.data?.items.length),
+                    fields: formatCount(customFields.data?.items.length),
+                  },
+                ),
       tone: pipelineStages.isError || customFields.isError ? 'tomato' : 'blue',
       icon: 'sliders' as const,
       section: 'crm' as const,
@@ -90,15 +148,46 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileAutomationTitle', 'Automation library'),
-      detail: t(
-        'settingsOverview.tileAutomationDetail',
-        '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
-        {
-          tags: formatCount(tags.data?.items.length),
-          templates: formatCount(templates.data?.items.length),
-          rules: formatCount(leadRot.data?.items.length),
-        },
-      ),
+      detail:
+        tags.data?.pageContinues && templates.data?.pageContinues
+          ? t(
+              'settingsOverview.tileAutomationDetailPartialTagsAndTemplates',
+              '{{tags}} / {{templates}} / {{rules}} rot rules',
+              {
+                tags: tagLibraryCaption(tags.data.items.length, true),
+                templates: emailTemplateListCaption(templates.data.items.length, true),
+                rules: formatCount(leadRot.data?.items.length),
+              },
+            )
+          : tags.data?.pageContinues
+            ? t(
+                'settingsOverview.tileAutomationDetailPartialTags',
+                '{{tags}} / {{templates}} templates / {{rules}} rot rules',
+                {
+                  tags: tagLibraryCaption(tags.data.items.length, true),
+                  templates: formatCount(templates.data?.items.length),
+                  rules: formatCount(leadRot.data?.items.length),
+                },
+              )
+            : templates.data?.pageContinues
+              ? t(
+                  'settingsOverview.tileAutomationDetailPartialTemplates',
+                  '{{tags}} tags / {{templates}} / {{rules}} rot rules',
+                  {
+                    tags: formatCount(tags.data?.items.length),
+                    templates: emailTemplateListCaption(templates.data.items.length, true),
+                    rules: formatCount(leadRot.data?.items.length),
+                  },
+                )
+              : t(
+                  'settingsOverview.tileAutomationDetail',
+                  '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
+                  {
+                    tags: formatCount(tags.data?.items.length),
+                    templates: formatCount(templates.data?.items.length),
+                    rules: formatCount(leadRot.data?.items.length),
+                  },
+                ),
       tone: tags.isError || templates.isError || leadRot.isError ? 'tomato' : 'purple',
       icon: 'sparkle' as const,
       section: 'crm' as const,
@@ -106,9 +195,13 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileDeveloperTitle', 'Developer access'),
-      detail: t('settingsOverview.tileDeveloperDetail', '{{value}} API keys', {
-        value: formatCount(apiKeys.data?.items.length),
-      }),
+      detail: apiKeys.data?.pageContinues
+        ? t('settingsOverview.tileDeveloperDetailPartial', '{{drawn}}', {
+            drawn: apiKeyListCaption(apiKeys.data.items.length, true),
+          })
+        : t('settingsOverview.tileDeveloperDetail', '{{value}} API keys', {
+            value: formatCount(apiKeys.data?.items.length),
+          }),
       tone: apiKeys.isError ? 'tomato' : 'teal',
       icon: 'zap' as const,
       section: 'developer' as const,
@@ -116,10 +209,21 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     },
     {
       title: t('settingsOverview.tileWebhookTitle', 'Webhook delivery'),
-      detail: t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
-        active: formatCount((webhooks.data ?? []).filter((w) => w.active).length),
-        failing: formatCount((webhooks.data ?? []).filter((w) => w.failureCount > 0).length),
-      }),
+      detail:
+        webhooks.data && webhooks.data.pageContinues
+          ? t(
+              'settingsOverview.tileWebhookDetailPartial',
+              '{{active}} active / {{failing}} failing. {{drawn}}',
+              {
+                active: formatCount(webhookActive),
+                failing: formatCount(webhookFailing),
+                drawn: webhookListCaption(webhooks.data.items.length, true),
+              },
+            )
+          : t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
+              active: formatCount(webhookActive),
+              failing: formatCount(webhookFailing),
+            }),
       tone: webhooks.isError ? 'tomato' : 'purple',
       icon: 'webhook' as const,
       section: 'webhooks' as const,

@@ -13,9 +13,10 @@
 // ComplianceRow; this file owns the instrument around them: URL state, facets,
 // sorting, paging, and ONE fact fan-out for the visible page.
 //
-// Paging is client-side because the API hands back the whole matrix in one
-// response (bid-workspace.ts:141, `take: 500`). That is not a workaround — it is
-// what bounds the BidFact fan-out to 25 rows per screen (useBidFacts.ts).
+// Paging is client-side over the rows this matrix draws. The API loads one
+// row past that page and drops it. The header says when the page is not
+// every compliance row. The screen still shows 25 rows so the BidFact
+// fan-out stays bounded (useBidFacts.ts).
 
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -51,6 +52,7 @@ import { useTableQuery, type ListTableQueryState } from '@/lib/table/use-table-q
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 
 import { ComplianceMatrixToolbar } from './ComplianceMatrixToolbar';
+import { complianceMatrixCaption, shownComplianceMatrix } from './compliance-matrix-caption';
 import { ComplianceRow } from './ComplianceRow';
 import {
   ALL,
@@ -60,7 +62,10 @@ import {
   sortComplianceRows,
   statusCounts,
 } from './compliance-matrix-rows';
-import { COMPLIANCE_STATUSES, complianceMatrixSearchParams } from './compliance-matrix-search-params';
+import {
+  COMPLIANCE_STATUSES,
+  complianceMatrixSearchParams,
+} from './compliance-matrix-search-params';
 
 const COLUMN_COUNT = 5;
 
@@ -77,7 +82,16 @@ export function ComplianceMatrix() {
   const saveRow = useSaveComplianceRow(bidWorkspaceId);
   const { query } = useTableQuery(complianceMatrixSearchParams);
 
-  const allRows = data?.items ?? [];
+  const matrix = shownComplianceMatrix(data?.items ?? [], data?.matrixContinues);
+  const allRows = matrix.items;
+  const caption = data
+    ? complianceMatrixCaption(
+        allRows.length,
+        allRows.filter((row) => row.status === 'compliant').length,
+        allRows.filter((row) => row.status === 'pending').length,
+        matrix.pageContinues,
+      )
+    : null;
   const visible = sortComplianceRows(
     filterComplianceRows(allRows, {
       status: query.tab,
@@ -103,7 +117,7 @@ export function ComplianceMatrix() {
 
   return (
     <Card>
-      <MatrixHeader data={data} allRows={allRows} query={query} />
+      <MatrixHeader caption={caption} allRows={allRows} query={query} />
       <MatrixFetchStates
         isLoading={isLoading}
         isError={isError}
@@ -136,11 +150,11 @@ export function ComplianceMatrix() {
 }
 
 function MatrixHeader({
-  data,
+  caption,
   allRows,
   query,
 }: {
-  data: { compliantCount: number; total: number; pendingCount: number } | undefined;
+  caption: string | null;
   allRows: ComplianceRowData[];
   query: ListTableQueryState;
 }) {
@@ -150,15 +164,7 @@ function MatrixHeader({
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border-subtle px-4 py-2">
       <div>
         <h2 className="text-sm font-semibold text-fg-primary">{t('compliance.heading')}</h2>
-        {data && (
-          <p className="mt-0.5 text-xs text-fg-tertiary">
-            {t('compliance.summary', {
-              compliant: data.compliantCount,
-              total: data.total,
-              pending: data.pendingCount,
-            })}
-          </p>
-        )}
+        {caption && <p className="mt-0.5 text-xs text-fg-tertiary">{caption}</p>}
       </div>
       {allRows.length > 0 && (
         <ComplianceMatrixToolbar
