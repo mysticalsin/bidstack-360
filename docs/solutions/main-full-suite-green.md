@@ -41,7 +41,11 @@ gates failed: full E2E, Semgrep ERROR, and Lighthouse CI.
   `#f8fafc` into `.inline-edit-trigger { color: inherit }` on `/opportunities`.
 - Disable the service worker with `VITE_DISABLE_SERVICE_WORKER` in LHCI only.
   `navigator.webdriver` also matches Playwright and breaks `pwa-offline.spec.ts`.
-- Proposals pagination Next is covered by the Quick-actions FAB; force-click.
+- Proposals pagination Next sat under the Quick-actions FAB (page bottom
+  padding 60px / 48px vs a 76px+ FAB stack). Reserve `--fab-clearance` on
+  `.page` (desktop and mobile), `scroll-padding-bottom` on `html`, and
+  `scroll-margin-bottom` on `[data-slot=pagination]` so a normal click works.
+  Do not force-click past a control users also cannot reach.
 - `getByLabel('Key numbers')` matches the header group and the sr-only
   KeyNumbersStrip heading. Use `getByRole('group', { name: 'Key numbers' })`.
 - Responsive `toHaveScreenshot` baselines must come from the CI runner.

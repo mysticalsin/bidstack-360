@@ -65,8 +65,8 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 - **What went wrong:** After `608f9064`, shard 2 failed `pwa-offline.spec.ts` (SW never registered) and proposals Next stayed intercepted by the Quick-actions FAB.
 - **Root cause:** `navigator.webdriver` was used to skip SW registration so Lighthouse would not warm the app shell. Playwright sets webdriver, so the PWA tests saw no worker. Proposals Next is covered by `fixed bottom-6 right-6` Quick actions.
-- **Prevention rule:** Gate LHCI-only skips on a Vite build flag (`VITE_DISABLE_SERVICE_WORKER`), never `navigator.webdriver`. Force-click pagination when a documented overlay intercepts.
-- **Files affected:** `apps/web/src/main.tsx`, `apps/web/e2e/proposals.spec.ts`.
+- **Prevention rule:** Gate LHCI-only skips on a Vite build flag (`VITE_DISABLE_SERVICE_WORKER`), never `navigator.webdriver`. If a fixed overlay covers a real control, fix the layout (page padding / scroll-margin / safe area) so users can reach it; do not `click({ force: true })` past it in the spec.
+- **Files affected:** `apps/web/src/main.tsx`, `apps/web/src/index.css`, `apps/web/src/components/layout/LiquidQuickActions.tsx`, `apps/web/src/components/table-kit/table-pagination.tsx`, `apps/web/src/components/ui/CursorPager.tsx`, `apps/web/e2e/proposals.spec.ts`.
 
 ### 2026-11-02 TESTING: Lighthouse login stayed at 0.87 after deferring the hero video
 

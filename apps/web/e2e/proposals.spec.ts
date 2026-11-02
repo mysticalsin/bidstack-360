@@ -64,6 +64,27 @@ function firstRowName(page: Page) {
   return page.locator(DATA_ROWS).first().locator('td').first();
 }
 
+/** The Quick-actions FAB used to sit on Proposals Next. A force-click would
+ *  hide that from CI; real users cannot force-click. Fail if the discs overlap. */
+async function expectNextClearOfQuickActions(page: Page) {
+  const next = page
+    .getByRole('navigation', { name: /pagination/i })
+    .getByRole('button', { name: /^next$/i });
+  const fab = page.getByRole('button', { name: /^quick actions$/i });
+  await next.scrollIntoViewIfNeeded();
+  const nextBox = await next.boundingBox();
+  const fabBox = await fab.boundingBox();
+  expect(nextBox, 'pagination Next must be on screen').toBeTruthy();
+  expect(fabBox, 'Quick actions must be on screen').toBeTruthy();
+  if (!nextBox || !fabBox) return;
+  const overlap =
+    nextBox.x < fabBox.x + fabBox.width &&
+    nextBox.x + nextBox.width > fabBox.x &&
+    nextBox.y < fabBox.y + fabBox.height &&
+    nextBox.y + nextBox.height > fabBox.y;
+  expect(overlap, 'Quick-actions FAB must not cover pagination Next').toBe(false);
+}
+
 test('proposals view round-trips search, sort and page through the URL', async ({
   page,
   gotoAndWait,
@@ -95,11 +116,11 @@ test('proposals view round-trips search, sort and page through the URL', async (
     // (3) Pagination pushes history, so Back walks pages (url-param-audit §6).
     await page.goto(listUrl, { waitUntil: 'load' });
     await expect(firstRowName(page)).toHaveText(`${stamp} Alpha`, { timeout: 20_000 });
+    await expectNextClearOfQuickActions(page);
     await page
       .getByRole('navigation', { name: /pagination/i })
       .getByRole('button', { name: /^next$/i })
-      // Quick-actions FAB (fixed bottom-right) sits on the pager in CI.
-      .click({ force: true });
+      .click();
     await expect(page).toHaveURL(/[?&]page=2\b/, { timeout: 10_000 });
     await expect(page.locator(DATA_ROWS)).toHaveCount(1);
     await expect(firstRowName(page)).toHaveText(`${stamp} Foxtrot`);
@@ -150,10 +171,10 @@ test('the proposals table body never goes empty during a page transition', async
     });
 
     const pager = page.getByRole('navigation', { name: /pagination/i });
-    // force: the Quick-actions FAB intercepts the real click in CI.
-    await pager.getByRole('button', { name: /^next$/i }).click({ force: true });
+    await expectNextClearOfQuickActions(page);
+    await pager.getByRole('button', { name: /^next$/i }).click();
     await expect(page.locator(DATA_ROWS)).toHaveCount(1, { timeout: 10_000 });
-    await pager.getByRole('button', { name: /^previous$/i }).click({ force: true });
+    await pager.getByRole('button', { name: /^previous$/i }).click();
     await expect(page.locator(DATA_ROWS)).toHaveCount(5, { timeout: 10_000 });
 
     const blankFrames = await page.evaluate(() => {
