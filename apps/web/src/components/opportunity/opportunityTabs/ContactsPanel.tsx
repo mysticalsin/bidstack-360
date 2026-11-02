@@ -8,6 +8,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import {
+  opportunityContactCaption,
+  shownOpportunityContacts,
+} from '@/components/opportunity/opportunity-contact-caption';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -27,15 +31,17 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
   const unlink = useUnlinkContact();
   const update = useUpdateContactRole();
   const allContacts = useContacts();
+  const page = shownOpportunityContacts(
+    contacts.data?.items ?? [],
+    contacts.data?.contactsContinue,
+  );
 
   return (
     <Card>
       <div className="flex items-center justify-between px-5 py-4">
         <SectionHeader
           title={t('contacts.linkedTitle', 'Linked contacts')}
-          caption={t('contacts.countCaption', '{{count}} contacts', {
-            count: contacts.data?.items.length ?? 0,
-          })}
+          caption={opportunityContactCaption(page.items.length, page.pageContinues)}
         />
         <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(true)}>
           {t('contacts.linkAction', '+ Link contact')}
@@ -58,7 +64,7 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
             >
               <option value="">{t('contacts.selectPlaceholder', 'Select a contact…')}</option>
               {(allContacts.data?.items ?? [])
-                .filter((c) => !contacts.data?.items.some((oc) => oc.contactId === c.id))
+                .filter((c) => !page.items.some((oc) => oc.contactId === c.id))
                 .map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.email ? `(${c.email})` : ''}
@@ -74,14 +80,14 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
 
       {contacts.isLoading ? (
         <LoadingSkeleton rows={3} />
-      ) : !contacts.data || contacts.data.items.length === 0 ? (
+      ) : !contacts.data || page.items.length === 0 ? (
         <EmptyState
           title={t('contacts.emptyTitle', 'No linked contacts')}
           message={t('contacts.emptyMessage', 'Link contacts to track who is involved in this deal.')}
         />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
-          {contacts.data.items.map((oc) => (
+          {page.items.map((oc) => (
             <li key={oc.id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
