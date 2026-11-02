@@ -24,6 +24,10 @@ import {
 import { microsToUnitsText, unitsTextToMicros, type Forecast } from '@bidstack/shared';
 
 import {
+  FORECAST_LIST_PAGE,
+  forecastGroupCaption,
+} from './forecast-list-caption';
+import {
   CATEGORIES,
   CATEGORY_LABELS,
   forecastRowTotalCurrency,
@@ -56,6 +60,8 @@ interface ForecastListProps {
   onDeleteRow: (row: ForecastRow) => void;
   canWrite: boolean;
   readOnlyHint: string;
+  /** True when the list read one forecast past this page and dropped it. */
+  pageContinues?: boolean;
 }
 
 export function ForecastList({
@@ -69,6 +75,7 @@ export function ForecastList({
   onDeleteRow,
   canWrite,
   readOnlyHint,
+  pageContinues = false,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
@@ -113,9 +120,16 @@ export function ForecastList({
     <Card>
       <SectionHeader
         title={t('forecastList.sectionTitle', 'Forecast Details')}
-        caption={t('forecastList.sectionCaption', '{{count}} forecast groups', {
-          count: rows.length,
-        })}
+        caption={
+          pageContinues
+            ? t(
+                'forecastList.sectionCaptionPartial',
+                forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
+              )
+            : t('forecastList.sectionCaption', '{{count}} forecast groups', {
+                count: rows.length,
+              })
+        }
       />
 
       {isError ? (

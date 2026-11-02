@@ -24,6 +24,7 @@ import { ForecastChart } from './forecasts/ForecastChart';
 import { ForecastProjection } from './forecasts/ForecastProjection';
 import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
+import { forecastTotalsNote } from './forecasts/forecast-list-caption';
 import {
   buildChartData,
   forecastCurrencyBuckets,
@@ -62,6 +63,10 @@ export function ForecastsPage() {
     const items = forecasts.data?.items ?? [];
     return items.filter((i) => matchesPeriodFilter(i.period, periodFilter));
   }, [forecasts.data, periodFilter]);
+  // pageContinues is the forecast the list read past this page and dropped.
+  // It is not a forecast total. Amounts and groups below are this page.
+  const pageContinues = Boolean(forecasts.data?.pageContinues);
+  const totalsNote = forecastTotalsNote(pageContinues);
 
   const rows = useMemo(() => groupForecasts(filteredItems), [filteredItems]);
   const chartData = useMemo(() => buildChartData(rows), [rows]);
@@ -229,11 +234,18 @@ export function ForecastsPage() {
         </Tabs>
       </motion.div>
 
-      {/* ── Headline totals — the page's answer at a glance ── */}
+      {/* ── Headline totals — this page, not a book-wide sum ── */}
+      {totalsNote ? (
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('forecasts.totalsPartial', totalsNote)}
+        </p>
+      ) : null}
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
+        aria-label={
+          totalsNote ?? t('forecasts.totalsLabel', 'Forecast totals for the selected period')
+        }
       >
         {(
           [
@@ -317,6 +329,7 @@ export function ForecastsPage() {
           onDeleteRow={(row) => void handleDeleteRow(row)}
           canWrite={canWrite}
           readOnlyHint={readOnlyHint}
+          pageContinues={pageContinues}
         />
       </motion.div>
     </motion.div>

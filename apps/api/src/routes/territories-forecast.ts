@@ -25,21 +25,32 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           period: z.string().max(10).optional(),
           ownerId: z.string().uuid().optional(),
         }),
-        response: { 200: z.object({ items: z.array(Forecast) }) },
+        response: {
+          200: z.object({
+            items: z.array(Forecast),
+            /** True when one forecast past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
+          }),
+        },
       },
     },
     async (req) => {
-      const rows = await prisma.forecast.findMany({
+      // One row past the page is the probe. It is dropped and is not a forecast total.
+      const FORECAST_LIST_PAGE = 500;
+      const loaded = await prisma.forecast.findMany({
         where: {
           orgId: req.auth.orgId,
           ...(req.query.period ? { period: req.query.period } : {}),
           ...(req.query.ownerId ? { ownerId: req.query.ownerId } : {}),
         },
         include: { owner: { select: { name: true } } },
-        orderBy: { period: 'desc' },
-        take: 500,
+        orderBy: [{ period: 'desc' }, { id: 'asc' }],
+        take: FORECAST_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > FORECAST_LIST_PAGE;
+      const rows = pageContinues ? loaded.slice(0, FORECAST_LIST_PAGE) : loaded;
       return {
+        pageContinues,
         items: rows.map((r) => ({
           id: r.id,
           orgId: r.orgId,
