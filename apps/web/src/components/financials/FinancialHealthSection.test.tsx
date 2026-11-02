@@ -66,6 +66,10 @@ describe('FinancialHealthSection', () => {
     expect(rev.textContent).not.toContain('1.82bn');
     expect(rev.textContent).toContain('+7%');
     expect(rev.textContent).toContain('FY2025');
+    expect(rev.textContent).toContain('3 years');
+    expect(rev.textContent).not.toMatch(/not every filing/i);
+    expect(screen.queryByTestId('filing-period-caption')).toBeNull();
+    expect(rev.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Revenue, 3 years');
     expect(rev.querySelector('a')?.getAttribute('href')).toBe('https://filings.xbrl.org/r/2025');
     expect(screen.getByTestId('fh-tile-margin').textContent).toContain('16.5%');
     expect(screen.getByTestId('fh-tile-margin').textContent).toContain('-5.9 pts');
@@ -111,6 +115,36 @@ describe('FinancialHealthSection', () => {
     render(<FinancialHealthSection companyId="c1" />);
     expect(screen.getAllByText(/period to 31 Dec 2025/).length).toBe(2);
     expect(screen.queryByTestId('fh-stale')).toBeNull();
+  });
+
+  it('says twenty filings are not the whole history when a later period was loaded', () => {
+    // WHY: twenty periods used to read as every filing ("20 years"). The extra
+    // period is the probe. It is not drawn. A page that fits keeps "N years".
+    const periods = Array.from({ length: 21 }, (_, n) => P(2025 - n, 1000e6 + n, 10));
+    state.data = { ...real, periods: periods.slice(0, 20), periodsContinue: true, signals: [] };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getByTestId('filing-period-caption').textContent).toBe(
+      '20 in the latest 20, not every filing',
+    );
+    const rev = screen.getByTestId('fh-tile-revenue');
+    expect(rev.textContent).not.toContain('20 years');
+    expect(rev.textContent).not.toMatch(/not every filing/i);
+    expect(rev.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
+      'Revenue, 20 in the latest 20, not every filing',
+    );
+    expect(rev.textContent).toContain('FY2025');
+    expect(rev.querySelector('a')?.getAttribute('href')).toBe('https://filings.xbrl.org/r/2025');
+    cleanup();
+
+    state.data = { ...real, periods, periodsContinue: false, signals: [] };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getByTestId('filing-period-caption').textContent).toBe(
+      '20 in the latest 20, not every filing',
+    );
+    expect(screen.getByTestId('fh-tile-revenue').textContent).not.toContain('FY2005');
+    expect(screen.getByTestId('fh-tile-revenue').querySelector('a')?.getAttribute('href')).not.toBe(
+      'https://filings.xbrl.org/r/2005',
+    );
   });
 
   it('flags statements older than about 18 months as history (CI Financial stopped filing in 2023)', () => {

@@ -15,6 +15,7 @@ import { Spark } from '@/components/viz/charts';
 import { noDash } from '@/components/signals/category';
 import { useAccountFinancials, useTrackFinancials } from '@/hooks/useAccountFinancials';
 
+import { filingPeriodCaption, shownFilingPeriods } from './filing-period-caption';
 import { buildTiles, type Tile } from './financials-format';
 
 type Signal = AccountFinancials['signals'][number];
@@ -24,7 +25,7 @@ const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short
 const periodFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const STALE_MS = 548 * 24 * 3600 * 1000; // about 18 months
 
-function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
+function MetricTile({ t, sample, pageContinues }: { t: Tile; sample: boolean; pageContinues: boolean }) {
   const last = t.series.at(-1);
   const prev = t.series.at(-2);
   if (!last) {
@@ -36,6 +37,7 @@ function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
     );
   }
   const source = sample ? 'Sample' : last.p.source;
+  const history = filingPeriodCaption(t.series.length, false);
   return (
     <div className="fh-tile" data-testid={`fh-tile-${t.key}`}>
       <span className="wd-row-meta">{t.label}</span>
@@ -43,9 +45,14 @@ function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
         {t.fmt(last)}
         {prev ? <span className="fh-delta">{t.delta(last, prev)}</span> : null}
       </span>
-      <Spark values={t.series.map((s) => s.v)} label={`${t.label}, ${t.series.length} years`} width={120} height={28} />
+      <Spark
+        values={t.series.map((s) => s.v)}
+        label={pageContinues ? `${t.label}, ${filingPeriodCaption(t.series.length, true)}` : `${t.label}, ${t.series.length} years`}
+        width={120}
+        height={28}
+      />
       <span className="fh-src">
-        FY{last.p.fiscalYear}, {t.series.length > 1 ? `${t.series.length} years, ` : ''}
+        FY{last.p.fiscalYear}, {pageContinues || !history ? '' : `${history}, `}
         {last.p.sourceUrl && !sample ? (
           <a className="wd-link" href={last.p.sourceUrl} target="_blank" rel="noreferrer">{source}</a>
         ) : (
@@ -106,9 +113,10 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
   const q = useAccountFinancials(companyId);
   const d = q.data;
   const general = d?.gate === 'general';
-  const tiles = d ? buildTiles(d.periods) : [];
-  const latest = d && !d.sample ? d.periods.reduce<string | null>((m, p) => (!m || p.periodEnd > m ? p.periodEnd : m), null) : null;
-  const latestFy = latest && d ? d.periods.find((p) => p.periodEnd === latest)?.fiscalYear : null;
+  const history = d ? shownFilingPeriods(d.periods, d.periodsContinue, d.sample) : { periods: [], pageContinues: false };
+  const tiles = d ? buildTiles(history.periods) : [];
+  const latest = d && !d.sample ? history.periods.reduce<string | null>((m, p) => (!m || p.periodEnd > m ? p.periodEnd : m), null) : null;
+  const latestFy = latest && d ? history.periods.find((p) => p.periodEnd === latest)?.fiscalYear : null;
   // Measured against the last pull (not the clock) so render stays pure.
   const stale = latest && d?.lastPulledAt ? new Date(d.lastPulledAt).getTime() - new Date(`${latest}T00:00:00Z`).getTime() > STALE_MS : false;
   const signals = d ? d.signals.slice().sort((a, b) => RANK[a.confidence] - RANK[b.confidence]).slice(0, 3) : [];
@@ -150,8 +158,13 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
                     Latest filed period is FY{latestFy}. No newer statements at this source, so read the trend as history.
                   </p>
                 ) : null}
+                {history.pageContinues ? (
+                  <p className="wd-row-meta" data-testid="filing-period-caption">
+                    {filingPeriodCaption(history.periods.length, true)}
+                  </p>
+                ) : null}
                 <div className="fh-tiles">
-                  {tiles.map((t) => <MetricTile key={t.key} t={t} sample={d.sample} />)}
+                  {tiles.map((t) => <MetricTile key={t.key} t={t} sample={d.sample} pageContinues={history.pageContinues} />)}
                 </div>
                 {signals.length ? (
                   <>

@@ -147,6 +147,30 @@ export const FinancialSignal = z.object({
 });
 export type FinancialSignal = z.infer<typeof FinancialSignal>;
 
+/** Filed periods the account list draws. One more row is the probe. */
+export const FINANCIAL_PERIODS_DRAWN = 20;
+
+/**
+ * Periods one financials query may return. A fixed take of twenty dropped
+ * a later period, so those twenty read as every filing. One row past those
+ * twenty is the probe. It is not shown, and it is not a total.
+ */
+export function financialPeriodTake(): number {
+  return FINANCIAL_PERIODS_DRAWN + 1;
+}
+
+/** Latest periods to draw. The extra row only says another filing exists. */
+export function filingPeriodPage<T>(rows: readonly T[]): {
+  periods: T[];
+  pageContinues: boolean;
+} {
+  const pageContinues = rows.length > FINANCIAL_PERIODS_DRAWN;
+  return {
+    periods: pageContinues ? rows.slice(0, FINANCIAL_PERIODS_DRAWN) : [...rows],
+    pageContinues,
+  };
+}
+
 export const AccountFinancials = z.object({
   companyId: z.string(),
   tier: z.string(),
@@ -162,6 +186,11 @@ export const AccountFinancials = z.object({
   lastPulledAt: z.string().nullable(),
   nextPullAt: z.string().nullable(),
   periods: z.array(FinancialPeriod),
+  /**
+   * True when the query read one period past FINANCIAL_PERIODS_DRAWN and
+   * dropped it. `periods` is that page, not every filing. No filing total.
+   */
+  periodsContinue: z.boolean().optional(),
   signals: z.array(FinancialSignal),
   /** True when the section shows the built-in example instead of filings. */
   sample: z.boolean(),
