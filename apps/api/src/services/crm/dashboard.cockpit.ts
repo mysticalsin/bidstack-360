@@ -10,6 +10,7 @@ import { type z } from 'zod';
 import {
   recordedDecisionRole,
   ACCOUNT_ACTIVITY_PAGE_LIMIT,
+  COCKPIT_RISK_LIMIT,
   KEY_CONTACT_PAGE_LIMIT,
   type AccountCockpitSnapshot,
   type AiInsight,
@@ -42,7 +43,6 @@ import {
 } from './technical-stack.service.js';
 import { microsWireFields } from '../../lib/micros-wire.js';
 
-const COCKPIT_RISK_LIMIT = 6;
 const COCKPIT_COMPLIANCE_LIMIT = 6;
 
 // ─── Signal coverage (M2) ─────────────────────────────────────────────────────
@@ -500,6 +500,22 @@ export function keyContactPage<T>(
   return { items, pageContinues };
 }
 
+/**
+ * One risk page. The cockpit book has no risk total, so that total is not
+ * invented. One unique row past the page says these rows are not every risk.
+ * The extra row is not shown.
+ */
+export function riskRegisterPage<T>(rows: readonly T[]): {
+  items: T[];
+  pageContinues: boolean;
+} {
+  const pageContinues = rows.length > COCKPIT_RISK_LIMIT;
+  return {
+    items: pageContinues ? rows.slice(0, COCKPIT_RISK_LIMIT) : [...rows],
+    pageContinues,
+  };
+}
+
 export function buildActivities(
   tasks: Array<{
     id: string;
@@ -822,7 +838,7 @@ export function buildCockpit({
   const companyRisks = risks.filter(
     (risk) => risk.opportunityId != null && accountOpportunityIds.has(risk.opportunityId),
   );
-  const visibleRisks = uniqueBy(companyRisks, riskKey).slice(0, COCKPIT_RISK_LIMIT);
+  const risksPage = riskRegisterPage(uniqueBy(companyRisks, riskKey));
   const companyCompliance = compliance.filter(
     (check) => check.opportunityId != null && accountOpportunityIds.has(check.opportunityId),
   );
@@ -1023,7 +1039,8 @@ export function buildCockpit({
     keyContactsTruncated: contactsPage.pageContinues,
     recentActivity: activity.items,
     recentActivityTruncated: activity.pageContinues,
-    risks: visibleRisks.map(serializeRisk),
+    risks: risksPage.items.map(serializeRisk),
+    risksTruncated: risksPage.pageContinues,
     compliance: visibleCompliance.map(serializeCompliance),
     roadmap: [],
   };

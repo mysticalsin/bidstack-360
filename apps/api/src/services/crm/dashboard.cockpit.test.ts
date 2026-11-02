@@ -12,6 +12,7 @@ import {
   buildCockpit,
   computeSignalCoverage,
   keyContactPage,
+  riskRegisterPage,
 } from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
@@ -1253,5 +1254,84 @@ describe('key contact page', () => {
     const short = buildCockpit({ ...base, contacts: contacts.slice(0, 2) });
     expect(short.keyContactsTruncated).toBe(false);
     expect(short.keyContacts).toHaveLength(2);
+  });
+});
+
+describe('risk register page', () => {
+  it('drops one risk past the page and does not invent a register total', () => {
+    // WHY: the cockpit showed six risks and the open-issues caption treated
+    // that page as the recorded register. There is no risk count on the book.
+    // One unique row past the page is the only signal, and that row is not shown.
+    const rows = [1, 2, 3, 4, 5, 6, 7].map((n) => ({ title: `Risk ${n}` }));
+    const probe = riskRegisterPage(rows);
+    expect(probe.pageContinues).toBe(true);
+    expect(probe.items).toHaveLength(6);
+    expect(probe.items.map((row) => row.title)).not.toContain('Risk 7');
+
+    const exact = riskRegisterPage(rows.slice(0, 6));
+    expect(exact.pageContinues).toBe(false);
+    expect(exact.items).toHaveLength(6);
+
+    const short = riskRegisterPage(rows.slice(0, 2));
+    expect(short.pageContinues).toBe(false);
+    expect(short.items).toHaveLength(2);
+
+    const deal = {
+      id: 'linked-deal',
+      customer: 'Mantu',
+      companyId: 'mantu',
+      name: 'Renewal',
+      stage: 's2_sent',
+      pipelineStage: null,
+      valueMicros: 1n,
+      probability: 40,
+      dueDate: null,
+      owner: null,
+    };
+    const risk = (n: number, title = `Risk ${n}`) => ({
+      id: `risk-${n}`,
+      opportunityId: 'linked-deal',
+      title,
+      severity: 'high',
+      owner: null,
+      mitigation: null,
+      dueDate: null,
+      status: 'open',
+      companyName: null,
+    });
+    const base = {
+      company: company(),
+      companies: [],
+      opportunities: [deal],
+      contacts: [],
+      tasks: [],
+      compliance: [],
+      fieldOverrides: [],
+    };
+    const larger = buildCockpit({
+      ...base,
+      risks: [1, 2, 3, 4, 5, 6, 7].map((n) => risk(n)),
+    });
+    expect(larger.risksTruncated).toBe(true);
+    expect(larger.risks).toHaveLength(6);
+    expect(larger.risks.map((row) => row.title)).not.toContain('Risk 7');
+
+    const matched = buildCockpit({
+      ...base,
+      risks: [1, 2, 3, 4, 5, 6].map((n) => risk(n)),
+    });
+    expect(matched.risksTruncated).toBe(false);
+    expect(matched.risks).toHaveLength(6);
+
+    const duplicate = buildCockpit({
+      ...base,
+      risks: [1, 2, 3, 4, 5, 6, 7].map((n) => risk(n, n === 7 ? 'Risk 1' : `Risk ${n}`)),
+    });
+    expect(duplicate.risksTruncated).toBe(false);
+    expect(duplicate.risks).toHaveLength(6);
+
+    const few = buildCockpit({ ...base, risks: [risk(1), risk(2)] });
+    expect(few.risksTruncated).toBe(false);
+    expect(few.risks).toHaveLength(2);
   });
 });

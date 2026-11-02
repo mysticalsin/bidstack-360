@@ -7,52 +7,63 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { springSoft } from '@/lib/motion';
+import { riskRegisterCaption } from '@/pages/cockpit-risks';
 
-import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
+import { COCKPIT_RISK_LIMIT, type ComplianceCheck, type RiskItem } from '@bidstack/shared';
 
 import { severityBg, severityShort, severityTone } from './_tokens';
 
 interface Props {
   risks: RiskItem[];
   compliance: ComplianceCheck[];
+  /** True when the cockpit dropped one risk past this page. */
+  risksTruncated?: boolean;
 }
 
 // Memoized — render is pure on risks+compliance arrays, both stable per
 // snapshot fetch. Avoids re-render when sibling cards refetch.
-export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }: Props) {
+export const OpenIssuesCard = memo(function OpenIssuesCard({
+  risks,
+  compliance,
+  risksTruncated,
+}: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
-  const openRisks = risks.filter((r) => r.status === 'open' || r.status === 'in_progress');
+  // A seventh risk is the probe. It is not a row on this page.
+  const riskPage = risks.slice(0, COCKPIT_RISK_LIMIT);
+  const riskPageContinues = risksTruncated === true || riskPage.length < risks.length;
+  const openRisks = riskPage.filter((r) => r.status === 'open' || r.status === 'in_progress');
   const openCompliance = compliance.filter(
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
   );
   const total = openRisks.length + openCompliance.length;
-  const recorded = risks.length + compliance.length;
-  // Severity buckets are computed against the full risk list (not just open)
-  // so the bar reflects the registry total rather than "what's left today".
+  const recorded = riskPage.length + compliance.length;
+  const riskPageLabel = riskRegisterCaption(riskPage.length, true);
+  // Severity buckets count this risk page, open and closed. A continuing
+  // page is not the whole register; the caption says so.
   const buckets = [
     {
       label: 'Critical',
       labelText: t('openIssues.severityCritical', 'Critical'),
-      count: risks.filter((risk) => risk.severity === 'critical').length,
+      count: riskPage.filter((risk) => risk.severity === 'critical').length,
       tone: 'tomato',
     },
     {
       label: 'High',
       labelText: t('openIssues.severityHigh', 'High'),
-      count: risks.filter((risk) => risk.severity === 'high').length,
+      count: riskPage.filter((risk) => risk.severity === 'high').length,
       tone: 'amber',
     },
     {
       label: 'Medium',
       labelText: t('openIssues.severityMedium', 'Medium'),
-      count: risks.filter((risk) => risk.severity === 'medium').length,
+      count: riskPage.filter((risk) => risk.severity === 'medium').length,
       tone: 'blue',
     },
     {
       label: 'Low',
       labelText: t('openIssues.severityLow', 'Low'),
-      count: risks.filter((risk) => risk.severity === 'low').length,
+      count: riskPage.filter((risk) => risk.severity === 'low').length,
       tone: 'gray',
     },
   ] as const;
@@ -62,17 +73,19 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
       <SectionHeader
         title={t('openIssues.title', 'Open issues')}
         caption={
-          recorded === 0
-            ? t(
-                'openIssues.captionNoneRecorded',
-                'No risks or compliance checks recorded on this account',
-              )
-            : total === 0
-              ? t('openIssues.captionNoneOpen', 'No open items in the recorded register')
-              : t('openIssues.captionItemsToAction', '{{count}} open item{{plural}}', {
-                  count: total,
-                  plural: total === 1 ? '' : 's',
-                })
+          riskPageContinues
+            ? t('openIssues.riskPageCaption', riskPageLabel)
+            : recorded === 0
+              ? t(
+                  'openIssues.captionNoneRecorded',
+                  'No risks or compliance checks recorded on this account',
+                )
+              : total === 0
+                ? t('openIssues.captionNoneOpen', 'No open items in the recorded register')
+                : t('openIssues.captionItemsToAction', '{{count}} open item{{plural}}', {
+                    count: total,
+                    plural: total === 1 ? '' : 's',
+                  })
         }
       />
       <div style={{ padding: '8px 18px 14px' }}>
@@ -103,15 +116,17 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 : t('openIssues.noneOpenTitle', 'No open items')
             }
             message={
-              recorded === 0
-                ? t(
-                    'openIssues.emptyMessage',
-                    'This account has no risk or compliance rows. That is not a clearance.',
-                  )
-                : t(
-                    'openIssues.noneOpenMessage',
-                    'The recorded register has no open risks or compliance checks.',
-                  )
+              riskPageContinues
+                ? t('openIssues.riskPageCaption', riskPageLabel)
+                : recorded === 0
+                  ? t(
+                      'openIssues.emptyMessage',
+                      'This account has no risk or compliance rows. That is not a clearance.',
+                    )
+                  : t(
+                      'openIssues.noneOpenMessage',
+                      'The recorded register has no open risks or compliance checks.',
+                    )
             }
           />
         ) : (

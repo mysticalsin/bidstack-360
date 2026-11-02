@@ -242,6 +242,9 @@ export const AccountCockpitSnapshot = z.object({
   // and dropped it. recentActivity is that page, not every activity.
   recentActivityTruncated: z.boolean().optional(),
   risks: z.array(RiskItem),
+  // True when one unique risk past COCKPIT_RISK_LIMIT was dropped.
+  // risks is that page, not every row on the register. No register total is loaded.
+  risksTruncated: z.boolean().optional(),
   compliance: z.array(ComplianceCheck),
   roadmap: z.array(RoadmapItem),
 });
@@ -252,6 +255,9 @@ export const ACCOUNT_ACTIVITY_PAGE_LIMIT = 5;
 
 /** Key contacts shown on one account cockpit. contactCount, or one extra row, sets keyContactsTruncated. */
 export const KEY_CONTACT_PAGE_LIMIT = 5;
+
+/** Risks shown on one account cockpit. One extra unique row sets risksTruncated. */
+export const COCKPIT_RISK_LIMIT = 6;
 
 export const CrmDashboardSnapshot = z.object({
   generatedAt: z.string().datetime(),
