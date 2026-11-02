@@ -6,7 +6,7 @@ import type { Workflow, WorkflowCreate, WorkflowRun } from '@bidstack/shared';
 const KEY = 'workflows';
 
 export function useWorkflows(active?: boolean) {
-  return useQuery<{ items: Workflow[] }>({
+  return useQuery<{ items: Workflow[]; pageContinues: boolean }>({
     queryKey: [KEY, active],
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();

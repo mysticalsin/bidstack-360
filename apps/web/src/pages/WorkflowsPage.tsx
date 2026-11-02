@@ -19,6 +19,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import type { WorkflowCreate } from '@bidstack/shared';
 import { NewWorkflowDialog } from './workflowsPage/NewWorkflowDialog';
+import { WORKFLOW_LIST_PAGE, workflowListCaption } from './workflowsPage/workflow-list-caption';
 
 export function WorkflowsPage() {
   const { t } = useTranslation('crm');
@@ -41,6 +42,13 @@ export function WorkflowsPage() {
   );
 
   const items = data?.items ?? [];
+  // pageContinues is the workflow the list read past this page and dropped.
+  const pageContinues = Boolean(data?.pageContinues);
+  const workflowCountLabel = pageContinues
+    ? t('workflows.countPartial', workflowListCaption(items.length, true, WORKFLOW_LIST_PAGE))
+    : items.length === 1
+      ? t('workflows.countOne', '{{count}} workflow', { count: items.length })
+      : t('workflows.countOther', '{{count}} workflows', { count: items.length });
 
   const handleCreate = (body: WorkflowCreate) => {
     createWf.mutate(body, {
@@ -127,11 +135,7 @@ export function WorkflowsPage() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? `${
-              items.length === 1
-                ? t('workflows.countOne', '{{count}} workflow', { count: items.length })
-                : t('workflows.countOther', '{{count}} workflows', { count: items.length })
-            }${showActiveOnly ? t('workflows.activeOnlySuffix', ' · active only') : ''}`
+          ? `${workflowCountLabel}${showActiveOnly ? t('workflows.activeOnlySuffix', ' · active only') : ''}`
           : ''}
       </p>
 
