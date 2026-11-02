@@ -32,6 +32,13 @@ import { WebhookEventsCard } from '@/pages/integrations/WebhookEventsCard';
 import { buildIntegrationSummary } from '@/pages/integrations/integration-helpers';
 import { MCP_TOOLS } from '@/pages/integrations/types';
 import type { DustStatus, IntegrationSetupGuide, WebhookEvent } from '@/pages/integrations/types';
+
+/** Events the list draws, plus whether one event past the page was dropped. */
+type WebhookEventPage = {
+  items: WebhookEvent[];
+  /** True when one event past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+};
 import { IntegrationActivityPanel } from './IntegrationActivityPanel';
 
 export function IntegrationsSection() {
@@ -54,9 +61,9 @@ export function IntegrationsSection() {
   });
   const events = useQuery({
     queryKey: ['webhooks'],
-    queryFn: ({ signal }) =>
-      api<{ items: WebhookEvent[] }>('/api/integrations/webhooks', { signal }),
+    queryFn: ({ signal }) => api<WebhookEventPage>('/api/integrations/webhooks', { signal }),
   });
+  const eventsContinue = Boolean(events.data?.pageContinues);
   const connectors = useConnectorCatalog();
   const isError = setupGuide.isError || status.isError || events.isError;
   const summary = useMemo(
@@ -70,6 +77,7 @@ export function IntegrationsSection() {
         activeTab={activeTab}
         isLoading={setupGuide.isLoading || status.isLoading || events.isLoading}
         summary={summary}
+        eventsContinue={eventsContinue}
         onCreateApiKey={() => setActiveTab('developer')}
         onAddWebhook={() => setActiveTab('developer')}
       />
@@ -134,7 +142,11 @@ export function IntegrationsSection() {
           <ConnectionTester guide={setupGuide.data} isLoading={setupGuide.isLoading} />
           <ProviderHealthSection />
           <DataSourceCredentialsCard />
-          <WebhookEventsCard events={events.data?.items ?? []} isLoading={events.isLoading} />
+          <WebhookEventsCard
+            events={events.data?.items ?? []}
+            isLoading={events.isLoading}
+            pageContinues={eventsContinue}
+          />
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6 outline-none">

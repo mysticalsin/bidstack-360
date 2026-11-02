@@ -16,6 +16,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { cn } from '@/lib/cn';
 
+import { webhookEventCaption } from './webhook-event-caption';
 import type { IntegrationSummary } from './types';
 
 // ─── Metric card ───────────────────────────────────────────────────────────────
@@ -59,12 +60,15 @@ export function IntegrationHero({
   activeTab,
   isLoading,
   summary,
+  eventsContinue = false,
   onCreateApiKey,
   onAddWebhook,
 }: {
   activeTab: string;
   isLoading: boolean;
   summary: IntegrationSummary;
+  /** True when the event list read one row past the page and dropped it. */
+  eventsContinue?: boolean;
   onCreateApiKey: () => void;
   onAddWebhook: () => void;
 }) {
@@ -141,7 +145,18 @@ export function IntegrationHero({
         <IntegrationMetricCard
           icon="bell"
           label={t('integrationHero.metrics.webhookEvents.label', 'Webhook events')}
-          value={<AnimatedMetric value={String(summary.webhookEvents)} />}
+          value={
+            eventsContinue ? (
+              <span className="text-sm font-medium leading-5">
+                {t(
+                  'integrationHero.metrics.webhookEvents.partial',
+                  webhookEventCaption(summary.webhookEvents, true),
+                )}
+              </span>
+            ) : (
+              <AnimatedMetric value={String(summary.webhookEvents)} />
+            )
+          }
           tone={summary.attentionEvents > 0 ? 'tomato' : 'blue'}
           helper={
             summary.attentionEvents > 0

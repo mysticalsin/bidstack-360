@@ -357,17 +357,24 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
                 error: z.string().nullable(),
               }),
             ),
+            /** True when one event past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
           }),
         },
       },
     },
     async (req) => {
-      const events = await prisma.syncEvent.findMany({
+      // One row past the page is the probe. It is dropped and is not an event total.
+      const WEBHOOK_EVENT_PAGE = 50;
+      const loaded = await prisma.syncEvent.findMany({
         where: { orgId: req.auth.orgId },
         orderBy: { receivedAt: 'desc' },
-        take: 50,
+        take: WEBHOOK_EVENT_PAGE + 1,
       });
+      const pageContinues = loaded.length > WEBHOOK_EVENT_PAGE;
+      const events = pageContinues ? loaded.slice(0, WEBHOOK_EVENT_PAGE) : loaded;
       return {
+        pageContinues,
         items: events.map((e) => ({
           id: e.id.toString(),
           receivedAt: e.receivedAt.toISOString(),
