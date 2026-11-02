@@ -21,7 +21,7 @@ List opportunities matching filters.
 Fetch one opportunity with full intel payload.
 
 **Input:** `{ "id": "uuid" }` or `{ "code": "OP-2041" }`
-**Output:** `OpportunityFull`
+**Output:** `OpportunityFull`, except `tasks` is `{ items, limit, truncated }`. `truncated` means more follow-ups exist than `items`.
 
 ## `opportunity.update`
 Patch an opportunity. Common use: agent updates `stage`, `probability`, or `intel.triggers`.
