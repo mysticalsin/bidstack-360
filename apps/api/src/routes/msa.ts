@@ -54,6 +54,7 @@ import { applyCompanyScope, getAccessScope, type AccessScope } from '../lib/acce
 import { userHasPermission } from '../lib/rbac-decision-cache.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
+import { daysUntil } from '../msa/days-until.js';
 import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
 import { enqueueMsaTextExtract } from '../queues/msa-text-extract.js';
 import { issueMsaDownloadToken, MSA_DOWNLOAD_TTL_SECONDS, openMsaDownloadToken } from '../msa/download-token.js';
@@ -120,11 +121,6 @@ function startOfUtcDay(now: Date): number {
 export function noticeDeadline(expiry: Date | null, noticeDays: number | null): Date | null {
   if (!expiry || noticeDays == null) return null;
   return new Date(expiry.getTime() - noticeDays * DAY_MS);
-}
-
-function daysUntil(d: Date | null, now = new Date()): number | null {
-  if (!d) return null;
-  return Math.round((d.getTime() - startOfUtcDay(now)) / DAY_MS);
 }
 
 function serializeVersion(v: VersionRow): MsaFileVersion {
