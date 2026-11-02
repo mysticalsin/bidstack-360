@@ -7,6 +7,7 @@
 
 import { prisma } from '@bidstack/db';
 import {
+  formatMicrosDecimal,
   PLACEHOLDER_TOKEN_SET,
   type EmailTemplateRenderRequest,
   type EmailTemplateRenderResponse,
@@ -138,8 +139,8 @@ async function buildRenderContext(args: {
           name: opportunity.name,
           // Polo PreSales stores values as micros (millionths) to avoid float math.
           // Render in the opportunity's country-implied currency (EUR fallback).
-          amount: formatAmount(
-            Number(opportunity.valueMicros) / 1_000_000,
+          amount: formatAmountFromMicros(
+            opportunity.valueMicros,
             inferCurrencyFromCountry(opportunity.country),
           ),
         }
@@ -178,17 +179,10 @@ function resolveToken(token: string, ctx: RenderContext): unknown {
   return null;
 }
 
-function formatAmount(num: number, currency: string): string {
-  if (!Number.isFinite(num) || num === 0) return '';
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(num);
-  } catch {
-    return `${currency} ${num}`;
-  }
+export function formatAmountFromMicros(micros: bigint | number, currency: string): string {
+  const decimal = formatMicrosDecimal(micros);
+  if (decimal === '0' || decimal === '-0') return '';
+  return `${currency} ${decimal}`;
 }
 
 /**

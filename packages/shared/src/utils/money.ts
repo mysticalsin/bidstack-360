@@ -85,3 +85,22 @@ function unitsToFixedMicrosString(units: number): string {
   }
   return units.toFixed(6);
 }
+
+/**
+ * Formats integer micros as an exact decimal string (no IEEE-754).
+ *
+ * WHY: brief, Dust markdown, and email tokens must not call
+ * `Number(micros) / 1e6` or `toString()` on that Number. Large values and
+ * fractional cents have to survive as the same digits that are stored.
+ * Trailing fractional zeros are dropped (`1_230_000` → `1.23`).
+ */
+export function formatMicrosDecimal(micros: bigint | number): string {
+  const value = toBigIntMicros(micros);
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const whole = abs / MICROS_PER_UNIT;
+  const remainder = abs % MICROS_PER_UNIT;
+  const frac = remainder.toString().padStart(6, '0').replace(/0+$/, '');
+  const body = frac.length === 0 ? whole.toString() : `${whole.toString()}.${frac}`;
+  return negative ? `-${body}` : body;
+}
