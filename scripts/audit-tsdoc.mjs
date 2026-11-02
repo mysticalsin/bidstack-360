@@ -178,7 +178,7 @@ for (const { label, path } of SCAN_ROOTS) {
     const { documented, undocumented, missing } = analyzeFile(file);
     pkgDocumented += documented;
     pkgUndocumented += undocumented;
-    pkgMissing.push(...missing);
+    if (!jsonMode) pkgMissing.push(...missing);
   }
 
   const total = pkgDocumented + pkgUndocumented;
@@ -201,8 +201,17 @@ const totalAll = totalDocumented + totalUndocumented;
 const overallCoverage = totalAll === 0 ? 100 : Math.round((totalDocumented / totalAll) * 1000) / 10;
 
 if (jsonMode) {
+  // CI captures this JSON in a bash variable and re-parses it. Including
+  // every undocumented export (~5k rows / ~800KB) has aborted Node 24 on
+  // the runner with `malloc(): invalid size`, leaving PR_COV empty and
+  // failing the regression gate. The workflow comment only needs totals.
   process.stdout.write(
-    JSON.stringify({ overallCoverage, totalDocumented, totalUndocumented, packages: results }, null, 2),
+    JSON.stringify({
+      overallCoverage,
+      totalDocumented,
+      totalUndocumented,
+      packages: results.map(({ missing: _missing, ...pkg }) => pkg),
+    }),
   );
   process.stdout.write('\n');
 } else {
