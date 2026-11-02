@@ -16,6 +16,10 @@ import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 import { OPPORTUNITY_TASK_PAGE_LIMIT, opportunityTaskCaption } from '@/pages/opportunity-tasks';
+import {
+  opportunityDocumentCaption,
+  shownOpportunityDocuments,
+} from './opportunity-document-caption';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
@@ -41,6 +45,8 @@ interface OpportunityTabsProps {
     power: 'decision' | 'champion' | 'influencer' | 'gatekeeper' | 'approver';
   }>;
   documents?: Array<{ id: string; name: string; kind: string; bytes: number | null }>;
+  /** True when the detail query read one file past the drawn page and dropped it. */
+  documentsContinue?: boolean;
   // The Activity tab body — the page injects the timeline component
   // (pages/opportunityDetail/TimelinePanel) so this container stays dumb about
   // how the deal narrative is fetched and rendered.
@@ -52,6 +58,7 @@ export function OpportunityTabs({
   customer,
   intelDecisionUnit = [],
   documents = [],
+  documentsContinue = false,
   activityContent = null,
 }: OpportunityTabsProps) {
   const { t } = useTranslation('crm');
@@ -87,7 +94,7 @@ export function OpportunityTabs({
         <TasksPanel oppId={oppId} />
       </TabsContent>
       <TabsContent value="documents">
-        <DocumentsPanel documents={documents} />
+        <DocumentsPanel documents={documents} documentsContinue={documentsContinue} />
       </TabsContent>
       <TabsContent value="calls">
         <CallsPanel oppId={oppId} />
@@ -347,13 +354,16 @@ function CallsPanel({ oppId }: { oppId: string }) {
 
 function DocumentsPanel({
   documents,
+  documentsContinue,
 }: {
   documents: NonNullable<OpportunityTabsProps['documents']>;
+  documentsContinue: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [sendOpen, setSendOpen] = useState(false);
-  const primaryDocumentId = documents[0]?.id;
-  const hasDocument = documents.length > 0;
+  const page = shownOpportunityDocuments(documents, documentsContinue);
+  const primaryDocumentId = page.items[0]?.id;
+  const hasDocument = page.items.length > 0;
   // A signature request needs a Document id, not a DocumentTemplate id — with
   // no document uploaded there is nothing to send, so the trigger is disabled
   // rather than opening a modal that could only send a broken fallback id.
@@ -393,13 +403,11 @@ function DocumentsPanel({
       <Card>
         <SectionHeader
           title={t('opportunityTabs.documentsTitle', 'Documents')}
-          caption={t('opportunityTabs.documentsCount', '{{count}} files', {
-            count: documents.length,
-          })}
+          caption={opportunityDocumentCaption(page.items.length, page.pageContinues)}
           action={sendAction}
         />
         <ul className="divide-y divide-[var(--border-subtle)]">
-          {documents.map((d) => (
+          {page.items.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium text-[var(--fg-primary)] truncate">

@@ -67,6 +67,8 @@ export interface OpportunityFull extends Opportunity {
     bytes: number | null;
     createdAt: string;
   }>;
+  /** True when one file past the drawn page was loaded and dropped. Not a total. */
+  documentsContinue?: boolean;
 }
 
 export function useOpportunity(id: string | undefined) {

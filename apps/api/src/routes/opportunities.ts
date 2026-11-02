@@ -18,6 +18,8 @@ import {
   OpportunityFull,
   OpportunityPage,
   OpportunityPatch,
+  opportunityDocumentPage,
+  opportunityDocumentTake,
 } from '@bidstack/shared';
 
 import {
@@ -274,7 +276,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             },
           },
           tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
-          documents: { orderBy: { createdAt: 'desc' }, take: 50 },
+          // One row past the files the documents tab draws. The extra row is
+          // the probe. It is not a shown file, and it is not a total.
+          documents: { orderBy: { createdAt: 'desc' }, take: opportunityDocumentTake() },
         },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
@@ -295,7 +299,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, definitionId: true, value: true },
         take: 100,
       });
-      const full = serializeOpportunityFull(opp);
+      const documentPage = opportunityDocumentPage(opp.documents);
+      const full = serializeOpportunityFull({ ...opp, documents: documentPage.items });
       // Live buying-intent augmentation: merges Sillage signals into
       // intel.triggers on read, gated on SILLAGE_* env so this is a zero-cost
       // no-op until an operator configures it (see lib/sillage-intel-augment.ts).
@@ -308,7 +313,12 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             logger: req.log,
           })) as OpportunityFull['intel'])
         : full.intel;
-      return { ...full, intel, customFieldValues };
+      return {
+        ...full,
+        intel,
+        customFieldValues,
+        documentsContinue: documentPage.pageContinues,
+      };
     },
   );
 

@@ -182,6 +182,30 @@ export const OpportunityPage = z.object({
 });
 export type OpportunityPage = z.infer<typeof OpportunityPage>;
 
+/** Files the deal documents list draws. One more row is the probe. */
+export const OPPORTUNITY_DOCUMENTS_DRAWN = 50;
+
+/**
+ * Files one deal-detail query may return. A fixed take of the page dropped
+ * a later file, so that page read as every file. One row past the page is
+ * the probe. It is not shown, and it is not a total.
+ */
+export function opportunityDocumentTake(drawn = OPPORTUNITY_DOCUMENTS_DRAWN): number {
+  return drawn + 1;
+}
+
+/** Files to draw. The extra row only says another file exists. */
+export function opportunityDocumentPage<T>(
+  rows: readonly T[],
+  drawn = OPPORTUNITY_DOCUMENTS_DRAWN,
+): { items: T[]; pageContinues: boolean } {
+  const pageContinues = rows.length > drawn;
+  return {
+    items: pageContinues ? rows.slice(0, drawn) : [...rows],
+    pageContinues,
+  };
+}
+
 // Full 360° payload with nested intel, tasks, documents, and timeline.
 export const OpportunityFull = Opportunity.extend({
   intel: IntelPayload.nullable().optional(),
@@ -202,6 +226,11 @@ export const OpportunityFull = Opportunity.extend({
       createdAt: z.string().datetime(),
     }),
   ),
+  /**
+   * True when the detail query read one file past the page and dropped it.
+   * `documents` is that page, not every file on the deal. No file total.
+   */
+  documentsContinue: z.boolean().optional(),
   timeline: z.array(z.record(z.unknown())).default([]),
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
