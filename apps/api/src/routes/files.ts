@@ -32,6 +32,7 @@ import {
   isExtractableForIntel,
 } from '@bidstack/shared';
 
+import { MalwareScanError, resolveUploadScanStatus } from '../lib/malware-scan.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
@@ -247,9 +248,23 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
           'Uploaded object content type does not match finalize payload',
         );
       }
-      const scanStatus = process.env.STORAGE_SCAN_REQUIRED === 'true' ? 'pending' : 'not_required';
-      if (scanStatus === 'pending') {
-        throw server.httpErrors.conflict('Uploaded object has not passed malware scan');
+      let scanStatus: 'not_required' | 'passed';
+      try {
+        scanStatus = await resolveUploadScanStatus(() => storage.readBuffer(req.body.storageKey));
+      } catch (err) {
+        if (err instanceof MalwareScanError && err.kind === 'infected') {
+          await storage.delete(req.body.storageKey).catch((deleteErr) => {
+            req.log.warn(
+              { err: deleteErr, key: req.body.storageKey },
+              'failed to delete infected upload',
+            );
+          });
+          throw server.httpErrors.unprocessableEntity(err.message);
+        }
+        if (err instanceof MalwareScanError) {
+          throw server.httpErrors.serviceUnavailable(err.message);
+        }
+        throw err;
       }
 
       const accountId = normalizeAccountId(req.body.accountId);
@@ -428,10 +443,11 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       if (dl.kind === 'stream' && dl.stream) {
         // SECURITY: writing to reply.raw bypasses Fastify serialization AND the
         // onSend hooks where helmet/security-headers set CSP + nosniff — so we
-        // MUST emit them here. Without nosniff + attachment, an uploaded text/html
-        // file (an allowed type) would be sniffed and rendered INLINE on the API
-        // origin = stored XSS. Force attachment + nosniff + a locked-down CSP for
-        // all user-uploaded content (local-storage / demo path).
+        // MUST emit them here. Without nosniff + attachment, a leftover
+        // text/html object would be sniffed and rendered INLINE on the API
+        // origin = stored XSS. New HTML uploads are rejected at the schema;
+        // keep attachment + nosniff + a locked-down CSP for every remaining
+        // user-uploaded type (local-storage / demo path).
         reply.hijack();
         reply.raw.writeHead(200, {
           'Content-Type': dl.contentType ?? row.contentType,

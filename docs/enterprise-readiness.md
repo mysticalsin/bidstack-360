@@ -69,9 +69,9 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 |----|-----|--------|-----|
 | D1 | — | Already shipped | MSA: 25 MB, PDF/DOCX, magic bytes, org-prefixed keys, short-lived download tokens. Account files: 50 MB allow-list. |
 | D2 | **P0** | **Fixed** | Account-file auto-extract (LLM/Dust) is **blocked in real mode** unless `DOCUMENT_LLM_EXTRACT_ENABLED=true`. MSA library extract stays local. |
-| D3 | P1 | Open | `STORAGE_SCAN_REQUIRED` still defaults false. Turn on before treating uploads as malware-safe. |
-| D4 | P1 | Owner | Encryption at rest: application does not envelope-encrypt blobs. Use S3/R2 SSE (or disk encryption) plus `INTEGRATION_TOKEN_KEY` / `PII_ENCRYPTION_MASTER_KEY` for secrets/PII fields. Local disk is ephemeral. |
-| D5 | P2 | Open | `text/html` remains allowed on account files; local download forces attachment + nosniff + sandbox CSP. |
+| D3 | P1 | **Fixed** | Finalize ClamAV-scans when `STORAGE_SCAN_REQUIRED=true` (`CLAMAV_HOST`). Infected objects are deleted. Local default stays false. |
+| D4 | P1 | **Fixed** | S3/R2 PUTs request SSE-S3 (`AES256`). Secrets/PII still use `INTEGRATION_TOKEN_KEY` / `PII_ENCRYPTION_MASTER_KEY`. Local disk is ephemeral. |
+| D5 | P2 | **Fixed** | `text/html` is rejected on account files. Local download still forces attachment + nosniff + sandbox CSP. |
 
 ### (e) Data integrity
 
