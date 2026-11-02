@@ -218,6 +218,23 @@ describe('boot environment validation', () => {
     ).rejects.toThrow('RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
   });
 
+  it('rejects an explicit idempotency fail-open in production', async () => {
+    // WHY: IDEMPOTENCY_FAIL_CLOSED=false reopens the per-process dedup map.
+    // A production boot that accepted it would ack writes Redis could not check.
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        IDEMPOTENCY_FAIL_CLOSED: 'false',
+      }),
+    ).rejects.toThrow('IDEMPOTENCY_FAIL_CLOSED cannot be false in production');
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        IDEMPOTENCY_FAIL_CLOSED: '0',
+      }),
+    ).rejects.toThrow('IDEMPOTENCY_FAIL_CLOSED cannot be false in production');
+  });
+
   it('requires the tenant-scope guard set to warn or enforce in production', async () => {
     // BIDSTACK_TENANT_SCOPE_GUARD defaults 'off' for backward compatibility, but
     // an unscoped tenant-table query in production is an all-tenants data leak

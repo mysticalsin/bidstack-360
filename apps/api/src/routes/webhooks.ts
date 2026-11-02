@@ -1,8 +1,11 @@
-// Inbound webhooks. /webhooks/dust verifies HMAC, dedups via Redis (or
-// in-process Map fallback in dev), persists to sync_events, and acks <50ms.
+// Inbound webhooks. /webhooks/dust verifies HMAC, dedups via Redis, persists
+// to sync_events, and acks <50ms.
 //
 // The actual side-effect work runs in apps/worker; this route is just the
-// receiver.
+// receiver. A Redis outage must not ack the delivery: Dust would stop retrying
+// and the event would be gone. Production always fails closed. Outside
+// production, IDEMPOTENCY_FAIL_CLOSED=false is the only way back to the
+// per-process map.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -13,13 +16,26 @@ import { hashWebhookSigningSecret } from '@bidstack/shared/server-crypto';
 
 import { redis } from '../redis.js';
 
-// Webhook dedup. Redis is authoritative — `SET key 1 EX 7d NX` is the
-// atomic check-and-set. If Redis is unreachable we fall back to an in-memory
-// Map so dev still works, but the fallback is logged at warn level because
-// a clustered deploy without Redis can re-process Dust retries.
+// Webhook dedup. Redis `SET key 1 EX 7d NX` is the only store shared across
+// replicas. The in-memory map is a single-process stand-in and is reached
+// only when idempotencyFailsClosed() is false.
 const DEDUP_TTL_SECONDS = 7 * 24 * 60 * 60;
 const fallbackSeen = new Map<string, number>();
 const FALLBACK_TTL_MS = DEDUP_TTL_SECONDS * 1000;
+
+export type DustWebhookDedup =
+  | { outcome: 'new' }
+  | { outcome: 'duplicate' }
+  | { outcome: 'unavailable' };
+
+/** Refuse the Dust delivery when the idempotency store cannot be read. */
+export function idempotencyFailsClosed(env: NodeJS.ProcessEnv = process.env): boolean {
+  // An explicit false must not reopen the in-memory map once the process is production.
+  if (env.NODE_ENV === 'production') return true;
+  const explicit = env.IDEMPOTENCY_FAIL_CLOSED?.trim().toLowerCase();
+  if (explicit === 'false' || explicit === '0') return false;
+  return true;
+}
 
 // Replay window. A captured signed body older than this is rejected even if
 // the signature is valid — defends against credential-replay months later.
@@ -80,15 +96,20 @@ function isProductionLikeRuntime(): boolean {
   return nodeEnv === 'production' || deployEnv === 'production' || deployEnv === 'staging';
 }
 
-async function rememberOrReject(
+export async function rememberDustWebhook(
   eventId: string,
   log: { warn: (a: object, msg?: string) => void },
-): Promise<boolean> {
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<DustWebhookDedup> {
   // Try Redis NX first — the only durable option across replicas + restarts.
   try {
     const setResult = await redis.set(`dedup:dust:${eventId}`, '1', 'EX', DEDUP_TTL_SECONDS, 'NX');
-    return setResult === 'OK';
+    return setResult === 'OK' ? { outcome: 'new' } : { outcome: 'duplicate' };
   } catch (err) {
+    if (idempotencyFailsClosed(env)) {
+      log.warn({ err }, 'webhook dedup: Redis unreachable — delivery refused');
+      return { outcome: 'unavailable' };
+    }
     log.warn({ err }, 'webhook dedup: Redis unreachable, using process-local fallback');
     // Fallback: per-process Map. Sweeps expired entries on each call so we
     // don't leak memory if Redis stays down for hours.
@@ -96,7 +117,7 @@ async function rememberOrReject(
     for (const [k, expiry] of fallbackSeen) {
       if (expiry < now) fallbackSeen.delete(k);
     }
-    if (fallbackSeen.has(eventId)) return false;
+    if (fallbackSeen.has(eventId)) return { outcome: 'duplicate' };
     // Prevent unbounded memory growth if fallback runs for an extended period under high load
     if (fallbackSeen.size > 10_000) {
       const oldestKey = fallbackSeen.keys().next().value;
@@ -105,7 +126,7 @@ async function rememberOrReject(
       }
     }
     fallbackSeen.set(eventId, now + FALLBACK_TTL_MS);
-    return true;
+    return { outcome: 'new' };
   }
 }
 
@@ -186,7 +207,15 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.unauthorized('Invalid signature');
       }
 
-      if (!(await rememberOrReject(eid, req.log))) {
+      const dedup = await rememberDustWebhook(eid, req.log);
+      if (dedup.outcome === 'unavailable') {
+        // 503 is retryable. Acking 200 here would tell Dust to drop the event
+        // after the idempotency check could not run.
+        throw server.httpErrors.serviceUnavailable(
+          'Webhook idempotency store is unavailable; retry the delivery',
+        );
+      }
+      if (dedup.outcome === 'duplicate') {
         req.log.info({ eid }, 'webhook duplicate dropped');
         return { ok: true as const };
       }
