@@ -188,14 +188,17 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { companyId } = req.params;
       await assertCompanyVisible(server, req, companyId);
-      // Bounded per the query-guard. A single account's task volume is small;
-      // 1000 is a generous cap (counts are KPI-grade, not exact beyond it).
-      const tasks = await prisma.task.findMany({
+      // One row past the page is the probe. It is dropped and is not a task
+      // total. Counts below are this page.
+      const KAM_TODO_PAGE = 1000;
+      const loaded = await prisma.task.findMany({
         where: { orgId: req.auth.orgId, accountId: companyId, deletedAt: null },
         include: { initiative: { select: { id: true, title: true, stage: true } } },
-        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
-        take: 1000,
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        take: KAM_TODO_PAGE + 1,
       });
+      const pageContinues = loaded.length > KAM_TODO_PAGE;
+      const tasks = pageContinues ? loaded.slice(0, KAM_TODO_PAGE) : loaded;
       const openTasks = tasks.filter((t) => t.status !== 'done');
       const items = openTasks.map((t) => ({
         ...toTaskDetail(t),
@@ -222,6 +225,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
         companyId,
         openCount: openTasks.length,
         doneCount: tasks.length - openTasks.length,
+        pageContinues,
         items,
         staleInitiativeIds: activeInits.filter((i) => (openByInit.get(i.id) ?? 0) === 0).map((i) => i.id),
         overloadedInitiativeIds: activeInits.filter((i) => (openByInit.get(i.id) ?? 0) > 3).map((i) => i.id),

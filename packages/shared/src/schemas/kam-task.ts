@@ -59,14 +59,18 @@ export const KamAccountTodoItem = KamTaskDetail.extend({
 });
 
 /**
- * Per-account to-do roll-up. `staleInitiativeIds` / `overloadedInitiativeIds`
- * surface the soft 1–3-tasks-per-initiative hint (0 open = stale, >3 open =
+ * Per-account to-do roll-up. `openCount` and `doneCount` are this page.
+ * `pageContinues` means one task past the page was loaded and dropped. It is
+ * not a task total. `staleInitiativeIds` / `overloadedInitiativeIds` surface
+ * the soft 1–3-tasks-per-initiative hint (0 open = stale, >3 open =
  * overloaded) without hard-blocking task creation.
  */
 export const KamAccountTodos = z.object({
   companyId: z.string().uuid(),
   openCount: z.number().int(),
   doneCount: z.number().int(),
+  /** True when one task past this page was loaded and dropped. Not a total. */
+  pageContinues: z.boolean(),
   items: z.array(KamAccountTodoItem),
   staleInitiativeIds: z.array(z.string().uuid()),
   overloadedInitiativeIds: z.array(z.string().uuid()),

@@ -35,6 +35,7 @@ import {
 } from '@/hooks/useKam';
 
 import { kamInitiativeColumnHeading } from './kam-initiative-caption';
+import { kamTodoCaption, kamTodoEmptyMessage } from './kam-todo-caption';
 
 const STAGE_LABEL: Record<InitiativeStageValue, string> = {
   initiative: 'Initiatives',
@@ -221,16 +222,20 @@ export function KamTodoCard({ companyId }: { companyId: string }) {
       </Card>
     );
   const items = data?.items ?? [];
+  // pageContinues is the task the list read past this page and dropped.
+  // It is not a task total. openCount and doneCount are this page.
+  const pageContinues = Boolean(data?.pageContinues);
+  const latest = (data?.openCount ?? 0) + (data?.doneCount ?? 0);
   return (
     <Card>
       <SectionHeader
         title="To-do"
-        caption={`${data?.openCount ?? 0} open · ${data?.doneCount ?? 0} done`}
+        caption={kamTodoCaption(data?.openCount ?? 0, data?.doneCount ?? 0, pageContinues, latest)}
       />
       {items.length === 0 ? (
         <EmptyState
-          title="Nothing outstanding"
-          message="No open tasks across this account's initiatives."
+          title={pageContinues ? 'No open task on this page' : 'Nothing outstanding'}
+          message={kamTodoEmptyMessage(pageContinues)}
         />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
