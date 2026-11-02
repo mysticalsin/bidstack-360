@@ -201,6 +201,8 @@ export const ChallengeRollupResponse = z.object({
       meetingIds: z.array(z.string().uuid()),
     }),
   ),
+  /** True when one challenge past this page was loaded and dropped. */
+  challengesContinue: z.boolean().optional(),
 });
 export type ChallengeRollupResponse = z.infer<typeof ChallengeRollupResponse>;
 

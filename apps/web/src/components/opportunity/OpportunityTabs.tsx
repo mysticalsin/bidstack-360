@@ -15,7 +15,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
-import { OPPORTUNITY_TASK_PAGE_LIMIT, opportunityTaskCaption } from '@/pages/opportunity-tasks';
+import { OPPORTUNITY_TASK_PAGE_LIMIT, opportunityTaskCaption } from './opportunity-task-caption';
 import {
   OPPORTUNITY_CALLS_DRAWN,
   opportunityCallCaption,

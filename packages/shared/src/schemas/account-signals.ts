@@ -802,6 +802,8 @@ export const PortfolioMomentum = z.object({
   ),
   counts: z.object({ gaining: z.number().int(), steady: z.number().int(), declining: z.number().int() }),
   alerts: z.array(PortfolioAlert),
+  /** True when one account past this page was loaded and dropped. */
+  accountsContinue: z.boolean().optional(),
   computedAt: Iso,
 });
 export type PortfolioMomentum = z.infer<typeof PortfolioMomentum>;
