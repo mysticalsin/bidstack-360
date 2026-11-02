@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ServiceCaseDetailPage } from './ServiceCaseDetailPage';
+import { formatSlaDate } from './service-case-sla';
 import { toast } from '@/components/ui/Toast';
 import { useServiceCase, useUpdateServiceCase } from '@/hooks/useServiceCases';
 import type { ServiceCase } from '@bidstack/shared';
@@ -170,5 +171,53 @@ describe('ServiceCaseDetailPage — service-desk:write gating', () => {
     expect(saveNote.getAttribute('aria-label')).toBe(
       'Save note — You need service desk write access to update this case.',
     );
+  });
+});
+
+describe('ServiceCaseDetailPage — SLA on the UTC calendar day', () => {
+  beforeEach(() => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.mocked(useUpdateServiceCase).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateServiceCase>);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  function renderSla(slaDeadline: string, now: string) {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(now));
+    vi.mocked(useServiceCase).mockReturnValue({
+      data: { ...CASE, slaDeadline },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useServiceCase>);
+    renderPage();
+    return screen.getByText(/^SLA:/);
+  }
+
+  it('keeps today uncolored at 22:00Z and colors the previous UTC day', () => {
+    // WHY: the rose SLA is the past-due signal on the case. An 08:00Z deadline
+    // on 1 Nov is still today at 22:00Z. 31 Oct is already past.
+    const today = renderSla('2026-11-01T08:00:00.000Z', '2026-11-01T22:00:00Z');
+    expect(today.className).not.toContain('rose');
+    expect(today.textContent).toBe(`SLA: ${formatSlaDate('2026-11-01T08:00:00.000Z')}`);
+    cleanup();
+
+    const past = renderSla('2026-10-31T12:00:00.000Z', '2026-11-01T22:00:00Z');
+    expect(past.className).toContain('text-[var(--rose-9)]');
+  });
+
+  it('treats 02:00Z as the next UTC day', () => {
+    // WHY: America/Sao_Paulo is still 1 Nov, but the UTC day is 2 Nov.
+    const sla = renderSla('2026-11-02T00:00:00.000Z', '2026-11-02T02:00:00Z');
+    expect(sla.className).not.toContain('rose');
+    expect(sla.textContent).toBe(`SLA: ${formatSlaDate('2026-11-02T00:00:00.000Z')}`);
   });
 });

@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { useServiceCase, useUpdateServiceCase } from '@/hooks/useServiceCases';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { formatSlaDate, isSlaPastDue } from './service-case-sla';
 
 // Transition map keyed by the canonical CaseStatus enum (packages/shared
 // service-desk.ts: new | open | waiting_customer | waiting_internal |
@@ -115,9 +116,9 @@ export function ServiceCaseDetailPage() {
             <span>{t('serviceCaseDetail.priorityLabel', 'Priority: {{priority}}', { priority: cs.priority })}</span>
             <span>{t('serviceCaseDetail.sourceLabel', 'Source: {{source}}', { source: cs.source })}</span>
             {cs.slaDeadline && (
-              <span className={new Date(cs.slaDeadline) < new Date() ? 'text-[var(--rose-9)]' : ''}>
+              <span className={isSlaPastDue(cs.slaDeadline) ? 'text-[var(--rose-9)]' : ''}>
                 {t('serviceCaseDetail.slaLabel', 'SLA: {{date}}', {
-                  date: new Date(cs.slaDeadline).toLocaleDateString(),
+                  date: formatSlaDate(cs.slaDeadline),
                 })}
               </span>
             )}
