@@ -51,15 +51,28 @@ export const territoriesRoutingRoutes: FastifyPluginAsyncZod = async (server) =>
     '/lead-routing-rules',
     {
       config: { permission: 'leads:read' },
-      schema: { response: { 200: z.object({ items: z.array(LeadRoutingRule) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            items: z.array(LeadRoutingRule),
+            /** True when one routing rule past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
+          }),
+        },
+      },
     },
     async (req) => {
-      const rows = await prisma.leadRoutingRule.findMany({
+      // One row past the page is the probe. It is dropped and is not a routing-rule total.
+      const ROUTING_RULE_LIST_PAGE = 500;
+      const loaded = await prisma.leadRoutingRule.findMany({
         where: { orgId: req.auth.orgId, active: true },
         orderBy: { priority: 'desc' },
-        take: 500,
+        take: ROUTING_RULE_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > ROUTING_RULE_LIST_PAGE;
+      const rows = pageContinues ? loaded.slice(0, ROUTING_RULE_LIST_PAGE) : loaded;
       return {
+        pageContinues,
         items: rows.map((r) => ({
           id: r.id,
           orgId: r.orgId,

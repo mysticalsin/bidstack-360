@@ -74,7 +74,7 @@ export function useDeleteTerritory() {
 }
 
 export function useLeadRoutingRules() {
-  return useQuery<{ items: LeadRoutingRule[] }>({
+  return useQuery<{ items: LeadRoutingRule[]; pageContinues: boolean }>({
     queryKey: ['lead-routing-rules'],
     queryFn: ({ signal }) => api('/api/lead-routing-rules', { signal }),
   });

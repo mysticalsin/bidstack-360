@@ -83,6 +83,8 @@ export function TerritoriesPage() {
   // pageContinues is the territory the list read past this page and dropped.
   const pageContinues = Boolean(territories.data?.pageContinues);
   const rItems = rules.data?.items ?? [];
+  // rulesPageContinues is the routing rule the list read past this page and dropped.
+  const rulesPageContinues = Boolean(rules.data?.pageContinues);
   const aItems = analytics.data?.items ?? [];
   const totals = analytics.data?.totals;
 
@@ -405,6 +407,7 @@ export function TerritoriesPage() {
         />
         <RoutingRuleListPanel
           items={rItems}
+          pageContinues={rulesPageContinues}
           isLoading={rules.isLoading}
           isError={rules.isError}
           errorMessage={rules.error?.message}
