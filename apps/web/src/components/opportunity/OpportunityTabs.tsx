@@ -17,6 +17,11 @@ import type { Contact, Task } from '@bidstack/shared';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 import { OPPORTUNITY_TASK_PAGE_LIMIT, opportunityTaskCaption } from '@/pages/opportunity-tasks';
 import {
+  OPPORTUNITY_CALLS_DRAWN,
+  opportunityCallCaption,
+  shownOpportunityCalls,
+} from './opportunity-call-caption';
+import {
   opportunityDocumentCaption,
   shownOpportunityDocuments,
 } from './opportunity-document-caption';
@@ -280,7 +285,12 @@ function TasksPanel({ oppId }: { oppId: string }) {
 
 function CallsPanel({ oppId }: { oppId: string }) {
   const { t } = useTranslation('crm');
-  const calls = useCalls({ entityType: 'OPPORTUNITY', entityId: oppId });
+  // This deal's page. The route reads one row past the limit and drops it.
+  const calls = useCalls({
+    entityType: 'OPPORTUNITY',
+    entityId: oppId,
+    limit: OPPORTUNITY_CALLS_DRAWN,
+  });
   if (calls.isLoading) return <LoadingSkeleton />;
   if (calls.isError)
     return (
@@ -294,8 +304,10 @@ function CallsPanel({ oppId }: { oppId: string }) {
         }
       />
     );
-  const items = calls.data?.pages.flatMap((p) => p.calls) ?? [];
-  if (items.length === 0)
+  const loaded = calls.data?.pages.flatMap((p) => p.calls) ?? [];
+  const lastPage = calls.data?.pages[calls.data.pages.length - 1];
+  const page = shownOpportunityCalls(loaded, Boolean(lastPage?.nextCursor));
+  if (page.items.length === 0)
     return (
       <EmptyState
         title={t('opportunityTabs.callsEmptyTitle', 'No calls yet')}
@@ -309,12 +321,13 @@ function CallsPanel({ oppId }: { oppId: string }) {
     <Card>
       <SectionHeader
         title={t('opportunityTabs.callsTitle', 'Calls')}
-        caption={t('opportunityTabs.callsCount', '{{count}} call', {
-          count: items.length,
-        })}
+        caption={t(
+          'opportunityTabs.callsPageCaption',
+          opportunityCallCaption(page.items.length, page.pageContinues),
+        )}
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
-        {items.map((c) => {
+        {page.items.map((c) => {
           const when = c.startedAt
             ? formatDate(c.startedAt)
             : c.scheduledAt

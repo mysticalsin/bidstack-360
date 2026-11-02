@@ -149,6 +149,83 @@ describe('OpportunityTabs tasks caption', () => {
   });
 });
 
+function callRow(id: string) {
+  return {
+    id,
+    provider: 'ZOOM',
+    status: 'COMPLETED',
+    startedAt: '2026-11-01T15:00:00.000Z',
+    scheduledAt: null,
+    durationSec: 600,
+    summary: null,
+  };
+}
+
+describe('OpportunityTabs calls caption', () => {
+  afterEach(() => {
+    cleanup();
+    vi.mocked(api).mockReset();
+    vi.mocked(api).mockResolvedValue({ items: [] });
+  });
+
+  it('does not describe a full call page as every call', async () => {
+    // WHY: the Calls tab counted a 25-row page as every call on the deal.
+    // nextCursor means the route already read one row past the page and dropped it.
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (String(path).startsWith('/api/calls')) {
+        return Promise.resolve({
+          calls: Array.from({ length: 25 }, (_, index) => callRow(`call-${index}`)),
+          nextCursor: 'call-24',
+        });
+      }
+      return Promise.resolve({ items: [] });
+    });
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OpportunityTabs oppId="opp-1" customer="Acme" documents={[]} />
+      </QueryClientProvider>,
+    );
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Calls' }));
+
+    expect(await screen.findByText('25 in the latest 25, not every call')).toBeTruthy();
+    expect(screen.queryByText('25 call')).toBeNull();
+    expect(screen.queryByText('probe-call')).toBeNull();
+    expect(
+      vi.mocked(api).mock.calls.some(
+        (call) =>
+          String(call[0]).includes('/api/calls') &&
+          String(call[0]).includes('entityId=opp-1') &&
+          String(call[0]).includes('limit=25'),
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps the old call caption when the page does not continue', async () => {
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (String(path).startsWith('/api/calls')) {
+        return Promise.resolve({
+          calls: [callRow('call-1'), callRow('call-2')],
+          nextCursor: null,
+        });
+      }
+      return Promise.resolve({ items: [] });
+    });
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OpportunityTabs oppId="opp-1" customer="Acme" documents={[]} />
+      </QueryClientProvider>,
+    );
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Calls' }));
+
+    expect(await screen.findByText('2 call')).toBeTruthy();
+    expect(screen.queryByText(/not every call/i)).toBeNull();
+  });
+});
+
 describe('OpportunityTabs — DocumentsPanel send-for-signature trigger', () => {
   afterEach(() => {
     cleanup();
