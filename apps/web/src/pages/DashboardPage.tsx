@@ -235,6 +235,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                     risks={cockpit.risks}
                     compliance={cockpit.compliance}
                     risksTruncated={cockpit.risksTruncated}
+                    complianceTruncated={cockpit.complianceTruncated}
                   />
                 )}
               </div>

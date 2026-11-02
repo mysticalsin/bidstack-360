@@ -10,6 +10,7 @@ import { type z } from 'zod';
 import {
   recordedDecisionRole,
   ACCOUNT_ACTIVITY_PAGE_LIMIT,
+  COCKPIT_COMPLIANCE_LIMIT,
   COCKPIT_RISK_LIMIT,
   KEY_CONTACT_PAGE_LIMIT,
   type AccountCockpitSnapshot,
@@ -42,8 +43,6 @@ import {
   parseTechnicalStackOverride,
 } from './technical-stack.service.js';
 import { microsWireFields } from '../../lib/micros-wire.js';
-
-const COCKPIT_COMPLIANCE_LIMIT = 6;
 
 // ─── Signal coverage (M2) ─────────────────────────────────────────────────────
 // Real 4-factor scoring replacing the old hardcoded 72/strong placeholder.
@@ -516,6 +515,22 @@ export function riskRegisterPage<T>(rows: readonly T[]): {
   };
 }
 
+/**
+ * One compliance page. The cockpit book has no compliance total, so that
+ * total is not invented. One unique row past the page says these rows are
+ * not every check. The extra row is not shown. Same probe as `riskRegisterPage`.
+ */
+export function complianceCheckPage<T>(rows: readonly T[]): {
+  items: T[];
+  pageContinues: boolean;
+} {
+  const pageContinues = rows.length > COCKPIT_COMPLIANCE_LIMIT;
+  return {
+    items: pageContinues ? rows.slice(0, COCKPIT_COMPLIANCE_LIMIT) : [...rows],
+    pageContinues,
+  };
+}
+
 export function buildActivities(
   tasks: Array<{
     id: string;
@@ -842,10 +857,7 @@ export function buildCockpit({
   const companyCompliance = compliance.filter(
     (check) => check.opportunityId != null && accountOpportunityIds.has(check.opportunityId),
   );
-  const visibleCompliance = uniqueBy(companyCompliance, complianceKey).slice(
-    0,
-    COCKPIT_COMPLIANCE_LIMIT,
-  );
+  const compliancePage = complianceCheckPage(uniqueBy(companyCompliance, complianceKey));
   const apolloIntel = company.strategicIntel;
   const apolloLastSyncedAt = apolloIntel?.lastSyncedAt ?? null;
   const apolloSource =
@@ -1041,7 +1053,8 @@ export function buildCockpit({
     recentActivityTruncated: activity.pageContinues,
     risks: risksPage.items.map(serializeRisk),
     risksTruncated: risksPage.pageContinues,
-    compliance: visibleCompliance.map(serializeCompliance),
+    compliance: compliancePage.items.map(serializeCompliance),
+    complianceTruncated: compliancePage.pageContinues,
     roadmap: [],
   };
 }

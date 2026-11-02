@@ -246,6 +246,9 @@ export const AccountCockpitSnapshot = z.object({
   // risks is that page, not every row on the register. No register total is loaded.
   risksTruncated: z.boolean().optional(),
   compliance: z.array(ComplianceCheck),
+  // True when one unique check past COCKPIT_COMPLIANCE_LIMIT was dropped.
+  // compliance is that page, not every check. No compliance total is loaded.
+  complianceTruncated: z.boolean().optional(),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
@@ -258,6 +261,9 @@ export const KEY_CONTACT_PAGE_LIMIT = 5;
 
 /** Risks shown on one account cockpit. One extra unique row sets risksTruncated. */
 export const COCKPIT_RISK_LIMIT = 6;
+
+/** Compliance checks shown on one account cockpit. One extra unique row sets complianceTruncated. */
+export const COCKPIT_COMPLIANCE_LIMIT = 6;
 
 export const CrmDashboardSnapshot = z.object({
   generatedAt: z.string().datetime(),

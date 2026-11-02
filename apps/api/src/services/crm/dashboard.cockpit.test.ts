@@ -10,6 +10,7 @@ import {
   accountActivityPage,
   applyFieldOverrides,
   buildCockpit,
+  complianceCheckPage,
   computeSignalCoverage,
   keyContactPage,
   riskRegisterPage,
@@ -1333,5 +1334,82 @@ describe('risk register page', () => {
     const few = buildCockpit({ ...base, risks: [risk(1), risk(2)] });
     expect(few.risksTruncated).toBe(false);
     expect(few.risks).toHaveLength(2);
+  });
+});
+
+describe('compliance check page', () => {
+  it('drops one check past the page and does not invent a compliance total', () => {
+    // WHY: the cockpit showed six checks and the open-issues caption treated
+    // that page as the recorded register. There is no compliance count on the
+    // book. One unique row past the page is the only signal, and that row is
+    // not shown. A duplicate label is the same check, not a seventh.
+    const rows = [1, 2, 3, 4, 5, 6, 7].map((n) => ({ label: `Check ${n}` }));
+    const probe = complianceCheckPage(rows);
+    expect(probe.pageContinues).toBe(true);
+    expect(probe.items).toHaveLength(6);
+    expect(probe.items.map((row) => row.label)).not.toContain('Check 7');
+
+    const exact = complianceCheckPage(rows.slice(0, 6));
+    expect(exact.pageContinues).toBe(false);
+    expect(exact.items).toHaveLength(6);
+
+    const short = complianceCheckPage(rows.slice(0, 2));
+    expect(short.pageContinues).toBe(false);
+    expect(short.items).toHaveLength(2);
+
+    const deal = {
+      id: 'linked-deal',
+      customer: 'Mantu',
+      companyId: 'mantu',
+      name: 'Renewal',
+      stage: 's2_sent',
+      pipelineStage: null,
+      valueMicros: 1n,
+      probability: 40,
+      dueDate: null,
+      owner: null,
+    };
+    const check = (n: number, label = `Check ${n}`) => ({
+      id: `check-${n}`,
+      opportunityId: 'linked-deal',
+      label,
+      status: 'blocked',
+      owner: null,
+      sourceAttribution: [],
+    });
+    const base = {
+      company: company(),
+      companies: [],
+      opportunities: [deal],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      fieldOverrides: [],
+    };
+    const larger = buildCockpit({
+      ...base,
+      compliance: [1, 2, 3, 4, 5, 6, 7].map((n) => check(n)),
+    });
+    expect(larger.complianceTruncated).toBe(true);
+    expect(larger.compliance).toHaveLength(6);
+    expect(larger.compliance.map((row) => row.label)).not.toContain('Check 7');
+
+    const matched = buildCockpit({
+      ...base,
+      compliance: [1, 2, 3, 4, 5, 6].map((n) => check(n)),
+    });
+    expect(matched.complianceTruncated).toBe(false);
+    expect(matched.compliance).toHaveLength(6);
+
+    const duplicate = buildCockpit({
+      ...base,
+      compliance: [1, 2, 3, 4, 5, 6, 7].map((n) => check(n, n === 7 ? 'Check 1' : `Check ${n}`)),
+    });
+    expect(duplicate.complianceTruncated).toBe(false);
+    expect(duplicate.compliance).toHaveLength(6);
+
+    const few = buildCockpit({ ...base, compliance: [check(1), check(2)] });
+    expect(few.complianceTruncated).toBe(false);
+    expect(few.compliance).toHaveLength(2);
   });
 });

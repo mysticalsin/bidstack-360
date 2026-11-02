@@ -7,9 +7,15 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { springSoft } from '@/lib/motion';
+import { complianceCheckCaption } from '@/pages/cockpit-compliance';
 import { riskRegisterCaption } from '@/pages/cockpit-risks';
 
-import { COCKPIT_RISK_LIMIT, type ComplianceCheck, type RiskItem } from '@bidstack/shared';
+import {
+  COCKPIT_COMPLIANCE_LIMIT,
+  COCKPIT_RISK_LIMIT,
+  type ComplianceCheck,
+  type RiskItem,
+} from '@bidstack/shared';
 
 import { severityBg, severityShort, severityTone } from './_tokens';
 
@@ -18,6 +24,8 @@ interface Props {
   compliance: ComplianceCheck[];
   /** True when the cockpit dropped one risk past this page. */
   risksTruncated?: boolean;
+  /** True when the cockpit dropped one check past this page. */
+  complianceTruncated?: boolean;
 }
 
 // Memoized — render is pure on risks+compliance arrays, both stable per
@@ -26,19 +34,37 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
   risks,
   compliance,
   risksTruncated,
+  complianceTruncated,
 }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
-  // A seventh risk is the probe. It is not a row on this page.
+  // A seventh risk or check is the probe. It is not a row on this page.
   const riskPage = risks.slice(0, COCKPIT_RISK_LIMIT);
   const riskPageContinues = risksTruncated === true || riskPage.length < risks.length;
+  const compliancePage = compliance.slice(0, COCKPIT_COMPLIANCE_LIMIT);
+  const compliancePageContinues =
+    complianceTruncated === true || compliancePage.length < compliance.length;
   const openRisks = riskPage.filter((r) => r.status === 'open' || r.status === 'in_progress');
-  const openCompliance = compliance.filter(
+  const openCompliance = compliancePage.filter(
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
   );
   const total = openRisks.length + openCompliance.length;
-  const recorded = riskPage.length + compliance.length;
+  const recorded = riskPage.length + compliancePage.length;
   const riskPageLabel = riskRegisterCaption(riskPage.length, true);
+  const compliancePageLabel = complianceCheckCaption(compliancePage.length, true);
+  const sliceCaption =
+    riskPageContinues && compliancePageContinues
+      ? `${riskPageLabel}. ${compliancePageLabel}`
+      : riskPageContinues
+        ? riskPageLabel
+        : compliancePageContinues
+          ? compliancePageLabel
+          : null;
+  const sliceCaptionKey = riskPageContinues
+    ? compliancePageContinues
+      ? 'openIssues.issuePageCaption'
+      : 'openIssues.riskPageCaption'
+    : 'openIssues.compliancePageCaption';
   // Severity buckets count this risk page, open and closed. A continuing
   // page is not the whole register; the caption says so.
   const buckets = [
@@ -73,8 +99,8 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
       <SectionHeader
         title={t('openIssues.title', 'Open issues')}
         caption={
-          riskPageContinues
-            ? t('openIssues.riskPageCaption', riskPageLabel)
+          sliceCaption != null
+            ? t(sliceCaptionKey, sliceCaption)
             : recorded === 0
               ? t(
                   'openIssues.captionNoneRecorded',
@@ -116,8 +142,8 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({
                 : t('openIssues.noneOpenTitle', 'No open items')
             }
             message={
-              riskPageContinues
-                ? t('openIssues.riskPageCaption', riskPageLabel)
+              sliceCaption != null
+                ? t(sliceCaptionKey, sliceCaption)
                 : recorded === 0
                   ? t(
                       'openIssues.emptyMessage',
