@@ -30,5 +30,11 @@ export type SearchResult = z.infer<typeof SearchResult>;
 
 export const SearchResponse = z.object({
   items: z.array(SearchResult),
+  /**
+   * True when a per-type read kept one row past the limit, or the merged
+   * list was longer than the page. `items` is that page, not every match.
+   * This is not a result total.
+   */
+  pageContinues: z.boolean(),
 });
 export type SearchResponse = z.infer<typeof SearchResponse>;

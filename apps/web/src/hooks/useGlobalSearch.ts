@@ -12,6 +12,8 @@ export interface SearchResult {
 
 export interface SearchResponse {
   items: SearchResult[];
+  /** True when this page is not every match. Not a result total. */
+  pageContinues?: boolean;
   total: number;
   query: string;
 }

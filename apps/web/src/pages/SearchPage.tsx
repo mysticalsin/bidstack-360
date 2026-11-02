@@ -9,6 +9,8 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { cn } from '@/lib/cn';
 
+import { searchResultsCaption } from './search-results-caption';
+
 const TABS = [
   { key: 'all', label: 'All' },
   { key: 'opportunity', label: 'Opportunities' },
@@ -64,6 +66,12 @@ export function SearchPage() {
     if (activeTab === 'all') return data.items;
     return data.items.filter((i) => i.type === activeTab);
   }, [data, activeTab]);
+  const pageContinues = Boolean(data?.pageContinues);
+  const resultCaption = searchResultsCaption(
+    filtered.length,
+    pageContinues,
+    data?.items.length ?? filtered.length,
+  );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: data?.items.length ?? 0 };
@@ -173,12 +181,8 @@ export function SearchPage() {
                   transition={{ duration: 0.2 }}
                   className="space-y-1"
                 >
-                  <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
-                    {filtered.length === 1
-                      ? t('search.results.countOne', '{{count}} result', { count: filtered.length })
-                      : t('search.results.countOther', '{{count}} results', {
-                          count: filtered.length,
-                        })}
+                  <p className="mb-2 text-xs text-[var(--fg-tertiary)]" data-testid="search-result-count">
+                    {resultCaption}
                   </p>
                   {filtered.map((item) => (
                     <Link
