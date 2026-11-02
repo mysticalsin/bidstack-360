@@ -268,7 +268,9 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const scope = await getAccessScope(orgId, userId);
       const now = new Date();
-      const roots = await prisma.company.findMany({
+      // One row past the page the list calls every account. The extra row is
+      // the probe. It is not shown, and it is not a total.
+      const loadedRoots = await prisma.company.findMany({
         where: applyCompanyScope(
           {
             orgId,
@@ -286,8 +288,10 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         ),
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
-        take: req.query.limit,
+        take: req.query.limit + 1,
       });
+      const accountsContinue = loadedRoots.length > req.query.limit;
+      const roots = accountsContinue ? loadedRoots.slice(0, req.query.limit) : loadedRoots;
       const loaded = await loadMomentumInputs(orgId, scope, roots.map((r) => r.id), now);
       const accounts = roots
         .map((r) => {
@@ -352,7 +356,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const counts = { gaining: 0, steady: 0, declining: 0 };
       for (const a of accounts) counts[a.trend]++;
-      return { accounts, counts, alerts, computedAt: now.toISOString() };
+      return { accounts, counts, alerts, accountsContinue, computedAt: now.toISOString() };
     },
   );
 };

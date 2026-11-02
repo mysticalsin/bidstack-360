@@ -847,6 +847,11 @@ export const PortfolioMomentum = z.object({
   ),
   counts: z.object({ gaining: z.number().int(), steady: z.number().int(), declining: z.number().int() }),
   alerts: z.array(PortfolioAlert),
+  /**
+   * True when the query read one account past `limit` and dropped it.
+   * `accounts` is that page, not every account. No account total.
+   */
+  accountsContinue: z.boolean().optional(),
   computedAt: Iso,
 });
 export type PortfolioMomentum = z.infer<typeof PortfolioMomentum>;
