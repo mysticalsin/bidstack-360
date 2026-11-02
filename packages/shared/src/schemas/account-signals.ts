@@ -722,12 +722,42 @@ export const TimelineItem = z.object({
 });
 export type TimelineItem = z.infer<typeof TimelineItem>;
 
+/** Events the account timeline draws. One more row is the probe. */
+export const TIMELINE_EVENTS_DRAWN = 300;
+
+/**
+ * Events one timeline query may return before the page is cut. A fixed take
+ * of three hundred dropped a later event, so those three hundred read as
+ * every event in the window. One row past those three hundred is the probe.
+ * It is not shown, and it is not a total.
+ */
+export function timelineEventTake(): number {
+  return TIMELINE_EVENTS_DRAWN + 1;
+}
+
+/** Latest events to draw. The extra row only says another event exists. */
+export function timelineEventPage<T>(rows: readonly T[]): {
+  items: T[];
+  pageContinues: boolean;
+} {
+  const pageContinues = rows.length > TIMELINE_EVENTS_DRAWN;
+  return {
+    items: pageContinues ? rows.slice(0, TIMELINE_EVENTS_DRAWN) : [...rows],
+    pageContinues,
+  };
+}
+
 export const AccountTimeline = z.object({
   companyId: z.string(),
   from: Iso,
   to: Iso,
   items: z.array(TimelineItem),
   counts: z.record(z.string(), z.number().int()),
+  /**
+   * True when the timeline read one event past TIMELINE_EVENTS_DRAWN and
+   * dropped it. `items` is that page, not every event in the window.
+   */
+  timelineContinues: z.boolean().optional(),
 });
 export type AccountTimeline = z.infer<typeof AccountTimeline>;
 
