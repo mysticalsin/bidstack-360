@@ -16,6 +16,9 @@ import {
 /** Follow-ups on one deal. One extra row says the page is not the whole list. */
 const TASK_PAGE_LIMIT = 50;
 
+/** Files on one deal. One extra row says the page is not the whole list. */
+const DOCUMENT_PAGE_LIMIT = 50;
+
 const Input = z
   .object({
     id: z.string().uuid().optional(),
@@ -28,7 +31,7 @@ const Input = z
 
 export const opportunitiesGet: Tool<typeof Input> = {
   description:
-    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health. Tasks return { items, limit, truncated }. truncated means more follow-ups exist than items.',
+    'Fetch one opportunity. companyId is the company link. stage is the stored key and stageName is the live label. A deleted stage falls back to the key. outcome is open, won, or lost; a live lost or won flag decides it, and lost wins when both are set. currency is null and currencyBasis is unspecified. probability is null when nothing was recorded. A stored 0 is not a measured win chance, and it is not account health. Tasks return { items, limit, truncated }. truncated means more follow-ups exist than items. Documents return { items, limit, truncated }. truncated means more files exist than items.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -49,7 +52,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
         owner: true,
         pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
         tasks: { orderBy: { createdAt: 'desc' }, take: TASK_PAGE_LIMIT + 1 },
-        documents: { orderBy: { createdAt: 'desc' }, take: 50 },
+        documents: { orderBy: { createdAt: 'desc' }, take: DOCUMENT_PAGE_LIMIT + 1 },
       },
     });
     if (!opp) throw new Error('Opportunity not found');
@@ -82,7 +85,10 @@ export const opportunitiesGet: Tool<typeof Input> = {
         })),
         TASK_PAGE_LIMIT,
       ),
-      documents: opp.documents.map((d) => ({ id: d.id, name: d.name, kind: d.kind })),
+      documents: capPage(
+        opp.documents.map((d) => ({ id: d.id, name: d.name, kind: d.kind })),
+        DOCUMENT_PAGE_LIMIT,
+      ),
     };
   },
 };
