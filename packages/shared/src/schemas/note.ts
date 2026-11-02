@@ -57,7 +57,11 @@ export const NotePatch = z
   });
 export type NotePatch = z.infer<typeof NotePatch>;
 
-export const NoteList = z.object({ items: z.array(Note) });
+export const NoteList = z.object({
+  items: z.array(Note),
+  // True when the query read one row past `limit`. This page is not every note.
+  truncated: z.boolean(),
+});
 export type NoteList = z.infer<typeof NoteList>;
 
 export const MeetingNotesImportRequest = z.object({

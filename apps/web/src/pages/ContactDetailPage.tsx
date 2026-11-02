@@ -16,6 +16,7 @@ import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNote
 import { formatDate } from '@/lib/format';
 import { storedProbabilityLabel } from '@/lib/stored-probability';
 import { contactOpportunityCaption, dealsForContact } from './contact-deals';
+import { CONTACT_NOTE_PAGE_LIMIT, contactNoteCaption } from './contact-notes';
 import { CONTACT_TASK_PAGE_LIMIT, contactTaskCaption, contactTaskEmpty } from './contact-tasks';
 
 export function ContactDetailPage() {
@@ -24,7 +25,7 @@ export function ContactDetailPage() {
   const contact = useContact(id);
   const allOpps = useOpportunities({ limit: 100 });
   const allTasks = useTasks({ limit: CONTACT_TASK_PAGE_LIMIT });
-  const allNotes = useNotes(contact.data?.companyId ?? undefined);
+  const allNotes = useNotes(contact.data?.companyId ?? undefined, CONTACT_NOTE_PAGE_LIMIT);
 
   if (contact.isLoading) return <DetailPageSkeleton columns={3} cards={3} />;
   if (contact.isError)
@@ -59,6 +60,7 @@ export function ContactDetailPage() {
   const relatedOpps = dealsForContact(allOpps.data?.items ?? [], c.companyId);
   const oppPageContinues = Boolean(allOpps.data?.nextCursor);
   const taskPageContinues = Boolean(allTasks.data?.nextCursor);
+  const notePageContinues = Boolean(c.companyId && allNotes.data?.truncated);
   const relatedTasks =
     allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
   const relatedNotes = c.companyId ? (allNotes.data?.items ?? []) : [];
@@ -260,9 +262,11 @@ export function ContactDetailPage() {
         <Card>
           <SectionHeader
             title={t('contactDetail.notesTitle', 'Notes')}
-            caption={t('contactDetail.relatedCount', '{{count}} related', {
-              count: relatedNotes.length,
-            })}
+            caption={t(
+              'contactDetail.noteCaption',
+              contactNoteCaption(relatedNotes.length, notePageContinues),
+              { count: relatedNotes.length },
+            )}
           />
           {relatedNotes.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">

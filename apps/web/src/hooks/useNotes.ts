@@ -17,16 +17,22 @@ import type {
 
 const notesKey = (accountId: string) => ['notes', accountId] as const;
 
-export function useNotes(accountId: string | undefined) {
+type NotesPage = { items: Note[]; truncated?: boolean };
+
+export function useNotes(accountId: string | undefined, limit?: number) {
   return useQuery({
-    queryKey: notesKey(accountId ?? ''),
+    queryKey:
+      limit == null ? notesKey(accountId ?? '') : ([...notesKey(accountId ?? ''), limit] as const),
     // Only fetch when an accountId is available — the cockpit may render
     // briefly before route params resolve.
     enabled: Boolean(accountId),
-    queryFn: ({ signal }) =>
-      api<{ items: Note[] }>(`/api/notes?accountId=${encodeURIComponent(accountId!)}`, {
-        signal,
-      }),
+    queryFn: ({ signal }) => {
+      const limitQuery = limit == null ? '' : `&limit=${encodeURIComponent(String(limit))}`;
+      return api<NotesPage>(
+        `/api/notes?accountId=${encodeURIComponent(accountId!)}${limitQuery}`,
+        { signal },
+      );
+    },
   });
 }
 
@@ -55,9 +61,9 @@ export function useUpdateNote(accountId: string | undefined) {
       if (!accountId) return undefined;
       const key = notesKey(accountId);
       await qc.cancelQueries({ queryKey: key });
-      const snapshot = qc.getQueryData<{ items: Note[] }>(key);
+      const snapshot = qc.getQueryData<NotesPage>(key);
       if (snapshot) {
-        qc.setQueryData<{ items: Note[] }>(key, {
+        qc.setQueryData<NotesPage>(key, {
           ...snapshot,
           items: snapshot.items.map((n) => (n.id === id ? { ...n, ...patch } : n)),
         });
@@ -81,9 +87,9 @@ export function useDeleteNote(accountId: string | undefined) {
       if (!accountId) return undefined;
       const key = notesKey(accountId);
       await qc.cancelQueries({ queryKey: key });
-      const snapshot = qc.getQueryData<{ items: Note[] }>(key);
+      const snapshot = qc.getQueryData<NotesPage>(key);
       if (snapshot) {
-        qc.setQueryData<{ items: Note[] }>(key, {
+        qc.setQueryData<NotesPage>(key, {
           ...snapshot,
           items: snapshot.items.filter((n) => n.id !== id),
         });

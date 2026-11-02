@@ -141,16 +141,19 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       } else {
         where.accountId = accountId;
       }
-      const items = await prisma.note.findMany({
+      const rows = await prisma.note.findMany({
         where,
         include: { author: { select: { email: true } } },
         // Pinned-first, then newest-first within each pinned group. The
         // composite index covers the (orgId, accountId) prefix; the in-memory
-        // sort on `pinned` is cheap because limit ≤ 200.
+        // sort on `pinned` is cheap because limit ≤ 200. One extra row is the
+        // probe that sets truncated; it is not part of the page.
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-        take: req.query.limit,
+        take: req.query.limit + 1,
       });
-      return { items: items.map(serializeNote) };
+      const truncated = rows.length > req.query.limit;
+      const items = truncated ? rows.slice(0, req.query.limit) : rows;
+      return { items: items.map(serializeNote), truncated };
     },
   );
 
