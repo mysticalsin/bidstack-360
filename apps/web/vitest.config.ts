@@ -15,11 +15,12 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: false,
     include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./src/test/setup-happy-dom-animation.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/**/index.ts'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/**/index.ts', 'src/test/**'],
       thresholds: {
         lines: 60,
         functions: 60,
