@@ -21,6 +21,7 @@ import {
 export {
   DustStatus,
   ApiKeySummary,
+  ApiKeyCreateBody,
   IntegrationSetupGuide,
   IntegrationProbeBody,
   IntegrationProbeResult,

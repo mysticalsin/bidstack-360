@@ -50,7 +50,7 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 | ID | Pri | Status | Gap |
 |----|-----|--------|-----|
 | B1 | — | Already shipped | Matrix + route `config.permission` + MSA company scope + financials track toggle (Admin/AE). |
-| B2 | P1 | Open | API keys resolve **unrestricted** company/MSA scope (`getAccessScope` treats non-UUID `userId` as unrestricted). Fine for trusted MARS keys; do not issue write keys to vendors. |
+| B2 | P1 | **Fixed** | New API keys default-deny company/MSA resources and are read-only. Creator must set org-wide or an explicit company/MSA allowlist. Existing keys were backfilled unrestricted + writable. |
 | B3 | P1 | Open | Audit UI is gated by `settings:write`; Sales Manager has `audit-log:read` on the API but cannot open the Settings tab. |
 | B4 | P2 | Open | Admin role is a single full-tenant key. Split “user admin” vs “billing admin” if the team grows. |
 

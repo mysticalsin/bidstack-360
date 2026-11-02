@@ -8,6 +8,10 @@ export interface ApiKeySummary {
   name: string;
   prefix: string;
   scopes: string[];
+  readOnly: boolean;
+  unrestrictedScope: boolean;
+  companyIds: string[];
+  msaIds: string[];
   lastUsedAt: string | null;
   createdAt: string;
 }
@@ -28,6 +32,10 @@ export type ApiKeyScope = PermissionKey | 'read' | 'write' | 'mcp';
 interface CreateInput {
   name: string;
   scopes: ApiKeyScope[];
+  readOnly?: boolean;
+  unrestrictedScope?: boolean;
+  companyIds?: string[];
+  msaIds?: string[];
 }
 
 export function useApiKeys(options: { enabled?: boolean } = {}) {

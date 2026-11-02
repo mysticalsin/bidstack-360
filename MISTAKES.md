@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-02 TESTING: B2 `readOnly` default 403'd write-scoped integration keys
+
+- **What went wrong:** M2 defaulted new `ApiKey.readOnly` to true. Integration tests that insert write-scoped keys via `prisma.apiKey.create` did not set `readOnly: false`, so `requirePermission` returned "API key is read-only" before the intended admin / human-actor / missing-scope message. CI Integration failed on 7 assertions.
+- **Root cause:** Prisma defaults apply to test inserts. Tests that exercise a later gate assumed a writable key just because `scopes` included `write`.
+- **Prevention rule:** Any test that creates an API key and then hits a `:write` route to assert a *different* 403 must set `readOnly: false` (and `unrestrictedScope` when the test is about company/MSA visibility, not default-deny).
+- **Files affected:** `apps/api/src/routes/{ai-compute-auth,agent-provider-credentials,webhook-subscriptions,cross-sell,kam-drafts,org-settings,accounts}.integration.test.ts`.
+
+---
+
 ### 2026-07-07 BUG: `rowsFromUnknown` envelope-unwrap recursed into `undefined` forever
 
 - **What went wrong:** Writing `sillage-signals.ts`'s envelope-unwrap helper (`rowsFromUnknown`, adapted from the same pattern already in `company-seamless-enrichment.ts`), a malformed vendor payload with none of the checked envelope keys (`signals`/`data`/`results`/`items`) caused `rowsFromUnknown(root[key])` to be called with `root[key] === undefined` on every iteration. Since `record(undefined)` returns `{}`, the recursive call re-enters with the exact same `undefined` argument every time — infinite recursion, RangeError: Maximum call stack size exceeded. Caught by the "coerces malformed REST JSON" test: the stack overflow was silently swallowed by the caller's outer try/catch and surfaced as a wrong result (`source: null` instead of `'rest'`) rather than a crash, which made it non-obvious from the stack trace alone.

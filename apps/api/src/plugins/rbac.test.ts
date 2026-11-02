@@ -26,6 +26,7 @@ async function buildRbacTestServer(auth: {
   userId: string;
   role: string;
   scopes?: string[];
+  readOnly?: boolean;
 }) {
   const server = Fastify({ logger: false });
   await server.register(sensible);
@@ -37,6 +38,7 @@ async function buildRbacTestServer(auth: {
       userId: auth.userId,
       role: auth.role,
       scopes: auth.scopes ?? ['read', 'write'],
+      readOnly: auth.readOnly,
     };
   });
 
@@ -415,6 +417,24 @@ describe('rbac plugin', () => {
 
     expect(res.statusCode).toBe(403);
     expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('rejects a readOnly key even when it carries a write permission scope', async () => {
+    // WHY: B2 read-only keys must fail closed on mutations. A checked
+    // settings:write scope must not override the readOnly flag.
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['settings:write'],
+      readOnly: true,
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json<{ message: string }>().message).toContain('read-only');
     await server.close();
   });
 });
