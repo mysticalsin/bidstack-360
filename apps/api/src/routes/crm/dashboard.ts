@@ -7,6 +7,7 @@ import { CrmDashboardSnapshot, ReleaseScore } from '@bidstack/shared';
 import { isExpectedClientAbortError } from '../../lib/http-client-abort.js';
 import { fetchAccountOpenBook } from '../../services/crm/account-open-book.js';
 import { fetchChampionCoverage } from '../../services/crm/champion-coverage.js';
+import { fetchNextOpenTask } from '../../services/crm/next-open-task.js';
 import { buildDashboardSnapshot, normalizeName } from '../../services/crm/dashboard.service.js';
 import { getReleaseScore } from '../../services/crm/dashboard.queries.js';
 import { getAccessScope, scopeCacheTag, type AccessScope } from '../../lib/access-scope.js';
@@ -200,6 +201,45 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
           req.log.error(
             { err, orgId: req.auth.orgId, companies: req.body.companyIds.length },
             'Error in /crm/accounts/champion-coverage route',
+          );
+        }
+        throw err;
+      }
+    },
+  );
+
+  server.post(
+    '/crm/accounts/next-open-task',
+    {
+      config: { permission: 'companies:read' },
+      schema: {
+        body: z.object({
+          companyIds: z.array(z.string().trim().min(1).max(512)).max(2000),
+        }),
+        response: {
+          200: z.object({
+            task: z
+              .object({
+                id: z.string().uuid(),
+                title: z.string().min(1),
+                dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+                companyId: z.string().uuid(),
+              })
+              .nullable(),
+            complete: z.boolean(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      try {
+        const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+        return await fetchNextOpenTask(prisma, req.auth.orgId, req.body.companyIds, scope);
+      } catch (err) {
+        if (!shouldSuppressRouteErrorLog(err, req.raw)) {
+          req.log.error(
+            { err, orgId: req.auth.orgId, companies: req.body.companyIds.length },
+            'Error in /crm/accounts/next-open-task route',
           );
         }
         throw err;

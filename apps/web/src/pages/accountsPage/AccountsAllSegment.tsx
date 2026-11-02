@@ -10,6 +10,7 @@ import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/compo
 import { toast } from '@/components/ui/Toast';
 import { useAccountOpenBook } from '@/hooks/useAccountOpenBook';
 import { useChampionCoverage } from '@/hooks/useChampionCoverage';
+import { useNextOpenTask } from '@/hooks/useNextOpenTask';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
@@ -19,6 +20,7 @@ import { springSoft } from '@/lib/motion';
 
 import { AccountBookChart } from './AccountBookChart';
 import { ChampionGap } from './ChampionGap';
+import { NextOpenTaskLine } from './NextOpenTaskLine';
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
@@ -200,6 +202,18 @@ export function AccountsAllSegment() {
       : championCoverage.isError
         ? 'error'
         : 'loading';
+  const nextOpenTask = useNextOpenTask(viewCompanyIds);
+  const nextTaskStatus =
+    viewCompanyIds.length === 0 || nextOpenTask.isSuccess
+      ? 'ready'
+      : nextOpenTask.isError
+        ? 'error'
+        : 'loading';
+  const nextTask = nextOpenTask.data?.task ?? null;
+  const nextTaskCompanyName = nextTask
+    ? (rows.find((row) => row.company.id.toLowerCase() === nextTask.companyId.toLowerCase())?.company.name ??
+      null)
+    : null;
 
   const topMissingFields = useMemo(() => {
     const counts = new Map<string, number>();
@@ -432,6 +446,13 @@ export function AccountsAllSegment() {
           status={championStatus}
           accounts={championCoverage.data?.accounts ?? viewCompanyIds.length}
           missing={championCoverage.data?.missing ?? 0}
+        />
+        <NextOpenTaskLine
+          status={nextTaskStatus}
+          hasAccounts={viewCompanyIds.length > 0}
+          task={nextTask}
+          companyName={nextTaskCompanyName}
+          complete={nextOpenTask.data?.complete ?? false}
         />
       </section>
 
