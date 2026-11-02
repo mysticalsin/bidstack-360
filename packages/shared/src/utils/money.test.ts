@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { microsToUnits, sumMicros, unitsToMicros } from './money.js';
+import { formatMicrosDecimal, microsToUnits, sumMicros, unitsToMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -107,5 +107,26 @@ describe('unitsToMicros', () => {
     expect(() => unitsToMicros('1.2345678')).toThrow(/Invalid money units/);
     expect(() => unitsToMicros('1e6')).toThrow(/Invalid money units/);
     expect(() => unitsToMicros(Number.NaN)).toThrow(/Invalid money units/);
+  });
+});
+
+describe('formatMicrosDecimal', () => {
+  it('keeps fractional cents that Number(micros)/1e6.toString() would drop', () => {
+    // 1.23 units and 1.234567 units are everyday quote leftovers. A float
+    // toString can already be wrong; the formatter must emit the stored digits.
+    expect(formatMicrosDecimal(1_230_000n)).toBe('1.23');
+    expect(formatMicrosDecimal(1_234_567n)).toBe('1.234567');
+  });
+
+  it('keeps a large value exact where Number(micros)/1e6 changes the digits', () => {
+    const micros = 9_007_199_254_740_993n;
+    expect((Number(micros) / 1_000_000).toString()).not.toBe('9007199254.740993');
+    expect(formatMicrosDecimal(micros)).toBe('9007199254.740993');
+  });
+
+  it('formats whole units and credits without a trailing decimal', () => {
+    expect(formatMicrosDecimal(2_000_000n)).toBe('2');
+    expect(formatMicrosDecimal(-1_500_000n)).toBe('-1.5');
+    expect(formatMicrosDecimal(0n)).toBe('0');
   });
 });

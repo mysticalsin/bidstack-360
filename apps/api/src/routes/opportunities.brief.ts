@@ -1,3 +1,5 @@
+import { formatMicrosDecimal } from '@bidstack/shared';
+
 interface BriefOpportunity {
   code: string;
   customer: string;
@@ -40,12 +42,9 @@ export interface OpportunityBriefInput {
 }
 
 function formatMoneyMicros(valueMicros: bigint | number): string {
-  const value = Number(valueMicros) / 1_000_000;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
+  // Exact decimal — Intl on Number(micros)/1e6 drops fractional cents and
+  // corrupts values past the safe-integer cliff.
+  return `EUR ${formatMicrosDecimal(valueMicros)}`;
 }
 
 function formatDate(value: Date | null): string {

@@ -48,7 +48,53 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('Validate margin model');
     expect(brief).toContain('Avery Sponsor');
     expect(brief).not.toMatch(/stub|DUST_API_KEY|DUST_AGENT_EXEC_BRIEF/i);
+    expect(brief).toContain('EUR 1250000');
     expect(estimateBriefTokens(brief)).toBeGreaterThan(50);
+  });
+
+  it('prints large values and fractional cents without Number(micros)/1e6', () => {
+    // WHY: the brief used Intl on Number(micros)/1e6, which rounds cents
+    // away and corrupts amounts past the safe-integer cliff.
+    const large = 9_007_199_254_740_993n;
+    const cents = 1_234_567n;
+    const largeBrief = buildOpportunityBrief({
+      opportunity: {
+        code: 'OP-9001',
+        customer: 'Exact Bank',
+        name: 'Cliff deal',
+        stage: 's2_sent',
+        pipelineStageName: null,
+        valueMicros: large,
+        probability: 50,
+        dueDate: null,
+        industry: null,
+        updatedAt: new Date('2026-11-02T00:00:00.000Z'),
+      },
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+    const centsBrief = buildOpportunityBrief({
+      opportunity: {
+        code: 'OP-9002',
+        customer: 'Exact Bank',
+        name: 'Cents deal',
+        stage: 's2_sent',
+        pipelineStageName: null,
+        valueMicros: cents,
+        probability: 50,
+        dueDate: null,
+        industry: null,
+        updatedAt: new Date('2026-11-02T00:00:00.000Z'),
+      },
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect((Number(large) / 1_000_000).toString()).not.toBe('9007199254.740993');
+    expect(largeBrief).toContain('EUR 9007199254.740993');
+    expect(centsBrief).toContain('EUR 1.234567');
   });
 
   it('redacts opted-out stakeholder names', () => {

@@ -12,4 +12,6 @@ remainder. Opportunity write paths and `serializeOpportunity` use those
 helpers. Storage is still `valueMicros` BigInt.
 
 **Do not:** multiply or divide micros with `Number` on the opportunity
-write/read path. Display formatting stays at the edge.
+write/read path, or on brief / Dust / email display. Use
+`formatMicrosDecimal` for exact decimal strings (large values and
+fractional cents).

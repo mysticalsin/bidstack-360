@@ -6,6 +6,7 @@
 // exponential backoff before giving up.
 
 import { prisma } from '@bidstack/db';
+import { formatMicrosDecimal } from '@bidstack/shared';
 import pino from 'pino';
 
 import { getOrgDust } from './dust-credentials.js';
@@ -60,11 +61,9 @@ function serializeOpportunityToMarkdown(opp: {
   intel: unknown;
 }): string {
   const value =
-    typeof opp.valueMicros === 'bigint'
-      ? (Number(opp.valueMicros) / 1_000_000).toString()
-      : typeof opp.valueMicros === 'number'
-        ? (opp.valueMicros / 1_000_000).toString()
-        : String(opp.valueMicros);
+    typeof opp.valueMicros === 'bigint' || typeof opp.valueMicros === 'number'
+      ? formatMicrosDecimal(opp.valueMicros)
+      : String(opp.valueMicros);
 
   return [
     `# ${opp.name}`,

@@ -5,6 +5,7 @@
 import { type z } from 'zod';
 
 import { prisma, type Opportunity } from '@bidstack/db';
+import { formatMicrosDecimal } from '@bidstack/shared';
 
 import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.js';
 
@@ -360,12 +361,7 @@ export function buildIntegrationSetupGuide() {
 // Opportunity serialization
 
 export function serializeOpportunityToMarkdown(opp: Opportunity): string {
-  const value =
-    typeof opp.valueMicros === 'bigint'
-      ? (Number(opp.valueMicros) / 1_000_000).toString()
-      : typeof opp.valueMicros === 'number'
-        ? (opp.valueMicros / 1_000_000).toString()
-        : String(opp.valueMicros);
+  const value = formatMicrosDecimal(opp.valueMicros);
 
   return [
     `# ${opp.name}`,
