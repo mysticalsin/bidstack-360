@@ -1,0 +1,22 @@
+{
+  "facts": {
+    "a": {
+      "value": "1823000000",
+      "dimensions": {
+        "entity": "lei:5493004DM8FGIY6QKF37",
+        "unit": "iso4217:EUR",
+        "concept": "ifrs-full:Revenue",
+        "period": "2025-01-01T00:00:00/2026-01-01T00:00:00"
+      }
+    },
+    "b": {
+      "value": "301000000",
+      "dimensions": {
+        "entity": "lei:5493004DM8FGIY6QKF37",
+        "unit": "iso4217:EUR",
+        "concept": "ifrs-full:ProfitLossFromOperatingActivities",
+        "period": "2025-01-01T00:00:00/2026-01-01T00:00:00"
+      }
+    }
+  }
+}
