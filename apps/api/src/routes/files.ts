@@ -20,19 +20,21 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
+  FILE_ATTACHMENTS_DRAWN,
   FILE_MAX_BYTES,
   FileAttachment,
   FileFinalizeRequest,
   FileListResponse,
   FileUploadUrlRequest,
   FileUploadUrlResponse,
+  fileAttachmentPage,
+  fileAttachmentTake,
   isExtractableForIntel,
 } from '@bidstack/shared';
 
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
-import { isRealDataMode } from '../lib/polo-mode.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
@@ -41,6 +43,24 @@ import { enqueueDocumentExtract } from '../queues/document-extract.js';
 // is already lowercase via normalizeName(); this is the symmetric write-side.
 function normalizeAccountId(raw: string): string {
   return raw.trim().toLowerCase();
+}
+
+const ACCOUNT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** A passed company id wins. A company UUID used as the account tag is the link. */
+export async function resolveFileCompanyId(
+  orgId: string,
+  accountId: string,
+  explicit?: string | null,
+): Promise<string | null> {
+  if (explicit) return explicit;
+  const normalized = normalizeAccountId(accountId);
+  if (!ACCOUNT_UUID.test(normalized)) return null;
+  const company = await prisma.company.findFirst({
+    where: { id: normalized, orgId, deletedAt: null },
+    select: { id: true },
+  });
+  return company?.id ?? null;
 }
 
 /**
@@ -233,6 +253,11 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const accountId = normalizeAccountId(req.body.accountId);
+      const companyId = await resolveFileCompanyId(
+        req.auth.orgId,
+        req.body.accountId,
+        req.body.companyId,
+      );
       // Atomic create + audit so a crash can't leave a file row without a
       // paper trail.
       const fileId = randomUUID();
@@ -242,7 +267,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
             id: fileId,
             orgId: req.auth.orgId,
             accountId,
-            companyId: req.body.companyId ?? null,
+            companyId,
             name: req.body.name,
             contentType: req.body.contentType,
             bytes: metadata.bytes,
@@ -275,12 +300,9 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       // Best-effort + fail-open — a queue/Redis hiccup must never fail the upload.
       // Skipped under NODE_ENV=test so the integration suite keeps asserting
       // explicit extraction control; dev/prod opt in by default.
-      const blockedByRealMode =
-        isRealDataMode() && process.env.DOCUMENT_LLM_EXTRACT_ENABLED !== 'true';
       if (
         accountId &&
         process.env.NODE_ENV !== 'test' &&
-        !blockedByRealMode &&
         isExtractableForIntel(req.body.contentType)
       ) {
         try {
@@ -289,7 +311,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
               orgId: req.auth.orgId,
               documentId: fileId,
               accountId,
-              companyId: req.body.companyId ?? null,
+              companyId,
               status: 'pending',
               extractedData: {},
             },
@@ -337,7 +359,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         querystring: z.object({
           accountId: z.string().min(1).max(255),
           companyId: z.string().uuid().optional(),
-          limit: z.coerce.number().int().min(1).max(200).default(100),
+          limit: z.coerce.number().int().min(1).max(200).default(FILE_ATTACHMENTS_DRAWN),
         }),
         response: { 200: FileListResponse },
       },
@@ -350,21 +372,26 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         companyId: req.query.companyId,
       });
       const accountId = normalizeAccountId(req.query.accountId);
-      const items = await prisma.fileAttachment.findMany({
+      const linkedCompanyId =
+        req.query.companyId ?? (ACCOUNT_UUID.test(accountId) ? accountId : undefined);
+      // One row past the page the list draws. The extra row is the probe.
+      // It is not a shown file, and it is not a total.
+      const loaded = await prisma.fileAttachment.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
           // MSA library files are served only through /msa (msa:read).
           contractVersions: { none: {} },
-          ...(req.query.companyId
-            ? { OR: [{ companyId: req.query.companyId }, { accountId }] }
+          ...(linkedCompanyId
+            ? { OR: [{ companyId: linkedCompanyId }, { accountId }] }
             : { accountId }),
         },
         include: { uploader: { select: { email: true } } },
         orderBy: { createdAt: 'desc' },
-        take: req.query.limit,
+        take: fileAttachmentTake(req.query.limit),
       });
-      return { items: items.map(serialize) };
+      const page = fileAttachmentPage(loaded, req.query.limit);
+      return { items: page.items.map(serialize), itemsContinue: page.pageContinues };
     },
   );
 
@@ -387,17 +414,6 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         userId: req.auth.userId,
         accountId: row.accountId,
         companyId: row.companyId,
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId.startsWith('apikey:') ? null : req.auth.userId,
-          action: 'file.download',
-          targetType: 'file',
-          targetId: row.id,
-          diff: { name: row.name, contentType: row.contentType },
-        },
       });
 
       const storage = await getStorage();

@@ -7,6 +7,8 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { formatDate, relativeTime } from '@/lib/format';
 
+import { opportunityTimelineCaption, shownOpportunityTimeline } from './opportunity-timeline-caption';
+
 // Timeline kind → icon. Covers the three legacy sources (audit/task/comment)
 // plus every Activity chatter type the API merges in; unknown kinds fall back
 // to a neutral glyph so a new server-side type can never break rendering.
@@ -56,7 +58,9 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
       />
     );
 
-  const items = timeline.data?.items ?? [];
+  const loaded = timeline.data?.items ?? [];
+  const page = shownOpportunityTimeline(loaded, timeline.data?.timelineContinues);
+  const items = page.items;
   if (items.length === 0)
     return (
       <EmptyState
@@ -72,9 +76,10 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
     <Card>
       <SectionHeader
         title={t('opportunityTabs.activityTitle', 'Activity')}
-        caption={t('opportunityDetail.timelineCount', '{{count}} events', {
-          count: items.length,
-        })}
+        caption={t(
+          'opportunityDetail.timelinePageCaption',
+          opportunityTimelineCaption(items.length, page.pageContinues),
+        )}
       />
       <ol className="px-5 py-4 space-y-4">
         {items.map((e) => (

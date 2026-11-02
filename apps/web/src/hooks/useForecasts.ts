@@ -20,7 +20,10 @@ export function useForecasts(period?: string) {
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       if (period) params.set('period', period);
-      return api<{ items: Forecast[] }>(`/api/forecasts?${params.toString()}`, { signal });
+      return api<{ items: Forecast[]; pageContinues?: boolean }>(
+        `/api/forecasts?${params.toString()}`,
+        { signal },
+      );
     },
   });
 }

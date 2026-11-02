@@ -49,7 +49,7 @@ export const meetingClient = {
   challenges: (groupId: string, signal?: AbortSignal) =>
     api<ChallengeRollupResponse>(`${MI}/accounts/${encodeURIComponent(groupId)}/challenges`, { signal }),
   flags: (status: 'open' | 'dismissed' | 'all', signal?: AbortSignal) =>
-    api<{ items: CrossRegionFlagOut[] }>(`${MI}/flags?status=${status}`, { signal }),
+    api<{ items: CrossRegionFlagOut[]; flagsContinue?: boolean }>(`${MI}/flags?status=${status}`, { signal }),
   watchdogFeed: (signal?: AbortSignal) => api<{ items: MeetingIntelWatchdogItem[] }>(`${MI}/flags?format=watchdog`, { signal }),
   /** The meeting behind a flag, for its recipient (redacted if the account is outside their scope). */
   flagMeeting: (flagId: string, signal?: AbortSignal) =>

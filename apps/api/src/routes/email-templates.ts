@@ -48,6 +48,8 @@ export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
   });
 
   // ─── GET /api/v1/email-templates ──────────────────────────────────────
+  // One row past the page is the probe. It is dropped and is not a template
+  // total.
   server.get(
     '/email-templates',
     {
@@ -60,7 +62,8 @@ export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const items = await prisma.emailTemplate.findMany({
+      const EMAIL_TEMPLATE_LIST_PAGE = 200;
+      const loaded = await prisma.emailTemplate.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
@@ -68,9 +71,14 @@ export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.query.category ? { category: req.query.category } : {}),
         },
         orderBy: [{ lastUsedAt: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
-        take: 200,
+        take: EMAIL_TEMPLATE_LIST_PAGE + 1,
       });
-      return { items: items.map(serialize) };
+      const pageContinues = loaded.length > EMAIL_TEMPLATE_LIST_PAGE;
+      const items = pageContinues ? loaded.slice(0, EMAIL_TEMPLATE_LIST_PAGE) : loaded;
+      return {
+        pageContinues,
+        items: items.map(serialize),
+      };
     },
   );
 

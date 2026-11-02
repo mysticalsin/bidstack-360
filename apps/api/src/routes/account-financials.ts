@@ -14,6 +14,8 @@ import {
   SAMPLE_FINANCIAL_PERIODS,
   SAMPLE_FINANCIAL_SIGNALS,
   TrackFinancialsUpdate,
+  filingPeriodPage,
+  financialPeriodTake,
   financialsEligible,
   financialsGate,
   tierLabel,
@@ -43,14 +45,16 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       topAccountRank: true,
       trackFinancials: true,
       financialProfile: true,
-      financialPeriods: { orderBy: [{ periodEnd: 'desc' }], take: 20 },
+      // One row past the twenty the list draws. The extra row is the probe.
+      // It is not a shown period, and it is not a total.
+      financialPeriods: { orderBy: [{ periodEnd: 'desc' }], take: financialPeriodTake() },
     },
   });
   if (!c) throw Object.assign(new Error('Account not found'), { statusCode: 404 });
   const gate = financialsGate(c);
   const p = c.financialProfile;
   const status = !financialsEligible(c) ? 'paused' : (p?.status ?? 'pending');
-  const periods: FinancialPeriod[] = c.financialPeriods.map((r) => {
+  const loaded: FinancialPeriod[] = c.financialPeriods.map((r) => {
     const { _derived, ...metrics } = r.metrics as Record<string, { value: number; concept: string }> & { _derived?: FinancialPeriod['derived'] };
     return {
       periodType: r.periodType === 'Q' ? 'Q' : 'FY',
@@ -65,6 +69,9 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       derived: { operatingMargin: _derived?.operatingMargin ?? null, netMargin: _derived?.netMargin ?? null, freeCashFlow: _derived?.freeCashFlow ?? null },
     };
   });
+  // The probe is the row past the list. It is not a period to show.
+  const page = filingPeriodPage(loaded);
+  const periods = page.periods;
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
   // Sample only for tracked accounts still waiting for real filings; General
   // accounts get the plain empty state instead.
@@ -83,6 +90,7 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
     lastPulledAt: p?.lastPulledAt ? p.lastPulledAt.toISOString() : null,
     nextPullAt: p?.nextPullAt && financialsEligible(c) ? p.nextPullAt.toISOString() : null,
     periods: sample ? SAMPLE_FINANCIAL_PERIODS : periods,
+    periodsContinue: sample ? false : page.pageContinues,
     signals: sample ? SAMPLE_FINANCIAL_SIGNALS : signals,
     sample,
   };

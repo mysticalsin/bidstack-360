@@ -12,7 +12,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { BidDocument, BidDocumentRegisterRequest, BidWorkspaceSnapshot } from '@bidstack/shared';
+import {
+  BidDocument,
+  BidDocumentRegisterRequest,
+  BidWorkspaceSnapshot,
+  complianceMatrixPage,
+  complianceMatrixTake,
+} from '@bidstack/shared';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
 import {
   WorkspaceParams,
@@ -132,9 +138,15 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
                 mandatory: z.boolean(),
               }),
             ),
+            // Length of `items`. Not a count of every compliance row.
             total: z.number().int(),
             compliantCount: z.number().int(),
             pendingCount: z.number().int(),
+            /**
+             * True when the query read one row past the page and dropped it.
+             * `items` is that page, not every compliance row.
+             */
+            matrixContinues: z.boolean().optional(),
           }),
         },
       },
@@ -143,10 +155,12 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
       if (!opportunity) return reply.notFound('Opportunity not found');
 
-      const matrixRows = await prisma.complianceMatrixRow.findMany({
+      // One row past the page the matrix draws. The extra row is the probe.
+      // It is not a shown row, and it is not a total.
+      const loaded = await prisma.complianceMatrixRow.findMany({
         where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
         orderBy: { createdAt: 'asc' },
-        take: 500,
+        take: complianceMatrixTake(),
         select: {
           id: true,
           responseStatus: true,
@@ -156,6 +170,8 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
           requirement: { select: { text: true, requirementType: true, mandatory: true } },
         },
       });
+      const matrixPage = complianceMatrixPage(loaded);
+      const matrixRows = matrixPage.items;
 
       function toFrontendStatus(rs: string): 'pending' | 'compliant' | 'partial' | 'non_compliant' {
         if (rs === 'YES') return 'compliant';
@@ -188,6 +204,7 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
         total: items.length,
         compliantCount: items.filter((i) => i.status === 'compliant').length,
         pendingCount: items.filter((i) => i.status === 'pending').length,
+        matrixContinues: matrixPage.pageContinues,
       };
     },
   );

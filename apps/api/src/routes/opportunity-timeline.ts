@@ -6,6 +6,22 @@ import { prisma } from '@bidstack/db';
 // Chatter Activity rows carry their human label in subject (calls/emails/
 // meetings) or description (notes). Fall back to a per-type synthesis so a
 // bare stage_change/field_edit row still reads as a sentence, never as "".
+function stageWords(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) return 'unknown';
+  return value
+    .trim()
+    .split('_')
+    .map((part) => (part.length === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join(' ');
+}
+
+/** Stage audits store fromStage/toStage. Older rows and chatter may use from/to. */
+function movedText(diff: Record<string, unknown> | null | undefined): string {
+  const from = stageWords(diff?.fromStage ?? diff?.from);
+  const to = stageWords(diff?.toStage ?? diff?.to);
+  return `Moved from ${from} to ${to}`;
+}
+
 function activityText(row: {
   type: string;
   subject: string | null;
@@ -17,13 +33,7 @@ function activityText(row: {
     return row.description.slice(0, 120) + (row.description.length > 120 ? '…' : '');
   }
   const body = row.body as Record<string, unknown> | null;
-  if (
-    row.type === 'stage_change' &&
-    typeof body?.from === 'string' &&
-    typeof body?.to === 'string'
-  ) {
-    return `Moved from ${body.from} to ${body.to}`;
-  }
+  if (row.type === 'stage_change') return movedText(body);
   return row.type.replace(/_/g, ' ');
 }
 
@@ -47,6 +57,11 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
                 metadata: z.record(z.unknown()).optional(),
               }),
             ),
+            /**
+             * True when the merge read one event past `limit` and dropped it.
+             * `items` is that page, not every event on the deal.
+             */
+            timelineContinues: z.boolean().optional(),
           }),
         },
       },
@@ -70,24 +85,25 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
       // who hold that permission.
       const canSeeAuditDiff = await server.hasPermission(req, 'audit-log:read');
 
-      // Fetch all activity sources in parallel
+      // One row past the page the activity panel draws, from each source.
+      // The extra row is the probe. It is not shown, and it is not a total.
       const [auditLogs, tasks, comments, activities] = await Promise.all([
         prisma.auditLog.findMany({
           where: { orgId, targetType: 'opportunity', targetId: oppId },
           orderBy: { at: 'desc' },
-          take: limit,
+          take: limit + 1,
           include: { user: { select: { name: true } } },
         }),
         prisma.task.findMany({
           where: { orgId, oppId, deletedAt: null },
           orderBy: { createdAt: 'desc' },
-          take: limit,
+          take: limit + 1,
           include: { assignee: { select: { name: true } } },
         }),
         prisma.comment.findMany({
           where: { orgId, targetType: 'opportunity', targetId: oppId, deletedAt: null },
           orderBy: { createdAt: 'desc' },
-          take: limit,
+          take: limit + 1,
           include: { author: { select: { name: true } } },
         }),
         // Chatter feed (Wave 4 Activity model): calls, emails, meetings, notes,
@@ -98,7 +114,7 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
         prisma.activity.findMany({
           where: { orgId, entityType: 'opportunity', entityId: oppId, deletedAt: null },
           orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-          take: limit,
+          take: limit + 1,
           include: { owner: { select: { name: true } } },
         }),
       ]);
@@ -122,9 +138,7 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           const changed = diff ? Object.keys(diff).join(', ') : 'fields';
           text = `Updated ${changed}`;
         } else if (action === 'opportunity.stage') {
-          const from = (diff?.from as string) ?? 'unknown';
-          const to = (diff?.to as string) ?? 'unknown';
-          text = `Moved from ${from} to ${to}`;
+          text = movedText(diff);
         } else if (action === 'opportunity.delete') {
           text = 'Deleted opportunity';
         } else {
@@ -194,7 +208,9 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
         return diff !== 0 ? diff : b.id.localeCompare(a.id);
       });
 
-      return { items: items.slice(0, limit) };
+      // Drop the probe. A later row means this page is not every event.
+      const timelineContinues = items.length > limit;
+      return { items: timelineContinues ? items.slice(0, limit) : items, timelineContinues };
     },
   );
 };

@@ -78,6 +78,9 @@ export function TerritoriesPage() {
 
   const tItems = territories.data?.items ?? [];
   const rItems = rules.data?.items ?? [];
+  // pageContinues is the territory the list read past this page and dropped.
+  const pageContinues = Boolean(territories.data?.pageContinues);
+  const rulesPageContinues = Boolean(rules.data?.pageContinues);
   const aItems = analytics.data?.items ?? [];
   const totals = analytics.data?.totals;
 
@@ -384,6 +387,7 @@ export function TerritoriesPage() {
           onDelete={handleDeleteTerritory}
           selectedCountryCode={selected?.countryCode}
           canWrite={canWrite}
+          pageContinues={pageContinues}
         />
         <RoutingRuleListPanel
           items={rItems}
@@ -398,6 +402,7 @@ export function TerritoriesPage() {
           onDelete={handleDeleteRule}
           selectedCountryCode={selected?.countryCode}
           canWrite={canWrite}
+          pageContinues={rulesPageContinues}
         />
       </motion.div>
     </motion.div>

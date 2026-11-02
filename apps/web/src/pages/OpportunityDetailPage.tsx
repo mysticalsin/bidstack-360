@@ -522,6 +522,7 @@ export function OpportunityDetailPage() {
         customer={data.customer}
         intelDecisionUnit={intel.decisionUnit ?? []}
         documents={data.documents}
+        documentsContinue={data.documentsContinue}
         activityContent={<TimelinePanel oppId={data.id} />}
       />
 

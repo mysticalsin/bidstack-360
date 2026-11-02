@@ -206,14 +206,25 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: server.requirePermission('integrations:read'),
-      schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            items: z.array(ApiKeySummary),
+            pageContinues: z.boolean(),
+          }),
+        },
+      },
     },
     async (req) => {
-      const keys = await prisma.apiKey.findMany({
+      // One row past the page is the probe. It is dropped and is not a key total.
+      const API_KEY_LIST_PAGE = 500;
+      const loaded = await prisma.apiKey.findMany({
         where: { orgId: req.auth.orgId, revokedAt: null, deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        take: 500,
+        take: API_KEY_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > API_KEY_LIST_PAGE;
+      const keys = pageContinues ? loaded.slice(0, API_KEY_LIST_PAGE) : loaded;
       return {
         items: keys.map((k) => ({
           id: k.id,
@@ -223,6 +234,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
           lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
           createdAt: k.createdAt.toISOString(),
         })),
+        pageContinues,
       };
     },
   );
@@ -345,17 +357,24 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
                 error: z.string().nullable(),
               }),
             ),
+            /** True when one event past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
           }),
         },
       },
     },
     async (req) => {
-      const events = await prisma.syncEvent.findMany({
+      // One row past the page is the probe. It is dropped and is not an event total.
+      const WEBHOOK_EVENT_PAGE = 50;
+      const loaded = await prisma.syncEvent.findMany({
         where: { orgId: req.auth.orgId },
         orderBy: { receivedAt: 'desc' },
-        take: 50,
+        take: WEBHOOK_EVENT_PAGE + 1,
       });
+      const pageContinues = loaded.length > WEBHOOK_EVENT_PAGE;
+      const events = pageContinues ? loaded.slice(0, WEBHOOK_EVENT_PAGE) : loaded;
       return {
+        pageContinues,
         items: events.map((e) => ({
           id: e.id.toString(),
           receivedAt: e.receivedAt.toISOString(),

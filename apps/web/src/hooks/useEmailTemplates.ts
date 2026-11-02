@@ -13,12 +13,18 @@ import type {
 
 const KEY = 'email-templates';
 
+/** Templates the list draws, plus whether one template past the page was dropped. */
+type EmailTemplatePage = EmailTemplateList & {
+  /** True when one template past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+};
+
 export function useEmailTemplates(opts: { includeArchived?: boolean; enabled?: boolean } = {}) {
-  return useQuery<EmailTemplateList>({
+  return useQuery<EmailTemplatePage>({
     queryKey: [KEY, { includeArchived: opts.includeArchived ?? false }],
     queryFn: ({ signal }) => {
       const qs = opts.includeArchived ? '?includeArchived=true' : '';
-      return api<EmailTemplateList>(`/api/email-templates${qs}`, { signal });
+      return api<EmailTemplatePage>(`/api/email-templates${qs}`, { signal });
     },
     enabled: opts.enabled ?? true,
   });

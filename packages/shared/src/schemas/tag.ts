@@ -76,6 +76,8 @@ export type TagPatch = z.infer<typeof TagPatch>;
 
 export const TagList = z.object({
   items: z.array(Tag),
+  /** True when one tag past this page was loaded and dropped. Not a total. */
+  pageContinues: z.boolean(),
 });
 export type TagList = z.infer<typeof TagList>;
 

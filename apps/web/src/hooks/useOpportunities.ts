@@ -67,6 +67,7 @@ export interface OpportunityFull extends Opportunity {
     bytes: number | null;
     createdAt: string;
   }>;
+  documentsContinue?: boolean;
 }
 
 export function useOpportunity(id: string | undefined) {

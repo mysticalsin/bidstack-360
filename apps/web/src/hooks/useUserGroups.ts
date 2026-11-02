@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   UserGroup,
   UserGroupCreate,
+  UserGroupList,
   UserGroupPatch,
   UserGroupWithMembers,
 } from '@bidstack/shared';
@@ -19,8 +20,7 @@ const KEY = ['user-groups'] as const;
 export function useUserGroups() {
   return useQuery({
     queryKey: KEY,
-    queryFn: ({ signal }) => api<{ items: UserGroup[] }>('/api/v1/user-groups', { signal }),
-    select: (data) => data.items,
+    queryFn: ({ signal }) => api<UserGroupList>('/api/v1/user-groups', { signal }),
   });
 }
 

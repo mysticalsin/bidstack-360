@@ -15,6 +15,16 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
+import { OPPORTUNITY_TASK_PAGE_LIMIT, opportunityTaskCaption } from './opportunity-task-caption';
+import {
+  OPPORTUNITY_CALLS_DRAWN,
+  opportunityCallCaption,
+  shownOpportunityCalls,
+} from './opportunity-call-caption';
+import {
+  opportunityDocumentCaption,
+  shownOpportunityDocuments,
+} from './opportunity-document-caption';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
@@ -40,6 +50,8 @@ interface OpportunityTabsProps {
     power: 'decision' | 'champion' | 'influencer' | 'gatekeeper' | 'approver';
   }>;
   documents?: Array<{ id: string; name: string; kind: string; bytes: number | null }>;
+  /** True when the detail query read one file past the drawn page and dropped it. */
+  documentsContinue?: boolean;
   // The Activity tab body — the page injects the timeline component
   // (pages/opportunityDetail/TimelinePanel) so this container stays dumb about
   // how the deal narrative is fetched and rendered.
@@ -51,6 +63,7 @@ export function OpportunityTabs({
   customer,
   intelDecisionUnit = [],
   documents = [],
+  documentsContinue = false,
   activityContent = null,
 }: OpportunityTabsProps) {
   const { t } = useTranslation('crm');
@@ -86,7 +99,7 @@ export function OpportunityTabs({
         <TasksPanel oppId={oppId} />
       </TabsContent>
       <TabsContent value="documents">
-        <DocumentsPanel documents={documents} />
+        <DocumentsPanel documents={documents} documentsContinue={documentsContinue} />
       </TabsContent>
       <TabsContent value="calls">
         <CallsPanel oppId={oppId} />
@@ -175,7 +188,7 @@ function DecisionUnitPanel({
         title={t('opportunityTabs.decisionUnitEmptyTitle', 'No decision-unit members yet')}
         message={t(
           'opportunityTabs.decisionUnitEmptyMessage',
-          'Add a contact from the Contacts page or sync from Dust.',
+          'Link a contact to this opportunity. A job title is not a buying role.',
         )}
       />
     );
@@ -200,37 +213,10 @@ function DecisionUnitPanel({
               </div>
               <div className="text-xs text-[var(--fg-tertiary)]">{r.role}</div>
               {r.email ? (
-                <div className="text-[10px] font-mono text-[var(--fg-tertiary)] mt-0.5">
+                <div className="text-xs font-mono text-[var(--fg-tertiary)] mt-0.5">
                   {r.email}
                 </div>
               ) : null}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge
-                tone={
-                  r.sentiment === 'hot'
-                    ? 'tomato'
-                    : r.sentiment === 'warm'
-                      ? 'amber'
-                      : r.sentiment === 'cold'
-                        ? 'blue'
-                        : 'gray'
-                }
-              >
-                {r.sentiment}
-              </Badge>
-              <div
-                className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]"
-                aria-label={t(
-                  'opportunityTabs.influenceAriaLabel',
-                  'Influence {{value}} out of 5',
-                  {
-                    value: r.influence,
-                  },
-                )}
-              >
-                {r.influence}/5
-              </div>
             </div>
           </li>
         ))}
@@ -241,9 +227,11 @@ function DecisionUnitPanel({
 
 function TasksPanel({ oppId }: { oppId: string }) {
   const { t: translate } = useTranslation('crm');
-  const all = useTasks();
+  // This deal's page. The route reads one row past the limit and drops it.
+  const all = useTasks({ oppId, limit: OPPORTUNITY_TASK_PAGE_LIMIT });
   if (all.isLoading) return <LoadingSkeleton />;
   const tasks = all.data?.items.filter((t) => t.oppId === oppId) ?? [];
+  const pageContinues = Boolean(all.data?.nextCursor);
   if (tasks.length === 0)
     return (
       <EmptyState
@@ -258,9 +246,10 @@ function TasksPanel({ oppId }: { oppId: string }) {
     <Card>
       <SectionHeader
         title={translate('opportunityTabs.tasksTitle', 'Tasks')}
-        caption={translate('opportunityTabs.tasksActiveCount', '{{count}} active', {
-          count: tasks.length,
-        })}
+        caption={translate(
+          'opportunityTabs.tasksPageCaption',
+          opportunityTaskCaption(tasks.length, pageContinues),
+        )}
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {tasks.map((t: Task) => (
@@ -296,7 +285,12 @@ function TasksPanel({ oppId }: { oppId: string }) {
 
 function CallsPanel({ oppId }: { oppId: string }) {
   const { t } = useTranslation('crm');
-  const calls = useCalls({ entityType: 'OPPORTUNITY', entityId: oppId });
+  // This deal's page. The route reads one row past the limit and drops it.
+  const calls = useCalls({
+    entityType: 'OPPORTUNITY',
+    entityId: oppId,
+    limit: OPPORTUNITY_CALLS_DRAWN,
+  });
   if (calls.isLoading) return <LoadingSkeleton />;
   if (calls.isError)
     return (
@@ -310,8 +304,10 @@ function CallsPanel({ oppId }: { oppId: string }) {
         }
       />
     );
-  const items = calls.data?.pages.flatMap((p) => p.calls) ?? [];
-  if (items.length === 0)
+  const loaded = calls.data?.pages.flatMap((p) => p.calls) ?? [];
+  const lastPage = calls.data?.pages[calls.data.pages.length - 1];
+  const page = shownOpportunityCalls(loaded, Boolean(lastPage?.nextCursor));
+  if (page.items.length === 0)
     return (
       <EmptyState
         title={t('opportunityTabs.callsEmptyTitle', 'No calls yet')}
@@ -325,12 +321,13 @@ function CallsPanel({ oppId }: { oppId: string }) {
     <Card>
       <SectionHeader
         title={t('opportunityTabs.callsTitle', 'Calls')}
-        caption={t('opportunityTabs.callsCount', '{{count}} call', {
-          count: items.length,
-        })}
+        caption={t(
+          'opportunityTabs.callsPageCaption',
+          opportunityCallCaption(page.items.length, page.pageContinues),
+        )}
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
-        {items.map((c) => {
+        {page.items.map((c) => {
           const when = c.startedAt
             ? formatDate(c.startedAt)
             : c.scheduledAt
@@ -370,13 +367,16 @@ function CallsPanel({ oppId }: { oppId: string }) {
 
 function DocumentsPanel({
   documents,
+  documentsContinue,
 }: {
   documents: NonNullable<OpportunityTabsProps['documents']>;
+  documentsContinue: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [sendOpen, setSendOpen] = useState(false);
-  const primaryDocumentId = documents[0]?.id;
-  const hasDocument = documents.length > 0;
+  const page = shownOpportunityDocuments(documents, documentsContinue);
+  const primaryDocumentId = page.items[0]?.id;
+  const hasDocument = page.items.length > 0;
   // A signature request needs a Document id, not a DocumentTemplate id — with
   // no document uploaded there is nothing to send, so the trigger is disabled
   // rather than opening a modal that could only send a broken fallback id.
@@ -416,13 +416,11 @@ function DocumentsPanel({
       <Card>
         <SectionHeader
           title={t('opportunityTabs.documentsTitle', 'Documents')}
-          caption={t('opportunityTabs.documentsCount', '{{count}} files', {
-            count: documents.length,
-          })}
+          caption={opportunityDocumentCaption(page.items.length, page.pageContinues)}
           action={sendAction}
         />
         <ul className="divide-y divide-[var(--border-subtle)]">
-          {documents.map((d) => (
+          {page.items.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium text-[var(--fg-primary)] truncate">

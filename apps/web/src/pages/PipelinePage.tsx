@@ -35,6 +35,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
+import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
@@ -42,7 +43,9 @@ export function PipelinePage() {
   const reduced = useReducedMotion();
   const navigate = useNavigate();
   const { formatMoney } = useFormatMoney();
-  const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
+  const { data, isLoading, isError, error } = useOpportunities({ limit: PIPELINE_BOARD_LIMIT });
+  const pageContinues = Boolean(data?.nextCursor);
+  const latest = data?.items.length ?? 0;
   const configuredStages = usePipelineStages();
   // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
   // board itself only loads the first 50 cards, so totals/win-rate computed
@@ -238,8 +241,9 @@ export function PipelinePage() {
               const filteredStageName = stageFilter
                 ? (stages.find((s) => s.id === stageFilter)?.name ?? '')
                 : '';
-              const label =
-                count === 1
+              const label = pageContinues
+                ? pipelineBoardCaption(count, pageContinues, latest)
+                : count === 1
                   ? t('pipeline.liveRegionCountOne', '{{count}} opportunity', { count })
                   : t('pipeline.liveRegionCountOther', '{{count}} opportunities', { count });
               return stageFilter ? `${label} · ${filteredStageName}` : label;
@@ -378,6 +382,8 @@ export function PipelinePage() {
                 items={items}
                 total={total}
                 conversion={conversion}
+                pageContinues={pageContinues}
+                latest={latest}
                 isHoverTarget={isHover}
                 draggingId={draggingId}
                 focusedId={focusedId}

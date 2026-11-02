@@ -70,5 +70,10 @@ export const KamAccountTodos = z.object({
   items: z.array(KamAccountTodoItem),
   staleInitiativeIds: z.array(z.string().uuid()),
   overloadedInitiativeIds: z.array(z.string().uuid()),
+  /**
+   * True when the query read one task past the page and dropped it.
+   * Counts and `items` are that page, not every task. No task total.
+   */
+  pageContinues: z.boolean().optional(),
 });
 export type KamAccountTodos = z.infer<typeof KamAccountTodos>;

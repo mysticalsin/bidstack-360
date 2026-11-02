@@ -54,6 +54,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-02 TESTING: Caption fold dropped financials schedule sync and tripped the query guard
+
+- **What went wrong:** #279 Integration failed on `account-financials` (GET left `accountFinancialProfile` null) and `kam-tasks` (GET `/todos` 400). E2E smoke skipped.
+- **Root cause:** Restoring polluted API routes from `main` then replaying only `pageContinues` hunks dropped the GET `syncAccountFinancialsSchedule` call that queues Strategic/Top filings. The to-do probe used `take: 1000 + 1`; `isUnboundedFindMany` treats `take > 1000` as unbounded and query-guard returns 400.
+- **Prevention rule:** When folding captions onto `main`, replay the caption probe around the current handler — do not drop side effects. Any `take: N + 1` must keep `N + 1 <= 1000`.
+- **Files affected:** `apps/api/src/routes/account-financials.ts`, `apps/api/src/routes/kam-tasks.ts`, `apps/web/src/pages/kam/kam-todo-caption.ts`.
+
 ### 2026-11-02 TESTING: Body FCP color leaked into opportunity inline-edit cells
 
 - **What went wrong:** `/opportunities` axe color-contrast failed at 1.04 (`#f8fafc` on `#ffffff`) on `.inline-edit-trigger`. `accounts.spec` hit a strict-mode duplicate for `Key numbers`. Responsive screenshots taken on the agent host missed CI fonts.

@@ -16,7 +16,10 @@ export function useOpportunityTimeline(oppId: string | undefined) {
     queryKey: ['opportunity-timeline', oppId],
     enabled: !!oppId,
     queryFn: ({ signal }) =>
-      api<{ items: TimelineEvent[] }>(`/api/opportunities/${oppId}/timeline`, { signal }),
+      api<{ items: TimelineEvent[]; timelineContinues?: boolean }>(
+        `/api/opportunities/${oppId}/timeline`,
+        { signal },
+      ),
     staleTime: 30_000,
   });
 }

@@ -17,6 +17,12 @@ export interface ApiKeyCreated extends ApiKeySummary {
   secret: string;
 }
 
+export interface ApiKeyList {
+  items: ApiKeySummary[];
+  /** True when one key past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+}
+
 export type ApiKeyScope = PermissionKey | 'read' | 'write' | 'mcp';
 
 interface CreateInput {
@@ -27,8 +33,7 @@ interface CreateInput {
 export function useApiKeys(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['api-keys'],
-    queryFn: ({ signal }) =>
-      api<{ items: ApiKeySummary[] }>('/api/integrations/api-keys', { signal }),
+    queryFn: ({ signal }) => api<ApiKeyList>('/api/integrations/api-keys', { signal }),
     enabled: options.enabled ?? true,
   });
 }

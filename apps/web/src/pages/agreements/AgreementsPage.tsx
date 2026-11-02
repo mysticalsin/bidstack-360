@@ -21,6 +21,11 @@ import { useMsaList } from '@/hooks/useMsa';
 import { fmtDate, fmtDays, KIND_LABEL, STATUS_LABEL, urgency } from '@/lib/msa/labels';
 import { MSA_KINDS, MSA_STATUSES } from '@/lib/msa/types';
 
+import {
+  AGREEMENTS_LIST_DRAWN,
+  agreementsListCaption,
+  agreementsListPage,
+} from './agreements-list-caption';
 import { applyView, headline, type AgreementsView } from './view';
 
 const WINDOWS = [
@@ -39,10 +44,16 @@ export default function AgreementsPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [now] = useState(() => Date.now());
   const canWrite = useHasPermission('msa:write');
-  // One fetch of the whole library (it is small: capped at the API's page size of 100);
-  // numbers, strip and table are all derived locally so filtering is instant.
-  const list = useMsaList({ topLevel: 'false', limit: 100, sort: 'expiry' });
-  const rows = useMemo(() => list.data?.data.items ?? [], [list.data]);
+  // One fetch of the library page, plus one row the table does not draw. The
+  // extra row is the probe. Numbers, strip and table are derived from the
+  // drawn rows so filtering stays instant. The probe is not a total.
+  const list = useMsaList({ topLevel: 'false', limit: AGREEMENTS_LIST_DRAWN + 1, sort: 'expiry' });
+  const loaded = useMemo(
+    () => agreementsListPage(list.data?.data.items ?? []),
+    [list.data],
+  );
+  const rows = loaded.items;
+  const agreementsContinue = loaded.pageContinues;
   const sample = Boolean(list.data?.sample);
   const nums = useMemo(() => headline(rows, now), [rows, now]);
   const shown = useMemo(() => applyView(rows, params, now), [rows, params, now]);
@@ -78,7 +89,11 @@ export default function AgreementsPage() {
       <header className="agr-head">
         <div>
           <h1>Agreements</h1>
-          <p className="agr-caption">Every MSA, framework, SOW and amendment, with what expires next and when notice is due.</p>
+          <p className="agr-caption">
+            {agreementsContinue
+              ? `The latest ${AGREEMENTS_LIST_DRAWN} agreements, not every MSA, framework, SOW and amendment.`
+              : 'Every MSA, framework, SOW and amendment, with what expires next and when notice is due.'}
+          </p>
         </div>
         <Button variant="primary" onClick={() => setNewOpen(true)} data-testid="agreements-new">
           <Icon name="plus" size={16} /> New agreement
@@ -90,7 +105,15 @@ export default function AgreementsPage() {
         <ErrorState title="Couldn't load agreements" message={list.error instanceof Error ? list.error.message : 'Try again in a moment.'} />
       ) : (
         <>
-          <div className="agr-kpis" role="group" aria-label="Agreement totals — select one to filter the table">
+          <div
+            className="agr-kpis"
+            role="group"
+            aria-label={
+              agreementsContinue
+                ? `Agreement counts on the latest ${AGREEMENTS_LIST_DRAWN}, not every agreement — select one to filter the table`
+                : 'Agreement totals — select one to filter the table'
+            }
+          >
             {KPI.map((k) => (
               <button key={k.id} type="button" className="agr-kpi" aria-pressed={view === k.id} onClick={() => set('view', view === k.id ? null : k.id)} data-testid={`agreements-kpi-${k.id}`}>
                 <span className="agr-kpi-label">{k.label}</span>
@@ -118,7 +141,7 @@ export default function AgreementsPage() {
           </section>
 
           <section className="agr-section" aria-labelledby="agr-all">
-            <h2 id="agr-all">All agreements</h2>
+            <h2 id="agr-all">{agreementsContinue ? 'Latest agreements' : 'All agreements'}</h2>
             <div className="drill-filters" role="search">
               <input type="search" aria-label="Search agreements" placeholder="Search title, reference or counterparty" value={params.get('q') ?? ''} onChange={(e) => set('q', e.target.value || null)} />
               <select aria-label="Status" value={params.get('status') ?? ''} onChange={(e) => set('status', e.target.value || null)}>
@@ -143,8 +166,10 @@ export default function AgreementsPage() {
               {filtered ? <button type="button" className="drill-more" onClick={() => setParams(new URLSearchParams(), { replace: true })}>Clear filters</button> : null}
             </div>
             <p className="agr-caption" aria-live="polite" data-testid="agreements-count">
-              {shown.length} {shown.length === 1 ? 'agreement' : 'agreements'}{filtered ? ' match' : ''}
-              {!params.get('q') && !params.get('kind') && !view ? ' · SOWs and amendments sit under their parent' : ''}
+              {agreementsListCaption(shown.length, agreementsContinue, {
+                filtered,
+                nestedNote: !params.get('q') && !params.get('kind') && !view,
+              })}
             </p>
             {shown.length === 0 ? <p className="drill-empty">No agreements match these filters.</p> : (
               <div className="agr-table-wrap">

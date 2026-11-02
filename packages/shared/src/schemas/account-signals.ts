@@ -728,6 +728,11 @@ export const AccountTimeline = z.object({
   to: Iso,
   items: z.array(TimelineItem),
   counts: z.record(z.string(), z.number().int()),
+  /**
+   * True when the query read one event past the page and dropped it.
+   * `items` is that page, not every event. No event total.
+   */
+  timelineContinues: z.boolean().optional(),
 });
 export type AccountTimeline = z.infer<typeof AccountTimeline>;
 
@@ -751,6 +756,11 @@ export const Initiative = z.object({
   firstSeen: Iso.nullable(),
   lastSeen: Iso.nullable(),
   evidence: z.array(InitiativeEvidence),
+  /**
+   * True when the loader read one evidence item past the page and dropped it.
+   * `evidence` is that page, not every evidence item. No evidence total.
+   */
+  evidenceContinues: z.boolean().optional(),
   hook: z.object({ offering: z.string(), pitch: z.string(), nextStep: z.string(), alreadySold: z.boolean() }),
   sample: z.boolean(),
 });
@@ -792,6 +802,8 @@ export const PortfolioMomentum = z.object({
   ),
   counts: z.object({ gaining: z.number().int(), steady: z.number().int(), declining: z.number().int() }),
   alerts: z.array(PortfolioAlert),
+  /** True when one account past this page was loaded and dropped. */
+  accountsContinue: z.boolean().optional(),
   computedAt: Iso,
 });
 export type PortfolioMomentum = z.infer<typeof PortfolioMomentum>;

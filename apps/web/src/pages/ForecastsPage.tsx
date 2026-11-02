@@ -24,6 +24,7 @@ import { ForecastChart } from './forecasts/ForecastChart';
 import { ForecastProjection } from './forecasts/ForecastProjection';
 import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
+import { forecastTotalsNote } from './forecasts/forecast-list-caption';
 import {
   buildChartData,
   groupForecasts,
@@ -59,6 +60,10 @@ export function ForecastsPage() {
     const items = forecasts.data?.items ?? [];
     return items.filter((i) => matchesPeriodFilter(i.period, periodFilter));
   }, [forecasts.data, periodFilter]);
+
+  // pageContinues is the forecast the list read past this page and dropped.
+  const pageContinues = Boolean(forecasts.data?.pageContinues);
+  const totalsNote = forecastTotalsNote(pageContinues);
 
   const rows = useMemo(() => groupForecasts(filteredItems), [filteredItems]);
   const chartData = useMemo(() => buildChartData(rows), [rows]);
@@ -232,6 +237,10 @@ export function ForecastsPage() {
         </Tabs>
       </motion.div>
 
+      {totalsNote ? (
+        <p className="text-xs text-[var(--fg-tertiary)]">{totalsNote}</p>
+      ) : null}
+
       {/* ── Headline totals — the page's answer at a glance ── */}
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
@@ -287,6 +296,7 @@ export function ForecastsPage() {
           formatMoneyMicros={formatMoneyMicros}
           canWrite={canWrite}
           readOnlyHint={readOnlyHint}
+          pageContinues={pageContinues}
         />
       </motion.div>
     </motion.div>
