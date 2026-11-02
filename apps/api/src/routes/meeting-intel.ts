@@ -499,15 +499,26 @@ export const meetingIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           agg.set(key, e);
         }
       }
-      const items = [...agg.values()]
-        .sort((a, b) => b.mentions - a.mentions || b.last.getTime() - a.last.getTime())
-        .slice(0, req.query.limit)
-        .map((e) => ({ challenge: e.challenge, mentions: e.mentions, regions: [...e.regions].sort(), lastMentionedAt: e.last.toISOString(), meetingIds: e.ids }));
+      const ranked = [...agg.values()].sort(
+        (a, b) => b.mentions - a.mentions || b.last.getTime() - a.last.getTime(),
+      );
+      // One row past the page the card calls every challenge. The extra row
+      // is the probe. It is not shown, and it is not a total.
+      const loaded = ranked.slice(0, req.query.limit + 1);
+      const challengesContinue = loaded.length > req.query.limit;
+      const page = challengesContinue ? loaded.slice(0, req.query.limit) : loaded;
+      const items = page.map((e) => ({
+        challenge: e.challenge,
+        mentions: e.mentions,
+        regions: [...e.regions].sort(),
+        lastMentionedAt: e.last.toISOString(),
+        meetingIds: e.ids,
+      }));
       await audit(req, 'meeting_intel.challenges.view', req.params.groupId, {
         returned: items.length,
         ...(base.admin ? { access: 'admin_override' } : {}),
       });
-      return { groupId: req.params.groupId, items };
+      return { groupId: req.params.groupId, items, challengesContinue };
     },
   );
 

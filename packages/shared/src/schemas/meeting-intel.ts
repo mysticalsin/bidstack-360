@@ -201,6 +201,11 @@ export const ChallengeRollupResponse = z.object({
       meetingIds: z.array(z.string().uuid()),
     }),
   ),
+  /**
+   * True when the rollup read one challenge past the page and dropped it.
+   * `items` is that page, not every challenge.
+   */
+  challengesContinue: z.boolean().optional(),
 });
 export type ChallengeRollupResponse = z.infer<typeof ChallengeRollupResponse>;
 
