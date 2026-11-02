@@ -9,6 +9,7 @@ import { type z } from 'zod';
 
 import {
   recordedDecisionRole,
+  ACCOUNT_ACTIVITY_PAGE_LIMIT,
   type AccountCockpitSnapshot,
   type AiInsight,
   type BidOpportunity,
@@ -467,6 +468,21 @@ function resolveCockpitTechnicalStack(
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
 
+/**
+ * One activity page. The extra row only says another activity exists.
+ * It is not shown, and it is not a total.
+ */
+export function accountActivityPage<T>(rows: readonly T[]): {
+  items: T[];
+  pageContinues: boolean;
+} {
+  const pageContinues = rows.length > ACCOUNT_ACTIVITY_PAGE_LIMIT;
+  return {
+    items: pageContinues ? rows.slice(0, ACCOUNT_ACTIVITY_PAGE_LIMIT) : [...rows],
+    pageContinues,
+  };
+}
+
 export function buildActivities(
   tasks: Array<{
     id: string;
@@ -861,6 +877,8 @@ export function buildCockpit({
   const lostDeals = winLoss.lostCount;
   const projectCount = performance?.book?.projectCount ?? companyOpps.length;
   const openCount = performance?.book?.openCount ?? openDeals.length;
+  // One row past the page is the probe. It is not an activity to show.
+  const activity = accountActivityPage(buildActivities(accountTasks));
 
   return {
     company,
@@ -983,7 +1001,8 @@ export function buildCockpit({
       ),
       updatedAt: contact.createdAt.toISOString(),
     })),
-    recentActivity: buildActivities(accountTasks).slice(0, 5),
+    recentActivity: activity.items,
+    recentActivityTruncated: activity.pageContinues,
     risks: visibleRisks.map(serializeRisk),
     compliance: visibleCompliance.map(serializeCompliance),
     roadmap: [],

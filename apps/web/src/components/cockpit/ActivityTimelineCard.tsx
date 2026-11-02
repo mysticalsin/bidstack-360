@@ -15,6 +15,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { activityWhen } from '@/lib/activity-when';
 import { springSoft } from '@/lib/motion';
+import { accountActivityCaption } from '@/pages/account-activity';
 
 import type { AccountCockpitSnapshot, CrmActivity } from '@bidstack/shared';
 
@@ -62,6 +63,8 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
         .slice(0, limit),
     [cockpit.recentActivity, limit],
   );
+  // The cockpit read one activity past this page and dropped it.
+  const pageContinues = cockpit.recentActivityTruncated === true;
 
   if (items.length === 0) {
     return (
@@ -86,9 +89,13 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
     >
       <SectionHeader
         title={t('activityTimeline.title', 'Recent activity')}
-        caption={t('activityTimeline.itemCount', 'Last {{count}} items', {
-          count: items.length,
-        })}
+        caption={
+          pageContinues
+            ? t('activityTimeline.pageCaption', accountActivityCaption(items.length, true))
+            : t('activityTimeline.itemCount', 'Last {{count}} items', {
+                count: items.length,
+              })
+        }
       />
       <div className="relative px-5 pb-5 pt-3">
         {/* The vertical rail that the dots sit on. Drawn once, sits behind

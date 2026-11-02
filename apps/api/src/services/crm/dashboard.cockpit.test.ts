@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrmCompany } from '@bidstack/shared';
 
-import { applyFieldOverrides, buildCockpit, computeSignalCoverage } from './dashboard.cockpit.js';
+import {
+  accountActivityPage,
+  applyFieldOverrides,
+  buildCockpit,
+  computeSignalCoverage,
+} from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
   return {
@@ -1074,5 +1079,73 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     });
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Open deals')?.value).toBe('120');
     expect(cockpit.kpis.find((kpi) => kpi.label === 'Projects')?.value).toBe('140');
+  });
+});
+
+describe('account activity page', () => {
+  it('drops the activity past the page and does not invent a total', () => {
+    // WHY: the cockpit showed five activities and the header counted that page
+    // as the activity. The sixth row only says another activity exists.
+    const rows = [1, 2, 3, 4, 5, 6].map((n) => ({ title: `Activity ${n}` }));
+    const page = accountActivityPage(rows);
+    expect(page.pageContinues).toBe(true);
+    expect(page.items.map((row) => row.title)).toEqual([
+      'Activity 1',
+      'Activity 2',
+      'Activity 3',
+      'Activity 4',
+      'Activity 5',
+    ]);
+    expect(page.items.map((row) => row.title)).not.toContain('Activity 6');
+    expect(page.items).toHaveLength(5);
+
+    const short = accountActivityPage(rows.slice(0, 2));
+    expect(short.pageContinues).toBe(false);
+    expect(short.items).toHaveLength(2);
+
+    const exact = accountActivityPage(rows.slice(0, 5));
+    expect(exact.pageContinues).toBe(false);
+    expect(exact.items).toHaveLength(5);
+  });
+
+  it('does not hand the cockpit a sixth activity to count as the whole feed', () => {
+    // WHY: the activity caption counts recentActivity. A sixth task must not
+    // land in that array, or "Last 6 items" would describe a page as every row.
+    const tasks = [1, 2, 3, 4, 5, 6].map((n) => ({
+      id: `task-${n}`,
+      title: `Activity ${n}`,
+      status: 'open',
+      dueDate: null,
+      accountId: 'mantu',
+      opportunity: null,
+      assignee: null,
+      createdAt: new Date(`2026-06-0${n}T00:00:00.000Z`),
+    }));
+    const cockpit = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks,
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(cockpit.recentActivityTruncated).toBe(true);
+    expect(cockpit.recentActivity).toHaveLength(5);
+    expect(cockpit.recentActivity.map((item) => item.subject)).not.toContain('Activity 6');
+
+    const short = buildCockpit({
+      company: company(),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: tasks.slice(0, 2),
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(short.recentActivityTruncated).toBe(false);
+    expect(short.recentActivity).toHaveLength(2);
   });
 });

@@ -234,11 +234,17 @@ export const AccountCockpitSnapshot = z.object({
   health: CompanyHealth,
   keyContacts: z.array(CrmPerson),
   recentActivity: z.array(CrmActivity),
+  // True when the cockpit read one activity past ACCOUNT_ACTIVITY_PAGE_LIMIT
+  // and dropped it. recentActivity is that page, not every activity.
+  recentActivityTruncated: z.boolean().optional(),
   risks: z.array(RiskItem),
   compliance: z.array(ComplianceCheck),
   roadmap: z.array(RoadmapItem),
 });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
+
+/** Activities shown on one account cockpit. One extra row sets recentActivityTruncated. */
+export const ACCOUNT_ACTIVITY_PAGE_LIMIT = 5;
 
 export const CrmDashboardSnapshot = z.object({
   generatedAt: z.string().datetime(),
