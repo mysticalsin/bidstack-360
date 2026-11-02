@@ -18,6 +18,7 @@ import {
   OpportunityPatch,
   opportunityDocumentPage,
   opportunityDocumentTake,
+  unitsToMicros,
 } from '@bidstack/shared';
 
 import {
@@ -427,9 +428,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(req.body.pipelineStageId !== undefined
           ? { pipelineStageId: req.body.pipelineStageId }
           : {}),
-        ...(req.body.value !== undefined
-          ? { valueMicros: BigInt(Math.round(req.body.value * 1_000_000)) }
-          : {}),
+        ...(req.body.value !== undefined ? { valueMicros: unitsToMicros(req.body.value) } : {}),
         ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
         ...(req.body.dueDate !== undefined
           ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }

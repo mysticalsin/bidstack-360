@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { microsToUnits, sumMicros } from './money.js';
+import { microsToUnits, sumMicros, unitsToMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -70,5 +70,42 @@ describe('sumMicros', () => {
 
   it('returns 0n for an empty list (e.g. a company with no opportunities)', () => {
     expect(sumMicros([])).toBe(0n);
+  });
+});
+
+describe('unitsToMicros', () => {
+  it('converts everyday unit amounts to exact micros', () => {
+    // WHY: opportunity create/patch used `BigInt(Math.round(value * 1e6))`.
+    // Everyday deals must still land on the same micros the UI already shows.
+    expect(unitsToMicros(1.5)).toBe(1_500_000n);
+    expect(unitsToMicros('1.5')).toBe(1_500_000n);
+    expect(unitsToMicros(0)).toBe(0n);
+  });
+
+  it('keeps micros exact where float multiply loses the safe-integer product', () => {
+    // 9,007,199,254.740993 units × 1e6 = 2^53 + 2 micros. The IEEE product
+    // is not a safe integer, so Math.round(units * 1e6) cannot recover it.
+    // A decimal string must.
+    const units = '9007199254.740993';
+    const micros = 9_007_199_254_740_993n;
+
+    const naive = BigInt(Math.round(Number(units) * 1_000_000));
+    expect(naive).not.toBe(micros);
+
+    expect(unitsToMicros(units)).toBe(micros);
+    expect(microsToUnits(unitsToMicros(units))).toBe(9_007_199_254.740993);
+  });
+
+  it('reconstructs negative credits without a double-counted sign', () => {
+    expect(unitsToMicros(-1.5)).toBe(-1_500_000n);
+    expect(unitsToMicros('-1.234567')).toBe(-1_234_567n);
+  });
+
+  it('rejects malformed unit strings instead of coercing them to 0', () => {
+    // Fail loud: a typo must not silently store a $0 opportunity.
+    expect(() => unitsToMicros('')).toThrow(/Invalid money units/);
+    expect(() => unitsToMicros('1.2345678')).toThrow(/Invalid money units/);
+    expect(() => unitsToMicros('1e6')).toThrow(/Invalid money units/);
+    expect(() => unitsToMicros(Number.NaN)).toThrow(/Invalid money units/);
   });
 });

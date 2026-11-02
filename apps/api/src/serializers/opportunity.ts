@@ -2,9 +2,10 @@
 // Numbers come back from Prisma as Decimal/BigInt and need explicit conversion.
 
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
-import type {
-  Opportunity as ApiOpportunity,
-  OpportunityFull as ApiOpportunityFull,
+import {
+  microsToUnits,
+  type Opportunity as ApiOpportunity,
+  type OpportunityFull as ApiOpportunityFull,
 } from '@bidstack/shared';
 
 type SerializedOwner = { id: string; name: string | null; email: string };
@@ -79,7 +80,10 @@ export function serializeOpportunity(
     stage: o.pipelineStage?.name ?? o.stage ?? null,
     pipelineStageId: o.pipelineStageId ?? null,
     pipelineStage: serializePipelineStage(o.pipelineStage),
-    value: Number(o.valueMicros) / 1_000_000,
+    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds
+    // BigInt→Number before dividing, so a deal past ~$9.007B silently
+    // corrupts on the wire. Storage stays micros.
+    value: microsToUnits(o.valueMicros),
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,

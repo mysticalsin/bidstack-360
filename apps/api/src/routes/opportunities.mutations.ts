@@ -19,6 +19,7 @@ import {
   OpportunityCreate,
   OpportunityImport,
   OpportunityImportResult,
+  unitsToMicros,
 } from '@bidstack/shared';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
@@ -131,7 +132,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                 name: body.name,
                 stage: stageKey,
                 pipelineStageId,
-                valueMicros: BigInt(Math.round(body.value * 1_000_000)),
+                valueMicros: unitsToMicros(body.value),
                 probability: body.probability,
                 dueDate: body.dueDate ? new Date(body.dueDate) : null,
                 industry: body.industry,
@@ -373,7 +374,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                     name: vr.row.name,
                     stage: vr.stageKey,
                     pipelineStageId: vr.pipelineStageId ?? undefined,
-                    valueMicros: BigInt(Math.round(vr.row.value * 1_000_000)),
+                    valueMicros: unitsToMicros(vr.row.value),
                     probability: vr.row.probability,
                     dueDate: vr.row.dueDate ? new Date(vr.row.dueDate) : null,
                     industry: vr.row.industry ?? null,
