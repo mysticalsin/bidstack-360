@@ -51,7 +51,7 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 |----|-----|--------|-----|
 | B1 | — | Already shipped | Matrix + route `config.permission` + MSA company scope + financials track toggle (Admin/AE). |
 | B2 | P1 | **Fixed** | New API keys default-deny company/MSA resources and are read-only. Creator must set org-wide or an explicit company/MSA allowlist. Existing keys were backfilled unrestricted + writable. |
-| B3 | P1 | Open | Audit UI is gated by `settings:write`; Sales Manager has `audit-log:read` on the API but cannot open the Settings tab. |
+| B3 | P1 | **Fixed** | Audit UI follows `audit-log:read` (Settings tab, `/audit-log`, command palette). `settings:write` is no longer required to open it. |
 | B4 | P2 | Open | Admin role is a single full-tenant key. Split “user admin” vs “billing admin” if the team grows. |
 
 ### (c) Audit log
@@ -60,8 +60,8 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 |----|-----|--------|-----|
 | C1 | — | Already shipped | MSA create/update/archive/download, intake confirm/reject, financials track toggle, role changes, import start/undo. |
 | C2 | **P1** | **Fixed** | Generic file downloads now write `file.download`. |
-| C3 | P1 | Open | Search/list diffs can include query prefixes; export returns actor emails to `audit-log:read` holders. |
-| C4 | P2 | Open | Viewing filed financials is not audited (mutations are). |
+| C3 | P1 | **Fixed** | List/export diffs drop `q`/`query`/`search`/`prefix`. Actor emails stay on `settings:write` exports only. |
+| C4 | P2 | **Fixed** | GET `/accounts/:id/financials` writes `account.financials.view`. |
 
 ### (d) Uploaded contract files
 

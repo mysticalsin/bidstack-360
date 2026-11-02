@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
@@ -31,7 +32,14 @@ export type SettingsSection =
 
 interface Group {
   label: string;
-  items: { id: SettingsSection; label: string; icon: IconName; admin?: boolean }[];
+  items: {
+    id: SettingsSection;
+    label: string;
+    icon: IconName;
+    admin?: boolean;
+    /** Shown when the user holds this permission even without settings:write. */
+    permission?: string;
+  }[];
 }
 
 const GROUPS: Group[] = [
@@ -75,7 +83,7 @@ const GROUPS: Group[] = [
       { id: 'integrations', label: 'Integrations', icon: 'link' },
       { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },
       { id: 'developer', label: 'Developer access', icon: 'zap', admin: true },
-      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true },
+      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true, permission: 'audit-log:read' },
     ],
   },
 ];
@@ -88,6 +96,7 @@ interface Props {
 export function SettingsLayout({ active, children }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
+  const canReadAudit = useHasPermission('audit-log:read');
   const [menuOpen, setMenuOpen] = useState(false);
   const navId = 'settings-section-nav';
 
@@ -181,7 +190,11 @@ export function SettingsLayout({ active, children }: Props) {
                 </span>
                 <ul className="mt-1 space-y-0.5">
                   {group.items
-                    .filter((item) => !item.admin || isAdmin)
+                    .filter((item) => {
+                      if (!item.admin) return true;
+                      if (isAdmin) return true;
+                      return item.permission === 'audit-log:read' && canReadAudit;
+                    })
                     .map((item) => (
                       <li key={item.id}>
                         <Link

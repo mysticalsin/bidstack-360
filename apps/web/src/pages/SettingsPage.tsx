@@ -24,6 +24,7 @@ import { OpportunityFiltersSection } from '@/components/settings/OpportunityFilt
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
 import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useIsAdmin } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
@@ -73,9 +74,14 @@ const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'developer',
 ]);
 
-function resolveSettingsTab(tab: string | null, isAdmin: boolean): SettingsSection {
+function resolveSettingsTab(
+  tab: string | null,
+  isAdmin: boolean,
+  canReadAudit: boolean,
+): SettingsSection {
   const candidate =
     tab && SETTINGS_SECTIONS.has(tab as SettingsSection) ? (tab as SettingsSection) : 'overview';
+  if (candidate === 'audit-log' && canReadAudit) return candidate;
   if (!isAdmin && ADMIN_SETTINGS_SECTIONS.has(candidate)) return 'overview';
   return candidate;
 }
@@ -84,8 +90,9 @@ export function SettingsPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = useIsAdmin();
+  const canReadAudit = useHasPermission('audit-log:read');
   const requestedTab = searchParams.get('tab');
-  const activeTab = resolveSettingsTab(requestedTab, isAdmin);
+  const activeTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit);
 
   useEffect(() => {
     if (requestedTab && requestedTab !== activeTab) {

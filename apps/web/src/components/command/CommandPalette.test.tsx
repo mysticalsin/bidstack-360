@@ -73,11 +73,15 @@ vi.mock('@/hooks/useAppModules', () => ({
   useAppModules: vi.fn(() => ({ data: undefined })),
 }));
 
-// /audit-log is permission-gated (RequireAdmin in AdminRoutes.tsx), not
-// module-flag-gated — a separate axis from useAppModules above. Defaults to
-// non-admin; individual tests override via vi.mocked(useIsAdmin).
+// /audit-log is permission-gated (audit-log:read), not module-flag-gated.
+const permissionMocks = vi.hoisted(() => ({
+  canReadAudit: false,
+}));
 vi.mock('@/lib/auth', () => ({
   useIsAdmin: vi.fn(() => false),
+}));
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: vi.fn((key: string) => key === 'audit-log:read' && permissionMocks.canReadAudit),
 }));
 
 // QuickAddMenu's create dialogs are real forms with their own data
@@ -157,6 +161,7 @@ afterEach(() => {
   // useIsAdmin is a vi.fn() with a module-level default — tests that
   // override it via mockReturnValue(true) must not leak into the next test.
   vi.mocked(useIsAdmin).mockReturnValue(false);
+  permissionMocks.canReadAudit = false;
 });
 
 describe('CommandPalette — accounts section', () => {
@@ -217,17 +222,17 @@ describe('CommandPalette — nav targets derived from NAV_SECTIONS', () => {
   // A non-admin must not see (or Enter-jump to) a route that exists only to
   // be bounced back to /dashboard on arrival — the leak is the search
   // result itself, independent of what happens after selection.
-  it('does not show the admin-gated Audit log route for a non-admin user', () => {
+  it('does not show the Audit log route without audit-log:read', () => {
     mockAppModules({});
-    vi.mocked(useIsAdmin).mockReturnValue(false);
+    permissionMocks.canReadAudit = false;
     renderPalette();
 
     expect(screen.queryByText('Go to Audit log')).toBeNull();
   });
 
-  it('shows the Audit log route once the user is an admin', () => {
+  it('shows the Audit log route once the user has audit-log:read', () => {
     mockAppModules({});
-    vi.mocked(useIsAdmin).mockReturnValue(true);
+    permissionMocks.canReadAudit = true;
     renderPalette();
 
     expect(screen.queryByText('Go to Audit log')).not.toBeNull();
