@@ -11,6 +11,7 @@ import { AiFeedback } from '@/components/ai/ai-feedback';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { formatUsdMicros } from '@/lib/format';
 import type {
   AccountIntelResult,
   DealSentimentResult,
@@ -110,7 +111,7 @@ function EmailDraftView({ data }: { data: EmailDraftResult }) {
   );
 }
 
-const SENTIMENT_BADGE: Record<DealSentimentResult['label'], string> = {
+const SENTIMENT_BADGE: Record<'positive' | 'neutral' | 'negative', string> = {
   positive: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
   neutral: 'bg-[var(--tag-gray-bg)] text-[var(--tag-gray-fg)]',
   negative: 'bg-[var(--danger-tint)] text-[var(--danger)]',
@@ -118,20 +119,29 @@ const SENTIMENT_BADGE: Record<DealSentimentResult['label'], string> = {
 
 function DealSentimentView({ data }: { data: DealSentimentResult }) {
   const { t } = useTranslation('crm');
-  const scoreText = `${data.score > 0 ? '+' : ''}${data.score.toFixed(1)}`;
+  const scoreText =
+    data.score == null ? null : `${data.score > 0 ? '+' : ''}${data.score.toFixed(1)}`;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            'rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider',
-            SENTIMENT_BADGE[data.label],
-          )}
-        >
-          {data.label}
-        </span>
+        {data.score == null || data.label == null ? (
+          <span className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('copilot.sentimentMissing', 'No sentiment score')}
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider',
+              SENTIMENT_BADGE[data.label],
+            )}
+          >
+            {data.label}
+          </span>
+        )}
         <span className="font-mono text-xs text-[var(--fg-tertiary)]">
-          {t('copilot.sentimentScore', '{{score}} on the −1…+1 read', { score: scoreText })}
+          {scoreText
+            ? t('copilot.sentimentScore', '{{score}} on the −1…+1 read', { score: scoreText })
+            : t('copilot.sentimentMissingDetail', 'No model score was returned')}
         </span>
       </div>
       {data.summary ? (
@@ -151,13 +161,21 @@ function AccountIntelView({ data }: { data: AccountIntelResult }) {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline gap-1.5">
-        <AnimatedNumber
-          value={data.healthScore}
-          duration={0.6}
-          className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]"
-        />
+        {data.healthScore == null ? (
+          <span className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('copilot.healthMissing', 'No health score')}
+          </span>
+        ) : (
+          <AnimatedNumber
+            value={data.healthScore}
+            duration={0.6}
+            className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]"
+          />
+        )}
         <span className="text-xs text-[var(--fg-tertiary)]">
-          {t('copilot.healthOutOf', '/ 100 relationship health')}
+          {data.healthScore == null
+            ? t('copilot.healthMissingDetail', 'No model score was returned')
+            : t('copilot.healthOutOf', '/ 100 model score, basis not recorded')}
         </span>
       </div>
       {data.summary ? (
@@ -182,7 +200,7 @@ export function CopilotResultView({ result }: { result: CopilotResultData }) {
       <p className="text-[10px] text-[var(--fg-muted)]">
         {t('copilot.cost', 'Cost: ${{amount}}', {
           // Money lives in micros on the wire; format at the edge only.
-          amount: (result.data.costMicros / 1_000_000).toFixed(4),
+          amount: formatUsdMicros(result.data.costMicros),
         })}
       </p>
       <AiFeedback sessionId={result.data.sessionId} />

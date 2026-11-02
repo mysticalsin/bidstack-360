@@ -1,4 +1,6 @@
 import { createHmac } from 'node:crypto';
+
+import { twilioPriceToMicros } from './twilio-sms.service.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
@@ -100,6 +102,16 @@ beforeEach(() => {
   mocks.decryptToken.mockReturnValue(
     JSON.stringify({ accountSid: 'AC123', authToken: 'twilio-secret' }),
   );
+});
+
+describe('twilioPriceToMicros', () => {
+  it('stores the signed price string as integer micros', () => {
+    // WHY: parseFloat(price) * 1e6 rounded this carrier price off the stored digit.
+    expect(twilioPriceToMicros('-0.007501')).toBe(-7501n);
+    expect(twilioPriceToMicros('0.00750')).toBe(7500n);
+    expect(twilioPriceToMicros('nope')).toBeNull();
+    expect(twilioPriceToMicros(null)).toBeNull();
+  });
 });
 
 describe('handleInboundSms', () => {

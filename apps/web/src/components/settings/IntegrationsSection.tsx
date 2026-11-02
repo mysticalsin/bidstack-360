@@ -143,10 +143,10 @@ export function IntegrationsSection() {
               action={
                 <div className="flex items-center gap-2">
                   {status.data ? (
-                    <Badge tone={status.data.configured ? 'jade' : 'amber'}>
-                      {status.data.configured
-                        ? t('integrations.statusConfigured', 'Configured')
-                        : t('integrations.statusNotConfigured', 'Not configured')}
+                    <Badge tone="amber">
+                      {status.data.connectionState === 'configured_unverified'
+                        ? t('integrations.statusUnverifiedConfigured', 'Configured, unverified')
+                        : t('integrations.statusUnverified', 'Unverified / not connected')}
                     </Badge>
                   ) : null}
                   {isAdmin ? (
@@ -191,6 +191,12 @@ export function IntegrationsSection() {
                 value={status.data?.pushed24h.toString() ?? t('integrations.notAvailable', 'n/a')}
               />
             </div>
+            <p className="mx-5 mb-5 text-sm leading-6 text-[var(--fg-secondary)]">
+              {t(
+                'integrations.mcpRegistration',
+                'In Dust, open Spaces, Tools, Add Tool, Add MCP Server. Paste a public HTTPS URL that ends in /mcp. Choose Bearer token (Authorization: Bearer), not Automatic OAuth — Polo has no Dust OAuth callback. Use a Polo API key scoped mcp and read. localhost cannot be registered with Dust cloud. This screen stays unverified until that public URL and a Dust API key exist.',
+              )}
+            </p>
             {status.data?.lastError ? (
               <div className="mx-5 mb-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">
                 {status.data.lastError}
@@ -257,7 +263,7 @@ function ApolloAccountIntelCard({
 }: {
   status:
     | {
-        status: 'healthy' | 'degraded' | 'down' | 'disabled';
+        status: 'healthy' | 'degraded' | 'down' | 'disabled' | 'unverified';
         message?: string | null;
         capabilities: string[];
         docsUrl: string;
@@ -341,7 +347,7 @@ function ApolloAccountIntelCard({
                 key={label}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2"
               >
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                <div className="text-xs font-medium text-[var(--fg-tertiary)]">
                   {label}
                 </div>
                 <div className="mt-1 text-sm font-medium text-[var(--fg-primary)]">{value}</div>
@@ -357,7 +363,7 @@ function ApolloAccountIntelCard({
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              <div className="text-xs font-medium text-[var(--fg-tertiary)]">
                 {t('integrations.mcpApiEnvironment', 'MCP/API environment')}
               </div>
               <p className="mt-1 text-xs text-[var(--fg-secondary)]">

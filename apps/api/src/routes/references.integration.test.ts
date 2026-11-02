@@ -135,6 +135,20 @@ describe('references routes', () => {
     createdReferenceIds.push(body.id);
   });
 
+  it('POST /api/v1/references stores a large amount as integer micros', async () => {
+    // WHY: the form used to multiply a unit number by 1e6 and drop the remainder.
+    const micros = '8598204328457184962';
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: { title: `Large reference ${randomUUID().slice(0, 8)}`, valueMicros: micros },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json() as { id: string; valueMicros: string };
+    createdReferenceIds.push(body.id);
+    expect(body.valueMicros).toBe(micros);
+  });
+
   // ── Input validation: POST body ────────────────────────────────────────────
 
   it('POST /api/v1/references rejects empty title', async () => {

@@ -3,14 +3,17 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useIsAdmin } from '@/lib/auth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { Sentry } from '@/lib/sentry';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useApproveDrafting } from '@/hooks/rfp/useApproveDrafting';
 
 export function DraftApprovalGate() {
   const { t } = useTranslation('rfp');
-  const isAdmin = useIsAdmin();
+  const capabilities = useCapabilities();
+  const canApprovePermission = Boolean(
+    capabilities.data?.permissions.includes('proposals:approve'),
+  );
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const orchestrationId = useRfpPipelineStore((s) => s.orchestrationId);
   const stage = useRfpPipelineStore((s) => s.stage);
@@ -20,7 +23,8 @@ export function DraftApprovalGate() {
 
   const isAwaitingDraftApproval = stage === 'awaiting_approval';
 
-  const canApprove = isAwaitingDraftApproval && reviewed && isAdmin && !!bidWorkspaceId && !!orchestrationId;
+  const canApprove =
+    isAwaitingDraftApproval && reviewed && canApprovePermission && !!bidWorkspaceId && !!orchestrationId;
 
   const approveMutation = useApproveDrafting();
 
@@ -56,12 +60,15 @@ export function DraftApprovalGate() {
         The pipeline has paused before generating the RFP drafts. Please review the extracted requirements and matched stories above to ensure the AI has the correct context before spending tokens on full section drafts.
       </div>
 
-      {!isAdmin && (
+      {capabilities.data && !canApprovePermission && (
         <div
           role="alert"
           className="rounded-lg border border-[var(--tag-amber-bg)] bg-[var(--tag-amber-bg)]/20 p-3 text-xs text-[var(--tag-amber-fg)]"
         >
-          {t('approval.requiresAdmin')}
+          {t(
+            'approval.requiresApprover',
+            'Approval requires the proposals approve permission. Admin access is not enough.',
+          )}
         </div>
       )}
 

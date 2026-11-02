@@ -21,6 +21,7 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 
 import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
+import { livePipelineStageFilter } from './opportunities.helpers.js';
 
 const BATCH_SIZE = 250;
 
@@ -52,8 +53,8 @@ const CSV_HEADERS = [
   'Name',
   'Customer',
   'Stage',
-  'Value (EUR)',
-  'Probability',
+  'Value (currency not recorded)',
+  'Stored probability',
   'Due date',
   'Owner',
   'Territory',
@@ -91,7 +92,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
         {
           orgId,
           deletedAt: null,
-          ...(pipelineStageId ? { pipelineStageId } : {}),
+          ...livePipelineStageFilter(pipelineStageId),
           ...(stage ? { stage: stage as PrismaStage } : {}),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),
@@ -124,7 +125,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           const batch = await prisma.opportunity.findMany({
             where,
             include: {
-              pipelineStage: { select: { name: true } },
+              pipelineStage: { select: { name: true, deletedAt: true } },
               owner: { select: { name: true, email: true } },
               territory: { select: { name: true } },
             },
@@ -142,7 +143,10 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           if (batch.length === 0) break;
 
           for (const opp of batch) {
-            const stageName = opp.pipelineStage?.name ?? opp.stage ?? '';
+            const stageName =
+              opp.pipelineStage && opp.pipelineStage.deletedAt == null
+                ? opp.pipelineStage.name
+                : (opp.stage ?? '');
             const ownerLabel = opp.owner?.name ?? opp.owner?.email ?? '';
             const territory = opp.territory?.name ?? '';
             stream.write(
@@ -152,7 +156,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
                 opp.customer,
                 stageName,
                 formatMicros(opp.valueMicros),
-                `${opp.probability}%`,
+                opp.probability === 0 ? 'not recorded' : `${opp.probability}%`,
                 opp.dueDate?.toISOString().slice(0, 10) ?? '',
                 ownerLabel,
                 territory,

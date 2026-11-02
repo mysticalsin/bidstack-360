@@ -79,7 +79,8 @@ export const ContractAgreementCreate = z.object({
   reference: z.string().min(1).max(255),
   countries: z.array(CountryCode).max(100).default([]),
   globalRebateBps: z.number().int().min(0).max(100_000).nullable().optional(),
-  currency: z.string().length(3).default('EUR'),
+  // No euro default. A missing code must fail validation instead of becoming EUR.
+  currency: z.string().trim().toUpperCase().length(3),
   rateCard: z.array(RateCardLine).max(200).default([]),
   effectiveDate: z.string().datetime().nullable().optional(),
   expiryDate: z.string().datetime().nullable().optional(),
@@ -127,8 +128,8 @@ export type ContractAgreementPage = z.infer<typeof ContractAgreementPage>;
 // ── Document extraction (OCR/LLM → reviewable prefill) ───────────────────────
 // A best-effort extraction of a contract document. Every field is nullable —
 // the user reviews/edits before it becomes a ContractAgreement. confidenceBps
-// mirrors the repo convention (8500 = LLM, 5200 = deterministic regex), so the
-// UI can flag low-confidence drafts and never auto-commit.
+// is null unless a measured score exists. method records which extractor ran
+// so the UI does not infer that from a fake percent.
 export const ContractExtractionDraft = z.object({
   reference: z.string().max(255).nullable(),
   kind: ContractKind.nullable(),
@@ -139,7 +140,8 @@ export const ContractExtractionDraft = z.object({
   expiryDate: z.string().datetime().nullable(),
   rateReviewSchedule: ContractRateSchedule.nullable(),
   rateCard: z.array(RateCardLine).max(200),
-  confidenceBps: z.number().int().min(0).max(10_000),
+  confidenceBps: z.number().int().min(0).max(10_000).nullable(),
+  method: z.enum(['llm', 'deterministic']).optional(),
   warnings: z.array(z.string()).max(50),
 });
 export type ContractExtractionDraft = z.infer<typeof ContractExtractionDraft>;

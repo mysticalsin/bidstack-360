@@ -9,7 +9,8 @@ const Input = z.object({
 });
 
 export const contactsGet: Tool<typeof Input> = {
-  description: 'Fetch a single contact by ID.',
+  description:
+    'Fetch one contact. companyId is the company link. linkState is linked or needs_review. The customer text is not a link. Contacts with aiOptOut have null email and phone.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -27,6 +28,8 @@ export const contactsGet: Tool<typeof Input> = {
     return {
       id: contact.id,
       customer: contact.customer,
+      companyId: contact.companyId,
+      linkState: contact.companyId ? ('linked' as const) : ('needs_review' as const),
       name: contact.name,
       role: contact.role,
       // Honor the per-contact AI opt-out — PII must not reach AI agents. (Review.)

@@ -106,6 +106,7 @@
       "exportFailed": "Export failed",
       "exportFailedDescription": "Try again in a moment."
     },
+    "probabilityUnrecorded": "Not recorded",
     "confirmDelete": {
       "titleOne": "Delete {{count}} opportunity?",
       "titleMany": "Delete {{count}} opportunities?",
@@ -118,7 +119,8 @@
       "inStageOne": "{{count}} opportunity in selected stage",
       "inStageMany": "{{count}} opportunities in selected stage",
       "totalOne": "{{count}} opportunity",
-      "totalMany": "{{count}} opportunities"
+      "totalMany": "{{count}} opportunities",
+      "pagePartial": "{{count}} on this page. This page is not the full match."
     },
     "error": {
       "title": "Couldn't load opportunities",
@@ -291,7 +293,7 @@
   },
   "contacts": {
     "title": "Contacts",
-    "subtitle": "{{count}} people in the decision unit.",
+    "subtitle": "{{count}} contacts on this page.",
     "actions": {
       "importCsv": {
         "label": "Import CSV",
@@ -359,6 +361,8 @@
       "deleted": "Deleted {{name}}"
     },
     "linkedTitle": "Linked contacts",
+    "countCaption_one": "{{count}} contact",
+    "countCaption_other": "{{count}} contacts",
     "countCaption": "{{count}} contacts",
     "linkAction": "+ Link contact",
     "selectPlaceholder": "Select a contact…",
@@ -380,13 +384,15 @@
     },
     "empty": {
       "title": "No accounts yet",
-      "body": "Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.",
+      "body": "Add an account. Pipeline, health, and technology stay blank until they are recorded on that account.",
       "importCsv": "Or import accounts from CSV",
       "filtered": "No accounts match your filters"
     },
     "summary": {
       "companyCount_one": "{{count}} company",
       "companyCount_other": "{{count}} companies",
+      "openDeals_one": "{{count}} open deal",
+      "openDeals_other": "{{count}} open deals",
       "openDeals": "{{count}} open deals",
       "weightedPipeline": "{{amount}} weighted pipeline"
     },
@@ -405,30 +411,30 @@
       "retry": "Retry"
     },
     "stats": {
-      "regionLabel": "Account source coverage",
+      "regionLabel": "Accounts in this view",
       "accounts": {
         "label": "Accounts",
-        "detail": "portfolio"
+        "detail": "count of companies in this view"
       },
       "openDeals": {
         "label": "Open deals",
-        "detail": "External CRM pipeline"
+        "detail": "count of open opportunities on accounts in this view"
       },
       "weightedPipeline": {
         "label": "Weighted pipeline",
-        "detail": "bid and presales"
+        "detail": "currency not recorded; not a euro forecast"
       },
       "logoCoverage": {
         "label": "Logo coverage",
         "detail": "brand assets"
       },
       "enrichedProfiles": {
-        "label": "Enriched profiles",
-        "detail": "verified data cache"
+        "label": "Verified-cache profiles",
+        "detail": "accounts tagged verified_data in this view, not a live enrichment"
       },
       "sourcesHealthy": {
-        "label": "Sources healthy",
-        "detail": "API mesh"
+        "label": "Catalog rows marked healthy",
+        "detail": "configuration status, not a live probe"
       }
     },
     "filters": {
@@ -526,12 +532,18 @@
     "zoomOut": "Zoom Out",
     "resetView": "Reset View",
     "legend": {
-      "pipeline": "Pipeline"
+      "pipeline": "Opportunities",
+      "basis": "Shade is the number of opportunities recorded in that country."
+    },
+    "country": {
+      "ariaLabel_one": "{{country}}: {{count}} opportunity",
+      "ariaLabel_other": "{{country}}: {{count}} opportunities"
     },
     "tooltip": {
-      "opportunityCount": "{{count}} opps",
-      "opportunityCount_one": "{{count}} opp",
-      "avgProbability": "Avg probability {{probability}}%"
+      "opportunityCount": "{{count}} opportunities",
+      "opportunityCount_one": "{{count}} opportunity",
+      "opportunityCount_other": "{{count}} opportunities",
+      "avgProbability": "Average open-stage probability {{probability}}%"
     }
   },
   "territoryPanels": {
@@ -649,6 +661,8 @@
     "toastExtractApplied": "Extracted fields applied — review before saving",
     "toastMissingReferenceTitle": "Missing reference",
     "toastMissingReferenceDesc": "A contract reference is required.",
+    "toastMissingCurrencyTitle": "Currency required",
+    "toastMissingCurrencyDesc": "Enter the 3-letter code printed on the agreement.",
     "toastAgreementRecorded": "Agreement recorded",
     "toastCouldNotSave": "Could not save",
     "addAgreement": "Add agreement",
@@ -665,7 +679,7 @@
     "scheduleQuarterly": "Quarterly rate review",
     "scheduleAdhoc": "Ad-hoc rate review",
     "fieldExpiryDate": "Expiry date",
-    "placeholderCurrency": "Currency (EUR)",
+    "placeholderCurrency": "3-letter currency code",
     "fieldCurrency": "Currency",
     "sourceDocument": "Source document",
     "removeAttachedDocument": "Remove attached document",
@@ -921,8 +935,10 @@
     "errorMessage": "Please try again.",
     "retry": "Retry",
     "decisionUnitEmptyTitle": "No decision-unit members yet",
-    "decisionUnitEmptyMessage": "Add a contact from the Contacts page or sync from Dust.",
+    "decisionUnitEmptyMessage": "Link a contact to this opportunity. A job title is not a buying role.",
     "decisionUnitTitle": "Decision unit",
+    "stakeholdersCount_one": "{{count}} stakeholder",
+    "stakeholdersCount_other": "{{count}} stakeholders",
     "stakeholdersCount": "{{count}} stakeholders",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influence {{value}} out of 5",
@@ -977,7 +993,9 @@
       "domainSignal": "Domain signal",
       "logoPreview": "Logo preview",
       "openDataReady": "Open data ready",
-      "nameSignal": "Name signal"
+      "nameSignal": "Name signal",
+      "wikidata": "Wikidata",
+      "none": "No source receipts"
     },
     "autofill": {
       "legalProfile": "Legal profile",
@@ -993,7 +1011,12 @@
         "ready": "ready",
         "preview": "preview",
         "fallback": "fallback",
-        "live": "{{count}} live"
+        "live": "{{count}} live",
+        "notRecorded": "not recorded",
+        "typed": "typed",
+        "recorded": "recorded",
+        "receipt_one": "{{count}} receipt",
+        "receipt_other": "{{count}} receipts"
       },
       "mapLabel": "Autofill readiness map"
     },
@@ -1005,13 +1028,19 @@
     },
     "dialog": {
       "title": "Add company",
-      "description": "Prefill the account from verified sources, logo providers, and the verified data cache."
+      "description": "Type a company name. The domain, website, and logo fill in from the public record."
     },
     "preview": {
       "companyFallback": "Company",
       "namePlaceholder": "Company preview",
       "domainPrompt": "Add a domain for logo and registry matching",
-      "confidence": "Confidence"
+      "confidence": "Confidence",
+      "storedConfidence": "Stored",
+      "notScored": "Not scored",
+      "notScoredHint": "A typed name or domain is not a confidence score.",
+      "storedHint": "Stored company confidence.",
+      "facts": "Public facts",
+      "headcount": "{{formatted}} people"
     },
     "field": {
       "companyOrDomain": "Company or domain",
@@ -1066,7 +1095,7 @@
     "labelSource": "Source",
     "bantHeading": "BANT qualification",
     "labelBudget": "Budget",
-    "placeholderBudget": "e.g. €500K",
+    "placeholderBudget": "Amount and currency, if known",
     "labelAuthority": "Authority",
     "placeholderAuthority": "Decision maker",
     "labelNeed": "Need",
@@ -1179,8 +1208,12 @@
     "sectionTitleRegion": "Global Opportunity Map",
     "sectionTitleIndustry": "Opportunities by Industry",
     "sectionTitleAccount": "Opportunities by Account",
-    "sectionCaptionRegion": "Heat intensity = total pipeline value. Click a country for details.",
-    "sectionCaptionSegment": "Ranked by total pipeline value across all opportunities.",
+    "sectionCaptionRegion": "Heat is unspecified pipeline by country. Currency not recorded; not a euro forecast.",
+    "sectionCaptionSegment": "Bar length is share of the largest segment. Amounts are unspecified opportunity value.",
+    "kpiPipelineBasis": "currency not recorded; not a euro forecast",
+    "kpiProbabilityBasis": "open deals only. A live stage supplies the number. A deal with no live stage uses its stored probability.",
+    "kpiCountriesBasis": "countries with at least one open opportunity",
+    "kpiOpportunitiesBasis": "open opportunities in this view",
     "breakdownTablistLabel": "Breakdown dimension",
     "tabRegion": "Region",
     "tabIndustry": "Industry",
@@ -1204,7 +1237,12 @@
     "liveRegionCountOne": "{{count}} opportunity",
     "liveRegionCountOther": "{{count}} opportunities",
     "kpiTotalPipeline": "Total pipeline",
-    "kpiOpenValue": "Open value",
+    "kpiOpenValue": "Open pipeline",
+    "kpiWonValue": "Won",
+    "kpiLostValue": "Lost",
+    "stageDealCount_one": "{{count}} deal",
+    "stageDealCount_other": "{{count}} deals",
+    "amountBasis": "These figures are every recorded opportunity, not the cards on this board and not the stage filter. {{basis}}. Open pipeline leaves out closed won and lost. Win rate is closed-won count divided by closed deals.",
     "kpiWinRate": "Win rate",
     "winRateNoClosedBids": "No closed bids",
     "kpiActiveDeals": "Active deals",
@@ -1413,8 +1451,8 @@
     "greetingMorning": "Good morning",
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
-    "pageTitle": "Workspace Command Center",
-    "pageSubtitle": "{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline",
+    "pageTitle": "Pipeline",
+    "pageSubtitle": "{{companies}} companies · {{openDeals}} open deals",
     "allAccounts": "All accounts",
     "opportunities": "Opportunities",
     "errorTitle": "Could not load dashboard",
@@ -1626,9 +1664,10 @@
     "scheduleReviewButton": "Schedule review",
     "askDustButton": "Ask Dust",
     "changeStageLabel": "Change stage",
-    "editValueLabel": "Edit deal value (EUR)",
+    "editValueLabel": "Edit deal value (currency not recorded)",
     "editProbabilityLabel": "Edit probability",
     "likely": "likely",
+    "storedProbabilityProxy": "not a measured win chance",
     "editDueDateLabel": "Edit due date",
     "liveCollaborationLabel": "Live collaboration"
   },
@@ -1770,15 +1809,17 @@
   "createOpportunity": {
     "triggerButton": "+ New opportunity",
     "dialogTitle": "New opportunity",
-    "dialogDescription": "Add a bid to your pipeline. You can refine intel after Dust data verification runs.",
+    "dialogDescription": "Add a bid to your pipeline. The amount does not store a currency.",
     "customerLabel": "Customer",
     "customerPlaceholder": "Search companies…",
     "nameLabel": "Opportunity name",
     "namePlaceholder": "Acme — IT Modernization",
     "stageLabel": "Stage",
     "industryLabel": "Industry",
-    "valueLabel": "Value (EUR)",
+    "valueLabel": "Value",
+    "valueHint": "Currency not recorded",
     "probabilityLabel": "Probability %",
+    "probabilityHint": "Blank is stored as 0 and adds nothing to weighted pipeline. It is not a measured win chance.",
     "dueDateLabel": "Due date",
     "countryLabel": "Country",
     "cancel": "Cancel",
@@ -1801,6 +1842,8 @@
       "domain": "Domain"
     },
     "meta": {
+      "employees_one": "{{count}} employee",
+      "employees_other": "{{count}} employees",
       "employees": "{{count}} employees",
       "taxId": "Tax ID: {{taxId}}",
       "parent": "Parent:"
@@ -1826,11 +1869,12 @@
     "statusUpdating": "Updating live rates",
     "statusCached": "Using cached rates",
     "tooltipRatesUnavailable": "Rates unavailable: {{error}}",
-    "tooltipCurrency": "Currency: {{name}}",
-    "triggerAriaLabel": "Select currency, current: {{currency}}",
-    "triggerLabel": "Currency",
-    "listboxAriaLabel": "Select currency",
+    "tooltipCurrency": "{{name}} applies only when an amount records a currency. Unspecified amounts stay unspecified.",
+    "triggerAriaLabel": "Select display currency, current: {{currency}}",
+    "triggerLabel": "Display",
+    "listboxAriaLabel": "Select display currency",
     "displayCurrencyLabel": "Display currency",
+    "unspecifiedNote": "Does not apply to amounts whose currency was not recorded.",
     "autoButtonTitle": "Auto selects currency from your browser location, then timezone",
     "autoButton": "Auto",
     "statusLiveRates": "Live rates",
@@ -1841,7 +1885,7 @@
     "editTitle": "Edit {{name}}",
     "newTitle": "New contact",
     "editDescription": "Patch updates the record and writes an audit entry.",
-    "newDescription": "Add a person to the decision unit.",
+    "newDescription": "Add a contact. A job title is not a buying role.",
     "errorRequired": "Customer and name are required",
     "errorSaveFailed": "Save failed",
     "fieldCustomer": "Customer / account",
@@ -1890,6 +1934,8 @@
     "allIndustries": "All industries",
     "filterTagAriaLabel": "Filter by tag",
     "allTags": "All tags",
+    "resultCount_one": "{{count}} reference",
+    "resultCount_other": "{{count}} references",
     "resultCount": "{{count}} references",
     "errorTitle": "Could not load references",
     "errorMessage": "Please try again in a moment.",
@@ -1956,7 +2002,7 @@
   },
   "predictiveAdmin": {
     "modelTableLoadingLabel": "Loading models...",
-    "modelTableEmpty": "No {{entityType}} models trained yet. Click \"Retrain Now\" to train the first model.",
+    "modelTableEmpty": "No {{entityType}} model is stored. Training needs at least 50 closed records from this org.",
     "modelTableCaption": "{{entityType}} predictive model history",
     "colVersion": "Version",
     "colAccuracyMetrics": "Accuracy Metrics",
@@ -1970,13 +2016,13 @@
     "activeModelLabel": "Active model",
     "inactiveModelLabel": "Inactive",
     "sectionHeading": "{{entityType}} Scoring Model",
-    "sectionSubtitle": "Logistic regression · per-org · retrained weekly",
+    "sectionSubtitle": "Stored only after 50 closed records. Weekly queue: Sunday 02:00 UTC.",
     "retrainButtonLabel": "Retrain {{entityType}} model now",
     "retrainPending": "Queuing…",
     "retrainButton": "Retrain Now",
     "retrainError": "Retrain failed. Please try again.",
     "pageTitle": "Predictive Scoring",
-    "pageSubtitle": "ML-based lead and opportunity scoring — trained on your org's closed deal history. Models are automatically retrained every Sunday at 02:00 UTC.",
+    "pageSubtitle": "A lead or opportunity stays unscored until a model is trained on this org’s closed records. Fewer than 50 closed records stores no model.",
     "dataPrivacyLabel": "Data privacy:",
     "dataPrivacyBody": "Model artifacts contain only learned weights — no raw deal data, names, or emails. Each org trains its own isolated model. Scores are cached for 1 hour in Redis and invalidated on record updates."
   },
@@ -2010,7 +2056,10 @@
     "tableHeaderContribution": "Contribution",
     "title": "ML Score Analysis",
     "chartAria": "Top {{count}} factors influencing the {{label}}",
-    "footer": "Model v{{modelVersion}} · Logistic regression · Updated hourly",
+    "footer": "Model {{modelVersion}} · logistic regression · cached for one hour",
+    "footerBoosted": "Model {{modelVersion}} · gradient boosted · cached for one hour",
+    "footerUnscored": "No trained model. This is not a forecast.",
+    "titleUnscored": "Score",
     "labelLeadScore": "Lead Score",
     "labelWinProbability": "Win Probability"
   },
@@ -2059,7 +2108,9 @@
     "dashboardSubtitle": "Today: {{date}} - {{company}} cockpit",
     "dashboardTitle": "Dashboard",
     "accountStatusSummaryLabel": "Account status summary",
-    "attributionConfidence": "{{percent}}% attribution confidence",
+    "attributionConfidence": "{{percent}}% recorded confidence on this account",
+    "healthBasis": "Weighted mix: firmographics 30%, contacts 25%, engagement 20%, open-deal completeness 25%. Not measured relationship health.",
+    "signalCoverageHint": "Weighted mix: firmographics 30%, contacts 25%, engagement 20%, open-deal completeness 25%. Not measured relationship health.",
     "refreshed": "Refreshed {{time}}",
     "externalFreshness": "External {{freshness}} - {{time}}",
     "externalNotSynced": "External source not synced",
@@ -2110,21 +2161,26 @@
   "oppToolbar": {
     "kpiOpportunities": "Opportunities",
     "kpiRevenue": "Revenue",
-    "kpiWeightedRevenue": "WR",
+    "kpiWeightedRevenue": "Weighted",
     "kpiOpen": "Open",
     "kpiOpenCount": "Open",
     "kpiOpenPipeline": "Open pipeline",
-    "kpiWeightedRevenuePage": "WR (page)",
+    "kpiWeightedRevenuePage": "Weighted (page)",
+    "kpiWeightedRevenueDetail": "Open rows on this page × stored probability. {{basis}}",
+    "kpiCurrencyBasis": "currency not recorded; not a euro forecast",
     "kpiOpportunitiesPage": "Opportunities (page)",
     "kpiRevenuePage": "Revenue (page)",
     "kpiOpenPage": "Open (page)",
     "kpiRegionLabel": "Opportunities KPI summary",
     "title": "Opportunities",
     "resultsFor": "results for",
+    "pageForSearch": "on this page for",
+    "stageOnPage": "on this page.",
+    "pageNotFullMatch": "This page is not the full match.",
     "clear": "clear",
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",
-    "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "bidsInFlight": "{{count}} on this page · click any cell to edit inline.",
     "exportingLabel": "Exporting opportunities…",
     "exportLabel": "Export visible opportunities as CSV",
     "exporting": "Exporting…",
@@ -2186,6 +2242,8 @@
     "allIndustries": "All industries",
     "industryLoadError": "Could not load industry filters.",
     "retry": "Retry",
+    "resultCount_one": "{{count}} account",
+    "resultCount_other": "{{count}} accounts",
     "resultCount": "{{count}} account",
     "errorTitle": "Couldn't load top accounts",
     "errorMessage": "Couldn't load top accounts.",
@@ -2193,7 +2251,11 @@
     "emptyMessage": "Add opportunities with values to see top accounts ranked by pipeline.",
     "totalPipeline": "total pipeline",
     "won": "won",
+    "openDeals_one": "{{count}} open deal",
+    "openDeals_other": "{{count}} open deals",
     "openDeals": "{{count}} open deals",
+    "contacts_one": "{{count}} contact",
+    "contacts_other": "{{count}} contacts",
     "contacts": "{{count}} contacts",
     "sourceCurated": "Curated top 10",
     "sourceAuto": "Auto-ranked",
@@ -2240,21 +2302,23 @@
       "ariaLabel": "Account decision signals"
     },
     "badge": {
-      "ready": "{{count}}% ready",
+      "ready": "{{count}}% readiness proxy",
+      "coverage": "Coverage · {{band}}",
       "stackSignals": "{{count}} stack signals"
     },
     "signal": {
       "readiness": {
-        "label": "Bid readiness estimate",
-        "detailReady": "ready for exec review",
-        "detailFocus": "needs presales focus"
+        "label": "Bid readiness proxy",
+        "detail": "weighted mix of recorded signals on this account, not a measured score"
       },
       "source": {
-        "label": "Source coverage",
-        "detail": "{{count}} attributed source"
+        "label": "Source receipts",
+        "detail": "{{count}} attribution receipts. Not a coverage percent.",
+        "detailWithLogo": "{{attribution}} attribution receipt and 1 stored logo. Not a coverage percent."
       },
       "decision": {
-        "label": "Decision coverage"
+        "label": "Influence map",
+        "value": "{{score}}/5 proxy"
       },
       "risk": {
         "label": "Open risk load",
@@ -2273,8 +2337,14 @@
       "advance": "Advance the next proposal step with available account context and owner alignment."
     },
     "committee": {
+      "champions_one": "{{count}} champion mapped",
+      "champions_other": "{{count}} champions mapped",
       "champions": "{{count}} champion mapped",
+      "buyers_one": "{{count}} buyer mapped",
+      "buyers_other": "{{count}} buyers mapped",
       "buyers": "{{count}} buyer mapped",
+      "stakeholders_one": "{{count}} stakeholder mapped",
+      "stakeholders_other": "{{count}} stakeholders mapped",
       "stakeholders": "{{count}} stakeholder mapped",
       "empty": "map buyer and champion"
     },
@@ -2284,7 +2354,7 @@
         "pending": "Pipeline pending"
       },
       "weightedValue": {
-        "label": "Weighted account value",
+        "label": "Reported annual revenue",
         "notVerified": "Not verified"
       },
       "ownerMap": {
@@ -2839,6 +2909,9 @@
     "financial": {
       "title": "Financial health",
       "private": "Private",
+      "sourceNotProbed": "source not probed",
+      "unknown": "unknown",
+      "proxy": "proxy",
       "marketCap": "Market cap",
       "revenueTtm": "Revenue (TTM)",
       "growth": "Growth",
@@ -2898,7 +2971,7 @@
     "searchPlaceholder": "Search or create…",
     "existingTagsLabel": "Existing tags",
     "createNamed": "+ Create “{{name}}”",
-    "aiSuggestions": "AI suggestions",
+    "aiSuggestions": "Matches in this text",
     "suggestThinking": "Thinking…",
     "suggestAction": "Suggest"
   },
@@ -2980,7 +3053,8 @@
     "caption": "Why deals close — and the pattern across the org",
     "errorTitle": "Could not load win/loss patterns",
     "errorMessage": "Try again shortly.",
-    "recordedCount": "{{won}} won · {{lost}} lost recorded",
+    "recordedCount": "{{won}} won and {{lost}} lost reason records across the org",
+    "accountClosed": "This account has {{count}} closed deals. A closed stage is not a reason.",
     "patternBadge": "Pattern",
     "mostLossesCitePrefix": "Most losses cite ",
     "noReasonsYet": "No loss reasons recorded yet — capture a few to surface patterns.",
@@ -3087,20 +3161,21 @@
   "healthScore": {
     "regionLabel": "Account signal coverage",
     "title": "Signal coverage",
-    "signalsScored": "{{count}} account signals scored",
-    "gaugeLabel": "Account signal coverage {{score}} out of 100",
-    "coverage": "Coverage",
-    "strongestBand": "Strongest coverage band",
+    "signalsScored": "{{count}} factors. {{weights}} The number beside a band is how many factors landed there.",
+    "gaugeLabel": "Weighted signal mix {{score}} out of 100. {{weights}}",
+    "coverage": "Signal mix",
+    "strongestBand": "Most factors",
+    "notRelationshipHealth": "Bands: 75+ strong, 50+ good, 25+ watch, below 25 at risk. Not measured relationship health.",
     "noSignal": "No signal",
-    "healthBands": "Health bands",
+    "healthBands": "Coverage bands",
     "whatDrivesScore": "What drives this score",
     "scoreFactors": "Score factors",
     "nextLabel": "Next: ",
     "band": {
-      "strong": "Strong",
-      "good": "Good",
-      "needsAttention": "Needs attention",
-      "critical": "Critical"
+      "strong": "Strong, proxy",
+      "good": "Good, proxy",
+      "needsAttention": "Watch, proxy",
+      "critical": "At risk, proxy"
     }
   },
   "objectSettingsForm": {
@@ -3203,7 +3278,11 @@
     "emptyFilteredTitle": "No courses tagged \"{{sector}}\"",
     "emptyTitle": "No courses published yet",
     "emptyMessage": "Courses appear here as soon as Mantu Academy publishes them with sector tags.",
+    "resultCount_one": "{{count}} course",
+    "resultCount_other": "{{count}} courses",
     "resultCount": "{{count}} course",
+    "resultCountInSector_one": "{{count}} course in {{sector}}",
+    "resultCountInSector_other": "{{count}} courses in {{sector}}",
     "resultCountInSector": "{{count}} course in {{sector}}",
     "filterGroupLabel": "Filter by sector",
     "allSectors": "All sectors",
@@ -3361,7 +3440,8 @@
     "unknownIndustry": "Unknown industry",
     "dataSourcesAria": "{{name}} data sources",
     "openDeals": "Open deals",
-    "pipeline": "Pipeline",
+    "pipeline": "Weighted pipeline",
+    "pipelineMissingProbability": "{{count}} open deals have no recorded probability and are not in the weighted pipeline.",
     "totalDeals": "Total deals",
     "employees": "Employees",
     "confidence": "Confidence",
@@ -3370,15 +3450,19 @@
   "openIssues": {
     "regionLabel": "Open issues by severity",
     "title": "Open issues",
-    "captionAllClear": "All clear",
-    "captionItemsToAction": "{{count}} item{{plural}} to action",
+    "captionAllClear": "No open items in the recorded register",
+    "captionNoneRecorded": "No risks or compliance checks recorded on this account",
+    "captionNoneOpen": "No open items in the recorded register",
+    "captionItemsToAction": "{{count}} open item{{plural}}",
     "bucketsLabel": "Severity buckets",
     "severityCritical": "Critical",
     "severityHigh": "High",
     "severityMedium": "Medium",
     "severityLow": "Low",
-    "emptyTitle": "No open issues",
-    "emptyMessage": "Everything is green here.",
+    "emptyTitle": "Nothing recorded",
+    "emptyMessage": "This account has no risk or compliance rows. That is not a clearance.",
+    "noneOpenTitle": "No open items",
+    "noneOpenMessage": "The recorded register has no open risks or compliance checks.",
     "unassigned": "Unassigned",
     "dueSuffix": " - due {{dueDate}}",
     "noOwner": "No owner"
@@ -3401,6 +3485,8 @@
   "activityTimeline": {
     "regionLabel": "Recent activity",
     "title": "Recent activity",
+    "itemCount_one": "Last {{count}} item",
+    "itemCount_other": "Last {{count}} items",
     "itemCount": "Last {{count}} items",
     "emptyTitle": "Nothing yet",
     "emptyMessage": "Tasks, emails, and Dust runs for this account will appear here."
@@ -3451,6 +3537,8 @@
     "qualityWarningDetail": "{{classified}} of {{total}} accounts carry an ABC sector classification — treat these splits as directional until ABC coverage improves.",
     "accountCountOne": "{{count}} account",
     "accountCountOther": "{{count}} accounts",
+    "geoIndustryMeta_one": "{{count}} opp · {{value}}",
+    "geoIndustryMeta_other": "{{count}} opps · {{value}}",
     "fteValue": "{{value}} FTE",
     "fteUnknown": "FTE unknown",
     "fteUnknownTooltip": "No account in this sector has a known headcount",
@@ -3468,7 +3556,9 @@
     "columnTerritory": "Territory",
     "columnStage": "Stage",
     "columnValue": "Value",
-    "columnProbability": "Probability",
+    "columnValueTitle": "currency not recorded; not a euro forecast",
+    "columnProbability": "Stored probability",
+    "columnProbabilityTitle": "Stored on the deal. A blank is saved as 0 and is not a measured win chance.",
     "columnDue": "Due"
   },
   "territorySegmentBreakdown": {
@@ -3484,7 +3574,7 @@
     "emptyTitle": "No data yet",
     "oppCountOne": "{{count}} opp",
     "oppCountOther": "{{count}} opps",
-    "avgProbability": "{{percent}}% avg probability",
+    "avgProbability": "{{percent}}% open-stage probability",
     "overflowOne": "+ {{count}} more {{noun}} not shown",
     "overflowIndustryOther": "+ {{count}} more {{noun}} segments not shown",
     "overflowOther": "+ {{count}} more {{noun}}s not shown"
@@ -3495,7 +3585,8 @@
     "opportunityNameLabel": "Opportunity name",
     "opportunityNamePlaceholderWithCompany": "{{companyName}} — Opportunity",
     "opportunityNamePlaceholder": "Opportunity name",
-    "valueLabel": "Value (EUR)",
+    "valueLabel": "Value",
+    "valueHint": "Currency not recorded",
     "stageLabel": "Stage",
     "stageDiscovery": "Discovery",
     "stageQualified": "Qualified",
@@ -3649,9 +3740,11 @@
   },
   "kpiSidebar": {
     "title": "Platform status",
-    "caption": "Latest available Polo PreSales metrics",
-    "releaseScore": "Release score",
-    "providersHealthy": "Providers healthy",
+    "caption": "Catalog and stored samples for this workspace. Not a live integration probe.",
+    "releaseScore": "Release score, stored rubric",
+    "releaseScoreUnset": "Release score unset",
+    "releaseScoreNone": "no stored score",
+    "providersHealthy": "Providers marked healthy",
     "queueBacklog": "Queue backlog",
     "overdueTasks": "Overdue tasks"
   },
@@ -3734,7 +3827,7 @@
   },
   "businessSnapshot": {
     "title": "Business snapshot",
-    "caption": "Health: {{band}} - score {{score}}/100",
+    "caption": "{{recorded}} of {{total}} fields on this card are filled. The bar is {{share}}% of those fields.",
     "region": {
       "ariaLabel": "Business snapshot"
     },
@@ -3833,12 +3926,12 @@
   },
   "forecastChart": {
     "title": "Forecast Breakdown",
-    "caption": "Stacked by category across periods"
+    "caption": "Stacked by category. Currency not recorded; not a euro forecast."
   },
   "techStack": {
-    "regionLabel": "Technical Stack Overview",
-    "title": "Technical Stack Overview",
-    "caption": "From discovery & verification",
+    "regionLabel": "Technology on this account",
+    "title": "Technology",
+    "caption": "Products recorded on this account",
     "emptyTitle": "No stack data yet",
     "emptyMessage": "Enrich this account to discover its stack."
   },
@@ -3847,12 +3940,18 @@
     "noTitleOrEmail": "n/a"
   },
   "pipelineByStageMini": {
+    "dealCount_one": "{{count}} deal",
+    "dealCount_other": "{{count}} deals",
+    "openCaption": "Open stages only. Closed won and lost stay in the win rate.",
+    "emptyOpen": "No open pipeline.",
     "heading": "Pipeline by stage"
   },
   "microsoftSignInButton": {
     "label": "Sign in with Microsoft"
   },
   "customObjectNavItem": {
+    "recordCountLabel_one": "{{count}} record",
+    "recordCountLabel_other": "{{count}} records",
     "recordCountLabel": "{{count}} records"
   },
   "alert": {
@@ -3861,21 +3960,23 @@
   "pipelineByStage": {
     "regionLabel": "Portfolio pipeline by stage",
     "title": "Portfolio pipeline",
-    "caption": "All-account pipeline by stage"
+    "caption": "Org-wide stages, not this account alone. Bar length is unspecified pipeline share. Currency not recorded; not a euro forecast."
   },
   "accountDashboardWidgets": {
-    "railAriaLabel": "CRM integration status",
-    "railLabel": "Integration activity",
-    "railCaption": "ERP, External CRM, verified data connectors"
+    "railAriaLabel": "Connector catalog status",
+    "railLabel": "Connector catalog",
+    "railCaption": "Configuration status, not a live probe"
   },
   "oppIndustryBreakdown": {
     "title": "Pipeline by industry",
+    "sectorCount_one": "{{count}} sector",
+    "sectorCount_other": "{{count}} sectors",
     "sectorCount": "{{count}} sector"
   },
   "revenueEvolution": {
     "regionLabel": "Revenue evolution",
     "title": "Revenue evolution",
-    "caption": "Won-deal revenue with this client by month",
+    "caption": "Won-deal amounts by month on this account. Currency not recorded; not a euro forecast.",
     "srSummary": "{{count}} months of won-deal revenue. Peak {{period}}.",
     "barsListLabel": "Won-deal revenue by month",
     "barLabel": "{{period}}: {{amount}}"
@@ -3883,7 +3984,7 @@
   "winLoss": {
     "regionLabel": "Win / loss",
     "title": "Win / loss",
-    "caption": "Decided deals on this account",
+    "caption": "Decided deals on this account. Win rate is won ÷ decided. Currency not recorded; not a euro forecast.",
     "winRateLabel": "win rate",
     "wonCount": "{{count}} won",
     "lostCount": "{{count}} lost",

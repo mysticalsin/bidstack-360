@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductsTab, SolutionsTab } from './IntelTabs';
 
+vi.mock('@/hooks/useFormatMoney', () => ({
+  useFormatMoney: () => ({
+    formatMoneyMicros: (micros: string | number | bigint) => `price:${String(micros)}`,
+  }),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (_key: string, fallback: string, values?: Record<string, unknown>) => {
@@ -189,5 +195,58 @@ describe('IntelTabs source badges', () => {
     expect(
       screen.getByTestId('product-product-1-field-source-currency').getAttribute('aria-label'),
     ).toBe('Currency source: Currency set by finance owner.');
+  });
+
+  it('does not print 0% when an extract was not scored', () => {
+    render(
+      <SolutionsTab
+        solutions={[
+          {
+            id: 'solution-1',
+            name: 'Cloud modernization',
+            description: 'Migration and landing-zone advisory.',
+            category: 'consulting',
+            status: 'active',
+            confidenceBps: 0,
+            extractedFromDocumentId: files[0]!.id,
+          },
+        ]}
+        files={files}
+        onDelete={vi.fn()}
+        isDeleting={false}
+      />,
+    );
+
+    expect(screen.getByTestId('solution-solution-1-confidence').textContent).toContain('Not scored');
+    expect(screen.getByTestId('solution-solution-1-confidence').textContent).not.toContain('0%');
+  });
+
+  it('prints a product price from the micros digits when the number collapses', () => {
+    // WHY: Number(priceRangeMicros) moved this catalog price to the next cent.
+    const micros = '8598204328457184962';
+    render(
+      <ProductsTab
+        products={[
+          {
+            id: 'product-1',
+            name: 'Managed workspace',
+            description: null,
+            category: 'service',
+            priceRangeMicros: Number(BigInt(micros)),
+            priceRangeMicrosText: micros,
+            currency: 'EUR',
+            status: 'draft',
+            confidenceBps: 4300,
+            extractedFromDocumentId: null,
+          },
+        ]}
+        files={files}
+        onDelete={vi.fn()}
+        isDeleting={false}
+      />,
+    );
+
+    expect(screen.getByText(`price:${micros}`)).toBeDefined();
+    expect(screen.queryByText(`price:${Number(BigInt(micros))}`)).toBeNull();
   });
 });

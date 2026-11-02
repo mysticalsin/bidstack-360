@@ -2,9 +2,11 @@
 // Numbers come back from Prisma as Decimal/BigInt and need explicit conversion.
 
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
-import type {
-  Opportunity as ApiOpportunity,
-  OpportunityFull as ApiOpportunityFull,
+import {
+  microsToUnits,
+  presentOpportunityIntel,
+  type Opportunity as ApiOpportunity,
+  type OpportunityFull as ApiOpportunityFull,
 } from '@bidstack/shared';
 
 type SerializedOwner = { id: string; name: string | null; email: string };
@@ -20,10 +22,11 @@ type SerializedOpportunity = {
   id: string;
   code: string;
   customer: string;
+  companyId?: string | null;
   name: string;
   stage: OpportunityStage;
   pipelineStageId: string | null;
-  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null;
+  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean; deletedAt?: Date | null } | null;
   valueMicros: bigint | number;
   probability: number;
   dueDate: Date | null;
@@ -50,9 +53,10 @@ export interface OpportunityCounts {
 }
 
 function serializePipelineStage(
-  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null | undefined,
+  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean; deletedAt?: Date | null } | null | undefined,
 ): SerializedPipelineStage | null {
-  if (!ps) return null;
+  // A removed stage does not keep its name or its won/lost flags on the deal.
+  if (!ps || ps.deletedAt) return null;
   return {
     id: ps.id,
     name: ps.name,
@@ -67,15 +71,23 @@ export function serializeOpportunity(
   o: WithOwner & { territory?: { name: string } | null },
   counts?: OpportunityCounts,
 ): ApiOpportunity {
+  const liveStage = serializePipelineStage(o.pipelineStage);
+  // The stored id can still point at a removed stage. The read must not.
+  const stageRemoved = Boolean(o.pipelineStage?.deletedAt);
   return {
     id: o.id,
     code: o.code,
     customer: o.customer,
+    companyId: o.companyId ?? null,
     name: o.name,
-    stage: o.pipelineStage?.name ?? o.stage ?? null,
-    pipelineStageId: o.pipelineStageId ?? null,
-    pipelineStage: serializePipelineStage(o.pipelineStage),
-    value: Number(o.valueMicros) / 1_000_000,
+    stage: liveStage?.name ?? o.stage ?? null,
+    pipelineStageId: stageRemoved ? null : (o.pipelineStageId ?? null),
+    pipelineStage: liveStage,
+    value: microsToUnits(o.valueMicros),
+    valueMicros:
+      typeof o.valueMicros === 'bigint'
+        ? o.valueMicros.toString()
+        : BigInt(Math.trunc(o.valueMicros)).toString(),
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,
@@ -94,7 +106,7 @@ export function serializeOpportunity(
 export function serializeOpportunityFull(o: Full): ApiOpportunityFull {
   return {
     ...serializeOpportunity(o),
-    intel: o.intel as ApiOpportunityFull['intel'],
+    intel: presentOpportunityIntel(o.intel),
     tasks: o.tasks.map((t) => ({
       id: t.id,
       title: t.title,

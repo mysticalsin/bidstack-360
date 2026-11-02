@@ -159,6 +159,7 @@ function SignalRow({
   index: number;
   reducedMotion: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const attribution = signal.sourceAttribution[0];
   const href = signal.url ?? attribution?.sourceUrl ?? undefined;
   return (
@@ -175,8 +176,10 @@ function SignalRow({
         <strong>{signal.title}</strong>
         <span>{signal.summary}</span>
       </div>
-      <Badge tone={signal.confidence >= 0.9 ? 'jade' : 'blue'}>
-        {Math.round(signal.confidence * 100)}%
+      <Badge tone={signal.confidence != null && signal.confidence >= 0.9 ? 'jade' : 'gray'}>
+        {signal.confidence == null
+          ? t('liveDataMesh.notScored', 'Not scored')
+          : `${Math.round(signal.confidence * 100)}%`}
       </Badge>
     </motion.a>
   );

@@ -25,9 +25,12 @@ export const envSchema = z.object({
 
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
 
-  // Microsoft SSO
-  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('false'),
+  // Official sign-in is Microsoft. Google, including Gmail, stays available
+  // in this version. Unset means shown; only "false" hides a button.
+  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('true'),
   VITE_SSO_MICROSOFT_LABEL: z.string().optional(),
+  VITE_SSO_GOOGLE_ENABLED: z.enum(['true', 'false']).default('true'),
+  VITE_SSO_GOOGLE_LABEL: z.string().optional(),
 
   // ─── Demo mode (public passwordless "try the demo" door) ──────────────
   // DEMO_MODE=true arms a PUBLIC sign-in: any email → its own freshly-seeded
@@ -47,6 +50,8 @@ export const envSchema = z.object({
   DUST_API_KEY: z.string().min(1).optional().or(z.literal('')),
   DUST_WORKSPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_DATA_SOURCE_ID: z.string().min(1).optional().or(z.literal('')),
+  // Space sId that owns the data source. Not the space display name.
+  DUST_SPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_AGENT_EXEC_BRIEF: z.string().optional(),
   DUST_WEBHOOK_SECRET: z.string().min(1).optional().or(z.literal('')),
   DUST_BASE_URL: z.string().url().optional().or(z.literal('')),
@@ -403,6 +408,15 @@ export function getEnv(): Env {
   // mcp-server) against a `where` missing orgId compiling to an all-tenants
   // query. Off by default so an existing deployment isn't broken by a config
   // oversight, but production must run at least 'warn'.
+  const rfpQuotaFailClosed = (process.env.RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED ?? '')
+    .trim()
+    .toLowerCase();
+  if (
+    env.NODE_ENV === 'production' &&
+    (rfpQuotaFailClosed === 'false' || rfpQuotaFailClosed === '0')
+  ) {
+    semanticErrors.push('RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
+  }
   if (env.NODE_ENV === 'production' && env.BIDSTACK_TENANT_SCOPE_GUARD === 'off') {
     semanticErrors.push(
       "BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production (recommend 'enforce')",

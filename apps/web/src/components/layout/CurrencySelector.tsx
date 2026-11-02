@@ -124,9 +124,11 @@ export function CurrencySelector() {
             ? t('currencySelector.tooltipRatesUnavailable', 'Rates unavailable: {{error}}', {
                 error: ratesError,
               })
-            : t('currencySelector.tooltipCurrency', 'Currency: {{name}}', {
-                name: selected?.name ?? currency,
-              })
+            : t(
+                'currencySelector.tooltipCurrency',
+                '{{name}} applies only when an amount records a currency. Unspecified amounts stay unspecified.',
+                { name: selected?.name ?? currency },
+              )
         }
       >
         <button
@@ -146,7 +148,7 @@ export function CurrencySelector() {
           </span>
           <span className="tb-currency-code leading-none">
             <span className="block text-[10px] font-medium text-[var(--fg-tertiary)]">
-              {t('currencySelector.triggerLabel', 'Currency')}
+              {t('currencySelector.triggerLabel', 'Display')}
             </span>
             <span className="block text-xs font-semibold text-[var(--fg-primary)]">{currency}</span>
           </span>
@@ -182,6 +184,12 @@ export function CurrencySelector() {
                   {selected?.name ?? currency}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{statusText}</p>
+                <p className="mt-1 text-xs text-[var(--fg-secondary)]">
+                  {t(
+                    'currencySelector.unspecifiedNote',
+                    'Does not apply to amounts whose currency was not recorded.',
+                  )}
+                </p>
               </div>
               <button
                 type="button"

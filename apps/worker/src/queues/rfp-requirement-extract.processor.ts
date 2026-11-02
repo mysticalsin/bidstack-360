@@ -294,9 +294,8 @@ export async function processJob(
       mandatory: r.mandatory,
       priority: r.priority as 'low' | 'medium' | 'high' | 'critical',
       confidenceBps: r.confidenceBps,
-      // Extraction always produces a confidence (LLM or heuristic fallback),
-      // so these rows are ASSESSED — never the PENDING column default.
-      assessmentStatus: 'ASSESSED' as const,
+      // A keyword line or a model reply with no score is not assessed.
+      assessmentStatus: (r.confidenceBps == null ? 'PENDING' : 'ASSESSED') as 'PENDING' | 'ASSESSED',
       metadata: { orchestrationId, sourceChunkIndex: r.sourceChunkIndex, dustRunId },
     })),
     skipDuplicates: true,

@@ -6,20 +6,19 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { recordedMicros, unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { useTableSort } from '@/hooks/useTableSort';
 import { REASON_LABELS } from '@/pages/winLoss/reasonLabels';
 import type { WinLossClosedRow } from '@/pages/winLoss/useWinLossAnalysis';
 
 type SortKey = 'name' | 'customer' | 'outcome' | 'reason' | 'value' | 'owner' | 'decidedAt';
 
-const ACCESSORS: Record<SortKey, (r: WinLossClosedRow) => string | number | null> = {
+const ACCESSORS: Record<SortKey, (r: WinLossClosedRow) => string | number | bigint | null> = {
   name: (r) => r.name,
   customer: (r) => r.customer,
   outcome: (r) => r.outcome,
   reason: (r) => r.reason,
-  // Precision loss past 2^53 micros is irrelevant for ordering.
-  value: (r) => Number(r.valueMicros),
+  value: (r) => recordedMicros(0, r.valueMicros),
   owner: (r) => r.ownerName,
   decidedAt: (r) => r.decidedAt,
 };
@@ -29,7 +28,6 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
   // Currency-aware formatter converts the EUR-at-rest valueMicros into the
   // user's selected display currency; the raw @/lib/format formatter only
   // re-labels the symbol without applying the FX conversion.
-  const { formatMoneyMicros } = useFormatMoney();
   const { state, setState, sorted } = useTableSort<WinLossClosedRow, SortKey>(rows, ACCESSORS, {
     initial: { key: 'decidedAt', dir: 'desc' },
   });
@@ -63,7 +61,11 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
               {header('customer', t('winLoss.colCustomer', 'Customer'))}
               {header('outcome', t('winLoss.colOutcome', 'Outcome'))}
               {header('reason', t('winLoss.colReason', 'Reason'))}
-              {header('value', t('winLoss.colValue', 'Value'), 'right')}
+              {header(
+                'value',
+                t('winLoss.colValue', 'Value · currency not recorded'),
+                'right',
+              )}
               {header('owner', t('winLoss.colOwner', 'Owner'))}
               {header('decidedAt', t('winLoss.colDecided', 'Recorded'))}
             </tr>
@@ -98,7 +100,7 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
                   ) : null}
                 </td>
                 <td className="px-4 py-3 text-right align-top tabular-nums text-[var(--fg-secondary)]">
-                  {formatMoneyMicros(row.valueMicros, 'EUR')}
+                  {unspecifiedMicrosLabel(row.valueMicros)}
                 </td>
                 <td className="px-4 py-3 align-top text-xs text-[var(--fg-tertiary)]">
                   {row.ownerName ?? t('winLoss.unowned', 'Unowned')}

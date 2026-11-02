@@ -17,7 +17,13 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import {
+  compareMicros,
+  formatUnspecifiedCompactMicros,
+  microsSharePercent,
+  recordedMicros,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
@@ -29,12 +35,15 @@ import { keyAccountSignal } from './strategicSignals';
 const KEY_ACCOUNTS_PAGE_SIZE = 50;
 const KEY_ACCOUNTS_SIGNAL_SIZE = 200;
 
+export function labeledAccountCount(count: number): string {
+  return `${count} ${count === 1 ? 'account' : 'accounts'}`;
+}
+
 export function AccountsKeySegment() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
-  const { formatMoney } = useFormatMoney();
   // Debounce the value that feeds the query keys so a server fetch fires once the
   // user pauses typing — not on every keystroke. `search` still drives the input
   // display for responsive typing.
@@ -65,8 +74,12 @@ export function AccountsKeySegment() {
   const unclassifiedIndustry = t('keyAccounts.unclassifiedIndustry', 'Unclassified');
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
-  const totalPipeline = useMemo(
-    () => items.reduce((sum, account) => sum + account.totalValue, 0),
+  const totalPipelineMicros = useMemo(
+    () =>
+      items.reduce(
+        (sum, account) => sum + recordedMicros(account.totalValue, account.totalValueMicros),
+        0n,
+      ),
     [items],
   );
   const openDeals = useMemo(() => items.reduce((sum, account) => sum + account.openDeals, 0), [items]);
@@ -79,20 +92,25 @@ export function AccountsKeySegment() {
     [items],
   );
   const industryBreakdown = useMemo(() => {
-    const byIndustry = new Map<string, { count: number; pipeline: number }>();
+    const byIndustry = new Map<string, { count: number; pipelineMicros: bigint }>();
     for (const account of signalItems) {
       const key = account.industry || unclassifiedIndustry;
-      const current = byIndustry.get(key) ?? { count: 0, pipeline: 0 };
+      const current = byIndustry.get(key) ?? { count: 0, pipelineMicros: 0n };
       current.count += 1;
-      current.pipeline += account.totalValue;
+      current.pipelineMicros += recordedMicros(account.totalValue, account.totalValueMicros);
       byIndustry.set(key, current);
     }
     return [...byIndustry.entries()]
       .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => b.pipeline - a.pipeline || b.count - a.count)
+      .sort(
+        (a, b) => compareMicros(b.pipelineMicros, a.pipelineMicros) || b.count - a.count,
+      )
       .slice(0, 6);
   }, [signalItems, unclassifiedIndustry]);
-  const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
+  const maxIndustryMicros = industryBreakdown.reduce(
+    (max, item) => (compareMicros(item.pipelineMicros, max) > 0 ? item.pipelineMicros : max),
+    0n,
+  );
   const selectedIndustryStats = industryBreakdown.find((item) => item.name === industry);
   const leadingIndustry = selectedIndustryStats ?? industryBreakdown[0] ?? null;
 
@@ -183,13 +201,17 @@ export function AccountsKeySegment() {
             }
             sub={
               leadingIndustry
-                ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
-                    count: leadingIndustry.count,
-                    pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
-                  })
+                ? `${labeledAccountCount(leadingIndustry.count)} / ${formatUnspecifiedCompactMicros(leadingIndustry.pipelineMicros)}`
                 : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
             }
           >
+            <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'keyAccounts.industryBarBasis',
+                'Bar length is this industry’s share of unspecified pipeline on loaded strategic accounts. {{basis}}',
+                { basis: UNSPECIFIED_CURRENCY_BASIS },
+              )}
+            </p>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {industryBreakdown.map((item) => (
                 <button
@@ -204,13 +226,26 @@ export function AccountsKeySegment() {
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
-                    <span className="font-medium text-[var(--fg-tertiary)]">{item.count}</span>
+                    <span className="text-right font-medium tabular-nums text-[var(--fg-tertiary)]">
+                      {labeledAccountCount(item.count)}
+                      {' · '}
+                      {formatUnspecifiedCompactMicros(item.pipelineMicros)}
+                    </span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                     <motion.span
                       className="block h-full rounded-full bg-[var(--brand-primary)]"
                       initial={reducedMotion ? false : { width: 0 }}
-                      animate={{ width: `${Math.max(8, Math.round((item.pipeline / maxIndustryPipeline) * 100))}%` }}
+                      animate={{
+                        width: `${Math.max(
+                          8,
+                          Math.round(
+                            maxIndustryMicros > 0n
+                              ? microsSharePercent(item.pipelineMicros, maxIndustryMicros)
+                              : 0,
+                          ),
+                        )}%`,
+                      }}
                       transition={springSoft}
                     />
                   </div>
@@ -244,7 +279,7 @@ export function AccountsKeySegment() {
           aria-label={t('keyAccounts.statsStripAria', 'Key account totals on this page')}
           className="space-y-2"
         >
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+          <p className="text-sm text-[var(--fg-secondary)]">
             {t('keyAccounts.statsScope', 'On this page')}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -254,7 +289,8 @@ export function AccountsKeySegment() {
             />
             <StatTile
               label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
-              value={formatMoney(totalPipeline, 'EUR')}
+              value={formatUnspecifiedCompactMicros(totalPipelineMicros)}
+              sublabel={UNSPECIFIED_CURRENCY_BASIS}
             />
             <StatTile
               label={t('keyAccounts.statOpenDeals', 'Open deals')}
@@ -346,9 +382,13 @@ export function AccountsKeySegment() {
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">
-                              {formatMoney(account.totalValue, 'EUR')}
+                              {formatUnspecifiedCompactMicros(
+                                recordedMicros(account.totalValue, account.totalValueMicros),
+                              )}
                             </span>{' '}
-                            {t('keyAccounts.metricPipeline', 'pipeline')}
+                            {t('keyAccounts.metricPipeline', 'pipeline · {{basis}}', {
+                              basis: UNSPECIFIED_CURRENCY_BASIS,
+                            })}
                           </span>
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">

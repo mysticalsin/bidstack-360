@@ -5,6 +5,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { unitsTextToMicros } from '@bidstack/shared';
+
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +17,7 @@ export interface NewReferenceBody {
   industry?: string;
   contactName?: string;
   contactEmail?: string;
-  valueMicros?: number;
+  valueMicros?: string;
   documentUrl?: string;
   tags?: string[];
 }
@@ -37,6 +39,7 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
   const [documentUrl, setDocumentUrl] = useState('');
   const [tags, setTags] = useState('');
   const [titleError, setTitleError] = useState<string | undefined>();
+  const [valueError, setValueError] = useState<string | undefined>();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -45,9 +48,14 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
       return;
     }
     setTitleError(undefined);
-    // Value is entered in major units; the API + DB store micros (×1e6).
-    const major = value.trim() ? Number.parseFloat(value) : NaN;
-    const valueMicros = Number.isFinite(major) ? Math.round(major * 1_000_000) : undefined;
+    const trimmedValue = value.trim();
+    const parsed = trimmedValue ? unitsTextToMicros(trimmedValue) : null;
+    if (trimmedValue && parsed == null) {
+      setValueError(t('newReference.valueInvalid', 'Enter an amount with up to 6 decimal places.'));
+      return;
+    }
+    setValueError(undefined);
+    const valueMicros = parsed?.toString();
     onCreate({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -113,11 +121,15 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
             />
             <Input
               label={t('newReference.dealValueLabel', 'Deal value')}
-              type="number"
-              min={0}
+              type="text"
+              inputMode="decimal"
               placeholder={t('newReference.dealValuePlaceholder', '250000')}
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setValueError(undefined);
+              }}
+              error={valueError}
               disabled={isPending}
             />
           </div>

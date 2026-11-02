@@ -104,11 +104,11 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
           <div className="space-y-4 flex flex-col justify-between h-full">
             <div className="space-y-3">
               <div className="flex items-baseline gap-2">
-                <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
+                <div className="text-2xl font-medium tabular-nums text-[var(--fg-primary)]">
                   {data.totalScore.toFixed(0)}%
                 </div>
                 <div className="text-xs text-[var(--fg-tertiary)]">
-                  {t('bidScore.overallScore', 'overall score')}
+                  {t('bidScore.rubricProxy', 'rubric proxy, not a measured win rate')}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">

@@ -24,6 +24,8 @@
     "accounts": "Accounts",
     "companies": "Companies",
     "opportunities": "Opportunities",
+    "badgeOpenBids": "{{count}} open",
+    "badgeOverdueTasks": "{{count}} overdue",
     "pipeline": "Pipeline",
     "forecasts": "Forecasts",
     "bidMatrix": "Bid/No-Bid Matrix",

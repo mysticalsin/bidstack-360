@@ -4,6 +4,14 @@
 
 import { createHash } from 'node:crypto';
 
+/** A keyword or Dust extract is not a measured confidence. */
+export function recordedExtractionConfidence(): {
+  confidenceBps: 0;
+  confidenceBasis: 'not_scored';
+} {
+  return { confidenceBps: 0, confidenceBasis: 'not_scored' };
+}
+
 import {
   SOLUTION_KEYWORDS,
   PRODUCT_KEYWORDS,

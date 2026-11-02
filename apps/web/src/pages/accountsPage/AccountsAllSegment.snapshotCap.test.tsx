@@ -215,6 +215,8 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     renderSegment();
 
     expect(screen.getByText('No accounts yet')).toBeTruthy();
+    expect(screen.getByText(/stay blank until they are recorded/)).toBeTruthy();
+    expect(screen.queryByText(/populate automatically/i)).toBeNull();
     expect(screen.queryByText('No accounts match your filters')).toBeNull();
     expect(
       screen.getByRole('link', { name: /import accounts from csv/i }),

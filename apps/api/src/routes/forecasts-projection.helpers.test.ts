@@ -5,6 +5,7 @@ import {
   aggregateManualCommit,
   aggregateProjection,
   buildProjectionWindow,
+  probabilityForRow,
   quarterLabel,
   quarterPeriodKey,
   quarterStart,
@@ -51,6 +52,23 @@ describe('resolveStageProbability', () => {
     expect(resolveStageProbability('s2_sent', cfg)).toBe(55);
   });
 
+  it('uses the linked stage probability, including zero, ahead of the key map', () => {
+    // WHY: the first s1_lead row in the org used to weight every deal with
+    // that key. A deal on a later stage keeps that stage's own probability.
+    const cfg = new Map<string, number>([['s1_lead', 10]]);
+    const deal = (stageProbability: number | null): ProjectionRow => ({
+      period: '2026-Q2',
+      ownerId: null,
+      ownerName: null,
+      stage: 's1_lead',
+      stageProbability,
+      valueMicros: '1000000',
+    });
+    expect(probabilityForRow(deal(70), cfg)).toBe(70);
+    expect(probabilityForRow(deal(0), cfg)).toBe(0);
+    expect(probabilityForRow(deal(null), cfg)).toBe(10);
+  });
+
   it('falls back to the documented map when a stage is unconfigured', () => {
     expect(resolveStageProbability('s4_negotiation', new Map())).toBe(
       STAGE_WIN_PROBABILITY.s4_negotiation,
@@ -86,20 +104,20 @@ describe('aggregateProjection', () => {
       new Map(),
     );
     const q2 = result.find((p) => p.period === '2026-Q2')!;
-    expect(q2.openMicros).toBe(1_000_000); // won excluded from open
-    expect(q2.weightedMicros).toBe(400_000); // 1,000,000 × 40%
-    expect(q2.wonMicros).toBe(500_000);
+    expect(q2.openMicros).toBe('1000000'); // won excluded from open
+    expect(q2.weightedMicros).toBe('400000'); // 1,000,000 × 40%
+    expect(q2.wonMicros).toBe('500000');
   });
 
   it('returns every requested period even when empty, in order', () => {
     const result = aggregateProjection([], window, probs, new Map());
     expect(result.map((p) => p.period)).toEqual(['2026-Q2', '2026-Q3', '2026-Q4']);
-    expect(result.every((p) => p.openMicros === 0 && p.byOwner.length === 0)).toBe(true);
+    expect(result.every((p) => p.openMicros === '0' && p.byOwner.length === 0)).toBe(true);
   });
 
   it('skips rows outside the window (null period)', () => {
     const result = aggregateProjection([row({ period: null })], window, probs, new Map());
-    expect(result.every((p) => p.openMicros === 0)).toBe(true);
+    expect(result.every((p) => p.openMicros === '0')).toBe(true);
   });
 
   it('sorts owners by weighted value desc and labels unassigned', () => {
@@ -118,15 +136,33 @@ describe('aggregateProjection', () => {
     expect(q2.byOwner[1]!.ownerName).toBe('Ann');
   });
 
+  it('keeps a large open amount as the exact micros string', () => {
+    // WHY: Number(micros) rounds 8,598,204,328,457.184962 units to a nearby
+    // float. The projection must return the integer micros the database summed.
+    const micros = '8598204328457184962';
+    const result = aggregateProjection(
+      [row({ stage: 's4_negotiation', valueMicros: micros })],
+      window,
+      probs,
+      new Map(),
+    );
+    const q2 = result.find((p) => p.period === '2026-Q2')!;
+    const floated = BigInt(Math.round(Number(micros))).toString();
+    expect(floated).not.toBe(micros);
+    expect(q2.openMicros).toBe(micros);
+    expect(q2.weightedMicros).toBe('6878563462765747969'); // 80% of the integer micros, truncated
+    expect(q2.byOwner[0]!.openMicros).toBe(micros);
+  });
+
   it('overlays the manual commit override per period', () => {
     const result = aggregateProjection(
       [row({})],
       window,
       probs,
-      new Map([['2026-Q3', 9_000_000]]),
+      new Map([['2026-Q3', 9_000_000n]]),
     );
     expect(result.find((p) => p.period === '2026-Q2')!.manualCommitMicros).toBeNull();
-    expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe(9_000_000);
+    expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe('9000000');
   });
 });
 
@@ -145,7 +181,7 @@ describe('aggregateManualCommit', () => {
       [commitRow({ amountMicros: 1_000_000, currency: 'EUR' }), commitRow({ amountMicros: 5_000_000, currency: 'USD' })],
       'EUR',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(1_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(1_000_000n);
     expect(excludedCount).toBe(1);
   });
 
@@ -154,8 +190,31 @@ describe('aggregateManualCommit', () => {
       [commitRow({ amountMicros: 2_000_000 }), commitRow({ amountMicros: 3_000_000 })],
       'EUR',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(5_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(5_000_000n);
     expect(excludedCount).toBe(0);
+  });
+
+  it('treats the old EUR default and XXX as one unspecified bucket', () => {
+    const { byPeriod, excludedCount } = aggregateManualCommit(
+      [
+        commitRow({ amountMicros: 1_000_000, currency: 'EUR' }),
+        commitRow({ amountMicros: 2_000_000, currency: 'XXX' }),
+        commitRow({ amountMicros: 9_000_000, currency: 'USD' }),
+      ],
+      'XXX',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(3_000_000n);
+    expect(excludedCount).toBe(1);
+  });
+
+  it('sums a large commit as integer micros', () => {
+    // WHY: Number(amountMicros) moved this manual commit off the cent.
+    const micros = '8598204328457184962';
+    const { byPeriod } = aggregateManualCommit(
+      [commitRow({ amountMicros: micros }), commitRow({ amountMicros: 2n })],
+      'EUR',
+    );
+    expect(byPeriod.get('2026-Q2')).toBe(BigInt(micros) + 2n);
   });
 
   it('handles bigint amountMicros from the Prisma driver', () => {
@@ -163,6 +222,6 @@ describe('aggregateManualCommit', () => {
       [commitRow({ amountMicros: BigInt(7_000_000) })],
       'EUR',
     );
-    expect(byPeriod.get('2026-Q2')).toBe(7_000_000);
+    expect(byPeriod.get('2026-Q2')).toBe(7_000_000n);
   });
 });

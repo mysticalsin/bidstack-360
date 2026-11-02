@@ -14,7 +14,7 @@ export interface TerritoryAnalyticsItem {
   countryCode: string;
   countryCodeA3: string;
   opportunityCount: number;
-  totalValueMicros: number;
+  totalValueMicros: string | number;
   avgProbability: number;
   territories: string[];
   ownerNames: string[];
@@ -24,7 +24,7 @@ export interface TerritoryAnalytics {
   items: TerritoryAnalyticsItem[];
   totals: {
     totalCountries: number;
-    totalValueMicros: number;
+    totalValueMicros: string | number;
     totalOpportunities: number;
     avgProbability: number;
   };
@@ -117,7 +117,7 @@ export interface TerritorySegment {
   key: string;
   label: string;
   opportunityCount: number;
-  totalValueMicros: number;
+  totalValueMicros: string | number;
   avgProbability: number;
   ownerNames: string[];
 }
@@ -127,7 +127,7 @@ export interface TerritorySegments {
   items: TerritorySegment[];
   totals: {
     totalSegments: number;
-    totalValueMicros: number;
+    totalValueMicros: string | number;
     totalOpportunities: number;
     avgProbability: number;
   };

@@ -40,6 +40,7 @@ import {
   keywordOverlapBps,
   tagOverlapBps,
   recencyBps,
+  hybridScoreBps,
   mmrPrune,
   type ScoredCandidate,
 } from '../rfp-story-match.js';
@@ -195,12 +196,11 @@ describe('tagOverlapBps()', () => {
 // ─── recencyBps() ───────────────────────────────────────────────────────────
 
 describe('recencyBps()', () => {
-  it('returns exactly 5000 for null closedAt (unknown date → neutral)', () => {
-    expect(recencyBps(null)).toBe(5000);
-  });
-
-  it('returns exactly 5000 for undefined closedAt', () => {
-    expect(recencyBps(undefined)).toBe(5000);
+  it('does not score a missing close date as a one-year-old story', () => {
+    // WHY: 5000 bps is the half-life score. Using it for a null date ranked
+    // an undated reference as if it closed a year ago.
+    expect(recencyBps(null)).toBeNull();
+    expect(recencyBps(undefined)).toBeNull();
   });
 
   it('returns near 10000 for a very recent date (yesterday)', () => {
@@ -226,6 +226,26 @@ describe('recencyBps()', () => {
     // Allow ±50 bps tolerance for floating-point rounding
     expect(bps).toBeGreaterThan(4950);
     expect(bps).toBeLessThan(5050);
+  });
+
+  it('leaves a missing close date out of the hybrid score', () => {
+    const withNeutralRecency = Math.round(10000 * 0.55 + 5000 * 0.1);
+    const withoutRecency = hybridScoreBps({
+      cosineBps: 10000,
+      keywordBps: 0,
+      tagBps: 0,
+      recencyBps: null,
+    });
+    expect(withoutRecency).toBe(Math.round((10000 * 0.55) / 0.9));
+    expect(withoutRecency).not.toBe(withNeutralRecency);
+    expect(
+      hybridScoreBps({
+        cosineBps: 10000,
+        keywordBps: 10000,
+        tagBps: 10000,
+        recencyBps: null,
+      }),
+    ).toBe(10000);
   });
 
   it('returns exactly 10000 for a future date (clamped by Math.min)', () => {

@@ -167,6 +167,7 @@ describe('contract agreement routes', () => {
           accountKey: ACCOUNT,
           kind: 'msa',
           reference: 'MSA-WITH-DOC',
+          currency: 'EUR',
           sourceFileId: file.id,
         },
       });
@@ -196,10 +197,13 @@ describe('contract agreement routes', () => {
           accountKey: ACCOUNT,
           kind: 'msa',
           reference: 'MSA-BAD-DOC',
+          currency: 'EUR',
           sourceFileId: '11111111-1111-4111-8111-111111111111',
         },
       });
       expect(bad.statusCode).toBe(400);
+      expect(bad.headers['content-type']).toMatch(/application\/json/);
+      expect(bad.json()).toMatchObject({ statusCode: 400 });
 
       const otherAccountFile = await prisma.fileAttachment.create({
         data: {
@@ -218,6 +222,7 @@ describe('contract agreement routes', () => {
           accountKey: ACCOUNT,
           kind: 'msa',
           reference: 'MSA-WRONG-ACCOUNT-DOC',
+          currency: 'EUR',
           sourceFileId: otherAccountFile.id,
         },
       });
@@ -494,6 +499,7 @@ describe('contract agreement routes', () => {
           accountKey: ACCOUNT,
           kind: 'msa',
           reference: 'MSA-PENDING-SHOULD-NOT-LINK',
+          currency: 'EUR',
           sourceExtractionId: extraction.id,
         },
       });
@@ -501,6 +507,83 @@ describe('contract agreement routes', () => {
     } finally {
       await prisma.documentExtraction.deleteMany({ where: { id: extraction.id } });
       await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
+    }
+  });
+
+  t('a stored agreement with a bad country still returns JSON', async () => {
+    // WHY: one legacy row used to fail response validation. Fastify then sent
+    // plain text, and the account card showed "Invalid JSON response from server".
+    const createdBy = await prisma.user.findFirst({
+      where: { orgId: orgId! },
+      select: { id: true },
+    });
+    const row = await prisma.contractAgreement.create({
+      data: {
+        orgId: orgId!,
+        accountKey: ACCOUNT,
+        kind: 'msa',
+        reference: 'MSA-LEGACY-COUNTRY',
+        countries: ['France'],
+        currency: 'EU',
+        rateCard: [
+          { role: 'Consultant', rateMicros: '800', unit: 'day' },
+          { role: 'Broken', rateMicros: 1.5, unit: 'day' },
+          { role: 'Architect', rateMicros: 800_000_000, unit: 'day' },
+        ],
+        rateReviewSchedule: 'annual',
+        status: 'active',
+        notes: 'x'.repeat(4001),
+        effectiveDate: new Date('2026-03-01T00:00:00.000Z'),
+        createdById: createdBy?.id ?? orgId!,
+      },
+    });
+    const objectCard = await prisma.contractAgreement.create({
+      data: {
+        orgId: orgId!,
+        accountKey: ACCOUNT,
+        kind: 'msa',
+        reference: ' ',
+        countries: ['France'],
+        currency: 'EU',
+        rateCard: { nope: true },
+        rateReviewSchedule: 'annual',
+        status: 'active',
+        createdById: createdBy?.id ?? orgId!,
+      },
+    });
+    try {
+      const list = await server.inject({
+        method: 'GET',
+        url: `/api/contract-agreements?accountKey=${ACCOUNT}`,
+      });
+      expect(() => JSON.parse(list.body)).not.toThrow();
+      expect(list.headers['content-type']).toMatch(/application\/json/);
+      expect(list.statusCode).toBe(200);
+      const body = list.json() as {
+        items: Array<{
+          reference: string;
+          countries: string[];
+          notes: string | null;
+          currency: string;
+          rateCard: Array<{ role: string; rateMicros: number; unit: string }>;
+          effectiveDate: string | null;
+        }>;
+      };
+      const item = body.items.find((entry) => entry.reference === 'MSA-LEGACY-COUNTRY');
+      expect(item?.countries).toEqual([]);
+      expect(item?.currency).toBe('XXX');
+      expect(item?.rateCard).toEqual([
+        { role: 'Consultant', rateMicros: 800, unit: 'day' },
+        { role: 'Architect', rateMicros: 800_000_000, unit: 'day' },
+      ]);
+      expect(item?.notes?.length).toBeLessThanOrEqual(4000);
+      expect(item?.effectiveDate).toBe('2026-03-01T00:00:00.000Z');
+      const blank = body.items.find((entry) => entry.reference === 'Recorded agreement');
+      expect(blank?.currency).toBe('XXX');
+      expect(blank?.rateCard).toEqual([]);
+      expect(blank?.countries).toEqual([]);
+    } finally {
+      await prisma.contractAgreement.deleteMany({ where: { id: { in: [row.id, objectCard.id] } } });
     }
   });
 

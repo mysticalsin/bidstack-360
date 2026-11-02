@@ -157,6 +157,7 @@ export async function getOrgDust(
     client: new SerumGuardedDustClient({
       apiKey: creds.apiKey,
       workspaceId: creds.workspaceId,
+      spaceId: creds.spaceId,
       baseUrl: creds.baseUrl,
       // baseUrl is org-admin-controlled and only string-checked at save time;
       // the safe fetch re-resolves DNS per request so a rebinding host can't

@@ -184,7 +184,7 @@ export function KamInitiativeBoard({ companyId }: { companyId: string }) {
             const col = items.filter((i) => i.stage === stage);
             return (
               <section key={stage} aria-label={STAGE_LABEL[stage]} className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
+                <h3 className="text-sm text-[var(--fg-secondary)]">
                   {STAGE_LABEL[stage]} · {col.length}
                 </h3>
                 {col.map((init) => (
@@ -229,7 +229,7 @@ export function KamTodoCard({ companyId }: { companyId: string }) {
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {items.map((task) => (
-            <li key={task.id} className="flex items-center justify-between gap-3 px-5 py-2.5">
+            <li key={task.id} className="flex min-h-11 items-center justify-between gap-3 px-5 py-2">
               <div>
                 <p className="text-sm text-[var(--fg-primary)]">{task.title}</p>
                 <p className="text-xs text-[var(--fg-tertiary)]">{task.initiativeTitle}</p>

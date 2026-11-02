@@ -23,8 +23,14 @@ interface ChecklistItemDef {
 export function QuickStartPage() {
   const navigate = useNavigate();
   const { t } = useTranslation('onboarding');
-  const { completedChecklist, markChecklistItem, startTour, tourActive, openTemplatePicker } =
-    useOnboardingStore();
+  const {
+    completedChecklist,
+    markChecklistItem,
+    startTour,
+    tourActive,
+    openTemplatePicker,
+    setQuickStartVisible,
+  } = useOnboardingStore();
 
   // Steps backed by real workspace state reflect reality instead of a click, so
   // the progress bar stops being theatre. The rest stay click-acknowledged —
@@ -62,7 +68,7 @@ export function QuickStartPage() {
       label: t('quickStart.items.firstLead.label', 'Add your first lead'),
       description: t(
         'quickStart.items.firstLead.description',
-        'Capture inbound interest and let Polo PreSales score it automatically.',
+        'Capture inbound interest. A new lead stays unscored until a score is recorded.',
       ),
       action: () => navigate('/leads/new'),
     },
@@ -81,7 +87,7 @@ export function QuickStartPage() {
       label: t('quickStart.items.firstBidNoBid.label', 'Run your first bid/no-bid'),
       description: t(
         'quickStart.items.firstBidNoBid.description',
-        'Score an opportunity on fit, value, and win probability before you commit.',
+        'Score an opportunity on fit and value before you commit. A blank stored probability is not a measured win chance.',
       ),
       action: () => navigate('/bid-matrix'),
     },
@@ -241,8 +247,18 @@ export function QuickStartPage() {
           />
           <p className="font-semibold text-[var(--fg-primary)]">{t('quickStart.complete.title', "You're all set!")}</p>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('quickStart.complete.message', 'Your workspace is ready to pilot bids.')}
+            {t(
+              'quickStart.complete.message',
+              'Your workspace is ready. Turn Quick Start off so it leaves the navigation.',
+            )}
           </p>
+          <button
+            type="button"
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--brand-primary)] px-4 text-sm font-medium text-[var(--fg-on-brand)]"
+            onClick={() => setQuickStartVisible(false)}
+          >
+            {t('quickStart.complete.hide', 'Turn off Quick Start')}
+          </button>
         </div>
       )}
     </div>

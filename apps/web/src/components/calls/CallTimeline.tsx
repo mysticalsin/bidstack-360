@@ -17,6 +17,7 @@
 import { useState, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
+import { sentimentFigure, sentimentTone } from '@/components/calls/sentiment';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import {
@@ -67,17 +68,23 @@ function statusTone(status: string): BadgeTone {
 function SentimentBadge({ score }: { score: number | null }) {
   const { t } = useTranslation('crm');
   if (score === null) return null;
-  const pct = Math.round(score * 100);
-  const tone: BadgeTone = pct >= 70 ? 'jade' : pct >= 40 ? 'amber' : 'tomato';
+  const toneName = sentimentTone(score);
+  const tone: BadgeTone = toneName === 'positive' ? 'jade' : toneName === 'negative' ? 'tomato' : 'gray';
   const label =
-    pct >= 70
+    toneName === 'positive'
       ? t('callTimeline.sentimentPositive', 'Positive')
-      : pct >= 40
-        ? t('callTimeline.sentimentNeutral', 'Neutral')
-        : t('callTimeline.sentimentNegative', 'Negative');
+      : toneName === 'negative'
+        ? t('callTimeline.sentimentNegative', 'Negative')
+        : t('callTimeline.sentimentNeutral', 'Neutral');
+  const figure = sentimentFigure(score);
   return (
-    <Badge tone={tone} title={t('callTimeline.sentimentScoreTitle', 'Sentiment score: {{pct}}%', { pct })}>
-      {label} {pct}%
+    <Badge
+      tone={tone}
+      title={t('callTimeline.sentimentScoreTitle', 'Sentiment {{figure}} on a −1 to +1 scale', {
+        figure,
+      })}
+    >
+      {label} {figure}
     </Badge>
   );
 }

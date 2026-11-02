@@ -49,7 +49,7 @@ export function attribution({
   label: string;
   sourceUrl: string;
   fetchedAt: Date;
-  confidence: number;
+  confidence: number | null;
   providerMetadata: Record<string, unknown>;
 }): SourceAttribution {
   return {

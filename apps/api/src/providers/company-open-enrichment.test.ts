@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { faviconProfile, fetchOpenCompanyProfile } from './company-open-enrichment.js';
+import {
+  faviconProfile,
+  fetchOpenCompanyProfile,
+  toPublicPreview,
+} from './company-open-enrichment.js';
 
 const now = new Date('2026-05-11T00:00:00.000Z');
 
@@ -63,7 +67,7 @@ describe('company open data verification', () => {
     });
 
     expect(profile).toMatchObject({
-      legalName: 'Microsoft',
+      legalName: null,
       tradeName: 'Microsoft',
       domain: 'microsoft.com',
       website: 'https://www.microsoft.com/',
@@ -77,7 +81,101 @@ describe('company open data verification', () => {
       'wikidata',
       'wikipedia',
     ]);
-    expect(profile?.confidenceBps).toBeGreaterThanOrEqual(9000);
+    expect(profile?.confidenceBps).toBe(0);
+    expect(
+      profile?.sourceAttribution.find((item) => item.source === 'wikidata')?.confidence,
+    ).toBeNull();
+    expect(
+      profile?.sourceAttribution.find((item) => item.source === 'wikipedia')?.confidence,
+    ).toBeNull();
+    expect(profile?.legalName).toBeNull();
+    expect(profile?.revenueAmount).toBeNull();
+  });
+
+  it('keeps the preferred official name and a recognized revenue currency', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL) => {
+      const url = input.toString();
+      if (url.includes('wbsearchentities')) {
+        return jsonResponse({
+          search: [
+            {
+              id: 'Q80788',
+              label: 'DNB Bank',
+              description: 'Norwegian bank',
+              concepturi: 'https://www.wikidata.org/wiki/Q80788',
+            },
+          ],
+        });
+      }
+      if (url.includes('wbgetentities') && url.includes('props=labels')) {
+        return jsonResponse({
+          entities: {
+            Q585: { labels: { en: { value: 'Oslo' } } },
+            Q20: { labels: { en: { value: 'Norway' } } },
+            Q132643: { labels: { en: { value: 'Norwegian krone' } } },
+            Q4582045: { labels: { en: { value: 'Rune Bjerke' } } },
+            Q837171: { labels: { en: { value: 'financial services' } } },
+            Q909158: { labels: { en: { value: 'Oslo Stock Exchange' } } },
+          },
+        });
+      }
+      if (url.includes('wbgetentities')) {
+        return jsonResponse({
+          entities: {
+            Q80788: {
+              id: 'Q80788',
+              labels: { en: { value: 'DNB Bank' } },
+              descriptions: { en: { value: 'Norwegian bank' } },
+              claims: {
+                P856: [claim('https://www.dnb.no/')],
+                P1128: [claim({ amount: '+9020', unit: '1' })],
+                P2139: [
+                  claim({ amount: '+54857000000', unit: 'http://www.wikidata.org/entity/Q132643' }),
+                ],
+                P159: [claim({ id: 'Q585' })],
+                P17: [claim({ id: 'Q20' })],
+                P452: [claim({ id: 'Q837171' })],
+                P169: [claim({ id: 'Q4582045' })],
+                P414: [claim({ id: 'Q909158' })],
+                P1448: [
+                  claim({ text: 'Gjensidige NOR Sparebank ASA', language: 'nb' }, 'normal'),
+                  claim({ text: 'DNB Bank ASA', language: 'nb' }, 'preferred'),
+                ],
+              },
+              sitelinks: { enwiki: { title: 'DNB Bank' } },
+            },
+          },
+        });
+      }
+      if (url.includes('/page/summary/')) {
+        return jsonResponse({
+          extract: 'DNB Bank is a Norwegian bank.',
+          content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/DNB_Bank' } },
+        });
+      }
+      throw new Error(`Unexpected request ${url}`);
+    });
+
+    const profile = await fetchOpenCompanyProfile({
+      name: 'DNB Bank',
+      domain: 'dnb.no',
+      now,
+      fetchImpl,
+    });
+
+    expect(profile?.legalName).toBe('DNB Bank ASA');
+    expect(profile?.tradeName).toBe('DNB Bank');
+    expect(profile?.employeeCount).toBe(9020);
+    expect(profile?.revenueAmount).toBe(54_857_000_000);
+    expect(profile?.revenueCurrency).toBe('NOK');
+    expect(profile?.publicFacts).toMatchObject({
+      headquarters: 'Oslo, Norway',
+      chiefExecutive: 'Rune Bjerke',
+      stockExchange: 'Oslo Stock Exchange',
+      revenueCurrency: 'NOK',
+      revenueLabel: '54,857,000,000 NOK',
+    });
+    expect(profile?.industryLabels).toEqual(['financial services']);
   });
 
   it('rejects ambiguous non-company name matches instead of fabricating a profile', async () => {
@@ -180,6 +278,50 @@ describe('company open data verification', () => {
     expect(profile?.incorporationDate).toBeNull();
   });
 
+  it('turns a verified profile into the fields the add-company dialog can fill', () => {
+    // WHY: the dialog must not invent a domain. It only fills one when the
+    // public profile actually resolved an official website.
+    const preview = toPublicPreview({
+      legalName: 'Microsoft Corporation',
+      tradeName: 'Microsoft',
+      domain: 'microsoft.com',
+      website: 'https://www.microsoft.com/',
+      description: 'American multinational technology corporation',
+      logoUrl: null,
+      logoSource: null,
+      imageUrl: null,
+      employeeCount: 228000.4,
+      incorporationDate: null,
+      industryLabels: ['software industry', 'technology'],
+      revenueAmount: null,
+      revenueAmountText: null,
+      revenueCurrency: null,
+      publicFacts: {
+        description: 'American multinational technology corporation',
+        headquarters: 'Redmond, United States',
+        chiefExecutive: null,
+        stockExchange: null,
+        revenueLabel: '281.7 billion USD',
+        revenueCurrency: 'USD',
+      },
+      confidenceBps: 0,
+      sourceAttribution: [],
+      providerMetadata: {},
+    });
+    expect(preview).toEqual({
+      name: 'Microsoft',
+      legalName: 'Microsoft Corporation',
+      domain: 'microsoft.com',
+      website: 'https://www.microsoft.com/',
+      description: 'American multinational technology corporation',
+      headquarters: 'Redmond, United States',
+      employeeCount: null,
+      revenueLabel: '281.7 billion USD',
+      industry: 'software industry',
+    });
+    expect(toPublicPreview(null)).toBeNull();
+  });
+
   it('builds a direct favicon fallback when open profiles are unavailable', () => {
     const profile = faviconProfile({
       name: 'Mantu',
@@ -195,11 +337,13 @@ describe('company open data verification', () => {
       logoSource: 'favicon',
     });
     expect(profile.sourceAttribution[0]?.source).toBe('favicon');
+    expect(profile.sourceAttribution[0]?.confidence).toBeNull();
   });
 });
 
-function claim(value: unknown) {
+function claim(value: unknown, rank = 'normal') {
   return {
+    rank,
     mainsnak: {
       datavalue: { value },
     },

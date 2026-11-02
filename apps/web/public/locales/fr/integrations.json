@@ -158,6 +158,8 @@
     "header": {
       "title": "Catalogue de connecteurs",
       "caption": "Sources de données externes accessibles par Polo PreSales. Les flux ouverts fonctionnent sans clés ; les flux sous licence nécessitent des identifiants.",
+      "sourcesBadge_one": "{{count}} source",
+      "sourcesBadge_other": "{{count}} sources",
       "sourcesBadge": "{{count}} sources"
     },
     "error": {

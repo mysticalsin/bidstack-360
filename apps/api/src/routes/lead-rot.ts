@@ -155,7 +155,7 @@ function daysBetween(then: Date, now: Date): number {
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
-function buildPlays(
+export function buildPlays(
   status: z.infer<typeof LeadStatus>,
   daysInStage: number,
   isRotten: boolean,
@@ -165,12 +165,13 @@ function buildPlays(
   }
   const plays: RecoveryPlay[] = [];
 
+  // These are status rules. A canned action is not a confidence score.
   if (status === 'new' || status === 'contacted') {
     plays.push({
       kind: 'send_reengagement_email',
       rationale: `${daysInStage} days without progress — a short re-engagement note keeps the lead warm.`,
       payload: {},
-      confidence: 0.75,
+      confidence: null,
     });
   }
 
@@ -179,7 +180,7 @@ function buildPlays(
       kind: 'schedule_call',
       rationale: 'Live conversation tends to outperform another email at this stage.',
       payload: {},
-      confidence: 0.6,
+      confidence: null,
     });
   }
 
@@ -188,7 +189,7 @@ function buildPlays(
       kind: 'add_to_nurture',
       rationale: 'Drop into a long-cycle nurture cadence and revisit in two weeks.',
       payload: {},
-      confidence: 0.55,
+      confidence: null,
     });
   }
 
@@ -196,7 +197,7 @@ function buildPlays(
     kind: 'mark_lost',
     rationale: 'If outreach has gone silent for this long, marking lost frees pipeline focus.',
     payload: {},
-    confidence: 0.4,
+    confidence: null,
   });
 
   return plays.slice(0, 4);

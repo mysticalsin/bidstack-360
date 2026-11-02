@@ -22,20 +22,22 @@ import {
   TableScrollArea,
 } from '@/components/ui/Table';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
-import type { ForecastProjectionPeriod } from '@bidstack/shared';
+import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
+import { type ForecastProjectionPeriod } from '@bidstack/shared';
 
-type FormatMoney = (micros: number, currency?: string) => string;
+type FormatMoney = (micros: number | string) => string;
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
+  const formatMoneyMicros = (micros: number | string) => unspecifiedMicrosLabel(micros);
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
   const periods = projection.data?.periods ?? [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
-  const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
+  const hasPipeline = periods.some(
+    (p) => BigInt(p.openMicros) > 0n || BigInt(p.wonMicros) > 0n,
+  );
 
   return (
     <Card>
@@ -43,7 +45,7 @@ export function ForecastProjection() {
         title={t('forecastProjection.title', 'Weighted pipeline projection')}
         caption={t(
           'forecastProjection.caption',
-          'Open opportunities × stage win-probability, by close-date quarter.',
+          'Open opportunities × stored stage probability, by close-date quarter. Currency not recorded; not a euro forecast.',
         )}
       />
 
@@ -118,7 +120,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
             {c.key === 'weighted' && period.manualCommitMicros !== null ? (
               <Badge tone="amber">
                 {t('forecastProjection.override', 'Manual commit')}:{' '}
-                {formatMoneyMicros(period.manualCommitMicros, 'EUR')}
+                {unspecifiedMicrosLabel(period.manualCommitMicros)}
               </Badge>
             ) : null}
           </div>
@@ -127,7 +129,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
               c.accent ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-primary)]'
             }`}
           >
-            {formatMoneyMicros(c.value, 'EUR')}
+            {formatMoneyMicros(c.value)}
           </div>
         </div>
       ))}
@@ -165,13 +167,13 @@ function ProjectionOwnerTable({ period, formatMoneyMicros, t }: SubProps) {
                 <span className="text-sm font-medium text-[var(--fg-primary)]">{o.ownerName}</span>
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.openMicros, 'EUR')}
+                {formatMoneyMicros(o.openMicros)}
               </TableCell>
               <TableCell className="text-right tabular-nums font-semibold text-[var(--fg-primary)]">
-                {formatMoneyMicros(o.weightedMicros, 'EUR')}
+                {formatMoneyMicros(o.weightedMicros)}
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.wonMicros, 'EUR')}
+                {formatMoneyMicros(o.wonMicros)}
               </TableCell>
             </TableRow>
           ))}

@@ -46,7 +46,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           ownerName: r.owner.name,
           period: r.period,
           category: r.category as Forecast['category'],
-          amountMicros: Number(r.amountMicros),
+          amountMicros: r.amountMicros.toString(),
           currency: r.currency,
           note: r.note,
           createdAt: r.createdAt.toISOString(),
@@ -65,8 +65,8 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         body: z.object({
           period: z.string().min(1).max(50),
           category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
-          amountMicros: z.number().int().nonnegative().max(1_000_000_000_000_000),
-          currency: z.string().length(3).default('EUR'),
+          amountMicros: z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]),
+          currency: z.string().length(3).default('XXX'),
           note: z.string().max(2000).optional(),
           // The Forecasts grid lists every owner's rows and edits them inline,
           // so a write must target the row's owner — not whoever is signed in.
@@ -127,7 +127,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         ownerName: created.owner.name,
         period: created.period,
         category: created.category as Forecast['category'],
-        amountMicros: Number(created.amountMicros),
+        amountMicros: created.amountMicros.toString(),
         currency: created.currency,
         note: created.note,
         createdAt: created.createdAt.toISOString(),
@@ -170,7 +170,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
                 countryCode: z.string(),
                 countryCodeA3: z.string(),
                 opportunityCount: z.number().int(),
-                totalValueMicros: z.number(),
+                totalValueMicros: z.string(),
                 avgProbability: z.number(),
                 territories: z.array(z.string()),
                 ownerNames: z.array(z.string()),
@@ -178,7 +178,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
             ),
             totals: z.object({
               totalCountries: z.number().int(),
-              totalValueMicros: z.number(),
+              totalValueMicros: z.string(),
               totalOpportunities: z.number().int(),
               avgProbability: z.number(),
             }),
@@ -213,7 +213,12 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           COALESCE(o.country, t.country_codes[1], 'Unknown') AS "countryCode",
           COUNT(*)::int AS "opportunityCount",
           COALESCE(SUM(o.value_micros), 0)::text AS "totalValueMicros",
-          COALESCE(SUM(o.probability), 0)::float8 AS "sumProbability",
+          COALESCE(SUM(
+            CASE
+              WHEN live.id IS NOT NULL THEN live.probability::float8
+              ELSE o.probability::float8
+            END
+          ), 0)::float8 AS "sumProbability",
           COALESCE(
             array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL),
             ARRAY[]::text[]
@@ -225,8 +230,18 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         FROM opportunities o
         LEFT JOIN territories t ON t.id = o.territory_id
         LEFT JOIN users u ON u.id = o.owner_id
+        LEFT JOIN pipeline_stages live
+          ON live.id = o.pipeline_stage_id
+         AND live.deleted_at IS NULL
         WHERE o.org_id = ${req.auth.orgId}::uuid
           AND o.deleted_at IS NULL
+          AND o.stage NOT IN ('closed_won', 'closed_lost')
+          AND NOT EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND (ps.is_lost OR ps.is_won)
+          )
         GROUP BY COALESCE(o.country, t.country_codes[1], 'Unknown')
       `);
 
@@ -243,7 +258,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         countryCode: c.countryCode,
         countryCodeA3: A2_TO_A3[c.countryCode] ?? c.countryCode,
         opportunityCount: c.opportunityCount,
-        totalValueMicros: Number(c.totalValueMicros),
+        totalValueMicros: c.totalValueMicros,
         avgProbability:
           c.opportunityCount > 0
             ? Math.round((c.sumProbability / c.opportunityCount) * 10) / 10
@@ -253,13 +268,9 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       }));
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
-      // Sum the source BigInt strings, not the already-Number()-converted
-      // per-country totals — a float reduce() over Numbers re-introduces the
-      // precision loss sumMicros exists to avoid (same class of bug fixed in
-      // accounts.helpers.ts / forecast.service.ts). This field is denominated
-      // in micros (matches the per-row Number(c.totalValueMicros) above), so
-      // convert once at the boundary — no unit division, unlike microsToUnits.
-      const totalValueMicros = Number(sumMicros(rows.map((r) => BigInt(r.totalValueMicros))));
+      // Sum the source BigInt strings. The wire value stays that integer
+      // string so a large country total is not rounded before the map formats it.
+      const totalValueMicros = sumMicros(rows.map((r) => BigInt(r.totalValueMicros))).toString();
       const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       const avgProbability =
         totalOpportunities > 0
@@ -298,14 +309,14 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
                 key: z.string(),
                 label: z.string(),
                 opportunityCount: z.number().int(),
-                totalValueMicros: z.number(),
+                totalValueMicros: z.string(),
                 avgProbability: z.number(),
                 ownerNames: z.array(z.string()),
               }),
             ),
             totals: z.object({
               totalSegments: z.number().int(),
-              totalValueMicros: z.number(),
+              totalValueMicros: z.string(),
               totalOpportunities: z.number().int(),
               avgProbability: z.number(),
             }),
@@ -346,7 +357,12 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           ${keyExpr} AS "key",
           COUNT(*)::int AS "opportunityCount",
           COALESCE(SUM(o.value_micros), 0)::text AS "totalValueMicros",
-          COALESCE(SUM(o.probability), 0)::float8 AS "sumProbability",
+          COALESCE(SUM(
+            CASE
+              WHEN live.id IS NOT NULL THEN live.probability::float8
+              ELSE o.probability::float8
+            END
+          ), 0)::float8 AS "sumProbability",
           COALESCE(
             array_agg(DISTINCT u.name) FILTER (WHERE u.name IS NOT NULL),
             ARRAY[]::text[]
@@ -354,8 +370,18 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         FROM opportunities o
         LEFT JOIN companies c ON c.id = o.company_id
         LEFT JOIN users u ON u.id = o.owner_id
+        LEFT JOIN pipeline_stages live
+          ON live.id = o.pipeline_stage_id
+         AND live.deleted_at IS NULL
         WHERE o.org_id = ${req.auth.orgId}::uuid
           AND o.deleted_at IS NULL
+          AND o.stage NOT IN ('closed_won', 'closed_lost')
+          AND NOT EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND (ps.is_lost OR ps.is_won)
+          )
         GROUP BY ${keyExpr}
       `);
 
@@ -370,7 +396,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           key: g.key,
           label: g.key,
           opportunityCount: g.opportunityCount,
-          totalValueMicros: Number(g.totalValueMicros),
+          totalValueMicros: g.totalValueMicros,
           avgProbability:
             g.opportunityCount > 0
               ? Math.round((g.sumProbability / g.opportunityCount) * 10) / 10
@@ -387,7 +413,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           totalSegments: items.length,
           // Sum the source BigInt strings, not the already-Number()-converted
           // per-segment totals — same float-precision fix as /territories/analytics above.
-          totalValueMicros: Number(sumMicros(rows.map((r) => BigInt(r.totalValueMicros)))),
+          totalValueMicros: sumMicros(rows.map((r) => BigInt(r.totalValueMicros))).toString(),
           totalOpportunities,
           avgProbability:
             totalOpportunities > 0

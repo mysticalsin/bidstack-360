@@ -20,6 +20,10 @@ import {
   TableScrollArea,
 } from '@/components/ui/Table';
 import { useTableSort } from '@/hooks/useTableSort';
+import {
+  recordedMicros,
+  unspecifiedMicrosLabel,
+} from '@/components/dashboard/unspecified-currency';
 import type { WorkloadOwner } from '@/hooks/useWorkload';
 import { capacityLevel, relativeLoad, type CapacityLevel } from './workloadConfig';
 import { OwnerDrilldown } from './OwnerDrilldown';
@@ -27,11 +31,10 @@ import { OwnerDrilldown } from './OwnerDrilldown';
 type SortKey = 'owner' | 'openBids' | 'weighted' | 'overdueTasks' | 'closing';
 
 // Module-level so useTableSort's memo sees a stable reference.
-const ACCESSORS: Record<SortKey, (o: WorkloadOwner) => string | number | null> = {
+const ACCESSORS: Record<SortKey, (o: WorkloadOwner) => string | number | bigint | null> = {
   owner: (o) => o.name ?? o.email,
   openBids: (o) => o.openBids,
-  // Number() on micros loses sub-cent precision — irrelevant for ordering.
-  weighted: (o) => Number(o.weightedValueMicros),
+  weighted: (o) => recordedMicros(0, o.weightedValueMicros),
   overdueTasks: (o) => o.overdueTasks,
   closing: (o) => o.closingWithin7Days,
 };
@@ -89,10 +92,9 @@ function OwnerCell({ owner }: { owner: WorkloadOwner }) {
 
 interface Props {
   owners: WorkloadOwner[];
-  formatMoneyMicros: (micros: string) => string;
 }
 
-export function WorkloadTable({ owners, formatMoneyMicros }: Props) {
+export function WorkloadTable({ owners }: Props) {
   const { t } = useTranslation('crm');
   const { state, setState, sorted } = useTableSort<WorkloadOwner, SortKey>(owners, ACCESSORS, {
     initial: { key: 'weighted', dir: 'desc' },
@@ -176,7 +178,7 @@ export function WorkloadTable({ owners, formatMoneyMicros }: Props) {
                     {owner.openBids}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatMoneyMicros(owner.weightedValueMicros)}
+                    {unspecifiedMicrosLabel(owner.weightedValueMicros)}
                   </TableCell>
                   <TableCell
                     className={`text-right tabular-nums ${owner.overdueTasks > 0 ? 'font-semibold text-[var(--danger)]' : ''}`}

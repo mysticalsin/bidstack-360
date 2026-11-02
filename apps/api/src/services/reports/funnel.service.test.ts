@@ -39,18 +39,71 @@ describe('getPipelineKpis money precision', () => {
     // 600_000_000_001.
     const bigSumMicros = 600_000_000_001_000_000n;
 
-    opportunityGroupBy.mockResolvedValue([
-      { stage: 'proposal', _count: { _all: 1 }, _sum: { valueMicros: bigSumMicros } },
-    ]);
+    opportunityGroupBy
+      .mockResolvedValueOnce([
+        { stage: 'proposal', _count: { _all: 1 }, _sum: { valueMicros: bigSumMicros } },
+      ])
+      .mockResolvedValue([]);
 
     const result = await getPipelineKpis('org-1');
 
     expect(result.byStage[0]!.valueSum).toBe(600_000_000_001);
+    expect(result.byStage[0]!.valueSumMicros).toBe(bigSumMicros.toString());
     // `proposal` is an open stage, so the rollup must be exact too.
     expect(result.totalValueOpen).toBe(600_000_000_001);
+    expect(result.totalValueOpenMicros).toBe(bigSumMicros.toString());
+    expect(result.velocity.avgDaysOpen).toBeNull();
     // Sanity: the naive Number(bigint)/1e6 path would have produced a value that
     // is strictly not equal to the exact result — guards the test's own premise.
     expect(Number(bigSumMicros) / 1_000_000).not.toBe(600_000_000_001);
+  });
+
+  it('moves a lost stage flag out of the open book', async () => {
+    // WHY: marking the stage row lost does not rewrite the enum key. The open
+    // total used to keep that deal because the key still looked open.
+    opportunityGroupBy
+      .mockResolvedValueOnce([
+        { stage: 's4_negotiation', _count: { _all: 2 }, _sum: { valueMicros: 3_000_000n } },
+        { stage: 'closed_lost', _count: { _all: 1 }, _sum: { valueMicros: 1_000_000n } },
+      ])
+      .mockResolvedValueOnce([
+        { stage: 's4_negotiation', _count: { _all: 1 }, _sum: { valueMicros: 2_000_000n } },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getPipelineKpis('org-1');
+    expect(result.byStage.find((stage) => stage.stage === 's4_negotiation')).toEqual({
+      stage: 's4_negotiation',
+      count: 1,
+      valueSum: 1,
+      valueSumMicros: '1000000',
+    });
+    expect(result.byStage.find((stage) => stage.stage === 'closed_lost')).toEqual({
+      stage: 'closed_lost',
+      count: 2,
+      valueSum: 3,
+      valueSumMicros: '3000000',
+    });
+    expect(result.totalOpen).toBe(1);
+    expect(result.totalValueOpen).toBe(1);
+    expect(result.totalValueOpenMicros).toBe('1000000');
+  });
+
+  it('sums open stages as integer micros when their unit numbers collapse', async () => {
+    // WHY: adding the converted unit numbers made this open book one unit low.
+    const smaller = 9007199254740992n * 1_000_000n;
+    const larger = 9007199254740993n * 1_000_000n;
+    opportunityGroupBy
+      .mockResolvedValueOnce([
+        { stage: 'proposal', _count: { _all: 1 }, _sum: { valueMicros: smaller } },
+        { stage: 'negotiation', _count: { _all: 1 }, _sum: { valueMicros: larger } },
+      ])
+      .mockResolvedValue([]);
+
+    const result = await getPipelineKpis('org-1');
+
+    expect(result.totalValueOpenMicros).toBe((smaller + larger).toString());
+    expect(Number(9007199254740993n) + Number(9007199254740993n)).toBe(18_014_398_509_481_984);
   });
 
   it('scopes the groupBy query to the caller org and excludes soft-deleted rows', async () => {
@@ -60,5 +113,9 @@ describe('getPipelineKpis money precision', () => {
 
     const args = opportunityGroupBy.mock.calls[0]![0] as { where?: Record<string, unknown> };
     expect(args.where).toMatchObject({ orgId: 'org-42', deletedAt: null });
+    const lost = opportunityGroupBy.mock.calls[1]![0] as { where: { pipelineStage: unknown } };
+    const won = opportunityGroupBy.mock.calls[2]![0] as { where: { pipelineStage: unknown } };
+    expect(lost.where.pipelineStage).toMatchObject({ isLost: true, deletedAt: null });
+    expect(won.where.pipelineStage).toMatchObject({ isWon: true, isLost: false, deletedAt: null });
   });
 });

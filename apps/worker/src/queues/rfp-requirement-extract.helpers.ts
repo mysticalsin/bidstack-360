@@ -37,9 +37,9 @@ export const ExtractedRequirement = z.object({
   externalRef: z.string(),
   text: z.string().min(1),
   requirementType: z.string().default('functional'),
-  mandatory: z.boolean().default(true),
+  mandatory: z.boolean().default(false),
   priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-  confidenceBps: z.number().int().min(0).max(10000).default(7000),
+  confidenceBps: z.number().int().min(0).max(10000).nullable().default(null),
   sourceChunkIndex: z.number().int().min(0).default(0),
 });
 
@@ -86,9 +86,9 @@ export function fallbackExtract(rawText: string): Array<z.infer<typeof Extracted
       externalRef: `REQ-${String(i + 1).padStart(4, '0')}`,
       text: text.slice(0, 2000),
       requirementType: 'functional',
-      mandatory: true,
+      mandatory: /\b(shall|must|required)\b/i.test(text),
       priority: 'medium' as const,
-      confidenceBps: 4000,
+      confidenceBps: null,
       sourceChunkIndex: 0,
     }));
 }

@@ -115,6 +115,59 @@ describe('opportunity timeline', () => {
     );
   });
 
+  skipIfNoDb('names a lost stage move from the stored stage keys', async () => {
+    // WHY: the stage audit stores fromStage and toStage. Reading from and to
+    // rendered every lost move as unknown, including a close to closed_lost.
+    if (!orgId) throw new Error('isolated org missing');
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `TLL-${crypto.randomUUID().slice(0, 8)}`,
+        customer: 'timeline-lost',
+        name: 'Timeline Lost Move',
+        stage: 'closed_lost',
+      },
+    });
+    createdIds.opportunities.push(opportunity.id);
+    const auditLog = await prisma.auditLog.create({
+      data: {
+        orgId,
+        action: 'opportunity.stage',
+        targetType: 'opportunity',
+        targetId: opportunity.id,
+        diff: { fromStage: 's4_negotiation', toStage: 'closed_lost' },
+      },
+    });
+    createdIds.auditLogs.push(auditLog.id);
+    const chatter = await prisma.activity.create({
+      data: {
+        orgId,
+        type: 'stage_change',
+        entityType: 'opportunity',
+        entityId: opportunity.id,
+        actorType: 'system',
+        status: 'completed',
+        body: { from: 's1_lead', to: 'closed_lost' },
+        occurredAt: new Date('2026-07-04T10:00:00.000Z'),
+      },
+    });
+    createdIds.activities.push(chatter.id);
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+      headers: { authorization: 'Bearer stub' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as { items: Array<{ text: string }> };
+    expect(body.items.map((item) => item.text)).toEqual(
+      expect.arrayContaining([
+        'Moved from S4 Negotiation to Closed Lost',
+        'Moved from S1 Lead to Closed Lost',
+      ]),
+    );
+  });
+
   // WHY: the Activity chatter model (calls/emails/notes/stage events) was
   // built in parallel with the timeline and never merged — the deal narrative
   // silently omitted everything logged through /activities. This pins the

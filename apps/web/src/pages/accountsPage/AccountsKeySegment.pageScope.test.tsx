@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { KeyAccount } from '@/hooks/useKeyAccounts';
+import { formatUnspecifiedCompactMicros } from '@/components/dashboard/unspecified-currency';
 
 import { AccountsKeySegment } from './AccountsKeySegment';
 
@@ -132,5 +133,10 @@ describe('AccountsKeySegment KPI strip page-scope honesty', () => {
     // "Open deals" is the sum over the page (2 + 5), not a portfolio-wide sum.
     const openDealsTile = within(strip).getByText('Open deals').parentElement as HTMLElement;
     expect(within(openDealsTile).getByText('7')).toBeTruthy();
+
+    // Pipeline is the page sum in units (100 + 200). A missing micros string
+    // still converts those safe unit numbers instead of dropping them.
+    const pipelineTile = within(strip).getByText('Total pipeline').parentElement as HTMLElement;
+    expect(within(pipelineTile).getByText(formatUnspecifiedCompactMicros(300_000_000n))).toBeTruthy();
   });
 });

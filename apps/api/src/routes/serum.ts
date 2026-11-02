@@ -942,6 +942,11 @@ function queueStatus(row: QueueHealthRow): SerumSignalStatus {
   return 'ready';
 }
 
+/** A saved key is not a live probe. Attention means configured and unverified. */
+export function credentialSignalStatus(configured: boolean): SerumSignalStatus {
+  return configured ? 'attention' : 'not_configured';
+}
+
 function statusForCount(count: number, empty: SerumSignalStatus = 'empty'): SerumSignalStatus {
   return count > 0 ? 'active' : empty;
 }
@@ -1029,23 +1034,18 @@ function buildSignalHealth(args: {
     {
       id: 'provider-access',
       label: 'Provider access',
-      status: args.providerConfigured || args.dustConfigured ? 'ready' : 'not_configured',
+      status: credentialSignalStatus(args.providerConfigured || args.dustConfigured),
       detail: args.providerConfigured || args.dustConfigured
-        ? 'At least one org model provider or Dust fallback path is configured.'
+        ? 'A provider or Dust key is saved. That is not a live probe.'
         : 'No org model provider or Dust fallback credentials are configured.',
     },
     {
       id: 'dust-mcp-gateway',
       label: 'Dust/MCP gateway',
-      status:
-        args.dustConfigured && args.mcpConfigured
-          ? 'ready'
-          : args.dustConfigured || args.mcpConfigured
-            ? 'attention'
-            : 'not_configured',
+      status: credentialSignalStatus(args.dustConfigured || args.mcpConfigured),
       detail:
         args.dustConfigured && args.mcpConfigured
-          ? 'Dust credentials and MCP public URL are configured.'
+          ? 'Dust credentials and an MCP URL are saved. That is not a live probe.'
           : args.dustConfigured
             ? 'Dust credentials are configured, but MCP public URL is missing.'
             : args.mcpConfigured
@@ -1375,7 +1375,7 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
           title: 'Model calls today',
           value: String(modelCallsToday),
           detail: `${modelTokensToday.toLocaleString('en-US')} tokens recorded in AI audit telemetry.`,
-          status: modelCallsToday > 0 ? 'active' : providerConfigured || dustConfigured ? 'ready' : 'not_configured',
+          status: modelCallsToday > 0 ? 'active' : credentialSignalStatus(providerConfigured || dustConfigured),
           href: '/settings?tab=integrations',
         },
       ];
@@ -1408,22 +1408,22 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         {
           id: 'model-router',
           label: 'Model router',
-          status: providerConfigured || dustConfigured ? 'ready' : 'not_configured',
+          status: credentialSignalStatus(providerConfigured || dustConfigured),
           detail: activeProvider
-            ? `Org active provider: ${activeProvider}.`
+            ? `Org active provider: ${activeProvider}. Not a live probe.`
             : dustConfigured
-              ? 'Dust credentials are configured.'
+              ? 'Dust credentials are saved. Not a live probe.'
               : 'No org model provider or Dust fallback configured.',
           href: '/settings?tab=integrations',
         },
         {
           id: 'dust-mcp',
           label: 'Dust and MCP gateway',
-          status: dustConfigured && mcpConfigured ? 'ready' : dustConfigured || mcpConfigured ? 'attention' : 'not_configured',
+          status: credentialSignalStatus(dustConfigured || mcpConfigured),
           detail: dustConfigured
             ? mcpConfigured
-              ? 'Dust credentials and MCP public URL are configured.'
-              : 'Dust is configured; MCP public URL is missing.'
+              ? 'Dust credentials and an MCP URL are saved. Not a live probe.'
+              : 'Dust is saved; MCP public URL is missing. Not a live probe.'
             : 'Dust credentials are not configured for this org or environment.',
           href: '/settings?tab=integrations',
         },
@@ -1437,8 +1437,8 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         {
           id: 'evals',
           label: 'Evals and ship gates',
-          status: 'ready',
-          detail: 'Existing RFP eval fixtures are available; SERUM-specific eval suites are not yet promoted.',
+          status: 'empty',
+          detail: 'SERUM-specific eval suites are not promoted. Existing RFP fixtures are not a ship gate.',
         },
       ];
 

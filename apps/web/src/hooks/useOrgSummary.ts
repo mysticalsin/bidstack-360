@@ -8,6 +8,8 @@ export interface OrgSummary {
   opportunities: number;
   openOpportunities: number;
   pipelineValue: number;
+  /** Integer micros for the open pipeline. The number field cannot keep a large cent. */
+  pipelineValueMicros?: string;
   tasks: number;
   overdueTasks: number;
   serviceCases: number;

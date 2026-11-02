@@ -6,9 +6,10 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ThinkingMark } from '@/components/dashboard/widgets/PipelineMetricStrip';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { useOpportunityBrief } from '@/hooks/useOpportunityBrief';
 
 interface Props {
@@ -42,7 +43,7 @@ export function BriefingDialog({ opportunityId, opportunityLabel, open, onOpenCh
           )}
         >
           {brief.isPending ? (
-            <LoadingSkeleton rows={6} />
+            <ThinkingMark label={t('briefing.writing', 'Writing the brief from the recorded deal')} />
           ) : brief.isError ? (
             <ErrorState
               title={t('briefing.errorTitle', "Couldn't generate brief")}

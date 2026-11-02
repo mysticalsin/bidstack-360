@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 
-import { type KpiTone, TONE_BG, TONE_FG, TONE_GLOW } from './dashboard-types';
+import { type KpiTone, TONE_BG, TONE_FG } from './dashboard-types';
 
 // ─── AlertCard ───────────────────────────────────────────────────────────────
 
@@ -36,25 +36,22 @@ export function AlertCard({
     <GlassCard hoverable={false}>
       <Link
         to={href}
-        className="flex items-center gap-3"
+        className="flex min-h-11 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
         style={{ textDecoration: 'none', color: 'inherit' }}
       >
         <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
           style={{
             background: TONE_BG[tone],
             color: TONE_FG[tone],
-            boxShadow: `0 0 12px ${TONE_GLOW[tone]}`,
           }}
         >
           <Icon name={icon} size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            {label}
-          </div>
-          <div className="mt-0.5 flex items-baseline gap-1.5">
-            <span className="text-xl font-bold tabular-nums" style={{ color: TONE_FG[tone] }}>
+          <div className="text-sm text-[var(--fg-secondary)]">{label}</div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-2xl font-medium tabular-nums text-[var(--fg-primary)]">
               {value}
             </span>
             <span className="text-xs text-[var(--fg-secondary)]">

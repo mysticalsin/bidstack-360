@@ -76,7 +76,7 @@
       },
       "firstLead": {
         "label": "添加你的第一个潜在客户",
-        "description": "捕获入站兴趣，让 Polo PreSales 自动评分。"
+        "description": "捕获入站兴趣。新线索在记录分数之前保持未评分。"
       },
       "firstActivity": {
         "label": "记录你的第一项活动",
@@ -84,7 +84,7 @@
       },
       "firstBidNoBid": {
         "label": "进行你的第一次投标/不投标决策",
-        "description": "在投入前从契合度、价值和胜率为机会评分。"
+        "description": "在投入前从契合度和价值为机会评分。空白的已记录概率不是测得的赢单概率。"
       },
       "firstRfp": {
         "label": "开始你的第一份 RFP 响应",

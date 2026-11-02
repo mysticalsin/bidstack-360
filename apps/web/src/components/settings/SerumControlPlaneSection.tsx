@@ -290,7 +290,6 @@ const SERUM_CONFIG_SECTIONS: SerumConfigSection[] = [
       pricingMode: 'deterministic_only',
       modelMaySuggest: false,
       approvalRequiredBelowMarginPercent: 25,
-      currency: 'EUR',
     },
   },
   {

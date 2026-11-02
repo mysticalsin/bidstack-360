@@ -68,6 +68,8 @@ describe('reference search SERUM retrieval policy', () => {
 
     expect(result.mode).toBe('keyword');
     expect(result.references).toHaveLength(1);
+    expect(result.references[0]?.valueMicros).toBe('1000000');
+    expect(result.references[0]).not.toHaveProperty('valueEur');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mocks.checkRetrieval).toHaveBeenCalledWith({
       orgId,
@@ -78,6 +80,30 @@ describe('reference search SERUM retrieval policy', () => {
       sourceBacked: true,
       expectedConfidence: 1,
     });
+  });
+
+  it('returns a large reference amount as integer micros', async () => {
+    // WHY: valueEur used to divide micros by 1e6 and name the result euros.
+    // Number() also moves this amount off the cent.
+    mocks.checkRetrieval.mockResolvedValueOnce(decision(false));
+    mocks.queryRaw.mockResolvedValueOnce([
+      {
+        id: 'ref-large',
+        title: 'Large delivery',
+        description: null,
+        industry: null,
+        value_micros: 8_598_204_328_457_184_962n,
+        usage_count: 1,
+        document_url: null,
+        tags: [],
+        score: 0,
+      },
+    ]);
+
+    const result = await searchReferences(orgId, 'large delivery', { limit: 1 });
+    const reference = result.references[0];
+    expect(reference?.valueMicros).toBe('8598204328457184962');
+    expect(JSON.stringify(result)).not.toMatch(/valueEur|EUR|€/);
   });
 
   it('calls Cohere only after SERUM allows semantic retrieval', async () => {

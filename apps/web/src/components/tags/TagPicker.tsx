@@ -155,7 +155,7 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
             <div className="mt-3 border-t border-[var(--border-subtle)] pt-2">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  {t('tagPicker.aiSuggestions', 'AI suggestions')}
+                  {t('tagPicker.aiSuggestions', 'Matches in this text')}
                 </span>
                 <button
                   type="button"

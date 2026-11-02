@@ -29,7 +29,8 @@ export interface RankedReference {
   title: string;
   description: string | null;
   industry: string | null;
-  valueEur: number | null;
+  /** Integer micros. The reference row does not store a currency. */
+  valueMicros: string | null;
   usageCount: number;
   documentUrl: string | null;
   tags: string[];
@@ -206,7 +207,7 @@ export async function searchReferences(
       title: r.title,
       description: r.description,
       industry: r.industry,
-      valueEur: r.value_micros !== null ? Number(r.value_micros) / 1_000_000 : null,
+      valueMicros: r.value_micros === null ? null : BigInt(r.value_micros).toString(),
       usageCount: r.usage_count,
       documentUrl: r.document_url,
       tags: r.tags,

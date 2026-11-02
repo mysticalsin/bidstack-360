@@ -49,12 +49,13 @@ describe('fetchCompanyTechStackMcp', () => {
     });
 
     expect(profile?.technologies).toEqual(['Salesforce', 'Snowflake', 'Okta']);
+    expect(profile?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
     expect(profile?.sourceAttribution[0]).toMatchObject({
       source: 'tech_stack_mcp',
       label: 'BuiltWith MCP',
       sourceUrl: 'https://acme.com/',
       fetchedAt: '2026-06-17T12:00:00.000Z',
-      confidence: 0.86,
+      confidence: null,
     });
     expect(profile?.providerMetadata.techStackMcp).toMatchObject({
       technologies: ['Salesforce', 'Snowflake', 'Okta'],

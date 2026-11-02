@@ -7,6 +7,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { microsToUnitsText, unitsTextToMicros } from '@bidstack/shared';
+
 interface BaseProps<T> {
   value: T;
   onSave: (next: T) => Promise<unknown> | void;
@@ -34,6 +36,9 @@ interface NumberProps extends BaseProps<number> {
   max?: number;
   step?: number;
   suffix?: string;
+  /** Stored micros. The editor commits this integer instead of a rounded unit number. */
+  exactMicros?: string;
+  onSaveMicros?: (micros: string) => void | Promise<unknown>;
 }
 
 interface DateProps extends BaseProps<string | null> {
@@ -108,9 +113,9 @@ export function InlineEditText(props: TextProps) {
 }
 
 export function InlineEditNumber(props: NumberProps) {
-  const { value, onSave, validate, label, min, max, step, suffix } = props;
+  const { value, onSave, validate, label, min, max, step, suffix, exactMicros, onSaveMicros } = props;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(value));
+  const [draft, setDraft] = useState(exactMicros ? microsToUnitsText(exactMicros) : String(value));
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation('crm');
 
@@ -119,7 +124,7 @@ export function InlineEditNumber(props: NumberProps) {
       <ReadMode
         label={label ?? t('inlineEdit.editLabel', 'Edit')}
         onActivate={() => {
-          setDraft(String(value));
+          setDraft(exactMicros ? microsToUnitsText(exactMicros) : String(value));
           setEditing(true);
         }}
         className={props.className}
@@ -130,6 +135,17 @@ export function InlineEditNumber(props: NumberProps) {
   }
 
   const commit = async () => {
+    if (exactMicros && onSaveMicros) {
+      const micros = unitsTextToMicros(draft);
+      if (micros == null) {
+        setError(t('inlineEdit.mustBeNumber', 'Must be a number'));
+        return;
+      }
+      if (micros.toString() !== exactMicros) await onSaveMicros(micros.toString());
+      setEditing(false);
+      setError(null);
+      return;
+    }
     const num = Number(draft);
     if (Number.isNaN(num)) {
       setError(t('inlineEdit.mustBeNumber', 'Must be a number'));
@@ -149,7 +165,8 @@ export function InlineEditNumber(props: NumberProps) {
     <span className={props.className}>
       <input
         autoFocus
-        type="number"
+        type={exactMicros ? 'text' : 'number'}
+        inputMode={exactMicros ? 'decimal' : undefined}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => void commit()}

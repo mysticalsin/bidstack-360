@@ -1,12 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useCurrencyStore } from './currency';
-import { useFormatMoney } from '../hooks/useFormatMoney';
+import { microsToUnits } from '@bidstack/shared';
+
+import { convertMicrosByRates, useCurrencyStore } from './currency';
+import { useDisplayMoney } from '../hooks/useDisplayMoney';
+import { formatStoredMicros, useFormatMoney } from '../hooks/useFormatMoney';
+import { formatMoney, formatMoneyMicros } from '../lib/format';
 
 async function loadCurrency() {
   vi.resetModules();
   return import('./currency');
 }
+
+describe('convertMicrosByRates', () => {
+  it('does not snap a rate to six decimals', () => {
+    // WHY: rounding 1.1234567 to 1.123457 moved this amount by millions of micros.
+    const micros = 10_000_000_000_000n;
+    expect(convertMicrosByRates(micros, 1.1234567, 1)).toBe(8_901_099_615_143n);
+    expect(convertMicrosByRates(micros, 1.1234567, 1.1234567)).toBe(micros);
+  });
+
+  it('does not replace a rate with a nearby decimal', () => {
+    // WHY: 11/10 prints as 1.1, but it is not the stored rate. On this amount
+    // that decimal moves the result by 631 micros.
+    const micros = 8_598_204_328_457_184_962n;
+    const decimal = (micros * 10n + 5n) / 11n;
+    const converted = convertMicrosByRates(micros, 1.1, 1);
+    expect(converted).toBe(7_816_549_389_506_531_153n);
+    expect(converted).not.toBe(decimal);
+    expect(convertMicrosByRates(3_000_000n, 1 / 3, 1)).toBe(9_000_000n);
+  });
+});
 
 describe('useCurrencyStore', () => {
   beforeEach(() => {
@@ -361,6 +385,102 @@ describe('useCurrencyStore', () => {
     expect(useCurrencyStore.getState().convert(100, 'eur')).toBeCloseTo(110, 2);
     expect(useCurrencyStore.getState().convert(150, ' cad ')).toBeCloseTo(110, 2);
   });
+
+  it('converts a unit amount through integer micros', async () => {
+    // WHY: 0.1 * 1.1 is 0.11000000000000001, not 0.11.
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    expect(useCurrencyStore.getState().convert(0.1, 'EUR')).toBe(0.11);
+  });
+
+  it('converts a unit count past the safe integer range', async () => {
+    // WHY: this count is not a safe integer, so the rate was skipped and the
+    // figure stayed in the source currency.
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const huge = 9_007_199_254_740_992;
+    expect(Number.isSafeInteger(huge)).toBe(false);
+    const expected = microsToUnits(convertMicrosByRates(BigInt(huge) * 1_000_000n, 1, 1.1)!);
+    expect(useCurrencyStore.getState().convert(huge, 'EUR')).toBe(expected);
+    expect(useCurrencyStore.getState().convert(huge, 'EUR')).not.toBe(huge);
+  });
+
+  it('converts a fractional unit amount past the safe range', async () => {
+    // WHY: multiplying this fraction by 1e6 is not a safe integer, so the rate was skipped.
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const fractional = 9_007_199_254_740.992;
+    const micros = 9_007_199_254_740_992n * 1_000n;
+    const expected = microsToUnits(convertMicrosByRates(micros, 1, 1.1)!);
+    expect(useCurrencyStore.getState().convert(fractional, 'EUR')).toBe(expected);
+    expect(useCurrencyStore.getState().convert(fractional, 'EUR')).not.toBe(fractional);
+  });
+
+  it('prints a converted count past the safe unit range in full', () => {
+    // WHY: microsToUnits of this result is one unit low. The label must use the integer.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1.1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const huge = 9_007_199_254_740_992;
+    const micros = convertMicrosByRates(BigInt(huge) * 1_000_000n, 1, 1.1)!;
+    const full = formatMoneyMicros(micros, 'USD', { compact: false });
+    expect(full).not.toBe(formatMoney(microsToUnits(micros), 'USD'));
+    const { result } = renderHook(() => useDisplayMoney(huge, 'EUR'));
+    expect(result.current).toBe(full);
+    expect(result.current).toContain('9,907,919,180,215,092');
+    const formatted = renderHook(() => useFormatMoney());
+    expect(formatted.result.current.formatMoney(huge, 'EUR')).toBe(full);
+  });
+
+  it('does not print a collapsed number when the micros converter is omitted', () => {
+    // WHY: dividing these micros by 1e6 is one unit low, and formatting that
+    // float used to show the wrong amount in the display currency.
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const formatted = formatStoredMicros(huge, 'EUR', (amount) => amount * 1.1, 'USD');
+    expect(formatted).toContain('9,007,199,254,740,993');
+    expect(formatted).not.toContain('9,007,199,254,740,992');
+    const safe = formatStoredMicros('100000000', 'EUR', (amount) => amount * 1.1, 'USD', {
+      compact: false,
+    });
+    expect(safe).toContain('110');
+    // WHY: this cent does not survive a JavaScript multiply, and the converted
+    // number was printed in the display currency.
+    const large = formatStoredMicros(
+      '8598204328457184962',
+      'USD',
+      (amount) => amount * 1.1,
+      'EUR',
+      { compact: false },
+    );
+    expect(large).toContain('8,598,204,328,457.18');
+    expect(large).not.toContain('457.19');
+  });
 });
 
 describe('useFormatMoney hook integration', () => {
@@ -399,6 +519,92 @@ describe('useFormatMoney hook integration', () => {
 
     expect(formatted).toContain('€');
     expect(formatted).not.toContain('CA$');
+  });
+
+  it('does not convert micros that have no source currency', () => {
+    // Why: omitting the source used to assume euros and then convert into
+    // the header currency, so an unspecified pipeline looked like dollars.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: fullRates(),
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('1500000000000');
+    expect(formatted).toContain('unspecified');
+    expect(formatted).not.toMatch(/[$€]/);
+  });
+
+  it('prints an unspecified amount past the safe unit count in full', () => {
+    // WHY: compacting the unit number prints one unit low and drops the currency mark.
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const { result } = renderHook(() => useFormatMoney());
+    const huge = (9007199254740993n * 1_000_000n).toString();
+    const formatted = result.current.formatMoneyMicros(huge);
+    expect(formatted).toBe('9,007,199,254,740,993 unspecified');
+    expect(result.current.formatMoneyMicros(huge, null, { compact: false })).toBe(
+      '9,007,199,254,740,993 unspecified',
+    );
+    expect(result.current.formatMoneyMicros(Number(huge))).toBe('0 unspecified');
+  });
+
+  it('does not throw when a recorded amount is too large to round through a float', () => {
+    // WHY: Math.round(units * 1e6) is not a safe integer here, and BigInt() threw.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: fullRates(),
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+    });
+    expect(formatted).toContain('457.18');
+    expect(formatted).not.toContain('457.19');
+  });
+
+  it('keeps the stored cent when the rate does not change it', () => {
+    // WHY: a float round trip of this amount is not the original cent.
+    useCurrencyStore.setState({
+      currency: 'EUR',
+      rates: {
+        base: 'EUR',
+        rates: { ...fullRates(), USD: 1 },
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+    });
+    expect(formatted).toContain('8,598,204,328,457.18');
+    expect(formatted).toContain('€');
+    expect(formatted).not.toContain('457.19');
+  });
+
+  it('converts a large recorded amount in integer micros', () => {
+    // WHY: the float product does not fit a safe integer, so the cent was dropped.
+    useCurrencyStore.setState({
+      currency: 'EUR',
+      rates: {
+        base: 'EUR',
+        rates: fullRates(),
+        date: new Date().toISOString(),
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoneyMicros('8598204328457184962', 'USD', {
+      compact: false,
+    });
+    expect(formatted).toContain('7,816,549,389,506.53');
+    expect(formatted).toContain('€');
+    expect(formatted).not.toContain('457.19');
   });
 });
 

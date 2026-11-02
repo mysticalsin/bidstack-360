@@ -45,16 +45,14 @@ vi.mock('@/hooks/useAccountNews', () => ({
 }));
 
 describe('AccountNewsSignalCard provenance', () => {
-  it('renders source and source-confidence badges for open-web account news', () => {
+  it('names the news search without turning it into a confidence score', () => {
     render(<AccountNewsSignalCard accountId="Acme" />);
 
     expect(screen.getByText('Acme expands European AI team')).toBeTruthy();
     expect(screen.getByTestId('account-news-source').textContent).toBe('Google News');
-    expect(screen.getByTestId('account-news-source-confidence').textContent).toBe(
-      '62% source confidence',
-    );
+    expect(screen.queryByText('62% source confidence')).toBeNull();
     expect(screen.getByTestId('account-news-source').getAttribute('aria-label')).toContain(
-      'Google News open-web feed checked',
+      'not a scored source',
     );
   });
 });

@@ -24,9 +24,10 @@ export interface MintOpportunityInput {
   customer: string;
   name: string;
   /**
-   * Set for KAM (initiative.companyId). When omitted (e.g. lead-convert), the
-   * mint resolves an EXISTING Company by normalized `customer` name — link-only,
-   * never auto-created — so converted opps roll up into the account views (F2).
+   * Set when the caller already has the company (KAM initiative, or a lead
+   * whose companyId is stored). When omitted or null, the mint resolves an
+   * EXISTING Company by normalized `customer` name — link-only, never
+   * auto-created — so converted opps roll up into the account views (F2).
    */
   companyId?: string | null;
   valueMicros?: bigint;
@@ -108,7 +109,8 @@ export async function mintOpportunityTx(
       pipelineStageId,
       companyId,
       valueMicros: input.valueMicros ?? BigInt(0),
-      probability: input.probability ?? 20,
+      // Omitted is 0, which adds nothing to weighted pipeline. 20 was an invented chance.
+      probability: input.probability ?? 0,
       ownerId: input.ownerId ?? null,
     },
   });

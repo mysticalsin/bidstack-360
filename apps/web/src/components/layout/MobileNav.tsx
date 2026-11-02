@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { useUiStore } from '@/stores/ui';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { useAccountHistory } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
@@ -18,7 +19,7 @@ import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, visibleNavSections, isNavItemVisible, navBadgeCopy, type NavItem, type NavSection } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -68,7 +69,8 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
 
   const badges = { openBids, overdueTasks };
   const { data: appModules } = useAppModules();
-  const sections = NAV_SECTIONS.map((s) => ({
+  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
+  const sections = visibleNavSections(quickStartVisible).map((s) => ({
     ...s,
     items: s.items.filter((it) => isNavItemVisible(it, appModules)),
   })).filter((s) => s.items.length > 0);
@@ -79,7 +81,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="sb-mark" aria-hidden>
-            <PoloPreSalesLogo variant="mark" tone="inverse" title="" className="h-5 w-5" />
+            <PoloPreSalesLogo variant="mark" title="" className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-[var(--fg-primary)] leading-tight">
@@ -133,7 +135,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
 function NavGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="py-1">
-      <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <div className="px-3 py-1.5 text-xs font-medium text-[var(--fg-tertiary)]">
         {title}
       </div>
       {children}
@@ -167,7 +169,7 @@ function MobileNavSection({
         type="button"
         onClick={() => setSectionCollapsed(section.key, !collapsed)}
         aria-expanded={!collapsed}
-        className="flex min-h-9 w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
+        className="flex min-h-9 w-full items-center justify-between px-3 py-1.5 text-xs font-medium text-[var(--fg-tertiary)]"
       >
         <span>{t(section.titleKey, section.title)}</span>
         <Icon name="chevron-down" size={12} className={cn('transition-transform', collapsed && '-rotate-90')} ariaHidden />
@@ -192,6 +194,9 @@ function MobileNavItem({
   const { t } = useTranslation('common');
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
+  const badgePhrase =
+    badgeCopy && badge > 0 ? t(badgeCopy.key, badgeCopy.fallback, { count: badge }) : null;
   const location = useLocation();
 
   const isActive = (() => {
@@ -225,12 +230,16 @@ function MobileNavItem({
       )}
       end={item.end ?? item.to === '/'}
       onClick={onNavigate}
+      aria-label={badgePhrase ? `${label}, ${badgePhrase}` : label}
       onMouseEnter={() => prefetchRoute(item.to)}
     >
       <Icon name={item.icon} size={16} />
       <span className="flex-1">{label}</span>
       {badge > 0 && (
-        <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-tertiary)]">
+        <span
+          className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-tertiary)]"
+          title={badgePhrase ?? undefined}
+        >
           {badge}
         </span>
       )}

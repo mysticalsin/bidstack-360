@@ -1,12 +1,19 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ElementType, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ContractAgreementsCard } from './ContractAgreementsCard';
+import { ContractAgreementCreate } from '@bidstack/shared';
+import {
+  ContractAgreementsCard,
+  agreementRateMicros,
+  contractCurrencyCode,
+} from './ContractAgreementsCard';
 import type { ContractAgreement, ContractFieldProvenance } from '@bidstack/shared';
 
 const hookMocks = vi.hoisted(() => ({
   agreements: [] as ContractAgreement[],
+  isAdmin: false,
+  create: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -21,18 +28,21 @@ vi.mock('react-i18next', () => ({
 vi.mock('framer-motion', async () => {
   const React = await import('react');
   const motionComponent = (tag: ElementType) => {
-    const Component = React.forwardRef<HTMLElement, ComponentProps<'div'> & { children?: ReactNode }>(
-      ({ children, ...props }, ref) => {
-        const { animate, initial, transition, whileHover, whileTap, ...domProps } =
-          props as Record<string, unknown>;
-        void animate;
-        void initial;
-        void transition;
-        void whileHover;
-        void whileTap;
-        return React.createElement(tag, { ...domProps, ref }, children);
-      },
-    );
+    const Component = React.forwardRef<
+      HTMLElement,
+      ComponentProps<'div'> & { children?: ReactNode }
+    >(({ children, ...props }, ref) => {
+      const { animate, initial, transition, whileHover, whileTap, ...domProps } = props as Record<
+        string,
+        unknown
+      >;
+      void animate;
+      void initial;
+      void transition;
+      void whileHover;
+      void whileTap;
+      return React.createElement(tag, { ...domProps, ref }, children);
+    });
     Component.displayName = `Motion${String(tag)}`;
     return Component;
   };
@@ -49,7 +59,7 @@ vi.mock('framer-motion', async () => {
 });
 
 vi.mock('@/lib/auth', () => ({
-  useIsAdmin: () => false,
+  useIsAdmin: () => hookMocks.isAdmin,
 }));
 
 vi.mock('@/hooks/useContractAgreements', () => ({
@@ -59,7 +69,7 @@ vi.mock('@/hooks/useContractAgreements', () => ({
     isError: false,
     error: null,
   }),
-  useCreateContractAgreement: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateContractAgreement: () => ({ mutate: hookMocks.create, isPending: false }),
   useApproveContractExtraction: () => ({ mutate: vi.fn(), isPending: false }),
   useExtractContract: () => ({ mutate: vi.fn(), isPending: false }),
   useContractExtraction: () => ({ data: null }),
@@ -125,8 +135,77 @@ function agreement(): ContractAgreement {
   };
 }
 
+afterEach(() => {
+  cleanup();
+  hookMocks.create.mockReset();
+});
+
+describe('contract currency', () => {
+  it('does not turn a blank currency into euros', () => {
+    // Why: the add-agreement form used to submit EUR whenever the field was empty.
+    expect(contractCurrencyCode('')).toBeNull();
+    expect(contractCurrencyCode('  ')).toBeNull();
+    expect(contractCurrencyCode('EU')).toBeNull();
+    expect(contractCurrencyCode('nok')).toBe('NOK');
+  });
+
+  it('rejects a create body that omits currency instead of defaulting to EUR', () => {
+    const parsed = ContractAgreementCreate.safeParse({
+      accountKey: 'acme',
+      reference: 'MSA-1',
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('stores a fractional day rate as integer micros', () => {
+    // WHY: Math.round(rate * 1e6) cannot keep 850.50 as 850_500_000.
+    expect(agreementRateMicros('850.50')).toBe(850_500_000);
+    expect(agreementRateMicros('nope')).toBeNull();
+    expect(agreementRateMicros('1.2345678')).toBeNull();
+  });
+
+  it('saves a typed rate as integer micros and refuses a bad line', () => {
+    hookMocks.agreements = [];
+    hookMocks.isAdmin = true;
+    render(<ContractAgreementsCard accountKey="acme" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add agreement' }));
+    fireEvent.change(screen.getByLabelText('Contract reference'), {
+      target: { value: 'MSA-1' },
+    });
+    fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add rate line' }));
+    fireEvent.change(screen.getByLabelText('Rate line 1 role'), {
+      target: { value: 'Architect' },
+    });
+    fireEvent.change(screen.getByLabelText('Rate line 1 rate'), { target: { value: '850.50' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(hookMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currency: 'USD',
+        reference: 'MSA-1',
+        rateCard: [{ role: 'Architect', rateMicros: 850_500_000, unit: 'day' }],
+      }),
+      expect.anything(),
+    );
+
+    hookMocks.create.mockClear();
+    fireEvent.change(screen.getByLabelText('Rate line 1 rate'), { target: { value: 'nope' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(hookMocks.create).not.toHaveBeenCalled();
+  });
+
+  it('opens the add-agreement form with an empty currency field', () => {
+    hookMocks.agreements = [];
+    hookMocks.isAdmin = true;
+    render(<ContractAgreementsCard accountKey="acme" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add agreement' }));
+    expect((screen.getByLabelText('Currency') as HTMLInputElement).value).toBe('');
+  });
+});
+
 describe('ContractAgreementsCard provenance', () => {
   it('shows compact source badges on decision-critical contract fields', () => {
+    hookMocks.isAdmin = false;
     hookMocks.agreements = [agreement()];
 
     render(<ContractAgreementsCard accountKey="acme" />);
@@ -151,8 +230,7 @@ describe('ContractAgreementsCard provenance', () => {
         .getAttribute('aria-label'),
     ).toBe(aiSource.hint);
     expect(
-      screen.getByTestId('contract-source-33333333-3333-4333-8333-333333333333-rebate')
-        .textContent,
+      screen.getByTestId('contract-source-33333333-3333-4333-8333-333333333333-rebate').textContent,
     ).toBe('AI reviewed');
     expect(
       screen.getByTestId('contract-source-33333333-3333-4333-8333-333333333333-rate-review')

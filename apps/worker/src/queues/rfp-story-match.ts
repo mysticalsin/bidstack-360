@@ -15,7 +15,8 @@
 //
 // Score formula (basis points, 0–10000):
 //   final = cosine×0.55 + keyword×0.20 + tag×0.15 + recency×0.10
-// Each dimension is [0,10000] before weighting.
+// A missing close date drops recency and renormalizes the other weights.
+// Each measured dimension is [0,10000] before weighting.
 //
 // WHY $executeRaw for RequirementReferenceMatch: Wave 9 model not in generated
 // Prisma client (Windows DLL lock). All values parameterized.
@@ -63,7 +64,7 @@ interface CandidateRow {
 export interface ScoredCandidate extends CandidateRow {
   keywordBps: number;
   tagBps: number;
-  recencyBps: number;
+  recencyBps: number | null;
   finalBps: number;
 }
 
@@ -111,8 +112,8 @@ export function tagOverlapBps(reqText: string, refTags: string[]): number {
 
 // ─── Recency decay scoring ─────────────────────────────────────────────────
 
-export function recencyBps(closedAt: Date | null | undefined): number {
-  if (!closedAt) return 5000; // unknown → neutral
+export function recencyBps(closedAt: Date | null | undefined): number | null {
+  if (!closedAt) return null;
   const ageMs = Date.now() - closedAt.getTime();
   const ageDays = ageMs / 86_400_000;
   // Exponential decay: score = 10000 * exp(-ln2 * ageDays / halfLife)
@@ -123,6 +124,23 @@ export function recencyBps(closedAt: Date | null | undefined): number {
     10000,
     Math.round(10000 * Math.exp(-Math.LN2 * (ageDays / RECENCY_HALF_LIFE_DAYS))),
   );
+}
+
+/** Weighted hybrid score. A missing recency term is left out, not scored as 50%. */
+export function hybridScoreBps(parts: {
+  cosineBps: number;
+  keywordBps: number;
+  tagBps: number;
+  recencyBps: number | null;
+}): number {
+  const weighted: Array<[number, number]> = [
+    [parts.cosineBps, COSINE_WEIGHT],
+    [parts.keywordBps, KEYWORD_WEIGHT],
+    [parts.tagBps, TAG_WEIGHT],
+  ];
+  if (parts.recencyBps != null) weighted.push([parts.recencyBps, RECENCY_WEIGHT]);
+  const weightSum = weighted.reduce((sum, [, weight]) => sum + weight, 0);
+  return Math.round(weighted.reduce((sum, [value, weight]) => sum + value * weight, 0) / weightSum);
 }
 
 // ─── MMR diversity pruning ─────────────────────────────────────────────────
@@ -241,7 +259,7 @@ async function persistMatches(
   // requires an exact match to the constraint column list — a 2-col target
   // (requirement_id, reference_id) fails to resolve at runtime.
   for (const [idx, m] of topMatches.entries()) {
-    const reasoning = `cosine=${m.cosineBps}bps keyword=${m.keywordBps}bps tag=${m.tagBps}bps recency=${m.recencyBps}bps`;
+    const reasoning = `cosine=${m.cosineBps}bps keyword=${m.keywordBps}bps tag=${m.tagBps}bps recency=${m.recencyBps ?? 'unscored'}bps`;
     await prisma.$executeRaw`
       INSERT INTO requirement_reference_matches (
         id, org_id, requirement_id, reference_id,
@@ -312,12 +330,12 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
     const keywordBps = keywordOverlapBps(reqText, c.title);
     const tagBps = tagOverlapBps(reqText, c.tags ?? []);
     const recencyScore = recencyBps(c.closedAt);
-    const finalBps = Math.round(
-      c.cosineBps * COSINE_WEIGHT +
-        keywordBps * KEYWORD_WEIGHT +
-        tagBps * TAG_WEIGHT +
-        recencyScore * RECENCY_WEIGHT,
-    );
+    const finalBps = hybridScoreBps({
+      cosineBps: c.cosineBps,
+      keywordBps,
+      tagBps,
+      recencyBps: recencyScore,
+    });
     return { ...c, keywordBps, tagBps, recencyBps: recencyScore, finalBps };
   });
 

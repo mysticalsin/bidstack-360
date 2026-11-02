@@ -77,7 +77,7 @@ export function WebhookEventsCard({
             <caption className="sr-only">
               {t('webhookEvents.tableCaption', 'Recent webhook events, newest first')}
             </caption>
-            <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            <thead className="bg-[var(--surface-secondary)] text-xs text-[var(--fg-tertiary)]">
               <tr>
                 <th scope="col" className="px-5 py-3 font-semibold">
                   {t('webhookEvents.colEvent', 'Event')}

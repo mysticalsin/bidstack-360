@@ -76,7 +76,7 @@ export const MeetingImportedContact = z.object({
   email: z.string().email().nullable(),
   phone: z.string().nullable(),
   roleInDecision: z.enum(['buyer', 'blocker', 'champion', 'influencer', 'user']).nullable(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
 });
 export type MeetingImportedContact = z.infer<typeof MeetingImportedContact>;
 
@@ -84,7 +84,7 @@ export const MeetingImportedTask = z.object({
   title: z.string().min(1).max(255),
   dueDate: z.string().date().nullable(),
   status: z.enum(['open', 'in_progress', 'done', 'blocked']),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
 });
 export type MeetingImportedTask = z.infer<typeof MeetingImportedTask>;
 
