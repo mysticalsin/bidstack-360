@@ -389,7 +389,7 @@ export function TerritoriesPage() {
           canWrite={canWrite}
           pageContinues={pageContinues}
         />
-        <RoutingRuleListPanel>
+        <RoutingRuleListPanel
           items={rItems}
           isLoading={rules.isLoading}
           isError={rules.isError}
