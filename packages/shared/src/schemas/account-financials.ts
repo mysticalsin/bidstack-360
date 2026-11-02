@@ -86,7 +86,16 @@ export const METRIC_LABEL: Record<FinancialMetric | 'operatingMargin' | 'netMarg
 };
 
 export const FinancialValue = z.object({
-  value: z.number(),
+  /**
+   * Major units when they fit in a safe number. Omitted once the integer
+   * would have to pass through Number() and lose cents.
+   */
+  value: z.number().optional(),
+  /**
+   * Exact integer micros (major units × 1e6), including a leading minus.
+   * This is the amount the filing tile and timeline show.
+   */
+  valueMicros: z.string().regex(/^-?\d+$/).optional(),
   /** XBRL concept the number came from, e.g. ifrs-full:Revenue. */
   concept: z.string(),
 });
@@ -178,7 +187,7 @@ export const FINANCIALS_STATUS_COPY: Record<string, string> = {
  * numbers; never mixed with real periods.
  */
 function samplePeriod(year: number, revenue: number, op: number, capex: number, cash: number): FinancialPeriod {
-  const v = (value: number) => ({ value, concept: 'sample' });
+  const v = (value: number) => ({ value, valueMicros: `${value}000000`, concept: 'sample' });
   return {
     periodType: 'FY',
     fiscalYear: year,

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { runFinancialsScan, syncFinancialsSchedule } from './scan.js';
-import { buildVocab, detectFinancialSignals, findTextCues, repairSplitWords, sentenceAround, type SignalPeriod } from './signals.js';
+import { buildVocab, detectFinancialSignals, findTextCues, fmtMoney, repairSplitWords, sentenceAround, type SignalPeriod } from './signals.js';
 import { entityNameMatches, pacer, pullEdgar, pullEsef, type FinFetch } from './sources.js';
 import { buildPeriods, derived, factsFromCompanyFacts, factsFromXbrlJson, type CompanyFacts, type XbrlJson } from './xbrl.js';
 
@@ -72,7 +72,7 @@ describe('xbrl parsing', () => {
     expect(facts.some((f) => f.concept === 'ifrs-full:UnrelatedConcept')).toBe(false);
     const ps = buildPeriods(facts, { quarters: true });
     expect(ps.map((p) => `${p.periodType}:${p.periodEnd}`)).toEqual(['FY:2021-12-31', 'FY:2020-12-31']);
-    expect(ps[0]!.metrics.revenue).toEqual({ value: 2600, concept: 'ifrs-full:Revenue' });
+    expect(ps[0]!.metrics.revenue).toEqual({ value: 2600, valueMicros: '2600000000', concept: 'ifrs-full:Revenue' });
     expect(ps[0]!.metrics.cash?.value).toBe(230);
     expect(ps[0]!.metrics.debt?.value).toBe(3000);
     expect(ps[0]!.currency).toBe('CAD');
@@ -88,6 +88,26 @@ describe('xbrl parsing', () => {
     expect(ps[0]!.metrics.revenue?.value).toBe(1000);
     expect(ps[0]!.metrics.cash?.value).toBe(40);
     expect(derived(ps[0]!.metrics)).toEqual({ operatingMargin: 15, netMargin: null, freeCashFlow: null });
+  });
+
+  it('stores a filing amount past 2^53 as integer micros text', () => {
+    // WHY: Number("9007199254740993.25") is 9007199254740994. The cents are
+    // gone and the integer moved. Stored as a major-unit number, the tile
+    // then either prints that rounded figure or, once it is multiplied into
+    // micros, a zero. The filed string must stay integer micros text.
+    const raw = '9007199254740993.25';
+    // The number literal is already rounded, which is the read we refuse to store.
+    expect(Number(raw)).toBe(9007199254740994);
+    const doc = esefDoc(2025, { revenue: 1, op: 150, capex: 80, cash: 40 });
+    doc.facts.a!.value = raw;
+    const facts = factsFromXbrlJson(doc, null);
+    const revenue = facts.find((fact) => fact.concept === 'ifrs-full:Revenue');
+    expect(revenue?.valueMicros).toBe('9007199254740993250000');
+    expect(revenue?.value).toBeNull();
+    const period = buildPeriods(facts)[0]!;
+    expect(period.metrics.revenue?.valueMicros).toBe('9007199254740993250000');
+    expect(period.metrics.revenue?.value).toBeUndefined();
+    expect(period.metrics.revenue?.valueMicros).not.toBe('0');
   });
 
   it('keeps one concept per metric across years when a filer retags a line', () => {
@@ -106,6 +126,24 @@ describe('xbrl parsing', () => {
 // ── signal rules ──
 
 describe('signal rules', () => {
+  it('writes the timeline filing amount from integer micros', () => {
+    // WHY: the account timeline shows this sentence. Math.round turned
+    // 7,860,000 into "EUR 8m", and a micros integer printed as dollars
+    // would show 7,860,000,000,000.
+    const s = detectFinancialSignals([
+      P('2025-12-31', { revenue: 10_000_000, capex: 7_860_000, acquisitions: 7_860_000 }),
+      P('2024-12-31', { revenue: 10_000_000, capex: 1_000_000 }),
+    ]);
+    const capex = s.find((x) => x.rule === 'capex_up');
+    expect(capex?.explanation).toContain('EUR 7,860,000');
+    expect(capex?.explanation).not.toContain('8m');
+    expect(capex?.explanation).not.toContain('7,860,000,000,000');
+    const bought = s.find((x) => x.rule === 'acquisitions');
+    expect(bought?.title).toBe('Spent EUR 7,860,000 on acquisitions');
+    expect(fmtMoney(7_860_000, 'EUR')).toBe('EUR 7,860,000');
+    expect(fmtMoney({ valueMicros: '9007199254740993250000' }, 'EUR')).toBe('EUR 9,007,199,254,740,993.25');
+  });
+
   it('capex up 40% with a rising share reads as an expansion program', () => {
     const s = detectFinancialSignals([P('2025-12-31', { revenue: 1000, capex: 140 }), P('2024-12-31', { revenue: 1000, capex: 100 })]);
     const capex = s.find((x) => x.rule === 'capex_up');

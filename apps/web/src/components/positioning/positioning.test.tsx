@@ -45,7 +45,7 @@ const kn = (over: Partial<KeyNumber>): KeyNumber => ({
 describe('positioning-format', () => {
   it('formats values, deltas and direction tones', () => {
     expect(formatValue(kn({ value: 1234 }))).toBe('1,234');
-    expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1.70bn');
+    expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1,700,000,000');
     expect(formatValue(kn({ value: 18.34, unit: 'pct' }))).toBe('18.3%');
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');
@@ -86,7 +86,7 @@ describe('KeyNumbersStrip', () => {
     };
     render(<KeyNumbersStrip companyId="c1" />);
     const rev = screen.getByTestId('kn-revenue');
-    expect(within(rev).getByText('EUR 1.70bn')).toBeTruthy();
+    expect(within(rev).getByText('EUR 1,700,000,000')).toBeTruthy();
     expect(within(rev).getByText(/\+5\.0%/)).toBeTruthy();
     const tip = within(rev).getByRole('tooltip', { hidden: true });
     expect(tip.textContent).toContain('ESEF (filings.xbrl.org)');

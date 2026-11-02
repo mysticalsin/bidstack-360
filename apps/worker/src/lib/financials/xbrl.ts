@@ -8,7 +8,7 @@
  * Only undimensioned (consolidated total) facts are used. Nothing is
  * estimated: a metric is either the filed number with its concept, or absent.
  */
-import type { FinancialMetric, FinancialValue } from '@bidstack/shared';
+import { signedUnitsToMicros, type FinancialMetric, type FinancialValue } from '@bidstack/shared';
 
 /** Concepts per metric, first match wins. `*:Name` matches any prefix (filer extensions). */
 export const CONCEPTS: Record<FinancialMetric, string[]> = {
@@ -70,7 +70,10 @@ export const INSTANT: ReadonlySet<FinancialMetric> = new Set(['cash', 'debt', 'h
 
 export interface RawFact {
   concept: string;
-  value: number;
+  /** Major units when they fit in a safe number. Null when they do not. */
+  value: number | null;
+  /** Integer micros text for a money fact. Absent for a headcount. */
+  valueMicros?: string;
   unit: string;
   /** ISO date, inclusive. Null for instants. */
   start: string | null;
@@ -114,6 +117,42 @@ function periodKind(f: RawFact): 'FY' | 'Q' | 'instant' | null {
 const isMoneyUnit = (u: string) => /^[A-Z]{3}$/.test(u);
 
 /**
+ * Filed major units as integer micros. A digit string never passes through
+ * Number(), so an amount past 2^53 keeps its cents. A number is accepted
+ * only while unitsToMicros can hold it; otherwise the fact is omitted.
+ */
+export function filedMicros(raw: string | number | null | undefined): bigint | null {
+  if (raw == null || raw === '') return null;
+  return signedUnitsToMicros(raw);
+}
+
+/** Major units for ratios, only when every digit fits in a safe number. */
+function majorUnitsIfSafe(micros: bigint): number | null {
+  const neg = micros < 0n;
+  const abs = neg ? -micros : micros;
+  const whole = abs / 1_000_000n;
+  const rem = abs % 1_000_000n;
+  if (whole > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  if (rem === 0n) return neg ? -Number(whole) : Number(whole);
+  if (abs > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const amount = Number(whole) + Number(rem) / 1_000_000;
+  return neg ? -amount : amount;
+}
+
+function moneyFields(f: Pick<RawFact, 'value' | 'valueMicros' | 'unit'>): { value?: number; valueMicros?: string } {
+  let valueMicros = f.valueMicros;
+  const value = f.value;
+  if (!valueMicros && value != null && isMoneyUnit(f.unit)) {
+    const micros = filedMicros(value);
+    if (micros != null) valueMicros = micros.toString();
+  }
+  return {
+    ...(value != null ? { value } : {}),
+    ...(valueMicros ? { valueMicros } : {}),
+  };
+}
+
+/**
  * Group facts into periods. Flows define the periods (by end date); instants
  * on the same end date fill cash, debt and headcount. When a filer restates a
  * number, the latest filing wins.
@@ -122,18 +161,19 @@ export function buildPeriods(facts: RawFact[], opts: { quarters?: boolean } = {}
   const periods = new Map<string, ExtractedPeriod & { _rank: Partial<Record<FinancialMetric, number>>; _filed: Partial<Record<FinancialMetric, string>> }>();
   const instants: RawFact[] = [];
   const metrics = Object.keys(CONCEPTS) as FinancialMetric[];
-  const alts = new Map<string, Map<string, { value: number; filed: string }>>();
+  const alts = new Map<string, Map<string, { value?: number; valueMicros?: string; filed: string }>>();
   const take = (p: ExtractedPeriod & { _rank: Partial<Record<FinancialMetric, number>>; _filed: Partial<Record<FinancialMetric, string>> }, m: FinancialMetric, f: RawFact) => {
     const r = rank(m, f.concept);
     const ak = `${p.periodType}:${p.periodEnd}:${m}`;
-    const am = alts.get(ak) ?? new Map<string, { value: number; filed: string }>();
+    const am = alts.get(ak) ?? new Map<string, { value?: number; valueMicros?: string; filed: string }>();
     const prevAlt = am.get(f.concept);
-    if (!prevAlt || (f.filed ?? '') > prevAlt.filed) am.set(f.concept, { value: f.value, filed: f.filed ?? '' });
+    const stored = moneyFields(f);
+    if (!prevAlt || (f.filed ?? '') > prevAlt.filed) am.set(f.concept, { ...stored, filed: f.filed ?? '' });
     alts.set(ak, am);
     const prev = p._rank[m];
     const filed = f.filed ?? '';
     if (prev === undefined || r < prev || (r === prev && filed > (p._filed[m] ?? ''))) {
-      p.metrics[m] = { value: f.value, concept: f.concept };
+      p.metrics[m] = { ...stored, concept: f.concept };
       p._rank[m] = r;
       p._filed[m] = filed;
       if (filed && (!p.filedAt || filed > p.filedAt)) p.filedAt = filed;
@@ -184,7 +224,13 @@ export function buildPeriods(facts: RawFact[], opts: { quarters?: boolean } = {}
       if (!target) continue;
       for (const p of ps.slice(1)) {
         const alt = alts.get(`${type}:${p.periodEnd}:${m}`)?.get(target);
-        if (alt && p.metrics[m]?.concept !== target) p.metrics[m] = { value: alt.value, concept: target };
+        if (alt && p.metrics[m]?.concept !== target) {
+          p.metrics[m] = {
+            concept: target,
+            ...(alt.value != null ? { value: alt.value } : {}),
+            ...(alt.valueMicros ? { valueMicros: alt.valueMicros } : {}),
+          };
+        }
       }
     }
   }
@@ -211,7 +257,14 @@ export function factsFromCompanyFacts(cf: CompanyFacts): RawFact[] {
       for (const [unit, rows] of Object.entries(c.units)) {
         for (const r of rows) {
           if (!r.form || !(ANNUAL_FORMS.test(r.form) || QUARTER_FORMS.test(r.form))) continue;
-          out.push({ concept, value: r.val, unit: unit === 'pure' ? 'pure' : unit, start: r.start ?? null, end: r.end, filed: r.filed ?? null, form: r.form });
+          const unitName = unit === 'pure' ? 'pure' : unit;
+          if (isMoneyUnit(unitName)) {
+            const micros = filedMicros(r.val);
+            if (micros == null) continue;
+            out.push({ concept, value: majorUnitsIfSafe(micros), valueMicros: micros.toString(), unit: unitName, start: r.start ?? null, end: r.end, filed: r.filed ?? null, form: r.form });
+          } else {
+            out.push({ concept, value: r.val, unit: unitName, start: r.start ?? null, end: r.end, filed: r.filed ?? null, form: r.form });
+          }
         }
       }
     }
@@ -241,13 +294,28 @@ export function factsFromXbrlJson(doc: XbrlJson, filed: string | null): RawFact[
     if (Object.keys(dims).some((k) => !CORE_DIMS.has(k))) continue;
     const concept = dims.concept ?? '';
     if (!(Object.keys(CONCEPTS) as FinancialMetric[]).some((m) => rank(m, concept) >= 0)) continue;
-    const v = Number(f.value);
-    if (f.value == null || !Number.isFinite(v)) continue;
+    if (f.value == null) continue;
     const period = dims.period ?? '';
     const unit = (dims.unit ?? '').replace(/^iso4217:/, '') || 'pure';
     const [a, b] = period.split('/');
     if (!a) continue;
-    out.push(b ? { concept, value: v, unit, start: a.slice(0, 10), end: inclusive(b), filed } : { concept, value: v, unit, start: null, end: inclusive(a), filed });
+    const span = b ? { start: a.slice(0, 10), end: inclusive(b) } : { start: null, end: inclusive(a) };
+    if (isMoneyUnit(unit)) {
+      const micros = filedMicros(f.value);
+      if (micros == null) continue;
+      out.push({ concept, value: majorUnitsIfSafe(micros), valueMicros: micros.toString(), unit, ...span, filed });
+      continue;
+    }
+    const text = f.value.trim();
+    if (/^-?\d+$/.test(text)) {
+      const whole = Number(text);
+      if (!Number.isSafeInteger(whole)) continue;
+      out.push({ concept, value: whole, unit, ...span, filed });
+      continue;
+    }
+    const v = Number(text);
+    if (!Number.isFinite(v) || Math.abs(v) > Number.MAX_SAFE_INTEGER) continue;
+    out.push({ concept, value: v, unit, ...span, filed });
   }
   return out;
 }
@@ -264,14 +332,47 @@ export function textBlocksFromXbrlJson(doc: XbrlJson): Array<{ concept: string; 
 }
 
 /** Operating and net margin in % and free cash flow (OCF minus capex), when the inputs exist. */
+function microsOf(v: FinancialValue | undefined): bigint | null {
+  if (!v) return null;
+  if (v.valueMicros && /^-?\d+$/.test(v.valueMicros)) return BigInt(v.valueMicros);
+  if (typeof v.value === 'number') return filedMicros(v.value);
+  return null;
+}
+
+/** One-decimal percent from integer micros. Matches Math.round((part/whole)*1000)/10 for safe amounts. */
+function marginFromMicros(part: bigint | null, whole: bigint | null): number | null {
+  if (part == null || whole == null || whole <= 0n) return null;
+  const half = whole / 2n;
+  const scaled = (part * 1000n + (part < 0n ? -half : half)) / whole;
+  const n = Number(scaled);
+  if (!Number.isSafeInteger(n)) return null;
+  return n / 10;
+}
+
 export function derived(m: Partial<Record<FinancialMetric, FinancialValue>>): { operatingMargin: number | null; netMargin: number | null; freeCashFlow: number | null } {
   const rev = m.revenue?.value;
   const op = m.operatingIncome?.value;
+  const net = m.netIncome?.value;
   const ocf = m.operatingCashFlow?.value;
   const capex = m.capex?.value;
+  if (typeof rev === 'number' && (typeof op === 'number' || typeof net === 'number' || (typeof ocf === 'number' && typeof capex === 'number'))) {
+    return {
+      operatingMargin: rev && op !== undefined && rev > 0 ? Math.round((op / rev) * 1000) / 10 : null,
+      netMargin: rev && net !== undefined && rev > 0 ? Math.round((net / rev) * 1000) / 10 : null,
+      freeCashFlow: ocf !== undefined && capex !== undefined ? ocf - Math.abs(capex) : null,
+    };
+  }
+  const revMicros = microsOf(m.revenue);
+  const flow = microsOf(m.operatingCashFlow);
+  const spent = microsOf(m.capex);
+  let freeCashFlow: number | null = null;
+  if (flow != null && spent != null) {
+    const absCapex = spent < 0n ? -spent : spent;
+    freeCashFlow = majorUnitsIfSafe(flow - absCapex);
+  }
   return {
-    operatingMargin: rev && op !== undefined && rev > 0 ? Math.round((op / rev) * 1000) / 10 : null,
-    netMargin: rev && m.netIncome && rev > 0 ? Math.round((m.netIncome.value / rev) * 1000) / 10 : null,
-    freeCashFlow: ocf !== undefined && capex !== undefined ? ocf - Math.abs(capex) : null,
+    operatingMargin: marginFromMicros(microsOf(m.operatingIncome), revMicros),
+    netMargin: marginFromMicros(microsOf(m.netIncome), revMicros),
+    freeCashFlow,
   };
 }

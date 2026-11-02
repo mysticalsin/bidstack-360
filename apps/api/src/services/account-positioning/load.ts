@@ -213,7 +213,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
             fiscalYear: latest.fiscalYear,
             source: latest.source,
             currency: latest.currency,
-            revenue: latest.metrics.revenue.value,
+            revenue: latest.metrics.revenue.value ?? null,
             revenueYoY: pctChange(latest.metrics.revenue.value, prev?.metrics.revenue?.value),
             marginLabel: lm?.label ?? null,
             margin: lm?.value ?? null,
@@ -312,7 +312,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   // Employees: filings, then enrichment cache, then the account record.
   const hc = latest?.metrics.headcount;
   if (hc && latest) {
-    items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
+    items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value ?? null, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
   } else if (firmo?.employeeCount) {
     items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: firmo.employeeCount, delta: firmo.headcountGrowth12m != null ? Math.round(firmo.headcountGrowth12m * 1000) / 10 : null, deltaUnit: 'pct', source: 'Enrichment cache', period: `As of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}, change over 12 months`, anchor: 'firmographics' }));
   } else if (company.employeeCount) {
@@ -322,7 +322,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   // Revenue, with YoY.
   const rev = latest?.metrics.revenue;
   if (rev && latest) {
-    items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
+    items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value ?? null, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
   } else if (firmo?.annualRevenueUsd) {
     items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: 'USD', value: Number(firmo.annualRevenueUsd), source: 'Enrichment cache', period: `Annual, as of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}`, anchor: 'firmographics' }));
   } else if (apolloFacts.revenueMicros !== null && apolloFacts.revenueMicros > 0n) {

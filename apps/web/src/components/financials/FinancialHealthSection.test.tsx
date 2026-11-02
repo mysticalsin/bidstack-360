@@ -61,7 +61,9 @@ describe('FinancialHealthSection', () => {
     state.data = real;
     render(<FinancialHealthSection companyId="c1" />);
     const rev = screen.getByTestId('fh-tile-revenue');
-    expect(rev.textContent).toContain('EUR 1.82bn');
+    // WHY: 1.82bn is 3,000,000 short of the filed 1,823,000,000.
+    expect(rev.textContent).toContain('EUR 1,823,000,000');
+    expect(rev.textContent).not.toContain('1.82bn');
     expect(rev.textContent).toContain('+7%');
     expect(rev.textContent).toContain('FY2025');
     expect(rev.querySelector('a')?.getAttribute('href')).toBe('https://filings.xbrl.org/r/2025');
@@ -95,9 +97,14 @@ describe('FinancialHealthSection', () => {
   it('falls back to net margin for banks and formats money', () => {
     const tiles = buildTiles([P(2025, 90e9, null, 48), P(2024, 86e9, null, 53)]);
     expect(tiles[1]!.label).toBe('Net margin');
-    expect(fmtMoney(90_649e6, 'NOK')).toBe('NOK 90.6bn');
-    expect(fmtMoney(-156_444e6, 'NOK')).toBe('-NOK 156.4bn');
-    expect(fmtMoney(935e6, 'CAD')).toBe('CAD 935m');
+    // WHY: 90.6bn is 49,000,000 short of the filed 90,649,000,000, and
+    // treating 1,823,000,000 as micros would print EUR 1,823.
+    expect(fmtMoney(90_649e6, 'NOK')).toBe('NOK 90,649,000,000');
+    expect(fmtMoney(-156_444e6, 'NOK')).toBe('-NOK 156,444,000,000');
+    expect(fmtMoney(1_823_000_000, 'EUR')).toBe('EUR 1,823,000,000');
+    expect(fmtMoney({ value: 1_823_000_000, valueMicros: '1823000000000000' }, 'EUR')).toBe('EUR 1,823,000,000');
+    expect(fmtMoney({ valueMicros: '9007199254740993250000' }, 'EUR')).toBe('EUR 9,007,199,254,740,993.25');
+    expect(fmtMoney(935e6, 'CAD')).toBe('CAD 935,000,000');
   });
   it('period ends read as filed (31 Dec, not 30 Dec) and recent data is not flagged stale', () => {
     state.data = real;

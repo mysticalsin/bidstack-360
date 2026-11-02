@@ -4,9 +4,9 @@
  * Rules compare the latest annual period with the one before; nothing is
  * guessed when an input is missing.
  */
-import { cleanText, type FinancialSignal, type FinancialSignalRule } from '@bidstack/shared';
+import { formatMicrosAmount, cleanText, type FinancialSignal, type FinancialSignalRule, type FinancialValue } from '@bidstack/shared';
 
-import { derived, type ExtractedPeriod } from './xbrl.js';
+import { derived, filedMicros, type ExtractedPeriod } from './xbrl.js';
 
 export interface SignalPeriod extends ExtractedPeriod {
   sourceUrl: string;
@@ -35,10 +35,21 @@ const pct = (a: number, b: number) => (b === 0 ? null : ((a - b) / Math.abs(b)) 
 const r0 = (n: number) => Math.round(n);
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function fmtMoney(v: number, ccy: string): string {
-  const a = Math.abs(v);
-  const s = a >= 1e9 ? `${r1(a / 1e9)}bn` : a >= 1e6 ? `${r0(a / 1e6)}m` : `${r0(a / 1e3)}k`;
-  return `${v < 0 ? '-' : ''}${ccy} ${s}`;
+function microsOf(v: number | Pick<FinancialValue, 'value' | 'valueMicros'> | null | undefined): bigint | null {
+  if (v == null) return null;
+  if (typeof v === 'number') return filedMicros(v);
+  if (v.valueMicros && /^-?\d+$/.test(v.valueMicros)) return BigInt(v.valueMicros);
+  if (typeof v.value === 'number') return filedMicros(v.value);
+  return null;
+}
+
+/** Timeline and signal text. Integer micros, never a rounded compact label. */
+export function fmtMoney(v: number | Pick<FinancialValue, 'value' | 'valueMicros'> | null | undefined, ccy: string): string {
+  const micros = microsOf(v);
+  if (micros == null) return 'amount not readable';
+  const neg = micros < 0n;
+  const text = formatMicrosAmount(neg ? -micros : micros);
+  return `${neg ? '-' : ''}${ccy} ${text}`;
 }
 
 const fy = (p: ExtractedPeriod) => `FY${p.periodEnd.slice(0, 4)}`;
@@ -70,7 +81,7 @@ export function detectFinancialSignals(periodsIn: SignalPeriod[], cues: TextCue[
     const prevRev = pm.revenue?.value;
 
     // Capex: spending up a lot, ideally faster than revenue.
-    if (m.capex && pm.capex) {
+    if (typeof m.capex?.value === 'number' && typeof pm.capex?.value === 'number') {
       const c = Math.abs(m.capex.value);
       const pc = Math.abs(pm.capex.value);
       const g = pct(c, pc);
@@ -89,7 +100,7 @@ export function detectFinancialSignals(periodsIn: SignalPeriod[], cues: TextCue[
     }
 
     // R&D: share of revenue rising points at new products.
-    if (m.rnd && pm.rnd) {
+    if (typeof m.rnd?.value === 'number' && typeof pm.rnd?.value === 'number') {
       const g = pct(m.rnd.value, pm.rnd.value);
       const share = rev ? (m.rnd.value / rev) * 100 : null;
       const pshare = prevRev ? (pm.rnd.value / prevRev) * 100 : null;
@@ -124,7 +135,7 @@ export function detectFinancialSignals(periodsIn: SignalPeriod[], cues: TextCue[
     }
 
     // Restructuring charges booked (new or up sharply).
-    if (m.restructuring && m.restructuring.value > 0) {
+    if (typeof m.restructuring?.value === 'number' && m.restructuring.value > 0) {
       const p = pm.restructuring?.value ?? 0;
       const g = p > 0 ? pct(m.restructuring.value, p) : null;
       if (p <= 0 || (g !== null && g >= 50)) {
@@ -139,7 +150,7 @@ export function detectFinancialSignals(periodsIn: SignalPeriod[], cues: TextCue[
     }
 
     // Debt or leverage jump.
-    if (m.debt && pm.debt && pm.debt.value > 0) {
+    if (typeof m.debt?.value === 'number' && typeof pm.debt?.value === 'number' && pm.debt.value > 0) {
       const g = pct(m.debt.value, pm.debt.value);
       if (g !== null && g >= 30) {
         push(
@@ -153,7 +164,7 @@ export function detectFinancialSignals(periodsIn: SignalPeriod[], cues: TextCue[
     }
 
     // Acquisitions paid for in the year.
-    if (m.acquisitions && rev) {
+    if (typeof m.acquisitions?.value === 'number' && rev) {
       const a = Math.abs(m.acquisitions.value);
       if (a / rev >= 0.05) {
         push(
@@ -168,7 +179,7 @@ export function detectFinancialSignals(periodsIn: SignalPeriod[], cues: TextCue[
   }
 
   // Impairments: material write-downs in the latest year.
-  if (cur?.metrics.impairment && cur.metrics.impairment.value > 0) {
+  if (typeof cur?.metrics.impairment?.value === 'number' && cur.metrics.impairment.value > 0) {
     const v = cur.metrics.impairment.value;
     const rev = cur.metrics.revenue?.value;
     if (!rev || v / rev >= 0.01) {

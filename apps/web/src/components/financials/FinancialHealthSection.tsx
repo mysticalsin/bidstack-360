@@ -40,8 +40,8 @@ function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
     <div className="fh-tile" data-testid={`fh-tile-${t.key}`}>
       <span className="wd-row-meta">{t.label}</span>
       <span className="fh-value">
-        {t.fmt(last.v, last.p)}
-        {prev ? <span className="fh-delta">{t.delta(last.v, prev.v)}</span> : null}
+        {t.fmt(last)}
+        {prev ? <span className="fh-delta">{t.delta(last, prev)}</span> : null}
       </span>
       <Spark values={t.series.map((s) => s.v)} label={`${t.label}, ${t.series.length} years`} width={120} height={28} />
       <span className="fh-src">

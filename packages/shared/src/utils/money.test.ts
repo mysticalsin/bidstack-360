@@ -6,6 +6,7 @@ import {
   microsToUnits,
   microsToUnitsText,
   sumMicros,
+  signedUnitsToMicros,
   unitsTextToMicros,
   unitsToMicros,
 } from './money.js';
@@ -62,6 +63,11 @@ describe('microsToUnits', () => {
     expect(unitsToMicros(54_857_000_000)).toBe(54_857_000_000_000_000n);
     expect(unitsToMicros('+54857000000')).toBe(54_857_000_000_000_000n);
     expect(unitsToMicros('8598204328457.184962')).toBe(8_598_204_328_457_184_962n);
+    // WHY: Number("9007199254740993.25") is 9007199254740994, so a filing
+    // amount past 2^53 must stay on the digit string.
+    expect(signedUnitsToMicros('9007199254740993.25')).toBe(9_007_199_254_740_993_250_000n);
+    expect(signedUnitsToMicros(-1_823_000_000)).toBe(-1_823_000_000_000_000n);
+    expect(signedUnitsToMicros('-156444000000')).toBe(-156_444_000_000_000_000n);
     expect(microsToSafeNumber(54_857_000_000_000_000n)).toBeNull();
     expect(microsToSafeNumber(1_200_000_000_000_000n)).toBe(1_200_000_000_000_000);
   });

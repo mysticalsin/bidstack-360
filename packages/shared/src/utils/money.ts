@@ -77,6 +77,24 @@ export function unitsToMicros(value: number | string): bigint | null {
   return BigInt(rounded);
 }
 
+/** Major units to integer micros, including a leading minus. */
+export function signedUnitsToMicros(value: number | string): bigint | null {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    if (value < 0) {
+      const pos = unitsToMicros(-value);
+      return pos == null ? null : -pos;
+    }
+    return unitsToMicros(value);
+  }
+  const text = value.trim();
+  if (text.startsWith('-')) {
+    const pos = unitsTextToMicros(text.slice(1));
+    return pos == null ? null : -pos;
+  }
+  return unitsToMicros(text);
+}
+
 /** A JS number only when every digit of the micros integer survives. */
 export function microsToSafeNumber(
   micros: bigint | number | string | null | undefined,
