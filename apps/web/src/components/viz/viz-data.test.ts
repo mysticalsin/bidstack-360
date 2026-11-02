@@ -85,6 +85,33 @@ describe('viz-data', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
   });
 
+  it('uses the UTC calendar day for the Needs you past-due bids', () => {
+    // WHY: Needs you lists open bids past due. Comparing elapsed time from
+    // UTC midnight marks a bid due today as past due at 22:00Z. At 02:00Z
+    // the UTC day has rolled, even though America/Sao_Paulo is still the
+    // day before. A live won or lost stage is not an open bid.
+    const eveningUtc = Date.parse('2026-11-01T22:00:00Z');
+    const afterLocalMidnight = Date.parse('2026-11-02T02:00:00Z');
+    const dueNov1 = row({ stage: 's2_sent', dueDate: '2026-11-01', customer: 'Nov1' });
+    const dueOct31 = row({ stage: 's2_sent', dueDate: '2026-10-31', customer: 'Oct31' });
+    const dueNov2 = row({ stage: 's2_sent', dueDate: '2026-11-02', customer: 'Nov2' });
+    const won = row({
+      stage: 'S2 Sent',
+      dueDate: '2026-10-31',
+      customer: 'Won',
+      pipelineStage: { isWon: true, isLost: false },
+    });
+    const lost = row({
+      stage: 'S4 Negotiation',
+      dueDate: '2026-10-31',
+      customer: 'Lost',
+      pipelineStage: { isWon: false, isLost: true },
+    });
+
+    expect(pastDueOpen([dueNov1, dueOct31, won, lost], eveningUtc).map((o) => o.customer)).toEqual(['Oct31']);
+    expect(pastDueOpen([dueNov2, dueNov1, won, lost], afterLocalMidnight).map((o) => o.customer)).toEqual(['Nov1']);
+  });
+
   it('keeps a live lost stage out of the open book', () => {
     // WHY: the chart read the stage name only. A live lost flag on an open
     // key stayed in the open sum, and both flags still counted as a win.

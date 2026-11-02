@@ -146,9 +146,39 @@ export function accountBars(rows: OppRow[], n = 6) {
     .slice(0, n);
 }
 
-/** Open bids whose due date has already passed. */
+/**
+ * UTC midnight of a due date's calendar day.
+ * The wire date is YYYY-MM-DD; stored fixtures may also be midnight UTC ISO.
+ * Elapsed milliseconds from that midnight mark a bid due today as past due
+ * after 00:00 UTC. Local getDate would follow America/Sao_Paulo instead.
+ */
+function utcDueDay(dueDate: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dueDate);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const due = Date.UTC(year, month - 1, day);
+  const check = new Date(due);
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return due;
+}
+
+/** Open bids whose due date is a previous UTC calendar day. Due today is not past due. */
 export function pastDueOpen(rows: OppRow[], now = Date.now()) {
-  return rows.filter((o) => !isClosed(o) && o.dueDate && new Date(o.dueDate).getTime() < now);
+  const clock = new Date(now);
+  const today = Date.UTC(clock.getUTCFullYear(), clock.getUTCMonth(), clock.getUTCDate());
+  return rows.filter((o) => {
+    if (isClosed(o) || !o.dueDate) return false;
+    const due = utcDueDay(o.dueDate);
+    return due !== null && due < today;
+  });
 }
 
 /** Running win rate after each closed bid, in close order (sparkline). */
