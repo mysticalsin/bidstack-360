@@ -75,10 +75,12 @@ vi.mock('@clerk/clerk-react', () => {
 });
 
 function jsonResponse(body: unknown, status = 200) {
+  const serialized = JSON.stringify(body);
   return {
     ok: status >= 200 && status < 300,
     status,
-    text: async () => JSON.stringify(body),
+    text: async () => serialized,
+    json: async () => body,
   };
 }
 
@@ -339,5 +341,39 @@ describe('AuthProvider — clerk mode (publishableKey set)', () => {
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
     expect(screen.getByTestId('email').textContent).toBe('none');
     expect(localStorage.getItem('bidstack:session')).toBeNull();
+  });
+});
+
+describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => {
+  it('maps /me to the signed-in user instead of Jane Smith', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'cf-access');
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes('/api/v1/me') || url.includes('/api/me')) {
+        return jsonResponse({
+          id: 'user-ada',
+          email: 'ada@mantu.com',
+          name: 'Ada Lovelace',
+          role: 'admin',
+          roles: ['Admin'],
+          dataMode: 'real',
+          authProvider: 'cf-access',
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('email').textContent).toBe('ada@mantu.com');
+    });
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+    expect(screen.getByTestId('email').textContent).not.toBe('jane@mantu.com');
   });
 });

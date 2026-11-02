@@ -87,6 +87,15 @@ describe('polo-preview header contract', () => {
     expect(headers).toContainEqual(['cookie', 'session=abc']);
   });
 
+  it('forwards the verified Access email so Polo can map a per-user identity', () => {
+    const headers = filterRequestHeaders([
+      ['cf-access-authenticated-user-email', 'ada@mantu.com'],
+      ['cf-access-jwt-assertion', 'jwt'],
+    ]);
+    expect(headers).toContainEqual(['cf-access-authenticated-user-email', 'ada@mantu.com']);
+    expect(headers.map(([name]) => name.toLowerCase())).not.toContain('cf-access-jwt-assertion');
+  });
+
   it('strips hop-by-hop and content-encoding from reconstructed responses', () => {
     // WHY: the relay already decoded the body. Forwarding gzip + a decoded
     // body is the classic "this preview is a blank page" failure.

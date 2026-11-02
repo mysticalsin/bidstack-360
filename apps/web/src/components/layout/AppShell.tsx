@@ -5,6 +5,7 @@ import { MobileNav } from './MobileNav';
 import { OfflineIndicator } from './OfflineIndicator';
 import { RouteAnnouncer } from './RouteAnnouncer';
 import { Sidebar } from './Sidebar';
+import { DataModeBanner } from '@/components/identity/DataModeBanner';
 import { Topbar } from './Topbar';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -12,6 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <Sidebar />
       <div className="main">
+        <DataModeBanner />
         <Topbar />
         <main id="main" className="page" tabIndex={-1}>
           {children}

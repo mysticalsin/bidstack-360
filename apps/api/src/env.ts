@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { parseAllowedUsers } from './lib/allowed-users.js';
+
 /**
  * Boot-time environment validation.
  * Fails fast with a clear message if any required variable is missing.
@@ -27,6 +29,20 @@ export const envSchema = z.object({
   CLERK_WEBHOOK_SECRET: z.string().min(1).optional().or(z.literal('')),
 
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
+
+  // ─── Polo data mode + Cloudflare Access identity ──────────────────────
+  // Default stays demo so main/preview keep fixture data. Real mode refuses
+  // the shared stub Jane Smith session and requires Clerk or CF Access.
+  POLO_DATA_MODE: z.enum(['demo', 'real']).default('demo'),
+  POLO_ALLOWED_USERS: z.string().optional().or(z.literal('')),
+  POLO_REAL_ORG_CLERK: z.string().min(1).default('org_polo_real'),
+  CF_ACCESS_AUTH: z.enum(['true', 'false']).default('false'),
+  CF_ACCESS_TEAM_DOMAIN: z.string().optional().or(z.literal('')),
+  CF_ACCESS_AUD: z.string().optional().or(z.literal('')),
+  CF_ACCESS_TRUST_LOOPBACK_EMAIL: z.enum(['true', 'false']).default('true'),
+  // Account-file document intelligence (LLM/Dust). Off in real mode unless
+  // the operator explicitly enables it. MSA library extract stays local.
+  DOCUMENT_LLM_EXTRACT_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Microsoft SSO
   VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -471,6 +487,40 @@ export function getEnv(): Env {
   }
   if (env.SERUM_DEMO_MODE_ENABLED === 'true' && env.NODE_ENV === 'production') {
     semanticErrors.push('SERUM_DEMO_MODE_ENABLED=true is not allowed in production');
+  }
+  if (env.POLO_DATA_MODE === 'real' && env.DEMO_MODE === 'true') {
+    semanticErrors.push('POLO_DATA_MODE=real cannot run with DEMO_MODE=true');
+  }
+  if (env.POLO_DATA_MODE === 'real' && !env.CLERK_SECRET_KEY && env.CF_ACCESS_AUTH !== 'true') {
+    semanticErrors.push(
+      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true (shared stub identity is disabled)',
+    );
+  }
+  if (env.CF_ACCESS_AUTH === 'true') {
+    if (env.DEMO_MODE === 'true') {
+      semanticErrors.push('CF_ACCESS_AUTH=true is mutually exclusive with DEMO_MODE=true');
+    }
+    if (env.CLERK_SECRET_KEY) {
+      semanticErrors.push('CF_ACCESS_AUTH=true is mutually exclusive with CLERK_SECRET_KEY');
+    }
+    if (!env.POLO_ALLOWED_USERS?.trim()) {
+      semanticErrors.push('POLO_ALLOWED_USERS is required when CF_ACCESS_AUTH=true');
+    } else {
+      try {
+        const users = parseAllowedUsers(env.POLO_ALLOWED_USERS);
+        if (users.length === 0) {
+          semanticErrors.push('POLO_ALLOWED_USERS is required when CF_ACCESS_AUTH=true');
+        }
+      } catch (err) {
+        semanticErrors.push(err instanceof Error ? err.message : 'POLO_ALLOWED_USERS is invalid');
+      }
+    }
+    if (env.NODE_ENV === 'production' && !env.CF_ACCESS_TEAM_DOMAIN?.trim()) {
+      semanticErrors.push('CF_ACCESS_TEAM_DOMAIN is required when CF_ACCESS_AUTH=true in production');
+    }
+    if (env.NODE_ENV === 'production' && !env.CF_ACCESS_AUD?.trim()) {
+      semanticErrors.push('CF_ACCESS_AUD is required when CF_ACCESS_AUTH=true in production');
+    }
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

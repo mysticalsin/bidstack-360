@@ -15,13 +15,18 @@ vi.mock('react-i18next', () => ({
 
 const hookMocks = vi.hoisted(() => ({
   mutate: vi.fn(),
+  previewMutate: vi.fn(),
   useStartCsvImport: vi.fn(),
+  usePreviewCsvImport: vi.fn(),
+  useParseSpreadsheet: vi.fn(),
   useMigrationJob: vi.fn(),
   downloadMigrationErrors: vi.fn(),
 }));
 
 vi.mock('@/hooks/useMigrations', () => ({
   useStartCsvImport: hookMocks.useStartCsvImport,
+  usePreviewCsvImport: hookMocks.usePreviewCsvImport,
+  useParseSpreadsheet: hookMocks.useParseSpreadsheet,
   useMigrationJob: hookMocks.useMigrationJob,
   downloadMigrationErrors: hookMocks.downloadMigrationErrors,
 }));
@@ -47,13 +52,29 @@ describe('CsvImportWizard', () => {
     vi.clearAllMocks();
   });
 
-  it('auto-maps recognizable headers and blocks import while a required target field is unmapped', async () => {
+  function stubHooks() {
+    hookMocks.useStartCsvImport.mockReturnValue({
+      mutate: hookMocks.mutate,
+      isPending: false,
+      isError: false,
+    });
+    hookMocks.usePreviewCsvImport.mockReturnValue({
+      mutate: hookMocks.previewMutate,
+      isPending: false,
+      isError: false,
+    });
+    hookMocks.useParseSpreadsheet.mockReturnValue({
+      mutateAsync: vi.fn(),
+    });
+    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false });
+  }
+
+  it('auto-maps recognizable headers and blocks preview while a required target field is unmapped', async () => {
     // WHY: 'company' is the default entity and its Name field is required.
     // A CSV with an unrecognized header for the name column must leave that
-    // required field unmapped, and the wizard must refuse to start rather
-    // than silently import rows with a blank required field.
-    hookMocks.useStartCsvImport.mockReturnValue({ mutate: hookMocks.mutate, isPending: false, isError: false });
-    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false });
+    // required field unmapped, and the wizard must refuse to preview/write
+    // rather than silently import rows with a blank required field.
+    stubHooks();
 
     render(<CsvImportWizard />);
     await uploadFile('company_title,domain\nAcme,acme.com');
@@ -61,13 +82,14 @@ describe('CsvImportWizard', () => {
     expect(
       screen.getByText('Map a column to: Name.'),
     ).toBeTruthy();
-    const importButton = screen.getByRole('button', { name: /Import \d+ rows/ });
-    expect(importButton).toHaveProperty('disabled', true);
+    const previewButton = screen.getByRole('button', { name: /Preview \d+ rows/ });
+    expect(previewButton).toHaveProperty('disabled', true);
   });
 
-  it('once every required field is mapped, starts the import with the chosen dedup strategy', async () => {
-    hookMocks.useStartCsvImport.mockReturnValue({ mutate: hookMocks.mutate, isPending: false, isError: false });
-    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false });
+  it('requires preview confirmation before writing rows, using the chosen dedup strategy', async () => {
+    // WHY: real revenue/account imports must not write on the first click.
+    // Preview validates money/dates; Confirm is the only path that starts the job.
+    stubHooks();
 
     render(<CsvImportWizard />);
     // 'name' is a header autoMap should recognize for company.name.
@@ -78,7 +100,23 @@ describe('CsvImportWizard', () => {
     fireEvent.change(screen.getByLabelText('If a record already exists'), {
       target: { value: 'skip' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Import \d+ rows/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+
+    expect(hookMocks.previewMutate).toHaveBeenCalledOnce();
+    expect(hookMocks.mutate).not.toHaveBeenCalled();
+    const [previewInput, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    expect(previewInput).toMatchObject({ entityType: 'company' });
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [{ name: 'Acme' }],
+    });
+
+    await waitFor(() => expect(screen.getByText(/1 of 1 rows look valid/)).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
 
     expect(hookMocks.mutate).toHaveBeenCalledOnce();
     const [input] = hookMocks.mutate.mock.calls[0]!;
@@ -90,8 +128,7 @@ describe('CsvImportWizard', () => {
     // WHY: MAX_ROWS is a client-side guard against pasting a spreadsheet
     // export meant for a bulk-data pipeline, not this UI — it must reject
     // BEFORE start.mutate is ever reachable, not rely on the server 400ing.
-    hookMocks.useStartCsvImport.mockReturnValue({ mutate: hookMocks.mutate, isPending: false, isError: false });
-    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false });
+    stubHooks();
 
     render(<CsvImportWizard />);
     const rows = Array.from({ length: 10_001 }, (_, i) => `Row ${i}`).join('\n');
@@ -107,7 +144,7 @@ describe('CsvImportWizard', () => {
   });
 
   it('renders progress from the polled migration job and exposes the error-report download once rows fail', async () => {
-    hookMocks.useStartCsvImport.mockReturnValue({ mutate: hookMocks.mutate, isPending: false, isError: false });
+    stubHooks();
     hookMocks.useMigrationJob.mockReturnValue({
       data: {
         id: 'job-1',
@@ -121,7 +158,18 @@ describe('CsvImportWizard', () => {
 
     render(<CsvImportWizard />);
     await uploadFile('name,domain\nAcme,acme.com');
-    fireEvent.click(screen.getByRole('button', { name: /Import \d+ rows/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
     // The component's onSuccess callback sets jobId + advances to 'run' —
     // simulate that by invoking the mutate call's onSuccess directly.
     const [, opts] = hookMocks.mutate.mock.calls[0]!;

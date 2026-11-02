@@ -54,6 +54,7 @@ describe('normalizeEntity', () => {
     expect(normalizeEntity('Accounts')).toBe('company');
     expect(normalizeEntity('deals')).toBe('opportunity');
     expect(normalizeEntity('CONTACTS')).toBe('contact');
+    expect(normalizeEntity('financials')).toBe('financial');
   });
 
   it('returns null for unsupported entities so the job fails loudly', () => {

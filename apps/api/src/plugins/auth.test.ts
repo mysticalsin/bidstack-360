@@ -46,6 +46,8 @@ const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 const ORIGINAL_CLERK_KEY = process.env.CLERK_SECRET_KEY;
 const ORIGINAL_PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
 const ORIGINAL_SSO_ALLOWED_EMAIL_DOMAINS = process.env.SSO_ALLOWED_EMAIL_DOMAINS;
+const ORIGINAL_POLO_DATA_MODE = process.env.POLO_DATA_MODE;
+const ORIGINAL_CF_ACCESS_AUTH = process.env.CF_ACCESS_AUTH;
 
 describe('auth plugin', () => {
   beforeEach(() => {
@@ -53,6 +55,8 @@ describe('auth plugin', () => {
     delete process.env.CLERK_SECRET_KEY;
     delete process.env.PUBLIC_BASE_URL;
     delete process.env.SSO_ALLOWED_EMAIL_DOMAINS;
+    delete process.env.POLO_DATA_MODE;
+    delete process.env.CF_ACCESS_AUTH;
     vi.clearAllMocks();
   });
 
@@ -77,6 +81,16 @@ describe('auth plugin', () => {
     } else {
       process.env.SSO_ALLOWED_EMAIL_DOMAINS = ORIGINAL_SSO_ALLOWED_EMAIL_DOMAINS;
     }
+    if (ORIGINAL_POLO_DATA_MODE === undefined) {
+      delete process.env.POLO_DATA_MODE;
+    } else {
+      process.env.POLO_DATA_MODE = ORIGINAL_POLO_DATA_MODE;
+    }
+    if (ORIGINAL_CF_ACCESS_AUTH === undefined) {
+      delete process.env.CF_ACCESS_AUTH;
+    } else {
+      process.env.CF_ACCESS_AUTH = ORIGINAL_CF_ACCESS_AUTH;
+    }
   });
 
   it('refuses to start when NODE_ENV is unset and CLERK_SECRET_KEY is missing', async () => {
@@ -84,6 +98,24 @@ describe('auth plugin', () => {
     await expect(server.register(authPlugin)).rejects.toThrow(
       'CLERK_SECRET_KEY required in production',
     );
+  });
+
+  it('refuses stub auth when POLO_DATA_MODE=real even in development', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.POLO_DATA_MODE = 'real';
+    const server = Fastify({ logger: false });
+    await expect(server.register(authPlugin)).rejects.toThrow(
+      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true',
+    );
+  });
+
+  it('boots Cloudflare Access identity without Clerk in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CF_ACCESS_AUTH = 'true';
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await expect(server.register(authPlugin)).resolves.not.toThrow();
+    await server.close();
   });
 
   it('allows stub auth when NODE_ENV=development and CLERK_SECRET_KEY is missing', async () => {

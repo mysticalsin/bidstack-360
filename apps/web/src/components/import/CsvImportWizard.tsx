@@ -12,11 +12,14 @@ import {
 import {
   downloadMigrationErrors,
   useMigrationJob,
+  useParseSpreadsheet,
+  usePreviewCsvImport,
   useStartCsvImport,
+  type ImportPreviewResult,
   type MigrationJob,
 } from '@/hooks/useMigrations';
 
-type Step = 'upload' | 'map' | 'run';
+type Step = 'upload' | 'map' | 'preview' | 'run';
 type Dedup = 'skip' | 'update' | 'duplicate';
 const MAX_ROWS = 10_000;
 
@@ -35,8 +38,11 @@ export function CsvImportWizard() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const start = useStartCsvImport();
+  const preview = usePreviewCsvImport();
+  const parseSheet = useParseSpreadsheet();
   const job = useMigrationJob(jobId);
   const fields = TARGET_FIELDS[entity];
+  const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
 
   const requiredMissing = useMemo(() => {
     const mapped = new Set(Object.values(mappings).filter(Boolean) as string[]);
@@ -46,8 +52,13 @@ export function CsvImportWizard() {
   async function onFile(file: File) {
     setParseError(null);
     try {
-      const text = await file.text();
-      const result = parseCsv(text);
+      const lower = file.name.toLowerCase();
+      const result = lower.endsWith('.xlsx') || lower.endsWith('.xls')
+        ? await parseSheet.mutateAsync({
+            filename: file.name,
+            contentBase64: await fileToBase64(file),
+          })
+        : parseCsv(await file.text());
       if (result.headers.length === 0 || result.rows.length === 0) {
         setParseError(t('csvImport.error.noDataRows', 'That file has no data rows.'));
         return;
@@ -64,10 +75,14 @@ export function CsvImportWizard() {
       setParsed(result);
       setFileName(file.name);
       setMappings(autoMap(result.headers, TARGET_FIELDS[entity]));
+      setPreviewResult(null);
       setStep('map');
     } catch {
       setParseError(
-        t('csvImport.error.unreadable', 'Could not read that file. Make sure it is a UTF-8 CSV.'),
+        t(
+          'csvImport.error.unreadable',
+          'Could not read that file. Use a UTF-8 CSV or an .xlsx spreadsheet.',
+        ),
       );
     }
   }
@@ -75,6 +90,19 @@ export function CsvImportWizard() {
   function onEntityChange(next: ImportEntity) {
     setEntity(next);
     if (parsed) setMappings(autoMap(parsed.headers, TARGET_FIELDS[next]));
+  }
+
+  function runPreview() {
+    if (!parsed) return;
+    preview.mutate(
+      { entityType: entity, rows: parsed.rows, mappings },
+      {
+        onSuccess: (result) => {
+          setPreviewResult(result);
+          setStep('preview');
+        },
+      },
+    );
   }
 
   function runImport() {
@@ -103,6 +131,7 @@ export function CsvImportWizard() {
     setMappings({});
     setJobId(null);
     setParseError(null);
+    setPreviewResult(null);
   }
 
   return (
@@ -139,7 +168,7 @@ export function CsvImportWizard() {
           >
             <Icon name="upload" size={24} ariaHidden />
             <span className="text-sm font-medium">
-              {t('csvImport.upload.chooseFile', 'Choose a CSV file')}
+              {t('csvImport.upload.chooseFile', 'Choose a CSV or Excel file')}
             </span>
             <span className="text-xs text-[var(--fg-tertiary)]">
               {t('csvImport.upload.maxRows', 'Up to {{rows}} rows', {
@@ -150,7 +179,7 @@ export function CsvImportWizard() {
           <input
             ref={fileInput}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -267,14 +296,62 @@ export function CsvImportWizard() {
             <button
               type="button"
               className="btn btn-primary"
-              disabled={requiredMissing.length > 0 || start.isPending}
+              disabled={requiredMissing.length > 0 || preview.isPending}
+              onClick={runPreview}
+            >
+              {preview.isPending
+                ? t('csvImport.map.previewing', 'Validating…')
+                : t('csvImport.map.previewRows', 'Preview {{rows}} rows', {
+                    rows: parsed.rows.length.toLocaleString(),
+                  })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'preview' && previewResult && (
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'csvImport.preview.summary',
+              '{{valid}} of {{total}} rows look valid. Confirm to write them. Nothing has been saved yet.',
+              { valid: previewResult.validCount, total: previewResult.rowCount },
+            )}
+          </p>
+          {previewResult.invalidCount > 0 ? (
+            <div className="rounded-lg border border-[var(--danger)]/40 bg-[var(--danger)]/5 p-3 text-sm">
+              <p className="font-medium text-[var(--danger)]">
+                {t('csvImport.preview.issuesTitle', '{{count}} rows have problems', {
+                  count: previewResult.invalidCount,
+                })}
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--fg-secondary)]">
+                {previewResult.issues.slice(0, 8).map((issue) => (
+                  <li key={`${issue.row}-${issue.field}-${issue.message}`}>
+                    {t('csvImport.preview.issueRow', 'Row {{row}}', { row: issue.row })}
+                    {issue.field ? ` · ${issue.field}` : ''}: {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--fg-primary)]">
+              {t('csvImport.preview.allValid', 'Money, dates, and required fields passed validation.')}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <button type="button" className="btn btn-ghost" onClick={() => setStep('map')}>
+              {t('csvImport.preview.back', 'Back to mapping')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={start.isPending}
               onClick={runImport}
             >
               {start.isPending
                 ? t('csvImport.map.starting', 'Starting…')
-                : t('csvImport.map.importRows', 'Import {{rows}} rows', {
-                    rows: parsed.rows.length.toLocaleString(),
-                  })}
+                : t('csvImport.preview.confirm', 'Confirm import')}
             </button>
           </div>
         </div>
@@ -296,6 +373,7 @@ function StepHeader({ step }: { step: Step }) {
   const labels: { key: Step; label: string }[] = [
     { key: 'upload', label: t('csvImport.stepHeader.upload', 'Upload') },
     { key: 'map', label: t('csvImport.stepHeader.map', 'Map columns') },
+    { key: 'preview', label: t('csvImport.stepHeader.preview', 'Preview') },
     { key: 'run', label: t('csvImport.stepHeader.run', 'Import') },
   ];
   const activeIndex = labels.findIndex((l) => l.key === step);
@@ -320,6 +398,16 @@ function StepHeader({ step }: { step: Step }) {
       ))}
     </ol>
   );
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) {
+    binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 function ImportProgress({
