@@ -3,7 +3,11 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { SLACK_TASK_PAGE, slackTaskTodayHeading } from './slack-task-caption.js';
+import {
+  SLACK_TASK_PAGE,
+  slackTaskTodayHeading,
+  slackTaskTodayWindow,
+} from './slack-task-caption.js';
 
 /**
  * The Slack today list reads one row past the page. A heading that prints
@@ -65,5 +69,22 @@ describe('slack today task list caption', () => {
     expect(slackTaskTodayHeading(short.length, shortContinues, short.length)).not.toMatch(
       /not every/i,
     );
+  });
+
+  it('uses the UTC calendar day, not the server local midnight', () => {
+    // WHY: due_date is a date. setHours(0, 0, 0, 0) follows America/Sao_Paulo.
+    // At 02:30 UTC on 4 Nov it is still 3 Nov there, so local midnight would
+    // list yesterday's UTC tasks and drop today's. The task list uses the UTC day.
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/routes/integrations/slack-commands.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/slackTaskTodayWindow\(/);
+    expect(src).not.toMatch(/setHours\(0,\s*0,\s*0,\s*0\)/);
+
+    const eveningInSaoPaulo = new Date('2026-11-04T02:30:00.000Z');
+    const window = slackTaskTodayWindow(eveningInSaoPaulo);
+    expect(window.start.toISOString()).toBe('2026-11-04T00:00:00.000Z');
+    expect(window.end.toISOString()).toBe('2026-11-05T00:00:00.000Z');
   });
 });
