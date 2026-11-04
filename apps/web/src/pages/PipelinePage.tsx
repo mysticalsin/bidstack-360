@@ -251,8 +251,9 @@ export function PipelinePage() {
           : ''}
       </p>
 
-      {/* KPI summary bar */}
-      {!isLoading && data && (
+      {/* Reserve the KPI row while opportunities load: inserting it above
+          the still-visible stage skeleton pushes the whole board down. */}
+      {(isLoading || data) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
           {(() => {
             const rep = report.data;
@@ -265,7 +266,7 @@ export function PipelinePage() {
               closedTotal > 0
                 ? `${Math.round((closedWon / closedTotal) * 100)}%`
                 : t('pipeline.winRateNoClosedBids', 'No closed bids');
-            const loading = report.isLoading;
+            const loading = isLoading || report.isLoading;
             return [
               {
                 label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
