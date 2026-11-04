@@ -11,6 +11,8 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
+import { SLACK_TASK_PAGE, slackTaskTodayHeading } from './slack-task-caption.js';
+
 function signingSecret(): string {
   const v = process.env.SLACK_SIGNING_SECRET;
   if (!v) throw new Error('SLACK_SIGNING_SECRET is not set');
@@ -303,26 +305,29 @@ async function handleTasksCommand(slackUserId: string, teamId: string) {
       assigneeId: userMapping.userId,
       dueDate: { gte: today, lt: tomorrow },
     },
-    take: 10,
+    // One row past the page is the probe. It is dropped and is not a task total.
+    take: SLACK_TASK_PAGE + 1,
     select: { id: true, title: true, status: true },
     orderBy: { dueDate: 'asc' },
   });
+  const pageContinues = tasks.length > SLACK_TASK_PAGE;
+  const drawn = pageContinues ? tasks.slice(0, SLACK_TASK_PAGE) : tasks;
 
-  if (!tasks.length) {
+  if (!drawn.length) {
     return {
       response_type: 'ephemeral',
       text: ':white_check_mark: No tasks due today. Enjoy!',
     };
   }
 
-  const taskLines = tasks.map(
+  const taskLines = drawn.map(
     (t) =>
       `- ${t.status === 'done' ? '~' : ''}${t.title}${t.status === 'done' ? '~' : ''} - <https://app.bidstack.io/tasks/${t.id}|View>`,
   );
 
   return {
     response_type: 'ephemeral',
-    text: `:clipboard: *Your tasks today (${tasks.length}):*\n${taskLines.join('\n')}`,
+    text: `:clipboard: *${slackTaskTodayHeading(drawn.length, pageContinues)}:*\n${taskLines.join('\n')}`,
   };
 }
 
