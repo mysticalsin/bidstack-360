@@ -1,3 +1,4 @@
+import { headlineMicrosLabel } from "@/components/dashboard/unspecified-currency";
 import {
   type CurveFactory,
   curveLinear,
@@ -260,10 +261,14 @@ export function sparklineIndexAtX(
 }
 
 function formatCompact(value: number): string {
-  return new Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
+  if (!Number.isFinite(value)) return "—";
+  if (!Number.isSafeInteger(value)) {
+    return new Intl.NumberFormat("en", {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+  }
+  return headlineMicrosLabel(BigInt(value) * 1_000_000n, "en");
 }
 
 /** Screen-reader summary, e.g. "12 points, from 3.1K to 4.2K, up 35%". */
