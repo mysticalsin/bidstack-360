@@ -3,6 +3,13 @@ import type { KeyNumber } from '@bidstack/shared';
 import { fmtMoney } from '@/components/financials/financials-format';
 import { formatMoneyMicros } from '@/lib/format';
 
+import { formatMicrosAmount } from '@bidstack/shared';
+
+function recordedCurrency(code: string | null | undefined): string | null {
+  if (!code || !/^[A-Za-z]{3}$/.test(code)) return null;
+  return code.toUpperCase();
+}
+
 export type Direction = 'up' | 'down' | 'flat';
 
 export function directionOf(n: Pick<KeyNumber, 'delta'>): Direction | null {
@@ -30,10 +37,20 @@ export type MicrosFormatter = (micros: string | number) => string;
 export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
   if (n.value === null) return 'No data';
   switch (n.unit) {
-    case 'money':
-      return fmtMoney(n.value, n.currency ?? 'USD');
-    case 'money_micros':
-      return fmtMicros ? fmtMicros(Math.round(n.value)) : formatMoneyMicros(Math.round(n.value), undefined, { compact: true });
+    case 'money': {
+      const code = recordedCurrency(n.currency);
+      const label = fmtMoney(n.value, code ?? 'XXX');
+      return code ? label : `${label.replace(/^XXX\s*/, '')} unspecified`;
+    }
+    case 'money_micros': {
+      if (!Number.isFinite(n.value) || !Number.isSafeInteger(Math.round(n.value))) {
+        return 'amount not readable';
+      }
+      const micros = BigInt(Math.round(n.value));
+      const code = recordedCurrency(n.currency);
+      if (!code) return `${formatMicrosAmount(micros)} unspecified`;
+      return fmtMicros ? fmtMicros(Number(micros)) : formatMoneyMicros(micros, code, { compact: true });
+    }
     case 'pct':
       return `${n.value.toFixed(1)}%`;
     case 'score':
