@@ -11,7 +11,11 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
-import { SLACK_TASK_PAGE, slackTaskTodayHeading } from './slack-task-caption.js';
+import {
+  SLACK_TASK_PAGE,
+  slackTaskTodayHeading,
+  slackTaskTodayWindow,
+} from './slack-task-caption.js';
 
 function signingSecret(): string {
   const v = process.env.SLACK_SIGNING_SECRET;
@@ -294,10 +298,7 @@ async function handleTasksCommand(slackUserId: string, teamId: string) {
     };
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
+  const { start: today, end: tomorrow } = slackTaskTodayWindow();
 
   const tasks = await prisma.task.findMany({
     where: {
