@@ -94,7 +94,13 @@ async function seedSubject(opts: { optedOut?: boolean } = {}): Promise<Seeded> {
     data: { orgId: o, customer: company.name, companyId: company.id, name, email, phone },
   });
   const other = await prisma.contact.create({
-    data: { orgId: o, customer: company.name, companyId: company.id, name: `Other ${tag}`, email: otherEmail },
+    data: {
+      orgId: o,
+      customer: company.name,
+      companyId: company.id,
+      name: `Other ${tag}`,
+      email: otherEmail,
+    },
   });
 
   const activity = await prisma.activity.create({
@@ -129,7 +135,12 @@ async function seedSubject(opts: { optedOut?: boolean } = {}): Promise<Seeded> {
 
   const token = await prisma.integrationToken.upsert({
     where: { orgId_userId_provider: { orgId: o, userId: u, provider: 'twilio' } },
-    create: { orgId: o, userId: u, provider: 'twilio', accessTokenEncrypted: 'placeholder-ciphertext' },
+    create: {
+      orgId: o,
+      userId: u,
+      provider: 'twilio',
+      accessTokenEncrypted: 'placeholder-ciphertext',
+    },
     update: {},
   });
   const mail = await prisma.emailMessage.create({
@@ -256,14 +267,24 @@ async function seedSubject(opts: { optedOut?: boolean } = {}): Promise<Seeded> {
     data: { orgId: o, userId: u, type: 'mention', title: 'New reply', body: `${name} replied` },
   });
   await prisma.contactFact.create({
-    data: { orgId: o, contactId: contact.id, kind: 'buying_role', claim: `${name} signs off budget` },
+    data: {
+      orgId: o,
+      contactId: contact.id,
+      kind: 'buying_role',
+      claim: `${name} signs off budget`,
+    },
   });
   await prisma.customerCommitment.create({
     data: { orgId: o, companyId: company.id, promise: 'Send the RFP', ownerContactId: contact.id },
   });
   const opp = await prisma.opportunity.findFirst({ where: { orgId: o } });
   await prisma.opportunityContact.create({
-    data: { orgId: o, opportunityId: opp!.id, contactId: contact.id, notes: `${name} is the champion` },
+    data: {
+      orgId: o,
+      opportunityId: opp!.id,
+      contactId: contact.id,
+      notes: `${name} is the champion`,
+    },
   });
 
   // An audit row about the subject written before the erasure (ids only).
@@ -473,18 +494,32 @@ describe('data subject engine', () => {
     expect(report.retained.SmsConsent?.rows).toBe(1);
     expect(report.retained.SmsConsent?.basis).toMatch(/opt-out/i);
     const residue = await scanSubjectResidue(prisma, subject!);
-    expect(residue).toEqual([{ model: 'SmsConsent', field: 'phoneNumber', rows: 1, retained: true }]);
+    expect(residue).toEqual([
+      { model: 'SmsConsent', field: 'phoneNumber', rows: 1, retained: true },
+    ]);
   });
 
   t('a lead subject is erased with its linked email', async () => {
     const tag = randomUUID().slice(0, 8);
     const email = `lead.residue.${tag}@example.com`;
     const lead = await prisma.lead.create({
-      data: { orgId: orgId!, firstName: 'Lena', lastName: `Residue${tag}`, companyName: 'Residue Test Co', email, phone: '+15557654321' },
+      data: {
+        orgId: orgId!,
+        firstName: 'Lena',
+        lastName: `Residue${tag}`,
+        companyName: 'Residue Test Co',
+        email,
+        phone: '+15557654321',
+      },
     });
     const token = await prisma.integrationToken.upsert({
       where: { orgId_userId_provider: { orgId: orgId!, userId: userId!, provider: 'twilio' } },
-      create: { orgId: orgId!, userId: userId!, provider: 'twilio', accessTokenEncrypted: 'placeholder-ciphertext' },
+      create: {
+        orgId: orgId!,
+        userId: userId!,
+        provider: 'twilio',
+        accessTokenEncrypted: 'placeholder-ciphertext',
+      },
       update: {},
     });
     await prisma.emailMessage.create({

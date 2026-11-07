@@ -58,7 +58,12 @@ async function seedAged() {
   const old = new Date(Date.now() - 5 * YEAR);
   const token = await prisma.integrationToken.upsert({
     where: { orgId_userId_provider: { orgId: o, userId: u, provider: 'gmail' } },
-    create: { orgId: o, userId: u, provider: 'gmail', accessTokenEncrypted: 'placeholder-ciphertext' },
+    create: {
+      orgId: o,
+      userId: u,
+      provider: 'gmail',
+      accessTokenEncrypted: 'placeholder-ciphertext',
+    },
     update: {},
   });
   const oldMail = await prisma.emailMessage.create({
@@ -117,7 +122,11 @@ describe('retention sweep', () => {
     const ids = await seedAged();
     const report = await runRetentionSweep(prisma, { dryRun: false, orgId: orgId!, env: {} });
     expect(report.dryRun).toBe(false);
-    expect(await prisma.emailMessage.count({ where: { id: ids.oldMail, deletedAt: { not: undefined } } })).toBe(0);
+    expect(
+      await prisma.emailMessage.count({
+        where: { id: ids.oldMail, deletedAt: { not: undefined } },
+      }),
+    ).toBe(0);
     expect(await prisma.emailMessage.count({ where: { id: ids.freshMail } })).toBe(1);
     expect(await prisma.notification.count({ where: { id: ids.note } })).toBe(0);
     const call = await prisma.callSession.findFirst({ where: { id: ids.call } });

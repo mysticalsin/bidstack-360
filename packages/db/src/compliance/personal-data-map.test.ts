@@ -49,9 +49,10 @@ describe('personal data map', () => {
     const missing = personalFieldsInSchema(models)
       .filter((f) => !coveredFields(f.model).has(f.field))
       .map((f) => `${f.model}.${f.field}`);
-    expect(missing, `add these to SUBJECT_STORES or NON_SUBJECT_STORES: ${missing.join(', ')}`).toEqual(
-      [],
-    );
+    expect(
+      missing,
+      `add these to SUBJECT_STORES or NON_SUBJECT_STORES: ${missing.join(', ')}`,
+    ).toEqual([]);
   });
 
   it('has no stale entries (every mapped model and field exists)', () => {

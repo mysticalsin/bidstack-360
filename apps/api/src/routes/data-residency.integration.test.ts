@@ -53,7 +53,11 @@ describe('data residency setting', () => {
   t('starts unpinned and reports enforcement state', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/v1/org-settings/data-residency' });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { region: string | null; enforced: boolean; regionalStorage: boolean };
+    const body = res.json() as {
+      region: string | null;
+      enforced: boolean;
+      regionalStorage: boolean;
+    };
     expect(body.region).toBeNull();
     expect(typeof body.enforced).toBe('boolean');
     expect(typeof body.regionalStorage).toBe('boolean');

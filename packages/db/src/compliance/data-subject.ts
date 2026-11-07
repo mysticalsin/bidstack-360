@@ -111,9 +111,12 @@ function hasField(model: string, field: string): boolean {
 
 function delegate(db: Db, model: string) {
   const key = model.charAt(0).toLowerCase() + model.slice(1);
-  return (db as unknown as Record<string, { findMany(args: unknown): Promise<Array<Record<string, unknown>>> }>)[
-    key
-  ]!;
+  return (
+    db as unknown as Record<
+      string,
+      { findMany(args: unknown): Promise<Array<Record<string, unknown>>> }
+    >
+  )[key]!;
 }
 
 // ─── SQL fragments ───────────────────────────────────────────────────────────
@@ -164,7 +167,12 @@ function nullIfMention(model: string, field: string, s: DataSubject): Prisma.Sql
   return Prisma.sql`CASE WHEN lower(${col}::text) LIKE ANY(${likePatterns(s)}) THEN NULL ELSE ${col} END`;
 }
 
-async function idsWhere(db: Db, model: string, orgId: string, clause: Prisma.Sql): Promise<string[]> {
+async function idsWhere(
+  db: Db,
+  model: string,
+  orgId: string,
+  clause: Prisma.Sql,
+): Promise<string[]> {
   const rows = await db.$queryRaw<Array<{ id: string }>>(
     Prisma.sql`SELECT id::text AS id FROM ${T(model)}
                 WHERE ${C(model, 'orgId')} = ${orgId}::uuid AND (${clause})`,
@@ -417,7 +425,11 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
         db,
         'KamSession',
         s.orgId,
-        mentions('KamSession', ['attendees', 'transcriptText', 'transcriptStructured', 'aiNote'], s),
+        mentions(
+          'KamSession',
+          ['attendees', 'transcriptText', 'transcriptStructured', 'aiNote'],
+          s,
+        ),
       ),
     async erase(db, s, ids) {
       const m = 'KamSession';
@@ -429,7 +441,12 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
   },
   GovernanceMeeting: {
     find: (db, s) =>
-      idsWhere(db, 'GovernanceMeeting', s.orgId, mentions('GovernanceMeeting', ['participants', 'outcomes'], s)),
+      idsWhere(
+        db,
+        'GovernanceMeeting',
+        s.orgId,
+        mentions('GovernanceMeeting', ['participants', 'outcomes'], s),
+      ),
     async erase(db, s, ids) {
       const m = 'GovernanceMeeting';
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'participants')} = ${arrayWithout(m, 'participants', s)},
@@ -494,7 +511,12 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
   EmailTrackingPixel: {
     async find(db, s) {
       const messages = await emailMessageIds(db, s);
-      return idsWhere(db, 'EmailTrackingPixel', s.orgId, uuidIn('EmailTrackingPixel', 'emailMessageId', messages));
+      return idsWhere(
+        db,
+        'EmailTrackingPixel',
+        s.orgId,
+        uuidIn('EmailTrackingPixel', 'emailMessageId', messages),
+      );
     },
     async erase(db, _s, ids) {
       await db.$executeRaw`UPDATE ${T('EmailTrackingPixel')} SET ${C('EmailTrackingPixel', 'firstOpenedIp')} = NULL
@@ -524,7 +546,12 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
   SmsConsent: {
     find: (db, s) =>
       s.phones.length
-        ? idsWhere(db, 'SmsConsent', s.orgId, Prisma.sql`${C('SmsConsent', 'phoneNumber')} = ANY(${s.phones})`)
+        ? idsWhere(
+            db,
+            'SmsConsent',
+            s.orgId,
+            Prisma.sql`${C('SmsConsent', 'phoneNumber')} = ANY(${s.phones})`,
+          )
         : Promise.resolve([]),
     async erase(db, _s, ids) {
       const m = 'SmsConsent';
@@ -567,19 +594,22 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   Notification: {
-    find: (db, s) => idsWhere(db, 'Notification', s.orgId, mentions('Notification', ['title', 'body'], s)),
+    find: (db, s) =>
+      idsWhere(db, 'Notification', s.orgId, mentions('Notification', ['title', 'body'], s)),
     async erase(db, _s, ids) {
       await db.$executeRaw`DELETE FROM ${T('Notification')} WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   IntelEvidence: {
-    find: (db, s) => idsWhere(db, 'IntelEvidence', s.orgId, mentions('IntelEvidence', ['excerpt', 'label'], s)),
+    find: (db, s) =>
+      idsWhere(db, 'IntelEvidence', s.orgId, mentions('IntelEvidence', ['excerpt', 'label'], s)),
     async erase(db, _s, ids) {
       await db.$executeRaw`DELETE FROM ${T('IntelEvidence')} WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   SignatureRequest: {
-    find: (db, s) => idsWhere(db, 'SignatureRequest', s.orgId, mentions('SignatureRequest', ['recipients'], s)),
+    find: (db, s) =>
+      idsWhere(db, 'SignatureRequest', s.orgId, mentions('SignatureRequest', ['recipients'], s)),
   },
   SignatureEvent: {
     async find(db, s) {
@@ -604,7 +634,14 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
       inChunks(ids, (chunk) =>
         db.auditLog.findMany({
           where: { id: { in: chunk.map((id) => BigInt(id)) }, deletedAt: { not: undefined } },
-          select: { id: true, action: true, targetType: true, targetId: true, diff: true, at: true },
+          select: {
+            id: true,
+            action: true,
+            targetType: true,
+            targetId: true,
+            diff: true,
+            at: true,
+          },
           take: chunk.length,
         }),
       ),
@@ -625,7 +662,9 @@ function identity(
   const clean = (xs: Array<string | null | undefined>) =>
     xs.map((x) => (x ?? '').trim()).filter((x) => x.length > 0);
   return {
-    emails: clean(emails).map((e) => e.toLowerCase()).filter((e) => !isTombstoneEmail(e)),
+    emails: clean(emails)
+      .map((e) => e.toLowerCase())
+      .filter((e) => !isTombstoneEmail(e)),
     phones: clean(phones).filter((p) => p !== TOMBSTONE.phone),
     names: clean(names)
       .map((n) => n.toLowerCase())
@@ -737,7 +776,8 @@ async function defaultRows(db: Db, model: string, ids: string[]) {
 const READ_CHUNK = 1000;
 async function inChunks<T>(ids: string[], read: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
-  for (let i = 0; i < ids.length; i += READ_CHUNK) out.push(...(await read(ids.slice(i, i + READ_CHUNK))));
+  for (let i = 0; i < ids.length; i += READ_CHUNK)
+    out.push(...(await read(ids.slice(i, i + READ_CHUNK))));
   return out;
 }
 
@@ -768,11 +808,7 @@ export async function exportDataSubject(db: Db, s: DataSubject): Promise<DataSub
 
 /** JSON for an export bundle (BigInt ids and Dates serialised). */
 export function serializeDataSubjectBundle(bundle: DataSubjectBundle): string {
-  return JSON.stringify(
-    bundle,
-    (_k, v: unknown) => (typeof v === 'bigint' ? v.toString() : v),
-    2,
-  );
+  return JSON.stringify(bundle, (_k, v: unknown) => (typeof v === 'bigint' ? v.toString() : v), 2);
 }
 
 // ─── Erase ───────────────────────────────────────────────────────────────────
@@ -789,7 +825,10 @@ async function primaryScrubbedFields(db: Db, s: DataSubject): Promise<string[]> 
   const tomb = tombstoneEmail(s.orgId, s.subjectId);
   const fields: string[] = [];
   if (s.subjectType === 'contact') {
-    const c = await db.contact.findFirst({ where, select: { name: true, email: true, phone: true, role: true } });
+    const c = await db.contact.findFirst({
+      where,
+      select: { name: true, email: true, phone: true, role: true },
+    });
     if (!c) return [];
     if (c.name !== TOMBSTONE.name) fields.push('name');
     if (c.email !== null && c.email !== tomb) fields.push('email');
@@ -798,7 +837,15 @@ async function primaryScrubbedFields(db: Db, s: DataSubject): Promise<string[]> 
   } else if (s.subjectType === 'lead') {
     const l = await db.lead.findFirst({
       where,
-      select: { firstName: true, lastName: true, email: true, phone: true, title: true, notes: true, intel: true },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        title: true,
+        notes: true,
+        intel: true,
+      },
     });
     if (!l) return [];
     if (l.firstName !== TOMBSTONE.name) fields.push('firstName');
@@ -947,7 +994,12 @@ export async function scanSubjectResidue(db: Db, s: DataSubject): Promise<Residu
     );
     for (const r of rows) {
       if (Number(r.n) > 0) {
-        hits.push({ model: m.name, field: r.field, rows: Number(r.n), retained: RETAINED_MODELS.has(m.name) });
+        hits.push({
+          model: m.name,
+          field: r.field,
+          rows: Number(r.n),
+          retained: RETAINED_MODELS.has(m.name),
+        });
       }
     }
   }

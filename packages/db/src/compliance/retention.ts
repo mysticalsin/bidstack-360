@@ -65,7 +65,8 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
     action: 'scrub',
     table: 'call_sessions',
     ageExpr: 'coalesce(ended_at, created_at)',
-    pending: 'transcript_text IS NOT NULL OR transcript_structured IS NOT NULL OR recording_url IS NOT NULL',
+    pending:
+      'transcript_text IS NOT NULL OR transcript_structured IS NOT NULL OR recording_url IS NOT NULL',
     scrub: 'transcript_text = NULL, transcript_structured = NULL, recording_url = NULL',
     description: 'Call transcripts and recording links. The call record and summary stay.',
   },
@@ -107,7 +108,8 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
     action: 'delete',
     table: 'intel_evidence',
     ageExpr: 'fetched_at',
-    description: 'Public-source excerpts behind account intel (3 years after fetch, per the schema note).',
+    description:
+      'Public-source excerpts behind account intel (3 years after fetch, per the schema note).',
   },
   {
     dataClass: 'notifications',
@@ -158,7 +160,10 @@ function positiveDays(raw: string | undefined, fallback: number): number {
 export function resolveRetentionConfig(env: Env): RetentionConfig {
   return {
     mode: env.RETENTION_MODE === 'enforce' ? 'enforce' : 'report',
-    policies: RETENTION_POLICIES.map((p) => ({ ...p, days: positiveDays(env[p.envVar], p.defaultDays) })),
+    policies: RETENTION_POLICIES.map((p) => ({
+      ...p,
+      days: positiveDays(env[p.envVar], p.defaultDays),
+    })),
   };
 }
 

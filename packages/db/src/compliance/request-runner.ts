@@ -30,7 +30,8 @@ export async function runDataSubjectRequest(
   });
   const row = await db.dataSubjectRequest.findUnique({ where: { id: requestId } });
   if (!row) throw new Error(`data-subject-request ${requestId} not found`);
-  if (claimed.count === 0) return { id: row.id, status: 'skipped', kind: row.kind, dryRun: row.dryRun };
+  if (claimed.count === 0)
+    return { id: row.id, status: 'skipped', kind: row.kind, dryRun: row.dryRun };
 
   try {
     const subject = await resolveDataSubject(
@@ -53,7 +54,10 @@ export async function runDataSubjectRequest(
     } else {
       const bundle = await exportDataSubject(db, subject);
       const stores = Object.fromEntries(
-        Object.entries(bundle.stores).map(([model, rows]) => [model, { action: 'export', rows: rows.length }]),
+        Object.entries(bundle.stores).map(([model, rows]) => [
+          model,
+          { action: 'export', rows: rows.length },
+        ]),
       );
       report = {
         kind: 'export',

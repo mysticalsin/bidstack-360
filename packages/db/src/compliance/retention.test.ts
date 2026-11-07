@@ -45,7 +45,9 @@ describe('retention policies', () => {
     });
     expect(cfg.mode).toBe('enforce');
     const days = Object.fromEntries(cfg.policies.map((p) => [p.dataClass, p.days]));
-    const defaults = Object.fromEntries(RETENTION_POLICIES.map((p) => [p.dataClass, p.defaultDays]));
+    const defaults = Object.fromEntries(
+      RETENTION_POLICIES.map((p) => [p.dataClass, p.defaultDays]),
+    );
     expect(days.email_messages).toBe(30);
     expect(days.sms_messages).toBe(defaults.sms_messages);
     expect(days.notifications).toBe(defaults.notifications);

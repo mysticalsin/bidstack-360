@@ -34,7 +34,10 @@ const NON_TEXT_TYPES = new Set(['Boolean', 'Int', 'BigInt', 'Float', 'Decimal', 
 
 function isCandidate(f: SchemaField): boolean {
   return (
-    f.kind !== 'object' && !NON_TEXT_TYPES.has(f.type) && !/(Id|Hash)$/.test(f.name) && f.name !== 'id'
+    f.kind !== 'object' &&
+    !NON_TEXT_TYPES.has(f.type) &&
+    !/(Id|Hash)$/.test(f.name) &&
+    f.name !== 'id'
   );
 }
 
@@ -185,7 +188,13 @@ export const SUBJECT_STORES = [
   },
   {
     model: 'CallSession',
-    fields: ['participantEmails', 'transcriptText', 'transcriptStructured', 'summary', 'actionItems'],
+    fields: [
+      'participantEmails',
+      'transcriptText',
+      'transcriptStructured',
+      'summary',
+      'actionItems',
+    ],
     strategy: 'scrub',
     match: 'participant, entity link or mention',
   },
@@ -270,7 +279,7 @@ export const NON_SUBJECT_STORES: readonly NonSubjectStore[] = [
     model: 'IntegrationToken',
     fields: ['externalAccountEmail'],
     reason:
-      "The connected mailbox or calendar account of a staff member. Workforce data; revoked and deleted with the integration.",
+      'The connected mailbox or calendar account of a staff member. Workforce data; revoked and deleted with the integration.',
   },
   {
     model: 'OrgSettings',

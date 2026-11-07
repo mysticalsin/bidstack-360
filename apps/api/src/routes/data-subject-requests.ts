@@ -116,7 +116,9 @@ export const dataSubjectRequestRoutes: FastifyPluginAsyncZod = async (server) =>
     async (req, reply) => {
       assertSameOrg(req, req.params.orgId);
       const orgId = req.auth.orgId;
-      const row = await prisma.dataSubjectRequest.findFirst({ where: { id: req.params.id, orgId } });
+      const row = await prisma.dataSubjectRequest.findFirst({
+        where: { id: req.params.id, orgId },
+      });
       if (!row || row.kind !== 'export') throw req.server.httpErrors.notFound('Export not found');
       if (row.status !== 'done' || row.dryRun) {
         throw req.server.httpErrors.conflict('Export is not ready (dry run or still running)');
