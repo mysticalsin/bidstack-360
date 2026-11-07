@@ -3,7 +3,14 @@ import { EventEmitter } from 'node:events';
 import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 
-import { attachDeadLetter, DEAD_LETTER_QUEUE, deadLetterJobId, isFinalAttempt } from './dead-letter.js';
+import {
+  attachDeadLetter,
+  DEAD_LETTER_QUEUE,
+  DEAD_LETTER_RETENTION_MS,
+  deadLetterJobId,
+  isFinalAttempt,
+  trimDeadLetter,
+} from './dead-letter.js';
 
 const log = pino({ level: 'silent' });
 
@@ -24,6 +31,22 @@ describe('dead-letter', () => {
     expect(isFinalAttempt(job(1, 3))).toBe(false);
     expect(isFinalAttempt(job(3, 3))).toBe(true);
     expect(isFinalAttempt(job(1))).toBe(true);
+  });
+
+  it('an unrecoverable failure with attempts left is final (finishedOn set)', () => {
+    expect(isFinalAttempt({ ...job(1, 3), finishedOn: Date.now() })).toBe(true);
+  });
+
+  it('ids from repeatable jobs carry no ":"', () => {
+    expect(deadLetterJobId('crew-run-reaper', { id: 'repeat:abc:1700000000000' })).toBe(
+      'crew-run-reaper__repeat_abc_1700000000000',
+    );
+  });
+
+  it('trims entries past the retention window', async () => {
+    const clean = vi.fn(async () => ['a', 'b']);
+    await expect(trimDeadLetter({ clean } as never)).resolves.toBe(2);
+    expect(clean).toHaveBeenCalledWith(DEAD_LETTER_RETENTION_MS, 1000, 'wait');
   });
 
   it('copies an exhausted job with a deterministic id', async () => {

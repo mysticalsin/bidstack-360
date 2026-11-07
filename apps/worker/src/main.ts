@@ -59,7 +59,7 @@ import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
 // GDPR Art. 20 — tenant data-portability export
 import { startTenantExport } from './queues/tenant-export.js';
 import { startTenantExportSweeper } from './queues/tenant-export-sweeper.js';
-import { attachDeadLetter, DEAD_LETTER_QUEUE } from './lib/dead-letter.js';
+import { attachDeadLetter, DEAD_LETTER_QUEUE, trimDeadLetter } from './lib/dead-letter.js';
 import { workerReadiness } from './lib/health-probe.js';
 // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
 import { startAiAuditRetention } from './queues/ai-audit-retention.js';
@@ -206,6 +206,10 @@ await Promise.all([
 
 const deadLetterQueue = new BullQueue(DEAD_LETTER_QUEUE, { connection });
 queues.push(deadLetterQueue);
+const deadLetterTrim = setInterval(() => {
+  trimDeadLetter(deadLetterQueue).catch((err) => log.warn({ err }, 'dead-letter: trim failed'));
+}, 60 * 60 * 1000);
+deadLetterTrim.unref();
 
 for (const worker of workers) {
   attachSentryToWorker(worker, worker.name, log);
@@ -310,6 +314,7 @@ const shutdown = async (signal: string) => {
     // without a long EADDRINUSE retry window — BullMQ worker.close() below can
     // take seconds while it drains the active job.
     queueDepthCollector.stop();
+    clearInterval(deadLetterTrim);
     healthServer.close();
     await Promise.all(workers.map((w) => w.close()));
     await Promise.all(queues.map((q) => q.close()));
