@@ -10,7 +10,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -124,5 +124,54 @@ describe('AnalyticsDashboardPage — reports:write gating', () => {
     renderPage();
 
     expect(screen.queryByTestId('widget-config-modal')).toBeNull();
+  });
+});
+
+describe('AnalyticsDashboardPage — states', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    dashboardsMocks.useDashboards.mockImplementation(() => ({ data: [dashboard], isLoading: false }));
+    dashboardsMocks.useDashboardWidgets.mockImplementation(() => ({
+      data: [widget],
+      isLoading: false,
+      error: null,
+    }));
+  });
+
+  it('shows an error with a retry, not "No dashboards", when the list fails to load', () => {
+    const refetch = vi.fn();
+    dashboardsMocks.useDashboards.mockImplementation(
+      () =>
+        ({ data: undefined, isLoading: false, isError: true, error: new Error('boom'), refetch }) as never,
+    );
+
+    renderPage();
+
+    expect(screen.queryByText('No dashboards')).toBeNull();
+    expect(screen.getByRole('alert')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('shows a loading grid while the widgets load', () => {
+    dashboardsMocks.useDashboardWidgets.mockImplementation(
+      () => ({ data: undefined, isLoading: true, error: null }) as never,
+    );
+
+    renderPage();
+
+    expect(screen.getByTestId('widgets-loading')).toBeTruthy();
+  });
+
+  it('closes the dashboard switcher on Escape', () => {
+    renderPage();
+
+    const trigger = screen.getByRole('button', { name: /Switch dashboard/i });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('listbox')).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 });
