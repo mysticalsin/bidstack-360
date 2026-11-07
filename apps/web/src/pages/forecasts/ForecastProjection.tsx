@@ -112,7 +112,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
         >
           <div className="flex items-center justify-between">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
               {c.label}
             </div>
             {c.key === 'weighted' && period.manualCommitMicros !== null ? (
