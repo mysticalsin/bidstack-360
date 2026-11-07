@@ -122,7 +122,9 @@ describe('public sign routes', () => {
     expect(get.statusCode).toBe(404);
     const post = await submit(token);
     expect(post.statusCode).toBe(404);
-    const row = await prisma.signatureRequest.findUniqueOrThrow({ where: { id } });
+    const row = await prisma.signatureRequest.findFirstOrThrow({
+      where: { id, deletedAt: { not: null } },
+    });
     expect(row.status).toBe('SENT');
   });
 

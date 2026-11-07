@@ -573,7 +573,8 @@
     "errorLinkExpiredDetail": "Este enlace de firma ha caducado. Ponte en contacto con el remitente para reenviar la solicitud.",
     "errorLinkInvalidDetail": "Este enlace de firma no es válido o ha caducado. Ponte en contacto con el remitente para reenviar la solicitud.",
     "errorLinkExpiredTitle": "Enlace caducado",
-    "errorLinkInvalidTitle": "Enlace de firma no válido"
+    "errorLinkInvalidTitle": "Enlace de firma no válido",
+    "errorLinkClosedTitle": "Firma cerrada"
   },
   "worldMap": {
     "preset": {

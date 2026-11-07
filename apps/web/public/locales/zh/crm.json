@@ -510,7 +510,8 @@
     "errorLinkExpiredDetail": "此签名链接已过期。请联系发件人重新发送请求。",
     "errorLinkInvalidDetail": "此签名链接无效或已过期。请联系发件人重新发送请求。",
     "errorLinkExpiredTitle": "链接已过期",
-    "errorLinkInvalidTitle": "无效的签名链接"
+    "errorLinkInvalidTitle": "无效的签名链接",
+    "errorLinkClosedTitle": "签名已关闭"
   },
   "worldMap": {
     "preset": {

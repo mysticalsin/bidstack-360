@@ -20,14 +20,20 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { InternalSignSubmit, PublicSignatureRequest } from '@bidstack/shared';
-import { handleInternalSign } from '../services/documents/signature.service.js';
+import {
+  closedSignLinkReason,
+  handleInternalSign,
+  signLinkExpiresAt,
+} from '../services/documents/signature.service.js';
+
+const signSubmitRateLimitMax = Number(process.env.PUBLIC_SIGN_RATE_LIMIT_MAX ?? 10);
 
 export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   // ── GET /sign/:token ──────────────────────────────────────────────────────
   server.get(
     '/sign/:token',
     {
-      config: { public: true },
+      config: { public: true, rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         response: {
@@ -44,18 +50,14 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
       const { token } = req.params;
 
       const request = await prisma.signatureRequest.findFirst({
-        where: { providerRequestId: token, provider: 'INTERNAL' },
+        where: { providerRequestId: token, provider: 'INTERNAL', deletedAt: null },
         include: { document: true, org: { select: { name: true } } },
       });
 
       if (!request) return reply.status(404).send({ message: 'Signing link not found' });
 
-      if (request.status === 'SIGNED') {
-        return reply.status(410).send({ message: 'This document has already been signed.' });
-      }
-      if (request.status === 'VOIDED') {
-        return reply.status(410).send({ message: 'This signing request has been voided.' });
-      }
+      const closed = await closedSignLinkReason(request);
+      if (closed) return reply.status(410).send({ message: closed });
 
       const recipients = request.recipients as Array<{ name?: string; email?: string }>;
       const recipient = recipients[0];
@@ -69,7 +71,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
         documentPreviewUrl: null,
         recipientName: recipient?.name ?? 'Recipient',
         recipientEmail: recipient?.email ?? 'unknown@unknown.invalid',
-        expiresAt: null,
+        expiresAt: signLinkExpiresAt(request).toISOString(),
       });
     },
   );
@@ -78,7 +80,10 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/sign/:token',
     {
-      config: { public: true },
+      config: {
+        public: true,
+        rateLimit: { max: signSubmitRateLimitMax, timeWindow: '1 hour' },
+      },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         body: InternalSignSubmit,

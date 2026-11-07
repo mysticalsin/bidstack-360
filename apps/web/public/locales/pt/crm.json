@@ -510,7 +510,8 @@
     "errorLinkExpiredDetail": "Este link de assinatura expirou. Entre em contato com o remetente para reenviar a solicitação.",
     "errorLinkInvalidDetail": "Este link de assinatura é inválido ou expirou. Entre em contato com o remetente para reenviar a solicitação.",
     "errorLinkExpiredTitle": "Link expirado",
-    "errorLinkInvalidTitle": "Link de assinatura inválido"
+    "errorLinkInvalidTitle": "Link de assinatura inválido",
+    "errorLinkClosedTitle": "Assinatura encerrada"
   },
   "worldMap": {
     "preset": {
