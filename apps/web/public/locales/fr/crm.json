@@ -1872,9 +1872,9 @@
       "label": "Sections de l'entreprise"
     },
     "tab": {
-      "contacts": "Contacts ({{count}})",
-      "opportunities": "Opportunités ({{count}})",
-      "cases": "Cas ({{count}})",
+      "contacts": "Contacts ({{shown}})",
+      "opportunities": "Opportunités ({{shown}})",
+      "cases": "Cas ({{shown}})",
       "notes": "Notes ({{count}})",
       "hierarchy": "Hiérarchie"
     }

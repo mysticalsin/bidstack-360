@@ -17,6 +17,7 @@ import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
 import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
+import { relatedCount } from './companyDetail/relatedCount';
 
 type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 type View = 'overview' | 'details';
@@ -175,7 +176,7 @@ export function CompanyDetailPage() {
               [
                 {
                   key: 'contacts',
-                  label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', { count: c.contacts.length }),
+                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', { shown: relatedCount(c.contacts.length) }),
                 },
                 {
                   key: 'people',
@@ -183,13 +184,13 @@ export function CompanyDetailPage() {
                 },
                 {
                   key: 'opportunities',
-                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
-                    count: c.opportunities.length,
+                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{shown}})', {
+                    shown: relatedCount(c.opportunities.length),
                   }),
                 },
                 {
                   key: 'cases',
-                  label: t('companyDetail.tab.cases', 'Cases ({{count}})', { count: c.openCases.length }),
+                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', { shown: relatedCount(c.openCases.length) }),
                 },
                 {
                   key: 'notes',

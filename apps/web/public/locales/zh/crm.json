@@ -1817,9 +1817,9 @@
       "label": "公司板块"
     },
     "tab": {
-      "contacts": "联系人 ({{count}})",
-      "opportunities": "商机 ({{count}})",
-      "cases": "工单 ({{count}})",
+      "contacts": "联系人 ({{shown}})",
+      "opportunities": "商机 ({{shown}})",
+      "cases": "工单 ({{shown}})",
       "notes": "备注 ({{count}})",
       "hierarchy": "层级结构"
     }

@@ -1817,9 +1817,9 @@
       "label": "Sezioni dell'azienda"
     },
     "tab": {
-      "contacts": "Contatti ({{count}})",
-      "opportunities": "Opportunità ({{count}})",
-      "cases": "Casi ({{count}})",
+      "contacts": "Contatti ({{shown}})",
+      "opportunities": "Opportunità ({{shown}})",
+      "cases": "Casi ({{shown}})",
       "notes": "Note ({{count}})",
       "hierarchy": "Gerarchia"
     }

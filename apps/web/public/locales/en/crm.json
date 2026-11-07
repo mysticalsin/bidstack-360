@@ -1818,9 +1818,9 @@
       "label": "Company sections"
     },
     "tab": {
-      "contacts": "Contacts ({{count}})",
-      "opportunities": "Opportunities ({{count}})",
-      "cases": "Cases ({{count}})",
+      "contacts": "Contacts ({{shown}})",
+      "opportunities": "Opportunities ({{shown}})",
+      "cases": "Cases ({{shown}})",
       "notes": "Notes ({{count}})",
       "hierarchy": "Hierarchy"
     }
