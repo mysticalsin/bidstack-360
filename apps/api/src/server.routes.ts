@@ -241,6 +241,14 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
       const target = req.url.replace('/odoo/', '/erp/');
       return reply.redirect(target, 307);
     });
+  } else {
+    // Only the status probe answers, so the settings card can say "not
+    // configured" instead of logging a 404 for every visitor.
+    server.get(
+      '/api/v1/integrations/erp/status',
+      { preHandler: server.requirePermission('integrations:read') },
+      async () => ({ configured: false, url: null, database: null, reachable: false, toolCount: null, lastError: null }),
+    );
   }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
