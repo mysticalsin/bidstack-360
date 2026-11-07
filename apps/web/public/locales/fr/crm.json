@@ -558,7 +558,7 @@
     "skipToMain": "Aller au contenu principal",
     "brandSecureSignature": "Signature sécurisée",
     "mainAriaLabel": "Signature de document",
-    "footerLegalNote": "Votre signature a une valeur juridique. Cette page ne contient aucune technologie de suivi.",
+    "footerLegalNote": "Il s'agit d'une signature d'approbation interne, et non d'une signature électronique juridiquement contraignante. Cette page ne contient aucune technologie de suivi.",
     "stepReview": "Examiner",
     "stepSign": "Signer",
     "stepSubmit": "Envoyer",
@@ -582,8 +582,8 @@
     "back": "Retour",
     "continue": "Continuer",
     "submitHeading": "Vérifier et envoyer",
-    "submitLegalIntro": "En envoyant, vous signez légalement",
-    "termsAgreement": "J'accepte que cette signature électronique a une valeur juridique et reflète mon intention de signer ce document. J'ai eu la possibilité d'en examiner le contenu.",
+    "submitLegalIntro": "En envoyant, vous apposez une signature d'approbation interne sur",
+    "termsAgreement": "Je comprends qu'il s'agit d'une signature d'approbation interne, et non d'une signature électronique juridiquement contraignante, et qu'elle reflète mon intention d'approuver ce document. J'ai eu la possibilité d'en examiner le contenu.",
     "submitting": "Envoi…",
     "submitSignatureButton": "Envoyer la signature",
     "confirmHeading": "Signature envoyée",
@@ -595,7 +595,8 @@
     "errorLinkExpiredDetail": "Ce lien de signature a expiré. Veuillez contacter l'expéditeur pour renvoyer la demande.",
     "errorLinkInvalidDetail": "Ce lien de signature n'est pas valide ou a expiré. Veuillez contacter l'expéditeur pour renvoyer la demande.",
     "errorLinkExpiredTitle": "Lien expiré",
-    "errorLinkInvalidTitle": "Lien de signature non valide"
+    "errorLinkInvalidTitle": "Lien de signature non valide",
+    "errorLinkClosedTitle": "Signature clôturée"
   },
   "worldMap": {
     "preset": {

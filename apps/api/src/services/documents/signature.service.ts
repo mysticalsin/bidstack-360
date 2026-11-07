@@ -108,7 +108,58 @@ async function getDocuSignAccessToken(): Promise<string> {
   return dsTokenCache.token;
 }
 
+/** INTERNAL signing links stop working this many days after they were sent. */
+export const SIGN_LINK_TTL_DAYS = 30;
+
+const SIGN_LINK_TTL_MS = SIGN_LINK_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+/** Statuses from which an INTERNAL link can still be signed. */
+export const SIGNABLE_STATUSES: SignatureStatus[] = ['SENT', 'VIEWED'];
+
+export function signLinkExpiresAt(request: { sentAt: Date | null; createdAt: Date }): Date {
+  return new Date((request.sentAt ?? request.createdAt).getTime() + SIGN_LINK_TTL_MS);
+}
+
+/**
+ * Why a public link can no longer be signed, or null when it still can. A link
+ * past its expiry is flipped to EXPIRED here so the sender sees the real state.
+ */
+export async function closedSignLinkReason(request: {
+  id: string;
+  status: string;
+  sentAt: Date | null;
+  createdAt: Date;
+}): Promise<string | null> {
+  switch (request.status) {
+    case 'SIGNED':
+      return 'This document has already been signed.';
+    case 'VOIDED':
+      return 'This signing request has been voided.';
+    case 'DECLINED':
+      return 'This signing request was declined.';
+    case 'EXPIRED':
+      return 'This signing link has expired.';
+  }
+  if (!(SIGNABLE_STATUSES as string[]).includes(request.status)) {
+    return 'This signing request is not open for signature.';
+  }
+  if (signLinkExpiresAt(request).getTime() <= Date.now()) {
+    await prisma.signatureRequest.updateMany({
+      where: { id: request.id, status: { in: SIGNABLE_STATUSES } },
+      data: { status: 'EXPIRED' },
+    });
+    return 'This signing link has expired.';
+  }
+  return null;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function gone(msg: string): never {
+  const err = new Error(msg) as FastifyError;
+  err.statusCode = 410;
+  throw err;
+}
 
 function notFound(msg: string): never {
   const err = new Error(msg) as FastifyError;
@@ -435,25 +486,38 @@ export async function handleInternalSign(params: {
   const { token, typedName, signatureDataUrl, ipAddress, userAgent } = params;
 
   const request = await prisma.signatureRequest.findFirst({
-    where: { providerRequestId: token, provider: 'INTERNAL' },
+    where: { providerRequestId: token, provider: 'INTERNAL', deletedAt: null },
     include: { document: true },
   });
 
-  if (!request) notFound('Signing link not found or expired');
-  if (request.status === 'VOIDED') badRequest('This signing request has been voided');
-  if (request.status === 'SIGNED') badRequest('Document has already been signed');
+  if (!request) notFound('Signing link not found');
+  const closed = await closedSignLinkReason(request);
+  if (closed) gone(closed);
+  // Reject before the claim: an unrenderable image would otherwise be dropped
+  // from the PDF while the request still flips to SIGNED.
+  if (!safeSignatureSrc(signatureDataUrl)) {
+    badRequest('Signature must be a PNG, JPEG, GIF or WebP image');
+  }
 
   // The signed-PDF key is deterministic (orgId + requestId), so winning the
   // transition lets us record it up front and the loser never overwrites it.
   const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
 
   // TOCTOU GATE: claim the SIGNED transition atomically BEFORE the expensive
-  // PDF render + S3 PUT. `notIn: ['SIGNED','VOIDED']` means only one of two
-  // concurrent submits matches; the loser's count===0 aborts here — so we never
-  // render twice, never overwrite the signed PDF, and never record duplicate
-  // SIGNED events on the non-repudiable audit trail.
+  // PDF render + S3 PUT. Only one of two concurrent submits matches the open
+  // statuses; the loser's count===0 aborts here, so we never render twice,
+  // never overwrite the signed PDF, and never record duplicate SIGNED events
+  // on the non-repudiable audit trail.
   const claim = await prisma.signatureRequest.updateMany({
-    where: { id: request.id, status: { notIn: ['SIGNED', 'VOIDED'] } },
+    where: {
+      id: request.id,
+      deletedAt: null,
+      status: { in: SIGNABLE_STATUSES },
+      OR: [
+        { sentAt: { gt: new Date(Date.now() - SIGN_LINK_TTL_MS) } },
+        { sentAt: null, createdAt: { gt: new Date(Date.now() - SIGN_LINK_TTL_MS) } },
+      ],
+    },
     data: {
       status: 'SIGNED',
       completedAt: new Date(),
@@ -463,7 +527,7 @@ export async function handleInternalSign(params: {
   });
   if (claim.count === 0) {
     // Another request won the race (or it was voided between read and claim).
-    badRequest('Document has already been signed');
+    gone('This document has already been signed.');
   }
 
   // Build a minimal signed document HTML
