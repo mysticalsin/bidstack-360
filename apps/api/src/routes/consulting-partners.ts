@@ -120,7 +120,11 @@ export const consultingPartnersRoutes: FastifyPluginAsyncZod = async (server) =>
     '/companies/:id/consulting-partners/refresh',
     {
       config: { permission: 'account-intel:write', rateLimit: { max: 10, timeWindow: '1 minute' } },
-      schema: { params: idParam, response: { 202: ConsultingPartnersRefreshResponse } },
+      schema: {
+        params: idParam,
+        body: z.object({}).strict().nullish(),
+        response: { 202: ConsultingPartnersRefreshResponse },
+      },
     },
     async (req, reply) => {
       const { company } = await loadCompany(req);
