@@ -9,8 +9,10 @@ import { cleanup, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { MobileNav } from './MobileNav';
+import { SHELL_WIDE_QUERY } from './shellBreakpoint';
 import { Sidebar } from './Sidebar';
 import { useUiStore } from '@/stores/ui';
+import { mockMatchMedia } from '@/test/matchMedia';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
@@ -38,6 +40,7 @@ function expectColoredMark(root: ParentNode): void {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   localStorage.clear();
   useUiStore.setState({ sidebarCollapsed: false, collapsedSections: {}, mobileNavOpen: false });
 });
@@ -62,6 +65,7 @@ describe('brand mark', () => {
   });
 
   it('mobile drawer shows the full-color Polo mark', () => {
+    mockMatchMedia({ [SHELL_WIDE_QUERY]: false });
     useUiStore.setState({ mobileNavOpen: true });
     render(
       <MemoryRouter>

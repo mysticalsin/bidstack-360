@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
-      {/* Mobile navigation drawer — full-screen overlay below md breakpoint. */}
+      {/* Navigation drawer below 56rem, rendered in place inside the shell. */}
       <MobileNav />
       {/* Screen-reader-only live region — announces every route swap. */}
       <RouteAnnouncer />
