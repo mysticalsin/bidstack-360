@@ -1,9 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { TechnicalStackCoverage, TechnicalStackItem } from '@bidstack/shared';
+import type { TechnicalStackCoverage, TechnicalStackItemType } from '@bidstack/shared';
 
-import { TechCoverageLine, TechEvidenceChip, coverageParts } from './TechEvidence';
+import { TechCoverageLine, TechEvidenceChip } from './TechEvidence';
+import { coverageParts } from './techEvidenceText';
 
 const CHECKED = '2026-11-07T10:00:00.000Z';
 
@@ -25,7 +26,7 @@ function coverage(overrides: Partial<TechnicalStackCoverage> = {}): TechnicalSta
   };
 }
 
-const dnsItem: TechnicalStackItem = {
+const dnsItem: TechnicalStackItemType = {
   name: 'Microsoft 365',
   source: 'open_data:dns',
   confidence: 0.95,
@@ -95,7 +96,7 @@ describe('TechEvidenceChip', () => {
     const labels = ['apollo_io', 'manual', 'meeting_notes', 'open_data:web', 'open_data:jobs'].map((source) => {
       cleanup();
       render(<TechEvidenceChip item={{ name: 'X', source, confidence: 0.5 }} />);
-      return screen.getByRole('button').textContent;
+      return screen.getByRole('button').textContent?.replace(/\d+%$/, '');
     });
     expect(labels).toEqual(['Apollo', 'Manual', 'Meeting notes', 'Website', 'Jobs']);
   });

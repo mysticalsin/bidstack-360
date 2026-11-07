@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
@@ -139,6 +139,8 @@ describe('AccountCard coverage explainability', () => {
 });
 
 describe('AccountCard tech logos', () => {
+  beforeEach(cleanup);
+
   it('shows the top three technologies with their logos and names the rest in the tooltip', () => {
     const row = deriveAccount(
       company({
