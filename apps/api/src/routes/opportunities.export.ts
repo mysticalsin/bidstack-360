@@ -22,8 +22,13 @@ import { microsToUnits } from '@bidstack/shared';
 
 import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
 import { pumpBatches } from '../lib/batch-stream.js';
+import { createConcurrencyGate, gateSizeFromEnv } from '../lib/concurrency-gate.js';
 
 const BATCH_SIZE = 250;
+
+// Each export pages the whole table. Past a handful in flight per process,
+// every export slows down until all of them time out, so refuse the excess.
+const exportGate = createConcurrencyGate(gateSizeFromEnv('EXPORT_MAX_CONCURRENCY', 4));
 
 // RFC 4180 quoting + spreadsheet formula-injection neutralization. A leading
 // =, +, -, @, tab, or CR is prefixed with ' so Excel/Sheets won't execute it as
@@ -65,7 +70,10 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/opportunities/export',
     {
-      config: { permission: 'opportunities:read' },
+      config: {
+        permission: 'opportunities:read',
+        rateLimit: { max: 10, timeWindow: '1 minute' },
+      },
       schema: {
         summary: 'Export all opportunities as CSV (streaming)',
         tags: ['opportunities'],
@@ -80,6 +88,11 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       },
     },
     async (req, reply) => {
+      const release = exportGate.tryAcquire();
+      if (!release) {
+        reply.header('Retry-After', '5');
+        throw server.httpErrors.tooManyRequests('Too many exports are running. Retry in a few seconds.');
+      }
       const { stage, pipelineStageId, owner, industry } = req.query;
       const orgId = req.auth.orgId;
       const stamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -88,7 +101,13 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       // the rows they can see in the list/detail views — never a full-org
       // pipeline dump. Mirror the sibling list route (opportunities.ts) by
       // wrapping the where clause with applyOpportunityScope. See lib/access-scope.ts.
-      const accessScope = await getAccessScope(orgId, req.auth.userId);
+      let accessScope: Awaited<ReturnType<typeof getAccessScope>>;
+      try {
+        accessScope = await getAccessScope(orgId, req.auth.userId);
+      } catch (err) {
+        release();
+        throw err;
+      }
       const where = applyOpportunityScope(
         {
           orgId,
@@ -104,6 +123,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       // Stream through Fastify so global headers (CORS/security) still apply
       // while keeping memory flat for large exports.
       const stream = new PassThrough();
+      stream.once('close', release);
       reply
         .type('text/csv; charset=utf-8')
         .header('Content-Disposition', `attachment; filename="polo-presales-opportunities-${stamp}.csv"`)
