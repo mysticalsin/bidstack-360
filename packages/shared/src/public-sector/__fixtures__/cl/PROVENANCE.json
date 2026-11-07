@@ -1,0 +1,19 @@
+{
+  "recordedAt": "2026-11-06",
+  "scrubbedBy": "packages/shared/scripts/scrub-cl-fixtures.ts",
+  "real": {
+    "ocds-list-2025-07.json": "GET https://api.mercadopublico.cl/APISOCDS/OCDS/listaOCDSAgnoMes/2025/07/0/5 (HTTP 200)",
+    "ocds-list-trato-directo-2025-07.json": "GET https://api.mercadopublico.cl/APISOCDS/OCDS/listaOCDSAgnoMesTratoDirecto/2025/07/0/3 (HTTP 200)",
+    "ocds-tender-3951-19-LE25.json": "GET https://api.mercadopublico.cl/APISOCDS/OCDS/tender/3951-19-LE25 (HTTP 200), contact points scrubbed",
+    "ocds-award-3951-19-LE25.json": "GET https://api.mercadopublico.cl/APISOCDS/OCDS/award/3951-19-LE25 (HTTP 200), contact points scrubbed",
+    "ocds-award-2741-120-TD25.json": "GET https://api.mercadopublico.cl/APISOCDS/OCDS/award/2741-120-TD25 (HTTP 200), contact points scrubbed",
+    "mp-api-ticket-invalid.json": "Body of GET https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json?estado=activas with an invalid ticket (HTTP 203)",
+    "lic-da-2025-7.head.csv": "First 200 records of lic_2025-7.csv in https://transparenciachc.blob.core.windows.net/lic-da/2025-7.zip, Latin-1, cut at record boundaries, natural persons, emails and phones scrubbed",
+    "oc-da-2025-7.head.csv": "First 150 records of 2025-7.csv in https://transparenciachc.blob.core.windows.net/oc-da/2025-7.zip plus the 4 July 2025 rows listed in hist_OC_erroneas.csv, scrubbed the same way",
+    "hist_OC_erroneas.head.csv": "Header, first 36 rows and the 4 July 2025 rows of https://transparenciachc.blob.core.windows.net/oc-da/hist_OC_erroneas.csv"
+  },
+  "synthetic": {
+    "mp-api-licitaciones-dia.synthetic.json": "Shaped from the documented licitaciones.json detail fields; codes, RUTs and names are synthetic. The real day listing may return a compact subset, so the schema keeps everything but CodigoExterno, Nombre and CodigoEstado optional",
+    "mp-api-ordenesdecompra-dia.synthetic.json": "Shaped from the documented ordenesdecompra.json fields and the oc-da column names; codes, RUTs and names are synthetic"
+  }
+}

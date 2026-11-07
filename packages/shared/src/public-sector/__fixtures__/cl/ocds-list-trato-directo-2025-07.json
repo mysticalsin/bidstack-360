@@ -1,0 +1,23 @@
+{
+  "creationDate": "2026-11-06T16:35:54.3554",
+  "version": "1.2",
+  "pagination": {
+    "offset": 0,
+    "limit": 3,
+    "total": 12739
+  },
+  "data": [
+    {
+      "ocid": "ocds-70d2nz-2741-120-TD25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/2741-120-TD25"
+    },
+    {
+      "ocid": "ocds-70d2nz-3082-396-TD25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/3082-396-TD25"
+    },
+    {
+      "ocid": "ocds-70d2nz-2904-623-TD25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/2904-623-TD25"
+    }
+  ]
+}
