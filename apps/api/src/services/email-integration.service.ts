@@ -21,6 +21,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { prisma, IntegrationProvider, EmailProvider } from '@bidstack/db';
+import { grantsMailSend } from '@bidstack/shared';
 import {
   getAccessToken,
   type SendEmailParams,
@@ -60,6 +61,15 @@ export async function sendEmail(
   if (!token) {
     throw new Error('No active email integration found. Connect Gmail or Outlook first.');
   }
+
+  // Connect grants read-only scopes. Sending needs a send grant the user
+  // added on purpose; without one Polo keeps the message as a draft.
+  if (!grantsMailSend(token.scope ?? [])) {
+    throw Object.assign(new Error('This mailbox is connected read-only. Save a draft instead.'), {
+      statusCode: 409,
+    });
+  }
+
 
   const pixelToken = randomBytes(24).toString('base64url');
   const isGmail = token.provider === 'gmail';

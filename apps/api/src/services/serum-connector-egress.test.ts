@@ -146,6 +146,7 @@ beforeEach(() => {
     status: 'active',
     accessTokenEncrypted: 'encrypted-token',
     externalAccountEmail: 'seller@example.com',
+    scope: ['https://www.googleapis.com/auth/gmail.send'],
   });
   mocks.smsConsentFindUnique.mockResolvedValue(null);
   mocks.outboundRollback.mockResolvedValue(undefined);
