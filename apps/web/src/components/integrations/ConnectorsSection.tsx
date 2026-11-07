@@ -39,13 +39,19 @@ function categoryLabel(t: TFunc, category: Category): string {
   }
 }
 
+const WORKSPACE_CONNECTOR_IDS = new Set(['gmail', 'microsoft']);
+
 const ALL: Category[] = ['company', 'market', 'procurement', 'logo', 'people', 'ai'];
 
 export function ConnectorsSection() {
   const { t } = useTranslation('integrations');
   const { data, isLoading, isError, error, refetch } = useConnectorCatalog();
   const [filter, setFilter] = useState<Category | 'all'>('all');
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
+  // Gmail and Microsoft 365 live on WorkspaceAccountsCard, one card per provider.
+  const items = useMemo(
+    () => (data?.items ?? []).filter((c) => !WORKSPACE_CONNECTOR_IDS.has(c.id)),
+    [data?.items],
+  );
 
   // can verify stability — wrapping `items` in its own useMemo first would
   const filtered = useMemo(() => {
@@ -210,8 +216,7 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
   const qc = useQueryClient();
   const { data: userIntegrationsData } = useUserIntegrationsStatus();
   // Slack disconnect tears down the org's ONE shared workspace connection
-  // (server-gated behind integrations:write) — unlike Gmail/Microsoft mail,
-  // which only ever touch the caller's own mailbox and stay open to everyone.
+  // (server-gated behind integrations:write).
   const canDisconnectSlack = useHasPermission('integrations:write');
   const slackWriteHint = t(
     'connectors.row.slackWriteHint',
@@ -221,15 +226,8 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
   // Connect mutation
   const connectMutation = useMutation({
     mutationFn: async () => {
-      let startUrl = '';
-      if (connector.id === 'gmail') {
-        startUrl = '/api/integrations/gmail/oauth/start';
-      } else if (connector.id === 'slack') {
-        startUrl = '/api/integrations/slack/oauth/start';
-      } else if (connector.id === 'microsoft') {
-        startUrl = '/api/integrations/microsoft/mail/oauth/start';
-      }
-      if (!startUrl) return;
+      if (connector.id !== 'slack') return;
+      const startUrl = '/api/integrations/slack/oauth/start';
       const res = await api<{ authUrl: string }>(startUrl);
       if (res.authUrl) {
         window.location.href = res.authUrl;
@@ -240,16 +238,8 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
   // Disconnect mutation
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      let disconnectUrl = '';
-      if (connector.id === 'gmail') {
-        disconnectUrl = '/api/integrations/gmail/disconnect';
-      } else if (connector.id === 'slack') {
-        disconnectUrl = '/api/integrations/slack/disconnect';
-      } else if (connector.id === 'microsoft') {
-        disconnectUrl = '/api/integrations/microsoft/mail/disconnect';
-      }
-      if (!disconnectUrl) return;
-      await api(disconnectUrl, { method: 'DELETE' });
+      if (connector.id !== 'slack') return;
+      await api('/api/integrations/slack/disconnect', { method: 'DELETE' });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-integrations-status'] });
@@ -258,14 +248,9 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
     },
   });
 
-  const isUserIntegration = ['gmail', 'slack', 'microsoft'].includes(connector.id);
+  const isUserIntegration = connector.id === 'slack';
   const match = isUserIntegration
-    ? userIntegrationsData?.integrations?.find((ui) => {
-        if (connector.id === 'gmail') return ui.provider === 'gmail';
-        if (connector.id === 'slack') return ui.provider === 'slack';
-        if (connector.id === 'microsoft') return ui.provider === 'microsoft_graph';
-        return false;
-      })
+    ? userIntegrationsData?.integrations?.find((ui) => ui.provider === 'slack')
     : null;
 
   const isConnected = match ? match.status === 'CONNECTED' : false;

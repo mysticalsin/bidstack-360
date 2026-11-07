@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
 import { ErpConnectorCard } from '@/components/integrations/ErpConnectorCard';
+import { WorkspaceAccountsCard } from '@/components/integrations/WorkspaceAccountsCard';
 import { DataSourceCredentialsCard } from '@/components/settings/DataSourceCredentialsCard';
 import { ProviderHealthSection } from '@/components/integrations/ProviderHealthSection';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
@@ -261,6 +262,7 @@ export function IntegrationsSection() {
         </TabsContent>
 
         <TabsContent value="connectors" className="space-y-6 outline-none">
+          <WorkspaceAccountsCard />
           <ErpConnectorCard />
           <ConnectorsSection />
           <DataQualitySection />
