@@ -209,6 +209,10 @@ model Org {
   orgCharts                     OrgChart[]
   orgChartNodes                 OrgChartNode[]
   companyJobPostings            CompanyJobPosting[]
+  companyPosts                  CompanyPost[]
+  intelEvidence                 IntelEvidence[]
+  investmentThemes              InvestmentTheme[]
+  intelSourceRuns               IntelSourceRun[]
   enrichmentCreditUsage         EnrichmentCreditUsage[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
@@ -439,6 +443,10 @@ model Company {
   meetingIntel  MeetingIntel[]
   firmographics CompanyFirmographics?
   jobPostings   CompanyJobPosting[]
+  intelPosts    CompanyPost[]
+  intelEvidence IntelEvidence[]
+  intelThemes   InvestmentTheme[]
+  intelRuns     IntelSourceRun[]
   orgChart      OrgChart?
 
   @@index([orgId, domain])
@@ -5969,6 +5977,15 @@ model AccountWatchSubject {
   ticker                   String?
   exchange                 String?
   irFeedUrl                String?   @map("ir_feed_url")
+  /// Slice 12 account intelligence identifiers. Matched from GLEIF only on a
+  /// unique legal name and country hit, with the match kept as evidence.
+  brregOrgNumber           String?   @map("brreg_org_number")
+  frSiren                  String?   @map("fr_siren")
+  careersUrl               String?   @map("careers_url")
+  /// greenhouse | lever | ashby | workable | smartrecruiters | recruitee | personio
+  atsProvider              String?   @map("ats_provider")
+  atsBoard                 String?   @map("ats_board")
+  newsroomUrl              String?   @map("newsroom_url")
   identifiersConfirmedById String?   @map("identifiers_confirmed_by_id") @db.Uuid
   identifiersConfirmedAt   DateTime? @map("identifiers_confirmed_at") @db.Timestamptz(6)
   enabled                  Boolean   @default(true)
@@ -6289,8 +6306,11 @@ model CompanyFirmographics {
   @@map("company_firmographics")
 }
 
-/// Open roles at a CRM company, from a provider (Apollo job postings today).
-/// Classified at write time (function, seniority, skills, region).
+/// Open roles at a CRM company, from a provider (Apollo, Seamless) or a public
+/// job board (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee,
+/// Personio, schema.org JobPosting on the careers page). Classified at write
+/// time (function, seniority, skills, region). Retention: rows not seen for
+/// 180 days are pruned by the account-intel worker.
 model CompanyJobPosting {
   id         String    @id @default(uuid()) @db.Uuid
   orgId      String    @map("org_id") @db.Uuid
@@ -6306,9 +6326,12 @@ model CompanyJobPosting {
   function   String
   seniority  String
   skills     String[]  @default([])
+  department String?
   postedAt   DateTime? @map("posted_at") @db.Timestamptz(6)
   lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz(6)
   fetchedAt  DateTime  @map("fetched_at") @db.Timestamptz(6)
+  /// Demo fixture row, shown with a Sample tag.
+  sample     Boolean   @default(false)
 
   org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -6478,4 +6501,123 @@ model AccountFinancialPeriod {
   @@unique([companyId, source, periodType, periodEnd])
   @@index([orgId, companyId, periodEnd])
   @@map("account_financial_periods")
+}
+
+/// Slice 12: a post the company published itself (newsroom RSS or Atom, news
+/// sitemap, IR release). Classified with the shared news classifier. Holds
+/// the title and a short excerpt only, never the full article. Retention:
+/// pruned after 3 years by the account-intel worker.
+model CompanyPost {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  /// newsroom | sitemap | ir_feed | fixture
+  source      String
+  /// URL hash or feed guid, dedupe key within source.
+  externalId  String    @map("external_id")
+  url         String?
+  title       String
+  excerpt     String
+  /// product | partnership | acquisition | leadership | results | layoffs | expansion | other
+  kind        String
+  theme       String?
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  fetchedAt   DateTime  @map("fetched_at") @db.Timestamptz(6)
+  sample      Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, source, externalId])
+  @@index([orgId, companyId, publishedAt])
+  @@map("company_posts")
+}
+
+/// Slice 12 evidence ledger: one fact as read from a public source, with the
+/// URL, fetch time and the excerpt it came from. Registry facts, identifier
+/// matches and filing statements live here; job postings, posts and filed
+/// periods carry their own URL, fetch time and text. Retention: replaced on
+/// each refresh of the same key; pruned 3 years after fetchedAt.
+model IntelEvidence {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  /// gleif | brreg | fr_rne | companies_house | opencorporates | sec_edgar | esef | fixture
+  source    String
+  /// identifier | registry | statement
+  kind      String
+  /// Dedupe key within source, e.g. "lei" or "stmt:2025:3".
+  key       String
+  label     String?
+  url       String?
+  excerpt   String
+  /// Page, section or field the excerpt came from.
+  locator   String?
+  /// invest | cut | guidance for statements.
+  stance    String?
+  theme     String?
+  fetchedAt DateTime @map("fetched_at") @db.Timestamptz(6)
+  sample    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, source, key])
+  @@index([orgId, companyId, kind])
+  @@map("intel_evidence")
+}
+
+/// Slice 12: last computed investment plan line per account, rebuilt after
+/// each refresh. Each row cites evidence ids; next12 rows are always
+/// basis=inferred. Derived data, safe to drop and rebuild.
+model InvestmentTheme {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  /// investing | cutting | next12
+  direction   String
+  area        String
+  theme       String?
+  label       String
+  amount      Float?
+  currency    String?
+  trendPct    Float?   @map("trend_pct")
+  /// observed | stated | inferred
+  basis       String
+  summary     String
+  evidenceIds String[] @default([]) @map("evidence_ids")
+  computedAt  DateTime @map("computed_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, companyId, direction])
+  @@map("investment_themes")
+}
+
+/// Slice 12: last refresh per account and source (hiring | posts | financials |
+/// registry), shown next to each Refresh control.
+model IntelSourceRun {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  source        String
+  /// ok | partial | failed | not_configured | queued | running
+  status        String
+  lastFetchedAt DateTime? @map("last_fetched_at") @db.Timestamptz(6)
+  /// { new, updated, skipped, failed }
+  result        Json      @default("{}")
+  detail        String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, source])
+  @@map("intel_source_runs")
 }

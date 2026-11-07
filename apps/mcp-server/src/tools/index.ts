@@ -39,6 +39,7 @@ import {
   kamReadProspections,
   kamLogProspection,
 } from './kam-tools.js';
+import { accountIntelTools, accountIntelToolScopes } from './account-intel-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
   description: string;
@@ -93,6 +94,7 @@ export const tools = {
   kam_get_kpis: kamGetKpis,
   kam_read_prospections: kamReadProspections,
   kam_log_prospection: kamLogProspection,
+  ...accountIntelTools,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -137,6 +139,7 @@ export const toolScopes = {
   kam_get_kpis: 'read',
   kam_read_prospections: 'read',
   kam_log_prospection: 'kam',
+  ...accountIntelToolScopes,
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {
