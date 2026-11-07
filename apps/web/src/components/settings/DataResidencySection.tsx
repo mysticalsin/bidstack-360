@@ -30,7 +30,9 @@ export function DataResidencySection() {
     return (
       <ErrorState
         title={t('dataResidency.loadErrorTitle', 'Could not load the data region')}
-        message={residency.error?.message ?? t('dataResidency.loadErrorMessage', 'Try again shortly.')}
+        message={
+          residency.error?.message ?? t('dataResidency.loadErrorMessage', 'Try again shortly.')
+        }
       />
     );
   }
@@ -95,7 +97,10 @@ function DataResidencyForm({ initial }: { initial: OrgDataResidencyView }) {
                 'No regional bucket is configured for this region; exports use the default bucket.',
               )}{' '}
           {initial.enforced
-            ? t('dataResidency.enforcedOn', 'Strict mode is on: exports fail rather than leave the region.')
+            ? t(
+                'dataResidency.enforcedOn',
+                'Strict mode is on: exports fail rather than leave the region.',
+              )
             : t('dataResidency.enforcedOff', 'Strict mode is off.')}
         </p>
         <p className="mt-3 text-xs text-[var(--fg-tertiary)]">
@@ -109,7 +114,10 @@ function DataResidencyForm({ initial }: { initial: OrgDataResidencyView }) {
         <p className="text-xs text-[var(--fg-tertiary)]">
           {isAdmin
             ? t('dataResidency.persistedHint', 'Applies to the whole workspace.')
-            : t('dataResidency.readOnlyHint', 'The data region is read-only unless you are an admin.')}
+            : t(
+                'dataResidency.readOnlyHint',
+                'The data region is read-only unless you are an admin.',
+              )}
         </p>
         <Button
           variant="primary"
