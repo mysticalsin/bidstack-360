@@ -80,7 +80,9 @@ describe('OCDS API adapter: contract and paging', () => {
 });
 
 describe('OCDS API adapter: normalize (real recorded records)', () => {
-  it('maps a published tender to an active opportunity with traceability', async () => {
+  it('keeps a revoked tender cancelled even when the revocation carries an older timestamp', async () => {
+    // Real package: three "5-Publicada" releases, the newest stamped 11:30:06,
+    // then a "15-Revocada" tenderUpdate stamped 11:30:00. Cancelled is final.
     const unit = recordUnit('tender', '3951-19-LE25');
     const n = ocdsAdapter.normalize(await rawFrom(fixtureText('ocds-tender-3951-19-LE25.json'), unit), NORM);
     expect(n.opportunities).toHaveLength(1);
@@ -88,7 +90,8 @@ describe('OCDS API adapter: normalize (real recorded records)', () => {
     expect(opp).toMatchObject({
       externalId: '3951-19-LE25',
       ocid: 'ocds-70d2nz-3951-19-LE25',
-      stage: 'active',
+      stage: 'cancelled',
+      statusCode: 15,
       buyerExternalId: '4871',
       currencyCode: 'CLP',
       unspscCodes: ['80111701'],
