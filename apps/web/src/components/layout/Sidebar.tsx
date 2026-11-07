@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useTaskSummary } from '@/hooks/useTasks';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -47,6 +48,8 @@ export function Sidebar() {
   const taskSummary = useTaskSummary();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
+  const reduced = useReducedMotion();
+  const [instant, setInstant] = useState(false);
   const isAdmin = useIsAdmin();
   const { t } = useTranslation('common');
   const { data: appModules } = useAppModules();
@@ -103,10 +106,16 @@ export function Sidebar() {
         className={cn('sidebar', collapsed && 'is-collapsed')}
         aria-label="Primary navigation"
         data-tour="nav-sidebar"
+        // Read by `.app-shell:has(> .sidebar[data-motion='instant'])` to skip the width ease.
+        data-motion={reduced || instant ? 'instant' : 'animate'}
       >
         <button
           type="button"
-          onClick={toggle}
+          onClick={(event) => {
+            // detail 0 = Enter/Space (no pointer): resize at once, like the console pattern.
+            setInstant(event.detail === 0);
+            toggle();
+          }}
           className="sb-toggle"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
@@ -414,6 +423,7 @@ function AccountShortcut({
     <NavLink
       to={`/accounts/${acc.slug}`}
       className="sb-item"
+      aria-label={acc.name}
       title={collapsed ? undefined : acc.name}
       onMouseEnter={prefetch}
       onFocus={prefetch}
