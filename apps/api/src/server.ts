@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -35,7 +35,13 @@ import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
 
-export async function buildServer(): Promise<FastifyInstance> {
+/** Options for {@link buildServer}. */
+export interface BuildServerOptions {
+  /** Observes every route as it registers (route inventory tooling). */
+  onRoute?: onRouteHookHandler;
+}
+
+export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const server = Fastify({
     bodyLimit: 10485760, // 10 MiB to allow large Dust AI webhooks
     // Bound per-request and idle-socket lifetimes so a slow query or hung
@@ -83,6 +89,8 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
+
+  if (options.onRoute) server.addHook('onRoute', options.onRoute);
 
   // First hook: drop traffic that bypassed Front Door before any other work.
   registerFrontDoorGuard(server, config.AZURE_FRONT_DOOR_ID);
