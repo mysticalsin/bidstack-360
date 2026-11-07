@@ -70,6 +70,9 @@ function Decide({ flag, owners }: { flag: WhitespaceFlag; owners: Array<{ id: st
   const { accept, dismiss } = useWhitespaceDecision();
   const [line, setLine] = useState(flag.lines[0] ?? '');
   const [ownerId, setOwnerId] = useState(flag.owner?.id ?? owners[0]?.id ?? '');
+  const flagOwner = flag.owner;
+  const ownerOptions = flagOwner && !owners.some((o) => o.id === flagOwner.id) ? [flagOwner, ...owners] : owners;
+  const owner = ownerId || ownerOptions[0]?.id || '';
   const [due, setDue] = useState(() => inDays(14));
   const [opp, setOpp] = useState(false);
   const [reason, setReason] = useState('');
@@ -99,7 +102,7 @@ function Decide({ flag, owners }: { flag: WhitespaceFlag; owners: Array<{ id: st
         onSubmit={(e) => {
           e.preventDefault();
           accept.mutate(
-            { msaId: flag.msaId, line, ownerId, dueDate: due, createOpportunity: opp },
+            { msaId: flag.msaId, line, ownerId: owner, dueDate: due, createOpportunity: opp },
             { onSuccess: () => { toast.success(`Accepted: ${labelBusinessLine(line)} for ${flag.companyName}`); setMode(null); }, onError: err },
           );
         }}
@@ -108,8 +111,8 @@ function Decide({ flag, owners }: { flag: WhitespaceFlag; owners: Array<{ id: st
           {lineSelect}
           <label>
             Owner
-            <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} required data-testid="whitespace-owner">
-              {owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            <select value={owner} onChange={(e) => setOwnerId(e.target.value)} required data-testid="whitespace-owner">
+              {ownerOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
           </label>
         </div>
@@ -124,7 +127,7 @@ function Decide({ flag, owners }: { flag: WhitespaceFlag; owners: Array<{ id: st
           </label>
         </div>
         <div className="agr-actions" style={{ justifyContent: 'flex-start' }}>
-          <Button type="submit" variant="primary" size="sm" disabled={busy || !line || !ownerId} data-testid="whitespace-accept">Accept</Button>
+          <Button type="submit" variant="primary" size="sm" disabled={busy || !line || !owner} data-testid="whitespace-accept">Accept</Button>
           <Button type="button" variant="ghost" size="sm" onClick={() => setMode(null)}>Cancel</Button>
         </div>
       </form>
@@ -201,7 +204,7 @@ function Row({ flag, rank, open, onToggle, canWrite, owners }: {
                   ))}
                 </ul>
               ) : null}
-              {canWrite && flag.state === 'new' ? <Decide flag={flag} owners={owners} /> : null}
+              {canWrite && flag.state === 'new' ? <Decide key={`${flag.lines.join(',')}:${flag.evidenceHash}`} flag={flag} owners={owners} /> : null}
             </div>
           </div>
         </div>
@@ -306,7 +309,7 @@ export default function WhitespacePage() {
                 <Row key={f.id} flag={f} rank={i + 1} open={openId === f.id} onToggle={() => setOpenId(openId === f.id ? null : f.id)} canWrite={canWrite} owners={pickers} />
               ))}
             </ol>
-            {total > items.length ? (
+            {total > items.length && !params.get('all') ? (
               <button type="button" className="drill-more" onClick={() => set('all', '1')} data-testid="whitespace-more">Show {Math.min(total, 50) - items.length} more</button>
             ) : null}
           </>
