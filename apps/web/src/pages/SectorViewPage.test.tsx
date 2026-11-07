@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -15,6 +15,16 @@ vi.mock('@/hooks/useSectorView', () => ({ useSectorView: vi.fn() }));
 vi.mock('@/hooks/useTerritories', () => ({
   useTerritoryAnalytics: vi.fn(),
   useTerritorySegments: vi.fn(),
+}));
+
+const oppRows = vi.hoisted(() => ({
+  items: [
+    { id: 'o1', stage: 's2_sent', value: 1000, dueDate: '2026-01-15', customer: 'A', industry: 'technology' },
+    { id: 'o2', stage: 's1_lead', value: 400, dueDate: '2099-01-15', customer: 'B', industry: 'healthcare' },
+  ] as unknown[],
+}));
+vi.mock('@/hooks/useOpportunityRows', () => ({
+  useOpportunityRows: () => ({ data: { items: oppRows.items }, isLoading: false, isError: false }),
 }));
 
 vi.mock('@/components/territories/WorldMap', () => ({
@@ -154,5 +164,25 @@ describe('SectorViewPage selection state', () => {
 
     const sectors = screen.getByRole('group', { name: 'Sectors' });
     expect(sectors.querySelector('[aria-pressed="true"]')).toBeTruthy();
+  });
+});
+
+describe('SectorViewPage pipeline by sector', () => {
+  it('draws open pipeline per sector with overdue in front, below the metric tiles', () => {
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    const { container } = renderPage();
+    const chart = screen.getByTestId('sector-pipeline-iso');
+    expect(within(chart).getByRole('group', { name: /pipeline by sector/i })).toBeTruthy();
+    expect(container.querySelector('[aria-label="Technology, front row: Overdue 1k"]')).toBeTruthy();
+    const strip = container.querySelector('.sector-command-strip')!;
+    expect(strip.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('world-map')).toBeTruthy();
+  });
+
+  it('shows one empty sentence without open pipeline', () => {
+    oppRows.items = [];
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+    expect(within(screen.getByTestId('sector-pipeline-iso')).getByText('No open pipeline yet.')).toBeTruthy();
   });
 });

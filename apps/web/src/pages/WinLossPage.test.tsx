@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -75,6 +75,7 @@ function analysis(overrides: Partial<WinLossAnalysis> = {}): WinLossAnalysis {
       { reason: 'timing', won: 3, lost: 1 },
     ],
     competitors: [{ competitor: 'Acme Rival', won: 0, lost: 2 }],
+    cycleDays: [21, 34, 48, 60, 75, 96, 130, 160],
     recent: [
       {
         opportunityId: 'opp-1',
@@ -140,8 +141,11 @@ describe('WinLossPage', () => {
     expect(screen.getByText('Win rate')).toBeTruthy();
     expect(screen.getByText('Bids won')).toBeTruthy();
     expect(screen.getByText('Bids lost')).toBeTruthy();
-    // Two quarter buckets flow into the trend chart untouched.
-    expect(screen.getByTestId('win-loss-quarter-chart').textContent).toBe('2');
+    // Two quarter buckets flow into the diverging bars: won above, lost below.
+    const quarters = screen.getByTestId('win-loss-quarter-chart');
+    expect(within(quarters).getByRole('group', { name: /won vs lost by quarter/i })).toBeTruthy();
+    expect(within(quarters).getByRole('rowheader', { name: 'Q1 2026' })).toBeTruthy();
+    expect(within(quarters).getByRole('rowheader', { name: 'Q2 2026' })).toBeTruthy();
     // Reason Pareto shows only reasons with losses, labeled for humans.
     expect(screen.getByTestId('win-loss-reason-chart').textContent).toBe('Price,Timing');
     expect(screen.getByTestId('win-loss-competitor-chart').textContent).toBe('Acme Rival');
@@ -154,6 +158,20 @@ describe('WinLossPage', () => {
     const rows = screen.getAllByTestId(/^win-loss-row-/);
     expect(rows[0]!.getAttribute('data-testid')).toBe('win-loss-row-opp-1');
     expect(rows[1]!.getAttribute('data-testid')).toBe('win-loss-row-opp-2');
+  });
+
+  it('draws sales-cycle days as a dot histogram with the overdue threshold', () => {
+    renderPage();
+    const cycle = screen.getByTestId('win-loss-cycle-chart');
+    expect(
+      within(cycle).getByRole('img', { name: /8 bids, median 67\.5 days, p95 \d+(\.\d+)? days, 3 over 90 days/i }),
+    ).toBeTruthy();
+  });
+
+  it('shows the cycle empty state when no closed bid carries a cycle', () => {
+    setResult({ data: analysis({ cycleDays: [] }) });
+    renderPage();
+    expect(within(screen.getByTestId('win-loss-cycle-chart')).getByText('No sales cycles recorded yet.')).toBeTruthy();
   });
 
   it('re-sorts the closed table when a column header is cycled', () => {
