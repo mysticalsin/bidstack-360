@@ -38,6 +38,7 @@ import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startMsaReminders } from './queues/msa-reminders.js';
 import { startAccountEnrichment } from './queues/account-enrichment.js';
 import { startAccountIntel } from './queues/account-intel.js';
+import { startCompanyTechDetect } from './queues/company-tech-detect.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
@@ -176,6 +177,8 @@ await Promise.all([
   startAccountEnrichment(connection, log, workers, queues),
   // Account intelligence: job boards, company posts, registries, scheduled filings scan
   startAccountIntel(connection, log, workers, queues),
+  // Open data technology stack: on create and import, plus a weekly batched sweep
+  startCompanyTechDetect(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),
