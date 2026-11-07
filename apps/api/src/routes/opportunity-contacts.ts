@@ -60,16 +60,18 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     if (req.method !== 'GET') await server.requirePermission('opportunities:write')(req);
   });
   // Every route here is keyed by the deal: a deal outside the caller's access
-  // scope (or org) is 404 for reads and writes alike.
-  server.addHook('preHandler', async (req) => {
-    const id = (req.params as { id?: string } | undefined)?.id;
-    if (!id) return;
+  // scope (or org) is 404 for reads and writes alike. Checked in the handler,
+  // after schema validation, so a hook never queries with an unvalidated id.
+  const assertVisibleOpportunity = async (
+    auth: Parameters<typeof visibleOpportunityWhere>[0],
+    id: string,
+  ) => {
     const visible = await prisma.opportunity.findFirst({
-      where: await visibleOpportunityWhere(req.auth, id),
+      where: await visibleOpportunityWhere(auth, id),
       select: { id: true },
     });
     if (!visible) throw server.httpErrors.notFound('Opportunity not found');
-  });
+  };
 
   server.get(
     '/opportunities/:id/contacts',
@@ -90,6 +92,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req) => {
+      await assertVisibleOpportunity(req.auth, req.params.id);
       // One row past the contacts the deal list draws. The extra row is the
       // probe. It is not a shown contact, and it is not a total.
       const loaded = await prisma.opportunityContact.findMany({
@@ -165,6 +168,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req) => {
+      await assertVisibleOpportunity(req.auth, req.params.id);
       if (req.body.isPrimary) {
         await prisma.opportunityContact.updateMany({
           where: { opportunityId: req.params.id, orgId: req.auth.orgId, isPrimary: true },
@@ -206,6 +210,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req, reply) => {
+      await assertVisibleOpportunity(req.auth, req.params.id);
       const existing = await prisma.opportunityContact.findFirst({
         where: {
           opportunityId: req.params.id,
