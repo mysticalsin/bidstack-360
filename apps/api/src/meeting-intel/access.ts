@@ -12,7 +12,7 @@
 import { Prisma, prisma } from '@bidstack/db';
 import { ACCOUNT_TEAM_OPEN_STAGES } from '@bidstack/shared';
 
-import { applyCompanyScope, type AccessScope } from '../lib/access-scope.js';
+import { applyCompanyScope, isApiKeyActor, type AccessScope } from '../lib/access-scope.js';
 
 export const OPEN_STAGES = ACCOUNT_TEAM_OPEN_STAGES;
 export const RESTRICTED_COMPANY = 'Restricted company';
@@ -30,10 +30,13 @@ export function accountTeamPredicate(userId: string): Prisma.CompanyWhereInput {
 
 export function visibleMeetingWhere(orgId: string, scope: AccessScope): Prisma.MeetingIntelWhereInput {
   const me = scope.userId;
+  const company = applyCompanyScope({ orgId, deletedAt: null }, scope);
+  // An API key attends nothing and its userId is not a uuid: org-visible meetings only.
+  if (isApiKeyActor(me)) return { orgId, deletedAt: null, company, visibility: 'org' };
   return {
     orgId,
     deletedAt: null,
-    company: applyCompanyScope({ orgId, deletedAt: null }, scope),
+    company,
     OR: [
       { visibility: 'org' },
       { createdById: me },
