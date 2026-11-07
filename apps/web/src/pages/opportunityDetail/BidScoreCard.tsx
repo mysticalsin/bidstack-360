@@ -58,7 +58,7 @@ function CategoryScores({ categoryScores }: { categoryScores: Record<string, num
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-1" aria-label={t('bidScore.categoryScoresLabel', 'Category scores')}>
       {entries.map(([cat, value]) => (
-        <div key={cat} className="flex items-center justify-between gap-2 text-[11px]">
+        <div key={cat} className="flex items-center justify-between gap-2 text-xs">
           <span className="truncate text-[var(--fg-tertiary)]">
             {CATEGORY_INFO[cat]?.label ?? cat}
           </span>

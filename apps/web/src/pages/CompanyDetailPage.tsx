@@ -17,13 +17,8 @@ import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSe
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
-import {
-  ContactTab,
-  OpportunityTab,
-  CasesTab,
-  NotesTab,
-  HierarchyTab,
-} from './companyDetail/CompanyTabs';
+import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
+import { relatedCount } from './companyDetail/relatedCount';
 
 type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 type View = 'overview' | 'details';
@@ -150,15 +145,9 @@ export function CompanyDetailPage() {
             )}
             {c.countryCode && <span>{c.countryCode}</span>}
             {c.employeeCount && (
-              <span>
-                {t('companyDetail.meta.employees', '{{count}} employees', {
-                  count: c.employeeCount,
-                })}
-              </span>
+              <span>{t('companyDetail.meta.employees', '{{count}} employees', { count: c.employeeCount })}</span>
             )}
-            {c.taxId && (
-              <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>
-            )}
+            {c.taxId && <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>}
             {c.parent && (
               <span className="flex items-center gap-1">
                 <Icon name="git-branch" size={12} />
@@ -168,7 +157,7 @@ export function CompanyDetailPage() {
                 ) : (
                   <Link
                     to={`/companies/${c.parent.id}`}
-                    className="font-medium text-[var(--brand-primary)] hover:underline"
+                    className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                   >
                     {c.parent.name}
                   </Link>
@@ -179,7 +168,7 @@ export function CompanyDetailPage() {
 
           <AccountActivityCharts companyId={c.id} />
 
-          <CompanyTechStackSection companyName={c.name} />
+          <CompanyTechStackSection companyId={c.id} />
 
           <div
             className="flex gap-2 border-b border-[var(--border-subtle)]"
@@ -190,9 +179,7 @@ export function CompanyDetailPage() {
               [
                 {
                   key: 'contacts',
-                  label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', {
-                    count: c.contacts.length,
-                  }),
+                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', { shown: relatedCount(c.contacts.length) }),
                 },
                 {
                   key: 'people',
@@ -200,21 +187,17 @@ export function CompanyDetailPage() {
                 },
                 {
                   key: 'opportunities',
-                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
-                    count: c.opportunities.length,
+                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{shown}})', {
+                    shown: relatedCount(c.opportunities.length),
                   }),
                 },
                 {
                   key: 'cases',
-                  label: t('companyDetail.tab.cases', 'Cases ({{count}})', {
-                    count: c.openCases.length,
-                  }),
+                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', { shown: relatedCount(c.openCases.length) }),
                 },
                 {
                   key: 'notes',
-                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', {
-                    count: c.notes.length,
-                  }),
+                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
                 },
                 { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
               ] as { key: TabKey; label: string }[]
@@ -228,14 +211,7 @@ export function CompanyDetailPage() {
                 tabIndex={tab === tabItem.key ? 0 : -1}
                 onClick={() => setTab(tabItem.key)}
                 onKeyDown={(e) => {
-                  const keys = [
-                    'contacts',
-                    'people',
-                    'opportunities',
-                    'cases',
-                    'notes',
-                    'hierarchy',
-                  ] as const;
+                  const keys = ['contacts', 'people', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
                   const idx = keys.indexOf(tabItem.key);
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
@@ -251,7 +227,7 @@ export function CompanyDetailPage() {
                 }}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
                   tab === tabItem.key
-                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                     : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
                 }`}
               >
@@ -277,11 +253,7 @@ export function CompanyDetailPage() {
             </div>
           )}
           {tab === 'opportunities' && (
-            <div
-              role="tabpanel"
-              id={panelId('opportunities')}
-              aria-labelledby={tabId('opportunities')}
-            >
+            <div role="tabpanel" id={panelId('opportunities')} aria-labelledby={tabId('opportunities')}>
               <OpportunityTab opportunities={c.opportunities} />
             </div>
           )}

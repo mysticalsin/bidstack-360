@@ -107,30 +107,38 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           );
         }
       }
-      const created = await prisma.forecast.upsert({
-        where: {
-          orgId_ownerId_period_category: {
+      const upsert = () =>
+        prisma.forecast.upsert({
+          where: {
+            orgId_ownerId_period_category: {
+              orgId: req.auth.orgId,
+              ownerId: targetOwnerId,
+              period: req.body.period,
+              category: req.body.category,
+            },
+          },
+          create: {
             orgId: req.auth.orgId,
             ownerId: targetOwnerId,
             period: req.body.period,
             category: req.body.category,
+            amountMicros: BigInt(req.body.amountMicros),
+            currency: req.body.currency,
+            note: req.body.note ?? null,
           },
-        },
-        create: {
-          orgId: req.auth.orgId,
-          ownerId: targetOwnerId,
-          period: req.body.period,
-          category: req.body.category,
-          amountMicros: BigInt(req.body.amountMicros),
-          currency: req.body.currency,
-          note: req.body.note ?? null,
-        },
-        update: {
-          amountMicros: BigInt(req.body.amountMicros),
-          currency: req.body.currency,
-          note: req.body.note ?? null,
-        },
-        include: { owner: { select: { name: true } } },
+          update: {
+            amountMicros: BigInt(req.body.amountMicros),
+            currency: req.body.currency,
+            note: req.body.note ?? null,
+          },
+          include: { owner: { select: { name: true } } },
+        });
+      // Concurrent saves of one cell race between the upsert's read and its
+      // insert; the loser's retry finds the winner's row and updates it.
+      const created = await upsert().catch((err: unknown) => {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')
+          return upsert();
+        throw err;
       });
       return reply.code(201).send({
         id: created.id,
@@ -286,9 +294,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       const totalValueMicros = sumMicros(rows.map((r) => BigInt(r.totalValueMicros))).toString();
       const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       const avgProbability =
-        totalOpportunities > 0
-          ? Math.round((totalProbability / totalOpportunities) * 10) / 10
-          : 0;
+        totalOpportunities > 0 ? Math.round((totalProbability / totalOpportunities) * 10) / 10 : 0;
 
       return {
         items,

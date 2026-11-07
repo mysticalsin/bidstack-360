@@ -119,3 +119,28 @@ export async function resolveCompanyIdByName(
   const index = await loadCompanyNameIndex(db, orgId);
   return index.get(key) ?? null;
 }
+
+/**
+ * A1 (bid clock) due-date window. dueDate is a Postgres `date` (midnight UTC),
+ * so the window starts on the UTC day boundary; that keeps "due within 7 days"
+ * in step with the DueDateChip and the bid-deadline-alerts worker
+ * (apps/worker/src/queues/bid-deadline-alerts.helpers.ts daysUntilDue).
+ */
+export function opportunityDueDateWhere(
+  filter: { dueWithinDays?: number; overdue?: boolean },
+  now: Date = new Date(),
+): Pick<Prisma.OpportunityWhereInput, 'dueDate'> {
+  const startOfTodayUTC = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  if (filter.dueWithinDays !== undefined) {
+    return {
+      dueDate: {
+        gte: startOfTodayUTC,
+        lte: new Date(startOfTodayUTC.getTime() + filter.dueWithinDays * 86_400_000),
+      },
+    };
+  }
+  if (filter.overdue) return { dueDate: { lt: startOfTodayUTC } };
+  return {};
+}

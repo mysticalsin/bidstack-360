@@ -292,7 +292,7 @@ function Field({
 }) {
   return (
     <label htmlFor={htmlFor} className="block">
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
         {label}
         {required ? <span className="ml-0.5 text-[var(--danger)]">*</span> : null}
       </span>

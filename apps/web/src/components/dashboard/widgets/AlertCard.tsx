@@ -50,7 +50,7 @@ export function AlertCard({
           <Icon name={icon} size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {label}
           </div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
