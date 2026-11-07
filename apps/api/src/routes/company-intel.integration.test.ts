@@ -53,7 +53,7 @@ const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
 async function seededCompany() {
   const now = Date.now();
-  const c = await prisma.company.create({ data: { orgId: orgId!, name: `Intel Co ${now}`, tier: 'key', domain: 'intel-co.example' } });
+  const c = await prisma.company.create({ data: { orgId: orgId!, name: `Intel Co ${now}`, tier: 'key', domain: `intel-co-${now}.example` } });
   for (const [fy, revenue, capex] of [[2024, 1000e6, 80e6], [2025, 1100e6, 120e6]] as const) {
     await prisma.accountFinancialPeriod.create({
       data: {
