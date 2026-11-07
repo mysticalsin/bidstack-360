@@ -396,10 +396,6 @@ function CrewsSection({
         <div className="p-6">
           <EmptyState
             title={t('agentStudio.crewsEmptyTitle', 'No crews yet')}
-            message={t(
-              'agentStudio.crewsEmptyMessage',
-              'Once agents exist, an admin can assemble them into a crew. The standard set ships with a ready-to-run RFP Response Crew.',
-            )}
           />
         </div>
       ) : (

@@ -141,10 +141,6 @@ export function DashboardsListPage() {
       {dashboards.length === 0 ? (
         <EmptyState
           title={t('dashboardsList.emptyTitle', 'No dashboards yet')}
-          message={t(
-            'dashboardsList.emptyMessage',
-            'Create your first dashboard to start tracking what matters.',
-          )}
           action={
             canWrite ? (
               <button
