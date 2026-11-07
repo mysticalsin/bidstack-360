@@ -173,7 +173,7 @@ export interface PsSourceRef {
   retrievedAt: Date;
   licence: string;            // 'CC0-1.0', 'CC-BY-SA-4.0', 'ChileCompra-API-terms'
   attribution: string;        // text shown in the UI and exports
-  contentHash: string;        // sha256 of the raw payload
+  rawPayloadHash: string;     // SHA-256 of the exact bytes indexed by PsRawFetch
 }
 
 export interface PsAdapter {
@@ -202,7 +202,7 @@ Queues (constants in a new `queue-config.public-sector.ts`):
 | `ps-fetch` | one HTTP unit to raw store | from plan | CL API: global limiter sized to 80% of 10,000/day; BR: 60/min; CO: 5 concurrent |
 | `ps-normalize` | raw page to normalized upserts | after fetch | 4 |
 | `ps-bulk-import` | stream a monthly zip (CL lic-da/oc-da) | monthly plus backfill | 1, Chile quiet hours |
-| `ps-derive` | aggregates, benchmarks, flags, embeddings | after normalize batch | 2 |
+| `ps-derive` | aggregates, benchmarks, flags, embeddings | new or materially changed record IDs from normalize | 2 |
 | `ps-radar-match` | evaluate saved radars, write internal notifications | after derive | 2 |
 | `ps-source-health` | schema drift and freshness checks | daily | 1 |
 
@@ -222,24 +222,65 @@ the same ticket, so staging must use a different ticket or fixtures only.
 
 ### 3.4 Raw and normalized stores
 
-- **Raw**: every fetched payload is stored byte-for-byte in object storage
-  (same storage layer as `apps/worker/src/lib/storage-read.ts`), keyed
-  `ps-raw/{country}/{sourceKey}/{yyyy}/{mm}/{dd}/{contentHash}.{json|xml|csv.zip}`,
-  with a `PsRawFetch` row as the index. Raw is never mutated. Credentials are
-  stripped from the stored request URL.
-- **Normalized**: Postgres tables in section 4. Each normalized row points to the
-  raw rows that produced it.
-- Idempotency: natural keys per source (`orgId, sourceKey, externalId`); upserts
-  compare `contentHash` and skip unchanged rows; a changed hash writes a
-  `PsRecordVersion` diff so "last update" and change history are real.
+**Raw evidence.** Store the exact fetched body bytes, including the original ZIP
+bytes for bulk downloads. Compute `rawPayloadHash` as lowercase hex SHA-256 of
+those bytes before decoding, parsing or decompression. Index each fetch in
+`PsRawFetch` with its redacted request URL, retrieval time and immutable key:
 
-### 3.5 Traceability fields (on every normalized row)
+```text
+orgs/{orgId}/ps-raw/{country}/{sourceKey}/{yyyy}/{mm}/{dd}/{rawPayloadHash}.{ext}
+```
+
+Use the trusted job tenant's database UUID, the adapter's registered country,
+source key and extension (e.g. `json`, `xml`, `csv`, `csv.zip`), and the UTC
+retrieval date. Never interpolate a supplied path, URL, query or filename.
+This matches `keyBelongsToOrg` in `apps/worker/src/lib/storage-read.ts`.
+Resolve the index row by `orgId` and ID and verify ownership of its key before
+any read, replay or delete. Only identical keys within one org may reuse bytes.
+The existing `readStoredDocument({ orgId, storageKey })` buffers up to 50 MiB.
+The bulk importer must stream larger archives with the same ownership check.
+
+**Normalized records.** Each adapter defines a stable source identity and a
+typed projection of material business fields per record type. For
+`BidOpportunity`, put the adapter source key in the existing `source` column
+and upsert on `(orgId, source, externalId)`. For child records use a stable
+source item ID or documented composite (e.g. tender ID and source line ID for
+a lot). Never use page, row or array position as identity.
+
+Compute `recordHash` as lowercase hex SHA-256 of the UTF-8 canonical JSON for
+**one** projected record. Project after PII filtering and normalization. Use
+fixed field names, recursively sorted keys, explicit nulls for optional fields,
+UTC instants, source date-only values as dates, and integer micros as decimal
+strings. Sort set-valued fields such as UNSPSC codes and deduplicate them.
+Preserve order where it carries meaning. Include source business facts such
+as stage, published dates, quantities, amounts and currency. Treat a source
+refresh timestamp alone as provenance. Exclude sibling
+records, page metadata, retrieval times, raw IDs/keys/digests, generated IDs,
+computed confidence and tenant edits (e.g. a linked CRM opportunity).
+
+| Compared to the current record for this tenant and identity | Normalizer action |
+|---|---|
+| First observation | Insert the row and its raw references as a baseline. Schedule derivation once. |
+| Same `recordHash` | Keep the normalized row, its material-change time and version history intact. The fetch remains in `PsRawFetch`. Emit no change-driven work. |
+| Different `recordHash` | Atomically update the source-owned fields and raw references and append one `PsRecordVersion` with before/after record hashes and a material-field diff. Schedule derivation once for this change. |
+
+Serialize the comparison and write per natural key (or use a conditional write
+with retry) so competing workers cannot both version the same transition.
+Existing opportunities without a hash get a baseline from their stored facts
+where comparable. If no comparable baseline exists, initialize on first
+observation without inventing a historical diff. Preserve tenant-owned links.
+
+### 3.5 Traceability fields (on source-normalized records)
 
 `sourceKey, externalId, sourceUrl, apiUrl, publishedAt, sourceUpdatedAt,
-retrievedAt, licence, attribution, rawFetchIds[], contentHash, confidenceBps,
-stage`. The UI and every agent answer must render source link, publication date,
-last update and confidence, and label the stage (planned, active, awarded,
-ordered or paid).
+retrievedAt, licence, attribution, rawFetchIds[], recordHash, confidenceBps,
+stage`. URLs are credential-stripped. The raw references identify the evidence
+for the accepted version and resolve to same-org `PsRawFetch.rawPayloadHash`.
+On `BidOpportunity`, `sourceKey` in this contract maps to the existing `source`.
+Show the accepted record's source update date when available, otherwise its
+last material change. Display retrieval time separately. Every UI result and
+agent answer carries source link, publication date, last update, confidence
+and stage.
 
 ### 3.6 Confidence model
 
@@ -259,11 +300,38 @@ data", not a number.
 
 ### 3.7 Tenancy
 
-All tables are org-scoped (`orgId` + `@@index([orgId, ...])`), matching
-`schema.prisma`'s header rule and `packages/db/src/middleware/tenant-scope-guard.ts`.
-Public data is duplicated per enabled org. This costs storage but keeps tenant
-export (`tenant-export` queue), erasure (`apps/api/src/routes/erasure.ts`) and the
-guard working unchanged. A shared catalog is a later optimisation (open question 3).
+All module tables carry `orgId` and tenant indexes as required by
+`packages/db/src/middleware/tenant-scope-guard.ts`. Store a separate public
+data copy for each enabled org. A shared catalog remains open question 3.
+
+**Tenant portability.** The worker in `apps/worker/src/queues/tenant-export.ts`
+streams only the models in `TENANT_EXPORT_ENTITIES` in
+`apps/worker/src/lib/tenant-export-registry.ts`. In the phase that introduces
+each entity, add its stable NDJSON name, Prisma model and delegate accessor.
+For example, use `{ name: 'bidOpportunities', model: 'BidOpportunity', accessor: 'bidOpportunity' }`.
+Keep the worker's tenant predicate, UUID `id` cursor and existing export access
+checks. Use the following coverage when reviewing each schema change.
+
+| Coverage | Models and data |
+|---|---|
+| Source setup | Register `PsSource` for safe settings such as country, source key and enabled status. Omit cursor, credential/config references and internal diagnostics. |
+| Procurement | Register `BidOpportunity` (including existing rows), `PsPublicEntity`, `PsLot`, `PsSupplier`, `PsBid`, `PsAward`, `PsPurchaseOrder`, `PsProcurementPlanItem` and `PsDocument` (public annex metadata). Include clean public source links, licence and attribution where applicable. |
+| Tenant work and history | Register `PsRadar` (validated filters and notification choice), `PsReviewFlag` (reviewer, status and note), `PsRecordVersion` (sanitized material-field changes), and `PsCommercialBenchmark` (permitted summaries). Include same-org CRM link IDs. Apply the existing pricing and brief-review restrictions to protected content. |
+| CRM outputs | `Task`, `Activity`, `Note`, `Opportunity` and `BidScore` already have entries. Add a safe export projection for the module's `CompetitorInsight` rows and brief `Document` metadata when introduced. Exclude raw snippets, document storage URLs and unreviewed brief content. |
+| Internal only | Exclude `PsRawFetch`, raw response/annex bytes, `PsOpportunityEmbedding` and credential-bearing integration models. The normalized records carry the portable source facts. |
+
+Keep `safeSelectForModel`'s secret-field exclusions and `id` cursor. It skips
+relations and lists, and field-name checks cannot inspect scalar JSON. For
+newly registered models, define positive field projections. Omit hashes
+(including `sha256`), storage pointers, signed URLs, provider metadata,
+encrypted fields and section 6.3 identifiers. Allow only named safe scalar
+lists such as `unspscCodes`. Rebuild approved JSON (filters, attribution and
+version diffs) from typed fields, dropping unknown or restricted nested keys.
+Keep licence and attribution even when old rows use `sourceAttribution` JSON.
+For restricted pricing records, evaluate the export requester's
+`public-sector:pricing` permission before serialization. Omit protected pricing
+when access cannot be established, including pricing insights or version diffs
+that would disclose it. Keep the default selector for unrelated entities.
 
 ### 3.8 Credentials
 
@@ -325,9 +393,9 @@ HNSW index, as `ReferenceEmbedding` does. One migration per phase.
 | Model | Purpose | Key fields |
 |---|---|---|
 | `PsSource` | per-org source config and cursor | `country, sourceKey, enabled, cursor Json, lastSuccessAt, pausedReason, credentialConfigId` |
-| `PsRawFetch` | raw index | `sourceKey, requestUrlRedacted, httpStatus, storageKey, contentHash, bytes, retrievedAt` |
+| `PsRawFetch` | raw index | `sourceKey, requestUrlRedacted, httpStatus, storageKey, rawPayloadHash, bytes, retrievedAt` |
 | `PsPublicEntity` | buyer (organismo, entidad, órgão) | `country, externalId, taxId (RUT/NIT/CNPJ of the institution), name, normalizedName, sector, region, comuna, parentExternalId, companyId? -> Company` |
-| `BidOpportunity` (extend) | procurement opportunity | add `stage, procurementMethod, isDirectAward, closesAt, publishedAt, sourceUpdatedAt, unspscCodes String[], publicEntityId?, ocid?, confidenceBps, sourceKey, rawFetchIds String[], contentHash, opportunityId? -> Opportunity` |
+| `BidOpportunity` (extend) | procurement opportunity | add `stage, procurementMethod, isDirectAward, closesAt, publishedAt, sourceUpdatedAt, unspscCodes String[], publicEntityId?, ocid?, confidenceBps, rawFetchIds String[], recordHash, opportunityId? -> Opportunity` |
 | `PsLot` | line items / lots | `bidOpportunityId, lineNo, unspsc, description, quantity, unit, estimatedValueMicros` |
 | `PsSupplier` | supplier or competitor | `country, taxId, name, normalizedName, isNaturalPerson, competitorProfileId? -> CompetitorProfile, companyId?` |
 | `PsBid` | offer received | `bidOpportunityId, lotId?, supplierId, offeredAmountMicros, currencyCode, selected Boolean, submittedAt` |
@@ -338,12 +406,12 @@ HNSW index, as `ReferenceEmbedding` does. One migration per phase.
 | `PsCommercialBenchmark` | pricing intelligence | `role, seniority, country, region, currencyCode, periodStart, periodEnd, p25/p50/p75 Micros, comparableCount, inflationIndex, inflationBaseDate, method, confidenceBps, evidenceIds String[]` |
 | `PsReviewFlag` | neutral review flags | `targetType, targetId, kind ('direct_award', 'single_bidder', 'amount_outlier', 'currency_mismatch'), status ('open','reviewed','dismissed'), reviewedByUserId?, note` |
 | `PsRadar` | saved radar | `name, ownerUserId, filters Json (keywords, entities, regions, unspsc, stage, closesWithinDays, minValue, maxValue, competitors), notify ('none','in_app','digest_draft')` |
-| `PsRecordVersion` | change history | `targetType, targetId, contentHashBefore, contentHashAfter, diff Json, observedAt` |
-| `PsOpportunityEmbedding` | semantic search | `bidOpportunityId @unique, model, dim, vector Unsupported("vector(1024)"), contentHash` |
+| `PsRecordVersion` | change history | `targetType, targetId, recordHashBefore, recordHashAfter, diff Json, observedAt` |
+| `PsOpportunityEmbedding` | semantic search | `bidOpportunityId @unique, model, dim, vector Unsupported("vector(1024)"), embeddingInputHash (derived input cache key)` |
 
 CRM actions are not a new model: they are `Task`, `Activity`, `Opportunity` and
 `CompetitorInsight` rows linked from `BidOpportunity.opportunityId` or the
-`PsSupplier.competitorProfileId`, so the existing CRM, audit and export paths apply.
+`PsSupplier.competitorProfileId`, with export coverage specified in section 3.7.
 Competitor awards and bids also emit `CompetitorInsight` rows (category `win_loss`
 or `pricing`, `provider: 'public-sector:{sourceKey}'`, `sourceUrl` = ficha URL).
 
@@ -449,7 +517,11 @@ through `buildAgentUserMessage` before any LLM call, as in `competitor-research.
 Raw payloads: 24 months, then delete, except monthly bulk archives (kept, since
 they are reproducible public files). Normalized: while the module is enabled.
 Natural-person supplier rows: 36 months after last activity unless linked to a CRM
-record. Tenant erasure removes everything through the cascade on `orgId`.
+record. For tenant erasure, durably queue cleanup of the org's raw objects before
+losing their keys to a DB cascade, or sweep its exact `orgs/{orgId}/ps-raw/`
+prefix. Include bulk archives when erasing a tenant. Expiry must preserve an
+object while another retained fetch in the same org references its exact key.
+Make deletion retryable. The contact/lead erasure route handles a separate flow.
 
 ---
 
@@ -493,12 +565,37 @@ fixture; parser rejects `{"Codigo":203}` as `TicketInvalid`.
 **8b.1 Adapter and raw store.** Tests: credential never appears in
 `requestUrlRedacted`; quota guard refuses call 8,001 of the day; 203 sets
 `doNotRetry` and pauses the source; annex URL to `169.254.169.254` is blocked.
+Ingest identical bytes for two orgs on the same date. Assert equal payload
+digests, distinct keys, successful owner reads and rejected cross-org reads
+through the worker reader. Reject a delete of B's key under A's tenant
+context. Erase org A, retry its cleanup and read org B's
+copy again. Reject path-like source inputs before storage access.
 
-**8b.2 Normalize and idempotent upsert.** Tests: running the same fixture twice
-yields zero new rows and zero `PsRecordVersion`; a changed amount yields one
-version; status code 8 maps to stage `awarded`; Latin-1 CSV decodes
-`EXÁMENES` correctly; an erroneous PO is stored with `excludedFromOfficial=true`
-and is excluded from official totals but present in raw totals.
+**8b.2 Normalize and idempotent upsert.** Exercise a two-tender fixture through
+the adapter and worker. Capture each normalized ID, hash, material-change time,
+version count and change-driven derivations after the baseline import.
+
+| Re-import scenario | Expected result |
+|---|---|
+| Replay identical bytes, including a job retry | Same payload and record hashes. No new normalized rows, versions or derivations. |
+| Change only tender B's amount | New raw payload hash. Only B gets a new record hash, one amount diff, a new material-change time and one change-driven derivation. A keeps its ID, hash, timestamp and version count. B's evidence resolves to the new fetch. |
+| Reorder the two rows, reorder JSON keys or change only envelope/retrieval metadata | For different bytes the raw hash changes. For a time-only refetch of identical bytes it stays equal. Both record hashes and material-change times stay equal. Zero versions and zero change-driven derivations. |
+| Redeliver the changed batch concurrently | One committed B transition and one logical downstream change. No second diff. |
+
+Keep tests for status code 8 mapping to `awarded`, Latin-1 `EXÁMENES` decoding,
+and erroneous POs visible in raw totals and excluded from official totals.
+
+**Export acceptance (8b.2 onward, repeated as each model lands).** Extend
+`apps/worker/src/queues/tenant-export.contract.test.ts`. Seed two orgs with
+overlapping source IDs and distinct review notes, saved filters and CRM links.
+Run `processTenantExportJob`, gunzip the actual archive and check its manifest,
+entity tags, IDs, links, permitted field values and attribution against the
+expected rows for the requesting org. Include a pre-module `BidOpportunity`.
+Assert zero foreign-tenant rows or links, zero internal-only entities and zero
+restricted fields or sentinel values anywhere in NDJSON, including nested JSON,
+signed URLs and dropped Colombia fields. Compare archives for requesters with
+and without pricing access. Seed only synthetic sentinel values.
+Check each new registry entry against the generated Prisma model and delegate.
 
 **8b.3 Radar and opportunity sheet.** Tests: route without
 `public-sector:read` returns 403; radar filter by UNSPSC, region and closing window;
