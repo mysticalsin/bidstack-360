@@ -25,7 +25,8 @@ import type { Page, Request, Response } from '@playwright/test';
 import { THEMES, VIEWPORTS, layoutIssues, useTheme, type LayoutIssue } from './proposals-layout.js';
 
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:4010';
-const DESTRUCTIVE = /delete|remove|archive|void|revoke|sign out|log out/i;
+const DESTRUCTIVE =
+  /delete|remove|archive|void|revoke|sign out|log out|approve|submit|send|publish/i;
 
 test.skip(!process.env.E2E_AUDIT, 'set E2E_AUDIT=1 to run the section audit');
 

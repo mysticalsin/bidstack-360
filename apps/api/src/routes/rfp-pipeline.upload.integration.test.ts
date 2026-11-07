@@ -205,24 +205,27 @@ describe('POST /api/v1/opportunities/:opportunityId/rfp/upload', () => {
   skipIfNoDb('rejected uploads do not consume the hourly upload quota', async () => {
     const redisMod = await import('../redis.js');
     const incrSpy = vi.spyOn(redisMod.redis, 'incr');
-    const opp = await createOpportunity('upload-quota-not-burned');
-    const badFile = await createFile({ contentType: 'application/x-msdownload' });
+    try {
+      const opp = await createOpportunity('upload-quota-not-burned');
+      const badFile = await createFile({ contentType: 'application/x-msdownload' });
 
-    const bad = await ctx.server.inject({
-      method: 'POST',
-      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
-      payload: { fileAttachmentId: badFile.id },
-    });
-    const missing = await ctx.server.inject({
-      method: 'POST',
-      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
-      payload: { fileAttachmentId: randomUUID() },
-    });
+      const bad = await ctx.server.inject({
+        method: 'POST',
+        url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+        payload: { fileAttachmentId: badFile.id },
+      });
+      const missing = await ctx.server.inject({
+        method: 'POST',
+        url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+        payload: { fileAttachmentId: randomUUID() },
+      });
 
-    expect(bad.statusCode).toBe(415);
-    expect(missing.statusCode).toBe(404);
-    expect(incrSpy).not.toHaveBeenCalled();
-    incrSpy.mockRestore();
+      expect(bad.statusCode).toBe(415);
+      expect(missing.statusCode).toBe(404);
+      expect(incrSpy).not.toHaveBeenCalled();
+    } finally {
+      incrSpy.mockRestore();
+    }
   });
 
   skipIfNoDb('413 when the JSON metadata body is oversized (bytes go to storage, not here)', async () => {

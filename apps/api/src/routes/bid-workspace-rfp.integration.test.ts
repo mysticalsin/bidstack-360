@@ -36,7 +36,7 @@ describe('bid workspace draft section PATCH', () => {
     await server.close();
   });
 
-  async function makeProposal(status: 'draft' | 'approved' | 'submitted') {
+  async function makeProposal(status: 'draft' | 'approved' | 'submitted' | 'won' | 'lost') {
     const proposal = await prisma.proposal.create({
       data: {
         orgId,
@@ -69,7 +69,7 @@ describe('bid workspace draft section PATCH', () => {
     expect(res.json<{ content: string }>().content).toBe('Revised draft');
   });
 
-  it.each(['approved', 'submitted'] as const)(
+  it.each(['approved', 'submitted', 'won', 'lost'] as const)(
     'is 409 on a %s proposal and leaves the approved text unchanged',
     async (status) => {
       const { sectionId } = await makeProposal(status);

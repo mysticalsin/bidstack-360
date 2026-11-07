@@ -65,9 +65,12 @@ describe('public sign routes', () => {
     return { token, id: row.id };
   }
 
-  const submit = (token: string, signatureDataUrl = PNG) =>
+  // A fresh client IP per call keeps the per-IP limit out of the other cases.
+  const randomIp = () => `198.18.${randomBytes(1)[0]}.${randomBytes(1)[0]}`;
+  const submit = (token: string, signatureDataUrl = PNG, remoteAddress = randomIp()) =>
     server.inject({
       method: 'POST',
+      remoteAddress,
       url: `/api/v1/sign/${token}`,
       payload: { typedName: 'Dana Signer', signatureDataUrl, acceptedTerms: true },
     });
@@ -157,8 +160,9 @@ describe('public sign routes', () => {
 
   it('POST is rate limited per IP', async () => {
     const codes: number[] = [];
+    const ip = randomIp();
     for (let i = 0; i < 12; i++) {
-      const res = await submit(randomBytes(32).toString('hex'));
+      const res = await submit(randomBytes(32).toString('hex'), PNG, ip);
       codes.push(res.statusCode);
     }
     expect(codes).toContain(429);

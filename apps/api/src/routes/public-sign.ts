@@ -26,7 +26,8 @@ import {
   signLinkExpiresAt,
 } from '../services/documents/signature.service.js';
 
-const signSubmitRateLimitMax = Number(process.env.PUBLIC_SIGN_RATE_LIMIT_MAX ?? 10);
+const signSubmitRateLimitEnv = Number.parseInt(process.env.PUBLIC_SIGN_RATE_LIMIT_MAX ?? '', 10);
+const signSubmitRateLimitMax = signSubmitRateLimitEnv > 0 ? signSubmitRateLimitEnv : 10;
 
 export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   // ── GET /sign/:token ──────────────────────────────────────────────────────

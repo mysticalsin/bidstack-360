@@ -17,7 +17,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { Prisma, prisma } from '@bidstack/db';
 import {
   RFP_CREW,
   CREW_STAGES,
@@ -27,7 +27,11 @@ import {
 } from '@bidstack/shared';
 
 import { WorkspaceParams, ensureOpportunity } from './bid-workspace.helpers.js';
-import { immutableProposalMessage, proposalIsImmutable } from './proposals.approval.js';
+import {
+  IMMUTABLE_PROPOSAL_STATUSES,
+  immutableProposalMessage,
+  proposalIsImmutable,
+} from './proposals.approval.js';
 
 // Crew-board layout = a map of crew memberKey -> station (a pipeline stage or
 // 'oversight'). Sanitized against the shared roster on every read + write so a
@@ -309,7 +313,8 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const wordCount = req.body.content.trim().split(/\s+/).filter(Boolean).length;
       // Update scoped to org + the resolved proposal so a forged sectionId from
-      // another proposal/org can't be written. RETURNING gives us the new row.
+      // another proposal/org can't be written. The status re-check closes the
+      // window where an approve lands between the read above and this write.
       const rows = await prisma.$queryRaw<SectionRow[]>`
         UPDATE proposal_sections
         SET content = ${req.body.content},
@@ -318,10 +323,21 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
             updated_at = now()
         WHERE id = ${req.params.sectionId}::uuid AND org_id = ${req.auth.orgId}::uuid
           AND proposal_id = ${proposalId}::uuid AND deleted_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM proposals p
+            WHERE p.id = ${proposalId}::uuid
+              AND p.status::text IN (${Prisma.join([...IMMUTABLE_PROPOSAL_STATUSES])})
+          )
         RETURNING id, sort_order, title, content, ai_drafted, human_reviewed, updated_at
       `;
       const updated = rows[0];
-      if (!updated) return reply.notFound('Section not found');
+      if (!updated) {
+        const now = await latestProposal(req.auth.orgId, opportunity.id);
+        if (now && proposalIsImmutable(now.status)) {
+          throw server.httpErrors.conflict(immutableProposalMessage());
+        }
+        return reply.notFound('Section not found');
+      }
       return toDraftSection(updated);
     },
   );
