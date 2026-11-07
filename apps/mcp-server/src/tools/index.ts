@@ -108,6 +108,8 @@ export const tools = {
   account_hiring: agentTools.account_hiring,
   account_financials_summary: agentTools.account_financials_summary,
   account_news: agentTools.account_news,
+  // Open data technology stack (slice 16).
+  company_tech_stack: agentTools.company_tech_stack,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -162,6 +164,7 @@ export const toolScopes = {
   account_hiring: 'read',
   account_financials_summary: 'read',
   account_news: 'read',
+  company_tech_stack: 'read',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {
