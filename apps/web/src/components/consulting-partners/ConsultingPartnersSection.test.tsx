@@ -18,7 +18,7 @@ const kpmg: ConsultingPartnerCard = {
     { dimension: 'relationship', status: 'scored', us: 75, partner: 25, evidenceCount: 3, evidenceIds: ['p1'] },
   ],
   angles: [
-    { text: 'KPMG works on advisory and audit at MAPFRE in Digital, 3 public sources since 2025.', basis: 'observed', evidenceIds: ['p1'] },
+    { text: 'KPMG at MAPFRE: advisory and audit in Digital, 3 public sources since 2025.', basis: 'observed', evidenceIds: ['p1'] },
     { text: '3 wins vs 1 loss against KPMG in 2025.', basis: 'observed', evidenceIds: ['e1'] },
   ],
   timeline: [

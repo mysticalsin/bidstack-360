@@ -209,7 +209,7 @@ describe('positioning math', () => {
     expect(kpmg.relationships).toEqual(['advisory', 'audit']);
     expect(kpmg.record).toEqual({ wins: 3, losses: 1, firstYear: 2025, lastYear: 2025 });
     expect(kpmg.angles.map((a) => a.text)).toEqual([
-      'KPMG works on advisory and audit at MAPFRE in Data, 2 public sources since 2025.',
+      'KPMG at MAPFRE: advisory and audit in Data, 2 public sources since 2025.',
       '3 wins vs 1 loss against KPMG in 2025.',
       'We lead KPMG on domain depth: 3 of 3 cited records favour us.',
     ]);

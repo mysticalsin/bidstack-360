@@ -133,7 +133,7 @@ export function partnerAngles(
     const relText = joinWords(rels.map((r) => PARTNER_RELATIONSHIP_LABEL[r].toLowerCase()));
     const domText = doms.length ? ` in ${joinWords(doms.map((d) => PARTNER_DOMAIN_LABEL[d]))}` : '';
     out.push({
-      text: `${name} works on ${relText} at ${clientName}${domText}, ${plural(publicLinks.length, 'public source', 'public sources')}${since}.`,
+      text: `${name} at ${clientName}: ${relText}${domText}, ${plural(publicLinks.length, 'public source', 'public sources')}${since}.`,
       basis: publicLinks.every((e) => e.inferred) ? 'inferred' : 'observed',
       evidenceIds: publicLinks.slice(0, MAX_CITES).map((e) => e.id),
     });
