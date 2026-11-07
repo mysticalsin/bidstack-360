@@ -266,13 +266,13 @@ async function mintCaseNumber(tx: Prisma.TransactionClient, orgId: string): Prom
   // Soft-deleted cases still hold their number under the (orgId, number)
   // unique key, and string order breaks past CS-99999, so take the numeric
   // max over every row.
-  const [row] = await tx.$queryRaw<Array<{ max: number | null }>>`
-    SELECT MAX(CAST(SUBSTRING(number FROM 4) AS INTEGER)) AS max
+  const [row] = await tx.$queryRaw<Array<{ max: bigint | null }>>`
+    SELECT MAX(CAST(SUBSTRING(number FROM 4) AS BIGINT)) AS max
     FROM service_cases
-    WHERE org_id = ${orgId}::uuid AND number ~ '^CS-[0-9]+$'`;
+    WHERE org_id = ${orgId}::uuid AND number ~ '^CS-[0-9]{1,18}$'`;
   const last = row?.max ?? null;
   if (last === null) return 'CS-10001';
-  return `CS-${(Number(last) + 1).toString().padStart(5, '0')}`;
+  return `CS-${(BigInt(last) + 1n).toString().padStart(5, '0')}`;
 }
 
 function isUniqueViolation(err: unknown): boolean {
