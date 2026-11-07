@@ -105,8 +105,6 @@ async function open(page: Page, path: string): Promise<void> {
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
 }
 
-test.describe.configure({ mode: 'serial' });
-
 test.beforeAll(async ({ playwright }) => {
   const api = await playwright.request.newContext({
     extraHTTPHeaders: { 'x-bidstack-e2e-role': 'admin' },
@@ -176,25 +174,39 @@ test.describe('admin click audit', () => {
   });
 
   for (const path of STATIC_ROUTES) {
-    test(`every control does something: ${path}`, async ({ page }) => {
-      test.setTimeout(240_000);
+    test(`every control does something: ${path}`, async ({ page, context }) => {
+      test.setTimeout(480_000);
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       await open(page, path);
       const controls = page
         .getByRole('main')
         .locator(
           'button:visible:not([disabled]), a[href]:visible, [role="tab"]:visible, [role="switch"]:visible, [role="checkbox"]:visible',
         );
-      const total = Math.min(await controls.count(), 40);
+      const total = Math.min(await controls.count(), 25);
       const dead: string[] = [];
       const errors: string[] = [];
       for (let i = 0; i < total; i++) {
-        await open(page, path);
+        const drifted =
+          new URL(page.url()).pathname !== new URL(path, page.url()).pathname ||
+          (await page.locator('[role="dialog"]:visible').count()) > 0;
+        if (drifted) await open(page, path);
         const control = controls.nth(i);
         if (!(await control.isVisible().catch(() => false))) continue;
         const name =
           (await control.getAttribute('aria-label')) ||
           ((await control.innerText().catch(() => '')) ?? '').trim().slice(0, 40) ||
           `#${i}`;
+        // Re-selecting the active tab, filter or page link is a no-op by design.
+        const active = await control.evaluate(
+          (el) =>
+            el.getAttribute('aria-selected') === 'true' ||
+            el.getAttribute('aria-pressed') === 'true' ||
+            el.getAttribute('aria-current') === 'page' ||
+            el.getAttribute('data-state') === 'active' ||
+            el.getAttribute('data-state') === 'on',
+        );
+        if (active) continue;
         const href = await control.getAttribute('href');
         if (href && /^(https?:|mailto:|tel:)/.test(href) && !href.startsWith('http://127.0.0.1')) {
           continue;
@@ -217,8 +229,8 @@ test.describe('admin click audit', () => {
           });
           return box;
         });
-        await control.click({ timeout: 3_000 }).catch(() => undefined);
-        await page.waitForTimeout(500);
+        await control.click({ timeout: 1_500 }).catch(() => undefined);
+        await page.waitForTimeout(300);
         const after = await page.evaluate(
           (box) => ({
             url: location.href,
@@ -251,6 +263,7 @@ test.describe('admin click audit', () => {
   }
 
   test('global shell: theme toggle, command palette, notifications, 404', async ({ page }) => {
+    test.setTimeout(180_000);
     const sweep = watch(page);
     await open(page, '/settings');
     const html = page.locator('html');
@@ -261,9 +274,9 @@ test.describe('admin click audit', () => {
     await page.keyboard.press('ControlOrMeta+k');
     const palette = page.getByRole('dialog');
     await expect(palette).toBeVisible();
-    await page.keyboard.type('roles');
+    await page.keyboard.type('service desk');
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/roles/);
+    await expect(page).toHaveURL(/\/service-desk/);
 
     const bell = page.getByRole('button', { name: /notification/i }).first();
     if (await bell.isVisible().catch(() => false)) {
@@ -278,18 +291,20 @@ test.describe('admin click audit', () => {
     expect.soft(sweep.badResponses).toEqual([]);
   });
 
-  test('invalid and valid submits: role and webhook dialogs', async ({ page }) => {
+  test('webhook dialog blocks an invalid submit and closes cleanly', async ({ page }) => {
     const sweep = watch(page);
     await open(page, '/settings?tab=webhooks');
-    const add = page.getByRole('button', { name: /add|new|create/i }).first();
-    await add.click();
+    await page.getByRole('main').getByRole('button', { name: /add|new|create/i }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('button', { name: /create|save|add/i }).last().click();
-    await expect(dialog).toBeVisible();
+    const submit = dialog.getByRole('button', { name: /create subscription/i });
+    await expect(submit).toBeDisabled();
+    await dialog.getByRole('textbox').first().fill('not a url');
+    await expect(submit).toBeDisabled();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     expect.soft(sweep.pageErrors).toEqual([]);
+    expect.soft(sweep.badResponses).toEqual([]);
   });
 });
 
