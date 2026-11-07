@@ -511,7 +511,8 @@
     "errorLinkExpiredDetail": "This signing link has expired. Please contact the sender to resend the request.",
     "errorLinkInvalidDetail": "This signing link is invalid or has expired. Please contact the sender to resend the request.",
     "errorLinkExpiredTitle": "Link expired",
-    "errorLinkInvalidTitle": "Invalid signing link"
+    "errorLinkInvalidTitle": "Invalid signing link",
+    "errorLinkClosedTitle": "Signing closed"
   },
   "worldMap": {
     "preset": {

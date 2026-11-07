@@ -38,6 +38,16 @@ function withoutRowToggle(run: () => void) {
   };
 }
 
+/** Fixed-width columns cut long values; the title keeps the full text reachable. */
+function truncatedCell(value: string | null | undefined) {
+  if (!value) return null;
+  return (
+    <span className="block truncate" title={value}>
+      {value}
+    </span>
+  );
+}
+
 function contactLine(reference: Reference): string | null {
   return [reference.contactName, reference.contactEmail].filter(Boolean).join(' · ') || null;
 }
@@ -122,7 +132,9 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       cell: (row) => (
         <span className="flex min-w-0 items-center gap-2">
           <Avatar seed={row.company?.name ?? row.title} size={20} decorative />
-          <span className="block truncate font-medium text-fg-primary">{row.title}</span>
+          <span className="block truncate font-medium text-fg-primary" title={row.title}>
+            {row.title}
+          </span>
         </span>
       ),
     },
@@ -132,15 +144,16 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       sortable: true,
       width: 'w-32',
       hideBelow: 'md',
-      cell: (row) => row.company?.name ?? null,
+      cell: (row) => truncatedCell(row.company?.name),
     },
     {
       id: 'industry',
       header: t('references.column.industry', 'Industry'),
       sortable: true,
       width: 'w-28',
-      hideBelow: 'lg',
-      cell: (row) => row.industry,
+      // At lg the fixed columns leave the title column under 50px wide.
+      hideBelow: 'xl',
+      cell: (row) => truncatedCell(row.industry),
     },
     {
       id: 'usageCount',
@@ -156,6 +169,7 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       sortable: true,
       numeric: true,
       width: 'w-28',
+      hideBelow: 'xl',
       cell: (row) => (row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleDateString() : null),
     },
     {

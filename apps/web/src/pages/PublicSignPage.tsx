@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle, ChevronRight, Download, Pen, Type, X } from 'lucide-react';
 import type { PublicSignatureRequest } from '@bidstack/shared';
 
+import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { SignaturePad, type SignaturePadHandle } from '@/components/signatures/SignaturePad';
 import { usePublicSignatureRequest, useSubmitSignature } from '@/hooks/useSignatureRequests';
@@ -249,7 +250,7 @@ function StepIndicator({ step }: { step: Step }) {
         <li key={label} className="flex items-center gap-1">
           <span
             className={cn(
-              'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
+              'flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold',
               i < idx
                 ? 'bg-[var(--brand-primary)] text-[var(--fg-on-brand)]'
                 : i === idx
@@ -698,15 +699,20 @@ function ErrorState({ error }: { error: unknown }) {
       ? error.message
       : t('publicSign.errorLinkInvalidShort', 'This signing link is invalid or has expired.');
   const isExpired = msg.toLowerCase().includes('expir') || msg.toLowerCase().includes('token');
+  // 410 means the link was real but is closed (signed, voided, declined); the
+  // server message says which, so show it instead of calling the link invalid.
+  const isClosed = !isExpired && error instanceof ApiError && error.status === 410;
   const publicMessage = isExpired
     ? t(
         'publicSign.errorLinkExpiredDetail',
         'This signing link has expired. Please contact the sender to resend the request.',
       )
-    : t(
-        'publicSign.errorLinkInvalidDetail',
-        'This signing link is invalid or has expired. Please contact the sender to resend the request.',
-      );
+    : isClosed
+      ? msg
+      : t(
+          'publicSign.errorLinkInvalidDetail',
+          'This signing link is invalid or has expired. Please contact the sender to resend the request.',
+        );
   return (
     <div
       className="flex flex-col items-center gap-4 py-12 text-center"
@@ -719,7 +725,9 @@ function ErrorState({ error }: { error: unknown }) {
       <h1 className="text-xl font-bold text-[var(--fg-primary)]">
         {isExpired
           ? t('publicSign.errorLinkExpiredTitle', 'Link expired')
-          : t('publicSign.errorLinkInvalidTitle', 'Invalid signing link')}
+          : isClosed
+            ? t('publicSign.errorLinkClosedTitle', 'Signing closed')
+            : t('publicSign.errorLinkInvalidTitle', 'Invalid signing link')}
       </h1>
       <p className="max-w-sm text-sm text-[var(--fg-secondary)]">{publicMessage}</p>
     </div>

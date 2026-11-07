@@ -40,6 +40,7 @@ const apiEnv = [
   'BIDSTACK_ALLOW_STUB_ROLE_HEADER=true',
   'API_RATE_LIMIT_MAX=5000',
   'PUBLIC_BOOKING_RATE_LIMIT_MAX=5000',
+  'PUBLIC_SIGN_RATE_LIMIT_MAX=5000',
   e2eRedisUrl ? `REDIS_URL=${e2eRedisUrl}` : null,
 ]
   .filter(Boolean)

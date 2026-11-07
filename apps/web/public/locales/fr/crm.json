@@ -595,7 +595,8 @@
     "errorLinkExpiredDetail": "Ce lien de signature a expiré. Veuillez contacter l'expéditeur pour renvoyer la demande.",
     "errorLinkInvalidDetail": "Ce lien de signature n'est pas valide ou a expiré. Veuillez contacter l'expéditeur pour renvoyer la demande.",
     "errorLinkExpiredTitle": "Lien expiré",
-    "errorLinkInvalidTitle": "Lien de signature non valide"
+    "errorLinkInvalidTitle": "Lien de signature non valide",
+    "errorLinkClosedTitle": "Signature clôturée"
   },
   "worldMap": {
     "preset": {

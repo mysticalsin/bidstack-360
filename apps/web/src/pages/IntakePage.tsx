@@ -6,7 +6,7 @@
 //  3. Review — human-in-the-loop approval of extracted solutions/products
 //  4. Publish — commit approved extractions to the account profile
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +25,14 @@ import { PublishStep } from './intake/PublishStep';
 export function IntakePage() {
   const [params, setSearchParams] = useSearchParams();
   const accountId = params.get('account') ?? '';
-  const [step, setStep] = useState<StepId>('receive');
+  const [step, setStepState] = useState<StepId>('receive');
+  // Furthest step reached; the stepper only jumps back to steps already done.
+  const [reached, setReached] = useState(0);
+  const setStep = useCallback((next: StepId) => {
+    setStepState(next);
+    const idx = STEPS.findIndex((s) => s.id === next);
+    setReached((prev) => Math.max(prev, idx));
+  }, []);
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [extractingDocIds, setExtractingDocIds] = useState<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
@@ -78,7 +85,7 @@ export function IntakePage() {
       }
       setStep('review');
     }, 0);
-  }, [intel.data, hasPendingExtractions, extractingDocIds, t]);
+  }, [intel.data, hasPendingExtractions, extractingDocIds, t, setStep]);
 
   // Attaches the chosen account to the URL (?account=<id>) so the workflow
   // stays bookmarkable/shareable, matching the ?view= pattern on AccountsPage.
@@ -135,12 +142,6 @@ export function IntakePage() {
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
           {t('intake.title', 'Intake')}
         </h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {t(
-            'intake.subtitle',
-            'Receive documents, extract intelligence, review, and publish to account profiles.',
-          )}
-        </p>
       </motion.header>
 
       {/* Stepper */}
@@ -153,7 +154,9 @@ export function IntakePage() {
             <button
               type="button"
               onClick={() => setStep(s.id)}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+              disabled={step === s.id || i > reached}
+              aria-current={step === s.id ? 'step' : undefined}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
                 step === s.id
                   ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                   : i < STEPS.findIndex((x) => x.id === step)
@@ -161,12 +164,16 @@ export function IntakePage() {
                     : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]'
               }`}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-current/15 text-[10px] font-bold">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-current/15 text-xs font-bold">
                 {i + 1}
               </span>
               {s.label}
             </button>
-            {i < STEPS.length - 1 && <span className="text-[var(--border-subtle)]">→</span>}
+            {i < STEPS.length - 1 && (
+              <span className="text-[var(--border-subtle)]" aria-hidden>
+                →
+              </span>
+            )}
           </div>
         ))}
       </motion.div>
@@ -207,7 +214,8 @@ export function IntakePage() {
           onDone={() => {
             setSelectedDocs(new Set());
             setExtractingDocIds(new Set());
-            setStep('receive');
+            setReached(0);
+            setStepState('receive');
           }}
         />
       )}

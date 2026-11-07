@@ -510,7 +510,8 @@
     "errorLinkExpiredDetail": "Questo link per la firma è scaduto. Contatta il mittente per inviare nuovamente la richiesta.",
     "errorLinkInvalidDetail": "Questo link per la firma non è valido o è scaduto. Contatta il mittente per inviare nuovamente la richiesta.",
     "errorLinkExpiredTitle": "Link scaduto",
-    "errorLinkInvalidTitle": "Link per la firma non valido"
+    "errorLinkInvalidTitle": "Link per la firma non valido",
+    "errorLinkClosedTitle": "Firma chiusa"
   },
   "worldMap": {
     "preset": {
