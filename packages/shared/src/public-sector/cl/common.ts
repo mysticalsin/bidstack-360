@@ -298,7 +298,12 @@ export function redactPersonalRaw(raw: unknown, hashTaxId: (rut: string) => stri
     }
     if (v && typeof v === 'object' && !(v instanceof Date)) {
       const obj = v as Record<string, unknown>;
-      const kids = Object.entries(obj).map(([k, x]) => [k, walk(x)] as const);
+      // OCDS writes the RUT without a dash (`123456785`); only trust that form
+      // inside a CL-RUT identifier, where it cannot be an item or UNSPSC code.
+      const rutScheme = typeof obj.scheme === 'string' && obj.scheme.toUpperCase() === 'CL-RUT';
+      const kids = Object.entries(obj).map(
+        ([k, x]) => [k, rutScheme && k === 'id' ? walkRutId(x) : walk(x)] as const,
+      );
       const direct = kids.some(([, r]) => r.direct);
       const found = kids.some(([, r]) => r.found);
       const redact = (k: string): boolean => {
@@ -315,6 +320,11 @@ export function redactPersonalRaw(raw: unknown, hashTaxId: (rut: string) => stri
       return { value, direct: false, found };
     }
     return { value: v, direct: false, found: false };
+  };
+  const walkRutId = (v: unknown): { value: unknown; direct: boolean; found: boolean } => {
+    const rut = parseRut(typeof v === 'number' ? String(v) : str(v));
+    if (!rut || rut.body >= NATURAL_PERSON_RUT_CEILING) return walk(v);
+    return { value: `rut-hash:${hashTaxId(rut.formatted)}`, direct: true, found: true };
   };
   const first = walk(raw).value;
   if (names.size === 0) return first;
