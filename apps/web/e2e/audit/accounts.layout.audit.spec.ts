@@ -34,6 +34,8 @@ function readCeiling(): Record<string, number> {
 }
 
 test.describe.configure({ retries: 0, timeout: 300_000 });
+// Minutes of axe runs across 90 route, theme and viewport combinations: opt in.
+test.skip(process.env.E2E_AUDIT !== '1', 'set E2E_AUDIT=1 to run the accounts audits');
 
 let companyId = '';
 let contactId = '';
@@ -41,9 +43,13 @@ let leadId = '';
 
 test.beforeAll(async ({ request }) => {
   test.setTimeout(180_000);
-  const first = async (path: string) =>
-    ((await (await request.get(`${API}${path}`)).json()) as { items: Array<{ id: string }> }).items[0]
-      ?.id ?? '';
+  const first = async (path: string): Promise<string> => {
+    const res = await request.get(`${API}${path}`);
+    expect(res.ok(), `${path} -> ${res.status()}`).toBe(true);
+    const id = ((await res.json()) as { items: Array<{ id: string }> }).items[0]?.id;
+    if (!id) throw new Error(`seed has no rows for ${path}`);
+    return id;
+  };
   companyId = await first('/api/companies?limit=1');
   contactId = await first('/api/contacts?limit=1');
   leadId = await first('/api/leads?limit=1');
@@ -91,8 +97,12 @@ for (const theme of AUDIT_THEMES) {
         if (hard.length > 0) found.push(formatIssues(`${route.path()} @${vp.name}`, hard));
         if (tiny.length > 0) small.push(formatIssues(`${route.path()} @${vp.name}`, tiny));
         const limit = ceiling[key];
-        if (!WRITE_CEILING && limit !== undefined && tiny.length > limit) {
-          found.push(`${key}: ${tiny.length} text-under-12px runs, ceiling ${limit}`);
+        if (!WRITE_CEILING) {
+          if (limit === undefined) {
+            found.push(`${key}: no small-text ceiling recorded (run with AUDIT_WRITE_SMALL_TEXT=1)`);
+          } else if (tiny.length > limit) {
+            found.push(`${key}: ${tiny.length} text-under-12px runs, ceiling ${limit}`);
+          }
         }
       }
       if (WRITE_CEILING) writeFileSync(CEILING_FILE, `${JSON.stringify({ ...readCeiling(), ...counts }, null, 2)}\n`);

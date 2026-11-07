@@ -13,6 +13,10 @@ import type { Page, Response } from '@playwright/test';
 import { expect, test } from '../fixtures.js';
 import { settle } from './accounts-layout.js';
 
+// Clicks every control (status selects, territory toggles, ERP sync), so it
+// writes to the seed and runs for minutes: opt in, never in the sharded suite.
+test.skip(process.env.E2E_AUDIT !== '1', 'set E2E_AUDIT=1 to run the accounts audits');
+
 const API = process.env.E2E_API_URL ?? 'http://127.0.0.1:4010';
 const MAX_CONTROLS_PER_ROUTE = 30;
 const DESTRUCTIVE = /\b(delete|remove|archive|disqualify|merge|convert|discard|revoke|sign out|log out|clear all)\b/i;
@@ -33,7 +37,8 @@ test.beforeAll(async ({ request }) => {
   ids = {
     companyId: await first('/api/companies?limit=1'),
     contactId: await first('/api/contacts?limit=1'),
-    leadId: await first('/api/leads?limit=1'),
+    // An unconverted lead: converted leads keep their status option.
+    leadId: await first('/api/leads?limit=1&status=new'),
   };
 });
 
