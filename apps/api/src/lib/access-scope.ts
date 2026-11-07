@@ -174,11 +174,6 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-// API-key actors own no deals, and "apikey:<id>" is not a valid uuid for ownerId.
-function ownerClause(scope: AccessScope): Prisma.OpportunityWhereInput[] {
-  return isApiKeyActor(scope.userId) ? [] : [{ ownerId: scope.userId }];
-}
-
 /**
  * Merge the visibility rule into an existing opportunity where clause.
  * Wraps in AND so route-level filters (search OR, stage, owner…) survive.
@@ -187,7 +182,9 @@ export function applyOpportunityScope(
   where: Prisma.OpportunityWhereInput,
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput {
-  if (scope.unrestricted) return where;
+  // Country groups bind users. API keys are bounded by permission scopes and the
+  // company/MSA allowlist, and "apikey:<id>" is not a valid uuid for ownerId.
+  if (scope.unrestricted || isApiKeyActor(scope.userId)) return where;
   // Group codes are uppercase ISO-2 (CountryCode schema), but opportunity.country
   // / territory.countryCodes are stored raw — match both cases so a lowercase
   // record isn't silently hidden from a user who should see it. Prisma `in`
@@ -200,7 +197,7 @@ export function applyOpportunityScope(
         OR: [
           { country: { in: variants } },
           { territory: { countryCodes: { hasSome: variants } } },
-          ...ownerClause(scope),
+          { ownerId: scope.userId },
         ],
       },
     ],
@@ -220,9 +217,9 @@ export function countryVariantsForScope(scope: AccessScope): string[] {
 export function accountOpportunityScopePredicate(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput | null {
-  if (scope.unrestricted) return null;
+  if (scope.unrestricted || isApiKeyActor(scope.userId)) return null;
   const variants = countryVariantsForScope(scope);
-  const clauses: Prisma.OpportunityWhereInput[] = ownerClause(scope);
+  const clauses: Prisma.OpportunityWhereInput[] = [{ ownerId: scope.userId }];
   if (variants.length > 0) {
     clauses.unshift({ territory: { countryCodes: { hasSome: variants } } });
     clauses.unshift({ country: { in: variants } });
