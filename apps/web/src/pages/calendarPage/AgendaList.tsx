@@ -38,7 +38,7 @@ export function AgendaList({ keys, tz, events, todayKey, onSelect }: AgendaListP
             <h2
               className={cn(
                 'mb-2 text-xs font-semibold',
-                day.key === todayKey ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-secondary)]',
+                day.key === todayKey ? 'text-[var(--fg-primary)]' : 'text-[var(--fg-secondary)]',
               )}
             >
               {day.key === todayKey ? `${t('calendar.today', 'Today')}, ` : ''}

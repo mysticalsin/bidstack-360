@@ -85,7 +85,7 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
               key={key}
               className={cn(
                 'flex h-12 min-w-0 flex-col items-center justify-center text-xs font-medium',
-                isToday ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-secondary)]',
+                isToday ? 'text-[var(--fg-primary)]' : 'text-[var(--fg-secondary)]',
               )}
             >
               <span className="truncate">{formatDayLabel(key, { weekday: 'short' })}</span>
