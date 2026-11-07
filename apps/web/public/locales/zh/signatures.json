@@ -36,7 +36,7 @@
     "typedSignature": "键入签名",
     "drawnSignature": "手绘签名",
     "typeNamePlaceholder": "输入您的全名",
-    "agreed": "我同意此电子签名在法律上等同于我的手写签名。"
+    "agreed": "我理解此电子签名是内部审批签名，不是具有法律约束力的电子签名。"
   },
   "timeline": {
     "title": "签名历史",

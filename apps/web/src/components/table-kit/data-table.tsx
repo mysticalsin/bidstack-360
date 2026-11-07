@@ -83,7 +83,7 @@ export type DataTableColumn<TRow> = {
   cellClassName?: string;
   hideable?: boolean;
   defaultHidden?: boolean;
-  hideBelow?: 'sm' | 'md' | 'lg';
+  hideBelow?: 'sm' | 'md' | 'lg' | 'xl';
   /** Force tabular figures on a column that isn't right-aligned (IDs, dates). */
   numeric?: boolean;
   /** Opt out of the em-dash null render — for action / checkbox columns. */
@@ -136,6 +136,7 @@ const HIDE_BELOW_CLASS = {
   sm: 'hidden sm:table-cell',
   md: 'hidden md:table-cell',
   lg: 'hidden lg:table-cell',
+  xl: 'hidden xl:table-cell',
 } as const;
 
 // Right alignment implies numbers, and numbers in a dense grid must share a
