@@ -15,8 +15,9 @@
  *
  * Imported by:
  *   apps/api/src/routes/integrations/email.ts
- *   apps/api/src/routes/bookings.helpers.ts
- *   apps/api/src/services/cs/nps.service.ts
+ *
+ * System transactional mail (booking confirmations, NPS) does not come here;
+ * it uses transactional-email.service.ts so it never depends on mailbox scopes.
  */
 
 import { randomBytes } from 'node:crypto';
