@@ -69,6 +69,7 @@ export const PERMISSION_KEYS = [
   'users:read',
   'users:write',
   'webhooks:read',
+  'webhooks:replay',
   'webhooks:write',
   'workflows:read',
   'workflows:write',

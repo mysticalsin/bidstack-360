@@ -24,6 +24,7 @@ vi.mock('@bidstack/db', () => ({
   prisma: {
     webhookSubscription: { findFirst: mocks.subFindFirst, update: mocks.subUpdate },
     webhookDelivery: { create: mocks.deliveryCreate },
+    webhookMessage: { upsert: vi.fn(async () => ({})) },
   },
 }));
 

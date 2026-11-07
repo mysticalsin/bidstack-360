@@ -5,6 +5,7 @@
  * Import via @bidstack/shared (re-exported from queue-config.ts barrel).
  */
 import type { QueueConfig } from './queue-config.core.js';
+import { WEBHOOK_MAX_ATTEMPTS_CEILING } from './schemas/webhook-delivery-policy.js';
 
 // ─── Wave 4: Integration Hub queues ──────────────────────────────────────
 
@@ -195,16 +196,19 @@ export const CALL_UPDATE_DEAL: QueueConfig = {
  * Outbound webhook delivery — HTTP POST with HMAC-SHA256 signature to
  * partner-registered subscription URLs.
  *
- * Retry schedule: immediate → 30 s → 2 min → 15 min → 1 h → 6 h (5 attempts).
- * Dead-letters after 5 failures; increments `failureCount` on the subscription.
- * WHY exponential with large initial delay: partners need time to recover from
- * outages before we bombard them; 30 s covers most transient 500s.
+ * Retry schedule is per endpoint (WebhookSubscription retry policy). The
+ * default is 5 attempts, exponential from 30 s: +30 s, +1 min, +2 min, +4 min.
+ * `attempts` here is only the ceiling; the worker fails the job itself at the
+ * endpoint's maxAttempts, and the custom `webhook-endpoint` backoff reads the
+ * delay each failed attempt computed (endpoint curve or Retry-After).
+ * WHY a large initial delay: partners need time to recover from outages
+ * before we bombard them; 30 s covers most transient 500s.
  */
 export const WEBHOOK_DELIVERY: QueueConfig = {
   name: 'webhook.delivery',
   defaultJobOptions: {
-    attempts: 5,
-    backoff: { type: 'exponential', delay: 30_000 },
+    attempts: WEBHOOK_MAX_ATTEMPTS_CEILING,
+    backoff: { type: 'webhook-endpoint', delay: 30_000 },
     removeOnComplete: { age: 86_400 * 7, count: 1_000 }, // 7 days for audit
     removeOnFail: { age: 86_400 * 30, count: 5000 },
   },

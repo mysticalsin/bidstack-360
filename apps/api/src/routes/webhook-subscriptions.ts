@@ -6,7 +6,14 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
-import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
+import {
+  DEFAULT_WEBHOOK_RETRY_POLICY,
+  WEBHOOK_RETRY_LIMITS,
+  WebhookEventKeySchema,
+  WebhookRetryPolicySchema,
+  assertSafeWebhookUrl,
+  type WebhookRetryPolicy,
+} from '@bidstack/shared';
 import {
   decryptWebhookSigningSecret,
   encryptSecret,
@@ -27,6 +34,7 @@ const WebhookSub = z.object({
   lastDeliveryAt: z.string().datetime().nullable(),
   lastFailureAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  timeoutMs: z.number().int(),
 });
 
 const WebhookSubCreated = WebhookSub.extend({
@@ -51,13 +59,42 @@ const WebhookSubCreate = z.object({
   url: z.string().url().max(500),
   events: z.array(WebhookEventKeySchema).max(50).min(1),
   active: z.boolean().default(true),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(WEBHOOK_RETRY_LIMITS.timeoutMs.min)
+    .max(WEBHOOK_RETRY_LIMITS.timeoutMs.max)
+    .default(DEFAULT_WEBHOOK_RETRY_POLICY.timeoutMs),
 });
 
 const WebhookSubUpdate = z.object({
   url: z.string().url().max(500).optional(),
   events: z.array(WebhookEventKeySchema).max(50).min(1).optional(),
   active: z.boolean().optional(),
+  timeoutMs: z.number().int().min(WEBHOOK_RETRY_LIMITS.timeoutMs.min).max(WEBHOOK_RETRY_LIMITS.timeoutMs.max).optional(),
 });
+
+const RotateSecretBody = z.object({
+  overlapHours: z.number().int().min(0).max(72).default(24),
+});
+
+function newSigningSecret(): string {
+  return `whsec_${Buffer.from(randomUUID()).toString('base64url')}`;
+}
+
+function retryPolicyOf(sub: {
+  maxAttempts: number;
+  backoffStrategy: WebhookRetryPolicy['backoffStrategy'];
+  backoffBaseSeconds: number;
+  timeoutMs: number;
+}): WebhookRetryPolicy {
+  return {
+    maxAttempts: sub.maxAttempts,
+    backoffStrategy: sub.backoffStrategy,
+    backoffBaseSeconds: sub.backoffBaseSeconds,
+    timeoutMs: sub.timeoutMs,
+  };
+}
 
 async function requireHumanWebhookWrite(req: FastifyRequest): Promise<void> {
   if (req.auth.role === 'api' || req.auth.userId.startsWith('apikey:')) {
@@ -69,7 +106,11 @@ function webhookSubscriptionAuditData(args: {
   orgId: string;
   userId: string;
   action:
-    'webhook_subscription.create' | 'webhook_subscription.update' | 'webhook_subscription.delete';
+    | 'webhook_subscription.create'
+    | 'webhook_subscription.update'
+    | 'webhook_subscription.delete'
+    | 'webhook_subscription.retry_policy'
+    | 'webhook_subscription.rotate_secret';
   subscriptionId: string;
   diff?: Prisma.InputJsonValue;
 }): Prisma.AuditLogCreateInput {
@@ -113,6 +154,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
           lastDeliveryAt: true,
           lastFailureAt: true,
           createdAt: true,
+          timeoutMs: true,
         },
       });
       const pageContinues = loaded.length > WEBHOOK_LIST_PAGE;
@@ -128,6 +170,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
           lastDeliveryAt: s.lastDeliveryAt?.toISOString() ?? null,
           lastFailureAt: s.lastFailureAt?.toISOString() ?? null,
           createdAt: s.createdAt.toISOString(),
+          timeoutMs: s.timeoutMs,
         })),
       };
     },
@@ -150,7 +193,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       } catch (err) {
         throw server.httpErrors.badRequest(err instanceof Error ? err.message : 'Invalid URL');
       }
-      const secret = `whsec_${Buffer.from(randomUUID()).toString('base64url')}`;
+      const secret = newSigningSecret();
       const subscriptionId = randomUUID();
       const [created] = await prisma.$transaction([
         prisma.webhookSubscription.create({
@@ -164,6 +207,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             secretHash: hashWebhookSigningSecret(secret),
             events: req.body.events,
             active: req.body.active,
+            timeoutMs: req.body.timeoutMs,
           },
         }),
         prisma.auditLog.create({
@@ -175,6 +219,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             diff: {
               active: req.body.active,
               events: req.body.events,
+              timeoutMs: req.body.timeoutMs,
               urlHost: new URL(req.body.url).hostname,
             },
           }),
@@ -189,6 +234,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         lastDeliveryAt: null,
         lastFailureAt: null,
         createdAt: created.createdAt.toISOString(),
+        timeoutMs: created.timeoutMs,
         signingSecret: secret,
       });
     },
@@ -225,6 +271,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             ...(req.body.url !== undefined ? { url: req.body.url } : {}),
             ...(req.body.events !== undefined ? { events: req.body.events } : {}),
             ...(req.body.active !== undefined ? { active: req.body.active } : {}),
+            ...(req.body.timeoutMs !== undefined ? { timeoutMs: req.body.timeoutMs } : {}),
           },
         }),
         prisma.auditLog.create({
@@ -238,6 +285,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
               ...(req.body.url !== undefined ? { urlHost: new URL(req.body.url).hostname } : {}),
               ...(req.body.events !== undefined ? { events: req.body.events } : {}),
               ...(req.body.active !== undefined ? { active: req.body.active } : {}),
+              ...(req.body.timeoutMs !== undefined ? { timeoutMs: req.body.timeoutMs } : {}),
             },
           }),
         }),
@@ -251,6 +299,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         lastDeliveryAt: updated.lastDeliveryAt?.toISOString() ?? null,
         lastFailureAt: updated.lastFailureAt?.toISOString() ?? null,
         createdAt: updated.createdAt.toISOString(),
+        timeoutMs: updated.timeoutMs,
       };
     },
   );
@@ -284,6 +333,124 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         }),
       ]);
       return reply.code(204).send();
+    },
+  );
+
+  // ── Retry policy ──────────────────────────────────────────────────────────
+
+  async function findOwnedSubscription(req: FastifyRequest, id: string) {
+    const sub = await prisma.webhookSubscription.findFirst({
+      where: { id, orgId: req.auth.orgId, deletedAt: null },
+    });
+    if (!sub) throw server.httpErrors.notFound('Subscription not found');
+    return sub;
+  }
+
+  async function saveRetryPolicy(req: FastifyRequest, id: string, policy: WebhookRetryPolicy) {
+    const existing = await findOwnedSubscription(req, id);
+    const [updated] = await prisma.$transaction([
+      prisma.webhookSubscription.update({ where: { id: existing.id }, data: policy }),
+      prisma.auditLog.create({
+        data: webhookSubscriptionAuditData({
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'webhook_subscription.retry_policy',
+          subscriptionId: existing.id,
+          diff: { ...policy, previous: retryPolicyOf(existing) },
+        }),
+      }),
+    ]);
+    return retryPolicyOf(updated);
+  }
+
+  server.get(
+    '/webhook-subscriptions/:id/retry-policy',
+    {
+      preHandler: server.requirePermission('webhooks:read'),
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: WebhookRetryPolicySchema },
+      },
+    },
+    async (req) => retryPolicyOf(await findOwnedSubscription(req, req.params.id)),
+  );
+
+  server.put(
+    '/webhook-subscriptions/:id/retry-policy',
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: WebhookRetryPolicySchema,
+        response: { 200: WebhookRetryPolicySchema },
+      },
+    },
+    async (req) => saveRetryPolicy(req, req.params.id, req.body),
+  );
+
+  server.delete(
+    '/webhook-subscriptions/:id/retry-policy',
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: WebhookRetryPolicySchema },
+      },
+    },
+    async (req) => saveRetryPolicy(req, req.params.id, { ...DEFAULT_WEBHOOK_RETRY_POLICY }),
+  );
+
+  // ── Secret rotation ───────────────────────────────────────────────────────
+
+  server.post(
+    '/webhook-subscriptions/:id/rotate-secret',
+    {
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: RotateSecretBody,
+        response: {
+          200: z.object({
+            signingSecret: z.string(),
+            previousSecretExpiresAt: z.string().datetime().nullable(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const existing = await findOwnedSubscription(req, req.params.id);
+      const secret = newSigningSecret();
+      const overlapHours = req.body.overlapHours;
+      const previousSecretExpiresAt =
+        overlapHours > 0 ? new Date(Date.now() + overlapHours * 3_600_000) : null;
+      await prisma.$transaction([
+        prisma.webhookSubscription.update({
+          where: { id: existing.id },
+          data: {
+            // Encrypted at rest like on create; the plaintext is returned once.
+            secret: encryptSecret(secret),
+            secretHash: hashWebhookSigningSecret(secret),
+            previousSecret: previousSecretExpiresAt ? existing.secret : null,
+            previousSecretExpiresAt,
+          },
+        }),
+        prisma.auditLog.create({
+          data: webhookSubscriptionAuditData({
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'webhook_subscription.rotate_secret',
+            subscriptionId: existing.id,
+            diff: { overlapHours, previousSecretExpiresAt: previousSecretExpiresAt?.toISOString() ?? null },
+          }),
+        }),
+      ]);
+      return {
+        signingSecret: secret,
+        previousSecretExpiresAt: previousSecretExpiresAt?.toISOString() ?? null,
+      };
     },
   );
 

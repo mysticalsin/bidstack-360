@@ -188,6 +188,11 @@ const PERMISSION_SEEDS = [
   permission('users:read', 'Read users', 'View organization users.'),
   permission('users:write', 'Manage users', 'Update organization users and role assignments.'),
   permission('webhooks:read', 'Read webhooks', 'View webhook subscriptions.'),
+  permission(
+    'webhooks:replay',
+    'Replay webhooks',
+    'Re-send a stored webhook message to its endpoint through the outbox.',
+  ),
   permission('webhooks:write', 'Manage webhooks', 'Create and update webhook subscriptions.'),
   permission('workflows:read', 'Read workflows', 'View workflow automation definitions and runs.'),
   permission('workflows:write', 'Manage workflows', 'Create, update, and run workflow automation.'),

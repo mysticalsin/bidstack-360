@@ -85,7 +85,7 @@ function job(attemptsMade = 0, sub: Sub = {}, data: Record<string, unknown> = {}
 }
 
 function response(status: number, body = '', headers: Record<string, string> = {}): Response {
-  return new Response(body, { status, headers });
+  return new Response(status === 204 ? null : body, { status, headers });
 }
 
 beforeEach(() => {

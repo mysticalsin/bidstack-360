@@ -30,7 +30,14 @@ export type WebhookOutboxRow = {
   payload: Record<string, unknown>;
   attempts: number;
   createdAt: Date;
+  /** Replay rows only: the one subscription to deliver to. */
+  subscriptionId?: string | null;
+  /** Replay rows only: the message being re-sent. */
+  replayOfId?: string | null;
 };
+
+/** 'replays' claims only targeted replay rows (domain outbox flag off). */
+export type WebhookOutboxClaimMode = 'all' | 'replays';
 
 /** Delay before the next try after failed attempt number `attempt` (1-based). */
 export function webhookOutboxBackoffMs(attempt: number): number {
@@ -45,11 +52,14 @@ export async function recordWebhookOutboxEvent(
     event: string;
     payload: Record<string, unknown>;
     idempotencyKey: string;
+    subscriptionId?: string;
+    replayOfId?: string;
   },
 ): Promise<{ id: string; duplicate: boolean }> {
   const inserted = await db.$queryRaw<Array<{ id: string }>>`
-    INSERT INTO webhook_outbox (org_id, event, payload, idempotency_key)
-    VALUES (${input.orgId}::uuid, ${input.event}, ${JSON.stringify(input.payload)}::jsonb, ${input.idempotencyKey})
+    INSERT INTO webhook_outbox (org_id, event, payload, idempotency_key, subscription_id, replay_of_id)
+    VALUES (${input.orgId}::uuid, ${input.event}, ${JSON.stringify(input.payload)}::jsonb, ${input.idempotencyKey},
+            ${input.subscriptionId ?? null}::uuid, ${input.replayOfId ?? null}::uuid)
     ON CONFLICT (org_id, idempotency_key) DO NOTHING
     RETURNING id`;
   if (inserted[0]) return { id: inserted[0].id, duplicate: false };
@@ -62,7 +72,9 @@ export async function recordWebhookOutboxEvent(
 export async function claimWebhookOutboxBatch(
   db: Db,
   limit: number,
+  mode: WebhookOutboxClaimMode = 'all',
 ): Promise<WebhookOutboxRow[]> {
+  const replaysOnly = mode === 'replays';
   // Rows whose lease expired with the budget spent were held by relays that
   // crashed every time; stop retrying them.
   await db.$executeRaw`
@@ -70,7 +82,8 @@ export async function claimWebhookOutboxBatch(
        SET status = 'dead', last_error = coalesce(last_error, 'relay lease expired')
      WHERE status = 'pending'
        AND attempts >= ${WEBHOOK_OUTBOX_MAX_ATTEMPTS}
-       AND next_attempt_at <= now()`;
+       AND next_attempt_at <= now()
+       AND (NOT ${replaysOnly} OR subscription_id IS NOT NULL)`;
   const rows = await db.$queryRaw<
     Array<{
       id: string;
@@ -79,6 +92,8 @@ export async function claimWebhookOutboxBatch(
       payload: Record<string, unknown>;
       attempts: number;
       created_at: Date;
+      subscription_id: string | null;
+      replay_of_id: string | null;
     }>
   >`
     WITH due AS (
@@ -86,6 +101,7 @@ export async function claimWebhookOutboxBatch(
        WHERE status = 'pending'
          AND attempts < ${WEBHOOK_OUTBOX_MAX_ATTEMPTS}
          AND next_attempt_at <= now()
+         AND (NOT ${replaysOnly} OR subscription_id IS NOT NULL)
        ORDER BY next_attempt_at
        LIMIT ${limit}
        FOR UPDATE SKIP LOCKED
@@ -95,7 +111,8 @@ export async function claimWebhookOutboxBatch(
            next_attempt_at = now() + make_interval(secs => ${CLAIM_LEASE_MS / 1000}::float8)
       FROM due
      WHERE o.id = due.id
-    RETURNING o.id, o.org_id, o.event, o.payload, o.attempts, o.created_at`;
+    RETURNING o.id, o.org_id, o.event, o.payload, o.attempts, o.created_at,
+              o.subscription_id::text AS subscription_id, o.replay_of_id::text AS replay_of_id`;
   return rows.map((r) => ({
     id: r.id,
     orgId: r.org_id,
@@ -103,6 +120,8 @@ export async function claimWebhookOutboxBatch(
     payload: r.payload,
     attempts: r.attempts,
     createdAt: r.created_at,
+    subscriptionId: r.subscription_id,
+    replayOfId: r.replay_of_id,
   }));
 }
 

@@ -185,6 +185,7 @@ export {
   markWebhookOutboxFailed,
   recordWebhookOutboxEvent,
   webhookOutboxBackoffMs,
+  type WebhookOutboxClaimMode,
   type WebhookOutboxRow,
 } from './webhook-outbox.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';

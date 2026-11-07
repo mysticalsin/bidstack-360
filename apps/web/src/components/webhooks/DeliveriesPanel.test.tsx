@@ -9,7 +9,9 @@ vi.mock('react-i18next', () => ({
       fallback.replace(/\{\{(\w+)\}\}/g, (_, n: string) => String(vars?.[n] ?? '')),
   }),
 }));
-vi.mock('@/hooks/useWebhookDeliveries', () => ({ useWebhookDeliveryStats: m.useWebhookDeliveryStats }));
+vi.mock('@/hooks/useWebhookDeliveries', () => ({
+  useWebhookDeliveryStats: m.useWebhookDeliveryStats,
+}));
 
 import { DeliveriesPanel } from './DeliveriesPanel';
 
@@ -49,8 +51,12 @@ describe('DeliveriesPanel', () => {
 
   it('draws one cell per endpoint and hour, each with an accessible name', () => {
     render(<DeliveriesPanel subscriptions={SUBS} filters={{}} onFiltersChange={vi.fn()} />);
-    expect(screen.getByRole('img', { name: 'a.example.com, 14:00 UTC: 3 attempts, 1 failed' })).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'b.example.com, 09:00 UTC: 5 attempts, 0 failed' })).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: 'a.example.com, 14:00 UTC: 3 attempts, 1 failed' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: 'b.example.com, 09:00 UTC: 5 attempts, 0 failed' }),
+    ).toBeTruthy();
     expect(screen.getAllByRole('img', { name: /UTC: 0 attempts/ })).toHaveLength(46);
   });
 

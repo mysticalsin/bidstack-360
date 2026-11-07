@@ -109,8 +109,9 @@ function write(...res: string[]): PermissionKey[] {
  * Each entry lists the permissions granted to that role.
  */
 export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> = {
-  // msa:admin (archive MSAs and file versions, edit any MSA) is Admin-only.
-  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin'],
+  // msa:admin (archive MSAs and file versions, edit any MSA) and
+  // webhooks:replay (re-send a stored payload to an endpoint) are Admin-only.
+  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin', 'webhooks:replay'],
 
   'Sales Manager': [
     ...ALL_READ,

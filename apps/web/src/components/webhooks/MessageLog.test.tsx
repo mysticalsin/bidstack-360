@@ -86,11 +86,22 @@ const DETAIL = {
 };
 
 beforeEach(() => {
-  m.useWebhookMessages.mockReturnValue({ data: { items: ITEMS, nextCursor: null }, isLoading: false, isError: false });
-  m.useWebhookMessage.mockImplementation((id: string | null) => ({ data: id ? DETAIL : undefined, isLoading: false, isError: false }));
+  m.useWebhookMessages.mockReturnValue({
+    data: { items: ITEMS, nextCursor: null },
+    isLoading: false,
+    isError: false,
+  });
+  m.useWebhookMessage.mockImplementation((id: string | null) => ({
+    data: id ? DETAIL : undefined,
+    isLoading: false,
+    isError: false,
+  }));
   m.useReplayWebhookMessage.mockReturnValue({ mutateAsync: m.replay, isPending: false });
   m.replay.mockResolvedValue({ outboxId: 'o1', duplicate: false });
-  Object.assign(navigator, { clipboard: { writeText: m.writeText } });
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: m.writeText },
+    configurable: true,
+  });
   m.writeText.mockResolvedValue(undefined);
 });
 
@@ -151,7 +162,11 @@ describe('MessageLog', () => {
 
   it('shows one sentence and no table when there are no messages', () => {
     m.useHasPermission.mockReturnValue(true);
-    m.useWebhookMessages.mockReturnValue({ data: { items: [], nextCursor: null }, isLoading: false, isError: false });
+    m.useWebhookMessages.mockReturnValue({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+    });
     render(<MessageLog filters={{}} />);
     expect(screen.getByText('No messages match these filters.')).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();

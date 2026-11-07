@@ -29,14 +29,24 @@ const SUBS = [{ id: 's1', url: 'https://a.example.com/hook' }];
 
 beforeEach(() => {
   m.useWebhookRetryPolicy.mockReturnValue({
-    data: { maxAttempts: 5, backoffStrategy: 'exponential', backoffBaseSeconds: 30, timeoutMs: 10000 },
+    data: {
+      maxAttempts: 5,
+      backoffStrategy: 'exponential',
+      backoffBaseSeconds: 30,
+      timeoutMs: 10000,
+    },
     isLoading: false,
     isError: false,
   });
   m.useSaveWebhookRetryPolicy.mockReturnValue({ mutateAsync: m.save, isPending: false });
   m.useResetWebhookRetryPolicy.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   m.useWebhookDeliveryStats.mockReturnValue({
-    data: { messages: { total: 2, succeeded: 2, failed: 0, pending: 0 }, successRate: 1, heatmap: [], latencyMs: [120, 340] },
+    data: {
+      messages: { total: 2, succeeded: 2, failed: 0, pending: 0 },
+      successRate: 1,
+      heatmap: [],
+      latencyMs: [120, 340],
+    },
     isLoading: false,
     isError: false,
   });

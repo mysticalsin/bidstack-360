@@ -90,6 +90,7 @@ import { leadRotRoutes } from './routes/lead-rot.js';
 import { savedViewsRoutes } from './routes/saved-views.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
+import { webhookMessagesRoutes } from './routes/webhook-messages.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
 import { accountPeopleRoutes } from './routes/account-people.js';
@@ -264,6 +265,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
+await server.register(webhookMessagesRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
   await server.register(accountPeopleRoutes, { prefix: '/api/v1' });
   await server.register(duplicatesRoutes, { prefix: '/api/v1' });
