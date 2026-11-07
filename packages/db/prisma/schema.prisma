@@ -2443,7 +2443,6 @@ model Workflow {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([orgId, active], map: "workflows_org_active_idx")
-  @@index([orgId, updatedAt(sort: Desc)], map: "workflows_org_updated_idx")
   @@index([deletedAt])
   @@map("workflows")
 }
@@ -2636,7 +2635,6 @@ model ServiceCase {
   @@index([orgId, ownerId], map: "service_cases_org_owner_idx")
   @@index([orgId, slaDeadline], map: "service_cases_org_sla_idx")
   @@index([orgId, companyId])
-  @@index([orgId, createdAt(sort: Desc), id(sort: Desc)], map: "service_cases_org_created_idx")
   @@index([deletedAt])
   @@map("service_cases")
 }

@@ -183,6 +183,10 @@ export function applyOpportunityScope(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput {
   if (scope.unrestricted) return where;
+  // A key owns no deals and its userId is not a uuid: scope by its company allowlist.
+  if (isApiKeyActor(scope.userId)) {
+    return { AND: [where, { companyId: { in: scope.companyIds } }] };
+  }
   // Group codes are uppercase ISO-2 (CountryCode schema), but opportunity.country
   // / territory.countryCodes are stored raw — match both cases so a lowercase
   // record isn't silently hidden from a user who should see it. Prisma `in`
@@ -216,6 +220,7 @@ export function accountOpportunityScopePredicate(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput | null {
   if (scope.unrestricted) return null;
+  if (isApiKeyActor(scope.userId)) return { companyId: { in: scope.companyIds } };
   const variants = countryVariantsForScope(scope);
   const clauses: Prisma.OpportunityWhereInput[] = [{ ownerId: scope.userId }];
   if (variants.length > 0) {
