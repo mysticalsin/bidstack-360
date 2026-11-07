@@ -164,7 +164,7 @@ export function CompanyDetailPage() {
             )}
           </div>
 
-          <CompanyTechStackSection companyName={c.name} />
+          <CompanyTechStackSection companyId={c.id} />
 
           <div
             className="flex gap-2 border-b border-[var(--border-subtle)]"
