@@ -141,7 +141,7 @@ export const Row = memo(function Row({
         </label>
       </td>
 
-      <td className="px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
+      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
         <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)]">
           {opp.code}
         </Link>
@@ -286,7 +286,7 @@ export const Row = memo(function Row({
         {/* Editable date stays on DateCell; DueDateChip adds the urgency
             signal a bare date never carried — deadline slippage is the #1
             preventable bid loss. */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           <DateCell
             value={opp.dueDate}
             format={(v) => formatDate(v)}
