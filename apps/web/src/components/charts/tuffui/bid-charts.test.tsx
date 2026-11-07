@@ -75,7 +75,8 @@ describe('DivergingBars (bid placements)', () => {
 
   it('keeps an sr-only table with every number and stable, rounded geometry', () => {
     const { container } = render(<DivergingBars {...props} labels={['a', 'b', 'c', 'd', 'e', 'f', 'g']} series={[{ id: 's', label: 'S', values: [1, 2, 3, 4, 5, 6, 7] }]} below={undefined} />);
-    expect(within(screen.getByRole('table')).getByText('7')).toBeTruthy();
+    expect(within(screen.getByRole('table')).getByRole('rowheader', { name: 'g' })).toBeTruthy();
+    expect(within(screen.getByRole('table')).getAllByText('7').length).toBeGreaterThan(0);
     expectRoundedGeometry(container);
     cleanup();
     expectStable(() => <DivergingBars {...props} />);

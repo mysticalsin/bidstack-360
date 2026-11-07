@@ -27,7 +27,7 @@ describe('DashboardHero', () => {
   it('keeps the headline figures and draws bids by close month as diverging bars', () => {
     render(<DashboardHero rows={rows} openValue={11_900_000} weighted={7_100_000} openCount={6} onDrill={vi.fn()} />);
     expect(screen.getByRole('button', { name: /open pipeline 11\.9M: show the open bids/i })).toBeTruthy();
-    expect(screen.getByText('Weighted 7.1M')).toBeTruthy();
+    expect(screen.getByText(/^Weighted 7\.1M$/i)).toBeTruthy();
     expect(screen.getByRole('button', { name: /won this year 7\.9M/i })).toBeTruthy();
     expect(screen.getByRole('group', { name: /bids by close month/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Overdue' })).toBeTruthy();

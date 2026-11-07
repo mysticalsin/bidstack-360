@@ -1,76 +1,35 @@
-// Bid/No-Bid score card — owns the useBidScoreLatest hook and renders the
-// composite score, recommendation badge, per-criteria breakdown, category
-// scores, override badge (justification on hover/focus), and a drill-through
-// link to the bid matrix. Read-tolerant: criterion ids from older score
-// versions render with their legacy label and stored rating instead of
-// crashing or disappearing.
+// Bid/No-Bid score card: owns the useBidScoreLatest hook and renders the
+// composite score, recommendation badge, the criteria as a radar against the
+// go threshold, override badge (justification on hover/focus), and a
+// drill-through link to the bid matrix. Criterion ids from older score
+// versions are not in the registry, so they stay out of the radar.
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { bidCriterionById, bidCriterionLabel } from '@bidstack/shared';
 
+import { bidCriteriaRadar } from '@/components/charts/bid-chart-data';
+import { RadarChart } from '@/components/charts/tuffui/radar-chart';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useBidScoreLatest } from '@/hooks/useBidScore';
 
-import { CATEGORY_INFO } from '../bidNoBid/bidNoBidTypes';
-
 const REC_TONE = { bid: 'jade', no_bid: 'tomato', proceed_with_caution: 'amber' } as const;
 
-function CriteriaBreakdown({ criteria }: { criteria: Record<string, number> }) {
-  const { t } = useTranslation('crm');
-  const rows = Object.entries(criteria)
-    .filter(([, rating]) => rating > 0)
-    .sort(([a], [b]) => bidCriterionLabel(a).localeCompare(bidCriterionLabel(b)));
-  if (rows.length === 0) return null;
+const GO_LABEL = 'Go threshold';
 
-  return (
-    <ul className="space-y-1" aria-label={t('bidScore.criteriaBreakdownLabel', 'Criteria breakdown')}>
-      {rows.map(([id, rating]) => {
-        const def = bidCriterionById(id);
-        const points = def ? ((rating / 5) * def.weight).toFixed(1) : null;
-        return (
-          <li key={id} className="flex items-center justify-between gap-2 text-xs">
-            <span className="truncate text-[var(--fg-secondary)]">{bidCriterionLabel(id)}</span>
-            <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
-              <span className="text-[var(--fg-primary)]">{rating}/5</span>
-              <span className="w-14 text-right text-[var(--fg-tertiary)]">
-                {points !== null
-                  ? t('bidScore.criterionPoints', '{{points}}/{{weight}} pts', {
-                      points,
-                      weight: def?.weight,
-                    })
-                  : '—'}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function CategoryScores({ categoryScores }: { categoryScores: Record<string, number> }) {
+function CriteriaRadar({ criteria }: { criteria: Record<string, number> }) {
   const { t } = useTranslation('crm');
-  const entries = Object.entries(categoryScores);
-  if (entries.length === 0) return null;
+  const radar = bidCriteriaRadar(criteria);
+  if (radar.rated === 0) return null;
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1" aria-label={t('bidScore.categoryScoresLabel', 'Category scores')}>
-      {entries.map(([cat, value]) => (
-        <div key={cat} className="flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-[var(--fg-tertiary)]">
-            {CATEGORY_INFO[cat]?.label ?? cat}
-          </span>
-          <span
-            className="font-semibold tabular-nums"
-            style={{ color: CATEGORY_INFO[cat]?.color ?? 'var(--fg-secondary)' }}
-          >
-            {Math.round(value)}%
-          </span>
-        </div>
-      ))}
-    </div>
+    <RadarChart
+      title={t('bidScore.criteriaRadarLabel', 'Bid criteria')}
+      axes={radar.axes}
+      max={5}
+      series={{ id: 'score', label: t('bidScore.thisBid', 'This bid'), values: radar.values }}
+      baseline={{ label: t('bidScore.goThreshold', GO_LABEL), values: radar.baseline }}
+    />
   );
 }
 
@@ -134,8 +93,7 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
                   </Tooltip>
                 ) : null}
               </div>
-              <CriteriaBreakdown criteria={data.criteria} />
-              <CategoryScores categoryScores={data.categoryScores} />
+              <CriteriaRadar criteria={data.criteria} />
             </div>
             <div className="pt-2">
               <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">

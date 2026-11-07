@@ -55,7 +55,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2041',
     customer: 'CI Financial',
-    name: 'CI Financial — IT Modernization & MSP',
+    name: 'CI Financial: IT Modernization & MSP',
     stage: OpportunityStage.s3_technical_iteration,
     value: 1_240_000,
     probability: 65,
@@ -68,7 +68,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2042',
     customer: 'Logistec Corporation',
-    name: 'Logistec Corporation — SOC 2 Readiness',
+    name: 'Logistec Corporation: SOC 2 Readiness',
     stage: OpportunityStage.s1_ongoing,
     value: 320_000,
     probability: 35,
@@ -81,7 +81,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2043',
     customer: 'Rush University System for Health',
-    name: 'Rush University — EHR Cloud Migration',
+    name: 'Rush University: EHR Cloud Migration',
     stage: OpportunityStage.s4_negotiation,
     value: 4_800_000,
     probability: 78,
@@ -94,7 +94,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2044',
     customer: 'MAPFRE',
-    name: 'MAPFRE — Identity & Access Overhaul',
+    name: 'MAPFRE: Identity & Access Overhaul',
     stage: OpportunityStage.s1_ongoing,
     value: 680_000,
     probability: 20,
@@ -107,7 +107,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2045',
     customer: 'MAHLE',
-    name: 'MAHLE — OT/IT Convergence',
+    name: 'MAHLE: OT/IT Convergence',
     stage: OpportunityStage.s2_sent,
     value: 2_150_000,
     probability: 55,
@@ -120,7 +120,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2046',
     customer: 'Aritzia',
-    name: 'Aritzia — Endpoint Refresh',
+    name: 'Aritzia: Endpoint Refresh',
     stage: OpportunityStage.closed_won, // prototype: "won"
     value: 410_000,
     probability: 100,
@@ -133,7 +133,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2047',
     customer: 'NOS',
-    name: 'NOS — SOC build-out',
+    name: 'NOS: SOC build-out',
     stage: OpportunityStage.closed_lost, // prototype: "lost"
     value: 1_900_000,
     probability: 0,
@@ -146,7 +146,7 @@ export const fixtureOpps: FixtureOpp[] = [
   {
     code: 'OP-2048',
     customer: 'DNB Bank',
-    name: 'DNB Bank — Cloud landing zone',
+    name: 'DNB Bank: Cloud landing zone',
     stage: OpportunityStage.s1_ongoing,
     value: 2_700_000,
     probability: 40,

@@ -176,7 +176,7 @@ describe('SectorViewPage pipeline by sector', () => {
     expect(container.querySelector('[aria-label="Technology, front row: Overdue 1k"]')).toBeTruthy();
     const strip = container.querySelector('.sector-command-strip')!;
     expect(strip.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByTestId('world-map')).toBeTruthy();
+    expect(screen.getByText('Global opportunity map')).toBeTruthy();
   });
 
   it('shows one empty sentence without open pipeline', () => {

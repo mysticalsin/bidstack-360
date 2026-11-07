@@ -1,8 +1,9 @@
 // TUFFUI (https://tuffui.com) · MIT License · Copyright (c) 2026 TUFFUI contributors
-// Vendored from registry/diverging-bars/diverging-bars.tsx at commit 378f3eaa. See ./LICENSE.
-// Polo rewrites: Shell/Panel/ShellHeader and RollingNumber removed (the caller
-// owns the card and headline), shadcn colour classes swapped for Polo tokens,
-// palette moved to --chart-*, motion tokens inlined.
+// Vendored from registry/diverging-bars/diverging-bars.tsx at commit 378f3eaa (see ./LICENSE).
+// Rewrites at import: Shell/Panel/ShellHeader and RollingNumber removed (the
+// caller owns the card and headline), shadcn colour classes swapped for Polo
+// tokens, palette moved to --chart-*, motion tokens inlined, geometry rounded
+// to two decimals, onActivate on click and Enter, named column hit areas.
 
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
@@ -31,6 +32,8 @@ export type DivergingBarsProps = {
   format?: (value: number) => string;
   /** Called when a column is hovered, clicked or reached with the arrow keys. */
   onSelect?: (index: number) => void;
+  /** Called when a column is clicked, or reached with the arrow keys and Enter pressed. */
+  onActivate?: (index: number) => void;
   className?: string;
 };
 
@@ -85,6 +88,8 @@ function useWidth() {
 }
 
 const sum = (values: number[]) => values.reduce((n, v) => n + v, 0);
+// Fixed precision keeps server and client markup identical.
+const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /**
  * Stacked columns. Series stack upward as separate rounded segments; one
@@ -98,6 +103,7 @@ export function DivergingBars({
   title,
   format = compact,
   onSelect,
+  onActivate,
   className,
 }: DivergingBarsProps) {
   const reduce = useReducedMotion();
@@ -144,6 +150,11 @@ export function DivergingBars({
       End: count - 1,
     };
     if (event.key === 'Escape') return select(null, true);
+    if ((event.key === 'Enter' || event.key === ' ') && activeIndex !== null) {
+      event.preventDefault();
+      onActivate?.(activeIndex);
+      return;
+    }
     if (!(event.key in keys)) return;
     event.preventDefault();
     select((keys[event.key]! + count) % count, true);
@@ -155,15 +166,15 @@ export function DivergingBars({
   const downH = below ? DOWN_H : 0;
   const zero = PAD.top + UP_H;
   const H = zero + (below ? ZERO_GAP + downH : 0) + PAD.bottom + 4;
-  const up = (v: number) => (v / upMax) * (UP_H - ZERO_GAP);
-  const down = (v: number) => (v / downMax) * downH;
+  const up = (v: number) => r2((v / upMax) * (UP_H - ZERO_GAP));
+  const down = (v: number) => r2((v / downMax) * downH);
 
   const innerW = Math.max(width - PAD.left - PAD.right, 40);
-  const band = innerW / Math.max(count, 1);
-  const barW = Math.min(band * 0.64, 22);
+  const band = r2(innerW / Math.max(count, 1));
+  const barW = r2(Math.min(band * 0.64, 22));
   const gap = barW < 8 ? 1.5 : 2;
-  const rx = Math.min(3, barW / 3);
-  const x = (i: number) => PAD.left + band * (i + 0.5);
+  const rx = r2(Math.min(3, barW / 3));
+  const x = (i: number) => r2(PAD.left + band * (i + 0.5));
   const labelEvery = Math.ceil(count / Math.max(Math.floor(innerW / 56), 1));
 
   const rows = (i: number) =>
@@ -216,7 +227,7 @@ export function DivergingBars({
           ref={ref}
           tabIndex={0}
           role="group"
-          aria-label={`${title}. Use arrow keys to read columns.`}
+          aria-label={`${title}. Use arrow keys to read columns${onActivate ? ', Enter to open one' : ''}.`}
           onKeyDown={onKeyDown}
           onBlur={() => fromKeyboard && setActive(null)}
           className="relative rounded-xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"
@@ -281,11 +292,11 @@ export function DivergingBars({
 
             {activeIndex !== null && (
               <rect
-                x={x(activeIndex) - Math.min(band, barW + 8) / 2}
+                x={r2(x(activeIndex) - Math.min(band, barW + 8) / 2)}
                 y={PAD.top - 6}
                 width={Math.min(band, barW + 8)}
                 height={UP_H + (below ? ZERO_GAP + downH : 0) + 12}
-                rx={Math.min(8, barW / 2 + 4)}
+                rx={r2(Math.min(8, barW / 2 + 4))}
                 style={{ fill: 'var(--surface-hover)' }}
               />
             )}
@@ -306,17 +317,17 @@ export function DivergingBars({
                   {visible.map((s) => {
                     const h = up(s.values[i] ?? 0);
                     if (h <= 0) return null;
-                    top -= h;
+                    top = r2(top - h);
                     // Every segment gives up the gap at its top; tiny ones keep 1px.
-                    const segH = Math.max(h - gap, 1);
+                    const segH = r2(Math.max(h - gap, 1));
                     return (
                       <motion.rect
                         key={s.id}
-                        x={x(i) - barW / 2}
+                        x={r2(x(i) - barW / 2)}
                         width={barW}
                         rx={rx}
                         initial={{ y: zero - ZERO_GAP, height: 0 }}
-                        animate={{ y: top + (h - segH), height: segH }}
+                        animate={{ y: r2(top + (h - segH)), height: segH }}
                         transition={transition}
                         style={{ fill: s.color }}
                       />
@@ -324,7 +335,7 @@ export function DivergingBars({
                   })}
                   {belowOn && below && (below.values[i] ?? 0) > 0 && (
                     <motion.rect
-                      x={x(i) - barW / 2}
+                      x={r2(x(i) - barW / 2)}
                       width={barW}
                       rx={rx}
                       y={zero + ZERO_GAP}
@@ -345,7 +356,7 @@ export function DivergingBars({
                   x={x(i)}
                   y={H - 6}
                   textAnchor={i === 0 ? 'start' : 'middle'}
-                  dx={i === 0 ? -barW / 2 : 0}
+                  dx={i === 0 ? r2(-barW / 2) : 0}
                   fontSize="10"
                   style={{
                     fill: activeIndex === i ? 'var(--fg-primary)' : 'var(--fg-tertiary)',
@@ -360,13 +371,21 @@ export function DivergingBars({
             {labels.map((label, i) => (
               <rect
                 key={`${label}-${i}`}
-                x={x(i) - band / 2}
+                role="graphics-symbol"
+                aria-label={`${label}: ${[...visible, ...(belowOn && below ? [below] : [])]
+                  .map((s) => `${s.label} ${format(s.values[i] ?? 0)}`)
+                  .join(', ')}`}
+                x={r2(x(i) - band / 2)}
                 y={PAD.top - 6}
                 width={band}
                 height={UP_H + (below ? ZERO_GAP + downH : 0) + 12}
                 fill="transparent"
+                className={onActivate ? 'cursor-pointer' : undefined}
                 onPointerEnter={() => select(i, false)}
-                onClick={() => select(i, false)}
+                onClick={() => {
+                  select(i, false);
+                  onActivate?.(i);
+                }}
               />
             ))}
           </svg>
