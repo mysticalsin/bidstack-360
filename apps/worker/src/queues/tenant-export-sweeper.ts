@@ -3,7 +3,8 @@
 //    was written. The row would wait forever.
 //  - `running` with no live worker: the worker died mid-export and BullMQ's
 //    stall handling exhausted the job without running our catch block.
-// The sweeper re-drives the first kind and fails the second kind past an SLA.
+// The sweeper re-drives the first kind and fails the second kind once its
+// heartbeat (updatedAt, refreshed by the running job) goes stale.
 
 import type { Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -17,8 +18,12 @@ const SWEEPER_QUEUE = 'tenant-export-sweeper';
 const SWEEP_EVERY_MS = 5 * 60 * 1000;
 /** A pending row younger than this may still be on its way to the queue. */
 export const PENDING_GRACE_MS = 10 * 60 * 1000;
-/** Longest a healthy export may run before it counts as abandoned. */
-export const RUNNING_SLA_MS = 2 * 60 * 60 * 1000;
+/**
+ * A running export with no heartbeat for this long counts as abandoned. The
+ * worker refreshes updatedAt every minute, and BullMQ retry backoff is at most
+ * a few minutes, so a live or retrying export never reaches this.
+ */
+export const RUNNING_STALE_MS = 15 * 60 * 1000;
 /** Rows re-enqueued per sweep, so a backlog drains over several sweeps. */
 export const SWEEP_BATCH = 100;
 
@@ -65,11 +70,11 @@ export async function sweepTenantExports(
     where: {
       status: 'running',
       deletedAt: null,
-      startedAt: { lt: new Date(now.getTime() - RUNNING_SLA_MS) },
+      updatedAt: { lt: new Date(now.getTime() - RUNNING_STALE_MS) },
     },
     data: {
       status: 'failed',
-      error: 'Export exceeded the 2-hour limit and was marked failed',
+      error: 'Export stopped reporting progress and was marked failed',
       completedAt: now,
     },
   });
