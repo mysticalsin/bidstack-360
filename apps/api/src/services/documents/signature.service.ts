@@ -108,6 +108,9 @@ async function getDocuSignAccessToken(): Promise<string> {
   return dsTokenCache.token;
 }
 
+/** INTERNAL signing links stop working this many days after they were sent. */
+export const SIGN_LINK_TTL_DAYS = 30;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function notFound(msg: string): never {

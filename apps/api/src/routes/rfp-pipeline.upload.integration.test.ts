@@ -202,6 +202,43 @@ describe('POST /api/v1/opportunities/:opportunityId/rfp/upload', () => {
     },
   );
 
+  skipIfNoDb('rejected uploads do not consume the hourly upload quota', async () => {
+    const redisMod = await import('../redis.js');
+    const incrSpy = vi.spyOn(redisMod.redis, 'incr');
+    const opp = await createOpportunity('upload-quota-not-burned');
+    const badFile = await createFile({ contentType: 'application/x-msdownload' });
+
+    const bad = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+      payload: { fileAttachmentId: badFile.id },
+    });
+    const missing = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+      payload: { fileAttachmentId: randomUUID() },
+    });
+
+    expect(bad.statusCode).toBe(415);
+    expect(missing.statusCode).toBe(404);
+    expect(incrSpy).not.toHaveBeenCalled();
+    incrSpy.mockRestore();
+  });
+
+  skipIfNoDb('413 when the JSON metadata body is oversized (bytes go to storage, not here)', async () => {
+    const opp = await createOpportunity('upload-oversized-body');
+    const file = await createFile();
+
+    const res = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/opportunities/${opp.id}/rfp/upload`,
+      headers: { 'content-type': 'application/json' },
+      payload: JSON.stringify({ fileAttachmentId: file.id, padding: 'x'.repeat(2 * 1024 * 1024) }),
+    });
+
+    expect(res.statusCode).toBe(413);
+  });
+
   skipIfNoDb('409 duplicate rfpRequestId rolls back document records', async () => {
     const opp = await createOpportunity('upload-duplicate-rfp');
     const firstFile = await createFile();
