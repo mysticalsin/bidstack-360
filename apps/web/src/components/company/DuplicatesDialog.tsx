@@ -310,7 +310,7 @@ function ClusterSection({
             {reasonLabel(reason, t)}
           </Badge>
         ))}
-        <span className="text-[11px] text-[var(--fg-tertiary)]">
+        <span className="text-xs text-[var(--fg-tertiary)]">
           {t('duplicates.recordCount', '{{count}} records', { count: cluster.records.length })}
         </span>
       </div>

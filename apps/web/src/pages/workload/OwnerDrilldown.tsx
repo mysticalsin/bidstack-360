@@ -63,7 +63,7 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
             to={`/opportunities/${o.id}`}
             className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 text-xs hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--border-focus)] dark:hover:bg-[var(--row-hover-tint)]"
           >
-            <span className="font-mono text-[11px] text-[var(--fg-tertiary)]">{o.code}</span>
+            <span className="font-mono text-xs text-[var(--fg-tertiary)]">{o.code}</span>
             <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg-primary)]">
               {o.customer} — {o.name}
             </span>

@@ -56,10 +56,7 @@ export default function SectorViewPage() {
   const classifiedPercent = view.data
     ? formatPercent(view.data.classifiedAccounts, view.data.totalAccounts)
     : '0%';
-  const maxSectorAccounts = Math.max(
-    1,
-    ...sectors.map((sector) => sector.accountCount),
-  );
+  const maxSectorAccounts = Math.max(1, ...sectors.map((sector) => sector.accountCount));
 
   return (
     <div className="space-y-5">
@@ -94,11 +91,7 @@ export default function SectorViewPage() {
             t('sectorView.errorMessage', 'The sector endpoint did not respond.')
           }
           action={
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => void view.refetch()}
-            >
+            <button type="button" className="btn btn-secondary" onClick={() => void view.refetch()}>
               {t('sectorView.retry', 'Retry')}
             </button>
           }
@@ -139,10 +132,7 @@ export default function SectorViewPage() {
           ) : null}
 
           {view.data.dataQualityWarning ? (
-            <div
-              role="status"
-              className="sector-quality-banner"
-            >
+            <div role="status" className="sector-quality-banner">
               <Icon name="info" size={16} aria-hidden />
               <div>
                 <strong>{t('sectorView.qualityWarningHeading', 'Sector coverage is low.')}</strong>{' '}
@@ -158,7 +148,10 @@ export default function SectorViewPage() {
             </div>
           ) : null}
 
-          <section className="sector-command-strip" aria-label={t('sectorView.metricsLabel', 'Sector metrics')}>
+          <section
+            className="sector-command-strip"
+            aria-label={t('sectorView.metricsLabel', 'Sector metrics')}
+          >
             <SectorMetric
               icon="building"
               label={t('sectorView.metricAccounts', 'Accounts')}
@@ -196,7 +189,7 @@ export default function SectorViewPage() {
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
                   {t('sectorView.geoEyebrow', 'Global opportunity map')}
                 </p>
                 <h2 className="text-base font-semibold text-[var(--fg-primary)]">
@@ -239,12 +232,18 @@ export default function SectorViewPage() {
                 ) : analytics.isError ? (
                   <ErrorState
                     title={t('sectorView.geoErrorTitle', 'Could not load the map')}
-                    message={analytics.error?.message ?? t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')}
+                    message={
+                      analytics.error?.message ??
+                      t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')
+                    }
                   />
                 ) : (analytics.data?.items.length ?? 0) === 0 ? (
                   <EmptyState
                     title={t('sectorView.geoEmptyTitle', 'No geographic data')}
-                    message={t('sectorView.geoEmptyMessage', 'Opportunities need a country to appear on the map.')}
+                    message={t(
+                      'sectorView.geoEmptyMessage',
+                      'Opportunities need a country to appear on the map.',
+                    )}
                   />
                 ) : (
                   <WorldMap
@@ -264,7 +263,10 @@ export default function SectorViewPage() {
                 ) : industrySegments.isError ? (
                   <ErrorState
                     title={t('sectorView.geoErrorTitle', 'Could not load the map')}
-                    message={industrySegments.error?.message ?? t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')}
+                    message={
+                      industrySegments.error?.message ??
+                      t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')
+                    }
                   />
                 ) : (
                   <IndustryBars items={industrySegments.data?.items ?? []} />
@@ -282,7 +284,11 @@ export default function SectorViewPage() {
                 </div>
                 <Badge tone="blue">{t('sectorView.mapBadge', 'ABC')}</Badge>
               </div>
-              <div className="sector-radar-list">
+              <div
+                className="sector-radar-list"
+                role="group"
+                aria-label={t('sectorView.sectorListLabel', 'Sectors')}
+              >
                 {view.data.sectors.map((sector) => (
                   <SectorButton
                     key={sector.sector}
@@ -305,14 +311,26 @@ export default function SectorViewPage() {
                     <p>{t('sectorView.detailEyebrow', 'Selected sector')}</p>
                     <h2>{titleCase(selectedSector.sector)}</h2>
                     <span>
-                      {t('sectorView.detailSummary', '{{accounts}} accounts across {{countries}} countries', {
-                        accounts: selectedSector.accountCount,
-                        countries: selectedSector.countries.length,
-                      })}
+                      {t(
+                        'sectorView.detailSummary',
+                        '{{accounts}} accounts across {{countries}} countries',
+                        {
+                          accounts: selectedSector.accountCount,
+                          countries: selectedSector.countries.length,
+                        },
+                      )}
                     </span>
                   </div>
-                  <div className="sector-detail-score" aria-label={t('sectorView.knownFteLabel', 'Known FTE coverage')}>
-                    <strong>{formatPercent(selectedSector.coverage.knownFteAccounts, selectedSector.accountCount)}</strong>
+                  <div
+                    className="sector-detail-score"
+                    aria-label={t('sectorView.knownFteLabel', 'Known FTE coverage')}
+                  >
+                    <strong>
+                      {formatPercent(
+                        selectedSector.coverage.knownFteAccounts,
+                        selectedSector.accountCount,
+                      )}
+                    </strong>
                     <span>{t('sectorView.knownFte', 'known FTE')}</span>
                   </div>
                 </div>
@@ -343,10 +361,15 @@ export default function SectorViewPage() {
                   </div>
                 ) : null}
 
-                <div className="sector-country-strip" aria-label={t('sectorView.countryFilterLabel', 'Country filter')}>
+                <div
+                  className="sector-country-strip"
+                  role="group"
+                  aria-label={t('sectorView.countryFilterLabel', 'Country filter')}
+                >
                   <button
                     type="button"
                     className={country === null ? 'is-active' : ''}
+                    aria-pressed={country === null}
                     onClick={() => setCountry(null)}
                   >
                     {t('sectorView.countryAll', 'All')}
@@ -356,6 +379,7 @@ export default function SectorViewPage() {
                       key={item.countryCode}
                       type="button"
                       className={country === item.countryCode ? 'is-active' : ''}
+                      aria-pressed={country === item.countryCode}
                       onClick={() => setCountry(item.countryCode)}
                     >
                       {countryLabel(item.countryCode)}
@@ -364,7 +388,10 @@ export default function SectorViewPage() {
                   ))}
                 </div>
 
-                <div className="sector-account-list" aria-label={t('sectorView.accountListLabel', 'Sector accounts')}>
+                <div
+                  className="sector-account-list"
+                  aria-label={t('sectorView.accountListLabel', 'Sector accounts')}
+                >
                   {filteredAccounts.length > 0 ? (
                     filteredAccounts.map((account) => (
                       <SectorAccountRow key={account.id} account={account} />
@@ -372,7 +399,10 @@ export default function SectorViewPage() {
                   ) : (
                     <EmptyState
                       title={t('sectorView.countryEmptyTitle', 'No account in this country sample')}
-                      message={t('sectorView.countryEmptyMessage', 'Choose another country or return to all accounts.')}
+                      message={t(
+                        'sectorView.countryEmptyMessage',
+                        'Choose another country or return to all accounts.',
+                      )}
                     />
                   )}
                 </div>
@@ -419,7 +449,10 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
     return (
       <EmptyState
         title={t('sectorView.geoIndustryEmptyTitle', 'No industry pipeline yet')}
-        message={t('sectorView.geoIndustryEmptyMessage', 'Opportunities gain an industry from their account classification.')}
+        message={t(
+          'sectorView.geoIndustryEmptyMessage',
+          'Opportunities gain an industry from their account classification.',
+        )}
       />
     );
   }
@@ -430,7 +463,9 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
       {sorted.map((seg) => (
         <div key={seg.key}>
           <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-            <span className="truncate font-medium text-[var(--fg-primary)]">{titleCase(seg.label)}</span>
+            <span className="truncate font-medium text-[var(--fg-primary)]">
+              {titleCase(seg.label)}
+            </span>
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
@@ -483,7 +518,9 @@ function SectorButton({
         <span style={{ width }} />
       </span>
       <span className="sector-radar-fte">
-        {sector.fteVolume != null ? sector.fteVolume.toLocaleString() : t('sectorView.fteUnknown', 'FTE unknown')}
+        {sector.fteVolume != null
+          ? sector.fteVolume.toLocaleString()
+          : t('sectorView.fteUnknown', 'FTE unknown')}
       </span>
     </button>
   );
@@ -518,7 +555,9 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
           {countryLabel(account.countryCode)}
           {account.domain ? ` / ${account.domain}` : ''}
         </small>
-        <span className={`sector-account-next${signal.status === 'complete' ? ' is-complete' : ''}`}>
+        <span
+          className={`sector-account-next${signal.status === 'complete' ? ' is-complete' : ''}`}
+        >
           {signal.reason} <b>{`Next: ${signal.nextAction}`}</b>
         </span>
       </span>
@@ -526,7 +565,11 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
         <Badge tone={account.source === 'verified_data' ? 'jade' : 'gray'}>
           {sourceLabel(account.source)}
         </Badge>
-        <small>{t('sectorView.accountConfidence', '{{value}}% confidence', { value: Math.round(account.confidence * 100) })}</small>
+        <small>
+          {t('sectorView.accountConfidence', '{{value}}% confidence', {
+            value: Math.round(account.confidence * 100),
+          })}
+        </small>
       </span>
       <Icon name="chevron-right" size={16} aria-hidden />
     </Link>

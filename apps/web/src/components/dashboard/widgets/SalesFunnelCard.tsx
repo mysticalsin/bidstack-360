@@ -66,13 +66,13 @@ export function SalesFunnelCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
-            <Icon name="filter" size={13} className="text-[var(--brand-primary)]" />
+            <Icon name="filter" size={13} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
           </div>
           <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('salesFunnel.title', 'Sales funnel')}
           </h2>
         </div>
-        <Link to="/pipeline" className="text-xs text-[var(--brand-primary)] hover:underline">
+        <Link to="/pipeline" className="text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline">
           {t('salesFunnel.viewPipeline', 'View pipeline')}
         </Link>
       </div>

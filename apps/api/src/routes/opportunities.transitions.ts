@@ -20,6 +20,7 @@ import {
 } from '@bidstack/shared';
 import { config } from '../env.js';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { createNotification } from '../services/notification.service.js';
@@ -80,7 +81,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
@@ -445,7 +446,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
         include: { pipelineStage: { select: { name: true } } },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');

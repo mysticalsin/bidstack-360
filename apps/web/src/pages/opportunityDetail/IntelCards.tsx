@@ -163,7 +163,7 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
               </div>
             </div>
             <div
-              className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] tabular-nums"
+              className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] tabular-nums"
               aria-label={t('intelCards.triggers.weightAria', 'Weight {{weight}}/10', { weight: trigger.weight })}
             >
               {trigger.weight}/10

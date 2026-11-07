@@ -67,14 +67,14 @@ export function StatTile({
         'motion-reduce:transition-none motion-reduce:hover:translate-y-0',
       )}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
+      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
         {label}
       </div>
       <div className="mt-2 truncate text-xl font-bold leading-tight tabular-nums text-[var(--fg-primary)]">
         {value}
       </div>
       {sublabel ? (
-        <div className="mt-1.5 text-[11px] font-medium text-[var(--fg-tertiary)]">{sublabel}</div>
+        <div className="mt-1.5 text-xs font-medium text-[var(--fg-tertiary)]">{sublabel}</div>
       ) : null}
     </div>
   );

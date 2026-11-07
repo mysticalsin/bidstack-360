@@ -79,6 +79,13 @@ export function LeadKanbanView({ leads }: Props) {
   const applyMove = useCallback(
     (lead: LeadSummary, targetStatus: LeadStatus) => {
       if (lead.status === targetStatus) return;
+      // The API rejects status edits into or out of converted: conversion
+      // creates the account and deal, so it only happens through Convert.
+      if (lead.status === 'converted') return;
+      if (targetStatus === 'converted') {
+        toast.info(t('leadKanban.convertFromLead', 'Open the lead and use Convert'));
+        return;
+      }
       update.mutate(
         { id: lead.id, patch: { status: targetStatus } },
         {
@@ -199,7 +206,10 @@ function Card({
   onMove: (leadId: string, dir: -1 | 1) => void;
 }) {
   const { t } = useTranslation('crm');
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: lead.id });
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: lead.id,
+    disabled: lead.status === 'converted',
+  });
   const days = daysSince(lead.statusChangedAt);
   const isRotten = rottenDays !== null && days >= rottenDays;
 
@@ -254,7 +264,7 @@ function Card({
       <p className="truncate text-xs text-[var(--fg-secondary)]">{lead.companyName}</p>
 
       <footer className="mt-1 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[var(--fg-tertiary)]">
+        <span className="text-xs text-[var(--fg-tertiary)]">
           {t('leadKanban.daysInStage', '{{count}}d in stage', { count: days })}
         </span>
         {isRotten ? <RotBadge leadId={lead.id} daysOver={days - (rottenDays ?? 0)} /> : null}
@@ -310,7 +320,7 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
         onClick={() => (open ? setOpen(false) : void onOpen())}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex h-5 items-center gap-1 rounded-full bg-[var(--danger)] px-2 text-[10px] font-semibold text-white"
+        className="inline-flex h-5 items-center gap-1 rounded-full bg-[var(--danger)] px-2 text-xs font-semibold text-white"
         aria-label={t(
           'leadKanban.rotBadgeAriaLabel',
           'Rotting: {{count}} days past threshold. Open recovery plays.',
@@ -327,7 +337,7 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
           aria-label={t('leadKanban.recoveryMenuAriaLabel', 'Suggested recovery plays')}
           className="absolute right-0 top-6 z-20 w-64 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-2 shadow-xl"
         >
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {t('leadKanban.recoveryHeading', 'Suggested recovery')}
           </div>
           {suggest.isPending ? (
@@ -354,7 +364,7 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
                     <div className="font-medium text-[var(--fg-primary)]">
                       {labelFor(play.kind, t)}
                     </div>
-                    <div className="text-[10px] text-[var(--fg-tertiary)]">{play.rationale}</div>
+                    <div className="text-xs text-[var(--fg-tertiary)]">{play.rationale}</div>
                   </Link>
                 </li>
               ))}

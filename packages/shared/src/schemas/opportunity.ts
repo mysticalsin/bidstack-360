@@ -145,6 +145,13 @@ export const OpportunityImportResult = z.object({
 });
 export type OpportunityImportResult = z.infer<typeof OpportunityImportResult>;
 
+// Query-string flag: "false"/"0" must read as false. z.coerce.boolean() turns
+// every non-empty string, "false" included, into true.
+export const QueryFlag = z.preprocess(
+  (v) => (v === 'false' || v === '0' ? false : v === 'true' || v === '1' ? true : v),
+  z.boolean(),
+);
+
 // Filter is consumed from query strings — coerce numerics so callers can pass
 // `?limit=20` without manual casting.
 export const OpportunityFilter = z.object({
@@ -160,7 +167,7 @@ export const OpportunityFilter = z.object({
   // (the UI only ever sends one) but the route does not enforce that — both
   // can be combined by a caller if that's ever useful.
   dueWithinDays: z.coerce.number().int().min(0).max(365).optional(),
-  overdue: z.coerce.boolean().optional(),
+  overdue: QueryFlag.optional(),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 

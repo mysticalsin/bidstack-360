@@ -65,7 +65,7 @@ export function KpiTile({
       />
       <div className="flex items-center justify-between gap-3 relative z-10">
         <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {label}
           </span>
           <div className="text-xl font-extrabold text-[var(--fg-primary)] tabular-nums tracking-tight">
@@ -101,11 +101,7 @@ export function CountryDetailPanel({
       : 0;
 
   return (
-    <Card
-      className={
-        selected ? 'transition-all duration-300' : 'opacity-70 transition-all duration-300'
-      }
-    >
+    <Card className="transition-all duration-300">
       <SectionHeader
         title={
           selected
@@ -119,7 +115,7 @@ export function CountryDetailPanel({
           selected && onClear ? (
             <button
               onClick={onClear}
-              className="text-[10px] font-bold text-[var(--fg-tertiary)] hover:text-[var(--brand-primary)] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] hover:bg-[var(--surface-hover)] transition-all cursor-pointer active:scale-95"
+              className="text-xs font-bold text-[var(--fg-tertiary)] hover:text-[var(--brand-primary)] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] hover:bg-[var(--surface-hover)] transition-all cursor-pointer active:scale-95"
             >
               {t('territoryPanels.clear', 'Clear')}
             </button>
@@ -132,7 +128,7 @@ export function CountryDetailPanel({
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
               {/* Metric-label icons inherit the label's tertiary tone — the old
                   per-icon amber/blue/emerald/purple sprinkle read as rainbow. */}
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
                 <Icon name="target" size={10} />
                 {t('territoryPanels.opportunities', 'Opportunities')}
               </div>
@@ -141,7 +137,7 @@ export function CountryDetailPanel({
               </div>
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
                 <Icon name="dollar" size={10} />
                 {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
@@ -153,7 +149,7 @@ export function CountryDetailPanel({
 
           {globalTotals && globalTotals.totalValueMicros > 0 && (
             <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
-              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 <span className="flex items-center gap-1.5">
                   {/* "growth" is a registered glyph — "activity" wasn't, so the
                       Icon component silently rendered nothing here. */}
@@ -177,7 +173,7 @@ export function CountryDetailPanel({
 
           <div className="space-y-3 border-t border-[var(--border-subtle)] pt-3">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
                 <Icon name="git-branch" size={11} />
                 {t('territoryPanels.assignedTerritories', 'Assigned Territories')}
               </div>
@@ -186,7 +182,7 @@ export function CountryDetailPanel({
                   selected.territories.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--fg-secondary)] shadow-sm hover:border-[var(--brand-primary)] transition-all duration-150 cursor-default"
+                      className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-0.5 text-xs font-semibold text-[var(--fg-secondary)] shadow-sm hover:border-[var(--brand-primary)] transition-all duration-150 cursor-default"
                     >
                       {t}
                     </span>
@@ -200,7 +196,7 @@ export function CountryDetailPanel({
             </div>
 
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
                 <Icon name="user" size={11} />
                 {t('territoryPanels.accountOwners', 'Account Owners')}
               </div>
@@ -209,7 +205,7 @@ export function CountryDetailPanel({
                   selected.ownerNames.map((o) => (
                     <span
                       key={o}
-                      className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--fg-secondary)] shadow-sm"
+                      className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-0.5 text-xs font-semibold text-[var(--fg-secondary)] shadow-sm"
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-[var(--presence-online)] mr-1.5 animate-pulse" />
                       {o}
@@ -230,12 +226,6 @@ export function CountryDetailPanel({
           </div>
           <span className="text-xs font-semibold text-[var(--fg-secondary)]">
             {t('territoryPanels.noCountrySelected', 'No Country Selected')}
-          </span>
-          <span className="text-[11px] text-[var(--fg-tertiary)] mt-1.5 max-w-[200px]">
-            {t(
-              'territoryPanels.noCountrySelectedHint',
-              'Click any active territory on the interactive map above to load metrics.',
-            )}
           </span>
         </div>
       )}
@@ -293,13 +283,7 @@ export function TerritoryListPanel({
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('territoryPanels.noTerritories', 'No territories')}
-          message={t(
-            'territoryPanels.noTerritoriesHint',
-            'Create your first territory to get started.',
-          )}
-        />
+        <EmptyState title={t('territoryPanels.noTerritories', 'No territories')} />
       ) : (
         <div className="space-y-2">
           {items.map((territory) => {
@@ -343,16 +327,16 @@ export function TerritoryListPanel({
                           {territory.name}
                         </div>
                         {territory.active ? (
-                          <span className="inline-flex items-center rounded-full bg-[var(--success-surface)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success-fg)] tracking-wide uppercase">
+                          <span className="inline-flex items-center rounded-full bg-[var(--success-surface)] px-1.5 py-0.5 text-xs font-bold text-[var(--success-fg)] tracking-wide uppercase">
                             {t('territoryPanels.active', 'Active')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--fg-tertiary)] tracking-wide uppercase">
+                          <span className="inline-flex items-center rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-bold text-[var(--fg-tertiary)] tracking-wide uppercase">
                             {t('territoryPanels.inactive', 'Inactive')}
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-[var(--fg-secondary)] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <div className="text-xs text-[var(--fg-secondary)] mt-0.5 flex items-center gap-1.5 flex-wrap">
                         {/* brand-deep: AA at 11px in both themes (indigo-500/80
                             was ~3.5:1 on white) and stays inside the one accent. */}
                         <span className="font-semibold text-[var(--brand-deep)]">
@@ -377,7 +361,7 @@ export function TerritoryListPanel({
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-[10px] font-semibold text-[var(--fg-secondary)] flex items-center gap-1 bg-[var(--surface-sunken)]/60 px-2 py-0.5 rounded-md border border-[var(--border-subtle)]">
+                      <div className="text-xs font-semibold text-[var(--fg-secondary)] flex items-center gap-1 bg-[var(--surface-sunken)]/60 px-2 py-0.5 rounded-md border border-[var(--border-subtle)]">
                         <Icon name="user" size={10} className="text-[var(--fg-tertiary)]" />
                         {territory.ownerName ?? t('territoryPanels.unassigned', 'Unassigned')}
                       </div>
@@ -461,13 +445,7 @@ export function RoutingRuleListPanel({
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('territoryPanels.noRoutingRules', 'No routing rules')}
-          message={t(
-            'territoryPanels.noRoutingRulesHint',
-            'Create your first rule to auto-assign leads.',
-          )}
-        />
+        <EmptyState title={t('territoryPanels.noRoutingRules', 'No routing rules')} />
       ) : (
         <div className="space-y-2">
           {items.map((r) => {
@@ -527,21 +505,21 @@ export function RoutingRuleListPanel({
                           {r.name}
                         </div>
                         {r.active ? (
-                          <span className="inline-flex items-center rounded-full bg-[var(--success-surface)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success-fg)] tracking-wide uppercase">
+                          <span className="inline-flex items-center rounded-full bg-[var(--success-surface)] px-1.5 py-0.5 text-xs font-bold text-[var(--success-fg)] tracking-wide uppercase">
                             {t('territoryPanels.active', 'Active')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--fg-tertiary)] tracking-wide uppercase">
+                          <span className="inline-flex items-center rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-bold text-[var(--fg-tertiary)] tracking-wide uppercase">
                             {t('territoryPanels.inactive', 'Inactive')}
                           </span>
                         )}
                         {criteria.countryCode ? (
-                          <span className="inline-flex items-center rounded-full bg-[var(--brand-primary-tint)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--brand-primary)] tracking-wide uppercase">
+                          <span className="inline-flex items-center rounded-full bg-[var(--brand-primary-tint)] px-1.5 py-0.5 text-xs font-bold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] tracking-wide uppercase">
                             {String(criteria.countryCode)}
                           </span>
                         ) : null}
                       </div>
-                      <div className="text-[11px] text-[var(--fg-secondary)] mt-1 flex items-center gap-1.5 flex-wrap">
+                      <div className="text-xs text-[var(--fg-secondary)] mt-1 flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-[var(--fg-tertiary)]">
                           {t('territoryPanels.priority', 'Priority {{priority}}', {
                             priority: r.priority,

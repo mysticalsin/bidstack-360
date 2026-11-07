@@ -715,6 +715,10 @@ model Contact {
   @@index([orgId, createdAt(sort: Desc)], map: "contacts_org_created_idx")
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "contacts_org_email_hash_idx")
+  // ?search= ILIKE '%term%' over these three columns.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_name_trgm_idx")
+  @@index([customer(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_customer_trgm_idx")
+  @@index([role(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_role_trgm_idx")
   @@map("contacts")
 }
 
@@ -5572,6 +5576,8 @@ model WinLossRecord {
 
   @@index([orgId, outcome, reason], map: "win_loss_records_org_outcome_reason_idx")
   @@index([orgId, opportunityId], map: "win_loss_records_org_opp_idx")
+  // GET /win-loss/analysis filters on (orgId, createdAt range) and sorts by createdAt.
+  @@index([orgId, createdAt(sort: Desc)], map: "win_loss_records_org_created_idx")
   @@map("win_loss_records")
 }
 
