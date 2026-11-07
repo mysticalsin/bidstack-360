@@ -551,7 +551,6 @@
     "failedToLoad": "加载失败",
     "retry": "重试",
     "noTerritories": "无区域",
-    "noTerritoriesHint": "创建您的第一个区域以开始。",
     "active": "活跃",
     "inactive": "未激活",
     "global": "全球",
@@ -562,7 +561,6 @@
     "delete": "删除",
     "leadRoutingRules": "线索路由规则",
     "noRoutingRules": "无路由规则",
-    "noRoutingRulesHint": "创建您的第一条规则以自动分配线索。",
     "assignUser": "用户",
     "assignTerritory": "区域",
     "assignRoundRobin": "轮询 ({{count}})",
@@ -1169,7 +1167,6 @@
   },
   "territories": {
     "pageTitle": "区域",
-    "pageSubtitle": "全球商机分布、区域覆盖和线索路由。",
     "totalsBadge": "{{countries}} 个国家共 {{opportunities}} 个商机",
     "newRuleButton": "新建规则",
     "newTerritoryButton": "新建区域",

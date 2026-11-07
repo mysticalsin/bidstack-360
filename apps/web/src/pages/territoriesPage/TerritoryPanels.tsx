@@ -283,13 +283,7 @@ export function TerritoryListPanel({
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('territoryPanels.noTerritories', 'No territories')}
-          message={t(
-            'territoryPanels.noTerritoriesHint',
-            'Create your first territory to get started.',
-          )}
-        />
+        <EmptyState title={t('territoryPanels.noTerritories', 'No territories')} />
       ) : (
         <div className="space-y-2">
           {items.map((territory) => {
@@ -451,13 +445,7 @@ export function RoutingRuleListPanel({
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('territoryPanels.noRoutingRules', 'No routing rules')}
-          message={t(
-            'territoryPanels.noRoutingRulesHint',
-            'Create your first rule to auto-assign leads.',
-          )}
-        />
+        <EmptyState title={t('territoryPanels.noRoutingRules', 'No routing rules')} />
       ) : (
         <div className="space-y-2">
           {items.map((r) => {

@@ -636,7 +636,6 @@
     "failedToLoad": "Échec du chargement",
     "retry": "Réessayer",
     "noTerritories": "Aucun territoire",
-    "noTerritoriesHint": "Créez votre premier territoire pour commencer.",
     "active": "Actif",
     "inactive": "Inactif",
     "global": "Mondial",
@@ -647,7 +646,6 @@
     "delete": "Supprimer",
     "leadRoutingRules": "Règles de routage des leads",
     "noRoutingRules": "Aucune règle de routage",
-    "noRoutingRulesHint": "Créez votre première règle pour attribuer automatiquement les leads.",
     "assignUser": "Utilisateur",
     "assignTerritory": "Territoire",
     "assignRoundRobin": "Rotation ({{count}})",
@@ -1254,7 +1252,6 @@
   },
   "territories": {
     "pageTitle": "Territoires",
-    "pageSubtitle": "Empreinte mondiale des opportunités, couverture des territoires et routage des prospects.",
     "totalsBadge": "{{opportunities}} opportunités dans {{countries}} pays",
     "newRuleButton": "Nouvelle règle",
     "newTerritoryButton": "Nouveau territoire",

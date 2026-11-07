@@ -614,7 +614,6 @@
     "failedToLoad": "Error al cargar",
     "retry": "Reintentar",
     "noTerritories": "Sin territorios",
-    "noTerritoriesHint": "Crea tu primer territorio para empezar.",
     "active": "Activo",
     "inactive": "Inactivo",
     "global": "Global",
@@ -625,7 +624,6 @@
     "delete": "Eliminar",
     "leadRoutingRules": "Reglas de enrutamiento de leads",
     "noRoutingRules": "Sin reglas de enrutamiento",
-    "noRoutingRulesHint": "Crea tu primera regla para asignar leads automáticamente.",
     "assignUser": "Usuario",
     "assignTerritory": "Territorio",
     "assignRoundRobin": "Rotación ({{count}})",
@@ -1232,7 +1230,6 @@
   },
   "territories": {
     "pageTitle": "Territorios",
-    "pageSubtitle": "Presencia global de oportunidades, cobertura de territorios y enrutamiento de prospectos.",
     "totalsBadge": "{{opportunities}} oportunidades en {{countries}} países",
     "newRuleButton": "Nueva regla",
     "newTerritoryButton": "Nuevo territorio",

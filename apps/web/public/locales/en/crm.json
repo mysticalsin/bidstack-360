@@ -552,7 +552,6 @@
     "failedToLoad": "Failed to load",
     "retry": "Retry",
     "noTerritories": "No territories",
-    "noTerritoriesHint": "Create your first territory to get started.",
     "active": "Active",
     "inactive": "Inactive",
     "global": "Global",
@@ -563,7 +562,6 @@
     "delete": "Delete",
     "leadRoutingRules": "Lead Routing Rules",
     "noRoutingRules": "No routing rules",
-    "noRoutingRulesHint": "Create your first rule to auto-assign leads.",
     "assignUser": "User",
     "assignTerritory": "Territory",
     "assignRoundRobin": "Round Robin ({{count}})",
@@ -1170,7 +1168,6 @@
   },
   "territories": {
     "pageTitle": "Territories",
-    "pageSubtitle": "Global opportunity footprint, territory coverage, and lead routing.",
     "totalsBadge": "{{opportunities}} opps across {{countries}} countries",
     "newRuleButton": "New rule",
     "newTerritoryButton": "New territory",
