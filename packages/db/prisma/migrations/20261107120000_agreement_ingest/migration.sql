@@ -69,7 +69,7 @@ CREATE INDEX "agreement_ingest_items_org_sha_idx" ON "agreement_ingest_items"("o
 CREATE INDEX "agreement_ingest_items_status_idx" ON "agreement_ingest_items"("status", "created_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "agreement_ingest_items_org_idem_uq" ON "agreement_ingest_items"("org_id", "idempotency_key");
+CREATE UNIQUE INDEX "agreement_ingest_items_org_idem_uq" ON "agreement_ingest_items"("org_id", "actor_type", "actor_id", "idempotency_key");
 
 -- AddForeignKey
 ALTER TABLE "agreement_sources" ADD CONSTRAINT "agreement_sources_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "orgs"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -157,6 +157,13 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
       for (let attempt = 0; attempt < 3 && !result; attempt += 1) {
         try {
           result = await prisma.$transaction(async (tx) => {
+            // Serialize accepts on this MSA so a double click cannot create two actions.
+            await tx.$queryRaw`SELECT id FROM contract_agreements WHERE id = ${flag.msaId}::uuid FOR UPDATE`;
+            const taken = await tx.msaWhitespaceDecision.findFirst({
+              where: { orgId: req.auth.orgId, contractId: flag.msaId, line, state: 'accepted' },
+              select: { id: true },
+            });
+            if (taken) throw server.httpErrors.conflict('This line is already accepted');
             const action = await tx.crossSellAction.create({
               data: {
                 orgId: req.auth.orgId,

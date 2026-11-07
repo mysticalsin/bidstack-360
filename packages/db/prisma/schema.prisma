@@ -5511,7 +5511,7 @@ model AgreementIngestItem {
   org    Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   source AgreementSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
 
-  @@unique([orgId, idempotencyKey], map: "agreement_ingest_items_org_idem_uq")
+  @@unique([orgId, actorType, actorId, idempotencyKey], map: "agreement_ingest_items_org_idem_uq")
   @@index([orgId, externalSource, externalId], map: "agreement_ingest_items_org_ext_idx")
   @@index([orgId, sha256], map: "agreement_ingest_items_org_sha_idx")
   @@index([status, createdAt], map: "agreement_ingest_items_status_idx")

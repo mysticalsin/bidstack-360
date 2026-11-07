@@ -10,7 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { invalidateAccessScope } from '../../lib/access-scope.js';
-import { __setAgreementIngestEnqueueForTest } from '../../queues/agreement-ingest.js';
+import { __setAgreementIngestEnqueueForTest, sweepQueuedAgreementItems } from '../../queues/agreement-ingest.js';
 import { buildServer } from '../../server.js';
 import { __setStorageForTest } from '../../storage/index.js';
 import {
@@ -25,7 +25,7 @@ import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../../te
 import { fakeDocx, makeFakeStorage, type FakeStorage } from '../../test-support/msa-storage.js';
 import { syntheticNorthwindMsaPdf } from '../../test-support/synthetic-msa-pdf.js';
 import { runAgreementSourceSync } from '../agreement-sources/sync.js';
-import { processAgreementIngestItem } from './process.js';
+import { processAgreementIngestItem, readCapped } from './process.js';
 
 let server: FastifyInstance;
 let org = { orgId: '', clerkOrg: '' };
@@ -234,6 +234,58 @@ describe('POST /ingest/agreements', () => {
     expect(versions.at(-1)?.note).toMatch(/rest/);
   });
 
+  it('never versions an agreement outside the sending key scope', async () => {
+    const companies = await prisma.company.findMany({ where: { orgId: org.orgId, deletedAt: null }, take: 2, orderBy: { name: 'asc' }, select: { id: true } });
+    const [a, b] = [companies[0]!.id, companies[1]!.id];
+    const key = await makeKey({ companyIds: [a] });
+    const externalId = `doc-${randomUUID()}`;
+    const post = (companyId: string) =>
+      server.inject({ method: 'POST', url: '/api/v1/ingest/agreements', headers: { 'x-api-key': key.raw }, payload: ingestBody({ externalId, metadata: { companyId } }) });
+    const first = await post(a);
+    expect(first.statusCode, first.body).toBe(202);
+    await processAgreementIngestItem(org.orgId, first.json().id);
+    const draftId = (await prisma.agreementIngestItem.findFirstOrThrow({ where: { id: first.json().id } })).intakeDraftId!;
+    const confirm = await call({ method: 'POST', url: `/msa/intake/${draftId}/confirm`, payload: { companyId: a, status: 'active' } });
+    expect(confirm.statusCode, confirm.body).toBe(201);
+    await prisma.apiKey.update({ where: { id: key.id }, data: { companyIds: [b] } });
+    invalidateAccessScope(org.orgId);
+    const second = await post(b);
+    expect(second.statusCode, second.body).toBe(202);
+    const outcome = await processAgreementIngestItem(org.orgId, second.json().id);
+    expect(outcome.status).toBe('rejected');
+    expect(await prisma.contractFileVersion.count({ where: { contractId: confirm.json().contractId } })).toBe(1);
+
+    // Another sender reusing the same external id never reaches that agreement.
+    const user = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody({ externalId }) });
+    expect((await processAgreementIngestItem(org.orgId, user.json().id)).status).toBe('drafted');
+  });
+
+  it('caps a URL body without trusting content-length', async () => {
+    const big = new ReadableStream<Uint8Array>({
+      start(c) {
+        const chunk = new Uint8Array(1024 * 1024);
+        for (let i = 0; i < 26; i += 1) c.enqueue(chunk);
+        c.close();
+      },
+    });
+    await expect(readCapped(new Response(big))).rejects.toThrow(/larger than 25 MB/);
+    expect((await readCapped(new Response(Buffer.from('%PDF-1.7')))).toString()).toBe('%PDF-1.7');
+  });
+
+  it('the sweep recovers rows stuck in processing', async () => {
+    const rest = await prisma.agreementIngestItem.create({
+      data: { orgId: org.orgId, channel: 'rest', externalSource: 'x', externalId: `stuck-${randomUUID()}`, fileName: 'a.pdf', actorType: 'user', status: 'processing', pendingContent: uniquePdf() },
+    });
+    const src = await prisma.agreementSource.create({ data: { orgId: org.orgId, kind: 'sharepoint', name: 'Stuck', config: {}, createdById: (await prisma.user.findFirstOrThrow({ where: { orgId: org.orgId } })).id } });
+    const fromSource = await prisma.agreementIngestItem.create({
+      data: { orgId: org.orgId, sourceId: src.id, channel: 'sharepoint', externalSource: 'sp', externalId: `stuck-${randomUUID()}`, fileName: 'b.pdf', actorType: 'source', actorId: src.id, status: 'processing' },
+    });
+    await prisma.$executeRaw`UPDATE agreement_ingest_items SET updated_at = now() - interval '11 minutes' WHERE id IN (${rest.id}::uuid, ${fromSource.id}::uuid)`;
+    await sweepQueuedAgreementItems();
+    expect((await prisma.agreementIngestItem.findFirstOrThrow({ where: { id: rest.id } })).status).toBe('queued');
+    expect((await prisma.agreementIngestItem.findFirstOrThrow({ where: { id: fromSource.id } })).status).toBe('failed');
+  });
+
   it('keeps ingest items tenant scoped', async () => {
     const other = await prisma.org.create({ data: { clerkOrg: `org_other_${randomUUID().slice(0, 8)}`, name: 'Other tenant' } });
     try {
@@ -300,6 +352,25 @@ describe('agreement sources and Sync now', () => {
     expect(mine?.lastRun?.runId).toBe('run-2');
   });
 
+  it('a failed download keeps the delta cursor so the next run retries it', async () => {
+    const created = await call({
+      method: 'POST',
+      url: '/msa/sources',
+      payload: { kind: 'sharepoint', name: 'Flaky library', config: { siteId: 'site-2', driveId: DRIVE_ID, folderPath: 'MSA' } },
+    });
+    const source = created.json() as { id: string };
+    const { fetch } = fakeFetch([
+      ['https://login.microsoftonline.com/', () => json({ access_token: 'tok' })],
+      [/\/content$/, () => new Response('busy', { status: 503 })],
+      [/token=page2/, () => json(GRAPH_DELTA_PAGE_2)],
+      [/root\/delta/, () => json(GRAPH_DELTA_PAGE_1)],
+    ]);
+    const run = await runAgreementSourceSync({ orgId: org.orgId, sourceId: source.id, runId: 'flaky-1' }, { fetch, env: GRAPH_ENV });
+    expect(run.state).toBe('completed');
+    expect(run.result?.failed).toBeGreaterThanOrEqual(1);
+    expect((await prisma.agreementSource.findFirstOrThrow({ where: { id: source.id } })).cursor).toBeNull();
+  });
+
   it('Sync now answers 202 with a deterministic run per Idempotency-Key', async () => {
     const created = await call({
       method: 'POST',
@@ -321,6 +392,9 @@ describe('agreement sources and Sync now', () => {
       expect(a.statusCode, a.body).toBe(202);
       const b = await call({ method: 'POST', url: `/msa/sources/${id}/sync`, headers: { 'idempotency-key': key } });
       expect(b.json().runId).toBe(a.json().runId);
+      expect(enqueued.filter((e) => e.kind === 'sync')).toHaveLength(1);
+      const other = await call({ method: 'POST', url: `/msa/sources/${id}/sync`, headers: { 'idempotency-key': `sync-${randomUUID()}` } });
+      expect(other.json().runId).toBe(a.json().runId);
       expect(enqueued.filter((e) => e.kind === 'sync')).toHaveLength(1);
       const poll = await call({ method: 'GET', url: `/msa/sources/${id}/runs/${a.json().runId}` });
       expect(poll.json()).toMatchObject({ state: 'queued' });
