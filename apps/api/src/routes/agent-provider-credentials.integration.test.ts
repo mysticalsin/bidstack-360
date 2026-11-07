@@ -7,7 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
-import { DIRECT_AGENT_PROVIDERS } from '@bidstack/shared/llm';
+import { agentProviderCredentialName, DIRECT_AGENT_PROVIDERS } from '@bidstack/shared/llm';
 
 import { buildServer } from '../server.js';
 import {
@@ -219,6 +219,34 @@ describe('agent provider routes', () => {
     expect(body.ok).toBe(false);
     expect(body.latencyMs).toBe(0); // short-circuits before any provider call
     expect(body.error).toMatch(/credential/i);
+  });
+
+  // The save path only checks the base URL as a string. A stored URL that now
+  // points at internal space (legacy row, DNS rebinding) must be refused at
+  // call time, before the server sends the key anywhere.
+  t('test-call refuses a stored base URL that points at internal space', async () => {
+    // Keyless provider, so the save needs no INTEGRATION_TOKEN_KEY.
+    const save = await server.inject({
+      method: 'PUT',
+      url: `${BASE}/credentials/omniroute`,
+      payload: {},
+    });
+    expect(save.statusCode).toBe(200);
+    await prisma.$executeRaw`
+      UPDATE integration_configs
+      SET config = jsonb_set(config, '{baseUrl}', '"https://169.254.169.254/v1"')
+      WHERE org_id = ${orgId}::uuid AND name = ${agentProviderCredentialName('omniroute')}
+    `;
+    try {
+      const res = await server.inject({ method: 'POST', url: `${BASE}/credentials/omniroute/test` });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { ok: boolean; latencyMs: number; error: string | null };
+      expect(body.ok).toBe(false);
+      expect(body.latencyMs).toBe(0);
+      expect(body.error).toMatch(/internal address/i);
+    } finally {
+      await server.inject({ method: 'DELETE', url: `${BASE}/credentials/omniroute` });
+    }
   });
 
   t('clearing the active provider falls back to none', async () => {
