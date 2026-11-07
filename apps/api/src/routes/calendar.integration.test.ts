@@ -134,6 +134,34 @@ describe('PATCH and DELETE /calendar/events/:id', () => {
     expect(del.statusCode).toBe(404);
   });
 
+  it('filing an event by hand marks it so the calendar pull keeps that filing', async () => {
+    const own = await seedEvent({ start: '2031-03-02T14:00:00Z', end: '2031-03-02T15:00:00Z' });
+    const companyId = randomUUID();
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/calendar/events/${own.id}`,
+      payload: { companyId },
+    });
+    expect(res.statusCode).toBe(200);
+    const row = await prisma.calendarEvent.findUniqueOrThrow({
+      where: { id: own.id },
+      select: { companyId: true, filedManually: true },
+    });
+    expect(row).toEqual({ companyId, filedManually: true });
+
+    const renamed = await seedEvent({ start: '2031-03-03T14:00:00Z', end: '2031-03-03T15:00:00Z' });
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/calendar/events/${renamed.id}`,
+      payload: { subject: 'Renamed' },
+    });
+    const untouched = await prisma.calendarEvent.findUniqueOrThrow({
+      where: { id: renamed.id },
+      select: { filedManually: true },
+    });
+    expect(untouched.filedManually).toBe(false);
+  });
+
   it('rejects a patch that would end before it starts', async () => {
     const own = await seedEvent({ start: '2031-03-02T14:00:00Z', end: '2031-03-02T15:00:00Z' });
     const res = await server.inject({
