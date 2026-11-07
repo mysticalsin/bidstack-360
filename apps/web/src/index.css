@@ -1801,7 +1801,7 @@ select:focus-visible {
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-card) 78%, transparent);
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1;
   padding: 5px 8px;
@@ -3286,7 +3286,7 @@ select:focus-visible {
 .account-source-stat > small {
   display: block;
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3301,7 +3301,7 @@ select:focus-visible {
 }
 .account-source-stat small {
   margin-top: 7px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -3424,7 +3424,7 @@ select:focus-visible {
 }
 .smart-confidence span {
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .smart-confidence strong {
@@ -3441,7 +3441,7 @@ select:focus-visible {
 .smart-field > span {
   color: var(--fg-tertiary);
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   margin-bottom: 6px;
   text-transform: uppercase;
@@ -3491,7 +3491,7 @@ select:focus-visible {
 }
 .smart-intel-head span {
   color: var(--fg-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -3523,7 +3523,7 @@ select:focus-visible {
   border-radius: 999px;
   color: var(--fg-secondary);
   display: inline-flex;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   min-height: 26px;
   padding: 4px 9px;
@@ -3556,11 +3556,11 @@ select:focus-visible {
 }
 .smart-autofill-map strong {
   color: var(--fg-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .smart-autofill-map em {
   color: var(--fg-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   margin-top: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3787,7 +3787,7 @@ select:focus-visible {
 .account-experience-copy p,
 .account-experience-copy span {
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -4105,7 +4105,7 @@ select:focus-visible {
   border-radius: 999px;
   background: var(--surface-sunken);
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
 }
@@ -4126,7 +4126,7 @@ select:focus-visible {
   background: color-mix(in srgb, var(--brand-primary) 8%, var(--surface-card));
   padding: 3px 8px;
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .account-card-tech.is-empty {
@@ -4149,7 +4149,7 @@ select:focus-visible {
   min-width: 0;
 }
 .account-card-stats dt {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4175,7 +4175,7 @@ select:focus-visible {
   justify-content: space-between;
   gap: 12px;
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4188,7 +4188,7 @@ select:focus-visible {
 .account-card-coverage {
   min-width: 0;
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4229,7 +4229,7 @@ select:focus-visible {
   border-radius: 12px;
   background: color-mix(in srgb, var(--warning) 8%, var(--surface-card));
   color: var(--fg-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: 0;
@@ -4247,7 +4247,7 @@ select:focus-visible {
 .strategic-signal-insight strong {
   grid-column: 2;
   color: var(--fg-primary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .strategic-signal-insight.is-complete {
   border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));
@@ -4272,7 +4272,7 @@ select:focus-visible {
   border-radius: 12px;
   background: color-mix(in srgb, var(--warning) 8%, var(--surface-card));
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -4289,7 +4289,7 @@ select:focus-visible {
 .account-card-insight strong {
   grid-column: 2;
   color: var(--fg-primary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .account-card-insight.is-complete {
   border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));

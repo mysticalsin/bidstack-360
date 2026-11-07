@@ -245,7 +245,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                   {rows.length > 0 ? (
                     <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--border-subtle)] text-xs">
                       <table className="w-full">
-                        <thead className="bg-[var(--surface-sunken)] text-[10px] uppercase text-[var(--fg-tertiary)]">
+                        <thead className="bg-[var(--surface-sunken)] text-xs uppercase text-[var(--fg-tertiary)]">
                           <tr>
                             {headers.map((h) => (
                               <th key={h} scope="col" className="px-2 py-1 text-left font-semibold">
@@ -289,7 +289,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                         </tbody>
                       </table>
                       {rows.length > 20 ? (
-                        <div className="bg-[var(--surface-sunken)] px-2 py-1 text-[10px] text-[var(--fg-tertiary)]">
+                        <div className="bg-[var(--surface-sunken)] px-2 py-1 text-xs text-[var(--fg-tertiary)]">
                           {t('contactCsvImport.showingFirstRows', 'Showing first 20 of {{count}} rows.', {
                             count: rows.length,
                           })}
