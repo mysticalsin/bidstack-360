@@ -1092,6 +1092,7 @@
     "cockpitDetailsAria": "驾驶舱详情"
   },
   "leadKanban": {
+    "convertFromLead": "打开线索并使用转换",
     "moveSuccess": "已移至 {{status}}",
     "moveError": "无法移动潜在客户",
     "boardAriaLabel": "潜在客户管道看板",

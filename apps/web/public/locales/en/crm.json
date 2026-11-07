@@ -1093,6 +1093,7 @@
     "cockpitDetailsAria": "Cockpit details"
   },
   "leadKanban": {
+    "convertFromLead": "Open the lead and use Convert",
     "moveSuccess": "Moved to {{status}}",
     "moveError": "Could not move lead",
     "boardAriaLabel": "Lead pipeline kanban",

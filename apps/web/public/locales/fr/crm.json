@@ -1177,6 +1177,7 @@
     "cockpitDetailsAria": "Détails du cockpit"
   },
   "leadKanban": {
+    "convertFromLead": "Ouvrez le lead et utilisez Convertir",
     "moveSuccess": "Déplacé vers {{status}}",
     "moveError": "Impossible de déplacer le prospect",
     "boardAriaLabel": "Kanban du pipeline de prospects",

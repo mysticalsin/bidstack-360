@@ -79,6 +79,13 @@ export function LeadKanbanView({ leads }: Props) {
   const applyMove = useCallback(
     (lead: LeadSummary, targetStatus: LeadStatus) => {
       if (lead.status === targetStatus) return;
+      // The API rejects status edits into or out of converted: conversion
+      // creates the account and deal, so it only happens through Convert.
+      if (lead.status === 'converted') return;
+      if (targetStatus === 'converted') {
+        toast.info(t('leadKanban.convertFromLead', 'Open the lead and use Convert'));
+        return;
+      }
       update.mutate(
         { id: lead.id, patch: { status: targetStatus } },
         {
@@ -199,7 +206,10 @@ function Card({
   onMove: (leadId: string, dir: -1 | 1) => void;
 }) {
   const { t } = useTranslation('crm');
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: lead.id });
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: lead.id,
+    disabled: lead.status === 'converted',
+  });
   const days = daysSince(lead.statusChangedAt);
   const isRotten = rottenDays !== null && days >= rottenDays;
 

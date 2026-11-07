@@ -1155,6 +1155,7 @@
     "cockpitDetailsAria": "Detalles del cockpit"
   },
   "leadKanban": {
+    "convertFromLead": "Abre el lead y usa Convertir",
     "moveSuccess": "Movido a {{status}}",
     "moveError": "No se pudo mover el lead",
     "boardAriaLabel": "Kanban del embudo de leads",
