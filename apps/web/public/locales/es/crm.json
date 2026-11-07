@@ -609,7 +609,6 @@
     "accountOwners": "Propietarios de cuenta",
     "noActiveOwners": "Sin propietarios activos",
     "noCountrySelected": "Ningún país seleccionado",
-    "noCountrySelectedHint": "Haz clic en cualquier territorio activo del mapa interactivo de arriba para cargar las métricas.",
     "territories": "Territorios",
     "countTotal": "{{count}} en total",
     "failedToLoad": "Error al cargar",

@@ -546,7 +546,6 @@
     "accountOwners": "客户负责人",
     "noActiveOwners": "无活跃负责人",
     "noCountrySelected": "未选择国家/地区",
-    "noCountrySelectedHint": "点击上方交互式地图中的任意活跃区域以加载指标。",
     "territories": "区域",
     "countTotal": "共 {{count}} 个",
     "failedToLoad": "加载失败",

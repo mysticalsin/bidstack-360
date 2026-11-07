@@ -547,7 +547,6 @@
     "accountOwners": "Account Owners",
     "noActiveOwners": "No active owners",
     "noCountrySelected": "No Country Selected",
-    "noCountrySelectedHint": "Click any active territory on the interactive map above to load metrics.",
     "territories": "Territories",
     "countTotal": "{{count}} total",
     "failedToLoad": "Failed to load",

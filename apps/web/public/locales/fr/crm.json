@@ -631,7 +631,6 @@
     "accountOwners": "Responsables de compte",
     "noActiveOwners": "Aucun responsable actif",
     "noCountrySelected": "Aucun pays sélectionné",
-    "noCountrySelectedHint": "Cliquez sur un territoire actif de la carte interactive ci-dessus pour charger les indicateurs.",
     "territories": "Territoires",
     "countTotal": "{{count}} au total",
     "failedToLoad": "Échec du chargement",

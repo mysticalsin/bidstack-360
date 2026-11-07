@@ -546,7 +546,6 @@
     "accountOwners": "Responsáveis pela conta",
     "noActiveOwners": "Nenhum responsável ativo",
     "noCountrySelected": "Nenhum país selecionado",
-    "noCountrySelectedHint": "Clique em qualquer território ativo no mapa interativo acima para carregar as métricas.",
     "territories": "Territórios",
     "countTotal": "{{count}} no total",
     "failedToLoad": "Falha ao carregar",
