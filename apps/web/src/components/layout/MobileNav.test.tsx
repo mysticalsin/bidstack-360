@@ -170,4 +170,28 @@ describe('MobileNav 56rem breakpoint', () => {
 
     expect(useUiStore.getState().mobileNavOpen).toBe(false);
   });
+
+  it('closes and unmounts an open drawer when the window widens past 56rem', () => {
+    const media = mockMatchMedia({ [SHELL_WIDE_QUERY]: false });
+    renderShell();
+    openDrawer();
+
+    act(() => media.setMatch(SHELL_WIDE_QUERY, true));
+
+    expect(useUiStore.getState().mobileNavOpen).toBe(false);
+    expect(document.querySelector('.mobile-nav-root')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('makes the rest of the shell inert while open and restores it on close', () => {
+    mockMatchMedia({ [SHELL_WIDE_QUERY]: false });
+    renderShell();
+    const { trigger } = openDrawer();
+    expect(trigger.hasAttribute('inert')).toBe(true);
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    expect(trigger.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+  });
 });

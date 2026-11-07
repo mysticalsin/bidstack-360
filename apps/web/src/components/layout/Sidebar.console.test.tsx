@@ -125,6 +125,18 @@ describe('Sidebar compact mode (64px rail)', () => {
     expect((await screen.findByRole('tooltip')).textContent).toContain('Dashboard');
   });
 
+  it('a section button expands the rail with the same keyboard or pointer motion rule', () => {
+    mockMatchMedia({});
+    renderSidebar();
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }), { detail: 0 });
+    expect(nav().getAttribute('data-motion')).toBe('instant');
+
+    fireEvent.click(within(nav()).getByRole('button', { name: 'Sales' }), { detail: 1 });
+
+    expect(useUiStore.getState().sidebarCollapsed).toBe(false);
+    expect(nav().getAttribute('data-motion')).toBe('animate');
+  });
+
   it('section flyouts still list their links', () => {
     mockMatchMedia({});
     useUiStore.setState({ sidebarCollapsed: true });

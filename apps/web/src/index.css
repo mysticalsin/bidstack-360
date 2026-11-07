@@ -881,7 +881,7 @@ select:focus-visible {
      coarse-pointer touch target. */
   padding-left: 8px;
   padding-right: 8px;
-  /* Let the section hover-flyouts escape the 56px rail as popovers. With
+  /* Let the section hover-flyouts escape the 64px rail as popovers. With
      overflow-y:auto the browser also computes overflow-x:auto, so the absolute
      flyouts (left:100%, 180px wide) extended the rail's scroll width to ~251px
      and produced a stray horizontal scrollbar + a scrollable second column.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -100,6 +100,12 @@ export function Sidebar() {
 
   const settings = isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS;
 
+  const toggleFrom = (event: MouseEvent) => {
+    // detail 0 = Enter/Space (no pointer): resize at once, like the console pattern.
+    setInstant(event.detail === 0);
+    toggle();
+  };
+
   return (
     <TooltipProvider delayDuration={300} disableHoverableContent>
       <nav
@@ -111,11 +117,7 @@ export function Sidebar() {
       >
         <button
           type="button"
-          onClick={(event) => {
-            // detail 0 = Enter/Space (no pointer): resize at once, like the console pattern.
-            setInstant(event.detail === 0);
-            toggle();
-          }}
+          onClick={toggleFrom}
           className="sb-toggle"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
@@ -151,6 +153,7 @@ export function Sidebar() {
             section={section}
             badges={badges}
             collapsed={collapsed}
+            onExpand={toggleFrom}
           />
         ))}
 
@@ -212,10 +215,12 @@ function SidebarSection({
   section,
   badges,
   collapsed,
+  onExpand,
 }: {
   section: NavSection;
   badges: Badges;
   collapsed: boolean;
+  onExpand: (event: MouseEvent) => void;
 }) {
   const location = useLocation();
   const override = useUiStore((s) => s.collapsedSections[section.key]);
@@ -253,10 +258,7 @@ function SidebarSection({
           className="sb-item sb-parent-trigger"
           aria-label={sectionTitle}
           title={sectionTitle}
-          onClick={() => {
-            const toggleSidebar = useUiStore.getState().toggleSidebar;
-            toggleSidebar();
-          }}
+          onClick={onExpand}
         >
           <Icon name={section.icon} size={16} />
           {totalBadge > 0 && <span className="sb-badge-dot" />}

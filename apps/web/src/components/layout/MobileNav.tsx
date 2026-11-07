@@ -33,7 +33,12 @@ export function MobileNav() {
   // The drawer only exists below 56rem; widening the window past it closes
   // a drawer left open so it cannot reappear when the window narrows again.
   useEffect(() => {
-    if (wide && open) setOpen(false);
+    if (!wide || !open) return;
+    setOpen(false);
+    // The drawer just unmounted with focus inside it; hand focus to the rail.
+    if (document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('.sb-toggle')?.focus();
+    }
   }, [wide, open, setOpen]);
 
   const close = useCallback(() => setOpen(false), [setOpen]);
@@ -44,6 +49,7 @@ export function MobileNav() {
 
 function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const reduced = useReducedMotion();
+  const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
@@ -60,7 +66,15 @@ function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
       el.removeAttribute('inert');
       el.focus();
       document.body.style.overflow = 'hidden';
+      // aria-modal alone does not stop touch screen readers swiping into the
+      // page behind, so the drawer's shell siblings go inert while it is open.
+      const behind = Array.from(root.current?.parentElement?.children ?? []).filter(
+        (node): node is HTMLElement =>
+          node instanceof HTMLElement && node !== root.current && !node.hasAttribute('inert'),
+      );
+      for (const node of behind) node.setAttribute('inert', '');
       return () => {
+        for (const node of behind) node.removeAttribute('inert');
         document.body.style.overflow = '';
       };
     }
@@ -82,7 +96,7 @@ function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !event.defaultPrevented) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -110,6 +124,7 @@ function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <div
+      ref={root}
       className="mobile-nav-root"
       data-state={open ? 'open' : 'closed'}
       data-motion={reduced ? 'instant' : 'animate'}
