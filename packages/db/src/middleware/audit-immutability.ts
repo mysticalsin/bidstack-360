@@ -24,7 +24,7 @@ import type { Prisma } from '../../generated/client/index.js';
  * locked down further with a DB role. Keeping the exception OUT of this
  * middleware keeps the rule here unconditional and easy to reason about.
  *
- * DB-level layer: migration 20261106210000_audit_log_hash_chain adds triggers
+ * DB-level layer: migration 20261107070020_audit_log_hash_chain_triggers adds triggers
  * that hash-chain every insert per org and reject content UPDATE and TRUNCATE
  * for every writer, raw SQL included. DELETE stays possible for the retention
  * purge and org cascade; chain verification reports the gap it leaves.

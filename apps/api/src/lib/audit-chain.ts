@@ -2,7 +2,7 @@
  * Audit log hash-chain verification.
  *
  * The chain is written by the audit_log_chain trigger (migration
- * 20261106210000_audit_log_hash_chain). Verification runs in SQL with the same
+ * 20261107070020_audit_log_hash_chain_triggers). Verification runs in SQL with the same
  * digest function, so the app never re-implements the canonical row format.
  * A row breaks the chain when its stored hash no longer matches its content
  * (tampering), when its prev_hash does not match the previous row's hash, or
