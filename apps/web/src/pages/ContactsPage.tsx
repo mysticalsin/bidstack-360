@@ -340,11 +340,6 @@ export function ContactsPage() {
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight gradient-text">
             {t('contacts.title', 'Contacts')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('contacts.subtitle', '{{count}} people in the decision unit.', {
-              count: items.length,
-            })}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {canWrite && (
