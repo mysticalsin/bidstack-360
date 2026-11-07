@@ -1,6 +1,6 @@
 /**
  * Email template routes: authoring, render preview, tenant isolation, RBAC,
- * list bounds and retry-safe deletes. Rendering never sends anything.
+ * list bounds and soft deletes. Rendering never sends anything.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -95,12 +95,12 @@ describe('email template authoring', () => {
     expect((await prisma.emailTemplate.findUnique({ where: { id: foreign.id } }))?.name).toBe('Foreign');
   });
 
-  it('treats a repeated delete as done', async () => {
+  it('answers 404 to a second delete of the same template', async () => {
     const id = await create();
     const first = await server.inject({ method: 'DELETE', url: `/api/v1/email-templates/${id}` });
     expect(first.statusCode).toBe(204);
-    const retry = await server.inject({ method: 'DELETE', url: `/api/v1/email-templates/${id}` });
-    expect(retry.statusCode).toBe(204);
+    const again = await server.inject({ method: 'DELETE', url: `/api/v1/email-templates/${id}` });
+    expect(again.statusCode).toBe(404);
   });
 
   it('caps the list at one page and says more exist', async () => {
