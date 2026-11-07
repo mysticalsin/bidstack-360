@@ -177,7 +177,7 @@ function buildArchiveStream(
  * claims the row, and a redelivery after completion is a no-op.
  */
 export async function processTenantExportJob(
-  job: Pick<Job<unknown>, 'data'>,
+  job: Pick<Job<unknown>, 'data'> & { attemptsMade?: number; opts?: { attempts?: number } },
   log: pino.Logger,
 ): Promise<void> {
   const parsed = TenantExportJob.safeParse(job.data);
@@ -229,6 +229,13 @@ export async function processTenantExportJob(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'tenant export failed';
+    // attemptsMade counts finished attempts, so this one is number attemptsMade + 1.
+    // Earlier attempts leave the row `running` so the BullMQ retry can re-claim it.
+    const finalAttempt = (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+    if (!finalAttempt) {
+      log.warn({ exportId, orgId, attemptsMade: job.attemptsMade, err }, 'tenant-export: attempt failed, will retry');
+      throw err;
+    }
     await prisma.tenantExport.updateMany({
       where: { id: exportId, orgId, status: 'running' },
       data: { status: 'failed', error: message.slice(0, 2000), completedAt: new Date() },

@@ -10,6 +10,7 @@ import {
   NotificationPage,
   NotificationPrefs,
   type NotificationType,
+  QueryBoolean,
 } from '@bidstack/shared';
 
 interface DbRow {
@@ -45,7 +46,7 @@ export const notificationsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/notifications',
     {
       schema: {
-        querystring: z.object({ unreadOnly: z.coerce.boolean().optional() }),
+        querystring: z.object({ unreadOnly: QueryBoolean.optional() }),
         response: { 200: NotificationPage },
       },
     },

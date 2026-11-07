@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 import { IntelPayload } from './intel.js';
+import { QueryBoolean } from './query-boolean.js';
 
 /** @deprecated Use PipelineStage table instead of enum. Kept for seed-data and UI transition. */
 export const OpportunityStage = z.enum([
@@ -160,7 +161,7 @@ export const OpportunityFilter = z.object({
   // (the UI only ever sends one) but the route does not enforce that — both
   // can be combined by a caller if that's ever useful.
   dueWithinDays: z.coerce.number().int().min(0).max(365).optional(),
-  overdue: z.coerce.boolean().optional(),
+  overdue: QueryBoolean.optional(),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 
