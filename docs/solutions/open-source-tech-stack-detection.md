@@ -87,6 +87,18 @@ All lanes are keyless and read organization-level public data only.
   a Sample tag for demo data.
 - Accounts list cards show the top 3 technologies with logos.
 
+### Editing and multiple stacks
+
+Companies often run more than one stack (a business unit, region or acquired
+entity on a different platform). Each category carries an optional `stack`
+name; no name means the main stack. The same category can appear in several
+stacks without merging (`Cloud` in the main stack and `Cloud` in
+`Oncology R&D` stay apart). Users with `companies:write` can add, rename and
+remove technologies, categories and stacks from the company page (Edit on the
+Technology stack card) or the account cockpit editor. Saves go through the
+existing manual override (`PUT /crm/companies/:key/technical-stack`) and are
+audited; detected technologies keep their source and confidence when kept.
+
 ### Agent tool
 
 `company_tech_stack` (read, `companies:read`, org scoped) returns the merged

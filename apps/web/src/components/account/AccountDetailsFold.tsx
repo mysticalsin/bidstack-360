@@ -6,7 +6,7 @@ import { useId, useState, type ReactNode } from 'react';
  * behind one quiet disclosure so the page leads with the visuals. Content stays
  * mounted (hidden) so queries warm up and in-page anchors keep working.
  */
-export function AccountDetailsFold({ label, children, defaultOpen = false }: { label: string; children: ReactNode; defaultOpen?: boolean }) {
+export function AccountDetailsFold({ label, children, defaultOpen = true }: { label: string; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const id = useId();
   return (

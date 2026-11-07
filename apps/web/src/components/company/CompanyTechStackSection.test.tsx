@@ -1,8 +1,14 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const stackHook = vi.hoisted(() => vi.fn());
-vi.mock('@/hooks/useCompanyTechnicalStack', () => ({ useCompanyTechnicalStack: stackHook }));
+const saveStack = vi.hoisted(() => vi.fn());
+const canWrite = vi.hoisted(() => ({ value: false }));
+vi.mock('@/hooks/useCompanyTechnicalStack', () => ({
+  useCompanyTechnicalStack: stackHook,
+  useSaveCompanyTechnicalStack: () => ({ mutateAsync: saveStack, isPending: false }),
+}));
+vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => canWrite.value }));
 
 import { CompanyTechStackSection } from './CompanyTechStackSection';
 
@@ -12,6 +18,85 @@ describe('CompanyTechStackSection', () => {
   afterEach(() => {
     cleanup();
     stackHook.mockReset();
+    saveStack.mockReset();
+    canWrite.value = false;
+  });
+
+  it('shows each named stack on its own when a company runs more than one', () => {
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [
+          { label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+          { stack: 'Oncology R&D', label: 'Cloud', items: [{ name: 'AWS', source: 'manual', confidence: 1 }] },
+        ],
+      },
+    });
+
+    render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
+
+    expect(screen.getByRole('heading', { name: 'Main stack' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Oncology R&D' })).toBeTruthy();
+    expect(screen.getAllByRole('heading', { name: 'Cloud' })).toHaveLength(2);
+  });
+
+  it('hides editing from users who cannot write companies', () => {
+    stackHook.mockReturnValue({ isLoading: false, data: { effectiveStack: [] } });
+
+    render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
+
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
+  it('lets a writer add, remove and split technologies into another stack, then saves', async () => {
+    canWrite.value = true;
+    saveStack.mockResolvedValue({});
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [
+          {
+            label: 'Cloud',
+            items: [
+              { name: 'Azure', source: 'open_data:dns', confidence: 0.9 },
+              { name: 'Heroku', source: 'open_data:web', confidence: 0.5 },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Heroku' }));
+    fireEvent.change(screen.getByLabelText('Add technology to category 1'), { target: { value: 'AWS' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]!);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add another stack' }));
+    fireEvent.change(screen.getByLabelText('Stack for category 2'), { target: { value: 'Oncology R&D' } });
+    fireEvent.change(screen.getByLabelText('Category 2 name'), { target: { value: 'Data' } });
+    fireEvent.change(screen.getByLabelText('Add technology to category 2'), { target: { value: 'Snowflake' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[1]!);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(saveStack).toHaveBeenCalledTimes(1));
+    expect(saveStack).toHaveBeenCalledWith([
+      {
+        label: 'Cloud',
+        items: [
+          { name: 'Azure', source: 'open_data:dns', confidence: 0.9 },
+          { name: 'AWS', source: 'manual', confidence: 1 },
+        ],
+      },
+      {
+        stack: 'Oncology R&D',
+        label: 'Data',
+        items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }],
+      },
+    ]);
+    await waitFor(() => expect(screen.queryByTestId('tech-stack-editor')).toBeNull());
   });
 
   it('looks the stack up by company id, which resolves accounts without an enrichment row', () => {

@@ -85,4 +85,49 @@ describe('technical stack overrides', () => {
 
     expect(state.suggestions).toEqual([]);
   });
+
+  it('keeps several named stacks apart when they share a category', () => {
+    const override = technicalStackOverrideValue([
+      { label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+      {
+        stack: 'Oncology R&D',
+        label: 'Cloud',
+        items: [{ name: 'AWS', source: 'manual', confidence: 1 }],
+      },
+      {
+        stack: ' Oncology R&D ',
+        label: 'cloud',
+        items: [{ name: 'Google Cloud', source: 'manual', confidence: 1 }],
+      },
+    ]);
+
+    expect(override.stack).toEqual([
+      { label: 'Cloud', items: [expect.objectContaining({ name: 'Azure' })] },
+      {
+        stack: 'Oncology R&D',
+        label: 'Cloud',
+        items: [
+          expect.objectContaining({ name: 'AWS' }),
+          expect.objectContaining({ name: 'Google Cloud' }),
+        ],
+      },
+    ]);
+  });
+
+  it('treats a blank stack name as the main stack', () => {
+    const override = technicalStackOverrideValue([
+      { stack: '  ', label: 'Data', items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }] },
+      { label: 'Data', items: [{ name: 'Databricks', source: 'manual', confidence: 1 }] },
+    ]);
+
+    expect(override.stack).toEqual([
+      {
+        label: 'Data',
+        items: [
+          expect.objectContaining({ name: 'Snowflake' }),
+          expect.objectContaining({ name: 'Databricks' }),
+        ],
+      },
+    ]);
+  });
 });
