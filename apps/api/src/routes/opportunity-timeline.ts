@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
+
 // Chatter Activity rows carry their human label in subject (calls/emails/
 // meetings) or description (notes). Fall back to a per-type synthesis so a
 // bare stage_change/field_edit row still reads as a sentence, never as "".
@@ -71,9 +73,9 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
       const oppId = req.params.id;
       const limit = req.query.limit;
 
-      // Verify the opportunity exists and belongs to the org
+      // The deal must exist in the org and sit inside the caller's access scope.
       const opp = await prisma.opportunity.findFirst({
-        where: { id: oppId, orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, oppId),
         select: { id: true, customer: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
