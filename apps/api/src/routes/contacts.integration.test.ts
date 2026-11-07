@@ -71,6 +71,14 @@ describe('contacts search indexes', () => {
       ).toBe(true);
     }
   });
+
+  // schema.prisma declared contacts_org_created_idx but no migration built it;
+  // the list orders by createdAt DESC within the org.
+  skipIfNoDb('the list sort index exists', async () => {
+    const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
+      SELECT indexname FROM pg_indexes WHERE tablename = 'contacts' AND indexname = 'contacts_org_created_idx'`;
+    expect(rows).toHaveLength(1);
+  });
 });
 
 describe('contacts routes', () => {

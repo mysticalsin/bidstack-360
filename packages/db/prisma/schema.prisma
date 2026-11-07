@@ -714,6 +714,10 @@ model Contact {
   @@index([orgId, createdAt(sort: Desc)], map: "contacts_org_created_idx")
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "contacts_org_email_hash_idx")
+  // ?search= ILIKE '%term%' over these three columns.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_name_trgm_idx")
+  @@index([customer(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_customer_trgm_idx")
+  @@index([role(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_role_trgm_idx")
   @@map("contacts")
 }
 
