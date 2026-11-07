@@ -27,7 +27,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/sign/:token',
     {
-      config: { public: true, rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { public: true },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         response: {
@@ -78,7 +78,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/sign/:token',
     {
-      config: { public: true, rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: { public: true },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         body: InternalSignSubmit,
