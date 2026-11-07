@@ -221,7 +221,7 @@
       "status": "状态",
       "priority": "优先级",
       "score": "评分",
-      "scoreRange": "评分 (0-10000)",
+      "scoreRange": "评分 (0-100)",
       "source": "来源",
       "created": "创建时间"
     },
@@ -309,7 +309,7 @@
       "undo": "撤销"
     },
     "search": {
-      "placeholder": "按姓名、客户、邮箱、角色搜索…",
+      "placeholder": "按姓名、客户、角色搜索…",
       "aria": "搜索联系人",
       "clear": {
         "aria": "清除搜索"
@@ -397,7 +397,7 @@
       "button": "同步 ERP 客户",
       "errorTitle": "ERP 客户同步失败",
       "errorDescription": "最近一次 ERP 客户拉取未能完成。",
-      "alertFallback": "上次同步未能拉取前 20 个 ERP 客户。",
+      "alertFallback": "上次同步未能拉取主要 ERP 客户。",
       "retry": "重试同步"
     },
     "actions": {
@@ -546,13 +546,11 @@
     "accountOwners": "客户负责人",
     "noActiveOwners": "无活跃负责人",
     "noCountrySelected": "未选择国家/地区",
-    "noCountrySelectedHint": "点击上方交互式地图中的任意活跃区域以加载指标。",
     "territories": "区域",
     "countTotal": "共 {{count}} 个",
     "failedToLoad": "加载失败",
     "retry": "重试",
     "noTerritories": "无区域",
-    "noTerritoriesHint": "创建您的第一个区域以开始。",
     "active": "活跃",
     "inactive": "未激活",
     "global": "全球",
@@ -563,7 +561,6 @@
     "delete": "删除",
     "leadRoutingRules": "线索路由规则",
     "noRoutingRules": "无路由规则",
-    "noRoutingRulesHint": "创建您的第一条规则以自动分配线索。",
     "assignUser": "用户",
     "assignTerritory": "区域",
     "assignRoundRobin": "轮询 ({{count}})",
@@ -1095,6 +1092,7 @@
     "cockpitDetailsAria": "驾驶舱详情"
   },
   "leadKanban": {
+    "convertFromLead": "打开线索并使用转换",
     "moveSuccess": "已移至 {{status}}",
     "moveError": "无法移动潜在客户",
     "boardAriaLabel": "潜在客户管道看板",
@@ -1170,7 +1168,6 @@
   },
   "territories": {
     "pageTitle": "区域",
-    "pageSubtitle": "全球商机分布、区域覆盖和线索路由。",
     "totalsBadge": "{{countries}} 个国家共 {{opportunities}} 个商机",
     "newRuleButton": "新建规则",
     "newTerritoryButton": "新建区域",
@@ -1820,9 +1817,9 @@
       "label": "公司板块"
     },
     "tab": {
-      "contacts": "联系人 ({{count}})",
-      "opportunities": "商机 ({{count}})",
-      "cases": "工单 ({{count}})",
+      "contacts": "联系人 ({{shown}})",
+      "opportunities": "商机 ({{shown}})",
+      "cases": "工单 ({{shown}})",
       "notes": "备注 ({{count}})",
       "hierarchy": "层级结构"
     }

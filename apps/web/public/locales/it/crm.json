@@ -221,7 +221,7 @@
       "status": "Stato",
       "priority": "Priorità",
       "score": "Punteggio",
-      "scoreRange": "Punteggio (0-10000)",
+      "scoreRange": "Punteggio (0-100)",
       "source": "Fonte",
       "created": "Creato"
     },
@@ -309,7 +309,7 @@
       "undo": "Annulla"
     },
     "search": {
-      "placeholder": "Cerca per nome, cliente, e-mail, ruolo…",
+      "placeholder": "Cerca per nome, cliente, ruolo…",
       "aria": "Cerca contatti",
       "clear": {
         "aria": "Cancella ricerca"
@@ -397,7 +397,7 @@
       "button": "Sincronizza account ERP",
       "errorTitle": "Sincronizzazione degli account ERP non riuscita",
       "errorDescription": "Non è stato possibile completare l'ultimo recupero clienti dall'ERP.",
-      "alertFallback": "L'ultima sincronizzazione non è riuscita a recuperare i primi 20 clienti dell'ERP.",
+      "alertFallback": "L'ultima sincronizzazione non è riuscita a recuperare i principali clienti dell'ERP.",
       "retry": "Riprova sincronizzazione"
     },
     "actions": {
@@ -546,13 +546,11 @@
     "accountOwners": "Titolari account",
     "noActiveOwners": "Nessun titolare attivo",
     "noCountrySelected": "Nessun paese selezionato",
-    "noCountrySelectedHint": "Fai clic su un territorio attivo nella mappa interattiva qui sopra per caricare le metriche.",
     "territories": "Territori",
     "countTotal": "{{count}} in totale",
     "failedToLoad": "Caricamento non riuscito",
     "retry": "Riprova",
     "noTerritories": "Nessun territorio",
-    "noTerritoriesHint": "Crea il tuo primo territorio per iniziare.",
     "active": "Attivo",
     "inactive": "Inattivo",
     "global": "Globale",
@@ -563,7 +561,6 @@
     "delete": "Elimina",
     "leadRoutingRules": "Regole di instradamento dei lead",
     "noRoutingRules": "Nessuna regola di instradamento",
-    "noRoutingRulesHint": "Crea la tua prima regola per assegnare automaticamente i lead.",
     "assignUser": "Utente",
     "assignTerritory": "Territorio",
     "assignRoundRobin": "Rotazione ({{count}})",
@@ -1095,6 +1092,7 @@
     "cockpitDetailsAria": "Dettagli del cockpit"
   },
   "leadKanban": {
+    "convertFromLead": "Apri il lead e usa Converti",
     "moveSuccess": "Spostato in {{status}}",
     "moveError": "Impossibile spostare il lead",
     "boardAriaLabel": "Kanban della pipeline dei lead",
@@ -1170,7 +1168,6 @@
   },
   "territories": {
     "pageTitle": "Territori",
-    "pageSubtitle": "Presenza globale delle opportunità, copertura dei territori e instradamento dei lead.",
     "totalsBadge": "{{opportunities}} opportunità in {{countries}} paesi",
     "newRuleButton": "Nuova regola",
     "newTerritoryButton": "Nuovo territorio",
@@ -1820,9 +1817,9 @@
       "label": "Sezioni dell'azienda"
     },
     "tab": {
-      "contacts": "Contatti ({{count}})",
-      "opportunities": "Opportunità ({{count}})",
-      "cases": "Casi ({{count}})",
+      "contacts": "Contatti ({{shown}})",
+      "opportunities": "Opportunità ({{shown}})",
+      "cases": "Casi ({{shown}})",
       "notes": "Note ({{count}})",
       "hierarchy": "Gerarchia"
     }
