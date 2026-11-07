@@ -1,0 +1,122 @@
+{
+  "Cantidad": 3,
+  "FechaCreacion": "2025-07-03T23:00:00.000",
+  "Version": "v1",
+  "Listado": [
+    {
+      "CodigoExterno": "9001-11-LE25",
+      "Nombre": "SERVICIO SINTETICO DE MANTENCION",
+      "CodigoEstado": 5,
+      "Descripcion": "Licitacion sintetica para pruebas.",
+      "FechaCierre": "2025-07-20T15:00:00",
+      "Estado": "Publicada",
+      "Comprador": {
+        "CodigoOrganismo": "900",
+        "NombreOrganismo": "ORGANISMO SINTETICO",
+        "RutUnidad": "61.000.001-0",
+        "CodigoUnidad": "9001",
+        "NombreUnidad": "UNIDAD DE COMPRAS SINTETICA",
+        "DireccionUnidad": "Calle Sintetica 1",
+        "ComunaUnidad": "Santiago",
+        "RegionUnidad": "Región Metropolitana de Santiago",
+        "RutUsuario": "1.000.001-K",
+        "CodigoUsuario": "1",
+        "NombreUsuario": "FUNCIONARIA SINTETICA",
+        "CargoUsuario": "Analista"
+      },
+      "CodigoTipo": 1,
+      "Tipo": "LE",
+      "TipoConvocatoria": "1",
+      "Moneda": "CLP",
+      "MontoEstimado": 25000000,
+      "Fechas": {
+        "FechaCreacion": "2025-07-01T10:00:00",
+        "FechaCierre": "2025-07-20T15:00:00",
+        "FechaPublicacion": "2025-07-03T09:00:00",
+        "FechaAdjudicacion": null
+      },
+      "Items": {
+        "Cantidad": 1,
+        "Listado": [
+          {
+            "Correlativo": 1,
+            "CodigoProducto": 72101507,
+            "CodigoCategoria": "72101500",
+            "Categoria": "Servicios de apoyo para la construccion",
+            "NombreProducto": "Servicio de mantenimiento de edificios",
+            "Descripcion": "Mantencion sintetica",
+            "UnidadMedida": "Unidad",
+            "Cantidad": 1,
+            "Adjudicacion": null
+          }
+        ]
+      },
+      "Adjudicacion": null
+    },
+    {
+      "CodigoExterno": "9001-12-LP25",
+      "Nombre": "SUMINISTRO SINTETICO DE EQUIPOS",
+      "CodigoEstado": 8,
+      "Descripcion": "Licitacion sintetica adjudicada.",
+      "FechaCierre": "2025-06-10T15:00:00",
+      "Estado": "Adjudicada",
+      "Comprador": {
+        "CodigoOrganismo": "900",
+        "NombreOrganismo": "ORGANISMO SINTETICO",
+        "RutUnidad": "61.000.001-0",
+        "CodigoUnidad": "9001",
+        "NombreUnidad": "UNIDAD DE COMPRAS SINTETICA",
+        "ComunaUnidad": "Santiago",
+        "RegionUnidad": "Región Metropolitana de Santiago",
+        "NombreUsuario": "FUNCIONARIA SINTETICA"
+      },
+      "Tipo": "LP",
+      "Moneda": "CLP",
+      "MontoEstimado": 150000000,
+      "Fechas": {
+        "FechaCierre": "2025-06-10T15:00:00",
+        "FechaPublicacion": "2025-05-20T09:00:00",
+        "FechaAdjudicacion": "2025-07-03T12:00:00"
+      },
+      "Items": {
+        "Cantidad": 1,
+        "Listado": [
+          {
+            "Correlativo": 1,
+            "CodigoProducto": 43211507,
+            "NombreProducto": "Computadores de escritorio",
+            "UnidadMedida": "Unidad",
+            "Cantidad": 100,
+            "Adjudicacion": {
+              "RutProveedor": "76.000.002-7",
+              "NombreProveedor": "PROVEEDORA SINTETICA SPA",
+              "Cantidad": 100,
+              "MontoUnitario": 1400000
+            }
+          }
+        ]
+      },
+      "Adjudicacion": {
+        "Tipo": 1,
+        "Fecha": "2025-07-03T12:00:00",
+        "Numero": "123",
+        "NumeroOferentes": 3,
+        "UrlActa": "https://www.mercadopublico.cl/Procurement/Modules/RFB/StepsProcessAward/PreviewAwardAct.aspx?qs=synthetic"
+      }
+    },
+    {
+      "CodigoExterno": "9001-13-LE25",
+      "Nombre": "CONSULTORIA SINTETICA REVOCADA",
+      "CodigoEstado": 18,
+      "FechaCierre": "2025-06-30T15:00:00",
+      "Comprador": {
+        "CodigoOrganismo": "900",
+        "RutUnidad": "61.000.001-0",
+        "CodigoUnidad": "9001",
+        "NombreUnidad": "UNIDAD DE COMPRAS SINTETICA"
+      },
+      "Moneda": "CLP",
+      "MontoEstimado": null
+    }
+  ]
+}

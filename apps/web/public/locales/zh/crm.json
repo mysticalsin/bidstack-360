@@ -473,7 +473,7 @@
     "skipToMain": "跳至主要内容",
     "brandSecureSignature": "安全签名",
     "mainAriaLabel": "文档签署",
-    "footerLegalNote": "您的签名具有法律约束力。本页面不包含任何跟踪技术。",
+    "footerLegalNote": "这是内部审批签名，不是具有法律约束力的电子签名。本页面不包含任何跟踪技术。",
     "stepReview": "查看",
     "stepSign": "签名",
     "stepSubmit": "提交",
@@ -497,8 +497,8 @@
     "back": "返回",
     "continue": "继续",
     "submitHeading": "检查并提交",
-    "submitLegalIntro": "提交即表示您依法签署",
-    "termsAgreement": "我同意此电子签名具有法律约束力，并代表我签署本文档的意愿。我已有机会查看其内容。",
+    "submitLegalIntro": "提交即表示您对以下文件加盖内部审批签名：",
+    "termsAgreement": "我理解这是内部审批签名，不是具有法律约束力的电子签名，并代表我批准本文档的意愿。我已有机会查看其内容。",
     "submitting": "正在提交…",
     "submitSignatureButton": "提交签名",
     "confirmHeading": "签名已提交",
@@ -510,7 +510,8 @@
     "errorLinkExpiredDetail": "此签名链接已过期。请联系发件人重新发送请求。",
     "errorLinkInvalidDetail": "此签名链接无效或已过期。请联系发件人重新发送请求。",
     "errorLinkExpiredTitle": "链接已过期",
-    "errorLinkInvalidTitle": "无效的签名链接"
+    "errorLinkInvalidTitle": "无效的签名链接",
+    "errorLinkClosedTitle": "签名已关闭"
   },
   "worldMap": {
     "preset": {

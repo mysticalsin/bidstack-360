@@ -373,19 +373,19 @@ export function ProposalDetailPage() {
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold text-fg-primary">{section.title}</h3>
                 {section.required && (
-                  <span className="text-[10px] font-medium text-danger bg-danger/10 px-1.5 py-0.5 rounded">
+                  <span className="text-xs font-medium text-danger bg-danger/10 px-1.5 py-0.5 rounded">
                     {t('proposalDetail.requiredBadge', 'Required')}
                   </span>
                 )}
                 {section.aiDrafted && (
-                  <span className="text-[10px] font-medium text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <span className="text-xs font-medium text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                     <Icon name="sparkle" size={10} />
                     {t('proposalDetail.aiDraftedBadge', 'AI Drafted')}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-fg-muted">
+                <span className="text-xs text-fg-muted">
                   {t('proposalDetail.wordCount', '{{count}} words', { count: section.wordCount })}
                 </span>
                 {canWrite && editingSection !== section.id && !locked && (
