@@ -1,6 +1,10 @@
 // Maps the enrichment API (packages/shared account-enrichment, contract in
 // /workspace/fleet/polo-enrichment-api.md) onto the account-page shape.
-import type { Firmographics, HiringBreakdown, PotentialProject as ApiProject } from '@bidstack/shared';
+import type {
+  Firmographics,
+  HiringBreakdown,
+  PotentialProject as ApiProject,
+} from '@bidstack/shared';
 
 import type { CompanyEnrichment, CountRow, OpenRole, PotentialProject, Sourced } from './types';
 
@@ -30,18 +34,48 @@ export interface ApiProjects {
   projects: ApiProject[];
 }
 
-export const PROVIDER_LABEL: Record<string, string> = { apollo: 'Apollo', seamless: 'Seamless.AI' };
+export const PROVIDER_LABEL: Record<string, string> = {
+  apollo: 'Apollo',
+  seamless: 'Seamless.AI',
+  fixture: 'Sample data',
+};
 export const FUNCTION_LABEL: Record<string, string> = {
-  data: 'Data', ml_ai: 'ML & AI', engineering: 'Engineering', infrastructure: 'Infrastructure', security: 'Security',
-  product: 'Product', design: 'Design', sales: 'Sales', marketing: 'Marketing', customer_success: 'Customer success',
-  finance: 'Finance', people: 'People', operations: 'Operations', legal: 'Legal', other: 'Other',
+  data: 'Data',
+  ml_ai: 'ML & AI',
+  engineering: 'Engineering',
+  infrastructure: 'Infrastructure',
+  security: 'Security',
+  product: 'Product',
+  design: 'Design',
+  sales: 'Sales',
+  marketing: 'Marketing',
+  customer_success: 'Customer success',
+  finance: 'Finance',
+  people: 'People',
+  operations: 'Operations',
+  legal: 'Legal',
+  other: 'Other',
 };
 export const SENIORITY_LABEL: Record<string, string> = {
-  intern: 'Intern', junior: 'Junior', mid: 'Mid', senior: 'Senior', lead: 'Lead', principal: 'Principal',
-  manager: 'Manager', director: 'Director', vp: 'VP', c_level: 'C-level',
+  intern: 'Intern',
+  junior: 'Junior',
+  mid: 'Mid',
+  senior: 'Senior',
+  lead: 'Lead',
+  principal: 'Principal',
+  manager: 'Manager',
+  director: 'Director',
+  vp: 'VP',
+  c_level: 'C-level',
 };
 export const SENIORITY_ORDER = Object.values(SENIORITY_LABEL);
-export const REGION_LABEL: Record<string, string> = { EMEA: 'EMEA', AMER: 'North America', LATAM: 'Latin America', APAC: 'APAC', unknown: 'Unknown' };
+export const REGION_LABEL: Record<string, string> = {
+  EMEA: 'EMEA',
+  AMER: 'North America',
+  LATAM: 'Latin America',
+  APAC: 'APAC',
+  unknown: 'Unknown',
+};
 
 const label = (m: Record<string, string>, k: string) => m[k] ?? k;
 
@@ -57,7 +91,8 @@ const NOTICE: Record<string, string> = {
   not_enriched: 'This account has not been enriched yet, so this is sample data.',
   pending: 'Enrichment is still running; some fields may fill in on the next run.',
   partial: 'Some fields were not returned by the providers.',
-  budget_exceeded: 'This month’s enrichment credit budget is used up; showing the last values fetched.',
+  budget_exceeded:
+    'This month’s enrichment credit budget is used up; showing the last values fetched.',
   rate_limited: 'The provider rate-limited the last run; it will retry.',
   error: 'The last enrichment run failed; showing the last values fetched.',
   no_domain: 'This account has no website domain, which enrichment needs.',
@@ -86,27 +121,46 @@ function role(p: ApiPosting): OpenRole {
 
 const CONF_RANK = { high: 0, medium: 1, low: 2 } as const;
 
-export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects | null): CompanyEnrichment {
+export function fromApi(
+  f: Firmographics,
+  h: ApiHiring | null,
+  pr: ApiProjects | null,
+): CompanyEnrichment {
   const fetchedAt = f.fetchedAt ?? new Date(0).toISOString();
   function src<T>(fields: string[], value: T): Sourced<T> {
     const p = fields.map((k) => f.provenance[k]).find(Boolean);
-    return { value, source: label(PROVIDER_LABEL, p?.source ?? 'apollo'), asOf: p?.fetchedAt ?? fetchedAt };
+    return {
+      value,
+      source: label(PROVIDER_LABEL, p?.source ?? 'apollo'),
+      asOf: p?.fetchedAt ?? fetchedAt,
+    };
   }
-  const revenue = f.annualRevenueUsd != null || f.revenueRange
-    ? src(['annualRevenueUsd', 'revenueRange'], { amount: f.annualRevenueUsd, range: f.revenueRange, currency: 'USD' })
-    : null;
-  const headcount = f.employeeCount != null || f.employeeRange
-    ? src(['employeeCount', 'employeeRange'], {
-        current: f.employeeCount,
-        range: f.employeeRange,
-        growth12m: f.headcountGrowth12m == null ? null : Math.round(f.headcountGrowth12m * 1000) / 10,
-      })
-    : null;
+  const revenue =
+    f.annualRevenueUsd != null || f.revenueRange
+      ? src(['annualRevenueUsd', 'revenueRange'], {
+          amount: f.annualRevenueUsd,
+          range: f.revenueRange,
+          currency: 'USD',
+        })
+      : null;
+  const headcount =
+    f.employeeCount != null || f.employeeRange
+      ? src(['employeeCount', 'employeeRange'], {
+          current: f.employeeCount,
+          range: f.employeeRange,
+          growth12m:
+            f.headcountGrowth12m == null ? null : Math.round(f.headcountGrowth12m * 1000) / 10,
+        })
+      : null;
   // Apollo often gives only a country for subsidiaries: one entry per place, HQ first.
   const seen = new Set<string>();
   const locs = [...f.locations]
     .sort((a, b) => Number(b.kind === 'hq') - Number(a.kind === 'hq'))
-    .map((l) => ({ city: l.city ?? l.state ?? l.country ?? '', country: l.country ?? '', hq: l.kind === 'hq' }))
+    .map((l) => ({
+      city: l.city ?? l.state ?? l.country ?? '',
+      country: l.country ?? '',
+      hq: l.kind === 'hq',
+    }))
     .filter((l) => {
       const k = `${l.city}|${l.country}`.toLowerCase();
       if (!l.city || seen.has(k)) return false;
@@ -114,7 +168,9 @@ export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects |
       return true;
     });
   const roles = (h?.postings ?? []).map(role);
-  const hiringSources = [...new Set((h?.postings ?? []).map((p) => label(PROVIDER_LABEL, p.source)))];
+  const hiringSources = [
+    ...new Set((h?.postings ?? []).map((p) => label(PROVIDER_LABEL, p.source))),
+  ];
   const projects: PotentialProject[] = (pr?.projects ?? [])
     .map((p) => ({
       id: p.id,
@@ -137,7 +193,10 @@ export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects |
         url: e.url,
       })),
     }))
-    .sort((a, b) => CONF_RANK[a.confidence] - CONF_RANK[b.confidence] || b.postingCount - a.postingCount);
+    .sort(
+      (a, b) =>
+        CONF_RANK[a.confidence] - CONF_RANK[b.confidence] || b.postingCount - a.postingCount,
+    );
   return {
     companyId: f.companyId,
     sample: false,
@@ -148,18 +207,24 @@ export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects |
     firmographics: {
       revenue,
       headcount,
-      industry: f.industry ? src(['industry', 'industries'], f.industry.charAt(0).toUpperCase() + f.industry.slice(1)) : null,
+      industry: f.industry
+        ? src(['industry', 'industries'], f.industry.charAt(0).toUpperCase() + f.industry.slice(1))
+        : null,
       locations: locs.length ? src(['locations'], locs) : null,
     },
     hiring: {
-      source: hiringSources.length ? `${hiringSources.join(' + ')} job postings` : 'Apollo job postings',
+      source: hiringSources.length
+        ? `${hiringSources.join(' + ')} job postings`
+        : 'Apollo job postings',
       asOf: h?.fetchedAt ?? fetchedAt,
       roles,
       total: h ? Math.max(h.postingsTotal, h.hiring.total) : 0,
       buckets: h
         ? {
             function: rows(h.hiring.byFunction, FUNCTION_LABEL),
-            seniority: rows(h.hiring.bySeniority, SENIORITY_LABEL).sort((a, b) => SENIORITY_ORDER.indexOf(a.label) - SENIORITY_ORDER.indexOf(b.label)),
+            seniority: rows(h.hiring.bySeniority, SENIORITY_LABEL).sort(
+              (a, b) => SENIORITY_ORDER.indexOf(a.label) - SENIORITY_ORDER.indexOf(b.label),
+            ),
             region: rows(h.hiring.byRegion, REGION_LABEL),
           }
         : undefined,

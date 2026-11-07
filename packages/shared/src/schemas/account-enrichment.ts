@@ -46,7 +46,8 @@ export const HiringRegion = z.enum(['EMEA', 'AMER', 'LATAM', 'APAC', 'unknown'])
 export type HiringRegion = z.infer<typeof HiringRegion>;
 
 export const FieldProvenance = z.object({
-  source: EnrichmentProviderId,
+  /** `fixture` marks demo seed values; real rows always carry a provider id. */
+  source: z.union([EnrichmentProviderId, z.literal('fixture')]),
   fetchedAt: z.string(),
 });
 export type FieldProvenance = z.infer<typeof FieldProvenance>;
