@@ -735,3 +735,5 @@ One technology stack per account, on `/accounts/:accountId` (Technical Stack car
   row; it truncates with an ellipsis and carries a `title` with the full list. No new row.
 - Layout: no overlap at 1440, 1024 and 390, light and dark; pills wrap; popover stays inside the
   viewport (collision padding 8px). Hit targets 24 x 24 minimum. Copy: no em dashes, no taglines.
+- Build note: the empty state keeps the existing copy `No technology detected yet` so current tests
+  and screenshots stay valid. Chip and Sample text use 12px (`text-xs`), the audit floor.
