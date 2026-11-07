@@ -37,14 +37,28 @@ test.describe('Audit log page', () => {
     const onDashboard = page.url().includes('/dashboard');
     test.skip(onDashboard, 'Current session is non-admin; redirected to /dashboard');
 
-    const table = page.getByRole('table', { name: 'Audit log entries, newest first' });
-    await expect(table).toBeVisible({ timeout: 30_000 });
+    // The seed writes no audit rows and the table only renders when rows exist,
+    // so write one here instead of relying on an earlier spec in the shard.
+    const created = await page.request.post('/api/v1/user-groups', {
+      data: { name: `e2e-audit-log-${Date.now()}` },
+      timeout: 10_000,
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
 
-    await expect(table.getByRole('columnheader', { name: 'Event' })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: 'Actor' })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: 'Target' })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: 'Time' })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: 'Details' })).toBeVisible();
+    try {
+      await gotoAndWait('/audit-log');
+      const table = page.getByRole('table', { name: 'Audit log entries, newest first' });
+      await expect(table).toBeVisible({ timeout: 30_000 });
+
+      await expect(table.getByRole('columnheader', { name: 'Event' })).toBeVisible();
+      await expect(table.getByRole('columnheader', { name: 'Actor' })).toBeVisible();
+      await expect(table.getByRole('columnheader', { name: 'Target' })).toBeVisible();
+      await expect(table.getByRole('columnheader', { name: 'Time' })).toBeVisible();
+      await expect(table.getByRole('columnheader', { name: 'Details' })).toBeVisible();
+    } finally {
+      await page.request.delete(`/api/v1/user-groups/${id}`, { timeout: 10_000 });
+    }
   });
 
   test('audit entries or empty state is shown', async ({ page, gotoAndWait }) => {

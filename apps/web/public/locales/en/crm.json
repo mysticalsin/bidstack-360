@@ -221,7 +221,7 @@
       "status": "Status",
       "priority": "Priority",
       "score": "Score",
-      "scoreRange": "Score (0-10000)",
+      "scoreRange": "Score (0-100)",
       "source": "Source",
       "created": "Created"
     },
@@ -309,7 +309,7 @@
       "undo": "Undo"
     },
     "search": {
-      "placeholder": "Search by name, customer, email, role…",
+      "placeholder": "Search by name, customer, role…",
       "aria": "Search contacts",
       "clear": {
         "aria": "Clear search"
@@ -397,7 +397,7 @@
       "button": "Sync ERP accounts",
       "errorTitle": "ERP account sync failed",
       "errorDescription": "The latest ERP customer pull could not complete.",
-      "alertFallback": "The last sync could not pull the top 20 ERP customers.",
+      "alertFallback": "The last sync could not pull the top ERP customers.",
       "retry": "Retry sync"
     },
     "actions": {
@@ -548,13 +548,11 @@
     "accountOwners": "Account Owners",
     "noActiveOwners": "No active owners",
     "noCountrySelected": "No Country Selected",
-    "noCountrySelectedHint": "Click any active territory on the interactive map above to load metrics.",
     "territories": "Territories",
     "countTotal": "{{count}} total",
     "failedToLoad": "Failed to load",
     "retry": "Retry",
     "noTerritories": "No territories",
-    "noTerritoriesHint": "Create your first territory to get started.",
     "active": "Active",
     "inactive": "Inactive",
     "global": "Global",
@@ -565,7 +563,6 @@
     "delete": "Delete",
     "leadRoutingRules": "Lead Routing Rules",
     "noRoutingRules": "No routing rules",
-    "noRoutingRulesHint": "Create your first rule to auto-assign leads.",
     "assignUser": "User",
     "assignTerritory": "Territory",
     "assignRoundRobin": "Round Robin ({{count}})",
@@ -1097,6 +1094,7 @@
     "cockpitDetailsAria": "Cockpit details"
   },
   "leadKanban": {
+    "convertFromLead": "Open the lead and use Convert",
     "moveSuccess": "Moved to {{status}}",
     "moveError": "Could not move lead",
     "boardAriaLabel": "Lead pipeline kanban",
@@ -1172,7 +1170,6 @@
   },
   "territories": {
     "pageTitle": "Territories",
-    "pageSubtitle": "Global opportunity footprint, territory coverage, and lead routing.",
     "totalsBadge": "{{opportunities}} opps across {{countries}} countries",
     "newRuleButton": "New rule",
     "newTerritoryButton": "New territory",
@@ -1822,9 +1819,9 @@
       "label": "Company sections"
     },
     "tab": {
-      "contacts": "Contacts ({{count}})",
-      "opportunities": "Opportunities ({{count}})",
-      "cases": "Cases ({{count}})",
+      "contacts": "Contacts ({{shown}})",
+      "opportunities": "Opportunities ({{shown}})",
+      "cases": "Cases ({{shown}})",
       "notes": "Notes ({{count}})",
       "hierarchy": "Hierarchy"
     }
