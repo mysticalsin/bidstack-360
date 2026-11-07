@@ -21,6 +21,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { prisma, IntegrationProvider, EmailProvider } from '@bidstack/db';
+import { maySendMail } from '@bidstack/shared';
 import {
   getAccessToken,
   type SendEmailParams,
@@ -60,6 +61,14 @@ export async function sendEmail(
   if (!token) {
     throw new Error('No active email integration found. Connect Gmail or Outlook first.');
   }
+
+  // Polo never sends, even on a legacy grant that still carries a send scope.
+  if (!maySendMail(token.scope ?? [])) {
+    throw Object.assign(new Error('This mailbox is connected read-only. Save a draft instead.'), {
+      statusCode: 409,
+    });
+  }
+
 
   const pixelToken = randomBytes(24).toString('base64url');
   const isGmail = token.provider === 'gmail';

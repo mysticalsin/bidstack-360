@@ -134,9 +134,9 @@ export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   // ─── DELETE /api/v1/email-templates/:id ───────────────────────────────
-  // Soft delete. Archived workflow runs still resolve historical templates
-  // via the `deletedAt IS NULL` filter being relaxed at lookup-time when
-  // a workflow run references a known id.
+  // Soft delete. Archived workflow runs still resolve
+  // historical templates via the `deletedAt IS NULL` filter being relaxed at
+  // lookup-time when a workflow run references a known id.
   server.delete(
     '/email-templates/:id',
     {
@@ -146,10 +146,14 @@ export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      await prisma.emailTemplate.update({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+      const { id } = req.params;
+      const { orgId } = req.auth;
+      const removed = await prisma.emailTemplate.updateMany({
+        where: { id, orgId, deletedAt: null },
         data: { deletedAt: new Date() },
       });
+      // A deleted template answers 404 and keeps its original deletedAt.
+      if (removed.count === 0) throw Object.assign(new Error('Email template not found'), { statusCode: 404 });
       return reply.code(204).send(null);
     },
   );

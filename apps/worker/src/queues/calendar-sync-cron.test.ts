@@ -124,6 +124,15 @@ describe('calendar cron fan-out is bounded (does not load every token in one job
     );
   });
 
+  it('pull fan-out keeps retrying grants whose last refresh failed', async () => {
+    tokenFindMany.mockResolvedValueOnce([] as never);
+    const { queue } = makeFakeQueue();
+    await fanoutIncrementalPulls(queue, log);
+    expect(tokenFindMany.mock.calls[0]![0]).toMatchObject({
+      where: { status: { in: ['active', 'error'] }, deletedAt: null },
+    });
+  });
+
   it('watch-renew fan-out also cursor-paginates active Google tokens in bounded batches', async () => {
     tokenFindMany.mockResolvedValueOnce(tokenRows('g', 200) as never);
     tokenFindMany.mockResolvedValueOnce(tokenRows('g2', 3) as never);
@@ -134,7 +143,7 @@ describe('calendar cron fan-out is bounded (does not load every token in one job
     expect(tokenFindMany).toHaveBeenCalledTimes(2);
     expect(tokenFindMany.mock.calls[0]![0]).toMatchObject({
       take: 200,
-      where: { provider: 'google_workspace', status: 'active', deletedAt: null },
+      where: { provider: { in: ['google_workspace', 'gmail'] }, status: 'active', deletedAt: null },
     });
     expect(add).toHaveBeenCalledTimes(203);
     expect(add).toHaveBeenCalledWith(
