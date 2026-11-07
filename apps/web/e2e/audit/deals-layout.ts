@@ -50,7 +50,7 @@ export async function settle(page: Page): Promise<void> {
 }
 
 export async function auditLayout(page: Page): Promise<LayoutIssue[]> {
-  const issues = await page.evaluate(() => {
+  const issues: LayoutIssue[] = await page.evaluate(() => {
     const out: Array<{ kind: 'overflow' | 'overlap' | 'clipped' | 'small-text'; detail: string }> =
       [];
     const root = document.scrollingElement ?? document.documentElement;
@@ -70,7 +70,11 @@ export async function auditLayout(page: Page): Promise<LayoutIssue[]> {
     const isVisible = (el: Element) => {
       if (el.closest('[aria-hidden="true"], .sr-only, [hidden], svg, canvas')) return false;
       const style = getComputedStyle(el);
-      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) {
+      if (
+        style.visibility === 'hidden' ||
+        style.display === 'none' ||
+        Number(style.opacity) === 0
+      ) {
         return false;
       }
       const r = el.getBoundingClientRect();
@@ -102,9 +106,9 @@ export async function auditLayout(page: Page): Promise<LayoutIssue[]> {
         const ellipsis = style.textOverflow === 'ellipsis';
         const titled = Boolean(
           el.getAttribute('title') ||
-            el.closest('[title]') ||
-            el.getAttribute('aria-label') ||
-            el.closest('[aria-label]'),
+          el.closest('[title]') ||
+          el.getAttribute('aria-label') ||
+          el.closest('[aria-label]'),
         );
         if (!ellipsis || !titled) {
           out.push({
@@ -160,7 +164,9 @@ export async function auditLayout(page: Page): Promise<LayoutIssue[]> {
           right = Math.min(right, c.left + c.width);
           bottom = Math.min(bottom, c.top + c.height);
         }
-        return right - left > 0 && bottom - top > 0 ? [new DOMRect(left, top, right - left, bottom - top)] : [];
+        return right - left > 0 && bottom - top > 0
+          ? [new DOMRect(left, top, right - left, bottom - top)]
+          : [];
       });
     };
 
@@ -187,7 +193,10 @@ export async function auditLayout(page: Page): Promise<LayoutIssue[]> {
     return out;
   });
 
-  const axe = await new AxeBuilder({ page }).include('main').withRules(['color-contrast']).analyze();
+  const axe = await new AxeBuilder({ page })
+    .include('main')
+    .withRules(['color-contrast'])
+    .analyze();
   for (const v of axe.violations) {
     for (const node of v.nodes) {
       issues.push({

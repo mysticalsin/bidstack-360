@@ -81,6 +81,14 @@ function watch(page: Page): Watch {
     // 401/403 are permission probes some panels make on purpose; 404 on a
     // probe for optional data (latest bid score) is the documented empty state.
     if (status === 404 && /\/bid-scores\/[^/]+\/latest/.test(url)) return;
+    // Other specs share the seed; a deal deleted under an open board answers 404,
+    // which the detail page renders as "not found".
+    if (
+      status === 404 &&
+      res.request().method() === 'GET' &&
+      /\/opportunities\/[0-9a-f-]{36}$/.test(url)
+    )
+      return;
     if (status === 409) return;
     errors.push(`http ${status}: ${res.request().method()} ${url}`);
   };
@@ -109,6 +117,7 @@ const SKIP_NAME = /delete|remove|archive|sign out|log out|discard|reset/i;
 interface Control {
   index: number;
   name: string;
+  offscreen?: boolean;
 }
 
 async function listControls(page: Page): Promise<Control[]> {
@@ -120,7 +129,7 @@ async function listControls(page: Page): Promise<Control[]> {
         'button, a[href], [role="tab"], [role="switch"], [role="menuitem"], [role="checkbox"], input[type="checkbox"], summary',
       ),
     );
-    const out: Array<{ index: number; name: string }> = [];
+    const out: Array<{ index: number; name: string; offscreen?: boolean }> = [];
     nodes.forEach((el, index) => {
       const r = el.getBoundingClientRect();
       const style = getComputedStyle(el);
@@ -140,7 +149,9 @@ async function listControls(page: Page): Promise<Control[]> {
         .replace(/\s+/g, ' ')
         .slice(0, 60);
       el.setAttribute('data-audit-index', String(index));
-      out.push({ index, name });
+      // Inactive carousel panels parked beside the viewport cannot be clicked.
+      const offscreen = r.left >= window.innerWidth || r.right <= 0;
+      out.push({ index, name, ...(offscreen ? { offscreen } : {}) });
     });
     return out;
   });
@@ -151,31 +162,45 @@ async function snapshot(page: Page) {
   return page.evaluate(() => {
     const main = document.querySelector('main');
     const states = Array.from(
-      document.querySelectorAll('[aria-pressed], [aria-expanded], [aria-checked], [aria-selected], [data-state]'),
+      document.querySelectorAll(
+        '[aria-pressed], [aria-expanded], [aria-checked], [aria-selected], [aria-sort], [data-state]',
+      ),
     )
       .map(
         (el) =>
-          `${el.getAttribute('aria-pressed')}|${el.getAttribute('aria-expanded')}|${el.getAttribute('aria-checked')}|${el.getAttribute('aria-selected')}|${el.getAttribute('data-state')}`,
+          `${el.getAttribute('aria-pressed')}|${el.getAttribute('aria-expanded')}|${el.getAttribute('aria-checked')}|${el.getAttribute('aria-selected')}|${el.getAttribute('aria-sort')}|${el.getAttribute('data-state')}`,
       )
       .join(';');
-    const checked = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
+    const checked = Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    )
       .map((i) => (i.checked ? '1' : '0'))
       .join('');
     return {
       url: location.pathname + location.search + location.hash,
-      dialogs: document.querySelectorAll('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]').length,
+      dialogs: document.querySelectorAll(
+        '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]',
+      ).length,
       toasts: document.querySelectorAll('[data-sonner-toast], [role="status"]').length,
       tooltips: document.querySelectorAll('[role="tooltip"]').length,
       states,
       checked,
-      html: (main?.innerHTML.length ?? 0) + (document.body.innerHTML.length % 9973),
+      // Content hash, not length: a sort that moves "descending" between headers keeps lengths equal.
+      html: (() => {
+        const text = `${main?.innerHTML ?? ''}${document.body.innerHTML.length}`;
+        let h = 0x811c9dc5;
+        for (let i = 0; i < text.length; i += 1) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+        return h >>> 0;
+      })(),
     };
   });
 }
 
 async function closeOverlays(page: Page) {
   for (let i = 0; i < 3; i += 1) {
-    const open = await page.locator('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]').count();
+    const open = await page
+      .locator('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+      .count();
     if (open === 0) return;
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
@@ -195,7 +220,11 @@ test.describe('deals click audit', () => {
       await settle(page);
       expect(w.errors, `load errors on ${path}`).toEqual([]);
 
-      const controls = (await listControls(page)).filter((c) => !SKIP_NAME.test(c.name));
+      const listed = (await listControls(page)).filter((c) => !SKIP_NAME.test(c.name));
+      for (const c of listed.filter((x) => x.offscreen)) {
+        test.info().annotations.push({ type: 'offscreen-focusable', description: c.name });
+      }
+      const controls = listed.filter((c) => !c.offscreen);
       const dead: string[] = [];
       const broken: string[] = [];
       for (const control of controls.slice(0, 80)) {
@@ -206,8 +235,14 @@ test.describe('deals click audit', () => {
           await listControls(page);
         }
         const target = page.locator(`main [data-audit-index="${control.index}"]`).first();
-        if ((await target.count()) === 0 || !(await target.isVisible().catch(() => false))) continue;
+        if ((await target.count()) === 0 || !(await target.isVisible().catch(() => false)))
+          continue;
         if (!(await target.isEnabled().catch(() => false))) continue;
+        const parked = await target.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          return r.left >= window.innerWidth || r.right <= 0;
+        });
+        if (parked) continue;
         const before = await snapshot(page);
         const requestCount = w.requests.length;
         const errorCount = w.errors.length;
@@ -276,7 +311,10 @@ test.describe('deals layout audit', () => {
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
           const shotDir = process.env.AUDIT_SHOT_DIR;
           if (shotDir && vp.name === 'desktop') {
-            await page.screenshot({ path: `${shotDir}/${route.name}-${theme}.png`, fullPage: true });
+            await page.screenshot({
+              path: `${shotDir}/${route.name}-${theme}.png`,
+              fullPage: true,
+            });
           }
           const issues = await auditLayout(page);
           // Sub-12px text set by the global type scale in index.css is owned by the
