@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma } from '../index.js';
 
-import type { Tool } from './index.js';
+import { isoDate, oppCitation, type AgentTool } from './types.js';
 
 const Input = z.object({
   oppId: z.string().uuid(),
@@ -11,9 +11,19 @@ const Input = z.object({
   assignee: z.string().email().optional(),
 });
 
-export const tasksCreate: Tool<typeof Input> = {
+async function findOpp(orgId: string, oppId: string) {
+  const opp = await prisma.opportunity.findFirst({
+    where: { id: oppId, orgId, deletedAt: null }, // skip soft-deleted (Review)
+  });
+  if (!opp) throw new Error('Opportunity not found');
+  return opp;
+}
+
+export const tasksCreate: AgentTool<typeof Input> = {
   description: 'Create a follow-up task on an opportunity.',
   input: Input,
+  kind: 'write',
+  permission: 'tasks:write',
   inputJsonSchema: {
     type: 'object',
     required: ['oppId', 'title'],
@@ -25,11 +35,21 @@ export const tasksCreate: Tool<typeof Input> = {
     },
     additionalProperties: false,
   },
+  preview: async (args, ctx) => {
+    const opp = await findOpp(ctx.orgId, args.oppId);
+    return {
+      title: 'Create task',
+      changes: [
+        { field: 'Title', value: args.title },
+        { field: 'Due date', value: args.dueDate ?? 'none' },
+        { field: 'Opportunity', value: `${opp.code} ${opp.name}` },
+        { field: 'Assignee', value: args.assignee ?? 'unassigned' },
+      ],
+      citation: oppCitation(opp),
+    };
+  },
   handler: async (args, ctx) => {
-    const opp = await prisma.opportunity.findFirst({
-      where: { id: args.oppId, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
-    });
-    if (!opp) throw new Error('Opportunity not found');
+    const opp = await findOpp(ctx.orgId, args.oppId);
 
     const assignee = args.assignee
       ? await prisma.user.findFirst({
@@ -50,7 +70,7 @@ export const tasksCreate: Tool<typeof Input> = {
     await prisma.auditLog.create({
       data: {
         orgId: ctx.orgId,
-        userId: null,
+        userId: ctx.userId ?? null,
         action: 'task.create',
         targetType: 'task',
         targetId: created.id,
@@ -67,7 +87,7 @@ export const tasksCreate: Tool<typeof Input> = {
       id: created.id,
       oppId: created.oppId,
       title: created.title,
-      dueDate: created.dueDate?.toISOString().slice(0, 10) ?? null,
+      dueDate: isoDate(created.dueDate),
       status: created.status,
       assignee: assignee?.email ?? null,
       createdAt: created.createdAt.toISOString(),

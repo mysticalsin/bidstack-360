@@ -71,6 +71,34 @@ export function parseCopilotContext(pathname: string): CopilotContext {
   return {};
 }
 
+/** Record ids Jarvis resolves "this" against. */
+export interface JarvisContext {
+  accountId?: string;
+  opportunityId?: string;
+  proposalId?: string;
+  rfpOpportunityId?: string;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Like parseCopilotContext, but also reads proposals and the RFP pipeline,
+ *  and only keeps real record ids (`/accounts/new` is not a record). */
+export function parseJarvisContext(pathname: string): JarvisContext {
+  const routes: Array<[RegExp, keyof JarvisContext]> = [
+    [/^\/accounts\/([^/]+)/, 'accountId'],
+    [/^\/opportunities\/([^/]+)/, 'opportunityId'],
+    [/^\/proposals\/([^/]+)/, 'proposalId'],
+    [/^\/rfp\/([^/]+)\/pipeline/, 'rfpOpportunityId'],
+  ];
+  for (const [re, key] of routes) {
+    const raw = re.exec(pathname)?.[1];
+    if (!raw) continue;
+    const id = decodeURIComponent(raw);
+    return UUID_RE.test(id) ? { [key]: id } : {};
+  }
+  return {};
+}
+
 /**
  * The four AI actions the palette offers, gated by what it can actually
  * supply. Meeting prep stays disabled until a calendar-event detail route
