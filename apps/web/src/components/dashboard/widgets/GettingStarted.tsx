@@ -67,7 +67,7 @@ export function GettingStarted() {
       transition={springSoft}
     >
       <div className="mb-8 text-center">
-        <div className="mb-2 text-xs font-medium text-[var(--brand-primary)]">
+        <div className="mb-2 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
           {t('orgDashboard.gettingStarted.eyebrow', 'Your workspace is ready')}
         </div>
         <h1
@@ -93,7 +93,7 @@ export function GettingStarted() {
                 className="group flex min-h-[44px] items-start gap-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4 text-left transition-all hover:border-[var(--brand)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
               >
                 <span
-                  className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--brand-primary)] transition-colors group-hover:bg-[var(--brand)]/10"
+                  className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)] transition-colors group-hover:bg-[var(--brand)]/10"
                   aria-hidden
                 >
                   <Icon name={card.icon} size={18} />
@@ -102,7 +102,7 @@ export function GettingStarted() {
                   <p className="text-sm font-semibold text-[var(--fg-primary)]">{card.title}</p>
                   <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">{card.body}</p>
                 </div>
-                <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--brand-primary)]">
+                <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
                   {card.cta}
                   <Icon
                     name="chevron-right"

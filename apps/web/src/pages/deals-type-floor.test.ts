@@ -34,13 +34,34 @@ function sourceFiles(path: string): string[] {
 
 const BELOW_FLOOR = /text-\[(?:[0-9]|1[01])(?:\.\d+)?px\]/g;
 
+// Dark --brand-primary is a fill colour (3.95:1 on the page); text needs --brand-deep.
+const BRAND_TEXT = /(?:^|[\s'"`])((?:[a-z-]+:)*)text-\[var\(--brand-primary\)\]/g;
+
+function dealsSources(): string[] {
+  return DEALS_SURFACES.flatMap(sourceFiles).filter(
+    (file) => file.endsWith('.tsx') && !file.endsWith('.test.tsx'),
+  );
+}
+
 describe('deals type floor', () => {
   it('keeps every deals surface at 12px text or larger', () => {
-    const offenders = DEALS_SURFACES.flatMap(sourceFiles)
-      .filter((file) => file.endsWith('.tsx') && !file.endsWith('.test.tsx'))
-      .flatMap((file) =>
-        (readFileSync(file, 'utf8').match(BELOW_FLOOR) ?? []).map((cls) => `${relative(SRC, file)} ${cls}`),
-      );
+    const offenders = dealsSources().flatMap((file) =>
+      (readFileSync(file, 'utf8').match(BELOW_FLOOR) ?? []).map((cls) => `${relative(SRC, file)} ${cls}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('pairs brand-coloured text with the dark foreground token', () => {
+    const offenders = dealsSources().flatMap((file) =>
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .flatMap((line, i) =>
+          [...line.matchAll(BRAND_TEXT)]
+            .filter(([, variants]) => !variants!.startsWith('dark:'))
+            .filter(([, variants]) => !line.includes(`dark:${variants}text-[var(--brand-deep)]`))
+            .map(([, variants]) => `${relative(SRC, file)}:${i + 1} ${variants}`),
+        ),
+    );
     expect(offenders).toEqual([]);
   });
 });
