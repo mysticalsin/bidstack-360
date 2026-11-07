@@ -24,8 +24,10 @@ export async function processDataSubjectJob(
   const parsed = DataSubjectJob.safeParse(job.data);
   if (!parsed.success) throw new Error('data-subject-request: invalid job data');
   const out = await runDataSubjectRequest(prisma, parsed.data.requestId);
-  if (out.status === 'failed') log.error(out, 'data subject request failed');
-  else log.info(out, 'data subject request processed');
+  // errorDetail can echo row values; logs get the stored code only.
+  const { errorDetail: _detail, ...safe } = out as typeof out & { errorDetail?: unknown };
+  if (out.status === 'failed') log.error(safe, 'data subject request failed');
+  else log.info(safe, 'data subject request processed');
   return out;
 }
 

@@ -92,6 +92,13 @@ Test paths are relative to the owning app or package (`apps/api/src/...`,
   get structural erasure) and **mentioned** (free text match only, where just
   the matched text is replaced with `[erased]`). A third party's record that
   mentions the subject is redacted, never deleted.
+- **Namesakes.** A name only links a row that has no email of its own, so a
+  different person with the same name and their own address keeps their
+  records, meetings and references. Other people's own name, email and phone
+  columns are never redacted. Free text cannot tell namesakes apart: their
+  name in a transcript or a name-only attendee list is redacted too.
+- **JSON columns** are matched on their decoded values, so a name after an
+  escaped newline in a transcript payload is still found.
 - **Export:** `POST /api/v1/orgs/:orgId/data-subject-requests` with
   `kind: export` queues a job; `GET .../:id/export` rebuilds the bundle live
   (it is never stored at rest) and writes `gdpr.export.downloaded`. Linked
@@ -127,8 +134,8 @@ The worker `retention-sweep` runs daily (`RETENTION_SWEEP_CRON`, default
 `settings:read` see the same dry run report at `GET /api/v1/compliance/retention`. A missing, zero or
 invalid period falls back to the default, so a typo cannot shorten retention.
 Rows with no end or meeting date age from `created_at`. In enforce mode each
-class that changed rows writes one `retention.sweep` audit row per tenant with
-counts only.
+class that changed rows writes `retention.sweep` audit rows (per tenant and
+batch, counts only) in the same transaction as the batch.
 
 | Data class              | Env var                                | Default (days) | Action                               |
 | ----------------------- | -------------------------------------- | -------------- | ------------------------------------ |
@@ -180,6 +187,6 @@ Not enforceable yet (stated in the settings screen as well):
 3. Data residency covers tenant exports only (ISO-A.5.23-CLOUD-RESIDENCY).
 4. Audit diffs written before this pack may contain raw personal values (contact create and delete diffs carried the name until now); they cannot be rewritten without breaking the chain, and the residue scan reports them as retained (SOC2-P4.3-ERASE).
 5. Owner only visibility for unfiled captured mail depends on the email capture slice, not on main yet (ISO-A.8.12-LEAKAGE).
-6. Free text that mentions a subject by first name only, a short name (under five characters) or a reformatted phone number is not matched by the erase engine; full name, email and 7 digit or longer phone are.
+6. Free text naming a namesake (same full name, different person) is redacted along with the subject's mentions. Free text that mentions a subject by first name only, a short name (under five characters) or a reformatted phone number is not matched by the erase engine; full name, email and 7 digit or longer phone are.
 7. No audit log retention period is defined.
 8. Accepting or rejecting a contact fact is not audited yet.

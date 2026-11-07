@@ -143,13 +143,46 @@ function reEscape(v: string): string {
  */
 export function subjectPattern(s: Pick<DataSubject, 'emails' | 'phones' | 'names'>): string | null {
   const parts = [
-    ...s.emails.map(
-      (e) => `(?<![[:alnum:]._%+-])${reEscape(e)}(?![[:alnum:]_%+-]|\\.[[:alnum:]])`,
-    ),
+    ...s.emails.map((e) => `(?<![[:alnum:]._%+-])${reEscape(e)}(?![[:alnum:]_%+-]|\\.[[:alnum:]])`),
     ...s.phones.map((p) => `(?<![[:digit:]])${reEscape(p)}(?![[:digit:]])`),
     ...s.names.map((n) => `\\m${n.split(/\s+/).map(reEscape).join('\\s+')}\\M`),
   ];
   return parts.length ? `(${parts.join('|')})` : null;
+}
+
+/** Emails and phones only: used on other people's identity columns, where a shared name is not the subject. */
+function identifierPattern(s: Pick<DataSubject, 'emails' | 'phones'>): string | null {
+  return subjectPattern({ emails: s.emails, phones: s.phones, names: [] });
+}
+
+/**
+ * Columns that identify the record's own person. On a record linked to the
+ * subject they are erased; on anyone else's record they are left alone, so a
+ * namesake keeps their name.
+ */
+const IDENTITY_FIELDS: Record<string, readonly string[]> = {
+  Contact: ['name', 'email', 'phone'],
+  Lead: ['firstName', 'lastName', 'email', 'phone'],
+  OrgChartNode: ['name', 'email', 'phone', 'linkedinUrl'],
+  ActivityAttendee: ['email'],
+  MeetingIntelAttendee: ['name', 'email'],
+  Booking: ['attendeeName', 'attendeeEmail', 'attendeePhone'],
+  Reference: ['contactName', 'contactEmail'],
+  SmsMessage: ['toNumber', 'fromNumber'],
+  SmsConsent: ['phoneNumber'],
+  EmailMessage: ['fromEmail'],
+  CalendarEvent: ['organizerEmail'],
+};
+
+function isIdentityField(model: string, field: string): boolean {
+  return IDENTITY_FIELDS[model]?.includes(field) ?? false;
+}
+
+/** Personal fields of a record that only mentions the subject: free text, never its own identity columns. */
+function mentionFields(model: string): readonly string[] {
+  return (STORE_FIELDS.get(model as SubjectStoreModel) ?? []).filter(
+    (f) => !isIdentityField(model, f),
+  );
 }
 
 function fieldMeta(model: string, field: string) {
@@ -180,17 +213,31 @@ function phoneIn(model: string, field: string, digits: string[]): Prisma.Sql {
 function jsonHasEmail(model: string, field: string, emails: string[]): Prisma.Sql {
   if (!emails.length) return FALSE;
   const col = C(model, field);
-  return Prisma.sql`(jsonb_typeof(${col}) = 'array' AND EXISTS (
+  return Prisma.sql`(CASE WHEN jsonb_typeof(${col}) = 'array' THEN EXISTS (
       SELECT 1 FROM jsonb_array_elements(${col}) e
        WHERE lower(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e ->> 'email' END)
-             = ANY(${emails}::text[])))`;
+             = ANY(${emails}::text[])) ELSE false END)`;
 }
 
-function mentions(model: string, fields: readonly string[], s: DataSubject): Prisma.Sql {
-  const re = subjectPattern(s);
+/**
+ * One column matches the pattern. JSON and list values are tested on their
+ * decoded strings: in the text form an escape such as `\n` sits right before
+ * the next word and would hide a name from the word boundary.
+ */
+function matches(model: string, field: string, re: string): Prisma.Sql {
+  const f = fieldMeta(model, field);
+  const col = C(model, field);
+  if (f.type === 'Json') {
+    return Prisma.sql`(${col} IS NOT NULL AND gdpr_redact_jsonb(${col}, ${re}, '') IS DISTINCT FROM ${col})`;
+  }
+  if (f.isList) return Prisma.sql`EXISTS (SELECT 1 FROM unnest(${col}) x WHERE x::text ~* ${re})`;
+  return Prisma.sql`${col}::text ~* ${re}`;
+}
+
+function anyMatch(model: string, fields: readonly string[], re: string | null): Prisma.Sql {
   if (!re || !fields.length) return FALSE;
   return Prisma.sql`(${Prisma.join(
-    fields.map((f) => Prisma.sql`${C(model, f)}::text ~* ${re}`),
+    fields.map((f) => matches(model, f, re)),
     ' OR ',
   )})`;
 }
@@ -201,29 +248,40 @@ function redactExpr(model: string, field: string, re: string): Prisma.Sql {
   const col = C(model, field);
   if (f.type === 'Json') return Prisma.sql`gdpr_redact_jsonb(${col}, ${re}, ${REDACTED})`;
   if (f.isList) {
-    return Prisma.sql`array(SELECT regexp_replace(x, ${re}, ${REDACTED}, 'gi')
-                              FROM unnest(${col}) WITH ORDINALITY AS u(x, i) ORDER BY i)`;
+    return Prisma.sql`CASE WHEN ${col} IS NULL THEN NULL ELSE array(SELECT regexp_replace(x, ${re}, ${REDACTED}, 'gi')
+                              FROM unnest(${col}) WITH ORDINALITY AS u(x, i) ORDER BY i) END`;
   }
   return Prisma.sql`regexp_replace(${col}, ${re}, ${REDACTED}, 'gi')`;
 }
 
-/** A jsonb array column without the entries (attendee, recipient) that name the subject. */
+/**
+ * A jsonb array column (attendees, recipients) without the subject's entry:
+ * matched on the entry's email, or on its exact name only when it has no
+ * email, so a namesake with their own address stays.
+ */
 function jsonWithout(model: string, field: string, s: DataSubject): Prisma.Sql {
   const col = C(model, field);
-  const re = subjectPattern(s);
-  if (!re) return col;
+  if (!s.emails.length && !s.names.length) return col;
   return Prisma.sql`CASE WHEN jsonb_typeof(${col}) = 'array' THEN coalesce((
       SELECT jsonb_agg(e ORDER BY i) FROM jsonb_array_elements(${col}) WITH ORDINALITY AS t(e, i)
-       WHERE NOT (e::text ~* ${re})), '[]'::jsonb) ELSE ${col} END`;
+       WHERE NOT coalesce(CASE jsonb_typeof(e)
+         WHEN 'string' THEN lower(e #>> '{}') = ANY(${s.emails}::text[])
+         WHEN 'object' THEN CASE WHEN nullif(e ->> 'email', '') IS NOT NULL
+                                 THEN lower(e ->> 'email') = ANY(${s.emails}::text[])
+                                 ELSE lower(regexp_replace(trim(e ->> 'name'), '\\s+', ' ', 'g')) = ANY(${s.names}::text[]) END
+         ELSE false END, false)), '[]'::jsonb) ELSE ${col} END`;
 }
 
-/** A text[] column without the entries that name the subject. */
+/** A text[] of attendee names or addresses with the entries that are exactly the subject. */
+function exactEntry(x: Prisma.Sql, s: DataSubject): Prisma.Sql {
+  return Prisma.sql`lower(regexp_replace(trim(${x}), '\\s+', ' ', 'g')) = ANY(${[...s.names, ...s.emails]}::text[])`;
+}
+
+/** A text[] column without the entries that are exactly the subject. */
 function arrayWithout(model: string, field: string, s: DataSubject): Prisma.Sql {
   const col = C(model, field);
-  const re = subjectPattern(s);
-  if (!re) return col;
-  return Prisma.sql`array(SELECT x FROM unnest(${col}) WITH ORDINALITY AS u(x, i)
-                           WHERE NOT (x ~* ${re}) ORDER BY i)`;
+  return Prisma.sql`CASE WHEN ${col} IS NULL THEN NULL ELSE array(SELECT x FROM unnest(${col}) WITH ORDINALITY AS u(x, i)
+                           WHERE NOT ${exactEntry(Prisma.sql`x`, s)} ORDER BY i) END`;
 }
 
 async function idsWhere(
@@ -284,14 +342,20 @@ function emailMessageLinked(db: Db, s: DataSubject): Promise<string[]> {
   );
 }
 
-function meetingAttendeeLinked(db: Db, s: DataSubject): Promise<string[]> {
+/**
+ * Attendee rows for the subject: by contact id or email, or by exact name when
+ * the row has no email. `strong` drops the name rule (used before wiping a
+ * whole transcript, where a namesake must not count).
+ */
+function meetingAttendeeLinked(db: Db, s: DataSubject, strong = false): Promise<string[]> {
+  const m = 'MeetingIntelAttendee';
   return idsWhere(
     db,
-    'MeetingIntelAttendee',
+    m,
     s.orgId,
-    Prisma.sql`${uuidIn('MeetingIntelAttendee', 'contactId', s.contactIds)}
-      OR ${lowerIn('MeetingIntelAttendee', 'email', s.emails)}
-      OR ${lowerIn('MeetingIntelAttendee', 'name', s.names)}`,
+    Prisma.sql`${uuidIn(m, 'contactId', s.contactIds)}
+      OR ${lowerIn(m, 'email', s.emails)}
+      ${strong ? Prisma.empty : Prisma.sql`OR (${C(m, 'email')} IS NULL AND ${C(m, 'contactId')} IS NULL AND ${lowerIn(m, 'name', s.names)})`}`,
   );
 }
 
@@ -454,7 +518,7 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     // A meeting the subject attended: the transcript holds their own words, so
     // it goes. A meeting that only mentions them is redacted in place.
     async linked(db, s) {
-      const attended = await meetingAttendeeLinked(db, s);
+      const attended = await meetingAttendeeLinked(db, s, true);
       return idsWhere(
         db,
         'MeetingIntel',
@@ -471,34 +535,29 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
   },
   MeetingIngestItem: { linked: none },
   KamSession: {
-    linked: (db, s) => {
-      const re = subjectPattern(s);
-      if (!re) return Promise.resolve([]);
-      return idsWhere(
+    // Attendees are free-text names, so a namesake cannot be told apart: the
+    // entry is dropped and the transcript is redacted in place, never wiped.
+    linked: (db, s) =>
+      idsWhere(
         db,
         'KamSession',
         s.orgId,
-        Prisma.sql`EXISTS (SELECT 1 FROM unnest(${C('KamSession', 'attendees')}) a WHERE a ~* ${re})`,
-      );
-    },
+        Prisma.sql`EXISTS (SELECT 1 FROM unnest(${C('KamSession', 'attendees')}) a WHERE ${exactEntry(Prisma.sql`a`, s)})`,
+      ),
     async erase(db, s, ids) {
       const m = 'KamSession';
-      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'attendees')} = ${arrayWithout(m, 'attendees', s)},
-          ${C(m, 'transcriptText')} = NULL, ${C(m, 'transcriptStructured')} = NULL
+      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'attendees')} = ${arrayWithout(m, 'attendees', s)}
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   GovernanceMeeting: {
-    linked: (db, s) => {
-      const re = subjectPattern(s);
-      if (!re) return Promise.resolve([]);
-      return idsWhere(
+    linked: (db, s) =>
+      idsWhere(
         db,
         'GovernanceMeeting',
         s.orgId,
-        Prisma.sql`EXISTS (SELECT 1 FROM unnest(${C('GovernanceMeeting', 'participants')}) a WHERE a ~* ${re})`,
-      );
-    },
+        Prisma.sql`EXISTS (SELECT 1 FROM unnest(${C('GovernanceMeeting', 'participants')}) a WHERE ${exactEntry(Prisma.sql`a`, s)})`,
+      ),
     async erase(db, s, ids) {
       const m = 'GovernanceMeeting';
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'participants')} = ${arrayWithout(m, 'participants', s)}
@@ -634,7 +693,8 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
         db,
         'Reference',
         s.orgId,
-        Prisma.sql`${lowerIn('Reference', 'contactEmail', s.emails)} OR ${lowerIn('Reference', 'contactName', s.names)}`,
+        Prisma.sql`${lowerIn('Reference', 'contactEmail', s.emails)}
+          OR (${C('Reference', 'contactEmail')} IS NULL AND ${lowerIn('Reference', 'contactName', s.names)})`,
       ),
     async erase(db, _s, ids) {
       await db.$executeRaw`UPDATE ${T('Reference')} SET ${C('Reference', 'contactName')} = NULL,
@@ -693,14 +753,19 @@ const STORE_FIELDS = new Map<SubjectStoreModel, readonly string[]>(
   SUBJECT_STORES.map((x) => [x.model, x.fields]),
 );
 
-/** Replace the subject's identifiers with REDACTED in the store's personal fields of these rows. */
-async function redactRows(db: Db, model: SubjectStoreModel, s: DataSubject, ids: string[]) {
+/** Replace the subject's identifiers with REDACTED in these fields of these rows. */
+async function redactRows(
+  db: Db,
+  model: SubjectStoreModel,
+  s: DataSubject,
+  ids: string[],
+  fields: readonly string[],
+) {
   const re = subjectPattern(s);
-  const fields = STORE_FIELDS.get(model) ?? [];
   if (!re || !fields.length || !ids.length) return;
   const sets = fields.map((f) => Prisma.sql`${C(model, f)} = ${redactExpr(model, f, re)}`);
   await db.$executeRaw`UPDATE ${T(model)} SET ${Prisma.join(sets, ', ')}
-    WHERE id = ANY(${ids}::uuid[]) AND ${mentions(model, fields, s)}`;
+    WHERE id = ANY(${ids}::uuid[]) AND ${anyMatch(model, fields, re)}`;
 }
 
 // ─── Subject resolution ──────────────────────────────────────────────────────
@@ -722,7 +787,9 @@ function identity(
   return {
     emails: clean(emails)
       .map((e) => e.toLowerCase())
-      .filter((e) => /^[^@]+@[^@]+\.[^@]+$/.test(e) && !UNSAFE_TOKEN.test(e) && !isTombstoneEmail(e)),
+      .filter(
+        (e) => /^[^@]+@[^@]+\.[^@]+$/.test(e) && !UNSAFE_TOKEN.test(e) && !isTombstoneEmail(e),
+      ),
     phones: phoneList.filter((p) => !/["\\]/.test(p)),
     phoneDigits: phoneList.map((p) => p.replace(/[^0-9]/g, '')),
     names: clean(names)
@@ -857,11 +924,17 @@ async function plan(db: Db, s: DataSubject): Promise<Map<SubjectStoreModel, Stor
   for (const store of SUBJECT_STORES) {
     const linked = uniq(await HANDLERS[store.model].linked(db, s));
     const linkedSet = new Set(linked);
+    const fields = mentionFields(store.model);
     const mentioned =
-      store.fields.length && hasField(store.model, 'orgId')
-        ? (await idsWhere(db, store.model, s.orgId, mentions(store.model, store.fields, s))).filter(
-            (id) => !linkedSet.has(id),
-          )
+      fields.length && hasField(store.model, 'orgId')
+        ? (
+            await idsWhere(
+              db,
+              store.model,
+              s.orgId,
+              anyMatch(store.model, fields, subjectPattern(s)),
+            )
+          ).filter((id) => !linkedSet.has(id))
         : [];
     out.set(store.model, { linked, mentioned });
   }
@@ -876,10 +949,10 @@ async function mentionSummaries(
   ids: string[],
 ): Promise<Array<Record<string, unknown>>> {
   const re = subjectPattern(s);
-  const fields = STORE_FIELDS.get(model) ?? [];
+  const fields = mentionFields(model);
   if (!re || !ids.length || !fields.length) return [];
   const cols = fields.map(
-    (f) => Prisma.sql`CASE WHEN ${C(model, f)}::text ~* ${re} THEN ${f}::text END`,
+    (f) => Prisma.sql`CASE WHEN ${matches(model, f, re)} THEN ${f}::text END`,
   );
   const rows = await db.$queryRaw<Array<{ id: string; fields: string[] }>>`
     SELECT id::text AS id, array_remove(ARRAY[${Prisma.join(cols, ', ')}], NULL) AS fields
@@ -904,7 +977,10 @@ export async function exportDataSubject(db: Db, s: DataSubject): Promise<DataSub
         ? await h.rows(db, linked)
         : await defaultRows(db, model, linked)
       : [];
-    stores[model] = [...rows.map(stripSecrets), ...(await mentionSummaries(db, model, s, mentioned))];
+    stores[model] = [
+      ...rows.map(stripSecrets),
+      ...(await mentionSummaries(db, model, s, mentioned)),
+    ];
   }
   return {
     subject: { type: s.subjectType, id: s.subjectId },
@@ -1016,7 +1092,10 @@ export async function eraseDataSubject(
         if (!opts.dryRun) {
           if (linked.length) kept = (await HANDLERS[store.model].erase?.(tx, s, linked)) ?? 0;
           // A row kept under a legal basis keeps its identifier (that is why it is kept).
-          if (!basis) await redactRows(tx, store.model, s, [...linked, ...mentioned]);
+          if (!basis) {
+            await redactRows(tx, store.model, s, linked, store.fields);
+            await redactRows(tx, store.model, s, mentioned, mentionFields(store.model));
+          }
         }
         stores[store.model] = {
           action: store.strategy,
@@ -1099,11 +1178,17 @@ export async function scanSubjectResidue(db: Db, s: DataSubject): Promise<Residu
     if (SCAN_SKIP_MODELS.has(m.name) || !hasField(m.name, 'orgId')) continue;
     const cols = scanColumns(m);
     if (!cols.length) continue;
-    const parts = cols.map(
-      (f) => Prisma.sql`SELECT ${f}::text AS field, count(*) AS n FROM ${T(m.name)}
-                         WHERE ${C(m.name, 'orgId')} = ${s.orgId}::uuid
-                           AND ${C(m.name, f)}::text ~* ${re}`,
-    );
+    // Another person's own name column holding the same name is a namesake,
+    // not residue; their email or phone matching the subject still is.
+    const idRe = identifierPattern(s);
+    const parts = cols.map((f) => {
+      const hit = isIdentityField(m.name, f)
+        ? Prisma.sql`(${idRe ? matches(m.name, f, idRe) : FALSE}
+            OR (id::text = ANY(${subjectIds(s)}::text[]) AND ${matches(m.name, f, re)}))`
+        : matches(m.name, f, re);
+      return Prisma.sql`SELECT ${f}::text AS field, count(*) AS n FROM ${T(m.name)}
+                         WHERE ${C(m.name, 'orgId')} = ${s.orgId}::uuid AND ${hit}`;
+    });
     const rows = await db.$queryRaw<Array<{ field: string; n: bigint }>>(
       Prisma.sql`${Prisma.join(parts, ' UNION ALL ')}`,
     );

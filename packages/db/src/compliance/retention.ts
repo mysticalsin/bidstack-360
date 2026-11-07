@@ -221,36 +221,36 @@ export async function runRetentionSweep(
       );
       rows = Number(r?.n ?? 0);
     } else {
-      const perOrg = new Map<string, number>();
       for (let i = 0; i < MAX_BATCHES; i += 1) {
         const batch = Prisma.sql`ctid IN (SELECT ctid FROM ${table} WHERE ${where} LIMIT ${BATCH})`;
         const changed =
           p.action === 'delete'
             ? Prisma.sql`DELETE FROM ${table} WHERE ${batch} RETURNING org_id`
             : Prisma.sql`UPDATE ${table} SET ${Prisma.raw(p.scrub ?? '')} WHERE ${batch} RETURNING org_id`;
-        const counted = await db.$queryRaw<Array<{ org_id: string; n: bigint }>>(
-          Prisma.sql`WITH c AS (${changed}) SELECT org_id::text AS org_id, count(*) AS n FROM c GROUP BY org_id`,
-        );
-        let n = 0;
-        for (const r of counted) {
-          n += Number(r.n);
-          perOrg.set(r.org_id, (perOrg.get(r.org_id) ?? 0) + Number(r.n));
-        }
+        // The batch and its counts-only audit rows (one per tenant) commit together.
+        const n = await db.$transaction(async (tx) => {
+          const counted = await tx.$queryRaw<Array<{ org_id: string | null; n: bigint }>>(
+            Prisma.sql`WITH c AS (${changed}) SELECT org_id::text AS org_id, count(*) AS n FROM c GROUP BY org_id`,
+          );
+          let total = 0;
+          for (const r of counted) {
+            total += Number(r.n);
+            if (!r.org_id) continue;
+            await tx.auditLog.create({
+              data: {
+                orgId: r.org_id,
+                userId: null,
+                action: 'retention.sweep',
+                targetType: 'data_class',
+                targetId: p.dataClass,
+                diff: { dataClass: p.dataClass, action: p.action, days: p.days, rows: Number(r.n) },
+              },
+            });
+          }
+          return total;
+        });
         rows += n;
         if (n < BATCH) break;
-      }
-      // One audit row per tenant and class, counts only.
-      for (const [orgId, n] of perOrg) {
-        await db.auditLog.create({
-          data: {
-            orgId,
-            userId: null,
-            action: 'retention.sweep',
-            targetType: 'data_class',
-            targetId: p.dataClass,
-            diff: { dataClass: p.dataClass, action: p.action, days: p.days, rows: n },
-          },
-        });
       }
     }
     classes.push({

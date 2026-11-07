@@ -615,6 +615,84 @@ describe('data subject matching is bounded to the subject', () => {
     expect(await scanSubjectResidue(prisma, subject!)).toEqual([]);
   });
 
+  t(
+    'a namesake with their own address keeps their records; JSON after a newline is found',
+    async () => {
+      const o = orgId!;
+      const tag = randomUUID().slice(0, 8);
+      const name = `John Namesake${tag}`;
+      const email = `john.${tag}@one.test`;
+      const otherEmail = `john.${tag}@two.test`;
+      const company = await prisma.company.create({
+        data: { orgId: o, name: `Namesake Co ${tag}` },
+      });
+      const subjectContact = await prisma.contact.create({
+        data: { orgId: o, customer: company.name, companyId: company.id, name, email },
+      });
+      const namesake = await prisma.contact.create({
+        data: { orgId: o, customer: company.name, companyId: company.id, name, email: otherEmail },
+      });
+      // The namesake attended this meeting with their own address.
+      const theirMeeting = await prisma.meetingIntel.create({
+        data: {
+          orgId: o,
+          companyId: company.id,
+          title: 'Their meeting',
+          heldAt: new Date(),
+          dedupeKey: `ns-${tag}`,
+          transcriptText: 'Opening remarks on scope',
+        },
+      });
+      await prisma.meetingIntelAttendee.create({
+        data: {
+          orgId: o,
+          meetingId: theirMeeting.id,
+          contactId: namesake.id,
+          name,
+          email: otherEmail,
+        },
+      });
+      const ref = await prisma.reference.create({
+        data: {
+          orgId: o,
+          title: `Ref ${tag}`,
+          tags: [],
+          contactName: name,
+          contactEmail: otherEmail,
+        },
+      });
+      const ingest = await prisma.meetingIngestItem.create({
+        data: {
+          orgId: o,
+          source: 'manual',
+          externalId: `nl-${tag}`,
+          payload: { transcript: `Intro\n${email} joined late` },
+        },
+      });
+
+      const subject = await resolveDataSubject(prisma, o, 'contact', subjectContact.id);
+      await eraseDataSubject(prisma, subject!, { dryRun: false, actorUserId: userId });
+
+      const kept = await prisma.contact.findUnique({ where: { id: namesake.id } });
+      expect(kept?.name).toBe(name);
+      expect(kept?.email).toBe(otherEmail);
+      const meeting = await prisma.meetingIntel.findUnique({ where: { id: theirMeeting.id } });
+      expect(meeting?.transcriptText).toBe('Opening remarks on scope');
+      const attendee = await prisma.meetingIntelAttendee.findFirst({
+        where: { meetingId: theirMeeting.id },
+      });
+      expect(attendee?.email).toBe(otherEmail);
+      const r = await prisma.reference.findUnique({ where: { id: ref.id } });
+      expect(r?.contactEmail).toBe(otherEmail);
+
+      const item = await prisma.meetingIngestItem.findUnique({ where: { id: ingest.id } });
+      expect(JSON.stringify(item?.payload)).not.toContain(email);
+      expect(JSON.stringify(item?.payload)).toContain('[erased] joined late');
+
+      expect(await scanSubjectResidue(prisma, subject!)).toEqual([]);
+    },
+  );
+
   t('a single first name or a short phone is not used as an identifier', async () => {
     const c = await prisma.contact.create({
       data: { orgId: orgId!, customer: 'Short Co', name: 'Ana', phone: '12345' },
