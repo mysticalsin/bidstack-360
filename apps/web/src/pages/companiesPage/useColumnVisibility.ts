@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
 
 const STORAGE_SLOT = 'polo.companies.columns.v1';
+/** Hidden until the user turns them on, so the intel columns fit at 1440. */
+const DEFAULT_HIDDEN = ['domain', 'industry'];
 
 function readHidden(): Set<string> {
   try {
     const raw = localStorage.getItem(STORAGE_SLOT);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    const parsed: unknown = raw ? JSON.parse(raw) : DEFAULT_HIDDEN;
     return new Set(
       Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [],
     );
