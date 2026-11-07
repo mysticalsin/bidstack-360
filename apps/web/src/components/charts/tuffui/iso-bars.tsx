@@ -291,6 +291,7 @@ export function IsoBars({ labels, back, front = [], title, format = compact, onS
               return (
                 <g
                   key={`${p.row}-${p.index}`}
+                  role="graphics-symbol"
                   aria-label={prismText(p)}
                   className={cn(
                     'transition-opacity duration-150',

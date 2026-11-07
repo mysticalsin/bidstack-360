@@ -113,12 +113,23 @@ export function winFactorRows(drivers: readonly { label: string; contribution: n
 /** Go threshold per criterion on the 0 to 5 scale (the bid threshold is a percentage). */
 const GO_RATING = round2((BID_THRESHOLDS.bid / 100) * 5);
 
-/** Registry criteria as radar axes; unrated criteria sit at 0. */
+/**
+ * Rated registry criteria as radar axes, in registry order. Unrated criteria
+ * stay off the radar so nothing reads as a 0 that was never given; ids from
+ * older score versions come back as `legacy` for a plain list.
+ */
 export function bidCriteriaRadar(criteria: Readonly<Record<string, number>>) {
-  const axes = BID_CRITERIA.map((c) => c.label);
-  const values = BID_CRITERIA.map((c) => round2(criteria[c.id] ?? 0));
-  const rated = BID_CRITERIA.filter((c) => typeof criteria[c.id] === 'number').length;
-  return { axes, values, baseline: axes.map(() => GO_RATING), rated };
+  const rated = BID_CRITERIA.filter((c) => typeof criteria[c.id] === 'number' && criteria[c.id]! > 0);
+  const known = new Set(BID_CRITERIA.map((c) => c.id));
+  return {
+    axes: rated.map((c) => c.label),
+    values: rated.map((c) => round2(criteria[c.id]!)),
+    baseline: rated.map(() => GO_RATING),
+    rated: rated.length,
+    legacy: Object.entries(criteria)
+      .filter(([id, v]) => !known.has(id) && v > 0)
+      .map(([id, rating]) => ({ id, rating })),
+  };
 }
 
 /** API quarters ("2026-Q1") as chart labels ("Q1 2026"), won above and lost below. */
@@ -160,12 +171,14 @@ export function sectorPipeline(rows: readonly (OppRow & { industry?: string | nu
 }
 
 /** Forecast periods in whole units: won, weighted open, and the unweighted rest of open. */
-export function forecastPeriodBars(
-  periods: readonly { label: string; openMicros: number; weightedMicros: number; wonMicros: number }[],
+export function forecastPeriodBars<P extends { label: string; openMicros: number; weightedMicros: number; wonMicros: number }>(
+  periods: readonly P[],
 ) {
   const kept = periods.filter((p) => p.openMicros > 0 || p.weightedMicros > 0 || p.wonMicros > 0);
   const units = (m: number) => round2(m / 1_000_000);
   return {
+    /** The source period behind each column, for drill-through. */
+    periods: kept,
     labels: kept.map((p) => p.label),
     won: kept.map((p) => units(p.wonMicros)),
     weighted: kept.map((p) => units(p.weightedMicros)),

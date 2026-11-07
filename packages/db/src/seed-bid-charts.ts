@@ -49,6 +49,7 @@ export async function seedBidChartDemo(prisma: PrismaClient, orgId: string, seed
       weightedSum: composite.weightedSum,
       totalWeight: composite.totalWeight,
       recommendation: composite.recommendation,
+      memosPolicies: [],
       notes: DEMO_NOTE,
     };
     await prisma.bidScore.upsert({

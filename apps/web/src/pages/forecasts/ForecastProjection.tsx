@@ -39,8 +39,7 @@ export function ForecastProjection() {
   const periods = projection.data?.periods ?? [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
   const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
-  const charted = periods.filter((p) => p.openMicros > 0 || p.weightedMicros > 0 || p.wonMicros > 0);
-  const bars = forecastPeriodBars(charted);
+  const bars = forecastPeriodBars(periods);
 
   return (
     <Card>
@@ -77,7 +76,7 @@ export function ForecastProjection() {
               { id: 'unweighted', label: t('forecastProjection.unweighted', 'Unweighted'), values: bars.unweighted, color: 'var(--chart-3)' },
             ]}
             format={fmtCompact}
-            onActivate={(i) => setSelected(charted[i]?.period ?? null)}
+            onActivate={(i) => setSelected(bars.periods[i]?.period ?? null)}
           />
           <Tabs value={activePeriod.period} onValueChange={setSelected}>
             <TabsList aria-label={t('forecastProjection.periodLabel', 'Forecast period')}>

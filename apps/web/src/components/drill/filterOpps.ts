@@ -24,7 +24,8 @@ export function filterOpps(rows: OppRow[], f: OppDrillFilter, q = '', year = new
     }
     if (f.closeMonth) {
       const d = closeDate(o);
-      if (!d || new Date(d).toISOString().slice(0, 7) !== f.closeMonth) return false;
+      const t = d ? new Date(d).getTime() : Number.NaN;
+      if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 7) !== f.closeMonth) return false;
     }
     if (needle && !`${o.name ?? ''} ${o.customer ?? ''} ${o.code ?? ''}`.toLowerCase().includes(needle)) return false;
     return true;

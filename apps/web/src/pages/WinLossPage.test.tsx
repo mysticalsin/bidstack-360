@@ -164,7 +164,7 @@ describe('WinLossPage', () => {
     renderPage();
     const cycle = screen.getByTestId('win-loss-cycle-chart');
     expect(
-      within(cycle).getByRole('img', { name: /8 bids, median 67\.5 days, p95 \d+(\.\d+)? days, 3 over 90 days/i }),
+      within(cycle).getByRole('img', { name: /8 bids, median 67\.5 days, p95 \d+(\.\d+)? days, 3 90\+ days/i }),
     ).toBeTruthy();
   });
 

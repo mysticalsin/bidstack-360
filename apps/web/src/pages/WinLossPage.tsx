@@ -226,7 +226,7 @@ export default function WinLossPage() {
                   title={t('winLoss.cycleChartTitle', 'Sales cycle')}
                   values={data.cycleDays ?? []}
                   threshold={SALES_CYCLE_OVERDUE_DAYS}
-                  thresholdLabel={t('winLoss.cycleOverdue', 'over {{days}} days', { days: SALES_CYCLE_OVERDUE_DAYS })}
+                  thresholdLabel={t('winLoss.cycleOverdue', '{{days}}+ days', { days: SALES_CYCLE_OVERDUE_DAYS })}
                   unit={t('winLoss.cycleUnit', 'bids')}
                   bins={24}
                   format={formatDays}

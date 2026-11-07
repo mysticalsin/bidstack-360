@@ -58,8 +58,8 @@ describe('BidScoreCard', () => {
       data: {
         totalScore: 68,
         recommendation: 'proceed_with_caution',
-        criteria: { strategic_fit: 4, relationship: 3, competitive: 3, deal_size: 5, timeline_risk: 2 },
-        categoryScores: { strategic: 68 },
+        criteria: { strategic_fit: 4, relationship: 3, competitive: 3, deal_size: 5, timeline_risk: 2, fit: 3 },
+        categoryScores: { strategic: 70 },
         overrideJustification: null,
       },
       isLoading: false,
@@ -71,6 +71,8 @@ describe('BidScoreCard', () => {
     expect(screen.getByRole('group', { name: /bid criteria/i })).toBeTruthy();
     expect(screen.getByRole('img', { name: /strongest on deal size/i })).toBeTruthy();
     expect(screen.getAllByText('Go threshold').length).toBeGreaterThan(0);
+    expect(screen.getByRole('list', { name: 'Criteria from an older matrix' }).textContent).toContain('3/5');
+    expect(screen.getByLabelText('Category scores').textContent).toContain('70%');
   });
 
   it('keeps Evaluate Now when the bid has not been scored', () => {

@@ -29,7 +29,7 @@ export function ActivityByHourCard() {
     <ChartCard
       testId="dashboard-activity-hours"
       title="Activity by hour"
-      meta={`Latest ${hours.total} logged`}
+      meta={data && data.total > hours.total ? `Latest ${hours.total} of ${data.total}` : `${hours.total} logged`}
       interactive
       summary={hours.total ? `${hours.total} activities, busiest at ${busiest.label}:00 with ${busiest.n}.` : 'No activity logged yet.'}
       table={{

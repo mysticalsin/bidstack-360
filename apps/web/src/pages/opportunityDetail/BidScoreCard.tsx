@@ -1,10 +1,13 @@
 // Bid/No-Bid score card: owns the useBidScoreLatest hook and renders the
-// composite score, recommendation badge, the criteria as a radar against the
-// go threshold, override badge (justification on hover/focus), and a
-// drill-through link to the bid matrix. Criterion ids from older score
-// versions are not in the registry, so they stay out of the radar.
+// composite score, recommendation badge, the rated criteria as a radar against
+// the go threshold, category scores, override badge (justification on
+// hover/focus), and a drill-through link to the bid matrix. Criterion ids from
+// older score versions are not in the registry, so they render as a plain
+// list with their stored rating instead of disappearing.
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+
+import { bidCriterionLabel } from '@bidstack/shared';
 
 import { bidCriteriaRadar } from '@/components/charts/bid-chart-data';
 import { RadarChart } from '@/components/charts/tuffui/radar-chart';
@@ -14,22 +17,72 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useBidScoreLatest } from '@/hooks/useBidScore';
 
+import { CATEGORY_INFO } from '../bidNoBid/bidNoBidTypes';
+
 const REC_TONE = { bid: 'jade', no_bid: 'tomato', proceed_with_caution: 'amber' } as const;
 
 const GO_LABEL = 'Go threshold';
+const ratingFormat = (v: number) => `${+v.toFixed(2)}`;
 
 function CriteriaRadar({ criteria }: { criteria: Record<string, number> }) {
   const { t } = useTranslation('crm');
   const radar = bidCriteriaRadar(criteria);
-  if (radar.rated === 0) return null;
   return (
-    <RadarChart
-      title={t('bidScore.criteriaRadarLabel', 'Bid criteria')}
-      axes={radar.axes}
-      max={5}
-      series={{ id: 'score', label: t('bidScore.thisBid', 'This bid'), values: radar.values }}
-      baseline={{ label: t('bidScore.goThreshold', GO_LABEL), values: radar.baseline }}
-    />
+    <>
+      {radar.rated >= 3 ? (
+        <RadarChart
+          title={t('bidScore.criteriaRadarLabel', 'Bid criteria')}
+          axes={radar.axes}
+          max={5}
+          series={{ id: 'score', label: t('bidScore.thisBid', 'This bid'), values: radar.values }}
+          baseline={{ label: t('bidScore.goThreshold', GO_LABEL), values: radar.baseline }}
+          format={ratingFormat}
+        />
+      ) : null}
+      {radar.rated > 0 && radar.rated < 3 ? (
+        <RatedList
+          label={t('bidScore.criteriaBreakdownLabel', 'Criteria breakdown')}
+          rows={radar.axes.map((axis, i) => ({ id: axis, label: axis, rating: radar.values[i]! }))}
+        />
+      ) : null}
+      {radar.legacy.length ? (
+        <RatedList
+          label={t('bidScore.legacyCriteriaLabel', 'Criteria from an older matrix')}
+          rows={radar.legacy.map((l) => ({ id: l.id, label: bidCriterionLabel(l.id), rating: l.rating }))}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function RatedList({ label, rows }: { label: string; rows: Array<{ id: string; label: string; rating: number }> }) {
+  return (
+    <ul className="space-y-1" aria-label={label}>
+      {rows.map((r) => (
+        <li key={r.id} className="flex items-center justify-between gap-2 text-xs">
+          <span className="truncate text-[var(--fg-secondary)]">{r.label}</span>
+          <span className="tabular-nums text-[var(--fg-primary)]">{r.rating}/5</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CategoryScores({ categoryScores }: { categoryScores: Record<string, number> }) {
+  const { t } = useTranslation('crm');
+  const entries = Object.entries(categoryScores);
+  if (entries.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-1" aria-label={t('bidScore.categoryScoresLabel', 'Category scores')}>
+      {entries.map(([cat, value]) => (
+        <div key={cat} className="flex items-center justify-between gap-2 text-xs">
+          <span className="truncate text-[var(--fg-tertiary)]">{CATEGORY_INFO[cat]?.label ?? cat}</span>
+          <span className="font-semibold tabular-nums" style={{ color: CATEGORY_INFO[cat]?.color ?? 'var(--fg-secondary)' }}>
+            {Math.round(value)}%
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -94,6 +147,7 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
                 ) : null}
               </div>
               <CriteriaRadar criteria={data.criteria} />
+              <CategoryScores categoryScores={data.categoryScores} />
             </div>
             <div className="pt-2">
               <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">

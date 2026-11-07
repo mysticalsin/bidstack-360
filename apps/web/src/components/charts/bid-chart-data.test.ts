@@ -108,13 +108,13 @@ describe('winFactorRows', () => {
 });
 
 describe('bidCriteriaRadar', () => {
-  it('maps every registry criterion to an axis with the go threshold as baseline', () => {
-    const out = bidCriteriaRadar({ strategic_fit: 4, deal_size: 5, timeline_risk: 2 });
-    expect(out.axes).toHaveLength(10);
-    expect(out.axes[0]).toBe('Strategic Fit');
-    expect(out.values[0]).toBe(4);
+  it('maps rated registry criteria to axes with the go threshold as baseline', () => {
+    const out = bidCriteriaRadar({ strategic_fit: 4, deal_size: 5, timeline_risk: 2, fit: 3 });
+    expect(out.axes).toEqual(['Strategic Fit', 'Deal Size', 'Timeline Risk']);
+    expect(out.values).toEqual([4, 5, 2]);
     expect(out.baseline.every((v) => v === 3.75)).toBe(true);
     expect(out.rated).toBe(3);
+    expect(out.legacy).toEqual([{ id: 'fit', rating: 3 }]);
   });
 
   it('reports nothing rated for an empty score', () => {
