@@ -59,15 +59,13 @@ describe('API key resource scope (B2)', () => {
 });
 
 describe('API key opportunity scope', () => {
-  it('never matches a restricted key against the uuid owner column', () => {
+  it('leaves opportunity visibility to key scopes, never the uuid owner column', () => {
     const scope = accessScopeFromApiKey(KEY, {
       unrestrictedScope: false,
       companyIds: [],
       msaIds: [],
     });
-    const where = JSON.stringify(applyOpportunityScope({ orgId: 'org-1' }, scope));
-    const account = JSON.stringify(accountOpportunityScopePredicate(scope));
-    expect(where).not.toContain(KEY);
-    expect(account).not.toContain(KEY);
+    expect(applyOpportunityScope({ orgId: 'org-1' }, scope)).toEqual({ orgId: 'org-1' });
+    expect(accountOpportunityScopePredicate(scope)).toBeNull();
   });
 });
