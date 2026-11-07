@@ -6,6 +6,8 @@
  * and attributes, so anything not listed (scripts, styles, forms, frames,
  * event handlers, SVG) never reaches the page. Remote images are blocked,
  * not proxied, so opening a thread never tells the sender it was read.
+ * class and id are dropped (a sender could reuse the app's own utility
+ * classes to overlay the page) and style keeps only a short property list.
  */
 
 const ALLOWED_TAGS = new Set([
@@ -22,8 +24,8 @@ const DROP_WITH_CONTENT = new Set([
 ]);
 
 const ALLOWED_ATTRS = new Set([
-  'align', 'alt', 'border', 'cellpadding', 'cellspacing', 'class', 'colspan', 'dir',
-  'height', 'href', 'id', 'rowspan', 'src', 'style', 'title', 'type', 'valign', 'width',
+  'align', 'alt', 'border', 'cellpadding', 'cellspacing', 'colspan', 'dir',
+  'height', 'href', 'rowspan', 'src', 'style', 'title', 'type', 'valign', 'width',
 ]);
 
 const QUOTE_SELECTORS = [
@@ -38,7 +40,34 @@ const QUOTE_SELECTORS = [
 
 const SAFE_HREF = /^(https?:|mailto:|tel:|#)/i;
 const INLINE_IMAGE = /^data:image\/(png|gif|jpe?g|webp);base64,/i;
-const UNSAFE_STYLE = /url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:/i;
+/** Typography, colour and box spacing only: nothing that positions, layers or loads. */
+const ALLOWED_STYLE_PROPS = new Set([
+  'color', 'background-color', 'font-family', 'font-size', 'font-style', 'font-weight',
+  'line-height', 'text-align', 'text-decoration', 'text-transform', 'vertical-align',
+  'white-space', 'width', 'max-width', 'height',
+  'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+  'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
+  'border-color', 'border-style', 'border-width', 'border-collapse', 'border-radius',
+]);
+/** Plain values only; the one function allowed is a colour. */
+const SAFE_STYLE_VALUE = /^(?:[#%.,\w\s'"-]|rgba?\([\d\s.,%]+\))+$/i;
+const QUOTE_MARK = 'data-quote';
+
+function cleanStyle(value: string): string {
+  return value
+    .split(';')
+    .map((decl) => {
+      const at = decl.indexOf(':');
+      if (at < 0) return null;
+      const prop = decl.slice(0, at).trim().toLowerCase();
+      const val = decl.slice(at + 1).trim();
+      if (!ALLOWED_STYLE_PROPS.has(prop) || !val || !SAFE_STYLE_VALUE.test(val)) return null;
+      return `${prop}: ${val}`;
+    })
+    .filter((decl): decl is string => decl !== null)
+    .join('; ');
+}
 
 export interface SanitizedEmail {
   /** Safe body HTML without the quoted history. */
@@ -71,9 +100,14 @@ function cleanChildren(source: Node, target: Node, out: Document, stats: { block
       if (!ALLOWED_ATTRS.has(name)) continue;
       if (name === 'href' && !SAFE_HREF.test(value)) continue;
       if (name === 'src') continue;
-      if (name === 'style' && UNSAFE_STYLE.test(value)) continue;
+      if (name === 'style') {
+        const style = cleanStyle(value);
+        if (style) copy.setAttribute('style', style);
+        continue;
+      }
       copy.setAttribute(name, value);
     }
+    if (el.matches(QUOTE_SELECTORS.join(','))) copy.setAttribute(QUOTE_MARK, 'true');
     if (tag === 'a' && copy.hasAttribute('href')) {
       copy.setAttribute('target', '_blank');
       copy.setAttribute('rel', 'noopener noreferrer nofollow');
@@ -100,8 +134,9 @@ export function sanitizeEmailHtml(raw: string): SanitizedEmail {
   cleanChildren(parsed.body, root, out, stats);
 
   let quotedHtml: string | null = null;
-  const quote = root.querySelector(QUOTE_SELECTORS.join(','));
+  const quote = root.querySelector(`[${QUOTE_MARK}]`);
   if (quote) {
+    quote.removeAttribute(QUOTE_MARK);
     const holder = out.createElement('div');
     let node: ChildNode | null = quote;
     // The quote marker and everything after it at the same level is history.

@@ -24,6 +24,25 @@ describe('sanitizeEmailHtml', () => {
     expect(html).not.toContain('t.test');
   });
 
+  it('drops class and id so a sender cannot reuse app classes or clobber the DOM', () => {
+    const { html } = sanitizeEmailHtml('<div class="fixed inset-0 z-50" id="root"><p id="x">Hi</p></div>');
+    expect(html).toBe('<div><p>Hi</p></div>');
+  });
+
+  it('keeps only allowlisted style properties and rejects overlays and escapes', () => {
+    const { html } = sanitizeEmailHtml(
+      '<p style="color: #c00; position: fixed; inset: 0; z-index: 99999; font-weight: bold">a</p>' +
+        '<p style="background-image: image-set(&quot;https://t.test/a.png&quot; 1x)">b</p>' +
+        '<p style="background: u\\72l(https://t.test/b.png)">c</p>' +
+        '<p style="color: rgb(10, 20, 30); text-align: center">d</p>',
+    );
+    expect(html).toContain('<p style="color: #c00; font-weight: bold">a</p>');
+    expect(html).toContain('<p>b</p>');
+    expect(html).toContain('<p>c</p>');
+    expect(html).toContain('<p style="color: rgb(10, 20, 30); text-align: center">d</p>');
+    expect(html).not.toMatch(/position|z-index|inset|t\.test/);
+  });
+
   it('opens links in a new tab without a referrer', () => {
     const { html } = sanitizeEmailHtml('<a href="https://acme.test">Acme</a>');
     expect(html).toContain('target="_blank"');

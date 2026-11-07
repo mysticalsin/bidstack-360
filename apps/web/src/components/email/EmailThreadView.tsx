@@ -12,7 +12,7 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { sanitizeEmailHtml, splitQuotedText } from '@/lib/email/sanitize';
 import { api } from '@/lib/api';
 
-const BODY = 'email-body text-sm leading-6 text-[var(--fg-primary)] break-words [&_a]:text-[var(--brand-primary)] [&_a]:underline';
+const BODY = 'email-body isolate overflow-x-auto text-sm leading-6 text-[var(--fg-primary)] break-words [&_a]:text-[var(--brand-primary)] [&_a]:underline';
 
 export function EmailThreadView({ threadId }: { threadId: string }) {
   const { t } = useTranslation('crm');
