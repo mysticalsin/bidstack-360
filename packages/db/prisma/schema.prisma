@@ -5532,6 +5532,8 @@ model WinLossRecord {
 
   @@index([orgId, outcome, reason], map: "win_loss_records_org_outcome_reason_idx")
   @@index([orgId, opportunityId], map: "win_loss_records_org_opp_idx")
+  // GET /win-loss/analysis filters on (orgId, createdAt range) and sorts by createdAt.
+  @@index([orgId, createdAt(sort: Desc)], map: "win_loss_records_org_created_idx")
   @@map("win_loss_records")
 }
 
