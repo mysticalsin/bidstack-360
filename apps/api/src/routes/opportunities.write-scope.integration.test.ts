@@ -1,8 +1,6 @@
-// Integration test for M7 access scoping on every by-id opportunity route
-// beyond GET /opportunities/:id. Regression: list, count and detail were
-// scoped, but PATCH, DELETE, stage moves, brief, timeline, deal contacts,
-// win/loss records and bid scores only checked orgId, so a country-restricted
-// user could read or change a deal they cannot open.
+// M7 access scope on the by-id deal routes: a country-restricted user gets 404
+// for any read or write on a deal they cannot open, and child lists (bid
+// scores) leave such deals out.
 //
 // Same harness as opportunities.detail-scope.integration.test.ts: the isolated
 // org's admin joins a fresh FR-only group; the DE deal (no owner) is out of scope.
@@ -106,13 +104,23 @@ const t = makeSkipIfNoDb(() => dbReachable && !!orgId && !!stubUserId);
 type Call = { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; url: string; payload?: object };
 
 const calls = (id: string): Array<[string, Call]> => [
-  ['PATCH deal', { method: 'PATCH', url: `/api/opportunities/${id}`, payload: { name: 'renamed' } }],
-  ['stage move', { method: 'POST', url: `/api/opportunities/${id}/stage`, payload: { stage: 's1_ongoing' } }],
+  [
+    'PATCH deal',
+    { method: 'PATCH', url: `/api/opportunities/${id}`, payload: { name: 'renamed' } },
+  ],
+  [
+    'stage move',
+    { method: 'POST', url: `/api/opportunities/${id}/stage`, payload: { stage: 's1_ongoing' } },
+  ],
   ['timeline', { method: 'GET', url: `/api/opportunities/${id}/timeline` }],
   ['contacts list', { method: 'GET', url: `/api/opportunities/${id}/contacts` }],
   [
     'contact link',
-    { method: 'POST', url: `/api/opportunities/${id}/contacts`, payload: { contactId, role: 'other' } },
+    {
+      method: 'POST',
+      url: `/api/opportunities/${id}/contacts`,
+      payload: { contactId, role: 'other' },
+    },
   ],
   ['win/loss read', { method: 'GET', url: `/api/win-loss/${id}` }],
   [
@@ -120,6 +128,23 @@ const calls = (id: string): Array<[string, Call]> => [
     { method: 'PUT', url: `/api/win-loss/${id}`, payload: { outcome: 'won', reason: 'price' } },
   ],
   ['bid score latest', { method: 'GET', url: `/api/bid-scores/${id}/latest` }],
+  [
+    'bid classification',
+    {
+      method: 'POST',
+      url: `/api/opportunities/${id}/classification`,
+      payload: { fteEstimate: 5, commitmentLevel: 'low' },
+    },
+  ],
+  ['gate decisions read', { method: 'GET', url: `/api/opportunities/${id}/gate-decisions` }],
+  [
+    'gate decision write',
+    {
+      method: 'POST',
+      url: `/api/opportunities/${id}/gate-decisions`,
+      payload: { gate: 'go_no_go', outcome: 'go' },
+    },
+  ],
   ['DELETE deal', { method: 'DELETE', url: `/api/opportunities/${id}` }],
 ];
 
@@ -156,9 +181,15 @@ describe('opportunity by-id routes honour access scope', () => {
       payload: { name: 'FR renamed' },
     });
     expect(patch.statusCode, patch.body).toBe(200);
-    const timeline = await server.inject({ method: 'GET', url: `/api/opportunities/${frOppId}/timeline` });
+    const timeline = await server.inject({
+      method: 'GET',
+      url: `/api/opportunities/${frOppId}/timeline`,
+    });
     expect(timeline.statusCode).toBe(200);
-    const contacts = await server.inject({ method: 'GET', url: `/api/opportunities/${frOppId}/contacts` });
+    const contacts = await server.inject({
+      method: 'GET',
+      url: `/api/opportunities/${frOppId}/contacts`,
+    });
     expect(contacts.statusCode).toBe(200);
     const winLoss = await server.inject({ method: 'GET', url: `/api/win-loss/${frOppId}` });
     expect(winLoss.statusCode).toBe(200);
