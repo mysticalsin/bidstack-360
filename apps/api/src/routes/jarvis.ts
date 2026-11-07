@@ -74,12 +74,15 @@ async function auditAction(
 
 export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
   const requireHuman = server.requireHumanActor('Jarvis requires a user session');
+  // Baseline gate for every Jarvis route; each tool then checks its own
+  // permission, and confirm checks the tool's write permission again.
+  const requireReader = server.requirePermission('opportunities:read');
 
   server.post(
     '/ai-assistant/jarvis/runs',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
-      preHandler: [requireHuman],
+      preHandler: [requireHuman, requireReader],
       schema: { body: RunBody },
     },
     async (req, reply) => {
@@ -119,7 +122,7 @@ export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
     '/ai-assistant/jarvis/runs/:runId',
     {
       config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
-      preHandler: [requireHuman],
+      preHandler: [requireHuman, requireReader],
       schema: { params: RunParams },
     },
     async (req) => {
@@ -133,7 +136,7 @@ export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
     '/ai-assistant/jarvis/actions/:actionId/confirm',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
-      preHandler: [requireHuman],
+      preHandler: [requireHuman, requireReader],
       schema: { params: ActionParams },
     },
     async (req) => {
@@ -172,7 +175,7 @@ export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
     '/ai-assistant/jarvis/actions/:actionId/cancel',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
-      preHandler: [requireHuman],
+      preHandler: [requireHuman, requireReader],
       schema: { params: ActionParams },
     },
     async (req) => {
