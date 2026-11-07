@@ -9,6 +9,7 @@ import {
   accountNews,
 } from './account-intel.js';
 import { bidsOverdue, proposalSectionDraft, proposalStatus } from './bids.js';
+import { msaWhitespace, relationshipMap } from './msa-whitespace.js';
 import { opportunitiesGet, opportunitiesList, opportunityUpdate } from './opportunities.js';
 import { accountUpdates, recordsResolve } from './records.js';
 import { rfpSummary } from './rfp.js';
@@ -30,6 +31,8 @@ export const agentTools = {
   account_hiring: accountHiring,
   account_financials_summary: accountFinancialsSummary,
   account_news: accountNews,
+  msa_whitespace: msaWhitespace,
+  relationship_map: relationshipMap,
 } as const satisfies Record<string, AgentTool>;
 
 export type AgentToolName = keyof typeof agentTools;
@@ -43,12 +46,14 @@ export {
   accountNews,
   accountUpdates,
   bidsOverdue,
+  msaWhitespace,
   opportunitiesGet,
   opportunitiesList,
   opportunityUpdate,
   proposalSectionDraft,
   proposalStatus,
   recordsResolve,
+  relationshipMap,
   rfpSummary,
   tasksCreate,
 };

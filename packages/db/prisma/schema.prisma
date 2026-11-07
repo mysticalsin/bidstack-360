@@ -204,6 +204,7 @@ model Org {
   msaIntakeDrafts               MsaIntakeDraft[]
   agreementSources              AgreementSource[]
   agreementIngestItems          AgreementIngestItem[]
+  msaWhitespaceDecisions        MsaWhitespaceDecision[]
   meetingSourceConnections      MeetingSourceConnection[]
   meetingIngestItems            MeetingIngestItem[]
   meetingIntel                  MeetingIntel[]
@@ -5368,6 +5369,7 @@ model ContractAgreement {
   children       ContractAgreement[]   @relation("ContractHierarchy")
   owner          User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   signingEntity  SigningEntity?        @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
+  whitespaceDecisions MsaWhitespaceDecision[]
   fileVersions   ContractFileVersion[]
   intakeDrafts   MsaIntakeDraft[]
 
@@ -5514,6 +5516,32 @@ model AgreementIngestItem {
   @@index([orgId, sha256], map: "agreement_ingest_items_org_sha_idx")
   @@index([status, createdAt], map: "agreement_ingest_items_status_idx")
   @@map("agreement_ingest_items")
+}
+
+// Accept / dismiss decisions on ranked MSA whitespace flags (slice 13b), one
+// row per decision on one business line of one MSA. A dismissal hides that
+// line for 90 days unless evidenceHash changes. Accepting links the
+// CrossSellAction or draft Opportunity the click created.
+model MsaWhitespaceDecision {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  contractId        String   @map("contract_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  line              String   @db.VarChar(40)
+  state             String   @db.VarChar(20)
+  reason            String?  @db.VarChar(500)
+  evidenceHash      String   @map("evidence_hash") @db.VarChar(16)
+  score             Int
+  decidedById       String   @map("decided_by_id") @db.Uuid
+  decidedAt         DateTime @default(now()) @map("decided_at") @db.Timestamptz(6)
+  crossSellActionId String?  @map("cross_sell_action_id") @db.Uuid
+  opportunityId     String?  @map("opportunity_id") @db.Uuid
+
+  org      Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contract ContractAgreement @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, contractId, line, decidedAt], map: "msa_whitespace_decisions_org_msa_line_idx")
+  @@map("msa_whitespace_decisions")
 }
 
 // One uploaded file version of a contract (MSA, SOW, amendment, addendum).

@@ -109,6 +109,9 @@ export const tools = {
   account_hiring: agentTools.account_hiring,
   account_financials_summary: agentTools.account_financials_summary,
   account_news: agentTools.account_news,
+  // MSA whitespace and who works with them (slice 13b).
+  msa_whitespace: agentTools.msa_whitespace,
+  relationship_map: agentTools.relationship_map,
   // Agreement pull (slice 13a): stages a document for MSA intake review.
   agreements_ingest: agreementsIngest,
 } as const;
@@ -165,6 +168,8 @@ export const toolScopes = {
   account_hiring: 'read',
   account_financials_summary: 'read',
   account_news: 'read',
+  msa_whitespace: 'read',
+  relationship_map: 'read',
   agreements_ingest: 'write',
 } satisfies Record<ToolName, ToolScope>;
 

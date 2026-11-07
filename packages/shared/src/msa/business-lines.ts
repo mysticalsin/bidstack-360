@@ -56,11 +56,18 @@ export function labelBusinessLine(value: string): string {
   return isBusinessLine(value) ? BUSINESS_LINE_LABEL[value] : value;
 }
 
+function tokenPattern(token: string): RegExp {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Whole words only: "it" must not match "digital" or "with".
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
+}
+
+const LINE_PATTERNS = LINE_ALIASES.map(({ line, tokens }) => ({ line, patterns: tokens.map(tokenPattern) }));
+
 export function detectBusinessLines(text: string): Line[] {
-  const lower = text.toLowerCase();
   const found = new Set<Line>();
-  for (const { line, tokens } of LINE_ALIASES) {
-    if (tokens.some((token) => lower.includes(token))) found.add(line);
+  for (const { line, patterns } of LINE_PATTERNS) {
+    if (patterns.some((p) => p.test(text))) found.add(line);
   }
   return [...found];
 }

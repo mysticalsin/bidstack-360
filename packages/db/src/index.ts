@@ -185,6 +185,7 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
+export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
@@ -198,3 +199,5 @@ export {
   stageAgreementIngest,
 } from './agreements/stage.js';
 export type { IngestActor, StageAgreementInput, StageAgreementResult } from './agreements/stage.js';
+export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
+export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
