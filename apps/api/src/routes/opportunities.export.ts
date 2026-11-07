@@ -18,9 +18,10 @@ import { PassThrough } from 'node:stream';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
-import { microsToUnits } from '@bidstack/shared';
+import { OpportunityFilter, microsToUnits } from '@bidstack/shared';
 
 import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
+import { opportunityDueDateWhere } from './opportunities.helpers.js';
 
 const BATCH_SIZE = 250;
 
@@ -68,18 +69,21 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       schema: {
         summary: 'Export all opportunities as CSV (streaming)',
         tags: ['opportunities'],
-        querystring: z.object({
-          stage: z.string().optional(),
-          pipelineStageId: z.string().uuid().optional(),
-          owner: z.string().email().optional(),
-          industry: z.string().optional(),
-        }),
+        // Same filters as the list route, so the CSV holds the rows on screen.
+        querystring: OpportunityFilter.pick({
+          stage: true,
+          pipelineStageId: true,
+          industry: true,
+          search: true,
+          dueWithinDays: true,
+          overdue: true,
+        }).extend({ owner: z.string().email().optional() }),
         // Bypass Fastify's JSON serializer; reply is streamed as CSV.
         response: { 200: z.any() },
       },
     },
     async (req, reply) => {
-      const { stage, pipelineStageId, owner, industry } = req.query;
+      const { stage, pipelineStageId, owner, industry, search, dueWithinDays, overdue } = req.query;
       const orgId = req.auth.orgId;
       const stamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
@@ -96,6 +100,16 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           ...(stage ? { stage: stage as PrismaStage } : {}),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),
+          ...opportunityDueDateWhere({ dueWithinDays, overdue }),
+          ...(search
+            ? {
+                OR: [
+                  { customer: { contains: search, mode: 'insensitive' } },
+                  { name: { contains: search, mode: 'insensitive' } },
+                  { code: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
         },
         accessScope,
       );

@@ -10,6 +10,8 @@ import {
   opportunityContactTake,
 } from '@bidstack/shared';
 
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
+
 function serialize(oc: {
   id: string;
   orgId: string;
@@ -57,6 +59,19 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
   server.addHook('preHandler', async (req) => {
     if (req.method !== 'GET') await server.requirePermission('opportunities:write')(req);
   });
+  // Every route here is keyed by the deal: a deal outside the caller's access
+  // scope (or org) is 404 for reads and writes alike. Checked in the handler,
+  // after schema validation, so a hook never queries with an unvalidated id.
+  const assertVisibleOpportunity = async (
+    auth: Parameters<typeof visibleOpportunityWhere>[0],
+    id: string,
+  ) => {
+    const visible = await prisma.opportunity.findFirst({
+      where: await visibleOpportunityWhere(auth, id),
+      select: { id: true },
+    });
+    if (!visible) throw server.httpErrors.notFound('Opportunity not found');
+  };
 
   server.get(
     '/opportunities/:id/contacts',
@@ -77,6 +92,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req) => {
+      await assertVisibleOpportunity(req.auth, req.params.id);
       // One row past the contacts the deal list draws. The extra row is the
       // probe. It is not a shown contact, and it is not a total.
       const loaded = await prisma.opportunityContact.findMany({
@@ -106,7 +122,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     },
     async (req, reply) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
         select: { id: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
@@ -152,6 +168,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req) => {
+      await assertVisibleOpportunity(req.auth, req.params.id);
       if (req.body.isPrimary) {
         await prisma.opportunityContact.updateMany({
           where: { opportunityId: req.params.id, orgId: req.auth.orgId, isPrimary: true },
@@ -193,6 +210,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req, reply) => {
+      await assertVisibleOpportunity(req.auth, req.params.id);
       const existing = await prisma.opportunityContact.findFirst({
         where: {
           opportunityId: req.params.id,
