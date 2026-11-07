@@ -1,13 +1,12 @@
 import type { z } from 'zod';
+
+import { agentTools } from '@bidstack/db/agent-tools';
+
 import type { McpAuthCtx } from '../auth.js';
 
-import { opportunitiesList } from './opportunities-list.js';
-import { opportunitiesGet } from './opportunities-get.js';
-import { opportunityUpdate } from './opportunity-update.js';
 import { contactsList } from './contacts-list.js';
 import { contactsGet } from './contacts-get.js';
 import { contactsCreate } from './contacts-create.js';
-import { tasksCreate } from './tasks-create.js';
 import { tasksList } from './tasks-list.js';
 import { tasksUpdate } from './tasks-update.js';
 import { proposalDraft } from './proposal-draft.js';
@@ -55,15 +54,18 @@ export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
 // the registry so Dust's tool catalog and the existing MCP catalog resolve
 // without translation. Handlers are shared — only the dictionary key
 // differs.
+//
+// The shared agent tools (@bidstack/db/agent-tools) are the same objects
+// Jarvis runs in the API: one definition, two surfaces.
 export const tools = {
   // Legacy dotted names (kept for backward compatibility with v0.1 clients)
-  'opportunities.list': opportunitiesList,
-  'opportunities.get': opportunitiesGet,
-  'opportunity.update': opportunityUpdate,
+  'opportunities.list': agentTools['opportunities.list'],
+  'opportunities.get': agentTools['opportunities.get'],
+  'opportunity.update': agentTools['opportunity.update'],
   'contacts.list': contactsList,
   'contacts.get': contactsGet,
   'contacts.create': contactsCreate,
-  'tasks.create': tasksCreate,
+  'tasks.create': agentTools['tasks.create'],
   'tasks.list': tasksList,
   'tasks.update': tasksUpdate,
   'proposal.draft': proposalDraft,
@@ -94,6 +96,14 @@ export const tools = {
   kam_get_kpis: kamGetKpis,
   kam_read_prospections: kamReadProspections,
   kam_log_prospection: kamLogProspection,
+  // Jarvis-era shared tools: account, proposal and RFP reads plus the
+  // section-draft write.
+  'records.resolve': agentTools['records.resolve'],
+  'account.updates': agentTools['account.updates'],
+  'proposal.status': agentTools['proposal.status'],
+  'rfp.summary': agentTools['rfp.summary'],
+  'bids.overdue': agentTools['bids.overdue'],
+  'proposal.section_draft': agentTools['proposal.section_draft'],
   // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
   ...activityTools,
 } as const;
@@ -140,6 +150,12 @@ export const toolScopes = {
   kam_get_kpis: 'read',
   kam_read_prospections: 'read',
   kam_log_prospection: 'kam',
+  'records.resolve': 'read',
+  'account.updates': 'read',
+  'proposal.status': 'read',
+  'rfp.summary': 'read',
+  'bids.overdue': 'read',
+  'proposal.section_draft': 'write',
   ...activityToolScopes,
 } satisfies Record<ToolName, ToolScope>;
 

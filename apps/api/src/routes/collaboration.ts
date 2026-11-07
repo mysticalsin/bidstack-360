@@ -306,7 +306,12 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
     '/mentions',
     {
       schema: {
-        querystring: z.object({ unreadOnly: z.coerce.boolean().optional() }),
+        querystring: z.object({
+          unreadOnly: z
+            .enum(['true', 'false'])
+            .transform((v) => v === 'true')
+            .optional(),
+        }),
         response: { 200: z.object({ items: z.array(Mention) }) },
       },
     },

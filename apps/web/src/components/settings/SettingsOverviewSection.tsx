@@ -236,7 +236,7 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
       <Card className="overflow-hidden">
         <div className="grid gap-4 p-5 lg:grid-cols-[1fr,280px]">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
               <Icon name="checkCircle" size={14} ariaHidden />
               {t('settingsOverview.heroBadge', 'Enterprise settings command center')}
             </div>
@@ -339,7 +339,7 @@ function OverviewTile({
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
           <Icon name={icon} size={18} ariaHidden />
         </div>
         <div className="min-w-0 flex-1">
