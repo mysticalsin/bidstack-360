@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, afterEach, beforeAll, describe, expect } from 'vitest';
 
-import { prisma } from '@bidstack/db';
+import { normalizeEnrichmentName, prisma } from '@bidstack/db';
 import { createCrtShState, type DnsResolverLike, type PublicGet } from '@bidstack/shared/server';
 
 import { buildServer } from '../../server.js';
@@ -182,6 +182,39 @@ describe('technical stack refresh, open data lane', () => {
     } finally {
       if (prev !== undefined) process.env.APOLLO_API_KEY = prev;
     }
+  });
+
+  skipIfNoDb('keeps a sample stack when no lane can run, and a real run replaces it', async () => {
+    const normalizedName = normalizeEnrichmentName(NAME);
+    const checkedAt = new Date().toISOString();
+    const sample = JSON.stringify({
+      version: 1,
+      checkedAt,
+      sample: true,
+      items: [{ name: 'Okta', category: 'Identity', lane: 'ct', source: 'open_data:ct', confidence: 0.8, evidence: { url: null, record: 'Sample: certificate', observedAt: checkedAt } }],
+      lanes: [{ lane: 'ct', status: 'found', count: 1, detail: null, checkedAt }],
+      apolloFallback: null,
+    });
+    await prisma.companyEnrichment.createMany({
+      data: [{ orgId: orgA!.orgId, normalizedName, legalName: NAME, domain: DOMAIN }],
+      skipDuplicates: true,
+    });
+    const updated = await prisma.$executeRaw`
+      UPDATE company_enrichments SET provider_metadata = jsonb_set(provider_metadata, '{openTechStack}', ${sample}::jsonb, true)
+      WHERE org_id = ${orgA!.orgId}::uuid AND normalized_name = ${normalizedName}`;
+    expect(updated).toBe(1);
+    __setOpenTechApolloEnqueueForTest(async () => null);
+
+    __setOpenTechDetectDepsForTest({ network: false });
+    const offline = await refresh(companyId);
+    expect(offline.statusCode).toBe(200);
+    expect(offline.json().state.coverage).toMatchObject({ sample: true });
+
+    __setOpenTechDetectDepsForTest({ network: true, resolver: richResolver, get, sleep: async () => {}, ct: createCrtShState() });
+    const live = await refresh(companyId);
+    expect(live.json().state.coverage).toMatchObject({ sample: false });
+    const names = live.json().state.providerStack.flatMap((c: { items: Array<{ name: string }> }) => c.items.map((i) => i.name));
+    expect(names).not.toContain('Okta');
   });
 
   skipIfNoDb('retries are idempotent: one item per technology and lane', async () => {

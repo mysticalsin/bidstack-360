@@ -134,7 +134,12 @@ export async function refreshCompanyOpenTechStack({
       ...(deps ?? {}),
     },
   );
-  const merged = mergeOpenTechSnapshot(previous?.sample ? null : previous, run);
+  // A run where no lane could check anything (network off, every lane down)
+  // reports its lanes but keeps the stored stack, sample data included. An
+  // empty jobs lane only means no postings are stored, so it does not count.
+  const anyLaneRan = run.lanes.some((l) => l.status === 'found' || (l.status === 'empty' && l.lane !== 'jobs'));
+  const merged = mergeOpenTechSnapshot(previous?.sample && anyLaneRan ? null : previous, run);
+  const keepStored = !anyLaneRan && previous !== null;
   const openItems = openTechItemCount(merged);
 
   let apolloFallback: ApolloFallbackDecision = 'not_needed';
@@ -153,7 +158,7 @@ export async function refreshCompanyOpenTechStack({
   const snapshot: OpenTechStackSnapshot = { ...merged, apolloFallback };
   const githubFound = run.githubOrg && run.githubOrg !== githubOrg ? run.githubOrg : null;
 
-  let stored = Boolean(enrichment);
+  let stored = Boolean(enrichment) && !keepStored;
   if (!enrichment && createIfMissing) {
     const created = await prisma.companyEnrichment.createMany({
       data: [{ orgId, normalizedName, legalName: companyName.trim(), domain, website }],
@@ -175,6 +180,8 @@ export async function refreshCompanyOpenTechStack({
         SET provider_metadata = jsonb_set(provider_metadata, '{githubOrg}', to_jsonb(${githubFound}::text), true)
         WHERE org_id = ${orgId}::uuid AND normalized_name = ${normalizedName} AND deleted_at IS NULL`;
     }
+  } else if (keepStored) {
+    log.info({ company: companyName }, 'open tech stack kept: no lane could run');
   } else {
     log.info({ company: companyName }, 'open tech stack not stored: no enrichment row yet');
   }
