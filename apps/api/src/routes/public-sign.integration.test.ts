@@ -11,6 +11,7 @@ import { prisma } from '@bidstack/db';
 import type { SignatureStatus } from '@bidstack/shared';
 
 import { buildServer } from '../server.js';
+import { htmlToPdf } from '../services/documents/document.service.js';
 import { SIGN_LINK_TTL_DAYS } from '../services/documents/signature.service.js';
 
 vi.mock('../services/documents/document.service.js', async (importOriginal) => ({
@@ -156,6 +157,15 @@ describe('public sign routes', () => {
       where: { signatureRequestId: id, type: 'SIGNED' },
     });
     expect(events).toBe(1);
+  });
+
+  it('the signed PDF says it is not a legally binding e-signature', async () => {
+    const { token } = await makeRequest();
+    vi.mocked(htmlToPdf).mockClear();
+    const res = await submit(token);
+    expect(res.statusCode).toBe(200);
+    const html = vi.mocked(htmlToPdf).mock.calls[0]?.[0] as string;
+    expect(html.replace(/\s+/g, ' ')).toContain('not a legally binding e-signature');
   });
 
   it('POST is rate limited per IP', async () => {
