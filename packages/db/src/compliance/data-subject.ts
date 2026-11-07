@@ -281,7 +281,7 @@ function exactEntry(x: Prisma.Sql, s: DataSubject): Prisma.Sql {
 function arrayWithout(model: string, field: string, s: DataSubject): Prisma.Sql {
   const col = C(model, field);
   return Prisma.sql`CASE WHEN ${col} IS NULL THEN NULL ELSE array(SELECT x FROM unnest(${col}) WITH ORDINALITY AS u(x, i)
-                           WHERE NOT ${exactEntry(Prisma.sql`x`, s)} ORDER BY i) END`;
+                           WHERE NOT coalesce(${exactEntry(Prisma.sql`x`, s)}, false) ORDER BY i) END`;
 }
 
 async function idsWhere(

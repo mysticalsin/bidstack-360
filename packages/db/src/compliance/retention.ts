@@ -228,27 +228,35 @@ export async function runRetentionSweep(
             ? Prisma.sql`DELETE FROM ${table} WHERE ${batch} RETURNING org_id`
             : Prisma.sql`UPDATE ${table} SET ${Prisma.raw(p.scrub ?? '')} WHERE ${batch} RETURNING org_id`;
         // The batch and its counts-only audit rows (one per tenant) commit together.
-        const n = await db.$transaction(async (tx) => {
-          const counted = await tx.$queryRaw<Array<{ org_id: string | null; n: bigint }>>(
-            Prisma.sql`WITH c AS (${changed}) SELECT org_id::text AS org_id, count(*) AS n FROM c GROUP BY org_id`,
-          );
-          let total = 0;
-          for (const r of counted) {
-            total += Number(r.n);
-            if (!r.org_id) continue;
-            await tx.auditLog.create({
-              data: {
-                orgId: r.org_id,
-                userId: null,
-                action: 'retention.sweep',
-                targetType: 'data_class',
-                targetId: p.dataClass,
-                diff: { dataClass: p.dataClass, action: p.action, days: p.days, rows: Number(r.n) },
-              },
-            });
-          }
-          return total;
-        });
+        const n = await db.$transaction(
+          async (tx) => {
+            const counted = await tx.$queryRaw<Array<{ org_id: string | null; n: bigint }>>(
+              Prisma.sql`WITH c AS (${changed}) SELECT org_id::text AS org_id, count(*) AS n FROM c GROUP BY org_id`,
+            );
+            let total = 0;
+            for (const r of counted) {
+              total += Number(r.n);
+              if (!r.org_id) continue;
+              await tx.auditLog.create({
+                data: {
+                  orgId: r.org_id,
+                  userId: null,
+                  action: 'retention.sweep',
+                  targetType: 'data_class',
+                  targetId: p.dataClass,
+                  diff: {
+                    dataClass: p.dataClass,
+                    action: p.action,
+                    days: p.days,
+                    rows: Number(r.n),
+                  },
+                },
+              });
+            }
+            return total;
+          },
+          { timeout: 120_000, maxWait: 10_000 },
+        );
         rows += n;
         if (n < BATCH) break;
       }

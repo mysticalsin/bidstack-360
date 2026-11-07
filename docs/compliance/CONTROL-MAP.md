@@ -96,7 +96,8 @@ Test paths are relative to the owning app or package (`apps/api/src/...`,
   different person with the same name and their own address keeps their
   records, meetings and references. Other people's own name, email and phone
   columns are never redacted. Free text cannot tell namesakes apart: their
-  name in a transcript or a name-only attendee list is redacted too.
+  name in a transcript, an attendee list or a reference with no email is
+  treated as the subject's and redacted or dropped. Run the dry run first.
 - **JSON columns** are matched on their decoded values, so a name after an
   escaped newline in a transcript payload is still found.
 - **Export:** `POST /api/v1/orgs/:orgId/data-subject-requests` with
