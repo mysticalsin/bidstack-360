@@ -57,6 +57,8 @@ function isExpectedFailure(res: Response): boolean {
   if (/\/(integrations|health|status|providers|dust|odoo|sharepoint|lms)\b/.test(url)) return true;
   // The unknown-token sign check expects the API to say so.
   if (/\/sign\/[0-9a-f]{64}$/.test(url) && (status === 404 || status === 410)) return true;
+  // useBidScoreLatest reads 404 as "not scored yet" and does not retry it.
+  if (/\/bid-scores\/[0-9a-f-]{36}\/latest$/.test(url) && status === 404) return true;
   return false;
 }
 
@@ -99,8 +101,6 @@ async function open(page: Page, path: string): Promise<void> {
   await expect(page.getByRole('main')).toBeVisible({ timeout: 20_000 });
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
 }
-
-test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ playwright }) => {
   const api = await playwright.request.newContext({

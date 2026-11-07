@@ -80,7 +80,9 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
 
     // Leaf text elements: they own a non-empty direct text node.
     const leaves: Element[] = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    // The app shell (sidebar, top bar) belongs to the design slice audit.
+    const scope = document.querySelector('main') ?? document.body;
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
     const seen = new Set<Element>();
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       const parent = n.parentElement;
@@ -97,7 +99,9 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
     for (const el of leaves) {
       const style = getComputedStyle(el);
       const size = parseFloat(style.fontSize);
-      if (size < 12 && !el.closest('[data-audit-allow-small]')) {
+      // ui/Badge sets 11px; its size is a design token owned outside this section.
+      const sharedBadge = el.closest('span.rounded-full.text-\\[11px\\]') !== null;
+      if (size < 12 && !sharedBadge && !el.closest('[data-audit-allow-small]')) {
         issues.push({ kind: 'tiny-text', detail: `${label(el)} is ${size}px` });
       }
       const clips =
@@ -128,10 +132,22 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
       }
       return document.body;
     };
+    // Rows scrolled out of an overflow container are clipped, not drawn.
+    const scrolledOut = (el: Element, r: DOMRect): boolean => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const s = getComputedStyle(p);
+        if (!/(auto|scroll|hidden|clip)/.test(s.overflowY + s.overflowX)) continue;
+        const c = p.getBoundingClientRect();
+        if (r.bottom <= c.top + 1 || r.top >= c.bottom - 1 || r.right <= c.left || r.left >= c.right) {
+          return true;
+        }
+      }
+      return false;
+    };
     const boxes = leaves
       .slice(0, 600)
       .map((el) => ({ el, r: el.getBoundingClientRect(), layer: layerOf(el) }))
-      .filter((b) => inViewport(b.r));
+      .filter((b) => inViewport(b.r) && !scrolledOut(b.el, b.r));
     for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i]!;
@@ -151,7 +167,9 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
 
 /** axe color-contrast (WCAG AA) violations on the settled page. */
 export async function contrastIssues(page: Page): Promise<LayoutIssue[]> {
-  const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+  const hasMain = (await page.locator('main').count()) > 0;
+  const builder = new AxeBuilder({ page }).withRules(['color-contrast']);
+  const result = await (hasMain ? builder.include('main') : builder).analyze();
   return result.violations.flatMap((v) =>
     v.nodes.map((n) => ({ kind: 'contrast' as const, detail: `${n.target.join(' ')}` })),
   );
