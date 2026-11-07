@@ -128,6 +128,12 @@ const READ_LIKE_MUTATIONS: Record<string, string> = {
   'POST /api/v1/ai-assistant/meeting-prep': 'AI brief; nothing persisted.',
   'POST /api/v1/ai-assistant/enrich-contact': 'AI suggestion; nothing persisted.',
   'POST /api/v1/ai-assistant/account-intel': 'AI brief; nothing persisted.',
+  'POST /api/v1/ai-assistant/jarvis/runs':
+    'Jarvis run; tools check their own permission and writes are only staged.',
+  'POST /api/v1/ai-assistant/jarvis/actions/:actionId/confirm':
+    'Handler re-checks the staged tool’s write permission before it executes (jarvis.integration.test.ts).',
+  'POST /api/v1/ai-assistant/jarvis/actions/:actionId/cancel':
+    'Discards the caller’s own staged action; nothing executes.',
   'POST /api/v1/integrations/twilio/test': 'Connection check that sends no SMS.',
   'POST /api/v1/tags/suggest': 'Tag suggestions for a draft entity; nothing persisted.',
 };
