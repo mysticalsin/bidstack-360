@@ -397,7 +397,7 @@
       "button": "Sync ERP accounts",
       "errorTitle": "ERP account sync failed",
       "errorDescription": "The latest ERP customer pull could not complete.",
-      "alertFallback": "The last sync could not pull the top 20 ERP customers.",
+      "alertFallback": "The last sync could not pull the top ERP customers.",
       "retry": "Retry sync"
     },
     "actions": {

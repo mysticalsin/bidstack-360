@@ -397,7 +397,7 @@
       "button": "Sincronizza account ERP",
       "errorTitle": "Sincronizzazione degli account ERP non riuscita",
       "errorDescription": "Non è stato possibile completare l'ultimo recupero clienti dall'ERP.",
-      "alertFallback": "L'ultima sincronizzazione non è riuscita a recuperare i primi 20 clienti dell'ERP.",
+      "alertFallback": "L'ultima sincronizzazione non è riuscita a recuperare i principali clienti dell'ERP.",
       "retry": "Riprova sincronizzazione"
     },
     "actions": {

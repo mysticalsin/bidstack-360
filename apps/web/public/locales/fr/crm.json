@@ -482,7 +482,7 @@
       "button": "Synchroniser les comptes ERP",
       "errorTitle": "Échec de la synchronisation des comptes ERP",
       "errorDescription": "La dernière récupération des clients ERP n'a pas pu aboutir.",
-      "alertFallback": "La dernière synchronisation n'a pas pu récupérer les 20 principaux clients ERP.",
+      "alertFallback": "La dernière synchronisation n'a pas pu récupérer les principaux clients ERP.",
       "retry": "Relancer la synchronisation"
     },
     "actions": {

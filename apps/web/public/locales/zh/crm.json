@@ -397,7 +397,7 @@
       "button": "同步 ERP 客户",
       "errorTitle": "ERP 客户同步失败",
       "errorDescription": "最近一次 ERP 客户拉取未能完成。",
-      "alertFallback": "上次同步未能拉取前 20 个 ERP 客户。",
+      "alertFallback": "上次同步未能拉取主要 ERP 客户。",
       "retry": "重试同步"
     },
     "actions": {

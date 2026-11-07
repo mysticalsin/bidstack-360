@@ -397,7 +397,7 @@
       "button": "Sincronizar contas do ERP",
       "errorTitle": "Falha na sincronização das contas do ERP",
       "errorDescription": "A última extração de clientes do ERP não pôde ser concluída.",
-      "alertFallback": "A última sincronização não conseguiu extrair os 20 principais clientes do ERP.",
+      "alertFallback": "A última sincronização não conseguiu extrair os principais clientes do ERP.",
       "retry": "Tentar sincronizar novamente"
     },
     "actions": {
