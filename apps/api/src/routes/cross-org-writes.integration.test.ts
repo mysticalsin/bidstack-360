@@ -214,6 +214,73 @@ async function rawTemplate(id: string) {
   return rows[0]!;
 }
 
+// Positive controls: the same requests against org A's own rows succeed, so a
+// renamed or removed route cannot make the 404 checks above pass.
+describe('the same writes succeed inside the caller org', () => {
+  t('PATCH /users/:id/role on a teammate', async () => {
+    const mate = await prisma.user.findFirstOrThrow({
+      where: { orgId: orgA! },
+      orderBy: { createdAt: 'desc' },
+    });
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/users/${mate.id}/role`,
+      headers: admin,
+      payload: { role: 'member' },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  t('DELETE /integrations/api-keys/:id on an own key', async () => {
+    const rawKey = `bs_own_${randomUUID()}`;
+    const own = await prisma.apiKey.create({
+      data: {
+        orgId: orgA!,
+        name: 'org A key',
+        prefix: rawKey.slice(0, 8),
+        hashedKey: createHash('sha256').update(rawKey).digest('hex'),
+        scopes: ['read'],
+      },
+    });
+    const res = await server.inject({ method: 'DELETE', url: `/api/v1/integrations/api-keys/${own.id}`, headers: admin });
+    expect(res.statusCode, res.body).toBe(204);
+  });
+
+  t('PATCH /workflows/:id, /email-templates/:id and /pipeline-stages/:id on own rows', async () => {
+    const wf = await prisma.workflow.create({ data: { orgId: orgA!, name: 'org A workflow', triggerKind: 'manual' } });
+    const wfRes = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/workflows/${wf.id}`,
+      headers: admin,
+      payload: { name: 'renamed' },
+    });
+    expect(wfRes.statusCode, wfRes.body).toBe(200);
+
+    const tpl = await prisma.emailTemplate.create({
+      data: { orgId: orgA!, name: `org A template ${randomUUID()}`, subject: 's', bodyHtml: '<p>a</p>' },
+    });
+    const tplRes = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/email-templates/${tpl.id}`,
+      headers: admin,
+      payload: { subject: 'updated' },
+    });
+    expect(tplRes.statusCode, tplRes.body).toBe(200);
+
+    const pipeline = await prisma.pipeline.create({ data: { orgId: orgA!, name: `org A pipeline ${randomUUID()}` } });
+    const stage = await prisma.pipelineStage.create({
+      data: { orgId: orgA!, pipelineId: pipeline.id, key: 'qualify', name: 'Qualify' },
+    });
+    const stageRes = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/pipeline-stages/${stage.id}`,
+      headers: admin,
+      payload: { name: 'Qualified' },
+    });
+    expect(stageRes.statusCode, stageRes.body).toBe(200);
+  });
+});
+
 describe('soft-deleted email templates stay deleted', () => {
   t('PATCH on a deleted template answers 404 and does not edit it', async () => {
     const res = await server.inject({
