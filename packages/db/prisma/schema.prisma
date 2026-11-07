@@ -3511,6 +3511,8 @@ model CalendarEvent {
   contactId         String?             @map("contact_id") @db.Uuid
   companyId         String?             @map("company_id") @db.Uuid
   opportunityId     String?             @map("opportunity_id") @db.Uuid
+  /// A user filed this event by hand; the provider pull never refiles it.
+  filedManually     Boolean             @default(false) @map("filed_manually")
   /// Client-supplied retry key so a repeated create returns the same row.
   clientRequestId   String?             @map("client_request_id") @db.VarChar(64)
   externalUpdatedAt DateTime?           @map("external_updated_at") @db.Timestamptz(6)

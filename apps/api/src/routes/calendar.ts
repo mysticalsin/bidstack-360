@@ -95,6 +95,11 @@ type EventRow = {
   createdAt: Date;
 };
 
+/** The body files the event by hand (any filing field present, null included). */
+function isFiling(body: { contactId?: unknown; companyId?: unknown; opportunityId?: unknown }): boolean {
+  return body.contactId !== undefined || body.companyId !== undefined || body.opportunityId !== undefined;
+}
+
 function toResponse(e: EventRow): z.infer<typeof CalendarEventResponse> {
   return {
     id: e.id,
@@ -250,6 +255,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
             contactId: req.body.contactId ?? null,
             companyId: req.body.companyId ?? null,
             opportunityId: req.body.opportunityId ?? null,
+            filedManually: isFiling(req.body),
             clientRequestId: clientRequestId ?? null,
             syncState: push ? 'PENDING_PUSH' : 'SYNCED',
           },
@@ -319,6 +325,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.contactId !== undefined ? { contactId: req.body.contactId } : {}),
           ...(req.body.companyId !== undefined ? { companyId: req.body.companyId } : {}),
           ...(req.body.opportunityId !== undefined ? { opportunityId: req.body.opportunityId } : {}),
+          ...(isFiling(req.body) ? { filedManually: true } : {}),
           syncState: push ? 'PENDING_PUSH' : 'SYNCED',
         },
         select: EVENT_SELECT,

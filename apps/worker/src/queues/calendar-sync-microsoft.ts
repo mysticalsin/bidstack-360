@@ -13,7 +13,7 @@ import {
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
 
-import { captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { calendarFiling, refileUnlessManual, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
@@ -271,14 +271,12 @@ async function upsertMicrosoftEvents(
         isCancelled: item.isCancelled ?? false,
         attendees,
         organizerEmail,
-        relatedEntityType: target?.entityType ?? null,
-        relatedEntityId: target?.entityId ?? null,
-        ...captureColumns(target),
         externalUpdatedAt: item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime) : null,
         etag: item['@odata.etag'] ?? null,
         syncState: 'SYNCED' as const,
         lastSyncedAt: new Date(),
       };
+      const filing = calendarFiling(target);
 
       await prisma.calendarEvent.upsert({
         where: {
@@ -289,9 +287,10 @@ async function upsertMicrosoftEvents(
             externalId: item.id,
           },
         },
-        create: { orgId, ownerId: userId, externalId: item.id, provider: 'microsoft_graph', ...fields },
+        create: { orgId, ownerId: userId, externalId: item.id, provider: 'microsoft_graph', ...fields, ...filing },
         update: fields,
       });
+      await refileUnlessManual({ orgId, ownerId: userId, provider: 'microsoft_graph', externalId: item.id }, filing);
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');
     }
