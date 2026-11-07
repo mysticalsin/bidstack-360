@@ -8,6 +8,7 @@ import { RadialDots } from '@/components/charts/tuffui/radial-dots';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyActivitySummary } from '@/hooks/useCompanyActivitySummary';
 import { browserTimeZone } from '@/lib/timezone';
 
@@ -50,9 +51,23 @@ function ChartCard({
   );
 }
 
+const COMPANY_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The summary route takes a company UUID and needs `activities:read`. Without
+ * either, the request would be a 4xx (the browser logs those as console
+ * errors), so the section stays out of the page and nothing is fetched.
+ */
 export function AccountActivityCharts({ companyId }: { companyId: string }) {
   const tz = browserTimeZone();
-  const { data, isLoading, isError, refetch } = useCompanyActivitySummary(companyId, tz);
+  const canRead = useHasPermission('activities:read');
+  const eligible = canRead && COMPANY_ID_RE.test(companyId);
+  const { data, isLoading, isError, refetch } = useCompanyActivitySummary(
+    eligible ? companyId : undefined,
+    tz,
+  );
+
+  if (!eligible) return null;
 
   if (isLoading) {
     return (
