@@ -4308,6 +4308,9 @@ select:focus-visible {
   margin-top: auto;
   padding-top: 4px;
 }
+[data-theme='dark'] .account-card-foot {
+  color: var(--brand-deep);
+}
 .account-card:hover .account-card-foot {
   text-decoration: underline;
 }

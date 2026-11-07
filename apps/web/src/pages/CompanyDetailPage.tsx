@@ -155,7 +155,7 @@ export function CompanyDetailPage() {
                 ) : (
                   <Link
                     to={`/companies/${c.parent.id}`}
-                    className="font-medium text-[var(--brand-primary)] hover:underline"
+                    className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                   >
                     {c.parent.name}
                   </Link>
@@ -223,7 +223,7 @@ export function CompanyDetailPage() {
                 }}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
                   tab === tabItem.key
-                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                     : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
                 }`}
               >
