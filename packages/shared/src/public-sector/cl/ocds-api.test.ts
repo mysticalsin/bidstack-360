@@ -60,11 +60,12 @@ describe('OCDS API adapter: contract and paging', () => {
   });
 
   it('pages with offset until pagination.total is reached (real list response)', async () => {
-    const raw = await rawFrom(fixtureText('ocds-list-2025-07.json'), julyUnit());
-    // The recorded page used limit 5 against a total of 10,328.
+    // The recorded page was requested with limit 5 against a total of 10,328.
+    const first = { ...julyUnit(), url: ocdsListUrl({ year: 2025, month: 7, offset: 0, limit: 5 }) };
+    const raw = await rawFrom(fixtureText('ocds-list-2025-07.json'), first);
     expect(ocdsAdapter.nextCursor(raw, null)).toEqual({ year: 2025, month: 7, offset: 5, limit: 5 });
-    const last = { ...raw, body: raw.body.replace('"offset": 0', '"offset": 10325') };
-    expect(ocdsAdapter.nextCursor(last, null)).toBeNull();
+    const lastUnit = { ...first, url: ocdsListUrl({ year: 2025, month: 7, offset: 10325, limit: 5 }) };
+    expect(ocdsAdapter.nextCursor(await rawFrom(fixtureText('ocds-list-2025-07.json'), lastUnit), null)).toBeNull();
   });
 
   it('expands a list page into tender and award record units over https', async () => {

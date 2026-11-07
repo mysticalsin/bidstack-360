@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BACKOFF_DEFAULTS, backoffDelayMs, decideRetry, parseRetryAfterMs } from './backoff.js';
+import { BACKOFF_DEFAULTS, MAX_RETRY_AFTER_MS, backoffDelayMs, decideRetry, parseRetryAfterMs } from './backoff.js';
 import { PsSourceError } from './errors.js';
 
 describe('exponential backoff with jitter', () => {
@@ -9,14 +9,19 @@ describe('exponential backoff with jitter', () => {
     expect(BACKOFF_DEFAULTS.maxAttempts).toBe(5);
   });
 
-  it('doubles the ceiling per attempt and jitters inside [ceiling/2, ceiling]', () => {
+  it('doubles the step per attempt and jitters inside [step, 1.5 x step], never below 10 s', () => {
     const low = () => 0;
     const high = () => 0.999_999;
-    expect(backoffDelayMs(1, { random: low })).toBe(5_000);
-    expect(backoffDelayMs(1, { random: high })).toBeLessThanOrEqual(10_000);
-    expect(backoffDelayMs(2, { random: low })).toBe(10_000);
-    expect(backoffDelayMs(3, { random: low })).toBe(20_000);
-    expect(backoffDelayMs(4, { random: high })).toBeLessThanOrEqual(80_000);
+    expect(backoffDelayMs(1, { random: low })).toBe(10_000);
+    expect(backoffDelayMs(1, { random: high })).toBeLessThanOrEqual(15_000);
+    expect(backoffDelayMs(2, { random: low })).toBe(20_000);
+    expect(backoffDelayMs(3, { random: low })).toBe(40_000);
+    expect(backoffDelayMs(4, { random: high })).toBeLessThanOrEqual(120_000);
+  });
+
+  it('clamps a huge Retry-After from a server', () => {
+    const err = new PsSourceError('rate_limited', 'slow down', { retryAfterMs: 7 * 24 * 3_600_000 });
+    expect(decideRetry(err, 1).delayMs).toBe(MAX_RETRY_AFTER_MS);
   });
 
   it('spreads retries so parallel workers do not retry in lockstep', () => {

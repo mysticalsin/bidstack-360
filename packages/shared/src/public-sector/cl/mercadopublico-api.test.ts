@@ -25,6 +25,7 @@ const ctx = (fetch: ReturnType<typeof cannedFetch>) => ({
   fetch,
   secret: SECRET,
   now: () => FIXED_NOW,
+  quota: createQuotaGuard({ store: new InMemoryQuotaStore(), credentialId: 'test', now: () => FIXED_NOW }),
 });
 
 describe('Mercado Publico API adapter: contract', () => {
