@@ -71,12 +71,6 @@ export function WorkloadPage() {
         <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
           {t('workload.title', 'Team Workload')}
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--fg-secondary)]">
-          {t(
-            'workload.subtitle',
-            "Who's carrying the book into this week — live bids per desk, weighted pipeline, and the deadlines landing in the next seven days.",
-          )}
-        </p>
       </motion.header>
 
       <motion.div
@@ -89,7 +83,7 @@ export function WorkloadPage() {
             key={tile.key}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
           >
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
               {tile.label}
             </div>
             <div
@@ -121,10 +115,6 @@ export function WorkloadPage() {
           <EmptyState
             icon="briefcase"
             title={t('workload.emptyTitle', 'No live bids on any desk')}
-            message={t(
-              'workload.emptyMessage',
-              "Once opportunities have owners, this becomes your Monday-morning triage: who's over capacity, who can take the next RFP, and which bids sit ownerless.",
-            )}
             secondary={
               <EmptyStateLink to="/opportunities">
                 {t('workload.emptyCta', 'Open the pipeline and assign owners')}

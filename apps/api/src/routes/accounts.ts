@@ -208,8 +208,12 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       //
       // Conditional filters are expressed as (${param}::text IS NULL OR ...)
       // so Prisma can parameterize all values safely without dynamic SQL.
-      const searchPat = search ? `%${search}%` : null;
-      const industryVal = industry ?? null;
+      // Escape LIKE metacharacters so the auto leaderboard filters the same way
+      // as Prisma `contains` / `equals` in curated mode: "%" or "_" in a search
+      // is a literal character, and industry is an exact case-insensitive match.
+      const likeLiteral = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+      const searchPat = search ? `%${likeLiteral(search)}%` : null;
+      const industryVal = industry ? likeLiteral(industry) : null;
       const countryVariants = countryVariantsForScope(scope);
       const companyCountryScopeSql =
         !scope.unrestricted && countryVariants.length > 0
@@ -288,9 +292,9 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         WHERE c.org_id    = ${orgId}::uuid
           AND c.deleted_at IS NULL
           AND (${searchPat}::text IS NULL
-               OR c.name   ILIKE ${searchPat}
-               OR c.domain ILIKE ${searchPat})
-          AND (${industryVal}::text IS NULL OR c.industry ILIKE ${industryVal})
+               OR c.name   ILIKE ${searchPat} ESCAPE '\\'
+               OR c.domain ILIKE ${searchPat} ESCAPE '\\')
+          AND (${industryVal}::text IS NULL OR c.industry ILIKE ${industryVal} ESCAPE '\\')
           ${accountScopeSql}
         GROUP BY c.id
         ORDER BY "totalValue" DESC

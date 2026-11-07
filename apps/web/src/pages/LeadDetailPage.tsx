@@ -12,7 +12,6 @@ import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useConvertLead, useDeleteLead, useLead, useUpdateLead } from '@/hooks/useLeads';
-import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { DraftInput, DraftTextarea } from '@/components/ui/DraftInput';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
@@ -21,14 +20,9 @@ import { LeadPriority, LeadStatus, LeadSource } from '@bidstack/shared';
 
 import { ConvertLeadDialog } from './leadDetail/ConvertLeadDialog';
 
-const STATUS_OPTIONS: LeadStatus[] = [
-  'new',
-  'contacted',
-  'qualified',
-  'nurture',
-  'disqualified',
-  'converted',
-];
+// 'converted' is only reachable through the convert action, which creates the
+// opportunity and contact; the API rejects it on PATCH.
+const STATUS_OPTIONS: LeadStatus[] = ['new', 'contacted', 'qualified', 'nurture', 'disqualified'];
 const PRIORITY_OPTIONS: LeadPriority[] = ['low', 'medium', 'high', 'critical'];
 
 export function LeadDetailPage() {
@@ -45,13 +39,6 @@ export function LeadDetailPage() {
   // that always 403 (matches OppInlineEditCells' canEdit convention).
   const canWrite = useHasPermission('leads:write');
   const readOnlyHint = t('leadDetail.readOnlyHint', 'You need lead write access to make changes.');
-  const { debounced: debouncedUpdate } = useDebouncedCallback((patch: Record<string, unknown>) => {
-    // onError now lives on useUpdateLead itself (matches useCompanies.ts), so every
-    // call site gets a failure toast without needing its own override here.
-    update.mutate(patch as Parameters<typeof update.mutate>[0], {
-      onSuccess: () => toast.success(t('leadDetail.toastSaved', 'Saved')),
-    });
-  }, 500);
   const [isConverting, setIsConverting] = useState(false);
 
   if (lead.isLoading) return <DetailPageSkeleton columns={2} cards={3} />;
@@ -275,7 +262,7 @@ export function LeadDetailPage() {
                   title={canWrite ? undefined : readOnlyHint}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {STATUS_OPTIONS.map((s) => (
+                  {(isConverted ? [...STATUS_OPTIONS, 'converted' as const] : STATUS_OPTIONS).map((s) => (
                     <option key={s} value={s}>
                       {s.charAt(0).toUpperCase() + s.slice(1)}
                     </option>
@@ -310,7 +297,7 @@ export function LeadDetailPage() {
                   {t('leadDetail.labelScore', 'Score')}
                 </label>
                 <div className="flex items-center gap-2">
-                  <input
+                  <DraftInput
                     aria-label={
                       canWrite
                         ? t('leadDetail.labelScore', 'Score')
@@ -319,8 +306,18 @@ export function LeadDetailPage() {
                     type="number"
                     min={0}
                     max={100}
-                    value={l.score}
-                    onChange={(e) => debouncedUpdate({ score: Number(e.target.value) })}
+                    serverValue={String(l.score)}
+                    commit={(v) => {
+                      if (v.trim() === '') return;
+                      const n = Number(v);
+                      if (!Number.isFinite(n)) return;
+                      const score = Math.min(100, Math.max(0, Math.round(n)));
+                      if (score === l.score) return;
+                      update.mutate(
+                        { score },
+                        { onSuccess: () => toast.success(t('leadDetail.toastSaved', 'Saved')) },
+                      );
+                    }}
                     disabled={!canWrite}
                     title={canWrite ? undefined : readOnlyHint}
                     className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
