@@ -19,6 +19,9 @@ CREATE TABLE "msa_whitespace_decisions" (
 
 CREATE INDEX "msa_whitespace_decisions_org_msa_line_idx" ON "msa_whitespace_decisions"("org_id", "contract_id", "line", "decided_at");
 
+-- One accepted decision per (MSA, line); backs the row lock in the accept route.
+CREATE UNIQUE INDEX "msa_whitespace_decisions_accepted_uq" ON "msa_whitespace_decisions"("org_id", "contract_id", "line") WHERE "state" = 'accepted';
+
 ALTER TABLE "msa_whitespace_decisions" ADD CONSTRAINT "msa_whitespace_decisions_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "orgs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "msa_whitespace_decisions" ADD CONSTRAINT "msa_whitespace_decisions_contract_id_fkey" FOREIGN KEY ("contract_id") REFERENCES "contract_agreements"("id") ON DELETE CASCADE ON UPDATE CASCADE;

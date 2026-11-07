@@ -49,9 +49,23 @@ export async function loadAccountActivityLines(
   const out = new Map<string, AccountActivity>();
   for (const id of companyIds) out.set(id, { opportunityLines: [], projectLines: [], revenueLines: [] });
   if (companyIds.length === 0) return out;
+  // Opportunities drafted from an accepted flag are the flag's own follow-up,
+  // not evidence that the line is already sold.
+  const drafted = await db.msaWhitespaceDecision.findMany({
+    where: { orgId, companyId: { in: companyIds }, opportunityId: { not: null } },
+    select: { opportunityId: true },
+    take: 1000,
+  });
+  const draftedIds = drafted.map((d) => d.opportunityId).filter((id): id is string => Boolean(id));
   const [opps, projects, subscriptions] = await Promise.all([
     db.opportunity.findMany({
-      where: { orgId, companyId: { in: companyIds }, deletedAt: null, stage: { not: 'closed_lost' } },
+      where: {
+        orgId,
+        companyId: { in: companyIds },
+        deletedAt: null,
+        stage: { not: 'closed_lost' },
+        ...(draftedIds.length ? { id: { notIn: draftedIds } } : {}),
+      },
       select: { companyId: true, name: true, industry: true },
       take: 1000,
     }),
@@ -182,9 +196,11 @@ export async function loadWhitespaceFlags(
       distinct: ['companyId', 'country'],
       take: 1000,
     }),
+    // Latest decision per (MSA, line) is all the state machine needs.
     db.msaWhitespaceDecision.findMany({
       where: { orgId, contractId: { in: rows.map((r) => r.id) } },
-      orderBy: { decidedAt: 'desc' },
+      orderBy: [{ contractId: 'asc' }, { line: 'asc' }, { decidedAt: 'desc' }],
+      distinct: ['contractId', 'line'],
       take: 1000,
     }),
   ]);

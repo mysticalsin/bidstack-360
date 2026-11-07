@@ -243,6 +243,19 @@ describe('accept and dismiss', () => {
   });
 });
 
+describe('concurrent accept', () => {
+  it('two clicks at once create one cross-sell action', async () => {
+    const msa = await prisma.contractAgreement.findFirstOrThrow({ where: { orgId: org.orgId, reference: 'NW-PHARMA-MSA-2026' } });
+    const flag = ((await call({ method: 'GET', url: `/msa/${msa.id}/whitespace` })).json() as { flag: WhitespaceFlag }).flag;
+    const line = flag.lines[0]!;
+    const before = await prisma.crossSellAction.count({ where: { orgId: org.orgId } });
+    const body = { line, ownerId: adminId, dueDate: '2026-12-15' };
+    const res = await Promise.all([1, 2].map(() => call({ method: 'POST', url: `/msa/${msa.id}/whitespace/accept`, payload: body })));
+    expect(res.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await prisma.crossSellAction.count({ where: { orgId: org.orgId } })).toBe(before + 1);
+  });
+});
+
 describe('agent tools', () => {
   it('msa_whitespace and relationship_map answer inside the caller scope', async () => {
     const out = (await agentTools.msa_whitespace.handler({ limit: 5 }, { orgId: org.orgId, userId: adminId })) as {
