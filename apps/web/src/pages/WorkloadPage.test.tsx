@@ -127,14 +127,15 @@ describe('WorkloadPage', () => {
     expect(screen.getByTestId('workload-kpi-weighted').textContent).toBe('€14000000');
   });
 
-  it('shows the bespoke zero state that tells the lead how to light it up', () => {
+  it('shows a plain zero state with the way out, and no tagline or helper paragraph', () => {
     hookMocks.owners = [];
 
     renderPage();
 
     expect(screen.getByText('No live bids on any desk')).toBeTruthy();
-    expect(screen.getByText(/Monday-morning triage/)).toBeTruthy();
     expect(screen.getByText('Open the pipeline and assign owners')).toBeTruthy();
+    expect(screen.queryByText(/Monday-morning triage/)).toBeNull();
+    expect(screen.queryByText(/carrying the book/)).toBeNull();
   });
 
   it('surfaces load failures with a retry instead of a blank screen', () => {

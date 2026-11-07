@@ -87,14 +87,14 @@ export const StageColumn = memo(function StageColumn({
             <span
               title={`${conversion}% of opps in this stage or later have advanced past it`}
               aria-label={`Conversion rate: ${conversion}%`}
-              className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-[var(--fg-secondary)]"
+              className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--fg-secondary)]"
             >
               <span aria-hidden>→</span>
               {conversion}%
             </span>
           ) : null}
         </div>
-        <span className="text-[10px] text-[var(--fg-tertiary)] tabular-nums">
+        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
           {pageContinues ? countLabel : <AnimatedNumber value={items.length} duration={0.6} />}
           {' · '}
           <AnimatedNumber
@@ -143,7 +143,7 @@ export const StageColumn = memo(function StageColumn({
             ))}
           </AnimatePresence>
           {items.length === 0 ? (
-            <li className="flex h-32 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-widest">
+            <li className="flex h-32 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-xs font-medium text-[var(--fg-tertiary)] uppercase tracking-widest">
               Drop here
             </li>
           ) : null}

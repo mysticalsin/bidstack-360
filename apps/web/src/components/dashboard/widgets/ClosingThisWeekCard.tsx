@@ -52,7 +52,7 @@ export function ClosingThisWeekCard() {
             {t('closingThisWeek.heading', 'Closing this week')}
           </h2>
         </div>
-        <Link to="/opportunities?due=within7" className="text-xs text-[var(--brand-primary)] hover:underline">
+        <Link to="/opportunities?due=within7" className="text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline">
           {t('closingThisWeek.viewAll', 'View all')}
         </Link>
       </div>
@@ -70,7 +70,7 @@ export function ClosingThisWeekCard() {
           </span>
           <button
             type="button"
-            className="min-h-[44px] rounded-md px-3 text-xs font-semibold text-[var(--brand-primary)] hover:bg-[var(--surface-hover)]"
+            className="min-h-[44px] rounded-md px-3 text-xs font-semibold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:bg-[var(--surface-hover)]"
             onClick={() => void closing.refetch()}
           >
             {t('closingThisWeek.retry', 'Retry')}

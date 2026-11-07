@@ -4,8 +4,8 @@ import {
   accessScopeFromApiKey,
   accountOpportunityScopePredicate,
   applyCompanyScope,
-  applyOpportunityScope,
   applyMsaResourceScope,
+  applyOpportunityScope,
   companyScopePredicate,
 } from './access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
@@ -82,5 +82,31 @@ describe('API key resource scope (B2)', () => {
       expect(JSON.stringify(where)).not.toContain('apikey:');
       expect(where).toMatchObject({ orgId: 'org-1', visibility: 'org' });
     }
+  });
+});
+
+describe('API key opportunity scope', () => {
+  it('bounds a restricted key to deals on its allowlisted companies, never the uuid owner column', () => {
+    const scope = accessScopeFromApiKey(KEY, {
+      unrestrictedScope: false,
+      companyIds: ['company-1'],
+      msaIds: [],
+    });
+    expect(applyOpportunityScope({ orgId: 'org-1' }, scope)).toEqual({
+      AND: [{ orgId: 'org-1' }, { companyId: { in: ['company-1'] } }],
+    });
+    expect(accountOpportunityScopePredicate(scope)).toEqual({ companyId: { in: ['company-1'] } });
+    expect(JSON.stringify(applyOpportunityScope({ orgId: 'org-1' }, scope))).not.toContain(KEY);
+  });
+
+  it('denies every deal to a restricted key with an empty allowlist', () => {
+    const scope = accessScopeFromApiKey(KEY, {
+      unrestrictedScope: false,
+      companyIds: [],
+      msaIds: [],
+    });
+    expect(applyOpportunityScope({ orgId: 'org-1' }, scope)).toEqual({
+      AND: [{ orgId: 'org-1' }, { companyId: { in: [] } }],
+    });
   });
 });

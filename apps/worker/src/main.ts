@@ -42,6 +42,7 @@ import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
 import { startTaskKamAlerts } from './queues/task-kam-alerts.js';
+import { startWebhookOutboxRelay } from './queues/webhook-outbox-relay.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -147,6 +148,8 @@ workers.push(...startCallWorkers(connection, log, queues));
 // workflow engine's `call_webhook` effect reuses this single queue instead of
 // opening (and leaking) a new one per dispatch job / schedule scan.
 const webhookDeliveryQueue = await startWebhookDeliveryWorker(connection, log, workers, queues);
+// Durable outbox -> webhook.delivery relay; no-op unless WEBHOOK_OUTBOX_ENABLED=true.
+await startWebhookOutboxRelay(connection, log, workers, queues, webhookDeliveryQueue);
 
 await Promise.all([
   startDustPoller(connection, log, workers, queues),

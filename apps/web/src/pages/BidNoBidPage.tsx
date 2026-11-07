@@ -87,13 +87,13 @@ export function BidNoBidPage() {
   /* eslint-disable react-hooks/set-state-in-effect */
   // Synchronize editable form state when the fetched score changes.
   // This is intentional: scores/notes are user-editable drafts that must reset
-  // to the latest persisted values when the opportunity or score changes.
+  // to the latest persisted values when the opportunity or score changes. An
+  // unscored deal starts blank, so one deal's draft is never saved onto another.
   useEffect(() => {
-    if (latestScore?.criteria) {
-      setScores(latestScore.criteria as Scores);
-      if (latestScore.notes) setNotes(latestScore.notes);
-    }
-  }, [latestScore]);
+    setScores((latestScore?.criteria as Scores | undefined) ?? {});
+    setNotes(latestScore?.notes ?? '');
+    setDefenseReasoning(null);
+  }, [opportunityId, latestScore]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const saveScore = useCallback(

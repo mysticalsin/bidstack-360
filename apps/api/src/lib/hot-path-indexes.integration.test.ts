@@ -66,8 +66,13 @@ const CASES: Array<{ name: string; index: string; sql: string }> = [
           WHERE first_name ILIKE '%mantu%' OR last_name ILIKE '%mantu%' OR company_name ILIKE '%mantu%'`,
   },
   {
-    name: 'GET /search contact name or role',
-    index: 'contacts_search_trgm_idx',
+    name: 'GET /search contact name or role (name branch)',
+    index: 'contacts_name_trgm_idx',
+    sql: `SELECT id FROM contacts WHERE name ILIKE '%mantu%' OR role ILIKE '%mantu%'`,
+  },
+  {
+    name: 'GET /search contact name or role (role branch)',
+    index: 'contacts_role_trgm_idx',
     sql: `SELECT id FROM contacts WHERE name ILIKE '%mantu%' OR role ILIKE '%mantu%'`,
   },
 ];

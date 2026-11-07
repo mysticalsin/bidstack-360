@@ -17,13 +17,14 @@
 //   "own records only" — intentional, not a bug.
 //
 // HONEST LIMITS of v1 (documented gaps, not silent ones):
-// - Opportunity LIST + COUNT + DETAIL-by-id (GET /opportunities/:id) are
-//   scoped — a restricted user cannot open an out-of-scope deal by direct
-//   link/ID. Companies/leads/contacts stay org-visible even though
+// - Opportunity list, count, and the by-id deal routes (via
+//   lib/visible-opportunity.ts) are scoped, so a restricted user cannot read
+//   or change an out-of-scope deal by direct link/ID. Companies/leads/contacts stay org-visible even though
 //   Company.countryCode exists (v2 candidate).
 // - API-key callers (req.auth.userId = "apikey:<id>", not a User row) have no
-//   group membership. New keys default-deny company/MSA resources unless the
-//   creator sets unrestrictedScope or an explicit company/MSA allowlist.
+//   group membership. New keys default-deny company/MSA resources and deals
+//   unless the creator sets unrestrictedScope or an explicit company/MSA
+//   allowlist; a restricted key sees deals on its allowlisted companies only.
 //   Their REST verbs are also bounded by exact permission scopes (and
 //   readOnly). Legacy read/write fallback is dev/migration only.
 

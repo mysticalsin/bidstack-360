@@ -24,10 +24,12 @@ import type { Prisma } from '../../generated/client/index.js';
  * locked down further with a DB role. Keeping the exception OUT of this
  * middleware keeps the rule here unconditional and easy to reason about.
  *
- * Follow-up (out of scope here): DB-level immutability is stronger than an
- * app-layer guard — a Postgres trigger that raises on UPDATE/DELETE, plus
- * REVOKE UPDATE, DELETE ON audit_log so only the retention role may purge. That
- * needs a migration and is the recommended hardening once this lands.
+ * DB-level layer: migration 20261107070020_audit_log_hash_chain_triggers adds triggers
+ * that hash-chain every insert per org and reject content UPDATE and TRUNCATE
+ * for every writer, raw SQL included. DELETE stays possible for the retention
+ * purge and org cascade; chain verification reports the gap it leaves.
+ * Remaining follow-up: REVOKE DELETE ON audit_log from the app role so only the
+ * retention role may purge.
  */
 
 const AUDIT_MODEL = 'AuditLog';

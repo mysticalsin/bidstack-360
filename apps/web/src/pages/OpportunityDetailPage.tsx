@@ -9,7 +9,7 @@ import { DueDateChip } from '@/components/ui/DueDateChip';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
@@ -73,7 +73,7 @@ export function OpportunityDetailPage() {
     { value: 'closed_lost', label: t('opportunityDetail.stageClosedLost', 'Closed lost') },
   ];
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, isError, error } = useOpportunity(id);
+  const { data, isLoading, isError, error, refetch } = useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
   // Delete/patch/stage-move all 403 server-side without opportunities:write
@@ -126,7 +126,10 @@ export function OpportunityDetailPage() {
             label: t('opportunityDetail.commandCreateTaskLabel', 'Create task for {{name}}', {
               name: data.name,
             }),
-            hint: t('opportunityDetail.commandCreateTaskHint', 'Add a to-do linked to this opportunity'),
+            hint: t(
+              'opportunityDetail.commandCreateTaskHint',
+              'Add a to-do linked to this opportunity',
+            ),
             onSelect: () => setTaskOpen(true),
           },
           {
@@ -134,7 +137,10 @@ export function OpportunityDetailPage() {
             label: t('opportunityDetail.commandBriefingLabel', 'Open AI briefing for {{name}}', {
               name: data.name,
             }),
-            hint: t('opportunityDetail.commandBriefingHint', 'Generate a Dust AI briefing document'),
+            hint: t(
+              'opportunityDetail.commandBriefingHint',
+              'Generate a Dust AI briefing document',
+            ),
             onSelect: () => setBriefOpen(true),
           },
         ]
@@ -142,14 +148,21 @@ export function OpportunityDetailPage() {
   );
 
   if (isLoading) return <DetailPageSkeleton tabs columns={2} cards={3} />;
-  if (isError)
+  // A 404 (deleted, foreign or out of access scope) is "not found", not a failure.
+  const notFound = isError ? error instanceof ApiError && error.status === 404 : !data;
+  if (isError && !notFound)
     return (
       <ErrorState
         title={t('opportunityDetail.errorTitle', "Couldn't load this opportunity")}
-        message={error?.message ?? '—'}
+        message={error?.message}
+        action={
+          <Button variant="secondary" onClick={() => void refetch()}>
+            {t('opportunityDetail.retry', 'Retry')}
+          </Button>
+        }
       />
     );
-  if (!data) {
+  if (notFound || !data) {
     return (
       <EmptyState
         title={t('opportunityDetail.notFoundTitle', 'Opportunity not found')}
@@ -158,9 +171,12 @@ export function OpportunityDetailPage() {
           'The opportunity may have been deleted or you may not have access to it.',
         )}
         action={
-          <Button variant="secondary" onClick={() => window.history.back()}>
-            {t('opportunityDetail.goBack', 'Go back')}
-          </Button>
+          <Link
+            to="/opportunities"
+            className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--border-default)] px-4 text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]"
+          >
+            {t('opportunityDetail.backToList', 'Back to opportunities')}
+          </Link>
         }
       />
     );
@@ -196,7 +212,7 @@ export function OpportunityDetailPage() {
                 <li>
                   <Link
                     to="/opportunities"
-                    className="hover:text-[var(--brand-primary)] transition-colors"
+                    className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] transition-colors"
                   >
                     {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
                   </Link>
@@ -236,7 +252,7 @@ export function OpportunityDetailPage() {
               </h1>
               <div className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
                 <span className="flex items-center gap-1.5 font-medium">
-                  <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
+                  <Icon name="building" size={14} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
                   {canWrite ? (
                     <InlineEditText
                       value={data.customer}
@@ -260,11 +276,13 @@ export function OpportunityDetailPage() {
                       value={data.industry ?? ''}
                       onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
                       label={t('opportunityDetail.editIndustryLabel', 'Edit industry')}
-                      display={(v) => v || '—'}
+                      display={(v) => (v ? formatStage(v) : '—')}
                       placeholder={t('opportunityDetail.industryPlaceholder', 'Industry')}
                     />
                   ) : (
-                    <span title={readOnlyHint}>{data.industry || '—'}</span>
+                    <span title={readOnlyHint}>
+                      {data.industry ? formatStage(data.industry) : '—'}
+                    </span>
                   )}
                 </span>
                 <span className="opacity-30">|</span>
@@ -283,7 +301,10 @@ export function OpportunityDetailPage() {
                     <span className="opacity-30">|</span>
                     <span
                       className="flex items-center gap-1.5"
-                      title={t('opportunityDetail.bidClassHint', 'Amaris bid class (FTE size × commitment)')}
+                      title={t(
+                        'opportunityDetail.bidClassHint',
+                        'Amaris bid class (FTE size × commitment)',
+                      )}
                     >
                       <Icon name="shield" size={14} className="text-[var(--fg-tertiary)]" />
                       <Badge tone={BID_CLASS_TONE[data.bidClass] ?? 'gray'}>{data.bidClass}</Badge>
@@ -304,19 +325,23 @@ export function OpportunityDetailPage() {
                 />
                 <Link to={`/rfp/${data.id}/pipeline`}>
                   <Button variant="ghost" size="sm" className="rounded-full">
-                    <Icon name="wand" size={12} className="text-[var(--brand-primary)] mr-1" />
+                    <Icon name="wand" size={12} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] mr-1" />
                     {t('opportunityDetail.rfpPipelineButton', 'RFP Pipeline')}
                   </Button>
                 </Link>
                 <ScheduleReviewDialog
                   entityType="OPPORTUNITY"
                   entityId={data.id}
-                  defaultTopic={t('opportunityDetail.reviewDefaultTopic', 'Go/No-Go review — {{name}}', {
-                    name: data.name,
-                  })}
+                  defaultTopic={t(
+                    'opportunityDetail.reviewDefaultTopic',
+                    'Go/No-Go review — {{name}}',
+                    {
+                      name: data.name,
+                    },
+                  )}
                   trigger={
                     <Button variant="ghost" size="sm" className="rounded-full">
-                      <Icon name="clock" size={12} className="text-[var(--brand-primary)] mr-1" />
+                      <Icon name="clock" size={12} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] mr-1" />
                       {t('opportunityDetail.scheduleReviewButton', 'Schedule review')}
                     </Button>
                   }
@@ -346,7 +371,10 @@ export function OpportunityDetailPage() {
               </div>
               <div
                 className="flex flex-wrap items-center gap-2"
-                aria-label={t('opportunityDetail.outcomeActionsLabel', 'Opportunity outcome actions')}
+                aria-label={t(
+                  'opportunityDetail.outcomeActionsLabel',
+                  'Opportunity outcome actions',
+                )}
               >
                 {isWon ? (
                   <Button variant="success" size="sm" disabled className="rounded-full">
@@ -406,7 +434,10 @@ export function OpportunityDetailPage() {
                   options={stageOptions}
                   label={t('opportunityDetail.changeStageLabel', 'Change stage')}
                   display={(v) => (
-                    <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
+                    <Badge
+                      tone={stageTone(v)}
+                      className="px-4 py-1 text-xs uppercase tracking-wider"
+                    >
                       {formatStage(v)}
                     </Badge>
                   )}

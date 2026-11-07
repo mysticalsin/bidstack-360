@@ -30,7 +30,7 @@ export function PipelineByStageMini({
 
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
+      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
         {t('pipelineByStageMini.heading', 'Pipeline by stage')}
       </div>
       <div className="flex flex-col gap-2">

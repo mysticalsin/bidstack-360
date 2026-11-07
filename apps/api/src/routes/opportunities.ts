@@ -28,8 +28,9 @@ import {
   scopeCacheTag,
 } from '../lib/access-scope.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
-import { resolveCompanyIdByName } from './opportunities.helpers.js';
+import { opportunityDueDateWhere, resolveCompanyIdByName } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
@@ -51,23 +52,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // M7 access scoping: group-restricted users only see opportunities in
       // their countries (or that they own). See lib/access-scope.ts.
       const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
-      // A1 (bid clock): dueDate is a Postgres `date` (midnight UTC) — window on
-      // the UTC day boundary so "due within 7 days" agrees with the DueDateChip
-      // and bid-deadline-alerts worker regardless of the request's local zone.
-      // See apps/worker/src/queues/bid-deadline-alerts.helpers.ts's daysUntilDue.
-      const now = new Date();
-      const startOfTodayUTC = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-      );
-      const dueDateFilter: Prisma.OpportunityWhereInput['dueDate'] | undefined =
-        dueWithinDays !== undefined
-          ? {
-              gte: startOfTodayUTC,
-              lte: new Date(startOfTodayUTC.getTime() + dueWithinDays * 86_400_000),
-            }
-          : overdue
-            ? { lt: startOfTodayUTC }
-            : undefined;
+      const dueDateFilter = opportunityDueDateWhere({ dueWithinDays, overdue }).dueDate;
       return req.cache(
         async () => {
           const items = await prisma.opportunity.findMany({
@@ -317,7 +302,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const before = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
       });
       if (!before) throw server.httpErrors.notFound('Opportunity not found');
 
@@ -564,7 +549,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
         select: { id: true, code: true, customer: true, name: true, pipelineStageId: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
