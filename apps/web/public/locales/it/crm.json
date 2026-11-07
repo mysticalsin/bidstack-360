@@ -473,7 +473,7 @@
     "skipToMain": "Vai al contenuto principale",
     "brandSecureSignature": "Firma sicura",
     "mainAriaLabel": "Firma del documento",
-    "footerLegalNote": "La tua firma è giuridicamente vincolante. Questa pagina non contiene tecnologie di tracciamento.",
+    "footerLegalNote": "Questa è una firma di approvazione interna, non una firma elettronica giuridicamente vincolante. Questa pagina non contiene tecnologie di tracciamento.",
     "stepReview": "Esamina",
     "stepSign": "Firma",
     "stepSubmit": "Invia",
@@ -497,8 +497,8 @@
     "back": "Indietro",
     "continue": "Continua",
     "submitHeading": "Esamina e invia",
-    "submitLegalIntro": "Inviando, firmi legalmente",
-    "termsAgreement": "Accetto che questa firma elettronica sia giuridicamente vincolante e rappresenti la mia intenzione di firmare questo documento. Ho avuto la possibilità di esaminarne il contenuto.",
+    "submitLegalIntro": "Inviando, applichi una firma di approvazione interna a",
+    "termsAgreement": "Comprendo che è una firma di approvazione interna, non una firma elettronica giuridicamente vincolante, e che rappresenta la mia intenzione di approvare questo documento. Ho avuto la possibilità di esaminarne il contenuto.",
     "submitting": "Invio…",
     "submitSignatureButton": "Invia firma",
     "confirmHeading": "Firma inviata",
@@ -510,7 +510,8 @@
     "errorLinkExpiredDetail": "Questo link per la firma è scaduto. Contatta il mittente per inviare nuovamente la richiesta.",
     "errorLinkInvalidDetail": "Questo link per la firma non è valido o è scaduto. Contatta il mittente per inviare nuovamente la richiesta.",
     "errorLinkExpiredTitle": "Link scaduto",
-    "errorLinkInvalidTitle": "Link per la firma non valido"
+    "errorLinkInvalidTitle": "Link per la firma non valido",
+    "errorLinkClosedTitle": "Firma chiusa"
   },
   "worldMap": {
     "preset": {

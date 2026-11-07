@@ -20,6 +20,9 @@ export const ALLOWED_MIME_TYPES = ALLOWED_FILE_CONTENT_TYPES;
 /** 50 MiB — enforced at the route boundary to override the global 10 MiB cap. */
 export const RFP_MAX_BYTES = 50 * 1024 * 1024;
 
+/** The upload route only receives ids, so its JSON body stays small. */
+export const RFP_UPLOAD_BODY_LIMIT_BYTES = 16 * 1024;
+
 /** Rate-limit: 10 uploads per org per hour. Key format: rfp:upload:{orgId}. */
 export const RFP_UPLOAD_RATE_LIMIT_MAX = 10;
 export const RFP_UPLOAD_RATE_LIMIT_TTL_SECONDS = 3600;
