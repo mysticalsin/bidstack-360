@@ -105,6 +105,8 @@ export async function pullDelta(
             ownerEmail,
             participants: [fromEmail, ...toEmails.map((r) => r.email), ...ccEmails.map((r) => r.email)],
           });
+          // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
+          if (!target) continue;
           const html = msg.body?.contentType?.toLowerCase() === 'html';
 
           await prisma.emailMessage.upsert({
@@ -125,8 +127,8 @@ export async function pullDelta(
               receivedAt: msg.receivedDateTime ? new Date(msg.receivedDateTime) : null,
               sentAt: msg.sentDateTime ? new Date(msg.sentDateTime) : null,
               isOutbound: Boolean(ownerEmail) && fromEmail === ownerEmail,
-              entityType: target?.entityType ?? null,
-              entityId: target?.entityId ?? null,
+              entityType: target.entityType,
+              entityId: target.entityId,
               ...captureColumns(target),
             },
             update: {},

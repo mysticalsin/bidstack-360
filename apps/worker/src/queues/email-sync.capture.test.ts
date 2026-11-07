@@ -4,6 +4,7 @@ import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as CommsCapture from '../lib/comms-capture.js';
+import { resolveCaptureTarget } from '../lib/comms-capture.js';
 
 import { prisma } from '@bidstack/db';
 
@@ -134,6 +135,35 @@ describe('Outlook inbox capture', () => {
     );
   });
 
+  it('does not store mail that matches no contact, company or opportunity', async () => {
+    // One message per folder (inbox and sent items).
+    vi.mocked(resolveCaptureTarget).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'm-hr',
+              conversationId: 'conv-hr',
+              from: { emailAddress: { address: 'hr@amaris.com' } },
+              toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+              subject: 'Your pay slip',
+              receivedDateTime: '2026-11-06T14:00:00Z',
+              body: { contentType: 'text', content: 'Private' },
+            },
+          ],
+          '@odata.deltaLink': 'delta',
+        }),
+      ),
+    );
+
+    const result = await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
+
+    expect(result.persisted).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('looks the token up inside the job org only', async () => {
     findToken.mockResolvedValueOnce(null);
     const fetchMock = vi.fn();
@@ -200,6 +230,39 @@ describe('Gmail inbox capture', () => {
       expect.objectContaining({
         data: expect.objectContaining({ deltaState: { calendarSyncToken: 'keep', gmailHistoryId: '900' } }),
       }),
+    );
+  });
+
+  it('does not store mail that matches no contact, company or opportunity', async () => {
+    vi.mocked(resolveCaptureTarget).mockResolvedValueOnce(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '901' });
+        if (url.includes('/messages?')) return json({ messages: [{ id: 'g-hr', threadId: 't-hr' }] });
+        return json({
+          id: 'g-hr',
+          threadId: 't-hr',
+          internalDate: '1793973600000',
+          payload: {
+            mimeType: 'text/plain',
+            headers: [
+              { name: 'From', value: 'HR <hr@amaris.com>' },
+              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'Subject', value: 'Your pay slip' },
+            ],
+            body: { data: b64('Private') },
+          },
+        });
+      }),
+    );
+
+    const persisted = await pullGmail(tokenRow('gmail', {}), 'access-token', log);
+
+    expect(persisted).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(tokenUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '901' } }) }),
     );
   });
 

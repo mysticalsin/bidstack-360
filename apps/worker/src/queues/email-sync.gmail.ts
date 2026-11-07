@@ -179,6 +179,8 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
         ownerEmail,
         participants: [fromEmail, ...toEmails.map((a) => a.email), ...ccEmails.map((a) => a.email)],
       });
+      // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
+      if (!target) continue;
 
       await prisma.emailMessage.upsert({
         where: { orgId_externalMessageId: { orgId: token.orgId, externalMessageId: msg.id } },
@@ -198,8 +200,8 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
           receivedAt: isOutbound ? null : at,
           sentAt: isOutbound ? at : null,
           isOutbound,
-          entityType: target?.entityType ?? null,
-          entityId: target?.entityId ?? null,
+          entityType: target.entityType,
+          entityId: target.entityId,
           ...captureColumns(target),
         },
         update: {},

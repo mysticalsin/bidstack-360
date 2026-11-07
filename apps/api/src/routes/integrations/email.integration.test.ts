@@ -28,6 +28,7 @@ let orgId = '';
 let otherOrgId = '';
 let userId = '';
 let otherUserId = '';
+let colleagueId = '';
 let contactId = '';
 let restoreAuth: (() => void) | null = null;
 
@@ -68,6 +69,7 @@ beforeAll(async () => {
   userId = (await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' }, select: { id: true } }))!.id;
   otherUserId = (await prisma.user.findFirst({ where: { orgId: otherOrgId }, select: { id: true } }))!.id;
   contactId = (await prisma.contact.findFirst({ where: { orgId }, select: { id: true } }))!.id;
+  colleagueId = (await prisma.user.findFirst({ where: { orgId, id: { not: userId } }, select: { id: true } }))!.id;
 });
 
 afterAll(async () => {
@@ -108,6 +110,16 @@ describe('GET /email/messages', () => {
     expect(res.json<{ messages: Array<{ subject: string }> }>().messages.map((m) => m.subject)).toEqual(['filed']);
   });
 
+  it('hides a colleague\'s unfiled mail but shows mail filed on a CRM record', async () => {
+    await seedMessage({ user: colleagueId, subject: 'colleague private' });
+    await seedMessage({ user: colleagueId, contact: contactId, subject: 'colleague filed' });
+    await seedMessage({ subject: 'mine' });
+    const res = await server.inject({ method: 'GET', url: '/api/v1/email/messages' });
+    const body = res.json<{ messages: Array<{ subject: string }>; total: number }>();
+    expect(body.messages.map((m) => m.subject).sort()).toEqual(['colleague filed', 'mine']);
+    expect(body.total).toBe(2);
+  });
+
   it('rejects out-of-range pagination', async () => {
     for (const qs of ['limit=101', 'limit=0', 'page=0']) {
       const res = await server.inject({ method: 'GET', url: `/api/v1/email/messages?${qs}` });
@@ -125,6 +137,12 @@ describe('GET /email/threads/:threadId', () => {
     const body = res.json<{ messages: Array<{ subject: string; bodyHtml: string | null }> }>();
     expect(body.messages.map((m) => m.subject)).toEqual(['RFP questions', 'Re: RFP questions']);
     expect(body.messages[0]?.bodyHtml).toBe('<p>Hello</p>');
+  });
+
+  it('returns 404 for a colleague\'s unfiled thread', async () => {
+    await seedMessage({ user: colleagueId, thread: 'colleague-thread' });
+    const res = await server.inject({ method: 'GET', url: '/api/v1/email/threads/colleague-thread' });
+    expect(res.statusCode).toBe(404);
   });
 
   it('returns 404 for a thread that only exists in another org', async () => {

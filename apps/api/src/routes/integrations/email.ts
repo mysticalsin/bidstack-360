@@ -72,6 +72,19 @@ function toDraftDto(d: EmailDraft): EmailDraftDto {
   };
 }
 
+
+/** Unfiled mail stays private to the mailbox owner; filed mail is shared with the org. */
+function visibleTo(userId: string) {
+  return {
+    OR: [
+      { userId },
+      { entityId: { not: null } },
+      { contactId: { not: null } },
+      { companyId: { not: null } },
+      { opportunityId: { not: null } },
+    ],
+  };
+}
 export const emailRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
 
@@ -124,12 +137,13 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
       response: { 200: EmailListResponse },
     },
     handler: async (req, reply) => {
-      const { orgId } = req.auth;
+      const { orgId, userId } = req.auth;
       const { entityType, entityId, contactId, companyId, opportunityId, page, limit } = req.query;
 
       const where = {
         orgId,
         deletedAt: null,
+        ...visibleTo(userId),
         ...(entityType ? { entityType } : {}),
         ...(entityId ? { entityId } : {}),
         ...(contactId ? { contactId } : {}),
@@ -159,9 +173,9 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
       response: { 200: EmailThreadResponse },
     },
     handler: async (req, reply) => {
-      const { orgId } = req.auth;
+      const { orgId, userId } = req.auth;
       const messages = await prisma.emailMessage.findMany({
-        where: { orgId, threadId: req.params.threadId, deletedAt: null },
+        where: { orgId, threadId: req.params.threadId, deletedAt: null, ...visibleTo(userId) },
         orderBy: [{ receivedAt: 'asc' }, { sentAt: 'asc' }, { createdAt: 'asc' }],
         take: 200,
       });
