@@ -13,8 +13,9 @@ import { fixtureOpps } from './seed-data.js';
 const EM_DASH = '\u2014';
 
 describe('bid chart demo fixtures', () => {
-  it('display names carry no em dash', () => {
-    for (const o of [...fixtureOpps, ...fixtureClosedDeals]) expect(o.name).not.toContain(EM_DASH);
+  it('demo copy carries no em dash', () => {
+    const copy = [...demoWinLoss.map((r) => r.competitor ?? ''), ...demoActivities.map((a) => a.subject)];
+    for (const text of copy) expect(text).not.toContain(EM_DASH);
   });
 
   it('every closed deal has one win/loss record with a known reason and a positive cycle', () => {

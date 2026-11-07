@@ -16,16 +16,16 @@ export interface ClosedDealFixture {
 
 /** Closed deals across the last ten months for the enrichment-backed accounts. */
 export const fixtureClosedDeals: ClosedDealFixture[] = [
-  { code: 'OP-H01', customer: 'CI Financial', name: 'CI Financial: Cloud migration phase 1', stage: 'closed_won', value: 880_000, monthsAgo: 9, country: 'CA' },
-  { code: 'OP-H02', customer: 'CI Financial', name: 'CI Financial: Data platform pilot', stage: 'closed_won', value: 540_000, monthsAgo: 7, country: 'CA' },
-  { code: 'OP-H03', customer: 'CI Financial', name: 'CI Financial: Managed SOC RFP', stage: 'closed_lost', value: 1_200_000, monthsAgo: 6, country: 'CA' },
-  { code: 'OP-H04', customer: 'CI Financial', name: 'CI Financial: Endpoint security rollout', stage: 'closed_won', value: 720_000, monthsAgo: 4, country: 'CA' },
-  { code: 'OP-H05', customer: 'CI Financial', name: 'CI Financial: Zero Trust expansion', stage: 'closed_won', value: 1_350_000, monthsAgo: 2, country: 'CA' },
-  { code: 'OP-H06', customer: 'CI Financial', name: 'CI Financial: Legacy app retirement', stage: 'closed_lost', value: 300_000, monthsAgo: 1, country: 'CA' },
-  { code: 'OP-H07', customer: 'Rush University System for Health', name: 'Rush: EHR integration', stage: 'closed_won', value: 2_100_000, monthsAgo: 8, country: 'US' },
-  { code: 'OP-H08', customer: 'Rush University System for Health', name: 'Rush: Clinical analytics', stage: 'closed_won', value: 1_450_000, monthsAgo: 3, country: 'US' },
-  { code: 'OP-H09', customer: 'Mantu', name: 'Mantu: Internal tooling refresh', stage: 'closed_won', value: 410_000, monthsAgo: 5, country: 'FR' },
-  { code: 'OP-H10', customer: 'Mantu', name: 'Mantu: Workspace consolidation', stage: 'closed_lost', value: 260_000, monthsAgo: 2, country: 'FR' },
+  { code: 'OP-H01', customer: 'CI Financial', name: 'CI Financial — Cloud migration phase 1', stage: 'closed_won', value: 880_000, monthsAgo: 9, country: 'CA' },
+  { code: 'OP-H02', customer: 'CI Financial', name: 'CI Financial — Data platform pilot', stage: 'closed_won', value: 540_000, monthsAgo: 7, country: 'CA' },
+  { code: 'OP-H03', customer: 'CI Financial', name: 'CI Financial — Managed SOC RFP', stage: 'closed_lost', value: 1_200_000, monthsAgo: 6, country: 'CA' },
+  { code: 'OP-H04', customer: 'CI Financial', name: 'CI Financial — Endpoint security rollout', stage: 'closed_won', value: 720_000, monthsAgo: 4, country: 'CA' },
+  { code: 'OP-H05', customer: 'CI Financial', name: 'CI Financial — Zero Trust expansion', stage: 'closed_won', value: 1_350_000, monthsAgo: 2, country: 'CA' },
+  { code: 'OP-H06', customer: 'CI Financial', name: 'CI Financial — Legacy app retirement', stage: 'closed_lost', value: 300_000, monthsAgo: 1, country: 'CA' },
+  { code: 'OP-H07', customer: 'Rush University System for Health', name: 'Rush — EHR integration', stage: 'closed_won', value: 2_100_000, monthsAgo: 8, country: 'US' },
+  { code: 'OP-H08', customer: 'Rush University System for Health', name: 'Rush — Clinical analytics', stage: 'closed_won', value: 1_450_000, monthsAgo: 3, country: 'US' },
+  { code: 'OP-H09', customer: 'Mantu', name: 'Mantu — Internal tooling refresh', stage: 'closed_won', value: 410_000, monthsAgo: 5, country: 'FR' },
+  { code: 'OP-H10', customer: 'Mantu', name: 'Mantu — Workspace consolidation', stage: 'closed_lost', value: 260_000, monthsAgo: 2, country: 'FR' },
 ];
 
 export interface WinLossFixture {
