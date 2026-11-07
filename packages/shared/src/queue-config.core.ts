@@ -150,6 +150,29 @@ export type AccountEnrichmentJob =
   // search). Only enqueued by an admin; never swept.
   | OrgChartSeedJob;
 
+/**
+ * Account intelligence (slice 12): job boards, company posts, registries and
+ * filings per account.
+ *   'account-intel.refresh'          refresh chosen sources for one account
+ *   'account-intel.sweep'            repeatable, only when ACCOUNT_INTEL_AUTO_REFRESH=true
+ *   'account-intel.financials-scan'  repeatable filings scan unless FINANCIALS_SCAN_ENABLED=false
+ */
+export const ACCOUNT_INTEL: QueueConfig = {
+  name: 'account-intel',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the account-intel queue. */
+export type AccountIntelQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; sources: Array<'hiring' | 'posts' | 'financials' | 'registry'>; requestedBy?: string | null }
+  | { kind: 'sweep' }
+  | { kind: 'financials-scan' };
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;

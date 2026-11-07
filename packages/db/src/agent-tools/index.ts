@@ -2,6 +2,12 @@
 // (apps/mcp-server/src/tools) and by Jarvis (apps/api, ai-assistant jarvis
 // routes). Handlers are org-scoped by ctx.orgId; callers own authentication
 // and authorization (MCP: API-key scope; Jarvis: user RBAC via `permission`).
+import {
+  accountDirection,
+  accountFinancialsSummary,
+  accountHiring,
+  accountNews,
+} from './account-intel.js';
 import { bidsOverdue, proposalSectionDraft, proposalStatus } from './bids.js';
 import { opportunitiesGet, opportunitiesList, opportunityUpdate } from './opportunities.js';
 import { accountUpdates, recordsResolve } from './records.js';
@@ -20,6 +26,10 @@ export const agentTools = {
   'tasks.create': tasksCreate,
   'opportunity.update': opportunityUpdate,
   'proposal.section_draft': proposalSectionDraft,
+  account_direction: accountDirection,
+  account_hiring: accountHiring,
+  account_financials_summary: accountFinancialsSummary,
+  account_news: accountNews,
 } as const satisfies Record<string, AgentTool>;
 
 export type AgentToolName = keyof typeof agentTools;
@@ -27,6 +37,10 @@ export type AgentToolName = keyof typeof agentTools;
 export const AGENT_TOOL_NAMES = Object.keys(agentTools) as AgentToolName[];
 
 export {
+  accountDirection,
+  accountFinancialsSummary,
+  accountHiring,
+  accountNews,
   accountUpdates,
   bidsOverdue,
   opportunitiesGet,
