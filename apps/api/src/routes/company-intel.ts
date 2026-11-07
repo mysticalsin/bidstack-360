@@ -12,7 +12,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { type Prisma, loadCompanyIntel, prisma, readCompanyIntelSummaries, readImportBatches } from '@bidstack/db';
+import {
+  type Prisma,
+  loadCompanyIntel,
+  prisma,
+  readCompanyIntelSummaries,
+  readImportBatches,
+} from '@bidstack/db';
 import {
   AccountDirection,
   AccountFinancialsIntel,
@@ -42,11 +48,26 @@ function shouldAuditRead(key: string, now = Date.now()): boolean {
   lastReadAudit.set(key, now);
   return true;
 }
-const READ = { permission: 'account-intel:read' as const, rateLimit: { max: 60, timeWindow: '1 minute' } };
+const READ = {
+  permission: 'account-intel:read' as const,
+  rateLimit: { max: 60, timeWindow: '1 minute' },
+};
 
-async function audit(req: FastifyRequest, action: string, targetId: string, diff: Record<string, unknown> = {}): Promise<void> {
+async function audit(
+  req: FastifyRequest,
+  action: string,
+  targetId: string,
+  diff: Record<string, unknown> = {},
+): Promise<void> {
   await prisma.auditLog.create({
-    data: { orgId: req.auth.orgId, userId: req.auth.userId, action, targetType: 'company', targetId, diff: diff as Prisma.InputJsonValue },
+    data: {
+      orgId: req.auth.orgId,
+      userId: req.auth.userId,
+      action,
+      targetType: 'company',
+      targetId,
+      diff: diff as Prisma.InputJsonValue,
+    },
   });
 }
 
@@ -68,7 +89,8 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     if (!company) throw server.httpErrors.notFound('Company not found');
     const snapshot = await loadCompanyIntel(prisma, req.auth.orgId, company.id, new Date());
     if (!snapshot) throw server.httpErrors.notFound('Company not found');
-    if (shouldAuditRead(`${req.auth.orgId}:${req.auth.userId}:${company.id}:${view}`)) await audit(req, `intel.${view}.view`, company.id);
+    if (shouldAuditRead(`${req.auth.orgId}:${req.auth.userId}:${company.id}:${view}`))
+      await audit(req, `intel.${view}.view`, company.id);
     return composeAccountIntel(snapshot);
   }
 
@@ -115,9 +137,16 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         create: { orgId, companyId: company.id, source, status: 'queued' },
         update: { status: 'queued' },
       });
-      const jobId = await enqueueAccountIntel({ kind: 'refresh', orgId, companyId: company.id, sources: [source], requestedBy: req.auth.userId });
+      const jobId = await enqueueAccountIntel({
+        kind: 'refresh',
+        orgId,
+        companyId: company.id,
+        sources: [source],
+        requestedBy: req.auth.userId,
+      });
       if (!jobId) {
-        if (before) await prisma.intelSourceRun.update({ where: key, data: { status: before.status } });
+        if (before)
+          await prisma.intelSourceRun.update({ where: key, data: { status: before.status } });
         else await prisma.intelSourceRun.delete({ where: key });
       }
       const shown = jobId ? row : before;
@@ -132,7 +161,12 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           label: INTEL_SOURCE_LABEL[source],
           status: (shown?.status as IntelSourceStatus['status'] | undefined) ?? 'never',
           lastFetchedAt: shown?.lastFetchedAt?.toISOString() ?? null,
-          result: { new: result.new ?? 0, updated: result.updated ?? 0, skipped: result.skipped ?? 0, failed: result.failed ?? 0 },
+          result: {
+            new: result.new ?? 0,
+            updated: result.updated ?? 0,
+            skipped: result.skipped ?? 0,
+            failed: result.failed ?? 0,
+          },
           detail: shown?.detail ?? null,
         },
       };
@@ -141,7 +175,13 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/companies/:id/intel/summary',
-    { config: READ, schema: { params: idParam, response: { 200: z.object({ summary: CompanyIntelSummary.nullable() }) } } },
+    {
+      config: READ,
+      schema: {
+        params: idParam,
+        response: { 200: z.object({ summary: CompanyIntelSummary.nullable() }) },
+      },
+    },
     async (req) => {
       const company = await loadCompany(req, req.params.id);
       if (!company) throw server.httpErrors.notFound('Company not found');
@@ -154,12 +194,23 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/:id/intel/refresh-all',
     {
       config: { permission: 'account-intel:write', rateLimit: { max: 10, timeWindow: '1 minute' } },
-      schema: { params: idParam, response: { 202: z.object({ queued: z.boolean() }) } },
+      schema: {
+        params: idParam,
+        body: z.object({}).strict().nullish(),
+        response: { 202: z.object({ queued: z.boolean() }) },
+      },
     },
     async (req, reply) => {
       const company = await loadCompany(req, req.params.id);
       if (!company) throw server.httpErrors.notFound('Company not found');
-      const jobId = await enqueueCompanyFullRefresh({ kind: 'full-refresh', orgId: req.auth.orgId, companyId: company.id, batchId: null, force: true, requestedBy: req.auth.userId });
+      const jobId = await enqueueCompanyFullRefresh({
+        kind: 'full-refresh',
+        orgId: req.auth.orgId,
+        companyId: company.id,
+        batchId: null,
+        force: true,
+        requestedBy: req.auth.userId,
+      });
       await audit(req, 'intel.refresh_all', company.id, { queued: jobId !== null });
       reply.code(202);
       return { queued: jobId !== null };
@@ -168,7 +219,15 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/companies/intel-imports',
-    { config: READ, schema: { response: { 200: z.object({ items: z.array(IntelImportBatchView) }) } } },
-    async (req) => ({ items: await readImportBatches(prisma, req.auth.orgId, { since: new Date(Date.now() - IMPORT_BATCH_WINDOW_MS), limit: 5 }) }),
+    {
+      config: READ,
+      schema: { response: { 200: z.object({ items: z.array(IntelImportBatchView) }) } },
+    },
+    async (req) => ({
+      items: await readImportBatches(prisma, req.auth.orgId, {
+        since: new Date(Date.now() - IMPORT_BATCH_WINDOW_MS),
+        limit: 5,
+      }),
+    }),
   );
 };
