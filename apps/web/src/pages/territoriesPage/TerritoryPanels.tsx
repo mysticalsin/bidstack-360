@@ -514,7 +514,7 @@ export function RoutingRuleListPanel({
                           </span>
                         )}
                         {criteria.countryCode ? (
-                          <span className="inline-flex items-center rounded-full bg-[var(--brand-primary-tint)] px-1.5 py-0.5 text-xs font-bold text-[var(--brand-primary)] tracking-wide uppercase">
+                          <span className="inline-flex items-center rounded-full bg-[var(--brand-primary-tint)] px-1.5 py-0.5 text-xs font-bold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] tracking-wide uppercase">
                             {String(criteria.countryCode)}
                           </span>
                         ) : null}

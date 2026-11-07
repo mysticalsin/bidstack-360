@@ -605,6 +605,20 @@ describe('account technical stack', () => {
     });
     expect(leaked.statusCode).toBe(404);
   });
+
+  skipIfNoDb('a name shared by two companies (case aside) is ambiguous and does not resolve', async () => {
+    await prisma.company.createMany({
+      data: [
+        { orgId: orgA!.orgId, name: `Twin Co ${tag}` },
+        { orgId: orgA!.orgId, name: `TWIN CO ${tag}` },
+      ],
+    });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/crm/companies/${encodeURIComponent(`twin co ${tag}`)}/technical-stack`,
+    });
+    expect(res.statusCode).toBe(404);
+  });
 });
 
 describe('search', () => {
