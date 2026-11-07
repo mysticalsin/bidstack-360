@@ -119,7 +119,7 @@ function toFirmographics(companyId: string, row: Row | null, openJobs: number, n
 
 const Posting = z.object({
   id: z.string(),
-  source: EnrichmentProviderId,
+  source: z.string(),
   title: z.string(),
   url: z.string().nullable(),
   city: z.string().nullable(),
@@ -216,7 +216,7 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
         postingsTotal: total,
         postings: rows.map((p) => ({
           id: p.id,
-          source: p.source as EnrichmentProviderId,
+          source: p.source,
           title: p.title,
           url: p.url,
           city: p.city,

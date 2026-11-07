@@ -74,7 +74,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(oppId ? { oppId } : {}),
           ...(status ? { status } : {}),
         },
-        include: { assignee: true },
+        include: { assignee: { select: { email: true } } },
         orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),

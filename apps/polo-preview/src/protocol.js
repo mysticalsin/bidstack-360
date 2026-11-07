@@ -75,7 +75,7 @@ export function filterCookieHeader(cookie) {
     .map((part) => part.trim())
     .filter((part) => {
       const name = part.split('=')[0]?.trim().toLowerCase() ?? '';
-      return name.length > 0 && !name.startsWith('cf_');
+      return name.length > 0 && !name.startsWith('cf_') && name !== 'polo_session';
     });
   return kept.length > 0 ? kept.join('; ') : null;
 }

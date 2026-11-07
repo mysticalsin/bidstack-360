@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, Sparkles } from 'lucide-react';
@@ -27,41 +27,160 @@ const VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
 const LINKEDIN_URL = 'https://www.linkedin.com/in/tonywalteur/';
 
+// The polo-preview Worker answers /__auth/*. Anywhere else (plain Vercel, local
+// preview) the SPA fallback returns HTML, so only a JSON answer counts.
+type Gate = { kind: 'signed-in'; email: string } | { kind: 'otp' } | { kind: 'none' };
+
+async function readGate(signal: AbortSignal): Promise<Gate> {
+  try {
+    const res = await fetch('/__auth/me', {
+      credentials: 'same-origin',
+      headers: { accept: 'application/json' },
+      signal,
+    });
+    if (!(res.headers.get('content-type') ?? '').includes('application/json')) return { kind: 'none' };
+    const body = (await res.json()) as { email?: unknown; otp?: unknown };
+    if (res.ok && typeof body.email === 'string' && body.email) return { kind: 'signed-in', email: body.email };
+    if (res.status === 401 && body.otp === true) return { kind: 'otp' };
+  } catch {
+    /* offline, aborted or not behind the Worker */
+  }
+  return { kind: 'none' };
+}
+
+async function postAuth(path: string, body: Record<string, string>) {
+  const res = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { retryAfterSeconds?: number };
+  return { status: res.status, data };
+}
+
+type Step = 'checking' | 'email' | 'code' | 'entering';
+
 export function DemoSignIn() {
   const navigate = useNavigate();
   const { signIn } = useSignInAction();
   const reduceMotion = useReducedMotion();
   const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [otp, setOtp] = useState(false);
+  const [step, setStep] = useState<Step>('checking');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const enter = useCallback(
+    async (address: string) => {
+      setError(null);
+      setLoading(true);
+      try {
+        const res = await api<DemoSessionResponse>('/api/v1/demo/session', {
+          method: 'POST',
+          body: { email: address },
+        });
+        localStorage.setItem(DEMO_TOKEN_KEY, res.token);
+        localStorage.setItem(DEMO_EMAIL_KEY, res.email);
+        localStorage.setItem('bidstack:session', 'demo');
+        signIn(() => navigate('/dashboard', { replace: true }));
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : t(
+                'demoSignIn.error.generic',
+                'Could not start the demo. Please try again in a moment.',
+              ),
+        );
+        setLoading(false);
+        setStep('email');
+      }
+    },
+    [navigate, signIn, t],
+  );
+
+  const enterRef = useRef(enter);
+  useEffect(() => {
+    enterRef.current = enter;
+  }, [enter]);
+
+  // Already verified by Cloudflare (Access session or a Polo code): no second sign-in.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 2500);
+    void readGate(ctrl.signal).then((gate) => {
+      window.clearTimeout(timer);
+      if (ctrl.signal.aborted && gate.kind === 'none') {
+        setStep('email');
+        return;
+      }
+      if (gate.kind === 'signed-in') {
+        setEmail(gate.email);
+        setStep('entering');
+        void enterRef.current(gate.email);
+        return;
+      }
+      setOtp(gate.kind === 'otp');
+      setStep('email');
+    });
+    return () => {
+      window.clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, []);
+
+  async function requestCode() {
+    const res = await postAuth('/__auth/code', { email: email.trim() });
+    if (res.status === 202) {
+      setCode('');
+      setStep('code');
+      return;
+    }
+    setError(
+      res.status === 429
+        ? t('demoSignIn.error.slowDown', 'Wait {{s}} s before asking for a new code.', {
+            s: res.data.retryAfterSeconds ?? 60,
+          })
+        : res.status === 400
+          ? t('demoSignIn.error.email', 'Enter a valid email.')
+          : t('demoSignIn.error.send', 'Could not send the code. Try again in a moment.'),
+    );
+  }
+
+  async function verifyCode() {
+    const res = await postAuth('/__auth/verify', { email: email.trim(), code: code.trim() });
+    if (res.status === 200) {
+      setStep('entering');
+      await enter(email.trim());
+      return;
+    }
+    setError(t('demoSignIn.error.code', 'That code is wrong or expired.'));
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (loading || email.trim().length === 0) return;
+    if (!otp) {
+      await enter(email.trim());
+      return;
+    }
+    if (step === 'code' && code.trim().length === 0) return;
     setError(null);
     setLoading(true);
     try {
-      const res = await api<DemoSessionResponse>('/api/v1/demo/session', {
-        method: 'POST',
-        body: { email: email.trim() },
-      });
-      localStorage.setItem(DEMO_TOKEN_KEY, res.token);
-      localStorage.setItem(DEMO_EMAIL_KEY, res.email);
-      localStorage.setItem('bidstack:session', 'demo');
-      signIn(() => navigate('/dashboard', { replace: true }));
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : t(
-              'demoSignIn.error.generic',
-              'Could not start the demo. Please try again in a moment.',
-            ),
-      );
+      await (step === 'code' ? verifyCode() : requestCode());
+    } catch {
+      setError(t('demoSignIn.error.send', 'Could not send the code. Try again in a moment.'));
+    } finally {
       setLoading(false);
     }
   }
+
+  const codeStep = otp && step === 'code';
+  const busy = loading || step === 'entering';
 
   const fade = reduceMotion
     ? {}
@@ -146,40 +265,97 @@ export function DemoSignIn() {
               transition={{ duration: 0.6, delay: 0.15 }}
               onSubmit={onSubmit}
               noValidate
+              aria-busy={step === 'checking' || busy}
               className="w-full max-w-md rounded-2xl bg-white/75 p-2 shadow-[0_8px_40px_rgba(30,50,90,0.14)] ring-1 ring-white/60 backdrop-blur-xl sm:flex sm:items-center sm:gap-2"
             >
-              <label htmlFor="demo-email" className="sr-only">
-                {t('demoSignIn.emailLabel', 'Work email')}
-              </label>
-              <input
-                id="demo-email"
-                type="email"
-                required
-                autoFocus
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('demoSignIn.emailPlaceholder', 'you@company.com')}
-                disabled={loading}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? 'demo-error' : undefined}
-                className="h-12 w-full rounded-xl bg-transparent px-4 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-60 sm:flex-1"
-              />
-              <button
-                type="submit"
-                disabled={loading || email.trim().length === 0}
-                className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] px-6 font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-auto"
-              >
-                {loading ? (
-                  t('demoSignIn.submitLoading', 'Setting up…')
-                ) : (
-                  <>
-                    {t('demoSignIn.submit', 'Enter the demo')}
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </>
-                )}
-              </button>
+              {step === 'checking' || step === 'entering' ? (
+                <p
+                  role="status"
+                  className="flex h-12 w-full items-center justify-center gap-2 px-4 text-[15px] text-slate-700"
+                >
+                  {step === 'entering'
+                    ? t('demoSignIn.signingIn', 'Signing in as {{email}}…', { email })
+                    : t('demoSignIn.checking', 'Checking your session…')}
+                </p>
+              ) : codeStep ? (
+                <>
+                  <label htmlFor="demo-code" className="sr-only">
+                    {t('demoSignIn.codeLabel', 'Sign-in code sent to {{email}}', { email })}
+                  </label>
+                  <input
+                    id="demo-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    required
+                    autoFocus
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder={t('demoSignIn.codePlaceholder', '6-digit code')}
+                    disabled={busy}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? 'demo-error' : undefined}
+                    className="h-12 w-full rounded-xl bg-transparent px-4 text-center font-mono text-[18px] tracking-[0.3em] text-slate-900 placeholder:font-sans placeholder:text-[15px] placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none disabled:opacity-60 sm:flex-1"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy || code.length !== 6}
+                    className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] px-6 font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-auto"
+                  >
+                    {busy ? t('demoSignIn.submitLoading', 'Setting up…') : t('demoSignIn.verify', 'Sign in')}
+                    {busy ? null : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <label htmlFor="demo-email" className="sr-only">
+                    {t('demoSignIn.emailLabel', 'Work email')}
+                  </label>
+                  <input
+                    id="demo-email"
+                    type="email"
+                    required
+                    autoFocus
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t('demoSignIn.emailPlaceholder', 'you@company.com')}
+                    disabled={busy}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? 'demo-error' : undefined}
+                    className="h-12 w-full rounded-xl bg-transparent px-4 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-60 sm:flex-1"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy || email.trim().length === 0}
+                    className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] px-6 font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-auto"
+                  >
+                    {busy ? (
+                      t('demoSignIn.submitLoading', 'Setting up…')
+                    ) : (
+                      <>
+                        {otp ? t('demoSignIn.sendCode', 'Email me a code') : t('demoSignIn.submit', 'Enter the demo')}
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </motion.form>
+
+            {codeStep ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setStep('email');
+                }}
+                className="mt-3 text-sm font-medium text-slate-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50"
+              >
+                {t('demoSignIn.changeEmail', 'Use a different email')}
+              </button>
+            ) : null}
 
             {error ? (
               <p id="demo-error" role="alert" className="mt-3 text-sm font-medium text-red-600">
