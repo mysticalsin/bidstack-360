@@ -403,7 +403,7 @@ function CrewsSection({
           />
         </div>
       ) : (
-        <ul className="divide-y divide-[var(--border-subtle)]">
+        <ul data-fab-clear className="divide-y divide-[var(--border-subtle)]">
           {crews.data?.items.map((c) => (
             <li key={c.id}>
               <div className="flex items-center justify-between gap-3 px-4 py-3">
