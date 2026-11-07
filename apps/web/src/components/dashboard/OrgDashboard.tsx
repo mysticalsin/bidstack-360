@@ -217,7 +217,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
         transition={springSoft}
       >
         <div>
-          <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">{greeting}</div>
+          <div className="text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] mb-1">{greeting}</div>
           <div className="flex items-center gap-3">
             <PoloPreSalesLogo variant="mark" className="h-8 w-8 shrink-0" />
             <h1 className="page-title">{t('orgDashboard.pageTitle', 'Dashboard')}</h1>

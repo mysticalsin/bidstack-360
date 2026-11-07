@@ -141,8 +141,8 @@ export const Row = memo(function Row({
         </label>
       </td>
 
-      <td className="px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
-        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)]">
+      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
+        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]">
           {opp.code}
         </Link>
       </td>
@@ -150,14 +150,14 @@ export const Row = memo(function Row({
       <td className="px-5 py-3">
         <Link
           to={`/opportunities/${opp.id}`}
-          className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
+          className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
         >
           {opp.name}
         </Link>
         {opp.bidClass ? (
           <Badge
             tone={ROW_BID_CLASS_TONE[opp.bidClass] ?? 'gray'}
-            className="ml-2 align-middle text-[10px]"
+            className="ml-2 align-middle text-xs"
           >
             {opp.bidClass}
           </Badge>
@@ -286,7 +286,7 @@ export const Row = memo(function Row({
         {/* Editable date stays on DateCell; DueDateChip adds the urgency
             signal a bare date never carried — deadline slippage is the #1
             preventable bid loss. */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           <DateCell
             value={opp.dueDate}
             format={(v) => formatDate(v)}

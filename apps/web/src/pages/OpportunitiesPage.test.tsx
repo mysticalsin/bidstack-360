@@ -166,6 +166,15 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByRole('heading', { name: /Opportunities/i })).toBeTruthy();
     expect(screen.getByText('Acme Upgrade')).toBeTruthy();
     expect(screen.getByText('OP-0001')).toBeTruthy();
+    // Codes, due dates and the urgency chip read as one token each; wrapping
+    // them splits "OP-" from its number and stacks the chip on two lines.
+    expect(screen.getByText('OP-0001').closest('td')?.className).toContain('whitespace-nowrap');
+    expect(
+      within(screen.getByRole('table'))
+        .getByText(/overdue|left|Due today/)
+        .closest('td')
+        ?.querySelector('div')?.className,
+    ).toContain('whitespace-nowrap');
   });
 
   // A1 (bid clock): the "Due ≤ 7d" quick filter must actually reach the API
@@ -225,9 +234,9 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByText('No open bids yet')).toBeTruthy();
     expect(screen.getByText(/Convert a qualified lead or log the RFP/)).toBeTruthy();
     // Secondary path must land on the real CSV import wizard in Settings.
-    expect(
-      screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href'),
-    ).toBe('/settings?tab=data-import');
+    expect(screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href')).toBe(
+      '/settings?tab=data-import',
+    );
   });
 });
 

@@ -57,7 +57,7 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
                       })}
                     </div>
                   </div>
-                  <span className="text-[10px] font-medium text-[var(--fg-tertiary)]">
+                  <span className="text-xs font-medium text-[var(--fg-tertiary)]">
                     {d.period}
                   </span>
                 </div>
