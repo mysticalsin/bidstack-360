@@ -1,22 +1,16 @@
--- Append-only, hash-chained audit log (expand only).
--- New nullable columns; rows written before this migration stay unchained
--- (chain_seq NULL) and are skipped by verification. Every insert from any
+-- Hash-chained audit log, step 3 of 3 (expand only). Every insert from any
 -- writer (api, worker, mcp-server, raw SQL) is chained by the trigger, so no
--- application code sets these columns.
+-- application code sets the chain columns.
 --
 -- Rollback without data loss: DROP TRIGGER audit_log_chain / audit_log_append_only
--- ON audit_log; the columns can stay (contract step only after sign-off).
-
-ALTER TABLE "audit_log" ADD COLUMN "chain_seq" BIGINT,
-ADD COLUMN "prev_hash" VARCHAR(64),
-ADD COLUMN "row_hash" VARCHAR(64);
-
-CREATE UNIQUE INDEX "audit_log_org_chain_seq_key" ON "audit_log"("org_id", "chain_seq");
+-- / audit_log_no_truncate ON audit_log; the columns can stay (contract step
+-- only after sign-off).
 
 -- user_id is excluded from the digest: its FK is ON DELETE SET NULL and GDPR
 -- erasure must be able to null it without breaking the chain. The actor is
 -- still captured in diff by the writers. deleted_at is excluded for the same
--- reason (soft delete).
+-- reason (soft delete). Fields are encoded as a JSON array so no value can
+-- shift a field boundary (unlike a delimiter join).
 CREATE OR REPLACE FUNCTION audit_log_row_digest(prev TEXT, r "audit_log")
 RETURNS VARCHAR(64)
 LANGUAGE sql
@@ -25,17 +19,16 @@ AS $$
   SELECT encode(
     sha256(
       convert_to(
-        concat_ws(
-          '|',
+        jsonb_build_array(
           prev,
           r.org_id::text,
           r.chain_seq::text,
           r.action,
-          coalesce(r.target_type, ''),
-          coalesce(r.target_id, ''),
-          coalesce(r.diff::text, ''),
+          r.target_type,
+          r.target_id,
+          r.diff,
           to_char(r.at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-        ),
+        )::text,
         'UTF8'
       )
     ),

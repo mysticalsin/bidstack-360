@@ -7,15 +7,19 @@
  * and marks them dispatched. (orgId, idempotencyKey) is unique: replaying the
  * same logical event (client retry, double submit) records it once.
  *
- * Claiming moves next_attempt_at forward by the backoff for that attempt, so a
- * relay that crashes mid-batch leaves rows that become due again on their own
- * (a lease), and concurrent relays never claim the same row (SKIP LOCKED).
+ * Claiming takes a lease: next_attempt_at moves CLAIM_LEASE_MS ahead, so
+ * concurrent relays never claim the same row (SKIP LOCKED) and a relay that
+ * crashes mid-batch leaves rows that become due again once the lease expires.
+ * A recorded failure replaces the lease with the exponential backoff. A row
+ * that spends its attempt budget, by failures or by crashed relays, is
+ * dead-lettered (status 'dead', kept for inspection, never claimed again).
  */
 import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 export const WEBHOOK_OUTBOX_MAX_ATTEMPTS = 8;
 const BASE_BACKOFF_MS = 5_000;
 const MAX_BACKOFF_MS = 15 * 60_000;
+const CLAIM_LEASE_MS = 60_000;
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -28,7 +32,7 @@ export type WebhookOutboxRow = {
   createdAt: Date;
 };
 
-/** Delay before attempt `attempt + 1`, after `attempt` claims (1-based). */
+/** Delay before the next try after failed attempt number `attempt` (1-based). */
 export function webhookOutboxBackoffMs(attempt: number): number {
   const exp = BASE_BACKOFF_MS * 2 ** Math.max(0, attempt - 1);
   return Math.min(exp, MAX_BACKOFF_MS);
@@ -59,6 +63,14 @@ export async function claimWebhookOutboxBatch(
   db: Db,
   limit: number,
 ): Promise<WebhookOutboxRow[]> {
+  // Rows whose lease expired with the budget spent were held by relays that
+  // crashed every time; stop retrying them.
+  await db.$executeRaw`
+    UPDATE webhook_outbox
+       SET status = 'dead', last_error = coalesce(last_error, 'relay lease expired')
+     WHERE status = 'pending'
+       AND attempts >= ${WEBHOOK_OUTBOX_MAX_ATTEMPTS}
+       AND next_attempt_at <= now()`;
   const rows = await db.$queryRaw<
     Array<{
       id: string;
@@ -71,16 +83,16 @@ export async function claimWebhookOutboxBatch(
   >`
     WITH due AS (
       SELECT id FROM webhook_outbox
-       WHERE status = 'pending' AND next_attempt_at <= now()
+       WHERE status = 'pending'
+         AND attempts < ${WEBHOOK_OUTBOX_MAX_ATTEMPTS}
+         AND next_attempt_at <= now()
        ORDER BY next_attempt_at
        LIMIT ${limit}
        FOR UPDATE SKIP LOCKED
     )
     UPDATE webhook_outbox o
        SET attempts = o.attempts + 1,
-           next_attempt_at = now() + make_interval(secs => least(
-             ${BASE_BACKOFF_MS / 1000}::float8 * power(2, o.attempts),
-             ${MAX_BACKOFF_MS / 1000}::float8))
+           next_attempt_at = now() + make_interval(secs => ${CLAIM_LEASE_MS / 1000}::float8)
       FROM due
      WHERE o.id = due.id
     RETURNING o.id, o.org_id, o.event, o.payload, o.attempts, o.created_at`;
@@ -98,7 +110,7 @@ export async function markWebhookOutboxDispatched(db: Db, id: string): Promise<v
   await db.$executeRaw`
     UPDATE webhook_outbox
        SET status = 'dispatched', dispatched_at = now(), last_error = NULL
-     WHERE id = ${id}::uuid`;
+     WHERE id = ${id}::uuid AND status = 'pending'`;
 }
 
 /** Records a failed relay attempt; dead-letters after the max attempts. */
@@ -110,9 +122,12 @@ export async function markWebhookOutboxFailed(
   const rows = await db.$queryRaw<Array<{ status: string }>>`
     UPDATE webhook_outbox
        SET last_error = ${error.slice(0, 1000)},
+           next_attempt_at = now() + make_interval(secs => least(
+             ${BASE_BACKOFF_MS / 1000}::float8 * power(2, greatest(attempts - 1, 0)),
+             ${MAX_BACKOFF_MS / 1000}::float8)),
            status = CASE WHEN attempts >= ${WEBHOOK_OUTBOX_MAX_ATTEMPTS}
                          THEN 'dead'::webhook_outbox_status ELSE status END
-     WHERE id = ${id}::uuid
+     WHERE id = ${id}::uuid AND status = 'pending'
     RETURNING status::text`;
   return rows[0]?.status === 'dead' ? 'dead' : 'retry';
 }

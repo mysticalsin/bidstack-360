@@ -5,16 +5,18 @@
  * rows from webhook_outbox and fans each out to the existing webhook.delivery
  * queue, which owns HTTP delivery, signing and its own retry policy.
  *
- * Exactly-once fan-out per row and subscription: every delivery job gets the
+ * At-least-once fan-out, deduped downstream: every delivery job gets the
  * deterministic jobId outbox_<rowId>_<subscriptionId>, so a relay that crashes
  * after enqueueing but before marking the row dispatched re-adds the same ids
- * and BullMQ drops the duplicates. eventTimestamp is the row's createdAt, so a
- * re-relayed event signs identically.
+ * and BullMQ drops the duplicates while it still retains the earlier job. The
+ * delivery worker derives the event id from the job id and eventTimestamp is
+ * the row's createdAt, so a re-relayed event signs identically and partners
+ * can dedupe on the event id.
  *
- * Failure handling: claiming already moved next_attempt_at forward by the
- * exponential backoff (packages/db webhook-outbox.ts), so a failed enqueue just
- * records the error; after WEBHOOK_OUTBOX_MAX_ATTEMPTS the row is dead-lettered
- * (status 'dead', kept for inspection, never retried).
+ * Failure handling: a failed enqueue is recorded and the row retried after the
+ * exponential backoff (packages/db webhook-outbox.ts); after
+ * WEBHOOK_OUTBOX_MAX_ATTEMPTS the row is dead-lettered (status 'dead', kept for
+ * inspection, never retried).
  *
  * Started only when WEBHOOK_OUTBOX_ENABLED=true, the same flag that makes the
  * API write to the outbox.
