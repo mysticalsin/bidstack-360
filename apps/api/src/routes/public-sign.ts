@@ -7,7 +7,8 @@
  *
  * Security:
  *   - Token is a 256-bit random hex string — unguessable.
- *   - Rate-limited aggressively: 10 attempts per IP per hour.
+ *   - Rate-limited per IP: 30 reads per minute, 10 submissions per hour
+ *     (PUBLIC_SIGN_RATE_LIMIT_MAX overrides the submission cap).
  *   - Submitter IP + user-agent captured for audit trail.
  *   - No orgId, no auth — the token is the sole credential.
  *   - No PII in logs (recipient email not logged).
@@ -34,7 +35,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/sign/:token',
     {
-      config: { public: true, rateLimit: { max: 60, timeWindow: '1 minute' } },
+      config: { public: true, rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         response: {
